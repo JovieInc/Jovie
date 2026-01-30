@@ -24,7 +24,7 @@ export function BulkDeleteCreatorDialog({
   count,
   onOpenChange,
   onConfirm,
-}: BulkDeleteCreatorDialogProps) {
+}: Readonly<BulkDeleteCreatorDialogProps>) {
   const handleCancel = () => {
     onOpenChange(false);
   };

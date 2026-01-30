@@ -18,7 +18,7 @@ export function CreatorVerificationToggleButton({
   profile,
   status,
   onToggle,
-}: CreatorVerificationToggleButtonProps) {
+}: Readonly<CreatorVerificationToggleButtonProps>) {
   const isSuccess = status === 'success';
   const isError = status === 'error';
   const label = profile.isVerified ? 'Unverify' : 'Verify';

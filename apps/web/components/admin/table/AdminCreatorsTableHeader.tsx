@@ -41,7 +41,7 @@ export function AdminCreatorsTableHeader({
   onToggleSelectAll,
   onSortChange,
   headerActions,
-}: AdminCreatorsTableHeaderProps) {
+}: Readonly<AdminCreatorsTableHeaderProps>) {
   const headerCellClass = cn(
     'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'

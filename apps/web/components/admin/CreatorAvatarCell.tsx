@@ -25,7 +25,7 @@ export function CreatorAvatarCell({
   avatarUrl,
   verified = false,
   isFeatured = false,
-}: CreatorAvatarCellProps) {
+}: Readonly<CreatorAvatarCellProps>) {
   const notifications = useNotifications();
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null

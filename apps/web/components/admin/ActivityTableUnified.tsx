@@ -76,7 +76,9 @@ const getRowClassName = () => 'group hover:bg-surface-2/50';
 
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
-export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
+export function ActivityTableUnified({
+  items,
+}: Readonly<ActivityTableUnifiedProps>) {
   // Define table columns using TanStack Table
   const columns = useMemo<ColumnDef<AdminActivityItem, any>[]>(
     () => [

@@ -27,7 +27,7 @@ export interface ImpersonationBannerProps {
 export function ImpersonationBanner({
   onEnd,
   className = '',
-}: ImpersonationBannerProps) {
+}: Readonly<ImpersonationBannerProps>) {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [minimized, setMinimized] = useState(false);
 
@@ -86,7 +86,7 @@ export function ImpersonationBanner({
       onSuccess: () => {
         onEnd?.();
         // Reload page to clear any cached user state
-        window.location.reload();
+        globalThis.location.reload();
       },
     });
   };

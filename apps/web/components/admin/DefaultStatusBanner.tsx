@@ -26,7 +26,7 @@ export function DefaultStatusBanner({
   mrrGrowth30dUsd,
   stripeAvailability,
   mercuryAvailability,
-}: DefaultStatusBannerProps) {
+}: Readonly<DefaultStatusBannerProps>) {
   // Determine if we can actually show a meaningful status
   const canCalculateStatus =
     stripeAvailability?.isAvailable !== false &&

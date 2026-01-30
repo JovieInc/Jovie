@@ -225,6 +225,17 @@ export async function getAudienceServerData(params: {
           member.geoCountry
         );
 
+        // Handle both Date objects and already-serialized strings
+        let lastSeenAt: string | null;
+        if (member.lastSeenAt) {
+          lastSeenAt =
+            typeof member.lastSeenAt === 'string'
+              ? member.lastSeenAt
+              : member.lastSeenAt.toISOString();
+        } else {
+          lastSeenAt = null;
+        }
+
         return {
           id: member.id,
           type: member.type,
@@ -243,12 +254,7 @@ export async function getAudienceServerData(params: {
           purchaseCount: member.purchaseCount,
           tags: Array.isArray(member.tags) ? member.tags : [],
           deviceType: member.deviceType,
-          // Handle both Date objects and already-serialized strings
-          lastSeenAt: member.lastSeenAt
-            ? typeof member.lastSeenAt === 'string'
-              ? member.lastSeenAt
-              : member.lastSeenAt.toISOString()
-            : null,
+          lastSeenAt,
         };
       });
 
@@ -338,11 +344,15 @@ export async function getAudienceServerData(params: {
       const country = subscriber.countryCode;
       const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
       // Handle both Date objects and already-serialized strings
-      const createdAt = subscriber.createdAt
-        ? typeof subscriber.createdAt === 'string'
-          ? subscriber.createdAt
-          : subscriber.createdAt.toISOString()
-        : null;
+      let createdAt: string | null;
+      if (subscriber.createdAt) {
+        createdAt =
+          typeof subscriber.createdAt === 'string'
+            ? subscriber.createdAt
+            : subscriber.createdAt.toISOString();
+      } else {
+        createdAt = null;
+      }
       const displayName = subscriber.email || subscriber.phone || 'Contact';
       const type = subscriber.channel === 'email' ? 'email' : 'sms';
 

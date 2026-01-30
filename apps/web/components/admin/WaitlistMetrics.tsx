@@ -17,7 +17,7 @@ function MetricCard({
   icon: Icon,
   colorClass,
   bgClass,
-}: MetricCardProps) {
+}: Readonly<MetricCardProps>) {
   return (
     <div className='flex items-center gap-3 px-3 py-3 sm:px-4'>
       <div
@@ -45,7 +45,7 @@ interface WaitlistMetricsProps
     metrics: WaitlistMetricsType;
   }> {}
 
-export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
+export function WaitlistMetrics({ metrics }: Readonly<WaitlistMetricsProps>) {
   return (
     <div className='grid grid-cols-1 border-b border-subtle sm:grid-cols-3'>
       <div className='border-b border-subtle sm:border-b-0 sm:border-r'>

@@ -64,13 +64,13 @@ export function PreviewPanelProvider({
 }: PreviewPanelProviderProps) {
   // Check if screen is large (md breakpoint: 768px)
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (typeof window === 'undefined') return true; // SSR default
-    return window.matchMedia('(min-width: 768px)').matches;
+    if (typeof globalThis === 'undefined') return true; // SSR default
+    return globalThis.matchMedia('(min-width: 768px)').matches;
   });
 
   // Update isLargeScreen on resize
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const mediaQuery = globalThis.matchMedia('(min-width: 768px)');
     const handleChange = (e: MediaQueryListEvent) => {
       setIsLargeScreen(e.matches);
     };
@@ -129,8 +129,8 @@ export function PreviewPanelProvider({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [enabled]);
 
   // Separate memoized values for each context to prevent cascading re-renders

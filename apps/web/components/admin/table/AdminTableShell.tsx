@@ -51,7 +51,7 @@ export function AdminTableShell({
     const updateHeaderElevation = () => {
       rafIdRef.current = null;
       const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
       lastScrollTimeRef.current = Date.now();
     };
 
@@ -62,15 +62,16 @@ export function AdminTableShell({
       // Skip if we're within the throttle window
       if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
         // Schedule one final update after throttle period ends
-        if (rafIdRef.current === null) {
-          rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
+        if (rafIdRef.current !== null) {
+          return;
         }
+        rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
         return;
       }
 
       lastScrollTimeRef.current = now;
       const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
     };
 
     // Initial check
@@ -79,9 +80,10 @@ export function AdminTableShell({
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
+      if (rafIdRef.current === null) {
+        return;
       }
+      cancelAnimationFrame(rafIdRef.current);
     };
   }, [tableContainerRef]);
 

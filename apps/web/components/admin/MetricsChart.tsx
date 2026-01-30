@@ -8,7 +8,7 @@ interface MetricsChartProps {
   points: AdminUsagePoint[];
 }
 
-export function MetricsChart({ points }: MetricsChartProps) {
+export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
   const chartData = points.map(point => ({
     date: point.label,
     users: point.value,
