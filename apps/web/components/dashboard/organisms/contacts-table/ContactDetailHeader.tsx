@@ -9,11 +9,11 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ContactRole } from '@/types/contacts';
 
 interface ContactDetailHeaderProps {
-  role: ContactRole;
-  customLabel?: string | null;
-  email?: string | null;
-  onClose: () => void;
-  onDelete: () => void;
+  readonly role: ContactRole;
+  readonly customLabel?: string | null;
+  readonly email?: string | null;
+  readonly onClose: () => void;
+  readonly onDelete: () => void;
 }
 
 export function ContactDetailHeader({

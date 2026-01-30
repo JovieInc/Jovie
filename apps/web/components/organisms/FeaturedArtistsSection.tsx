@@ -14,11 +14,11 @@ export type FeaturedCreator = {
 };
 
 export interface FeaturedCreatorsSectionProps {
-  creators: FeaturedCreator[];
-  title?: string;
-  className?: string;
-  showTitle?: boolean;
-  showNames?: boolean;
+  readonly creators: FeaturedCreator[];
+  readonly title?: string;
+  readonly className?: string;
+  readonly showTitle?: boolean;
+  readonly showNames?: boolean;
 }
 
 const areCreatorsEqual = (

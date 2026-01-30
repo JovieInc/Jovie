@@ -41,33 +41,36 @@ export type ReleaseView = 'all' | 'singles' | 'albums';
 
 interface ReleaseTableSubheaderProps {
   /** All releases for export */
-  releases: ReleaseViewModel[];
+  readonly releases: ReleaseViewModel[];
   /** Selected release IDs for filtered export */
-  selectedIds: Set<string>;
+  readonly selectedIds: Set<string>;
   /** Column visibility state */
-  columnVisibility: Record<string, boolean>;
+  readonly columnVisibility: Record<string, boolean>;
   /** Callback when column visibility changes */
-  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  readonly onColumnVisibilityChange: (
+    columnId: string,
+    visible: boolean
+  ) => void;
   /** Available columns to toggle */
-  availableColumns: readonly { id: string; label: string }[];
+  readonly availableColumns: readonly { id: string; label: string }[];
   /** Callback to reset display settings to defaults */
-  onResetToDefaults?: () => void;
+  readonly onResetToDefaults?: () => void;
   /** Current filter state */
-  filters: ReleaseFilters;
+  readonly filters: ReleaseFilters;
   /** Callback when filters change */
-  onFiltersChange: (filters: ReleaseFilters) => void;
+  readonly onFiltersChange: (filters: ReleaseFilters) => void;
   /** Whether to show expandable track rows */
-  showTracks?: boolean;
+  readonly showTracks?: boolean;
   /** Callback when showTracks changes */
-  onShowTracksChange?: (show: boolean) => void;
+  readonly onShowTracksChange?: (show: boolean) => void;
   /** Whether to group releases by year */
-  groupByYear?: boolean;
+  readonly groupByYear?: boolean;
   /** Callback when groupByYear changes */
-  onGroupByYearChange?: (group: boolean) => void;
+  readonly onGroupByYearChange?: (group: boolean) => void;
   /** Current release view filter */
-  releaseView?: ReleaseView;
+  readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
-  onReleaseViewChange?: (view: ReleaseView) => void;
+  readonly onReleaseViewChange?: (view: ReleaseView) => void;
 }
 
 /** Options for release view segmented control */

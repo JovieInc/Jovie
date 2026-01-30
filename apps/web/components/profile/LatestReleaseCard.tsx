@@ -4,8 +4,8 @@ import Link from 'next/link';
 import type { DiscogRelease } from '@/lib/db/schema';
 
 type LatestReleaseCardProps = {
-  release: DiscogRelease;
-  artistHandle: string;
+  readonly release: DiscogRelease;
+  readonly artistHandle: string;
 };
 
 /**
