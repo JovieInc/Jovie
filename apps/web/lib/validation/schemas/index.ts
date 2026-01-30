@@ -162,6 +162,19 @@ export {
 } from './payments';
 
 // =============================================================================
+// Tip Schemas
+// =============================================================================
+
+export {
+  // Types
+  type Currency,
+  // Schema instances
+  currencySchema,
+  type TipCreationPayload,
+  tipCreationSchema,
+} from './tip';
+
+// =============================================================================
 // Media Schemas
 // =============================================================================
 
@@ -302,6 +315,7 @@ import * as notifications from './notifications';
 import * as onboarding from './onboarding';
 import * as payments from './payments';
 import * as pixels from './pixels';
+import * as tip from './tip';
 
 export {
   base,
@@ -315,4 +329,5 @@ export {
   onboarding,
   ingestion,
   pixels,
+  tip,
 };

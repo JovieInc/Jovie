@@ -6,7 +6,7 @@ import {
   fanReleaseNotifications,
   notificationSubscriptions,
 } from '@/lib/db';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';

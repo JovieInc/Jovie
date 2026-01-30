@@ -160,9 +160,6 @@ export function useOnboardingSubmit({
 
         // Handle database errors with retry suggestion
         if (isDatabaseError(error)) {
-          console.error(
-            '[ONBOARDING] Database error detected, suggesting retry'
-          );
           setState(prev => ({
             ...prev,
             error:

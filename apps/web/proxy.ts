@@ -1,5 +1,4 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import {
   type NextFetchEvent,
   type NextRequest,
@@ -12,6 +11,7 @@ import {
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { getUserState } from '@/lib/auth/proxy-state';
+import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
   buildContentSecurityPolicyReportOnly,
@@ -522,16 +522,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     return res;
   } catch (error) {
     // Log errors for observability - silent failures can mask security issues
-    console.error('[proxy] Middleware error:', {
-      error,
+    await captureError('Middleware error in proxy', error, {
       pathname: req.nextUrl.pathname,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    // Capture in Sentry for production monitoring
-    Sentry.captureException(error, {
-      tags: { context: 'proxy_middleware' },
-      extra: { pathname: req.nextUrl.pathname },
+      context: 'proxy_middleware',
     });
 
     // Fallback to basic middleware behavior
