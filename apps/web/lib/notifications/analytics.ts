@@ -3,7 +3,7 @@ import type { NotificationChannel } from '@/types/notifications';
 
 type BaseEventProps = {
   artist_id: string | null;
-  channel?: NotificationChannel | string;
+  channel?: string;
   source?: string;
 };
 
