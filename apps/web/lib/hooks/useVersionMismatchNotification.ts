@@ -41,7 +41,7 @@ export function useVersionMismatchNotification() {
       action: {
         label: 'Refresh Now',
         onClick: () => {
-          window.location.reload();
+          globalThis.location.reload();
         },
       },
       onDismiss: () => {

@@ -453,7 +453,7 @@ export function getBaseServerConfig(): BaseSentryServerConfig {
  *
  * This utility is essential for the lazy loading architecture because:
  * - SDK variant selection (lite vs full) only applies on client
- * - Route detection uses `window.location` which is client-only
+ * - Route detection uses `globalThis.location` which is client-only
  * - Dynamic imports for code splitting require client-side context
  *
  * @returns `true` if running in browser, `false` if server-side

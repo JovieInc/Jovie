@@ -56,7 +56,7 @@ export function AuthLoadingState({
               <button
                 type='button'
                 className='mt-3 inline-flex items-center justify-center rounded-[--radius-xl] border border-subtle px-3 py-1.5 text-[13px] font-medium text-primary-token hover:bg-surface-1 transition-colors'
-                onClick={() => window.location.reload()}
+                onClick={() => globalThis.location.reload()}
               >
                 Retry now
               </button>

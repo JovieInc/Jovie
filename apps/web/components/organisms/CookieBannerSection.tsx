@@ -6,13 +6,14 @@ import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
 
 declare global {
-  interface Window {
-    JVConsent?: {
-      onChange: (cb: (v: unknown) => void) => () => void;
-      _emit: (v: unknown) => void;
-      openModal: () => void;
-    };
-  }
+  // eslint-disable-next-line no-var
+  var JVConsent:
+    | {
+        onChange: (cb: (v: unknown) => void) => () => void;
+        _emit: (v: unknown) => void;
+        openModal: () => void;
+      }
+    | undefined;
 }
 
 export interface CookieBannerSectionProps {
@@ -40,9 +41,9 @@ export function CookieBannerSection({
   }, [showBanner]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.JVConsent) {
+    if (typeof window !== 'undefined' && !globalThis.JVConsent) {
       const listeners = new Set<(v: unknown) => void>();
-      window.JVConsent = {
+      globalThis.JVConsent = {
         onChange(cb: (v: unknown) => void) {
           listeners.add(cb);
           return () => listeners.delete(cb);
@@ -73,7 +74,7 @@ export function CookieBannerSection({
     } catch {
       // ignore
     }
-    window.JVConsent?._emit(consent);
+    globalThis.JVConsent?._emit(consent);
     setVisible(false);
   };
 
@@ -85,7 +86,7 @@ export function CookieBannerSection({
     } catch {
       // ignore
     }
-    window.JVConsent?._emit(consent);
+    globalThis.JVConsent?._emit(consent);
     setVisible(false);
   };
 
@@ -118,7 +119,7 @@ export function CookieBannerSection({
             } catch {
               // ignore
             }
-            window.JVConsent?._emit(c);
+            globalThis.JVConsent?._emit(c);
             setVisible(false);
           }}
         />

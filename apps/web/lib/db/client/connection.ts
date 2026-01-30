@@ -40,9 +40,9 @@ export function initializeDb(): DbType {
   const hasGlobal = typeof global !== 'undefined';
 
   // In development, reuse the global instance to avoid connection churn during HMR
-  if (!isProduction && hasGlobal && global.db) {
-    _db = global.db;
-    return global.db;
+  if (!isProduction && hasGlobal && globalThis.db) {
+    _db = globalThis.db;
+    return globalThis.db;
   }
 
   logDbInfo('db_init', 'Initializing database connection with HTTP driver', {
@@ -71,7 +71,7 @@ export function initializeDb(): DbType {
 
   // Store in global for development HMR reuse
   if (!isProduction && hasGlobal) {
-    global.db = dbInstance;
+    globalThis.db = dbInstance;
   }
 
   _db = dbInstance;

@@ -75,7 +75,7 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
     accessor: row =>
       typeof window === 'undefined'
         ? row.smartLinkPath
-        : `${window.location.origin}${row.smartLinkPath}`,
+        : `${globalThis.location.origin}${row.smartLinkPath}`,
   },
   {
     header: 'Spotify URL',

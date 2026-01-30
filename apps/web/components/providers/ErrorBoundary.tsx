@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<Props, State> {
         duration: 6000,
         action: {
           label: 'Reload',
-          onClick: () => window.location.reload(),
+          onClick: () => globalThis.location.reload(),
         },
       });
     }
@@ -188,7 +188,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className='flex justify-center'>
                 <button
                   type='button'
-                  onClick={() => window.location.reload()}
+                  onClick={() => globalThis.location.reload()}
                   className='btn btn-md btn-primary btn-press'
                 >
                   Reload page

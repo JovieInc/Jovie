@@ -51,13 +51,13 @@ function ContactListItem({
 
   const handleEmailClick = useCallback(() => {
     if (contact.email) {
-      window.location.href = `mailto:${contact.email}`;
+      globalThis.location.href = `mailto:${contact.email}`;
     }
   }, [contact.email]);
 
   const handlePhoneClick = useCallback(() => {
     if (contact.phone) {
-      window.location.href = `tel:${contact.phone}`;
+      globalThis.location.href = `tel:${contact.phone}`;
     }
   }, [contact.phone]);
 

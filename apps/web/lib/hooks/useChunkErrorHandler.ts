@@ -105,7 +105,7 @@ export function useChunkErrorHandler() {
           },
           extra: {
             message: error instanceof Error ? error.message : String(error),
-            url: window.location.href,
+            url: globalThis.location.href,
           },
         });
       }
@@ -132,7 +132,7 @@ export function useChunkErrorHandler() {
           action: {
             label: 'Refresh',
             onClick: () => {
-              window.location.reload();
+              globalThis.location.reload();
             },
           },
         }

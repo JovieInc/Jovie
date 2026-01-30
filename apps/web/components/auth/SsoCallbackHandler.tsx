@@ -31,7 +31,7 @@ export function SsoCallbackHandler({
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
-    const hash = window.location.hash;
+    const hash = globalThis.location.hash;
 
     // List of hash fragments that indicate Clerk wants password-related action
     // Since Jovie is passwordless, we redirect to dashboard/onboarding instead
@@ -49,7 +49,7 @@ export function SsoCallbackHandler({
 
       // Clear the hash and redirect to dashboard
       // The user is already authenticated via OAuth at this point
-      window.history.replaceState(null, '', window.location.pathname);
+      window.history.replaceState(null, '', globalThis.location.pathname);
 
       // Use signInFallbackRedirectUrl as the default destination
       // since password prompts typically happen for existing users

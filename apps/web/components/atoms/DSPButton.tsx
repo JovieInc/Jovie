@@ -44,7 +44,7 @@ export function DSPButton({
     if (isExternal) {
       globalThis.open(url, '_blank', 'noopener,noreferrer');
     } else {
-      window.location.href = url;
+      globalThis.location.href = url;
     }
   };
 
