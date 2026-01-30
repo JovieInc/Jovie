@@ -43,9 +43,9 @@ function ThemeKeyboardShortcut() {
       setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    globalThis.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', onKeyDown);
     };
   }, [resolvedTheme, setTheme]);
 

@@ -87,7 +87,7 @@ export function ResponsiveActionsCell({
 
   useEffect(() => {
     const updateBreakpoint = () => {
-      const width = window.innerWidth;
+      const width = globalThis.innerWidth;
       if (width < BREAKPOINTS.MOBILE) {
         setBreakpoint('mobile');
       } else if (width < BREAKPOINTS.TABLET) {
@@ -98,8 +98,8 @@ export function ResponsiveActionsCell({
     };
 
     updateBreakpoint();
-    window.addEventListener('resize', updateBreakpoint);
-    return () => window.removeEventListener('resize', updateBreakpoint);
+    globalThis.addEventListener('resize', updateBreakpoint);
+    return () => globalThis.removeEventListener('resize', updateBreakpoint);
   }, []);
 
   // Determine which actions to show inline vs overflow

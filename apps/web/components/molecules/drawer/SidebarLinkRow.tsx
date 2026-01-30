@@ -73,7 +73,7 @@ export function SidebarLinkRow({
       <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
         <button
           type='button'
-          onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+          onClick={() => globalThis.open(url, '_blank', 'noopener,noreferrer')}
           className={ACTION_BUTTON_CLASS}
           aria-label={`Open ${label}`}
         >

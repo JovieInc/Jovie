@@ -250,7 +250,11 @@ export function TourDatesTable({
           label: 'Open ticket link',
           icon: <Icon name='ExternalLink' className='h-4 w-4' />,
           onClick: () =>
-            window.open(tourDate.ticketUrl!, '_blank', 'noopener,noreferrer'),
+            globalThis.open(
+              tourDate.ticketUrl!,
+              '_blank',
+              'noopener,noreferrer'
+            ),
         });
       }
 
