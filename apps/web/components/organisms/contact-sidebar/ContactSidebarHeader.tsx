@@ -15,11 +15,11 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Contact } from './types';
 
 interface ContactSidebarHeaderProps {
-  contact: Contact | null;
-  hasContact: boolean;
-  onClose?: () => void;
-  onRefresh?: () => void;
-  onCopyProfileUrl: () => void;
+  readonly contact: Contact | null;
+  readonly hasContact: boolean;
+  readonly onClose?: () => void;
+  readonly onRefresh?: () => void;
+  readonly onCopyProfileUrl: () => void;
 }
 
 export function ContactSidebarHeader({

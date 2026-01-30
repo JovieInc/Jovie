@@ -18,10 +18,10 @@ export interface BulkAction {
 }
 
 export interface TableBulkActionsToolbarProps {
-  selectedCount: number;
-  onClearSelection: () => void;
-  actions: BulkAction[];
-  className?: string;
+  readonly selectedCount: number;
+  readonly onClearSelection: () => void;
+  readonly actions: BulkAction[];
+  readonly className?: string;
 }
 
 export function TableBulkActionsToolbar({

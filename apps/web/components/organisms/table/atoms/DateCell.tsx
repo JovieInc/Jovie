@@ -8,30 +8,30 @@ interface DateCellProps {
   /**
    * Date to display
    */
-  date: Date | null;
+  readonly date: Date | null;
 
   /**
    * Date format options for the cell display
    * @default { year: 'numeric', month: 'short', day: 'numeric' }
    */
-  formatOptions?: Intl.DateTimeFormatOptions;
+  readonly formatOptions?: Intl.DateTimeFormatOptions;
 
   /**
    * Date format options for the tooltip
    * @default { year: 'numeric', month: 'long', day: 'numeric' }
    */
-  tooltipFormatOptions?: Intl.DateTimeFormatOptions;
+  readonly tooltipFormatOptions?: Intl.DateTimeFormatOptions;
 
   /**
    * Locale for date formatting
    * @default 'en-US'
    */
-  locale?: string;
+  readonly locale?: string;
 
   /**
    * Additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

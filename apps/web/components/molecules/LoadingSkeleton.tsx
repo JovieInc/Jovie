@@ -9,11 +9,11 @@ function generateSkeletonKeys(prefix: string, count: number): string[] {
 }
 
 interface LoadingSkeletonProps {
-  className?: string;
-  lines?: number;
-  height?: string;
-  width?: string;
-  rounded?: 'sm' | 'md' | 'lg' | 'full';
+  readonly className?: string;
+  readonly lines?: number;
+  readonly height?: string;
+  readonly width?: string;
+  readonly rounded?: 'sm' | 'md' | 'lg' | 'full';
 }
 
 // Valid Tailwind height/width classes for validation

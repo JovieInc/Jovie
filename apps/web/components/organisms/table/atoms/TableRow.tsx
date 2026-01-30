@@ -1,15 +1,15 @@
 import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
-  children: React.ReactNode;
-  selected?: boolean;
-  onClick?: () => void;
-  virtualRow?: { start: number }; // For virtualization positioning
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly selected?: boolean;
+  readonly onClick?: () => void;
+  readonly virtualRow?: { start: number }; // For virtualization positioning
+  readonly className?: string;
   // Keyboard navigation props
-  keyboardFocused?: boolean;
-  onKeyDown?: (e: React.KeyboardEvent) => void;
-  rowIndex?: number;
+  readonly keyboardFocused?: boolean;
+  readonly onKeyDown?: (e: React.KeyboardEvent) => void;
+  readonly rowIndex?: number;
 }
 
 /**

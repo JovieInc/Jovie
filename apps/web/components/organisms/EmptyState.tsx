@@ -42,16 +42,16 @@ type SecondaryAction =
     };
 
 export interface EmptyStateProps {
-  icon?: React.ReactNode;
-  heading: string;
-  description?: string;
-  action?: PrimaryAction;
-  secondaryAction?: SecondaryAction;
-  variant?: EmptyStateVariant;
+  readonly icon?: React.ReactNode;
+  readonly heading: string;
+  readonly description?: string;
+  readonly action?: PrimaryAction;
+  readonly secondaryAction?: SecondaryAction;
+  readonly variant?: EmptyStateVariant;
   /** Button size - use 'sm' for less padding */
-  size?: 'default' | 'sm';
-  className?: string;
-  testId?: string;
+  readonly size?: 'default' | 'sm';
+  readonly className?: string;
+  readonly testId?: string;
 }
 
 const variantStyles: Record<

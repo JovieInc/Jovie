@@ -2,10 +2,10 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 interface FormStatusProps {
-  loading?: boolean;
-  error?: string;
-  success?: string;
-  className?: string;
+  readonly loading?: boolean;
+  readonly error?: string;
+  readonly success?: string;
+  readonly className?: string;
 }
 
 export function FormStatus({

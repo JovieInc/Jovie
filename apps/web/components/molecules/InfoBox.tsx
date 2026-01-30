@@ -2,10 +2,10 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface InfoBoxProps {
-  title?: string;
-  variant?: 'info' | 'warning' | 'success' | 'error';
-  children: React.ReactNode;
-  className?: string;
+  readonly title?: string;
+  readonly variant?: 'info' | 'warning' | 'success' | 'error';
+  readonly children: React.ReactNode;
+  readonly className?: string;
 }
 
 export function InfoBox({

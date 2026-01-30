@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 
 export interface TableHeaderRowProps {
-  children: React.ReactNode;
-  stickyOffset?: number; // Top offset in pixels for sticky positioning
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly stickyOffset?: number; // Top offset in pixels for sticky positioning
+  readonly className?: string;
 }
 
 export function TableHeaderRow({

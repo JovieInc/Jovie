@@ -1,12 +1,12 @@
 import { cn } from '@/lib/utils';
 
 export interface TableCellProps {
-  children: React.ReactNode;
-  width?: string; // e.g., 'w-14', 'w-[260px]'
-  align?: 'left' | 'center' | 'right';
-  className?: string;
-  hideOnMobile?: boolean;
-  as?: 'td' | 'th';
+  readonly children: React.ReactNode;
+  readonly width?: string; // e.g., 'w-14', 'w-[260px]'
+  readonly align?: 'left' | 'center' | 'right';
+  readonly className?: string;
+  readonly hideOnMobile?: boolean;
+  readonly as?: 'td' | 'th';
 }
 
 export function TableCell({

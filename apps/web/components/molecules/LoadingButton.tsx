@@ -7,11 +7,11 @@ import {
 // Trigger CI run to resolve check suite failures - updated
 
 interface LoadingButtonProps extends ButtonProps {
-  isLoading?: boolean;
-  loadingText?: string;
-  spinnerSize?: 'xs' | 'sm' | 'md' | 'lg';
-  spinnerVariant?: 'light' | 'dark' | 'auto';
-  children: React.ReactNode;
+  readonly isLoading?: boolean;
+  readonly loadingText?: string;
+  readonly spinnerSize?: 'xs' | 'sm' | 'md' | 'lg';
+  readonly spinnerVariant?: 'light' | 'dark' | 'auto';
+  readonly children: React.ReactNode;
 }
 
 export function LoadingButton({

@@ -2,14 +2,14 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface DataCardProps {
-  title: string;
-  subtitle?: string;
-  metadata?: string;
-  badge?: string;
-  badgeVariant?: 'default' | 'success' | 'warning' | 'error';
-  actions?: React.ReactNode;
-  className?: string;
-  children?: React.ReactNode;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly metadata?: string;
+  readonly badge?: string;
+  readonly badgeVariant?: 'default' | 'success' | 'warning' | 'error';
+  readonly actions?: React.ReactNode;
+  readonly className?: string;
+  readonly children?: React.ReactNode;
 }
 
 export function DataCard({

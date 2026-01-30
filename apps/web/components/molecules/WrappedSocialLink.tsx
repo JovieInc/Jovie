@@ -13,19 +13,19 @@ import { getCrawlerSafeLabel } from '@/lib/utils/domain-categorizer';
 import { extractDomain } from '@/lib/utils/url-parsing';
 
 interface WrappedSocialLinkProps {
-  href: string;
-  platform: string;
-  children?: ReactNode;
-  className?: string;
-  target?: string;
-  rel?: string;
-  'aria-label'?: string;
+  readonly href: string;
+  readonly platform: string;
+  readonly children?: ReactNode;
+  readonly className?: string;
+  readonly target?: string;
+  readonly rel?: string;
+  readonly 'aria-label'?: string;
 }
 
 interface WrappedLinkData {
-  wrappedUrl: string;
-  kind: 'normal' | 'sensitive';
-  alias: string;
+  readonly wrappedUrl: string;
+  readonly kind: 'normal' | 'sensitive';
+  readonly alias: string;
 }
 
 export function WrappedSocialLink({
@@ -147,10 +147,10 @@ export function WrappedSocialLink({
  * Simple wrapper for DSP buttons with anti-cloaking protection
  */
 interface WrappedDSPButtonProps {
-  href: string;
-  platform: string;
-  className?: string;
-  children: ReactNode;
+  readonly href: string;
+  readonly platform: string;
+  readonly className?: string;
+  readonly children: ReactNode;
 }
 
 export function WrappedDSPButton({
@@ -175,10 +175,10 @@ export function WrappedDSPButton({
  * Fallback component for unwrapped links (legacy support)
  */
 interface LegacySocialLinkProps {
-  href: string;
-  platform: string;
-  children: ReactNode;
-  className?: string;
+  readonly href: string;
+  readonly platform: string;
+  readonly children: ReactNode;
+  readonly className?: string;
 }
 
 export function LegacySocialLink({

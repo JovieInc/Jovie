@@ -9,22 +9,22 @@ interface ContextMenuSubmenuProps
     /**
      * Label for the submenu trigger (e.g., "Copy")
      */
-    label: string;
+    readonly label: string;
 
     /**
      * Icon to show before the label
      */
-    icon?: React.ReactNode;
+    readonly icon?: React.ReactNode;
 
     /**
      * Submenu items
      */
-    children: React.ReactNode;
+    readonly children: React.ReactNode;
 
     /**
      * Additional CSS classes for the trigger
      */
-    className?: string;
+    readonly className?: string;
   }> {}
 
 /**
@@ -106,27 +106,27 @@ interface ContextMenuItemProps
     /**
      * Click handler
      */
-    onClick: () => void;
+    readonly onClick: () => void;
 
     /**
      * Icon to show before the label
      */
-    icon?: React.ReactNode;
+    readonly icon?: React.ReactNode;
 
     /**
      * Item label
      */
-    children: React.ReactNode;
+    readonly children: React.ReactNode;
 
     /**
      * Whether this is a destructive action (shows in red)
      */
-    destructive?: boolean;
+    readonly destructive?: boolean;
 
     /**
      * Additional CSS classes
      */
-    className?: string;
+    readonly className?: string;
   }> {}
 
 /**
@@ -160,7 +160,7 @@ export function ContextMenuItem({
 
 interface ContextMenuSeparatorProps
   extends Readonly<{
-    className?: string;
+    readonly className?: string;
   }> {}
 
 /**

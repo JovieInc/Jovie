@@ -73,20 +73,20 @@ const CheckIcon = (
 
 export interface BenefitsSectionProps {
   /** Section title */
-  title?: string;
+  readonly title?: string;
   /** Section description */
-  description?: string;
+  readonly description?: string;
   /** Badge text */
-  badgeText?: string;
+  readonly badgeText?: string;
   /** Benefits data */
-  benefits?: Array<{
-    title: string;
-    description: string;
-    metric: string;
-    accent: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray';
+  readonly benefits?: Array<{
+    readonly title: string;
+    readonly description: string;
+    readonly metric: string;
+    readonly accent: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray';
   }>;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 const defaultBenefits = [

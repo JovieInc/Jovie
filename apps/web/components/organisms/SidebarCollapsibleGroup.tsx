@@ -12,10 +12,10 @@ import {
 import { cn } from '@/lib/utils';
 
 export interface SidebarCollapsibleGroupProps {
-  label: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  className?: string;
+  readonly label: string;
+  readonly children: React.ReactNode;
+  readonly defaultOpen?: boolean;
+  readonly className?: string;
 }
 
 export function SidebarCollapsibleGroup({

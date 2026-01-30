@@ -7,30 +7,30 @@ import { cn } from '@/lib/utils';
 
 export interface HeroSectionProps {
   /** Main headline text (will be large and prominent) */
-  headline: ReactNode;
+  readonly headline: ReactNode;
   /** Optional highlighted word(s) in the headline to apply gradient */
-  highlightText?: string;
+  readonly highlightText?: string;
   /** Gradient variant for highlighted text */
-  gradientVariant?:
+  readonly gradientVariant?:
     | 'primary'
     | 'secondary'
     | 'success'
     | 'warning'
     | 'purple-cyan';
   /** Subtitle/description text */
-  subtitle?: ReactNode;
+  readonly subtitle?: ReactNode;
   /** Optional emoji or icon to display above headline */
-  icon?: ReactNode;
+  readonly icon?: ReactNode;
   /** Main content area (usually form or buttons) */
-  children?: ReactNode;
+  readonly children?: ReactNode;
   /** Supporting text below main content */
-  supportingText?: ReactNode;
+  readonly supportingText?: ReactNode;
   /** Trust indicators or additional info */
-  trustIndicators?: ReactNode;
+  readonly trustIndicators?: ReactNode;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show background effects */
-  showBackgroundEffects?: boolean;
+  readonly showBackgroundEffects?: boolean;
 }
 
 export const HeroSection = memo(function HeroSection({

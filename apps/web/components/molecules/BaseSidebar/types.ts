@@ -10,48 +10,48 @@ export type SidebarPosition = 'left' | 'right';
 
 export interface BaseSidebarProps {
   /** Whether the sidebar is open */
-  isOpen: boolean;
+  readonly isOpen: boolean;
   /** Callback when sidebar should close */
-  onClose?: () => void;
+  readonly onClose?: () => void;
   /** Sidebar position */
-  position?: SidebarPosition;
+  readonly position?: SidebarPosition;
   /** Width in pixels (default: 320) */
-  width?: number;
+  readonly width?: number;
   /** Children to render inside the sidebar */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
   /** Aria label for accessibility */
-  ariaLabel?: string;
+  readonly ariaLabel?: string;
   /** Whether to close on Escape key (default: true) */
-  closeOnEscape?: boolean;
+  readonly closeOnEscape?: boolean;
   /** Whether to show overlay on mobile (default: true) */
-  showOverlay?: boolean;
+  readonly showOverlay?: boolean;
   /** Test ID for testing */
-  testId?: string;
+  readonly testId?: string;
 }
 
 export interface BaseSidebarHeaderProps {
   /** Header content */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
   /** Show close button (default: true if onClose provided) */
-  showCloseButton?: boolean;
+  readonly showCloseButton?: boolean;
   /** Close callback */
-  onClose?: () => void;
+  readonly onClose?: () => void;
 }
 
 export interface BaseSidebarContentProps {
   /** Content to render */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
 }
 
 export interface BaseSidebarFooterProps {
   /** Footer content */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
 }

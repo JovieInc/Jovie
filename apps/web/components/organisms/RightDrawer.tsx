@@ -11,13 +11,13 @@ export interface RightDrawerProps
     React.HTMLAttributes<HTMLElement>,
     'children' | 'className' | 'onKeyDown'
   > {
-  isOpen: boolean;
-  width: number;
-  children: React.ReactNode;
-  className?: string;
-  ariaLabel?: string;
-  onKeyDown?: (event: KeyboardEvent) => void;
-  contextMenuItems?: CommonDropdownItem[];
+  readonly isOpen: boolean;
+  readonly width: number;
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly ariaLabel?: string;
+  readonly onKeyDown?: (event: KeyboardEvent) => void;
+  readonly contextMenuItems?: CommonDropdownItem[];
 }
 
 const CONTEXT_MENU_CONTENT_CLASS =

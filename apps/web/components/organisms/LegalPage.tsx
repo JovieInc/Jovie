@@ -4,10 +4,10 @@ import { DocPage } from '@/components/organisms/DocPage';
 import { LegalDocument } from '@/lib/legal/getLegalDocument';
 
 export interface LegalPageProps {
-  doc: LegalDocument;
-  hero: LegalHeroProps;
-  contactEmail: string;
-  supportDescription: string;
+  readonly doc: LegalDocument;
+  readonly hero: LegalHeroProps;
+  readonly contactEmail: string;
+  readonly supportDescription: string;
 }
 
 export function LegalPage({

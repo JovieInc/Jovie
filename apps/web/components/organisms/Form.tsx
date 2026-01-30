@@ -3,11 +3,11 @@ import { FormStatus } from '@/components/molecules/FormStatus';
 import { cn } from '@/lib/utils';
 
 interface FormProps extends React.FormHTMLAttributes<HTMLFormElement> {
-  children: React.ReactNode;
-  loading?: boolean;
-  error?: string;
-  success?: string;
-  onSubmit?: (e: React.FormEvent) => void;
+  readonly children: React.ReactNode;
+  readonly loading?: boolean;
+  readonly error?: string;
+  readonly success?: string;
+  readonly onSubmit?: (e: React.FormEvent) => void;
 }
 
 export function Form({

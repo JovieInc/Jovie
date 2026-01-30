@@ -6,10 +6,10 @@ import { track } from '@/lib/analytics';
 import { usePortalMutation } from '@/lib/queries';
 
 interface BillingPortalLinkProps {
-  className?: string;
-  children?: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+  readonly className?: string;
+  readonly children?: React.ReactNode;
+  readonly variant?: 'primary' | 'secondary' | 'outline';
+  readonly size?: 'sm' | 'md' | 'lg';
 }
 
 export function BillingPortalLink({

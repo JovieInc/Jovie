@@ -36,9 +36,9 @@ const COOKIE_CATEGORIES = [
 ] as const;
 
 interface CookieModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSave?: (consent: Consent) => void;
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onSave?: (consent: Consent) => void;
 }
 
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {

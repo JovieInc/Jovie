@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DeferredSectionProps {
-  children: React.ReactNode;
-  placeholderHeight?: number | string;
-  placeholderWidth?: number | string;
-  rootMargin?: string;
-  className?: string;
-  placeholderClassName?: string;
-  testId?: string;
+  readonly children: React.ReactNode;
+  readonly placeholderHeight?: number | string;
+  readonly placeholderWidth?: number | string;
+  readonly rootMargin?: string;
+  readonly className?: string;
+  readonly placeholderClassName?: string;
+  readonly testId?: string;
 }
 
 export function DeferredSection({

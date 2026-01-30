@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils';
 import type { TocEntry } from '@/types/docs';
 
 export interface LegalSidebarProps {
-  toc: TocEntry[];
-  className?: string;
+  readonly toc: TocEntry[];
+  readonly className?: string;
 }
 
 export function LegalSidebar({ toc, className }: LegalSidebarProps) {

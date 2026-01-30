@@ -3,15 +3,15 @@ import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
 interface SectionProps {
-  children: React.ReactNode;
-  className?: string;
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  containerClassName?: string;
-  padding?: 'sm' | 'md' | 'lg' | 'xl' | 'none';
-  withGridBg?: boolean;
-  withBorder?: boolean;
-  as?: ElementType;
-  [key: string]: unknown; // For additional props like id, aria-*, etc.
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  readonly containerClassName?: string;
+  readonly padding?: 'sm' | 'md' | 'lg' | 'xl' | 'none';
+  readonly withGridBg?: boolean;
+  readonly withBorder?: boolean;
+  readonly as?: ElementType;
+  readonly [key: string]: unknown; // For additional props like id, aria-*, etc.
 }
 
 const paddingVariants = {

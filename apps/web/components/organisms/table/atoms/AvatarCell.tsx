@@ -10,37 +10,37 @@ interface AvatarCellProps {
   /**
    * Profile ID
    */
-  profileId: string;
+  readonly profileId: string;
 
   /**
    * Username for link and fallback
    */
-  username: string;
+  readonly username: string;
 
   /**
    * Avatar image URL
    */
-  avatarUrl: string | null;
+  readonly avatarUrl: string | null;
 
   /**
    * Display name (optional)
    */
-  displayName?: string | null;
+  readonly displayName?: string | null;
 
   /**
    * Whether the profile is verified
    */
-  verified?: boolean;
+  readonly verified?: boolean;
 
   /**
    * Whether the profile is featured
    */
-  isFeatured?: boolean;
+  readonly isFeatured?: boolean;
 
   /**
    * Additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

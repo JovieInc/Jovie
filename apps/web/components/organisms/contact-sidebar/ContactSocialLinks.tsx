@@ -23,18 +23,20 @@ import {
 } from './utils';
 
 interface ContactSocialLinksProps {
-  contact: Contact;
-  fullName: string;
-  isEditable: boolean;
-  isAddingLink: boolean;
-  newLinkUrl: string;
-  onSetIsAddingLink: (value: boolean) => void;
-  onSetNewLinkUrl: (value: string) => void;
-  onAddLink: () => void;
-  onRemoveLink: (index: number) => void;
-  onNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  readonly contact: Contact;
+  readonly fullName: string;
+  readonly isEditable: boolean;
+  readonly isAddingLink: boolean;
+  readonly newLinkUrl: string;
+  readonly onSetIsAddingLink: (value: boolean) => void;
+  readonly onSetNewLinkUrl: (value: string) => void;
+  readonly onAddLink: () => void;
+  readonly onRemoveLink: (index: number) => void;
+  readonly onNewLinkKeyDown: (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => void;
   /** Index of the link currently being removed (for loading state) */
-  removingLinkIndex?: number | null;
+  readonly removingLinkIndex?: number | null;
 }
 
 export const ContactSocialLinks = memo(function ContactSocialLinks({

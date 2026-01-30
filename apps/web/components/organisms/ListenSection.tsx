@@ -10,25 +10,25 @@ import { captureError } from '@/lib/error-tracking';
 
 export interface ListenSectionProps {
   /** Artist handle for tracking */
-  handle: string;
+  readonly handle: string;
   /** Available DSP platforms */
-  dsps: AvailableDSP[];
+  readonly dsps: AvailableDSP[];
   /** Initial preferred URL to auto-open */
-  initialPreferredUrl?: string | null;
+  readonly initialPreferredUrl?: string | null;
   /** Button size variant */
-  size?: 'sm' | 'md' | 'lg';
+  readonly size?: 'sm' | 'md' | 'lg';
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show the preference notice */
-  showPreferenceNotice?: boolean;
+  readonly showPreferenceNotice?: boolean;
   /** Custom preference notice text */
-  preferenceNoticeText?: string;
+  readonly preferenceNoticeText?: string;
   /** Whether to enable automatic preference saving */
-  savePreferences?: boolean;
+  readonly savePreferences?: boolean;
   /** Whether to enable deep linking */
-  enableDeepLinks?: boolean;
+  readonly enableDeepLinks?: boolean;
   /** Whether to enable analytics tracking */
-  enableTracking?: boolean;
+  readonly enableTracking?: boolean;
 }
 
 export function ListenSection({
