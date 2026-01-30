@@ -2,9 +2,9 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/app/(shell)/dashboard/actions';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 
 type CreatorProfileWithLinks = Awaited<
   ReturnType<typeof getCreatorProfileWithLinks>

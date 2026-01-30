@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
