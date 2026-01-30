@@ -63,7 +63,7 @@ const config = require('../performance-budgets.config.js') as BudgetConfig;
 const toKilobytes = (bytes: number) => bytes / 1024;
 
 const resolvePath = (path: string) =>
-  path.replace(/\[([^\]]+)\]/g, (_match, key: string) => {
+  path.replaceAll(/\[([^\]]+)\]/g, (_match, key: string) => {
     const normalizedKey = key.toLowerCase();
     const envKey = `PERF_BUDGET_${normalizedKey.toUpperCase()}`;
     const value = process.env[envKey] || DEFAULT_PARAMS[normalizedKey];
