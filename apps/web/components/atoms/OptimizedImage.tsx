@@ -14,28 +14,28 @@ import { cn } from '@/lib/utils';
 import { PlaceholderImage } from './PlaceholderImage';
 
 interface OptimizedImageProps {
-  src?: string | null;
-  alt: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-  shape?: 'circle' | 'square' | 'rounded';
-  className?: string;
-  priority?: boolean;
-  fill?: boolean;
-  width?: number;
-  height?: number;
-  quality?: number;
-  aspectRatio?: 'square' | 'video' | 'portrait' | 'wide' | number;
-  objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
-  objectPosition?: string;
-  sizes?: string;
-  placeholder?: 'blur' | 'empty';
-  blurDataURL?: string;
-  fallbackSrc?: string;
-  unoptimized?: boolean;
+  readonly src?: string | null;
+  readonly alt: string;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  readonly shape?: 'circle' | 'square' | 'rounded';
+  readonly className?: string;
+  readonly priority?: boolean;
+  readonly fill?: boolean;
+  readonly width?: number;
+  readonly height?: number;
+  readonly quality?: number;
+  readonly aspectRatio?: 'square' | 'video' | 'portrait' | 'wide' | number;
+  readonly objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
+  readonly objectPosition?: string;
+  readonly sizes?: string;
+  readonly placeholder?: 'blur' | 'empty';
+  readonly blurDataURL?: string;
+  readonly fallbackSrc?: string;
+  readonly unoptimized?: boolean;
   // SEO and accessibility
-  artistName?: string;
-  imageType?: 'avatar' | 'profile' | 'cover' | 'artwork' | 'icon';
-  enableVersioning?: boolean;
+  readonly artistName?: string;
+  readonly imageType?: 'avatar' | 'profile' | 'cover' | 'artwork' | 'icon';
+  readonly enableVersioning?: boolean;
 }
 
 const sizeClasses = {

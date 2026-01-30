@@ -18,15 +18,15 @@ import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
   /** When true, shows back arrow; when false, shows Jovie icon */
-  showBackButton: boolean;
+  readonly showBackButton: boolean;
   /** The artist handle for back navigation */
-  artistHandle: string;
+  readonly artistHandle: string;
   /** If true, creator has removed branding; hide upsell/claim CTA */
-  hideBranding?: boolean;
+  readonly hideBranding?: boolean;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
   /** Optional loading state to show animated spinner on the logo */
-  loading?: boolean;
+  readonly loading?: boolean;
 }
 
 /**
