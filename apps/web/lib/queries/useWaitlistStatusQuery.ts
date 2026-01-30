@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface WaitlistStatusResponse {
@@ -12,11 +13,7 @@ export interface WaitlistStatusResponse {
 async function fetchWaitlistStatus(
   signal?: AbortSignal
 ): Promise<WaitlistStatusResponse> {
-  const response = await fetch('/api/waitlist', { signal });
-  if (!response.ok) {
-    throw new Error('Failed to check waitlist status');
-  }
-  return response.json() as Promise<WaitlistStatusResponse>;
+  return fetchWithTimeout<WaitlistStatusResponse>('/api/waitlist', { signal });
 }
 
 /**
