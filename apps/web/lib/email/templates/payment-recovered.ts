@@ -44,7 +44,7 @@ export function getPaymentRecoveredText(
   data: PaymentRecoveredTemplateData
 ): string {
   const { userName, amountPaid, currency, planName } = data;
-  const dashboardUrl = getAppUrl('/app/dashboard');
+  const dashboardUrl = getAppUrl('/');
   const amount = formatAmount(amountPaid, currency);
 
   return `Hi ${userName},
@@ -72,7 +72,7 @@ export function getPaymentRecoveredHtml(
   data: PaymentRecoveredTemplateData
 ): string {
   const { userName, amountPaid, currency, planName } = data;
-  const dashboardUrl = getAppUrl('/app/dashboard');
+  const dashboardUrl = getAppUrl('/');
   const amount = formatAmount(amountPaid, currency);
   const safeName = escapeHtml(userName);
 

@@ -8,6 +8,7 @@
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   isSessionExists,
   isSignInSuggested,
@@ -138,7 +139,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       } catch (err) {
         // If user already has a session, redirect to dashboard
         if (isSessionExists(err)) {
-          base.router.push('/app/dashboard');
+          base.router.push(APP_ROUTES.DASHBOARD);
           return false;
         }
 
@@ -270,7 +271,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       } catch (err) {
         // If user already has a session, redirect to dashboard
         if (isSessionExists(err)) {
-          base.router.push('/app/dashboard');
+          base.router.push(APP_ROUTES.DASHBOARD);
           return;
         }
 
