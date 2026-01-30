@@ -7,46 +7,60 @@ const CONTACTS_LOADING_ROW_KEYS = Array.from(
 
 export default function ContactsLoading() {
   return (
-    <div className='min-h-screen'>
-      <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-        {/* Header */}
-        <div className='flex items-center justify-between'>
+    <div className='flex h-full min-h-0 flex-col'>
+      {/* Header */}
+      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
+        <div className='flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6'>
           <div className='space-y-2'>
-            <LoadingSkeleton height='h-7' width='w-32' />
-            <LoadingSkeleton height='h-4' width='w-48' />
+            <LoadingSkeleton height='h-6' width='w-32' rounded='md' />
+            <LoadingSkeleton height='h-4' width='w-48' rounded='md' />
           </div>
-          <LoadingSkeleton height='h-10' width='w-32' rounded='lg' />
+          <LoadingSkeleton height='h-9' width='w-32' rounded='lg' />
         </div>
+      </div>
 
-        {/* Search/filter bar */}
-        <div className='mt-6 flex gap-3'>
-          <LoadingSkeleton height='h-10' width='w-64' rounded='lg' />
-          <LoadingSkeleton height='h-10' width='w-32' rounded='lg' />
-        </div>
-
-        {/* Contact list */}
-        <div className='mt-6 space-y-3'>
-          {CONTACTS_LOADING_ROW_KEYS.map(key => (
-            <div
-              key={key}
-              className='flex items-center gap-4 rounded-lg border border-subtle bg-surface-0 p-4'
-            >
-              <LoadingSkeleton
-                height='h-12'
-                width='w-12'
-                rounded='full'
-                className='shrink-0'
-              />
-              <div className='min-w-0 flex-1 space-y-1'>
-                <LoadingSkeleton height='h-4' width='w-40' />
-                <LoadingSkeleton height='h-3' width='w-48' />
-              </div>
-              <div className='flex gap-2'>
-                <LoadingSkeleton height='h-8' width='w-8' rounded='lg' />
-                <LoadingSkeleton height='h-8' width='w-8' rounded='lg' />
-              </div>
+      {/* Content area */}
+      <div className='flex-1 min-h-0 overflow-hidden'>
+        <div className='flex h-full min-h-0 flex-col bg-surface-1'>
+          {/* Search/filter bar */}
+          <div className='shrink-0 border-b border-subtle px-4 py-3 sm:px-6'>
+            <div className='flex gap-3'>
+              <LoadingSkeleton height='h-9' width='w-64' rounded='lg' />
+              <LoadingSkeleton height='h-9' width='w-32' rounded='lg' />
             </div>
-          ))}
+          </div>
+
+          {/* Contact list */}
+          <div className='flex-1 min-h-0 overflow-auto'>
+            <div className='space-y-3 px-4 py-4 sm:px-6'>
+              {CONTACTS_LOADING_ROW_KEYS.map(key => (
+                <div
+                  key={key}
+                  className='flex items-center gap-4 rounded-lg border border-subtle bg-surface-0 p-4'
+                >
+                  <LoadingSkeleton
+                    height='h-12'
+                    width='w-12'
+                    rounded='full'
+                    className='shrink-0'
+                  />
+                  <div className='min-w-0 flex-1 space-y-1'>
+                    <LoadingSkeleton height='h-4' width='w-40' rounded='md' />
+                    <LoadingSkeleton height='h-3' width='w-48' rounded='md' />
+                  </div>
+                  <div className='flex gap-2'>
+                    <LoadingSkeleton height='h-8' width='w-8' rounded='lg' />
+                    <LoadingSkeleton height='h-8' width='w-8' rounded='lg' />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className='shrink-0 border-t border-subtle bg-surface-1/75 px-4 py-2 backdrop-blur-md sm:px-6'>
+            <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
+          </div>
         </div>
       </div>
     </div>

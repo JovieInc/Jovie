@@ -15,6 +15,23 @@
  * ```
  */
 
+// Atom testing utilities
+export {
+  expectFastRender,
+  expectKeyboardNavigable,
+  expectProperAriaAttributes,
+  expectReducedMotionSupport,
+  expectScreenReaderAnnouncement,
+  measureRenderTime,
+  mockIconProps,
+  mockImageProps,
+  mockProgressSteps,
+  mockUser,
+  renderInForm,
+  renderWithTheme,
+  simulateKeyboard,
+  waitForFocus,
+} from './atoms';
 // Browser/DOM mocks
 export {
   type ClipboardMockOptions,

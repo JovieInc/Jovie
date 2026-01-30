@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetCreatorProfileWithLinks = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/db/queries', () => ({
-  getCreatorProfileWithLinks: mockGetCreatorProfileWithLinks,
+vi.mock('@/lib/services/profile', () => ({
+  getProfileWithLinks: mockGetCreatorProfileWithLinks,
 }));
 
 describe('GET /api/creator', () => {

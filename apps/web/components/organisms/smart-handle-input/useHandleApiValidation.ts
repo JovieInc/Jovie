@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Handle API Validation Hook
  *

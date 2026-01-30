@@ -32,3 +32,33 @@ export {
   getAppleMusicToken,
   isAppleMusicConfigured,
 } from './apple-music-auth';
+// Deezer Provider
+export {
+  bulkLookupDeezerByIsrc,
+  type DeezerEnrichedArtist,
+  DeezerError,
+  extractDeezerImageUrls,
+  getBestDeezerImageUrl,
+  getDeezerArtist,
+  getDeezerStats,
+  isDeezerAvailable,
+  lookupDeezerByIsrc,
+  searchDeezerArtist,
+  toDeezerEnrichedArtist,
+} from './deezer';
+// Spotify Provider
+export {
+  clearSpotifyTokenCache,
+  extractSpotifyImageUrls,
+  getBestSpotifyImageUrl,
+  getSpotifyArtistProfile,
+  getSpotifyArtists,
+  getSpotifyStats,
+  isSpotifyAvailable,
+  isSpotifyConfigured,
+  type SpotifyArtistProfile,
+  type SpotifyEnrichedArtist,
+  SpotifyError,
+  SpotifyNotConfiguredError,
+  toEnrichedArtist as toSpotifyEnrichedArtist,
+} from './spotify';

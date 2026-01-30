@@ -6,7 +6,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { APP_URL } from '@/constants/domains';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 /**
  * Secret key for signing unsubscribe tokens.

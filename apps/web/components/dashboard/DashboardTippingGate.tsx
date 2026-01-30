@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 
 const DashboardTipping = dynamic(
   () =>
-    import('@/components/dashboard/DashboardTipping').then(mod => ({
+    import('@/components/dashboard/dashboard-tipping').then(mod => ({
       default: mod.DashboardTipping,
     })),
   {

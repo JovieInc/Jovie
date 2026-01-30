@@ -43,13 +43,11 @@ export function DashboardAnalytics() {
 
   return (
     <div className='space-y-8'>
+      <h1 className='sr-only'>Analytics</h1>
       {/* Header */}
       <div className='flex items-start justify-between'>
         <div>
-          <h1 className='text-3xl font-bold tracking-tight text-primary-token'>
-            Analytics
-          </h1>
-          <p className='text-secondary-token mt-1'>
+          <p className='text-secondary-token'>
             Track your audience growth and engagement
           </p>
         </div>
