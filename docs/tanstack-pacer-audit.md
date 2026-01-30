@@ -60,7 +60,7 @@ Global defaults are configured in `CoreProviders.tsx`:
 ### Usage Locations
 
 | Feature | File | Hook Used |
-|---------|------|-----------|
+| --------- | ------ | ----------- |
 | Artist Search | `lib/queries/useArtistSearchQuery.ts` | `useAsyncDebouncer` (direct) |
 | Table Search | `components/organisms/table/molecules/TableSearchBar.tsx` | `useDebouncer` (direct) |
 | Handle Validation | `components/organisms/smart-handle-input/useHandleApiValidation.ts` | `useAsyncValidation` |
@@ -82,7 +82,7 @@ Global defaults are configured in `CoreProviders.tsx`:
 Several components bypass the centralized hooks and use TanStack Pacer directly:
 
 | Component | Current Usage | Recommended |
-|-----------|--------------|-------------|
+| ----------- | -------------- | ------------- |
 | `useArtistSearchQuery.ts:124` | Direct `useAsyncDebouncer` | Use `useAsyncSearch` hook |
 | `useLinksPersistence.ts:350` | Direct `useAsyncDebouncer` + custom flush | Use `useAutoSave` hook |
 | `TableSearchBar.tsx:36` | Direct `useDebouncer` | Create `useDebouncedInput` hook |
@@ -124,7 +124,7 @@ Network failures don't have automatic retry. Affected operations:
 Several files use hardcoded timing values instead of `PACER_TIMING`:
 
 | Location | Hardcoded Value | Should Use |
-|----------|-----------------|------------|
+| ---------- | ----------------- | ------------ |
 | `useLinksPersistence.ts:124` | `500` | `PACER_TIMING.SAVE_DEBOUNCE_MS` |
 | `useSortingManager.ts` | `150` | New `PACER_TIMING.SORT_DEBOUNCE_MS` |
 | `useSettingsProfile.ts` | `900` | New `PACER_TIMING.PROFILE_SAVE_DEBOUNCE_MS` |
@@ -135,7 +135,7 @@ Several files use hardcoded timing values instead of `PACER_TIMING`:
 The re-export file includes many unused capabilities:
 
 | Feature | Exported | Used | Potential Use Case |
-|---------|----------|------|-------------------|
+| --------- | ---------- | ------ | ------------------- |
 | `useRateLimiter`, `useAsyncRateLimiter` | ✅ | ❌ | API call rate limiting (chat, validation) |
 | `AsyncRetryer` | ✅ | ❌ | Network failure recovery |
 | `useBatcher`, `useAsyncBatcher` | ✅ | ❌ | Bulk link saves |
@@ -161,7 +161,7 @@ The re-export file includes many unused capabilities:
 Not all TanStack Pacer usages leverage the centralized error utilities from `/lib/pacer/errors.ts`:
 
 | File | Uses `isAbortError` | Uses `formatPacerError` |
-|------|---------------------|------------------------|
+| ------ | --------------------- | ------------------------ |
 | `useAsyncValidation.ts` | ✅ | ❌ |
 | `useAsyncSearch.ts` | ✅ | ❌ |
 | `useArtistSearchQuery.ts` | ❌ | ❌ |
@@ -219,7 +219,7 @@ Create a `useAsyncValidationWithRetry` wrapper:
 
 ```typescript
 // lib/pacer/hooks/useAsyncValidationWithRetry.ts
-import { AsyncRetryer } from '@tanstack/react-pacer';
+import { AsyncRetryer, isNetworkError } from '@tanstack/react-pacer';
 
 export function useAsyncValidationWithRetry<TValue, TResult>(
   options: UseAsyncValidationOptions<TValue, TResult> & {
@@ -274,7 +274,7 @@ export const PACER_TIMING = {
 #### 4. Migrate Direct Usages to Centralized Hooks
 
 | File | Action |
-|------|--------|
+| ------ | -------- |
 | `useArtistSearchQuery.ts` | Consider using `useAsyncSearch` or document why TanStack Query is preferred |
 | `useLinksPersistence.ts` | Refactor to use `useAutoSave` with extracted versioning logic |
 | `TableSearchBar.tsx` | Create `useDebouncedInput` hook for input state sync pattern |
@@ -397,7 +397,7 @@ if (PACER_DEBUG) {
 ## Metrics to Track
 
 | Metric | Current | Target |
-|--------|---------|--------|
+| -------- | --------- | -------- |
 | Direct TanStack Pacer imports | 7 files | 0 files (all via centralized hooks) |
 | Hardcoded timing values | 4 locations | 0 locations |
 | Error handling coverage | 40% | 100% |
