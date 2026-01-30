@@ -17,8 +17,8 @@ import type { AudienceMember } from '@/types';
 import { EMPTY_VALUE_FALLBACK, formatDeviceTypeLabel } from './utils';
 
 interface CopyableValueProps {
-  value: string;
-  label: string;
+  readonly value: string;
+  readonly label: string;
 }
 
 function CopyableValue({ value, label }: CopyableValueProps) {
@@ -65,7 +65,7 @@ function CopyableValue({ value, label }: CopyableValueProps) {
 }
 
 interface AudienceMemberDetailsProps {
-  member: AudienceMember;
+  readonly member: AudienceMember;
 }
 
 export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {

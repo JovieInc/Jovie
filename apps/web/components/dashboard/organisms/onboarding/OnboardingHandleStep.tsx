@@ -33,9 +33,9 @@ function ValidationIcon({
   hasError,
   isValid,
 }: {
-  checking: boolean;
-  hasError: boolean;
-  isValid: boolean;
+  readonly checking: boolean;
+  readonly hasError: boolean;
+  readonly isValid: boolean;
 }) {
   if (checking) {
     return <LoadingSpinner size='sm' className='text-secondary-token' />;
@@ -104,9 +104,9 @@ function ButtonContent({
   isPendingSubmit,
   isChecking,
 }: {
-  isSubmitting: boolean;
-  isPendingSubmit: boolean;
-  isChecking: boolean;
+  readonly isSubmitting: boolean;
+  readonly isPendingSubmit: boolean;
+  readonly isChecking: boolean;
 }) {
   if (isSubmitting) {
     return (

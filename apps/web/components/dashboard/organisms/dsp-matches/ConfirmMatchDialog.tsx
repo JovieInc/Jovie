@@ -23,15 +23,15 @@ import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 export interface ConfirmMatchDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  isConfirming?: boolean;
-  matchData: {
-    matchId: string;
-    providerId: DspProviderId;
-    externalArtistName: string;
-    externalArtistUrl?: string | null;
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: () => void;
+  readonly isConfirming?: boolean;
+  readonly matchData: {
+    readonly matchId: string;
+    readonly providerId: DspProviderId;
+    readonly externalArtistName: string;
+    readonly externalArtistUrl?: string | null;
     externalArtistImageUrl?: string | null;
     confidenceScore: number;
     confidenceBreakdown?: ConfidenceBreakdownData;
