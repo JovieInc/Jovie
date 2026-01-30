@@ -30,9 +30,9 @@ function sanitizeSlug(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/[^a-z0-9-]/g, '-')
+    .replaceAll(/-+/g, '-')
     .replace(/^-/, '')
     .replace(/-$/, '');
 }
