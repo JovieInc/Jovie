@@ -3,18 +3,18 @@
 import { useMemo } from 'react';
 
 interface ProgressStep {
-  id: string;
-  title: string;
-  description?: string;
-  estimatedTimeSeconds?: number;
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly estimatedTimeSeconds?: number;
 }
 
 interface ProgressIndicatorProps {
-  currentStep: number;
-  totalSteps: number;
-  steps: ProgressStep[];
-  showTimeEstimate?: boolean;
-  className?: string;
+  readonly currentStep: number;
+  readonly totalSteps: number;
+  readonly steps: ProgressStep[];
+  readonly showTimeEstimate?: boolean;
+  readonly className?: string;
 }
 
 export function ProgressIndicator({

@@ -52,7 +52,7 @@ export function findDuplicate<T extends DetectedLink>(
   );
 
   const duplicate =
-    duplicateIndex !== -1 ? existingLinks[duplicateIndex] : null;
+    duplicateIndex === -1 ? null : existingLinks[duplicateIndex];
   const duplicateSection = duplicate ? sectionOf(duplicate) : null;
 
   const hasCrossSectionDuplicate =

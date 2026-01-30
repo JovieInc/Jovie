@@ -25,13 +25,13 @@ function buildSummary(contact: EditableContact): string {
 }
 
 export interface ContactItemProps {
-  contact: EditableContact;
-  onUpdate: (updates: Partial<EditableContact>) => void;
-  onToggleTerritory: (territory: string) => void;
-  onAddCustomTerritory: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
+  readonly contact: EditableContact;
+  readonly onUpdate: (updates: Partial<EditableContact>) => void;
+  readonly onToggleTerritory: (territory: string) => void;
+  readonly onAddCustomTerritory: () => void;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+  readonly onDelete: () => void;
 }
 
 export const ContactItem = memo(function ContactItem({

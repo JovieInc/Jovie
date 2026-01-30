@@ -9,6 +9,21 @@ let validationCompleted = false;
 let validationResult: ReturnType<typeof validateAndLogEnvironment> | null =
   null;
 
+// Track validation attempt timing for cold start detection
+let firstValidationTime: number | null = null;
+
+// Cold start retry window (must match instrumentation.ts retry intervals)
+const RETRY_WINDOW_MS = 5000;
+
+/**
+ * Reset validation state (useful for testing)
+ */
+export function resetValidationState(): void {
+  validationCompleted = false;
+  validationResult = null;
+  firstValidationTime = null;
+}
+
 function logEnvironmentInfo() {
   const envInfo = getEnvironmentInfo();
   console.log('[STARTUP] Environment Info:', {
@@ -60,13 +75,86 @@ function logValidationSummary(
   );
 }
 
+function isWithinRetryWindow(currentTime: number): boolean {
+  if (!firstValidationTime) {
+    return false;
+  }
+  const timeSinceFirst = currentTime - firstValidationTime;
+  return timeSinceFirst < RETRY_WINDOW_MS;
+}
+
+function handleCriticalIssuesInProduction(
+  hasCriticalIssues: boolean,
+  isProduction: boolean,
+  currentTime: number
+): void {
+  if (!hasCriticalIssues || !isProduction) {
+    return;
+  }
+
+  const withinRetryWindow = isWithinRetryWindow(currentTime);
+  if (withinRetryWindow) {
+    const timeSinceFirst = currentTime - (firstValidationTime || currentTime);
+    console.warn(
+      `[STARTUP] Critical issues detected but within retry window ` +
+        `(${timeSinceFirst}ms < ${RETRY_WINDOW_MS}ms) - allowing retry`
+    );
+    return;
+  }
+
+  validationCompleted = true;
+  throw new Error('Critical environment validation failed');
+}
+
+function shouldMarkValidationComplete(
+  hasCriticalIssues: boolean,
+  currentTime: number
+): boolean {
+  if (!hasCriticalIssues) {
+    return true;
+  }
+  return !isWithinRetryWindow(currentTime);
+}
+
+function createTransientErrorResult(): ReturnType<
+  typeof validateAndLogEnvironment
+> {
+  return {
+    valid: false,
+    errors: ['Environment validation error (transient)'],
+    warnings: [],
+    critical: [],
+  };
+}
+
+function createPermanentErrorResult(): ReturnType<
+  typeof validateAndLogEnvironment
+> {
+  return {
+    valid: false,
+    errors: ['Environment validation crashed'],
+    warnings: [],
+    critical: ['Failed to validate environment'],
+  };
+}
+
 /**
  * Run environment validation at application startup
  * This should be called early in the application lifecycle
  */
 export async function runStartupEnvironmentValidation() {
-  // Avoid duplicate validation
-  if (validationCompleted) {
+  // Track timing
+  const currentTime = Date.now();
+  if (!firstValidationTime) {
+    firstValidationTime = currentTime;
+  }
+
+  // Return cached result if available
+  if (validationCompleted && validationResult) {
+    const timeSinceFirst = currentTime - (firstValidationTime || currentTime);
+    console.log(
+      `[STARTUP] Using cached validation result (validated ${timeSinceFirst}ms ago)`
+    );
     return validationResult;
   }
 
@@ -82,24 +170,31 @@ export async function runStartupEnvironmentValidation() {
       isProduction
     );
 
-    if (hasCriticalIssues && isProduction) {
-      validationCompleted = true;
-      throw new Error('Critical environment validation failed');
-    }
+    handleCriticalIssuesInProduction(
+      hasCriticalIssues,
+      isProduction,
+      currentTime
+    );
 
     logValidationSummary(validationResult);
 
-    validationCompleted = true;
+    if (shouldMarkValidationComplete(hasCriticalIssues, currentTime)) {
+      validationCompleted = true;
+    }
+
     return validationResult;
   } catch (error) {
     console.error('[STARTUP] Environment validation failed:', error);
-    validationResult = {
-      valid: false,
-      errors: ['Environment validation crashed'],
-      warnings: [],
-      critical: ['Failed to validate environment'],
-    };
-    validationCompleted = true;
+
+    const withinRetryWindow = isWithinRetryWindow(currentTime);
+    validationResult = withinRetryWindow
+      ? createTransientErrorResult()
+      : createPermanentErrorResult();
+
+    if (!withinRetryWindow) {
+      validationCompleted = true;
+    }
+
     return validationResult;
   }
 }

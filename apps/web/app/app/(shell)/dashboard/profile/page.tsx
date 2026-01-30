@@ -3,7 +3,7 @@ import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/Laz
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
-import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
+import { getDashboardData, getProfileSocialLinks } from '../actions';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +17,7 @@ export default async function ProfilePage() {
 
   try {
     // Fetch dashboard data server-side (cached per request)
-    const dashboardData = await getDashboardDataCached();
+    const dashboardData = await getDashboardData();
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {

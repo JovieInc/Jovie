@@ -8,11 +8,11 @@ import { ComboboxOptionItem } from './ComboboxOptionItem';
 import type { ComboboxOption } from './types';
 
 interface ComboboxDropdownProps {
-  listboxId: string;
-  isOpen: boolean;
-  isLoading: boolean;
-  query: string;
-  filteredOptions: ComboboxOption[];
+  readonly listboxId: string;
+  readonly isOpen: boolean;
+  readonly isLoading: boolean;
+  readonly query: string;
+  readonly filteredOptions: ComboboxOption[];
 }
 
 export const ComboboxDropdown = forwardRef<

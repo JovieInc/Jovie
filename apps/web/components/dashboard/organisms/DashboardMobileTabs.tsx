@@ -99,7 +99,7 @@ const MORE_MENU_ITEMS: DashboardMobileTab[] = [
 ];
 
 export interface DashboardMobileTabsProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {

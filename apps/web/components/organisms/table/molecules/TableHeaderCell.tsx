@@ -7,12 +7,12 @@ import { cn, iconColors } from '../table.styles';
 
 interface TableHeaderCellProps<TData>
   extends Readonly<{
-    header: Header<TData, unknown>;
-    canSort: boolean;
-    sortDirection: false | 'asc' | 'desc';
-    stickyHeaderClass: string;
-    tableHeaderClass: string;
-    onToggleSort?: (event: unknown) => void;
+    readonly header: Header<TData, unknown>;
+    readonly canSort: boolean;
+    readonly sortDirection: false | 'asc' | 'desc';
+    readonly stickyHeaderClass: string;
+    readonly tableHeaderClass: string;
+    readonly onToggleSort?: (event: unknown) => void;
   }> {}
 
 /**
@@ -50,7 +50,7 @@ export function TableHeaderCell<TData>({
       aria-sort={ariaSort}
       className={cn(stickyHeaderClass)}
       style={{
-        width: header.getSize() !== 150 ? header.getSize() : undefined,
+        width: header.getSize() === 150 ? undefined : header.getSize(),
       }}
     >
       {(() => {

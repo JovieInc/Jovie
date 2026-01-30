@@ -65,40 +65,42 @@ export function WaitlistSocialStep({
         <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
       </div>
 
-      <fieldset
-        className='flex items-center justify-center gap-2'
-        onKeyDown={onPlatformKeyDown}
-        disabled={isSubmitting}
-      >
-        <legend className='sr-only'>Social platform</legend>
-        {SOCIAL_PLATFORM_OPTIONS.map((option, index) => {
-          const isSelected = socialPlatform === option.value;
-          return (
-            <label
-              key={option.value}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909] ${
-                isSelected
-                  ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
-                  : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
-              }`}
-            >
-              <input
-                ref={el => {
-                  platformButtonRefs.current[index] = el;
-                  setPlatformButtonRef(index, el);
-                }}
-                type='radio'
-                name='social-platform'
-                value={option.value}
-                checked={isSelected}
-                onChange={() => onPlatformSelect(option.value)}
-                className='sr-only'
-              />
-              {option.label}
-            </label>
-          );
-        })}
-      </fieldset>
+      <div>
+        <fieldset
+          className='flex items-center justify-center gap-2'
+          disabled={isSubmitting}
+        >
+          <legend className='sr-only'>Social platform</legend>
+          {SOCIAL_PLATFORM_OPTIONS.map((option, index) => {
+            const isSelected = socialPlatform === option.value;
+            return (
+              <label
+                key={option.value}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909] ${
+                  isSelected
+                    ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
+                    : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
+                }`}
+              >
+                <input
+                  ref={el => {
+                    platformButtonRefs.current[index] = el;
+                    setPlatformButtonRef(index, el);
+                  }}
+                  type='radio'
+                  name='social-platform'
+                  value={option.value}
+                  checked={isSelected}
+                  onChange={() => onPlatformSelect(option.value)}
+                  onKeyDown={onPlatformKeyDown}
+                  className='sr-only'
+                />
+                {option.label}
+              </label>
+            );
+          })}
+        </fieldset>
+      </div>
 
       <div>
         {socialPlatform === 'other' ? (

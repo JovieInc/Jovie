@@ -5,12 +5,12 @@ import type { ComponentType } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 
 export interface SettingsProGateCardProps {
-  title: string;
-  description: string;
-  icon: ComponentType<{ className?: string }>;
-  onUpgrade: () => void;
-  loading: boolean;
-  buttonClassName?: string;
+  readonly title: string;
+  readonly description: string;
+  readonly icon: ComponentType<{ className?: string }>;
+  readonly onUpgrade: () => void;
+  readonly loading: boolean;
+  readonly buttonClassName?: string;
 }
 
 export function SettingsProGateCard({

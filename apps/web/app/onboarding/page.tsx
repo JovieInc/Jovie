@@ -23,7 +23,7 @@ interface OnboardingPageProps {
  */
 export default async function OnboardingPage({
   searchParams,
-}: OnboardingPageProps) {
+}: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
 
   // proxy.ts already ensured user needsOnboarding

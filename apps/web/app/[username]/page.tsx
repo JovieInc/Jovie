@@ -11,13 +11,13 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
+  getProfileWithLinks as getCreatorProfileWithLinks,
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from '@/lib/services/profile';
@@ -407,7 +407,7 @@ export default async function ArtistPage({
       <ConsentBanner />
       {showClaimBanner && (
         <ClaimBanner
-          claimToken={claimTokenParam!}
+          claimToken={claimTokenParam}
           profileHandle={profile.username}
           displayName={profile.display_name || undefined}
         />

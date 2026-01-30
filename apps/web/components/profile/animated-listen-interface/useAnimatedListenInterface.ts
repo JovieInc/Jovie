@@ -115,10 +115,10 @@ export function useAnimatedListenInterface(
           await openDeepLink(dsp.url, deepLinkConfig);
         } catch (error) {
           console.debug('Deep link failed, using fallback:', error);
-          window.open(dsp.url, '_blank', 'noopener,noreferrer');
+          globalThis.open(dsp.url, '_blank', 'noopener,noreferrer');
         }
       } else {
-        window.open(dsp.url, '_blank', 'noopener,noreferrer');
+        globalThis.open(dsp.url, '_blank', 'noopener,noreferrer');
       }
     } catch (error) {
       console.error('Failed to handle DSP click:', error);

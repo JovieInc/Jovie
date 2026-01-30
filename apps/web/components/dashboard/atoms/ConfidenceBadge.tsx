@@ -3,10 +3,10 @@
 import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 
 export interface ConfidenceBadgeProps {
-  score: number; // 0-1 decimal
-  size?: 'sm' | 'md';
-  showLabel?: boolean;
-  className?: string;
+  readonly score: number; // 0-1 decimal
+  readonly size?: 'sm' | 'md';
+  readonly showLabel?: boolean;
+  readonly className?: string;
 }
 
 type ConfidenceLevel = 'high' | 'medium' | 'low';

@@ -28,7 +28,7 @@ const active = isDev || isPreview;
 
 function safeConsole() {
   // Ensure console exists in all environments
-  return typeof console !== 'undefined' ? console : ({} as Console);
+  return typeof console === 'undefined' ? ({} as Console) : console;
 }
 
 function formatMsg(scope: string | undefined, msg: unknown) {

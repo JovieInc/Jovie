@@ -24,12 +24,12 @@ type DialogSize = keyof typeof sizes;
 type UiDialogRootProps = React.ComponentPropsWithoutRef<typeof UiDialog>;
 
 interface DialogProps extends Omit<UiDialogRootProps, 'open' | 'onOpenChange'> {
-  open: boolean;
-  onClose: () => void;
-  size?: DialogSize;
-  hideClose?: boolean;
-  className?: string;
-  children: React.ReactNode;
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly size?: DialogSize;
+  readonly hideClose?: boolean;
+  readonly className?: string;
+  readonly children: React.ReactNode;
 }
 
 export function Dialog({

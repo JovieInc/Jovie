@@ -10,8 +10,8 @@ import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLi
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 interface DashboardPreviewProps {
-  artist: Artist;
-  socialLinksOverride?: LegacySocialLink[];
+  readonly artist: Artist;
+  readonly socialLinksOverride?: LegacySocialLink[];
 }
 
 export const DashboardPreview: React.FC<DashboardPreviewProps> = ({

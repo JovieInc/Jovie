@@ -3,10 +3,10 @@
 import { cn } from '@/lib/utils';
 
 export interface SortableHeaderButtonProps {
-  label: string;
-  direction?: 'asc' | 'desc';
-  onClick: () => void;
-  className?: string;
+  readonly label: string;
+  readonly direction?: 'asc' | 'desc';
+  readonly onClick: () => void;
+  readonly className?: string;
 }
 
 function getSortIndicator(direction?: 'asc' | 'desc'): string {

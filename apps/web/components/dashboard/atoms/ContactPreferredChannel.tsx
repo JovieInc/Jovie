@@ -3,9 +3,9 @@
 import type { ContactChannel } from '@/types/contacts';
 
 export interface ContactPreferredChannelProps {
-  contactId: string;
-  preferredChannel: ContactChannel | null | undefined;
-  onChannelChange: (channel: ContactChannel) => void;
+  readonly contactId: string;
+  readonly preferredChannel: ContactChannel | null | undefined;
+  readonly onChannelChange: (channel: ContactChannel) => void;
 }
 
 export function ContactPreferredChannel({

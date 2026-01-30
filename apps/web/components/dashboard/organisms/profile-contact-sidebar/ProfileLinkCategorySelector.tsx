@@ -6,8 +6,8 @@ import type { LinkSection } from '@/components/dashboard/organisms/links/utils/l
 export type CategoryOption = LinkSection | 'all';
 
 interface Category {
-  id: CategoryOption;
-  label: string;
+  readonly id: CategoryOption;
+  readonly label: string;
 }
 
 const CATEGORIES: Category[] = [
@@ -18,9 +18,9 @@ const CATEGORIES: Category[] = [
 ];
 
 export interface ProfileLinkCategorySelectorProps {
-  selectedCategory: CategoryOption;
-  onCategoryChange: (category: CategoryOption) => void;
-  categoryCounts?: Partial<Record<CategoryOption, number>>;
+  readonly selectedCategory: CategoryOption;
+  readonly onCategoryChange: (category: CategoryOption) => void;
+  readonly categoryCounts?: Partial<Record<CategoryOption, number>>;
 }
 
 export function ProfileLinkCategorySelector({

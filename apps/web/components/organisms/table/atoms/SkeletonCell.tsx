@@ -6,17 +6,17 @@ interface SkeletonCellProps
      * Width of the skeleton (e.g., '120px', 'w-40')
      * Should match the actual cell width to prevent layout shift
      */
-    width?: string;
+    readonly width?: string;
 
     /**
      * Type of skeleton to render
      */
-    variant?: 'text' | 'avatar' | 'badge' | 'button';
+    readonly variant?: 'text' | 'avatar' | 'badge' | 'button';
 
     /**
      * Additional CSS classes
      */
-    className?: string;
+    readonly className?: string;
   }> {}
 
 /**

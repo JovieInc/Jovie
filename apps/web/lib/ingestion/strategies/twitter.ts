@@ -60,7 +60,7 @@ export async function fetchTwitterDocument(
     timeoutMs: TWITTER_CONFIG.defaultTimeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     allowedHosts: TWITTER_CONFIG.validHosts,
   });

@@ -24,13 +24,13 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
       setEffectiveHandle(next && next.length > 0 ? next : handle);
     };
 
-    window.addEventListener(
+    globalThis.addEventListener(
       'jovie-hero-handle-change',
       listener as EventListener
     );
 
     return () => {
-      window.removeEventListener(
+      globalThis.removeEventListener(
         'jovie-hero-handle-change',
         listener as EventListener
       );

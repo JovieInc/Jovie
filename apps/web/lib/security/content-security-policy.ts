@@ -152,7 +152,7 @@ export const buildContentSecurityPolicyReportOnly = (
   // Use provided reportUri if explicitly set (including null to disable),
   // otherwise fall back to fetching it
   const reportUri =
-    options.reportUri !== undefined ? options.reportUri : getCspReportUri();
+    options.reportUri === undefined ? getCspReportUri() : options.reportUri;
   if (!reportUri) {
     // No reporting configured - skip report-only header
     return null;

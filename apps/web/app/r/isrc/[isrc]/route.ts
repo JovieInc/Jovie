@@ -16,11 +16,8 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles, discogTracks } from '@/lib/db/schema';
+import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import {
-  checkPublicRateLimit,
-  getPublicRateLimitStatus,
-} from '@/lib/utils/rate-limit';
 
 // ISRC format: 12 alphanumeric characters (dashes are optional and stripped)
 const ISRC_PATTERN = /^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$/i;
@@ -37,17 +34,15 @@ export async function GET(
 ) {
   // Public rate limiting check (per-IP) before any DB access
   const clientIP = extractClientIP(request.headers);
-  if (checkPublicRateLimit(clientIP, 'visit')) {
-    const status = getPublicRateLimitStatus(clientIP, 'visit');
+  const rateLimitResult = await publicVisitLimiter.limit(clientIP);
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: 'Rate limit exceeded' },
       {
         status: 429,
         headers: {
           ...NO_STORE_HEADERS,
-          'Retry-After': String(status.retryAfterSeconds),
-          'X-RateLimit-Limit': String(status.limit),
-          'X-RateLimit-Remaining': String(status.remaining),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );

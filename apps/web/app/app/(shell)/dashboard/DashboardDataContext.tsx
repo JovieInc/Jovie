@@ -13,7 +13,7 @@ interface DashboardDataProviderProps {
 export function DashboardDataProvider({
   value,
   children,
-}: DashboardDataProviderProps) {
+}: Readonly<DashboardDataProviderProps>) {
   return (
     <DashboardDataContext.Provider value={value}>
       {children}
@@ -24,7 +24,7 @@ export function DashboardDataProvider({
 export function useDashboardData(): DashboardData {
   const context = useContext(DashboardDataContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'useDashboardData must be used within a DashboardDataProvider'
     );
   }

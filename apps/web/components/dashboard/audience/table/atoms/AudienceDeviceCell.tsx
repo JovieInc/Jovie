@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { getDeviceIndicator } from '@/lib/utils/audience';
 
 export interface AudienceDeviceCellProps {
-  deviceType: string | null;
-  className?: string;
+  readonly deviceType: string | null;
+  readonly className?: string;
 }
 
 export function AudienceDeviceCell({

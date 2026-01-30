@@ -8,14 +8,14 @@ interface SkeletonRowProps {
   /**
    * Number of columns in the row
    */
-  columns: number;
+  readonly columns: number;
 
   /**
    * Column configuration for skeleton cells
    */
-  columnConfig?: Array<{
-    width?: string;
-    variant?: 'text' | 'avatar' | 'badge' | 'button';
+  readonly columnConfig?: Array<{
+    readonly width?: string;
+    readonly variant?: 'text' | 'avatar' | 'badge' | 'button';
   }>;
 
   /**
@@ -23,12 +23,12 @@ interface SkeletonRowProps {
    * Should match actual row height to prevent layout shift
    * @default '52px'
    */
-  height?: string;
+  readonly height?: string;
 
   /**
    * Additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

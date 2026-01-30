@@ -5,10 +5,10 @@ import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
 
 export interface DspProviderIconProps {
-  provider: DspProviderId;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-  showLabel?: boolean;
+  readonly provider: DspProviderId;
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly className?: string;
+  readonly showLabel?: boolean;
 }
 
 const PROVIDER_LABELS: Record<DspProviderId, string> = {

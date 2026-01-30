@@ -13,10 +13,10 @@ export function validateClerkUserId(userId: string): void {
   // Clerk user IDs are alphanumeric with underscores, typically starting with 'user_'
   const clerkIdPattern = /^[a-zA-Z0-9_-]+$/;
   if (!clerkIdPattern.test(userId)) {
-    throw new Error('Invalid user ID format');
+    throw new TypeError('Invalid user ID format');
   }
   if (userId.length > 255) {
-    throw new Error('User ID too long');
+    throw new TypeError('User ID too long');
   }
 }
 
@@ -33,7 +33,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   // Validate userId format to prevent SQL injection
@@ -97,7 +97,7 @@ export async function withDbSessionTx<T>(
   // In tests, db may be a lightweight mock without transaction support.
   if (typeof (db as DbType).transaction !== 'function') {
     // Fall back to using the mocked db object directly.
-    return await operation(db as unknown as DbType, userId);
+    return await operation(db, userId);
   }
 
   return await db.transaction(async tx => {
@@ -129,7 +129,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Authentication required');
+    throw new TypeError('Authentication required');
   }
   return userId;
 }
@@ -310,7 +310,7 @@ export async function getSessionContext(options?: {
 
   // User not found
   if (!result && requireUser) {
-    throw new Error('User not found');
+    throw new TypeError('User not found');
   }
 
   if (!result) {
@@ -347,7 +347,7 @@ export async function getSessionContext(options?: {
     : null;
 
   if (!profile && requireProfile) {
-    throw new Error('Profile not found');
+    throw new TypeError('Profile not found');
   }
 
   return {

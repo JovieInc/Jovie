@@ -94,19 +94,19 @@ function getGlowConfig(
 
 export interface FeatureCardProps {
   /** Feature title */
-  title: string;
+  readonly title: string;
   /** Feature description */
-  description: string;
+  readonly description: string;
   /** Optional metric or badge text */
-  metric?: string;
+  readonly metric?: string;
   /** Icon element to display */
-  icon: React.ReactNode;
+  readonly icon: React.ReactNode;
   /** Color accent for the icon */
-  accent?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray';
+  readonly accent?: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray';
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show hover effects */
-  interactive?: boolean;
+  readonly interactive?: boolean;
 }
 
 export function FeatureCard({

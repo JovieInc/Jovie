@@ -4,21 +4,20 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AdminTableShellRenderProps {
-  headerElevated: boolean;
+  readonly headerElevated: boolean;
   /** Pixel offset for sticky table headers when a toolbar is present. */
-  stickyTopPx: number;
+  readonly stickyTopPx: number;
 }
 
 export interface AdminTableShellProps {
-  toolbar?: React.ReactNode;
-  footer?: React.ReactNode;
-  children: (props: AdminTableShellRenderProps) => React.ReactNode;
-  className?: string;
-  scrollContainerProps?: Omit<
-    React.HTMLAttributes<HTMLDivElement>,
-    'children' | 'className' | 'ref'
+  readonly toolbar?: React.ReactNode;
+  readonly footer?: React.ReactNode;
+  readonly children: (props: AdminTableShellRenderProps) => React.ReactNode;
+  readonly className?: string;
+  readonly scrollContainerProps?: Readonly<
+    Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'ref'>
   >;
-  scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 const TOOLBAR_HEIGHT_PX = 56;
@@ -36,7 +35,7 @@ export function AdminTableShell({
   className,
   scrollContainerProps,
   scrollContainerRef: externalRef,
-}: AdminTableShellProps) {
+}: Readonly<AdminTableShellProps>) {
   const internalRef = React.useRef<HTMLDivElement | null>(null);
   const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
@@ -51,7 +50,7 @@ export function AdminTableShell({
     const updateHeaderElevation = () => {
       rafIdRef.current = null;
       const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
       lastScrollTimeRef.current = Date.now();
     };
 
@@ -62,15 +61,16 @@ export function AdminTableShell({
       // Skip if we're within the throttle window
       if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
         // Schedule one final update after throttle period ends
-        if (rafIdRef.current === null) {
-          rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
+        if (rafIdRef.current !== null) {
+          return;
         }
+        rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
         return;
       }
 
       lastScrollTimeRef.current = now;
       const isScrolled = container.scrollTop > 0;
-      setHeaderElevated(prev => (prev !== isScrolled ? isScrolled : prev));
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
     };
 
     // Initial check
@@ -79,9 +79,10 @@ export function AdminTableShell({
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
+      if (rafIdRef.current === null) {
+        return;
       }
+      cancelAnimationFrame(rafIdRef.current);
     };
   }, [tableContainerRef]);
 

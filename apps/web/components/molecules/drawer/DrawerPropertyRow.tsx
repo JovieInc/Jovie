@@ -4,12 +4,12 @@ import { type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerPropertyRowProps {
-  label: string;
-  value: ReactNode;
-  labelWidth?: number;
-  interactive?: boolean;
-  onClick?: () => void;
-  className?: string;
+  readonly label: string;
+  readonly value: ReactNode;
+  readonly labelWidth?: number;
+  readonly interactive?: boolean;
+  readonly onClick?: () => void;
+  readonly className?: string;
 }
 
 export function DrawerPropertyRow({

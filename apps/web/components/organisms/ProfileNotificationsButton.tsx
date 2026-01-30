@@ -6,11 +6,11 @@ import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
 type ProfileNotificationsButtonProps = {
-  hasActiveSubscriptions: boolean;
-  notificationsState: ProfileNotificationsState;
-  onClick: () => void;
-  ariaExpanded?: boolean;
-  buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  readonly hasActiveSubscriptions: boolean;
+  readonly notificationsState: ProfileNotificationsState;
+  readonly onClick: () => void;
+  readonly ariaExpanded?: boolean;
+  readonly buttonRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
 export function ProfileNotificationsButton({

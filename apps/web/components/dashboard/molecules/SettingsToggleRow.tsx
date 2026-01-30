@@ -5,14 +5,14 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SettingsToggleRowProps {
-  id?: string;
-  title: string;
-  description?: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  disabled?: boolean;
-  className?: string;
-  ariaLabel: string;
+  readonly id?: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly checked: boolean;
+  readonly onCheckedChange: (checked: boolean) => void;
+  readonly disabled?: boolean;
+  readonly className?: string;
+  readonly ariaLabel: string;
 }
 
 export function SettingsToggleRow({

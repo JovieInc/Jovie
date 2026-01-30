@@ -3,10 +3,10 @@
 import { Button } from '@jovie/ui';
 
 export interface CookieActionsProps {
-  onAcceptAll: () => void;
-  onReject: () => void;
-  onCustomize: () => void;
-  className?: string;
+  readonly onAcceptAll: () => void;
+  readonly onReject: () => void;
+  readonly onCustomize: () => void;
+  readonly className?: string;
 }
 
 export function CookieActions({

@@ -31,7 +31,7 @@ export async function getLegalDocument(
 ): Promise<LegalDocument> {
   const docInfo = LEGAL_DOCS[slug];
   if (!docInfo) {
-    throw new Error(`Unknown legal document slug: ${slug}`);
+    throw new SyntaxError(`Unknown legal document slug: ${slug}`);
   }
 
   const doc = await getMarkdownDocument(docInfo.file);

@@ -10,15 +10,15 @@ export interface DotBadgeVariant {
 
 export interface DotBadgeProps {
   /** Text label to display */
-  label: ReactNode;
+  readonly label: ReactNode;
   /** Size variant */
-  size?: 'sm' | 'md';
+  readonly size?: 'sm' | 'md';
   /** Style variant with className and dotClassName */
-  variant: DotBadgeVariant;
+  readonly variant: DotBadgeVariant;
   /** Optional title for accessibility */
-  title?: string;
+  readonly title?: string;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
 }
 
 const SIZE_CLASSES = {

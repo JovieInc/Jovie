@@ -39,17 +39,17 @@ function getGreetingName(artistName: string | null | undefined): string {
 }
 
 interface DashboardOverviewProps {
-  artist: Artist | null;
-  hasSocialLinks: boolean;
-  hasMusicLinks?: boolean;
+  readonly artist: Artist | null;
+  readonly hasSocialLinks: boolean;
+  readonly hasMusicLinks?: boolean;
 }
 
 interface SetupTaskItemProps {
-  isComplete: boolean;
-  stepNumber: number;
-  label: string;
-  actionHref: string;
-  actionLabel: string;
+  readonly isComplete: boolean;
+  readonly stepNumber: number;
+  readonly label: string;
+  readonly actionHref: string;
+  readonly actionLabel: string;
 }
 
 function SetupTaskItem({

@@ -54,7 +54,7 @@ function createToggleParser<TKey extends string>(
         >;
 
         if (!payload.profileId || typeof payload[fieldName] !== 'boolean') {
-          throw new Error(`profileId and ${fieldName} are required`);
+          throw new TypeError(`profileId and ${fieldName} are required`);
         }
 
         return {
@@ -68,7 +68,7 @@ function createToggleParser<TKey extends string>(
         const fieldValue = formData.get(fieldName);
 
         if (typeof profileId !== 'string' || profileId.length === 0) {
-          throw new Error('profileId is required');
+          throw new TypeError('profileId is required');
         }
 
         const boolValue =
@@ -125,7 +125,7 @@ export async function parseDeletePayload(
       const payload = json as { profileId?: string };
 
       if (!payload.profileId) {
-        throw new Error('profileId is required');
+        throw new TypeError('profileId is required');
       }
 
       return {
@@ -137,7 +137,7 @@ export async function parseDeletePayload(
       const profileId = formData.get('profileId');
 
       if (typeof profileId !== 'string' || profileId.length === 0) {
-        throw new Error('profileId is required');
+        throw new TypeError('profileId is required');
       }
 
       return {
@@ -174,13 +174,13 @@ function createBulkParser<TKey extends string>(
           : object);
 
         if (!isStringArray(payload.profileIds)) {
-          throw new Error('profileIds is required');
+          throw new TypeError('profileIds is required');
         }
 
         if (fieldName) {
           const fieldValue = (payload as Record<string, unknown>)[fieldName];
           if (typeof fieldValue !== 'boolean') {
-            throw new Error(`profileIds and ${fieldName} are required`);
+            throw new TypeError(`profileIds and ${fieldName} are required`);
           }
           return {
             profileIds: payload.profileIds,
@@ -195,12 +195,12 @@ function createBulkParser<TKey extends string>(
         const profileIdsRaw = formData.get('profileIds');
 
         if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-          throw new Error('profileIds is required');
+          throw new TypeError('profileIds is required');
         }
 
         const parsed = JSON.parse(profileIdsRaw) as unknown;
         if (!isStringArray(parsed)) {
-          throw new Error('profileIds must be an array');
+          throw new TypeError('profileIds must be an array');
         }
 
         if (fieldName) {

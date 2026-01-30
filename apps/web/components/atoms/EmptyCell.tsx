@@ -9,9 +9,9 @@ const EMPTY_MARKER = '—';
 
 interface EmptyCellProps {
   /** Optional tooltip explaining why the value is empty */
-  tooltip?: string;
+  readonly tooltip?: string;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

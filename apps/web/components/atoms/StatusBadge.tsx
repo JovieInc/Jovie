@@ -8,17 +8,17 @@ import {
 
 export interface StatusBadgeProps {
   /** Badge text content */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
   /** Color variant for the badge */
-  variant?: StatusBadgeVariant;
+  readonly variant?: StatusBadgeVariant;
   /** Optional icon to display before text */
-  icon?: React.ReactNode;
+  readonly icon?: React.ReactNode;
   /** Size variant */
-  size?: StatusBadgeSize;
+  readonly size?: StatusBadgeSize;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether the badge communicates dynamic state */
-  dynamic?: boolean;
+  readonly dynamic?: boolean;
 }
 
 export function StatusBadge({

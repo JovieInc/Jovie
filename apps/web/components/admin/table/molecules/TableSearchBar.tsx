@@ -7,11 +7,11 @@ import { cn } from '@/lib/utils';
 
 export interface TableSearchBarProps
   extends Readonly<{
-    value: string;
-    onChange: (value: string) => void;
-    placeholder?: string;
-    debounceMs?: number;
-    className?: string;
+    readonly value: string;
+    readonly onChange: (value: string) => void;
+    readonly placeholder?: string;
+    readonly debounceMs?: number;
+    readonly className?: string;
   }> {}
 
 export function TableSearchBar({
@@ -20,7 +20,7 @@ export function TableSearchBar({
   placeholder = 'Search...',
   debounceMs = 300,
   className,
-}: TableSearchBarProps) {
+}: Readonly<TableSearchBarProps>) {
   const [localValue, setLocalValue] = useState(value);
 
   // Sync external value changes to local state

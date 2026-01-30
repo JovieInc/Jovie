@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 
 export interface SortableHeaderButtonProps
   extends Readonly<{
-    label: string;
-    direction?: 'asc' | 'desc';
-    onClick: () => void;
-    className?: string;
+    readonly label: string;
+    readonly direction?: 'asc' | 'desc';
+    readonly onClick: () => void;
+    readonly className?: string;
   }> {}
 
 export function SortableHeaderButton({
@@ -15,7 +15,7 @@ export function SortableHeaderButton({
   direction,
   onClick,
   className,
-}: SortableHeaderButtonProps) {
+}: Readonly<SortableHeaderButtonProps>) {
   return (
     <button
       type='button'

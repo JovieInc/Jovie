@@ -18,18 +18,18 @@ import type { AdminCreatorProfilesSort } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 
 export interface AdminCreatorsTableHeaderProps {
-  sort: AdminCreatorProfilesSort;
-  headerCheckboxState: boolean | 'indeterminate';
-  selectedCount: number;
-  headerElevated: boolean;
-  stickyTopPx: number;
-  onToggleSelectAll: () => void;
-  onSortChange: (column: SortableColumnKey) => void;
+  readonly sort: AdminCreatorProfilesSort;
+  readonly headerCheckboxState: boolean | 'indeterminate';
+  readonly selectedCount: number;
+  readonly headerElevated: boolean;
+  readonly stickyTopPx: number;
+  readonly onToggleSelectAll: () => void;
+  readonly onSortChange: (column: SortableColumnKey) => void;
   /**
    * Optional header actions (e.g., ingest profile button, drawer toggle).
    * If provided, these will be displayed in the Actions column header.
    */
-  headerActions?: React.ReactNode;
+  readonly headerActions?: React.ReactNode;
 }
 
 export function AdminCreatorsTableHeader({
@@ -41,7 +41,7 @@ export function AdminCreatorsTableHeader({
   onToggleSelectAll,
   onSortChange,
   headerActions,
-}: AdminCreatorsTableHeaderProps) {
+}: Readonly<AdminCreatorsTableHeaderProps>) {
   const headerCellClass = cn(
     'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'

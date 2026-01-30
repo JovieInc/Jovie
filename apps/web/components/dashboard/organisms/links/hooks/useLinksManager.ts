@@ -236,7 +236,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
     async (link: DetectedLink) => {
       // Step 1: Enrich link with defaults and platform-specific adjustments
       const enriched = enrichLink<T>(link);
-      const { section, otherSection } = getSections(enriched as T);
+      const { section, otherSection } = getSections(enriched);
 
       // Step 2: Apply visibility rules
       const isVisible = shouldLinkBeVisible(links, section);

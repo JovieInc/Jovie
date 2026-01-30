@@ -26,7 +26,7 @@ export default function VenmoTipSelector({
       )}`;
 
       onContinue?.(url);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
     },
     [venmoLink, venmoUsername, onContinue]
   );

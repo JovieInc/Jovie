@@ -25,15 +25,15 @@ import {
 const columnHelper = createColumnHelper<AdminCreatorProfileRow>();
 
 export interface ColumnFactoryParams {
-  page: number;
-  pageSize: number;
+  readonly page: number;
+  readonly pageSize: number;
   /** Ref to current selected IDs - prevents column recreation on selection change */
-  selectedIdsRef: RefObject<Set<string>>;
+  readonly selectedIdsRef: RefObject<Set<string>>;
   /** Ref to current header checkbox state - prevents column recreation on selection change */
-  headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>;
-  toggleSelectAll: () => void;
-  toggleSelect: (id: string) => void;
-  getContextMenuItems: (
+  readonly headerCheckboxStateRef: RefObject<boolean | 'indeterminate'>;
+  readonly toggleSelectAll: () => void;
+  readonly toggleSelect: (id: string) => void;
+  readonly getContextMenuItems: (
     profile: AdminCreatorProfileRow
   ) => ContextMenuItemType[];
 }

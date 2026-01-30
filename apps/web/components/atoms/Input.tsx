@@ -31,15 +31,15 @@ type InputSize = 'sm' | 'md' | 'lg';
 // Legacy interface for backward compatibility
 interface LegacyInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  label?: string;
-  error?: string;
-  loading?: boolean;
+  readonly label?: string;
+  readonly error?: string;
+  readonly loading?: boolean;
 }
 
 // New interface for Catalyst UI Kit
 type InputProps = {
-  className?: string;
-  type?:
+  readonly className?: string;
+  readonly type?:
     | 'email'
     | 'number'
     | 'password'
@@ -48,13 +48,13 @@ type InputProps = {
     | 'text'
     | 'url'
     | DateType;
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-  inputClassName?: string;
-  trailing?: React.ReactNode;
-  statusIcon?: React.ReactNode;
-  helpText?: string;
-  validationState?: 'valid' | 'invalid' | 'pending' | null;
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly loading?: boolean;
+  readonly inputClassName?: string;
+  readonly trailing?: React.ReactNode;
+  readonly statusIcon?: React.ReactNode;
+  readonly helpText?: string;
+  readonly validationState?: 'valid' | 'invalid' | 'pending' | null;
 } & Omit<Headless.InputProps, 'as' | 'className'>;
 
 const dateInputClasses = [

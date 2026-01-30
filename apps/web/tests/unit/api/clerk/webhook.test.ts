@@ -285,7 +285,7 @@ describe('/api/clerk/webhook', () => {
     it('should reject requests with invalid signature', async () => {
       // Use the shared mockWebhook instance
       mockWebhookVerify.mockImplementation(() => {
-        throw new Error('Invalid signature');
+        throw new SyntaxError('Invalid signature');
       });
 
       const request = new NextRequest(

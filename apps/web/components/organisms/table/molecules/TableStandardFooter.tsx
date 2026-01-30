@@ -8,7 +8,7 @@ import {
 
 export interface TableStandardFooterProps extends TablePaginationFooterProps {
   /** Whether the footer should be sticky at the bottom */
-  sticky?: boolean;
+  readonly sticky?: boolean;
 }
 
 /**

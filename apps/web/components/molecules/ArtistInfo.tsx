@@ -5,13 +5,13 @@ import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
 import { Artist } from '@/types/db';
 
 interface ArtistInfoProps {
-  artist: Artist;
-  subtitle?: string;
-  avatarSize?: 'sm' | 'md' | 'lg' | 'xl';
-  nameSize?: 'sm' | 'md' | 'lg' | 'xl';
-  className?: string;
+  readonly artist: Artist;
+  readonly subtitle?: string;
+  readonly avatarSize?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly nameSize?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly className?: string;
   /** Whether avatar should link to profile root (useful on deep link routes) */
-  linkToProfile?: boolean;
+  readonly linkToProfile?: boolean;
 }
 
 export function ArtistInfo({

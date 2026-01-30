@@ -68,7 +68,7 @@ const NON_PERSONAL_DOMAINS = [
  */
 export function isValidEmail(email: string): boolean {
   // Basic format check
-  if (!email || !email.includes('@')) return false;
+  if (!email?.includes('@')) return false;
 
   // Length check
   if (email.length > 254) return false;
@@ -212,10 +212,10 @@ export function extractEmailsFromHtml(html: string): string[] {
   // Extract from text content (bio, descriptions)
   // Remove HTML tags first
   const textContent = html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ');
+    .replaceAll(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replaceAll(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replaceAll(/<[^>]+>/g, ' ')
+    .replaceAll(/\s+/g, ' ');
 
   for (const email of extractEmailsFromText(textContent)) {
     emails.add(email);

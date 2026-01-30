@@ -90,7 +90,7 @@ function generateSignature(
 ): string {
   const secret = getImpersonationSecret();
   if (!secret) {
-    throw new Error('Impersonation secret not configured');
+    throw new TypeError('Impersonation secret not configured');
   }
 
   const data = `${payload.realAdminClerkId}:${payload.realAdminDbId}:${payload.effectiveClerkId}:${payload.effectiveDbId}:${payload.issuedAt}:${payload.expiresAt}`;

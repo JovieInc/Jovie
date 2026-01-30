@@ -19,8 +19,8 @@ import type { ClerkSessionResource, ClerkUserResource } from './types';
 import { extractErrorMessage, formatRelativeDate } from './utils';
 
 export interface SessionManagementCardProps {
-  user: ClerkUserResource;
-  activeSessionId: string | null | undefined;
+  readonly user: ClerkUserResource;
+  readonly activeSessionId: string | null | undefined;
 }
 
 export function SessionManagementCard({

@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils';
 import { DspMatchEmptyState } from './DspMatchEmptyState';
 
 export interface DspMatchListProps {
-  profileId: string;
-  className?: string;
+  readonly profileId: string;
+  readonly className?: string;
 }
 
 type FilterStatus = DspMatchStatus | 'all';
@@ -116,7 +116,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
           const count =
             filter.value === 'all'
               ? allMatches.length
-              : (statusCounts[filter.value as DspMatchStatus] ?? 0);
+              : (statusCounts[filter.value] ?? 0);
           const isActive = statusFilter === filter.value;
 
           return (

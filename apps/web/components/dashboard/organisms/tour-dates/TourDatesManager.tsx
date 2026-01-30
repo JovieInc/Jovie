@@ -19,16 +19,16 @@ import { TourDatesEmptyState } from './TourDatesEmptyState';
 import { TourDatesTable } from './TourDatesTable';
 
 interface TourDatesManagerProps {
-  profileId: string;
-  initialTourDates: TourDateViewModel[];
-  connectionStatus: BandsintownConnectionStatus;
+  readonly profileId: string;
+  readonly initialTourDates: TourDateViewModel[];
+  readonly connectionStatus: BandsintownConnectionStatus;
 }
 
 export function TourDatesManager({
   profileId,
   initialTourDates,
   connectionStatus,
-}: TourDatesManagerProps) {
+}: Readonly<TourDatesManagerProps>) {
   const [tourDates, setTourDates] =
     useState<TourDateViewModel[]>(initialTourDates);
   const [selectedTourDate, setSelectedTourDate] =
@@ -187,7 +187,7 @@ export function TourDatesManager({
               isSyncing={syncMutation.isPending}
             />
           ) : (
-            <div className='flex flex-col items-center justify-center py-16 text-center'>
+            <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
               <p className='mt-4 text-sm text-secondary-token'>
                 No tour dates found

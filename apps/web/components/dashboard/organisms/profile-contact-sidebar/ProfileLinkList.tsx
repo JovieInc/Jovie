@@ -11,10 +11,10 @@ import { cn } from '@/lib/utils';
 import type { CategoryOption } from './ProfileLinkCategorySelector';
 
 export interface ProfileLinkListProps {
-  links: PreviewPanelLink[];
-  selectedCategory: CategoryOption;
-  onAddLink?: (category: LinkSection) => void;
-  onRemoveLink?: (linkId: string) => void;
+  readonly links: PreviewPanelLink[];
+  readonly selectedCategory: CategoryOption;
+  readonly onAddLink?: (category: LinkSection) => void;
+  readonly onRemoveLink?: (linkId: string) => void;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -60,8 +60,8 @@ function formatPlatformName(platform: string): string {
 }
 
 interface LinkItemProps {
-  link: PreviewPanelLink;
-  onRemove?: (linkId: string) => void;
+  readonly link: PreviewPanelLink;
+  readonly onRemove?: (linkId: string) => void;
 }
 
 function LinkItem({ link, onRemove }: LinkItemProps) {
@@ -79,7 +79,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   }, [link.url]);
 
   const handleOpen = useCallback(() => {
-    window.open(link.url, '_blank', 'noopener,noreferrer');
+    globalThis.open(link.url, '_blank', 'noopener,noreferrer');
   }, [link.url]);
 
   const handleRemove = useCallback(() => {
@@ -150,8 +150,8 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
 }
 
 interface SectionHeaderProps {
-  section: LinkSection;
-  onAdd?: (section: LinkSection) => void;
+  readonly section: LinkSection;
+  readonly onAdd?: (section: LinkSection) => void;
 }
 
 function SectionHeader({ section, onAdd }: SectionHeaderProps) {

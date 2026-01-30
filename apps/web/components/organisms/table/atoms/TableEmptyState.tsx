@@ -4,19 +4,19 @@ import { cn } from '@/lib/utils';
 
 export interface TableEmptyStateProps {
   /** Main title text */
-  title: string;
+  readonly title: string;
   /** Optional description text */
-  description?: string;
+  readonly description?: string;
   /** Optional icon to display */
-  icon?: React.ReactNode;
+  readonly icon?: React.ReactNode;
   /** Primary action button/link */
-  action?: React.ReactNode;
+  readonly action?: React.ReactNode;
   /** Secondary action button/link */
-  secondaryAction?: React.ReactNode;
+  readonly secondaryAction?: React.ReactNode;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** If provided, wraps content in <tr><td colSpan={colSpan}> */
-  colSpan?: number;
+  readonly colSpan?: number;
 }
 
 /**

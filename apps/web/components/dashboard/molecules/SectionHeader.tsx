@@ -3,10 +3,10 @@
 import * as React from 'react';
 
 export interface SectionHeaderProps {
-  title: string;
-  description?: string;
-  right?: React.ReactNode;
-  className?: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly right?: React.ReactNode;
+  readonly className?: string;
 }
 
 export function SectionHeader({

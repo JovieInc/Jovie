@@ -28,43 +28,51 @@ import {
 } from './utils/column-renderers';
 
 interface ProviderConfig {
-  label: string;
-  accent: string;
+  readonly label: string;
+  readonly accent: string;
 }
 
 interface ReleaseTableProps {
-  releases: ReleaseViewModel[];
-  providerConfig: Record<ProviderKey, ProviderConfig>;
-  artistName?: string | null;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
-  onEdit: (release: ReleaseViewModel) => void;
-  onAddUrl?: (
+  readonly releases: ReleaseViewModel[];
+  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
+  readonly artistName?: string | null;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  isAddingUrl?: boolean;
+  readonly isAddingUrl?: boolean;
   /** Selected release IDs (controlled from parent) */
-  selectedIds?: Set<string>;
+  readonly selectedIds?: Set<string>;
   /** Callback when selection changes */
-  onSelectionChange?: (selectedIds: Set<string>) => void;
+  readonly onSelectionChange?: (selectedIds: Set<string>) => void;
   /** Bulk actions shown in header when items selected */
-  bulkActions?: HeaderBulkAction[];
+  readonly bulkActions?: HeaderBulkAction[];
   /** Callback to clear selection */
-  onClearSelection?: () => void;
+  readonly onClearSelection?: () => void;
   /** Column visibility state from preferences */
-  columnVisibility?: Record<string, boolean>;
+  readonly columnVisibility?: Record<string, boolean>;
   /** Row height from density preference */
-  rowHeight?: number;
+  readonly rowHeight?: number;
   /** Callback when focused row changes via keyboard navigation */
-  onFocusedRowChange?: (release: ReleaseViewModel) => void;
+  readonly onFocusedRowChange?: (release: ReleaseViewModel) => void;
   /** Whether to show expandable track rows for albums/EPs */
-  showTracks?: boolean;
+  readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
-  groupByYear?: boolean;
+  readonly groupByYear?: boolean;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
+
+const MetaHeaderCell = () => (
+  <span className='sr-only'>Smart link, popularity, year</span>
+);
 
 /**
  * ReleaseTable - Releases table using UnifiedTable
@@ -243,7 +251,7 @@ export function ReleaseTable({
             label: `Open in ${providerLabels[provider.key] || provider.key}`,
             icon: menuIcon('ExternalLink'),
             onClick: () => {
-              window.open(provider.url!, '_blank', 'noopener,noreferrer');
+              globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
             },
           });
         }
@@ -320,9 +328,8 @@ export function ReleaseTable({
 
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
-      header: () => (
-        <span className='sr-only'>Smart link, popularity, year</span>
-      ),
+      // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
+      header: MetaHeaderCell,
       cell: createRightMetaCellRenderer(onCopy),
       size: 260,
       minSize: 260,

@@ -9,14 +9,14 @@ import { TipSelector } from '@/components/molecules/TipSelector';
 import { captureError } from '@/lib/error-tracking';
 
 interface TipSectionProps {
-  handle: string;
-  artistName: string;
-  amounts?: number[];
-  venmoLink?: string;
-  venmoUsername?: string | null;
-  onStripePayment?: (amount: number) => Promise<void>;
-  onVenmoPayment?: (url: string) => void;
-  className?: string;
+  readonly handle: string;
+  readonly artistName: string;
+  readonly amounts?: number[];
+  readonly venmoLink?: string;
+  readonly venmoUsername?: string | null;
+  readonly onStripePayment?: (amount: number) => Promise<void>;
+  readonly onVenmoPayment?: (url: string) => void;
+  readonly className?: string;
 }
 
 export function TipSection({
@@ -27,7 +27,7 @@ export function TipSection({
   onStripePayment,
   onVenmoPayment,
   className = '',
-}: TipSectionProps) {
+}: Readonly<TipSectionProps>) {
   const [loading, setLoading] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'venmo' | null>(
     null
@@ -61,13 +61,13 @@ export function TipSection({
     )}`;
 
     onVenmoPayment(url);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    globalThis.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // If no payment methods are supported, show QR fallback
   if (!onStripePayment && !venmoLink) {
     const currentUrl =
-      typeof window !== 'undefined' ? window.location.href : '';
+      typeof window === 'undefined' ? '' : window.location.href;
     return (
       <div className={`text-center space-y-4 ${className}`}>
         <QRCodeCard

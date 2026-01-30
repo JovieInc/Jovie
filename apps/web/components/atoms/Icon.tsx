@@ -169,9 +169,9 @@ function resolveIconName(name: string): IconName | undefined {
 }
 
 export interface IconProps extends Omit<LucideProps, 'ref'> {
-  name: IconName | string;
-  ariaLabel?: string;
-  ariaHidden?: boolean;
+  readonly name: IconName | string;
+  readonly ariaLabel?: string;
+  readonly ariaHidden?: boolean;
 }
 
 export function Icon({

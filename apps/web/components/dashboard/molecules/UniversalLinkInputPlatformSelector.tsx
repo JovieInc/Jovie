@@ -18,11 +18,13 @@ import {
 import { type CursorPosition } from './useInputFocusController';
 
 interface PlatformSelectorProps {
-  currentPlatformIcon: string;
-  onPlatformSelect: (platform: (typeof PLATFORM_OPTIONS)[number]) => void;
-  onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
-  onRestoreFocus: (cursor?: CursorPosition) => void;
-  disabled?: boolean;
+  readonly currentPlatformIcon: string;
+  readonly onPlatformSelect: (
+    platform: (typeof PLATFORM_OPTIONS)[number]
+  ) => void;
+  readonly onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
+  readonly onRestoreFocus: (cursor?: CursorPosition) => void;
+  readonly disabled?: boolean;
 }
 
 export function UniversalLinkInputPlatformSelector({

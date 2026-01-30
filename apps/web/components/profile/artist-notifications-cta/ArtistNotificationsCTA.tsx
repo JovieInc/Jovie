@@ -95,9 +95,9 @@ function SubscriptionSuccess() {
 }
 
 interface ChannelToggleProps {
-  channel: 'email' | 'sms';
-  isSubmitting: boolean;
-  onChannelChange: (channel: 'email' | 'sms') => void;
+  readonly channel: 'email' | 'sms';
+  readonly isSubmitting: boolean;
+  readonly onChannelChange: (channel: 'email' | 'sms') => void;
 }
 
 /**

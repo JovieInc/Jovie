@@ -36,12 +36,12 @@ export function useThrottledScroll(
   const { wait = PACER_TIMING.THROTTLE_MS, threshold = 0 } = options;
 
   const [scrollY, setScrollY] = useState(() =>
-    typeof window !== 'undefined' ? window.scrollY : 0
+    typeof window === 'undefined' ? 0 : globalThis.scrollY
   );
 
   const throttler = useThrottler(
     () => {
-      setScrollY(window.scrollY);
+      setScrollY(globalThis.scrollY);
     },
     { wait, leading: true, trailing: true }
   );
@@ -52,12 +52,12 @@ export function useThrottledScroll(
     };
 
     // Initial value
-    setScrollY(window.scrollY);
+    setScrollY(globalThis.scrollY);
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    globalThis.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      globalThis.removeEventListener('scroll', handleScroll);
       throttler.cancel();
     };
   }, [throttler]);

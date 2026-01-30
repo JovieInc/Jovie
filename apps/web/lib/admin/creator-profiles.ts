@@ -91,10 +91,10 @@ function parseConfidenceValue(rawValue: unknown): number | null {
   let parsedValue: number;
   if (typeof rawValue === 'number') {
     parsedValue = rawValue;
-  } else if (rawValue != null) {
-    parsedValue = Number(rawValue);
-  } else {
+  } else if (rawValue == null) {
     return null;
+  } else {
+    parsedValue = Number(rawValue);
   }
 
   if (Number.isNaN(parsedValue)) return null;

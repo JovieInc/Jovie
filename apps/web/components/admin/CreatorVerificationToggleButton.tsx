@@ -9,16 +9,16 @@ import { cn } from '@/lib/utils';
 
 interface CreatorVerificationToggleButtonProps
   extends Readonly<{
-    profile: AdminCreatorProfileRow;
-    status: CreatorVerificationStatus;
-    onToggle: () => Promise<void> | void;
+    readonly profile: AdminCreatorProfileRow;
+    readonly status: CreatorVerificationStatus;
+    readonly onToggle: () => Promise<void> | void;
   }> {}
 
 export function CreatorVerificationToggleButton({
   profile,
   status,
   onToggle,
-}: CreatorVerificationToggleButtonProps) {
+}: Readonly<CreatorVerificationToggleButtonProps>) {
   const isSuccess = status === 'success';
   const isError = status === 'error';
   const label = profile.isVerified ? 'Unverify' : 'Verify';

@@ -24,24 +24,24 @@ function getTotalScoreColorClass(percentage: number): string {
 }
 
 export interface ConfidenceBreakdownData {
-  isrcMatchScore: number;
-  upcMatchScore: number;
-  nameSimilarityScore: number;
-  followerRatioScore: number;
-  genreOverlapScore: number;
+  readonly isrcMatchScore: number;
+  readonly upcMatchScore: number;
+  readonly nameSimilarityScore: number;
+  readonly followerRatioScore: number;
+  readonly genreOverlapScore: number;
 }
 
 export interface MatchConfidenceBreakdownProps {
-  breakdown: ConfidenceBreakdownData;
-  totalScore: number;
-  className?: string;
+  readonly breakdown: ConfidenceBreakdownData;
+  readonly totalScore: number;
+  readonly className?: string;
 }
 
 interface ScoreRowProps {
-  label: string;
-  score: number;
-  weight: number;
-  description: string;
+  readonly label: string;
+  readonly score: number;
+  readonly weight: number;
+  readonly description: string;
 }
 
 const SCORE_CONFIG: Array<{

@@ -92,9 +92,9 @@ export async function GET(request: Request) {
         databaseUrlOk,
         databaseUrlValid: dbValidation.valid,
         thresholds,
-        error: !databaseUrlOk
-          ? 'DATABASE_URL not configured'
-          : 'DATABASE_URL validation failed',
+        error: databaseUrlOk
+          ? 'DATABASE_URL validation failed'
+          : 'DATABASE_URL not configured',
         validationError: dbValidation.error,
         config,
       },

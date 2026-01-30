@@ -19,17 +19,53 @@ export type ValidationRule = (env: {
   vercelEnv: string;
 }) => ValidationIssue | null;
 
+// Cold start detection threshold (seconds)
+const COLD_START_UPTIME_THRESHOLD = 5;
+
+/**
+ * Detect if we're in a Vercel cold start scenario.
+ *
+ * Indicators:
+ * - Running in production/preview (VERCEL_ENV set)
+ * - Early in process lifetime (uptime < 5s)
+ *
+ * Heuristic-based detection.
+ */
+function isLikelyVercelColdStart(): boolean {
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (!vercelEnv || vercelEnv === 'development') {
+    return false; // Not on Vercel production/preview
+  }
+
+  // Check process uptime (Node.js only)
+  if (typeof process !== 'undefined' && 'uptime' in process) {
+    const uptimeSeconds = (process as { uptime: () => number }).uptime();
+    return uptimeSeconds < COLD_START_UPTIME_THRESHOLD;
+  }
+
+  return false;
+}
+
 /**
  * Validation rule: Check Clerk publishable key exists
  */
 const checkClerkPublishableKey: ValidationRule = () => {
-  // Skip validation if in mock mode - this allows bypass during cold starts
-  // when environment variables may not be fully initialized yet
+  // Skip validation if in mock mode
   if (publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1') {
     return null;
   }
 
   if (!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    // During cold start, downgrade to warning instead of critical
+    if (isLikelyVercelColdStart()) {
+      return {
+        type: 'warning',
+        message:
+          'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing (may be cold start timing issue)',
+      };
+    }
+
+    // After cold start window, this is a real config error
     return {
       type: 'critical',
       message:

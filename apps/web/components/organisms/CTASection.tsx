@@ -2,12 +2,12 @@ import { SectionHeading } from '@/components/atoms/SectionHeading';
 import { CTAButton } from '@/components/ui/CTAButton';
 
 export interface CTASectionProps {
-  title: React.ReactNode;
-  buttonText: string;
-  buttonHref: string;
-  description?: React.ReactNode;
-  variant?: 'primary' | 'secondary';
-  className?: string;
+  readonly title: React.ReactNode;
+  readonly buttonText: string;
+  readonly buttonHref: string;
+  readonly description?: React.ReactNode;
+  readonly variant?: 'primary' | 'secondary';
+  readonly className?: string;
 }
 
 export function CTASection({

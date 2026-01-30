@@ -38,182 +38,182 @@ export interface UnifiedTableProps<TData> {
   /**
    * Table data
    */
-  data: TData[];
+  readonly data: TData[];
 
   /**
    * Column definitions (TanStack Table format)
    */
-  columns: ColumnDef<TData, unknown>[];
+  readonly columns: ColumnDef<TData, unknown>[];
 
   /**
    * Loading state
    */
-  isLoading?: boolean;
+  readonly isLoading?: boolean;
 
   /**
    * Empty state component
    */
-  emptyState?: React.ReactNode;
+  readonly emptyState?: React.ReactNode;
 
   /**
    * Row selection state (controlled)
    */
-  rowSelection?: RowSelectionState;
+  readonly rowSelection?: RowSelectionState;
 
   /**
    * Row selection change handler
    */
-  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  readonly onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
   /**
    * Sorting state (controlled)
    */
-  sorting?: SortingState;
+  readonly sorting?: SortingState;
 
   /**
    * Sorting change handler
    */
-  onSortingChange?: OnChangeFn<SortingState>;
+  readonly onSortingChange?: OnChangeFn<SortingState>;
 
   /**
    * Enable virtualization for large datasets
    * @default true for 20+ rows
    */
-  enableVirtualization?: boolean;
+  readonly enableVirtualization?: boolean;
 
   /**
    * Estimated row height for virtualization
    * @default 44
    */
-  rowHeight?: number;
+  readonly rowHeight?: number;
 
   /**
    * Number of rows to render above/below viewport
    * @default 5
    */
-  overscan?: number;
+  readonly overscan?: number;
 
   /**
    * Custom row renderer
    */
-  renderRow?: (row: TData, index: number) => React.ReactNode;
+  readonly renderRow?: (row: TData, index: number) => React.ReactNode;
 
   /**
    * Get unique row ID
    */
-  getRowId?: (row: TData) => string;
+  readonly getRowId?: (row: TData) => string;
 
   /**
    * Click handler for row
    */
-  onRowClick?: (row: TData) => void;
+  readonly onRowClick?: (row: TData) => void;
 
   /**
    * Context menu handler for row
    */
-  onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
+  readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
 
   /**
    * Get context menu items for a row
    */
-  getContextMenuItems?: (row: TData) => ContextMenuItemType[];
+  readonly getContextMenuItems?: (row: TData) => ContextMenuItemType[];
 
   /**
    * Get custom class names for a row
    */
-  getRowClassName?: (row: TData, index: number) => string;
+  readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
    * Additional table class names
    */
-  className?: string;
+  readonly className?: string;
 
   /**
    * Additional container class names (applied to scroll container)
    */
-  containerClassName?: string;
+  readonly containerClassName?: string;
 
   /**
    * Min width for table (prevents column squishing)
    */
-  minWidth?: string;
+  readonly minWidth?: string;
 
   /**
    * Number of skeleton rows to show when loading
    * @default 20
    */
-  skeletonRows?: number;
+  readonly skeletonRows?: number;
 
   /**
    * Optional grouping configuration
    * When provided, table will render with grouped rows and sticky group headers
    */
-  groupingConfig?: {
-    getGroupKey: (row: TData) => string;
-    getGroupLabel: (key: string) => string;
+  readonly groupingConfig?: {
+    readonly getGroupKey: (row: TData) => string;
+    readonly getGroupLabel: (key: string) => string;
   };
 
   /**
    * Enable keyboard navigation (arrow keys to move, Enter to select)
    * @default true when onRowClick is provided
    */
-  enableKeyboardNavigation?: boolean;
+  readonly enableKeyboardNavigation?: boolean;
 
   /**
    * Currently focused row index (controlled)
    */
-  focusedRowIndex?: number;
+  readonly focusedRowIndex?: number;
 
   /**
    * Callback when focused row changes via keyboard
    */
-  onFocusedRowChange?: (index: number) => void;
+  readonly onFocusedRowChange?: (index: number) => void;
 
   /**
    * Global filter value for client-side filtering
    */
-  globalFilter?: string;
+  readonly globalFilter?: string;
 
   /**
    * Callback when global filter changes
    */
-  onGlobalFilterChange?: OnChangeFn<string>;
+  readonly onGlobalFilterChange?: OnChangeFn<string>;
 
   /**
    * Enable client-side filtering
    * @default false
    */
-  enableFiltering?: boolean;
+  readonly enableFiltering?: boolean;
 
   /**
    * Column pinning configuration
    * Pin columns to left or right edges so they're always visible when scrolling
    * @example { left: ['select'], right: ['actions'] }
    */
-  columnPinning?: ColumnPinningState;
+  readonly columnPinning?: ColumnPinningState;
 
   /**
    * Enable column pinning
    * @default false
    */
-  enablePinning?: boolean;
+  readonly enablePinning?: boolean;
 
   /**
    * Column visibility state (controlled)
    * Maps column ID to visibility boolean
    */
-  columnVisibility?: VisibilityState;
+  readonly columnVisibility?: VisibilityState;
 
   /**
    * Column visibility change handler
    */
-  onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
+  readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
    * Set of expanded row IDs for expandable rows.
    * When provided with renderExpandedContent, enables row expansion.
    */
-  expandedRowIds?: Set<string>;
+  readonly expandedRowIds?: Set<string>;
 
   /**
    * Renders content to display below an expanded row.
@@ -222,37 +222,40 @@ export interface UnifiedTableProps<TData> {
    * @param row - The row data
    * @param columnCount - Number of columns for proper spanning
    */
-  renderExpandedContent?: (row: TData, columnCount: number) => React.ReactNode;
+  readonly renderExpandedContent?: (
+    row: TData,
+    columnCount: number
+  ) => React.ReactNode;
 
   /**
    * Callback to get the row ID for expansion tracking.
    * Required when using expandedRowIds.
    * Falls back to getRowId if not provided.
    */
-  getExpandableRowId?: (row: TData) => string;
+  readonly getExpandableRowId?: (row: TData) => string;
 }
 
 /**
  * Internal memoized row component to prevent inline handler recreation
  */
 interface TableRowProps<TData> {
-  row: Row<TData>;
-  rowIndex: number;
-  rowRefsMap: Map<number, HTMLTableRowElement>;
-  shouldEnableKeyboardNav: boolean;
-  shouldVirtualize: boolean;
-  virtualStart?: number;
-  focusedIndex: number;
-  onRowClick?: (row: TData) => void;
-  onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
-  onKeyDown: (
+  readonly row: Row<TData>;
+  readonly rowIndex: number;
+  readonly rowRefsMap: Map<number, HTMLTableRowElement>;
+  readonly shouldEnableKeyboardNav: boolean;
+  readonly shouldVirtualize: boolean;
+  readonly virtualStart?: number;
+  readonly focusedIndex: number;
+  readonly onRowClick?: (row: TData) => void;
+  readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
+  readonly onKeyDown: (
     event: React.KeyboardEvent,
     rowIndex: number,
     rowData: TData
   ) => void;
-  onFocusChange: (index: number) => void;
-  getRowClassName?: (row: TData, index: number) => string;
-  measureElement?: (el: HTMLTableRowElement | null) => void;
+  readonly onFocusChange: (index: number) => void;
+  readonly getRowClassName?: (row: TData, index: number) => string;
+  readonly measureElement?: (el: HTMLTableRowElement | null) => void;
 }
 
 const TableRow = memo(function TableRow<TData>({
@@ -350,7 +353,7 @@ const TableRow = memo(function TableRow<TData>({
           className={presets.tableCell}
           style={{
             width:
-              cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+              cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
           }}
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}

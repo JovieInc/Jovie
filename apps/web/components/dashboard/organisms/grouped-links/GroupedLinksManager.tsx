@@ -171,7 +171,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       {ytPrompt && (
         <YouTubeCrossCategoryPrompt
           candidate={ytPrompt.candidate}
-          target={ytPrompt.target as 'social' | 'dsp'}
+          target={ytPrompt.target}
           onConfirm={confirmYtPrompt}
           onCancel={cancelYtPrompt}
           animate={false}

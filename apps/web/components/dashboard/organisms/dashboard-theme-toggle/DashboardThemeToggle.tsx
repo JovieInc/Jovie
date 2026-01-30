@@ -61,10 +61,10 @@ function getThemeIcon(value: string) {
 }
 
 interface ThemeOptionGridProps {
-  theme: string | undefined;
-  resolvedTheme: string | undefined;
-  isUpdating: boolean;
-  onThemeChange: (value: ThemeValue) => void;
+  readonly theme: string | undefined;
+  readonly resolvedTheme: string | undefined;
+  readonly isUpdating: boolean;
+  readonly onThemeChange: (value: ThemeValue) => void;
 }
 
 function ThemeOptionGrid({
@@ -116,10 +116,10 @@ function ThemeOptionGrid({
 }
 
 interface ThemeToggleButtonProps {
-  isDark: boolean;
-  isUpdating: boolean;
-  onToggle: () => void;
-  variant: 'compact' | 'default';
+  readonly isDark: boolean;
+  readonly isUpdating: boolean;
+  readonly onToggle: () => void;
+  readonly variant: 'compact' | 'default';
 }
 
 function ThemeToggleButton({

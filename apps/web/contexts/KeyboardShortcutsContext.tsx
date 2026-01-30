@@ -62,7 +62,7 @@ export function KeyboardShortcutsProvider({
 export function useKeyboardShortcuts() {
   const context = useContext(KeyboardShortcutsContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'useKeyboardShortcuts must be used within a KeyboardShortcutsProvider'
     );
   }

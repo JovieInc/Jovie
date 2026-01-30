@@ -10,13 +10,13 @@ const navLinkClass =
   'inline-flex items-center justify-center h-8 px-3 text-sm font-medium text-secondary-token hover:text-primary-token transition-colors duration-150 focus-ring-themed';
 
 export interface HeaderNavProps {
-  sticky?: boolean;
-  className?: string;
-  logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  logoVariant?: LogoVariant;
-  hideNav?: boolean;
-  hidePricingLink?: boolean;
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
+  readonly sticky?: boolean;
+  readonly className?: string;
+  readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  readonly logoVariant?: LogoVariant;
+  readonly hideNav?: boolean;
+  readonly hidePricingLink?: boolean;
+  readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
 }
 
 export function HeaderNav({
@@ -43,7 +43,9 @@ export function HeaderNav({
             <LogoLink logoSize={logoSize} variant={logoVariant} />
           </div>
 
-          {!hideNav ? (
+          {hideNav ? (
+            <div className='flex-1' aria-hidden='true' />
+          ) : (
             <>
               {/* Navigation - Center (hidden on mobile) */}
               <div className='hidden md:flex flex-1 justify-center ml-8'>
@@ -51,11 +53,11 @@ export function HeaderNav({
                   className='flex items-center'
                   aria-label='Primary navigation'
                 >
-                  {!hidePricingLink ? (
+                  {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
                     </Link>
-                  ) : null}
+                  )}
                 </nav>
               </div>
 
@@ -65,16 +67,14 @@ export function HeaderNav({
                   className='flex items-center'
                   aria-label='Primary navigation'
                 >
-                  {!hidePricingLink ? (
+                  {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
                     </Link>
-                  ) : null}
+                  )}
                 </nav>
               </div>
             </>
-          ) : (
-            <div className='flex-1' aria-hidden='true' />
           )}
 
           {/* Actions - Right side */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createQueryFn } from './fetch';
+import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
 
@@ -54,13 +54,9 @@ export function useEndImpersonationMutation() {
 
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      const response = await fetch('/api/admin/impersonate', {
+      await fetchWithTimeout<{ success: boolean }>('/api/admin/impersonate', {
         method: 'DELETE',
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to end impersonation');
-      }
     },
     onSuccess: () => {
       // Update cache to reflect ended impersonation

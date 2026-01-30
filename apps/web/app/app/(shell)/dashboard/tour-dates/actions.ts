@@ -21,6 +21,8 @@ import { getDashboardData } from '../actions';
 // Types
 // ============================================================================
 
+type TicketStatus = 'available' | 'sold_out' | 'cancelled';
+
 export interface TourDateViewModel {
   id: string;
   profileId: string;
@@ -36,7 +38,7 @@ export interface TourDateViewModel {
   latitude: number | null;
   longitude: number | null;
   ticketUrl: string | null;
-  ticketStatus: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus: TicketStatus;
   lastSyncedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -66,7 +68,7 @@ async function requireProfile(): Promise<{
   }
 
   if (!data.selectedProfile) {
-    throw new Error('Missing creator profile');
+    throw new TypeError('Missing creator profile');
   }
 
   // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)
@@ -110,10 +112,10 @@ function validateTicketUrl(ticketUrl: string | undefined | null): void {
   try {
     const url = new URL(ticketUrl);
     if (!['http:', 'https:'].includes(url.protocol)) {
-      throw new Error('Invalid ticket URL: must use http or https');
+      throw new TypeError('Invalid ticket URL: must use http or https');
     }
   } catch {
-    throw new Error('Invalid ticket URL');
+    throw new TypeError('Invalid ticket URL');
   }
 }
 
@@ -281,7 +283,7 @@ export async function saveBandsintownApiKey(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -336,7 +338,7 @@ export async function removeBandsintownApiKey(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -383,7 +385,7 @@ export async function connectBandsintownArtist(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -452,7 +454,7 @@ export async function syncFromBandsintown(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -512,13 +514,13 @@ export async function createTourDate(params: {
   region?: string;
   country: string;
   ticketUrl?: string;
-  ticketStatus?: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus?: TicketStatus;
 }): Promise<TourDateViewModel> {
   noStore();
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -526,7 +528,7 @@ export async function createTourDate(params: {
   // Validate startDate
   const parsedStartDate = new Date(params.startDate);
   if (Number.isNaN(parsedStartDate.getTime())) {
-    throw new Error('Invalid start date');
+    throw new SyntaxError('Invalid start date');
   }
 
   // Validate ticketUrl if provided
@@ -573,13 +575,13 @@ export async function updateTourDate(params: {
   region?: string | null;
   country?: string;
   ticketUrl?: string | null;
-  ticketStatus?: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus?: TicketStatus;
 }): Promise<TourDateViewModel> {
   noStore();
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -594,7 +596,7 @@ export async function updateTourDate(params: {
     .limit(1);
 
   if (!existing) {
-    throw new Error('Tour date not found');
+    throw new TypeError('Tour date not found');
   }
 
   const updateData: Partial<TourDate> = {
@@ -605,7 +607,7 @@ export async function updateTourDate(params: {
   if (params.startDate !== undefined) {
     const parsedStartDate = new Date(params.startDate);
     if (Number.isNaN(parsedStartDate.getTime())) {
-      throw new Error('Invalid start date');
+      throw new SyntaxError('Invalid start date');
     }
     updateData.startDate = parsedStartDate;
   }
@@ -642,7 +644,7 @@ export async function deleteTourDate(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -653,7 +655,7 @@ export async function deleteTourDate(
     .where(and(eq(tourDates.id, id), eq(tourDates.profileId, profile.id)));
 
   if (result.rowCount === 0) {
-    throw new Error('Tour date not found');
+    throw new TypeError('Tour date not found');
   }
 
   void trackServerEvent('tour_date_deleted', {
@@ -674,7 +676,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();

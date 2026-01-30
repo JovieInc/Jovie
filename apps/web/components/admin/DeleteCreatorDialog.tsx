@@ -17,10 +17,10 @@ import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 interface DeleteCreatorDialogProps
   extends Readonly<{
-    profile: AdminCreatorProfileRow | null;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    onConfirm: () => Promise<{ success: boolean; error?: string }>;
+    readonly profile: AdminCreatorProfileRow | null;
+    readonly open: boolean;
+    readonly onOpenChange: (open: boolean) => void;
+    readonly onConfirm: () => Promise<{ success: boolean; error?: string }>;
   }> {}
 
 export function DeleteCreatorDialog({
@@ -28,7 +28,7 @@ export function DeleteCreatorDialog({
   open,
   onOpenChange,
   onConfirm,
-}: DeleteCreatorDialogProps) {
+}: Readonly<DeleteCreatorDialogProps>) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

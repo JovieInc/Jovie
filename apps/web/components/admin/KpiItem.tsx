@@ -2,12 +2,11 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface KpiItemProps {
-  title: string;
-  value: string;
-  metadata: ReactNode;
-  icon: LucideIcon;
-  iconClassName?: string;
-  iconChipClassName?: string;
+  readonly title: string;
+  readonly value: string;
+  readonly metadata: ReactNode;
+  readonly icon: LucideIcon;
+  readonly iconClassName?: string;
 }
 
 export function KpiItem({
@@ -16,7 +15,7 @@ export function KpiItem({
   metadata,
   icon: Icon,
   iconClassName,
-}: KpiItemProps) {
+}: Readonly<KpiItemProps>) {
   return (
     <div className='space-y-1.5'>
       <div className='flex items-center gap-1.5'>

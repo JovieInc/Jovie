@@ -46,29 +46,29 @@ function getBadgeText(
  */
 export interface SortableLinkItemProps<T extends DetectedLink = DetectedLink> {
   /** Unique identifier for DnD and menu control */
-  id: string;
+  readonly id: string;
   /** The link data to display */
-  link: T;
+  readonly link: T;
   /** Index of the link in the parent array (for handlers) */
-  index: number;
+  readonly index: number;
   /** Handler for toggling link visibility */
-  onToggle: (idx: number) => void;
+  readonly onToggle: (idx: number) => void;
   /** Handler for removing a link */
-  onRemove: (idx: number) => void;
+  readonly onRemove: (idx: number) => void;
   /** Handler for editing a link */
-  onEdit: (idx: number) => void;
+  readonly onEdit: (idx: number) => void;
   /** Whether the link is currently visible */
-  visible: boolean;
+  readonly visible: boolean;
   /** Whether drag-and-drop is enabled for this item */
-  draggable?: boolean;
+  readonly draggable?: boolean;
   /** ID of the currently open menu (for mutual exclusion) */
-  openMenuId: string | null;
+  readonly openMenuId: string | null;
   /** Callback when any menu opens/closes */
-  onAnyMenuOpen: (id: string | null) => void;
+  readonly onAnyMenuOpen: (id: string | null) => void;
   /** Whether this link was just added (for highlight animation) */
-  isLastAdded: boolean;
+  readonly isLastAdded: boolean;
   /** Function to build the primary label for the pill */
-  buildPillLabel: (link: DetectedLink) => string;
+  readonly buildPillLabel: (link: DetectedLink) => string;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardDataCached } from '../../dashboard/actions';
+import { getDashboardData } from '../../dashboard/actions';
 
 export const runtime = 'nodejs';
 
@@ -12,7 +12,7 @@ export default async function SettingsProfilePage() {
     redirect('/sign-in?redirect_url=/app/settings/profile');
   }
 
-  const dashboardData = await getDashboardDataCached();
+  const dashboardData = await getDashboardData();
   if (dashboardData.needsOnboarding) {
     redirect('/onboarding');
   }

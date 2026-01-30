@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerSectionProps {
-  title?: string;
-  children: ReactNode;
-  className?: string;
+  readonly title?: string;
+  readonly children: ReactNode;
+  readonly className?: string;
 }
 
 export function DrawerSection({

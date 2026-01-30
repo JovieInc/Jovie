@@ -278,7 +278,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
     labels[platform] ||
     platform
       .replaceAll('_', ' ')
-      .replace(/\b\w/g, (l: string) => l.toUpperCase())
+      .replaceAll(/\b\w/g, (l: string) => l.toUpperCase())
   );
 }
 

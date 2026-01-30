@@ -68,14 +68,14 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
   {
     header: 'Popularity',
     accessor: 'spotifyPopularity',
-    formatter: v => (v != null ? String(v) : ''),
+    formatter: v => (v == null ? '' : String(v)),
   },
   {
     header: 'Smart Link',
     accessor: row =>
-      typeof window !== 'undefined'
-        ? `${window.location.origin}${row.smartLinkPath}`
-        : row.smartLinkPath,
+      typeof window === 'undefined'
+        ? row.smartLinkPath
+        : `${window.location.origin}${row.smartLinkPath}`,
   },
   {
     header: 'Spotify URL',

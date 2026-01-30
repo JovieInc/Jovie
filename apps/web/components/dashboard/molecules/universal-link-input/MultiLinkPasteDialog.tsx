@@ -24,12 +24,12 @@ import { isBrandDark } from '@/lib/utils/color';
 import type { ExtractedLinkInfo } from './useMultiLinkPaste';
 
 export interface MultiLinkPasteDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  extractedLinks: ExtractedLinkInfo[];
-  onToggleSelection: (index: number) => void;
-  selectableCount: number;
+  readonly open: boolean;
+  readonly onClose: () => void;
+  readonly onConfirm: () => void;
+  readonly extractedLinks: ExtractedLinkInfo[];
+  readonly onToggleSelection: (index: number) => void;
+  readonly selectableCount: number;
 }
 
 /**
@@ -65,8 +65,8 @@ function LinkItem({
   info,
   onToggle,
 }: {
-  info: ExtractedLinkInfo;
-  onToggle: () => void;
+  readonly info: ExtractedLinkInfo;
+  readonly onToggle: () => void;
 }) {
   const { detectedLink, isDuplicate, isSelected } = info;
   const { platform, normalizedUrl } = detectedLink;
@@ -147,7 +147,7 @@ export function MultiLinkPasteDialog({
           <Icon name='Link' className='h-4 w-4 text-accent' />
         </div>
         <span>
-          Found {totalLinks} link{totalLinks !== 1 ? 's' : ''}
+          Found {totalLinks} link{totalLinks === 1 ? '' : 's'}
         </span>
       </DialogTitle>
 
@@ -181,7 +181,7 @@ export function MultiLinkPasteDialog({
           onClick={onConfirm}
           disabled={!hasSelectableLinks}
         >
-          Add {selectableCount} link{selectableCount !== 1 ? 's' : ''}
+          Add {selectableCount} link{selectableCount === 1 ? '' : 's'}
         </Button>
       </DialogActions>
     </Dialog>

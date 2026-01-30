@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchWithTimeout } from './fetch';
 
 const MINUTE = 60 * 1000;
 const SECONDS = 1000;
@@ -83,17 +84,9 @@ async function fetchCampaignPreview(
   threshold: number,
   limit: number
 ): Promise<CampaignPreviewResponse> {
-  const response = await fetch(
+  return fetchWithTimeout<CampaignPreviewResponse>(
     `/api/admin/creator-invite/bulk?threshold=${threshold}&limit=${limit}`
   );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Failed to fetch preview');
-  }
-
-  return data;
 }
 
 /**
@@ -102,19 +95,14 @@ async function fetchCampaignPreview(
 async function sendCampaignInvites(
   input: SendCampaignInvitesInput
 ): Promise<SendCampaignInvitesResponse> {
-  const response = await fetch('/api/admin/creator-invite/bulk', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Failed to send invites');
-  }
-
-  return data;
+  return fetchWithTimeout<SendCampaignInvitesResponse>(
+    '/api/admin/creator-invite/bulk',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
 }
 
 /**
@@ -180,15 +168,9 @@ export function useSendCampaignInvitesMutation() {
  * Query function for fetching campaign stats.
  */
 async function fetchCampaignStats(): Promise<CampaignStatsResponse> {
-  const response = await fetch('/api/admin/creator-invite/bulk/stats');
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error ?? 'Failed to fetch campaign stats');
-  }
-
-  return data;
+  return fetchWithTimeout<CampaignStatsResponse>(
+    '/api/admin/creator-invite/bulk/stats'
+  );
 }
 
 /**

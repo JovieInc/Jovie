@@ -65,8 +65,8 @@ export function EmailStep({
         onBack();
       }
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    globalThis.addEventListener('keydown', handleEscape);
+    return () => globalThis.removeEventListener('keydown', handleEscape);
   }, [onBack, isLoading]);
 
   const validateEmail = useCallback((value: string): boolean => {

@@ -5,10 +5,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 
 interface TipSelectorProps {
-  amounts?: number[];
-  onContinue: (amount: number) => void;
-  isLoading?: boolean;
-  className?: string;
+  readonly amounts?: number[];
+  readonly onContinue: (amount: number) => void;
+  readonly isLoading?: boolean;
+  readonly className?: string;
 }
 
 export function TipSelector({

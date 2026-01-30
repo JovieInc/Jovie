@@ -4,7 +4,7 @@ import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 type FilterStatus = DspMatchStatus | 'all';
 
 export interface DspMatchEmptyStateProps {
-  status: FilterStatus;
+  readonly status: FilterStatus;
 }
 
 const EMPTY_STATE_MESSAGES: Record<

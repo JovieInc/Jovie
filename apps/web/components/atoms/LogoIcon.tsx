@@ -2,9 +2,9 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 
 interface LogoIconProps {
-  size?: number;
-  className?: string;
-  variant?: 'color' | 'black' | 'white';
+  readonly size?: number;
+  readonly className?: string;
+  readonly variant?: 'color' | 'black' | 'white';
 }
 
 export function LogoIcon({

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardDataCached } from '../../dashboard/actions';
+import { getDashboardData } from '../../dashboard/actions';
 
 export const runtime = 'nodejs';
 
@@ -13,7 +13,7 @@ export default async function SettingsBrandingPage() {
     redirect('/sign-in?redirect_url=/app/settings/branding');
   }
 
-  const dashboardData = await getDashboardDataCached();
+  const dashboardData = await getDashboardData();
   if (dashboardData.needsOnboarding) {
     redirect('/onboarding');
   }

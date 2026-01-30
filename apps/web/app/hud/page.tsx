@@ -52,19 +52,8 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
   };
 
   // In production, host should be available from reverse proxy
-  if (!host || !isValidHost(host)) {
-    // Use validated env for fallback URL (includes protocol)
-    const base = publicEnv.NEXT_PUBLIC_APP_URL;
-    if (!host) {
-      console.warn('[HUD] Missing host header, using fallback:', base);
-    } else {
-      console.warn(
-        '[HUD] Invalid host header detected:',
-        host,
-        '- using fallback:',
-        base
-      );
-    }
+  if (host && isValidHost(host)) {
+    const base = `${proto}://${host}`;
     const url = new URL('/hud', base);
     if (kioskToken) {
       url.searchParams.set('kiosk', kioskToken);
@@ -72,20 +61,30 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
     return url.toString();
   }
 
-  const base = `${proto}://${host}`;
+  // Use validated env for fallback URL (includes protocol)
+  const base = publicEnv.NEXT_PUBLIC_APP_URL;
+  if (host) {
+    console.warn(
+      '[HUD] Invalid host header detected:',
+      host,
+      '- using fallback:',
+      base
+    );
+  } else {
+    console.warn('[HUD] Missing host header, using fallback:', base);
+  }
   const url = new URL('/hud', base);
   if (kioskToken) {
     url.searchParams.set('kiosk', kioskToken);
   }
-
   return url.toString();
 }
 
 export default async function HudPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: SearchParams;
-}) {
+}>) {
   const kioskTokenRaw = searchParams.kiosk;
   const kioskToken = typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
 
@@ -228,9 +227,9 @@ export default async function HudPage({
                       </div>
                       <div className='mt-3 text-xl text-white/70'>
                         DB latency{' '}
-                        {metrics.operations.dbLatencyMs != null
-                          ? `${metrics.operations.dbLatencyMs.toFixed(0)}ms`
-                          : '—'}
+                        {metrics.operations.dbLatencyMs === null
+                          ? '—'
+                          : `${metrics.operations.dbLatencyMs.toFixed(0)}ms`}
                       </div>
                     </div>
 
@@ -243,9 +242,9 @@ export default async function HudPage({
                       </div>
                       <div className='mt-3 text-xl text-white/70'>
                         p95{' '}
-                        {metrics.reliability.p95LatencyMs != null
-                          ? `${metrics.reliability.p95LatencyMs.toFixed(0)}ms`
-                          : '—'}
+                        {metrics.reliability.p95LatencyMs === null
+                          ? '—'
+                          : `${metrics.reliability.p95LatencyMs.toFixed(0)}ms`}
                       </div>
                     </div>
                   </div>

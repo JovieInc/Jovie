@@ -22,11 +22,11 @@ function isPastDate(date: Date): boolean {
 }
 
 interface TourDatesTableProps {
-  tourDates: TourDateViewModel[];
-  onEdit: (tourDate: TourDateViewModel) => void;
-  onDelete: (id: string) => void;
-  onSync?: () => void;
-  isSyncing?: boolean;
+  readonly tourDates: TourDateViewModel[];
+  readonly onEdit: (tourDate: TourDateViewModel) => void;
+  readonly onDelete: (id: string) => void;
+  readonly onSync?: () => void;
+  readonly isSyncing?: boolean;
 }
 
 const columnHelper = createColumnHelper<TourDateViewModel>();
@@ -250,7 +250,11 @@ export function TourDatesTable({
           label: 'Open ticket link',
           icon: <Icon name='ExternalLink' className='h-4 w-4' />,
           onClick: () =>
-            window.open(tourDate.ticketUrl!, '_blank', 'noopener,noreferrer'),
+            globalThis.open(
+              tourDate.ticketUrl!,
+              '_blank',
+              'noopener,noreferrer'
+            ),
         });
       }
 
@@ -275,6 +279,7 @@ export function TourDatesTable({
       columnHelper.accessor('startDate', {
         id: 'startDate',
         header: 'Date',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: info => (
           <DateCell
             startDate={info.getValue()}
@@ -289,6 +294,7 @@ export function TourDatesTable({
       columnHelper.accessor('venueName', {
         id: 'venue',
         header: 'Venue',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: info => <VenueCell venueName={info.getValue()} />,
         size: 200,
         enableSorting: true,
@@ -298,6 +304,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'location',
         header: 'Location',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: ({ row }) => (
           <LocationCell
             city={row.original.city}
@@ -312,6 +319,7 @@ export function TourDatesTable({
       columnHelper.accessor('ticketStatus', {
         id: 'status',
         header: 'Status',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: info => (
           <StatusCell
             ticketStatus={info.getValue()}
@@ -325,6 +333,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'tickets',
         header: 'Tickets',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />,
         size: 80,
       }),
@@ -333,6 +342,7 @@ export function TourDatesTable({
       columnHelper.accessor('provider', {
         id: 'source',
         header: 'Source',
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: info => <SourceCell provider={info.getValue()} />,
         size: 100,
       }),
@@ -340,7 +350,9 @@ export function TourDatesTable({
       // Actions column
       columnHelper.display({
         id: 'actions',
+        // NOSONAR S6478: TanStack Table header renderer prop, component already extracted and memoized
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />,
+        // NOSONAR S6478: TanStack Table cell renderer prop, component already extracted and memoized
         cell: ({ row }) => (
           <ActionsCell tourDate={row.original} onEdit={onEdit} />
         ),

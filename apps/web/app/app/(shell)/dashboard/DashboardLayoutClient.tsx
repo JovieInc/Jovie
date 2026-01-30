@@ -13,7 +13,8 @@ import React, {
 
 // Import useTableMeta for internal use and re-export for backward compatibility
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-export { useTableMeta };
+
+export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 
 import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
@@ -120,7 +121,7 @@ export default function DashboardLayoutClient({
   children,
   fullWidth = false,
   previewEnabled = true,
-}: DashboardLayoutClientProps) {
+}: Readonly<DashboardLayoutClientProps>) {
   const [, startTransition] = useTransition();
   const pathname = usePathname();
   const [tableMeta, setTableMeta] = useState<TableMeta>({
@@ -300,7 +301,7 @@ function DashboardLayoutWrapper({
   showDivider,
   showPreview,
   children,
-}: {
+}: Readonly<{
   crumbs: DashboardBreadcrumbItem[];
   useFullWidth: boolean;
   showMobileTabs: boolean;
@@ -309,7 +310,7 @@ function DashboardLayoutWrapper({
   showDivider?: boolean;
   showPreview: boolean;
   children: React.ReactNode;
-}) {
+}>) {
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
   const MobileMenuButton = isMobile ? (
@@ -386,7 +387,7 @@ function DashboardLayoutInner({
   previewEnabled,
   showMobileTabs,
   children,
-}: {
+}: Readonly<{
   crumbs: DashboardBreadcrumbItem[];
   useFullWidth: boolean;
   isContactTableRoute: boolean;
@@ -395,7 +396,7 @@ function DashboardLayoutInner({
   previewEnabled: boolean;
   showMobileTabs: boolean;
   children: React.ReactNode;
-}) {
+}>) {
   const previewContext = usePreviewPanelContext();
   const previewOpen = previewContext?.isOpen ?? false;
   const closePreview = previewContext?.close;

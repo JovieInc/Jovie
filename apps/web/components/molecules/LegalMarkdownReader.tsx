@@ -5,8 +5,8 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface LegalMarkdownReaderProps {
-  html: string;
-  className?: string;
+  readonly html: string;
+  readonly className?: string;
 }
 
 export function LegalMarkdownReader({

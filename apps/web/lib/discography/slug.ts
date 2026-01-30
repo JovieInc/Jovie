@@ -23,6 +23,9 @@ export function generateBaseSlug(
   title: string,
   maxLength: number = 50
 ): string {
+  // Guard against undefined to prevent runtime errors
+  if (!title) return '';
+
   return (
     title
       .toLowerCase()

@@ -8,29 +8,29 @@ interface GroupedTableBodyProps<T>
     /**
      * Grouped data from useTableGrouping hook
      */
-    groupedData: ReturnType<typeof useTableGrouping<T>>['groupedData'];
+    readonly groupedData: ReturnType<typeof useTableGrouping<T>>['groupedData'];
 
     /**
      * Function to register group headers for observation
      */
-    observeGroupHeader: ReturnType<
+    readonly observeGroupHeader: ReturnType<
       typeof useTableGrouping<T>
     >['observeGroupHeader'];
 
     /**
      * Number of columns (for colSpan)
      */
-    columns: number;
+    readonly columns: number;
 
     /**
      * Render function for each row
      */
-    renderRow: (row: T, index: number) => React.ReactNode;
+    readonly renderRow: (row: T, index: number) => React.ReactNode;
 
     /**
      * Currently visible group index (for smart sticky behavior)
      */
-    visibleGroupIndex?: number;
+    readonly visibleGroupIndex?: number;
   }> {}
 
 /**

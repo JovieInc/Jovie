@@ -11,12 +11,12 @@ import * as React from 'react';
 
 export interface AdminCreatorFiltersProps
   extends Readonly<{
-    initialPageSize: number;
+    readonly initialPageSize: number;
   }> {}
 
 export function AdminCreatorFilters({
   initialPageSize,
-}: AdminCreatorFiltersProps) {
+}: Readonly<AdminCreatorFiltersProps>) {
   const [pageSizeValue, setPageSizeValue] = React.useState<string>(
     String(initialPageSize)
   );

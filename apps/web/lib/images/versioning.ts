@@ -250,12 +250,12 @@ export function getOptimalImageFormat(): 'avif' | 'webp' | 'auto' {
   canvas.height = 1;
 
   // Check AVIF support
-  if (canvas.toDataURL('image/avif').indexOf('avif') > -1) {
+  if (canvas.toDataURL('image/avif').includes('avif')) {
     return 'avif';
   }
 
   // Check WebP support
-  if (canvas.toDataURL('image/webp').indexOf('webp') > -1) {
+  if (canvas.toDataURL('image/webp').includes('webp')) {
     return 'webp';
   }
 

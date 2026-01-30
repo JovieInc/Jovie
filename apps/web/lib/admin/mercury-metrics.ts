@@ -70,7 +70,7 @@ async function fetchMercury<T>(
 ): Promise<T> {
   const mercuryEnv = getMercuryEnv();
   if (!mercuryEnv) {
-    throw new Error('Mercury API credentials are not configured.');
+    throw new TypeError('Mercury API credentials are not configured.');
   }
 
   const url = new URL(`${MERCURY_BASE_URL}${path}`);

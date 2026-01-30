@@ -1,8 +1,8 @@
 export interface LegalHeroProps {
-  eyebrow: string;
-  title: string;
-  description: string;
-  highlight?: string;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly description: string;
+  readonly highlight?: string;
 }
 
 export function LegalHero({

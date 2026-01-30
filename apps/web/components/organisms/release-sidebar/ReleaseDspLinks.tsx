@@ -28,20 +28,25 @@ import type { Release } from './types';
 import { isValidUrl } from './utils';
 
 interface ReleaseDspLinksProps {
-  release: Release;
-  providerConfig: Record<ProviderKey, { label: string; accent: string }>;
-  isEditable: boolean;
-  isAddingLink: boolean;
-  newLinkUrl: string;
-  selectedProvider: ProviderKey | null;
-  isAddingDspLink: boolean;
-  isRemovingDspLink: string | null;
-  onSetIsAddingLink: (value: boolean) => void;
-  onSetNewLinkUrl: (value: string) => void;
-  onSetSelectedProvider: (value: ProviderKey | null) => void;
-  onAddLink: () => Promise<void>;
-  onRemoveLink: (provider: ProviderKey) => Promise<void>;
-  onNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  readonly release: Release;
+  readonly providerConfig: Record<
+    ProviderKey,
+    { label: string; accent: string }
+  >;
+  readonly isEditable: boolean;
+  readonly isAddingLink: boolean;
+  readonly newLinkUrl: string;
+  readonly selectedProvider: ProviderKey | null;
+  readonly isAddingDspLink: boolean;
+  readonly isRemovingDspLink: string | null;
+  readonly onSetIsAddingLink: (value: boolean) => void;
+  readonly onSetNewLinkUrl: (value: string) => void;
+  readonly onSetSelectedProvider: (value: ProviderKey | null) => void;
+  readonly onAddLink: () => Promise<void>;
+  readonly onRemoveLink: (provider: ProviderKey) => Promise<void>;
+  readonly onNewLinkKeyDown: (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) => void;
 }
 
 // Maps ProviderKey to DspProviderId for icons

@@ -5,10 +5,10 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import type { AdminUsagePoint } from '@/lib/admin/overview';
 
 interface MetricsChartProps {
-  points: AdminUsagePoint[];
+  readonly points: AdminUsagePoint[];
 }
 
-export function MetricsChart({ points }: MetricsChartProps) {
+export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
   const chartData = points.map(point => ({
     date: point.label,
     users: point.value,
@@ -30,7 +30,7 @@ export function MetricsChart({ points }: MetricsChartProps) {
     );
   }
 
-  const latest = chartData[chartData.length - 1];
+  const latest = chartData.at(-1)!;
   const start = chartData[0];
   const delta = latest.users - start.users;
   const deltaPct = start.users > 0 ? (delta / start.users) * 100 : 0;

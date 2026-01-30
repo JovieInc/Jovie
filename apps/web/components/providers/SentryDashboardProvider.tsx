@@ -109,7 +109,7 @@ export function SentryDashboardProvider({
 }: SentryDashboardProviderProps): React.ReactElement {
   // State is tracked internally for callbacks but not used for rendering
   // since the SDK upgrade is non-blocking
-  const [, setState] = useState<ProviderState>({
+  const [_state, setState] = useState<ProviderState>({
     upgradeState: 'idle',
     hasAttemptedUpgrade: false,
   });

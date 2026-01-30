@@ -13,9 +13,9 @@ import { cn } from '@/lib/utils';
 import { formatISODate } from '@/lib/utils/date-formatting';
 
 interface TourDateSidebarProps {
-  tourDate: TourDateViewModel | null;
-  profileId: string;
-  onClose: () => void;
+  readonly tourDate: TourDateViewModel | null;
+  readonly profileId: string;
+  readonly onClose: () => void;
 }
 
 type TicketStatus = 'available' | 'sold_out' | 'cancelled';

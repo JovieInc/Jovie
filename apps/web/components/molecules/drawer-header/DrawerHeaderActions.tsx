@@ -9,21 +9,21 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderAction {
-  id: string;
-  label: string;
-  icon: LucideIcon;
+  readonly id: string;
+  readonly label: string;
+  readonly icon: LucideIcon;
   /** Icon to show when isActive is true (e.g., Check icon after copy) */
-  activeIcon?: LucideIcon;
+  readonly activeIcon?: LucideIcon;
   /** When true, shows activeIcon instead of icon */
-  isActive?: boolean;
-  onClick?: () => void;
-  asChild?: boolean;
-  href?: string;
+  readonly isActive?: boolean;
+  readonly onClick?: () => void;
+  readonly asChild?: boolean;
+  readonly href?: string;
 }
 
 export interface DrawerHeaderActionsProps {
-  primaryActions: DrawerHeaderAction[]; // Max 2, shown inline
-  overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
+  readonly primaryActions: DrawerHeaderAction[]; // Max 2, shown inline
+  readonly overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
 }
 
 /**
@@ -47,7 +47,7 @@ export function DrawerHeaderActions({
       onClick:
         action.onClick ||
         (action.href
-          ? () => window.open(action.href, '_blank', 'noopener,noreferrer')
+          ? () => globalThis.open(action.href, '_blank', 'noopener,noreferrer')
           : () => {}),
     }));
 

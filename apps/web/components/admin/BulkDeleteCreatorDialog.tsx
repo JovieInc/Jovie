@@ -13,10 +13,10 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 
 interface BulkDeleteCreatorDialogProps {
-  open: boolean;
-  count: number;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
+  readonly open: boolean;
+  readonly count: number;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onConfirm: () => void;
 }
 
 export function BulkDeleteCreatorDialog({
@@ -24,7 +24,7 @@ export function BulkDeleteCreatorDialog({
   count,
   onOpenChange,
   onConfirm,
-}: BulkDeleteCreatorDialogProps) {
+}: Readonly<BulkDeleteCreatorDialogProps>) {
   const handleCancel = () => {
     onOpenChange(false);
   };

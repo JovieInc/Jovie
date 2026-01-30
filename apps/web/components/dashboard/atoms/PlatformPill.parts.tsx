@@ -31,8 +31,8 @@ export function PillShimmer({ show }: Readonly<{ show: boolean }>) {
  * Props for PillIcon component
  */
 export interface PillIconProps {
-  platformIcon: string;
-  style: CSSProperties;
+  readonly platformIcon: string;
+  readonly style: CSSProperties;
 }
 
 /**
@@ -54,8 +54,8 @@ export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
  * Props for CollapsedContent component
  */
 export interface CollapsedContentProps {
-  defaultExpanded: boolean;
-  primaryText: string;
+  readonly defaultExpanded: boolean;
+  readonly primaryText: string;
 }
 
 /**
@@ -83,10 +83,10 @@ export function CollapsedContent({
  * Props for ExpandedContent component
  */
 export interface ExpandedContentProps {
-  primaryText: string;
-  secondaryText?: string;
-  badgeText?: string;
-  suffix?: ReactNode;
+  readonly primaryText: string;
+  readonly secondaryText?: string;
+  readonly badgeText?: string;
+  readonly suffix?: ReactNode;
 }
 
 /**
@@ -139,8 +139,8 @@ export function ExpandedContent({
  * Props for TrailingContent component
  */
 export interface TrailingContentProps {
-  children: ReactNode;
-  collapsed: boolean;
+  readonly children: ReactNode;
+  readonly collapsed: boolean;
 }
 
 /**

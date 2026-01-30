@@ -55,7 +55,7 @@ export async function fetchInstagramDocument(
     timeoutMs: INSTAGRAM_CONFIG.defaultTimeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     allowedHosts: INSTAGRAM_CONFIG.validHosts,
   });

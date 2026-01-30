@@ -6,16 +6,16 @@ import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 
 export interface AdminCreatorsFooterProps
   extends Readonly<{
-    page: number;
-    totalPages: number;
-    from: number;
-    to: number;
-    total: number;
-    pageSize: number;
-    canPrev: boolean;
-    canNext: boolean;
-    prevHref: string | null | undefined;
-    nextHref: string | null | undefined;
+    readonly page: number;
+    readonly totalPages: number;
+    readonly from: number;
+    readonly to: number;
+    readonly total: number;
+    readonly pageSize: number;
+    readonly canPrev: boolean;
+    readonly canNext: boolean;
+    readonly prevHref: string | null | undefined;
+    readonly nextHref: string | null | undefined;
   }> {}
 
 export function AdminCreatorsFooter({
@@ -29,7 +29,7 @@ export function AdminCreatorsFooter({
   canNext,
   prevHref,
   nextHref,
-}: AdminCreatorsFooterProps) {
+}: Readonly<AdminCreatorsFooterProps>) {
   return (
     <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
       <div className='flex items-center gap-2'>

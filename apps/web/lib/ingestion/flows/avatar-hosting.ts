@@ -95,7 +95,7 @@ export async function copyAvatarToBlob(
     const contentType =
       response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
     if (!contentType || !SUPPORTED_IMAGE_MIME_TYPES_SET.has(contentType)) {
-      throw new Error(`Unsupported content type: ${contentType}`);
+      throw new TypeError(`Unsupported content type: ${contentType}`);
     }
 
     if (response.bodyUsed) {
@@ -116,12 +116,12 @@ export async function copyAvatarToBlob(
     }
 
     if (arrayBuffer.byteLength > AVATAR_MAX_FILE_SIZE_BYTES) {
-      throw new Error('Avatar exceeds max size');
+      throw new RangeError('Avatar exceeds max size');
     }
     const buffer = Buffer.from(arrayBuffer);
 
     if (!validateMagicBytes(buffer, contentType as SupportedImageMimeType)) {
-      throw new Error('Magic bytes validation failed');
+      throw new SyntaxError('Magic bytes validation failed');
     }
 
     const sharp = (await import('sharp')).default;
@@ -155,7 +155,7 @@ export async function copyAvatarToBlob(
     });
 
     if (!blob?.url) {
-      throw new Error('Blob upload returned no URL');
+      throw new SyntaxError('Blob upload returned no URL');
     }
 
     return blob.url;

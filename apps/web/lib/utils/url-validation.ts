@@ -14,8 +14,8 @@ const PRIVATE_IP_PATTERNS = [
   /^0\./, // Current network
   // IPv6 patterns (simplified matching)
   /^::1$/, // Loopback
-  /^fc[0-9a-f]{2}:/i, // Unique local
-  /^fd[0-9a-f]{2}:/i, // Unique local
+  /^fc[\da-f]{2}:/i, // Unique local
+  /^fd[\da-f]{2}:/i, // Unique local
   /^fe80:/i, // Link-local
   /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.|192\.168\.)/i, // IPv4-mapped
 ];

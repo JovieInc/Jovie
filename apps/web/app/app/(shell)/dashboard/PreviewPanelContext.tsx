@@ -61,16 +61,16 @@ export function PreviewPanelProvider({
   children,
   defaultOpen = false,
   enabled = true,
-}: PreviewPanelProviderProps) {
+}: Readonly<PreviewPanelProviderProps>) {
   // Check if screen is large (md breakpoint: 768px)
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (typeof window === 'undefined') return true; // SSR default
-    return window.matchMedia('(min-width: 768px)').matches;
+    if (typeof globalThis === 'undefined') return true; // SSR default
+    return globalThis.matchMedia('(min-width: 768px)').matches;
   });
 
   // Update isLargeScreen on resize
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const mediaQuery = globalThis.matchMedia('(min-width: 768px)');
     const handleChange = (e: MediaQueryListEvent) => {
       setIsLargeScreen(e.matches);
     };
@@ -129,8 +129,8 @@ export function PreviewPanelProvider({
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [enabled]);
 
   // Separate memoized values for each context to prevent cascading re-renders
@@ -169,7 +169,7 @@ export function PreviewPanelProvider({
 export function usePreviewPanelState(): PreviewPanelStateContextValue {
   const context = useContext(PreviewPanelStateContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanelState must be used within a PreviewPanelProvider'
     );
   }
@@ -184,7 +184,7 @@ export function usePreviewPanelState(): PreviewPanelStateContextValue {
 export function usePreviewPanelData(): PreviewPanelDataContextValue {
   const context = useContext(PreviewPanelDataContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanelData must be used within a PreviewPanelProvider'
     );
   }
@@ -199,7 +199,7 @@ export function usePreviewPanel(): PreviewPanelContextValue {
   const stateContext = useContext(PreviewPanelStateContext);
   const dataContext = useContext(PreviewPanelDataContext);
   if (!stateContext || !dataContext) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanel must be used within a PreviewPanelProvider'
     );
   }

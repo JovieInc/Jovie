@@ -2,10 +2,10 @@ import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 interface IconBadgeProps {
-  name: IconName;
-  colorVar: string;
-  className?: string;
-  ariaLabel?: string;
+  readonly name: IconName;
+  readonly colorVar: string;
+  readonly className?: string;
+  readonly ariaLabel?: string;
 }
 
 export function IconBadge({

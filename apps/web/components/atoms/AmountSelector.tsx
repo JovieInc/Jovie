@@ -4,12 +4,12 @@ import { memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AmountSelectorProps {
-  amount: number;
-  isSelected: boolean;
-  onClick: (index: number) => void;
-  index: number;
-  className?: string;
-  disabled?: boolean;
+  readonly amount: number;
+  readonly isSelected: boolean;
+  readonly onClick: (index: number) => void;
+  readonly index: number;
+  readonly className?: string;
+  readonly disabled?: boolean;
 }
 
 export const AmountSelector = memo(function AmountSelector({

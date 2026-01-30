@@ -5,12 +5,12 @@ import { BadgeCheck, RefreshCw, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface TableRowActionsProps {
-  isVerified: boolean;
-  isClaimed: boolean;
-  verificationStatus: 'idle' | 'loading' | 'success' | 'error';
-  refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
-  onToggleVerification: () => Promise<void>;
-  onRefreshIngest: () => void | Promise<void>;
+  readonly isVerified: boolean;
+  readonly isClaimed: boolean;
+  readonly verificationStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly onToggleVerification: () => Promise<void>;
+  readonly onRefreshIngest: () => void | Promise<void>;
 }
 
 export function TableRowActions({
@@ -20,7 +20,7 @@ export function TableRowActions({
   refreshIngestStatus,
   onToggleVerification,
   onRefreshIngest,
-}: TableRowActionsProps) {
+}: Readonly<TableRowActionsProps>) {
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
 

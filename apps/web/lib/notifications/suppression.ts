@@ -81,7 +81,7 @@ export async function isEmailSuppressed(
 
   return {
     suppressed: true,
-    reason: suppression.reason as SuppressionReason,
+    reason: suppression.reason,
     source: suppression.source,
     expiresAt: suppression.expiresAt,
   };
@@ -289,7 +289,7 @@ export async function getSuppressionStats(): Promise<
   // Map SQL results to counts object
   for (const row of results) {
     if (row.reason in counts) {
-      counts[row.reason as SuppressionReason] = Number(row.count);
+      counts[row.reason] = Number(row.count);
     }
   }
 

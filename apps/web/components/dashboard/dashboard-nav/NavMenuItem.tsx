@@ -11,17 +11,17 @@ import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
-  item: NavItem;
-  isActive: boolean;
-  shortcut?: KeyboardShortcut;
-  actions?: ReactNode;
+  readonly item: NavItem;
+  readonly isActive: boolean;
+  readonly shortcut?: KeyboardShortcut;
+  readonly actions?: ReactNode;
 }
 
 /**
  * Render shortcut keys in tooltip format
  * Handles both "G then D" sequential and single key formats
  */
-function ShortcutKeys({ shortcut }: { shortcut: KeyboardShortcut }) {
+function ShortcutKeys({ shortcut }: { readonly shortcut: KeyboardShortcut }) {
   const { keys } = shortcut;
 
   // Handle "G then D" style sequential shortcuts

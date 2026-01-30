@@ -157,17 +157,17 @@ function slugify(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .replace(/-/g, ''); // compact for socials (e.g., the1975)
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/(^-|-$)/g, '')
+    .replaceAll('-', ''); // compact for socials (e.g., the1975)
 }
 
 function _slugifyWithDashes(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/(^-|-$)/g, '');
 }
 
 function makeArtist(

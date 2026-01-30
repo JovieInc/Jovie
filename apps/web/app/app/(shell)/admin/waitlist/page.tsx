@@ -49,7 +49,7 @@ interface AdminWaitlistPageProps {
 
 export default async function AdminWaitlistPage({
   searchParams,
-}: AdminWaitlistPageProps) {
+}: Readonly<AdminWaitlistPageProps>) {
   const { page, pageSize } =
     await adminWaitlistSearchParams.parse(searchParams);
 

@@ -4,7 +4,7 @@ import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { getDashboardDataCached } from '../actions';
+import { getDashboardData } from '../actions';
 import { getProfileContactsForOwner } from './actions';
 
 export const runtime = 'nodejs';
@@ -17,7 +17,7 @@ export default async function ContactsPage() {
   }
 
   try {
-    const dashboardData = await getDashboardDataCached();
+    const dashboardData = await getDashboardData();
 
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');

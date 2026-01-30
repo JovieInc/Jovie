@@ -14,19 +14,19 @@ const INPUT_CLASS =
   'block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors';
 
 interface PlatformSectionProps {
-  platform: string;
-  pixelIdLabel: string;
-  pixelIdPlaceholder: string;
-  pixelIdName: string;
-  pixelIdValue: string;
-  tokenLabel: string;
-  tokenPlaceholder: string;
-  tokenName: string;
-  tokenValue: string;
-  helpUrl: string;
-  helpText: string;
-  onPixelIdChange: (value: string) => void;
-  onTokenChange: (value: string) => void;
+  readonly platform: string;
+  readonly pixelIdLabel: string;
+  readonly pixelIdPlaceholder: string;
+  readonly pixelIdName: string;
+  readonly pixelIdValue: string;
+  readonly tokenLabel: string;
+  readonly tokenPlaceholder: string;
+  readonly tokenName: string;
+  readonly tokenValue: string;
+  readonly helpUrl: string;
+  readonly helpText: string;
+  readonly onPixelIdChange: (value: string) => void;
+  readonly onTokenChange: (value: string) => void;
 }
 
 function PlatformSection({

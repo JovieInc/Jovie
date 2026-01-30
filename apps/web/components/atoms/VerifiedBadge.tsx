@@ -1,8 +1,8 @@
 import { BadgeCheck } from 'lucide-react';
 
 interface VerifiedBadgeProps {
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly className?: string;
 }
 
 export function VerifiedBadge({

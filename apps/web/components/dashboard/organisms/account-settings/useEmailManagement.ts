@@ -99,7 +99,7 @@ export function useEmailManagement(
       });
 
       if (verifiedEmail.verification?.status !== 'verified') {
-        throw new Error('Verification code is invalid or expired.');
+        throw new TypeError('Verification code is invalid or expired.');
       }
 
       setSyncingEmailId(verifiedEmail.id);

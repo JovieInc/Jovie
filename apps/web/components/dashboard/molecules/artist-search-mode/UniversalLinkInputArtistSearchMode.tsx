@@ -209,11 +209,12 @@ export function UniversalLinkInputArtistSearchMode({
                 aria-hidden='true'
               >
                 {results.map((artist, index) => (
-                  <div
+                  <button
                     key={artist.id}
-                    tabIndex={-1}
+                    type='button'
+                    tabIndex={0}
                     className={cn(
-                      'flex items-center gap-3 p-3 cursor-pointer transition-colors',
+                      'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
                       index === activeResultIndex
                         ? 'bg-surface-2'
                         : 'hover:bg-surface-2/50'
@@ -273,7 +274,7 @@ export function UniversalLinkInputArtistSearchMode({
                         </svg>
                       </div>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             </>

@@ -5,19 +5,19 @@ import type { AvailableDSP } from '@/lib/dsp';
 
 export interface DSPButtonGroupProps {
   /** Array of available DSP platforms */
-  dsps: AvailableDSP[];
+  readonly dsps: AvailableDSP[];
   /** Click handler for DSP buttons */
-  onDSPClick?: (dspKey: string, url: string) => void;
+  readonly onDSPClick?: (dspKey: string, url: string) => void;
   /** Button size variant */
-  size?: 'sm' | 'md' | 'lg';
+  readonly size?: 'sm' | 'md' | 'lg';
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Whether to show the preference notice */
-  showPreferenceNotice?: boolean;
+  readonly showPreferenceNotice?: boolean;
   /** Custom preference notice text */
-  preferenceNoticeText?: string;
+  readonly preferenceNoticeText?: string;
   /** Whether buttons are disabled */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 }
 
 export function DSPButtonGroup({

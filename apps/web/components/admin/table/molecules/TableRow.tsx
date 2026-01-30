@@ -2,17 +2,17 @@ import type * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
   /** Whether the row is in a selected state (e.g., single-row focus/navigation). Only one row can be selected at a time. */
-  selected?: boolean;
+  readonly selected?: boolean;
   /** Whether the row is checked (e.g., multi-select checkbox). Multiple rows can be checked simultaneously. */
-  checked?: boolean;
-  onClick?: () => void;
-  virtualRow?: { start: number }; // For virtualization positioning
-  className?: string;
-  rowRef?: React.RefCallback<HTMLTableRowElement>;
-  dataIndex?: number;
-  style?: React.CSSProperties;
+  readonly checked?: boolean;
+  readonly onClick?: () => void;
+  readonly virtualRow?: { readonly start: number }; // For virtualization positioning
+  readonly className?: string;
+  readonly rowRef?: React.RefCallback<HTMLTableRowElement>;
+  readonly dataIndex?: number;
+  readonly style?: React.CSSProperties;
 }
 
 export function TableRow({
@@ -25,7 +25,7 @@ export function TableRow({
   rowRef,
   dataIndex,
   style: customStyle,
-}: TableRowProps) {
+}: Readonly<TableRowProps>) {
   const isVirtual = virtualRow !== undefined;
 
   const combinedStyle: React.CSSProperties = {

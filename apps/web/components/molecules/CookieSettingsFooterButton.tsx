@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 
 export interface CookieSettingsFooterButtonProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function CookieSettingsFooterButton({

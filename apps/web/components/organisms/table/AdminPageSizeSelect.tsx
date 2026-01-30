@@ -13,9 +13,9 @@ const selectItemClassName =
   'text-primary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token';
 
 export interface AdminPageSizeSelectProps {
-  initialPageSize: number;
-  name?: string;
-  onPageSizeChange?: (pageSize: number) => void;
+  readonly initialPageSize: number;
+  readonly name?: string;
+  readonly onPageSizeChange?: (pageSize: number) => void;
 }
 
 export function AdminPageSizeSelect({

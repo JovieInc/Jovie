@@ -45,8 +45,8 @@ export default function Loading() {
                   {AUDIENCE_TABLE_ROW_KEYS.map(rowKey => (
                     <li
                       key={rowKey}
-                      className='grid grid-cols-7 gap-4 border-b border-subtle px-4 last:border-b-0'
-                      style={{ height: '60px' }}
+                      className='grid grid-cols-7 items-center gap-4 border-b border-subtle px-4 last:border-b-0'
+                      style={{ height: '44px' }}
                       aria-hidden='true'
                     >
                       {AUDIENCE_TABLE_COL_KEYS.map(colKey => (

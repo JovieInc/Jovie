@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 export type SettingsStatusPillState = 'saving' | 'saved';
 
 export interface SettingsStatusPillProps {
-  state: SettingsStatusPillState;
-  className?: string;
+  readonly state: SettingsStatusPillState;
+  readonly className?: string;
 }
 
 export function SettingsStatusPill({

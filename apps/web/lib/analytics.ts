@@ -42,7 +42,7 @@ export function track(event: string, properties?: Record<string, unknown>) {
   const envTag = getEnvTag(analyticsWindow.location.hostname);
 
   analyticsWindow.gtag('event', event, {
-    ...(properties || {}),
+    ...properties,
     env: envTag,
   });
 }

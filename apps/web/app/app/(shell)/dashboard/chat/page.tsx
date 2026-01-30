@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardDataCached } from '../actions';
+import { getDashboardData } from '../actions';
 
 export const metadata = {
   title: 'Chat with Jovie',
@@ -17,7 +17,7 @@ export default async function ChatPage() {
     redirect('/sign-in?redirect_url=/app/dashboard/chat');
   }
 
-  const dashboardData = await getDashboardDataCached();
+  const dashboardData = await getDashboardData();
 
   if (dashboardData.needsOnboarding) {
     redirect('/onboarding');

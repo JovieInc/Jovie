@@ -48,7 +48,7 @@ export async function trackEvent(
 
     // Add runtime information to properties
     const eventProperties = {
-      ...(properties || {}),
+      ...properties,
       runtime,
       server_side: true,
     };
@@ -97,7 +97,7 @@ export async function identifyUser(
     const runtime = getRuntime();
 
     const userProperties = {
-      ...(properties || {}),
+      ...properties,
       runtime,
       server_side: true,
     };

@@ -2,13 +2,15 @@ import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
 interface ReliabilityCardProps {
-  summary: AdminReliabilitySummary;
+  readonly summary: AdminReliabilitySummary;
 }
 
-export function ReliabilityCard({ summary }: ReliabilityCardProps) {
+export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
   const errorRateLabel = `${summary.errorRatePercent.toFixed(2)}%`;
   const latencyLabel =
-    summary.p95LatencyMs != null ? `${summary.p95LatencyMs.toFixed(0)}ms` : '—';
+    summary.p95LatencyMs === null
+      ? '—'
+      : `${summary.p95LatencyMs.toFixed(0)}ms`;
   const incidentsLabel = summary.incidents24h.toLocaleString();
   const lastIncidentLabel = summary.lastIncidentAt
     ? summary.lastIncidentAt.toISOString().slice(0, 10)

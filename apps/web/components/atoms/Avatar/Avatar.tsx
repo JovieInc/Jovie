@@ -7,13 +7,13 @@ import { cn } from '@/lib/utils';
 
 export interface AvatarProps {
   /** Avatar image source URL */
-  src?: string | null;
+  readonly src?: string | null;
   /** Alt text for the image */
-  alt: string;
+  readonly alt: string;
   /** Display name for fallback initials */
-  name?: string;
+  readonly name?: string;
   /** Avatar size */
-  size?:
+  readonly size?:
     | 'xs'
     | 'sm'
     | 'md'
@@ -28,19 +28,19 @@ export interface AvatarProps {
     | 'display-3xl'
     | 'display-4xl';
   /** Border radius style */
-  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+  readonly rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
   /** Whether this avatar represents a verified profile */
-  verified?: boolean;
+  readonly verified?: boolean;
   /** Loading priority for Next.js Image */
-  priority?: boolean;
+  readonly priority?: boolean;
   /** Image quality */
-  quality?: number;
+  readonly quality?: number;
   /** Fallback image URL */
-  fallbackSrc?: string;
+  readonly fallbackSrc?: string;
   /** Custom className */
-  className?: string;
+  readonly className?: string;
   /** Custom styling */
-  style?: React.ComponentPropsWithoutRef<'div'>['style'];
+  readonly style?: React.ComponentPropsWithoutRef<'div'>['style'];
 }
 
 // Size mappings with consistent design system values

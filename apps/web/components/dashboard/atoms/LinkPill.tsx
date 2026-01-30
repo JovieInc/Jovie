@@ -39,18 +39,18 @@ export type LinkPillMenuItem = {
 };
 
 export interface LinkPillProps {
-  platformIcon: string;
-  platformName: string;
-  primaryText: string;
-  secondaryText?: string;
-  state: LinkPillState;
-  badgeText?: string;
-  shimmerOnMount?: boolean;
-  menuItems: LinkPillMenuItem[];
-  menuId: string;
-  isMenuOpen: boolean;
-  onMenuOpenChange: (open: boolean) => void;
-  className?: string;
+  readonly platformIcon: string;
+  readonly platformName: string;
+  readonly primaryText: string;
+  readonly secondaryText?: string;
+  readonly state: LinkPillState;
+  readonly badgeText?: string;
+  readonly shimmerOnMount?: boolean;
+  readonly menuItems: LinkPillMenuItem[];
+  readonly menuId: string;
+  readonly isMenuOpen: boolean;
+  readonly onMenuOpenChange: (open: boolean) => void;
+  readonly className?: string;
 }
 
 export function LinkPill({

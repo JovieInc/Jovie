@@ -10,12 +10,12 @@ type CustomFallbackFn = (
 ) => ReactNode;
 
 interface QueryErrorBoundaryProps {
-  children: ReactNode;
+  readonly children: ReactNode;
   /**
    * Custom fallback component to render on error.
    * If not provided, uses DefaultErrorFallback.
    */
-  fallback?: CustomFallbackFn;
+  readonly fallback?: CustomFallbackFn;
 }
 
 /**

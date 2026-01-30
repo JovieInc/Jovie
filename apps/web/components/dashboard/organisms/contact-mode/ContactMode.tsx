@@ -19,15 +19,15 @@ import {
 import type { DashboardContact } from '@/types/contacts';
 
 export interface ContactModeProps {
-  artistName: string;
-  contacts: DashboardContact[];
-  hasError?: boolean;
+  readonly artistName: string;
+  readonly contacts: DashboardContact[];
+  readonly hasError?: boolean;
 }
 
 interface ContactListItemProps {
-  contact: DashboardContact;
-  onCopyEmail: (email: string) => void;
-  onCopyPhone: (phone: string) => void;
+  readonly contact: DashboardContact;
+  readonly onCopyEmail: (email: string) => void;
+  readonly onCopyPhone: (phone: string) => void;
 }
 
 function ContactListItem({

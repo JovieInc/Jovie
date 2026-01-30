@@ -5,12 +5,12 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DashboardHeaderActionButtonProps {
-  ariaLabel: string;
-  pressed?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-  icon: ReactNode;
-  className?: string;
+  readonly ariaLabel: string;
+  readonly pressed?: boolean;
+  readonly disabled?: boolean;
+  readonly onClick?: () => void;
+  readonly icon: ReactNode;
+  readonly className?: string;
 }
 
 export function DashboardHeaderActionButton({

@@ -77,24 +77,24 @@ const renderContextMenuItem = ({
 };
 
 export interface CreatorProfileTableRowProps {
-  profile: AdminCreatorProfileRow;
-  rowNumber: number;
-  isSelected: boolean;
-  isChecked: boolean;
-  isMobile: boolean;
-  verificationStatus: 'idle' | 'loading' | 'success' | 'error';
-  refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
-  isMenuOpen: boolean;
-  onRowClick: (id: string) => void;
-  onContextMenu: (id: string) => void;
-  onToggleSelect: (id: string) => void;
-  onMenuOpenChange: (open: boolean) => void;
-  onRefreshIngest: () => void | Promise<void>;
-  onToggleVerification: () => Promise<void>;
-  onToggleFeatured: () => Promise<void>;
-  onToggleMarketing: () => Promise<void>;
-  onSendInvite?: () => void;
-  onDelete: () => void | Promise<void>;
+  readonly profile: AdminCreatorProfileRow;
+  readonly rowNumber: number;
+  readonly isSelected: boolean;
+  readonly isChecked: boolean;
+  readonly isMobile: boolean;
+  readonly verificationStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly isMenuOpen: boolean;
+  readonly onRowClick: (id: string) => void;
+  readonly onContextMenu: (id: string) => void;
+  readonly onToggleSelect: (id: string) => void;
+  readonly onMenuOpenChange: (open: boolean) => void;
+  readonly onRefreshIngest: () => void | Promise<void>;
+  readonly onToggleVerification: () => Promise<void>;
+  readonly onToggleFeatured: () => Promise<void>;
+  readonly onToggleMarketing: () => Promise<void>;
+  readonly onSendInvite?: () => void;
+  readonly onDelete: () => void | Promise<void>;
 }
 
 /**
@@ -220,12 +220,15 @@ function CreatorProfileTableRowComponent({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        <div
-          className='relative flex h-5 w-5 items-center justify-center'
+        <button
+          type='button'
+          className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
+          tabIndex={-1}
+          aria-label='Checkbox container'
         >
           <span
             className={cn(
@@ -249,7 +252,7 @@ function CreatorProfileTableRowComponent({
               className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
             />
           </div>
-        </div>
+        </button>
       </td>
       <td
         className={cn(

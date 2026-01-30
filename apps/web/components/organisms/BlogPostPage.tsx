@@ -5,7 +5,7 @@ import { Container } from '@/components/site/Container';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';
 
 export interface BlogPostPageProps {
-  post: BlogPost;
+  readonly post: BlogPost;
 }
 
 function formatDate(dateString: string): string {

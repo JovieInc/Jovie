@@ -45,8 +45,8 @@ function HighlightedName({
   name,
   matchIndices,
 }: {
-  name: string;
-  matchIndices: number[];
+  readonly name: string;
+  readonly matchIndices: number[];
 }) {
   if (matchIndices.length === 0) {
     return <span className='font-medium'>{name}</span>;
@@ -83,11 +83,11 @@ function PlatformSuggestionItem({
   onMouseEnter,
   onClick,
 }: {
-  option: RankedPlatformOption;
-  active: boolean;
-  optionId: string;
-  onMouseEnter: () => void;
-  onClick: () => void;
+  readonly option: RankedPlatformOption;
+  readonly active: boolean;
+  readonly optionId: string;
+  readonly onMouseEnter: () => void;
+  readonly onClick: () => void;
 }) {
   const iconMeta = getPlatformIcon(option.icon);
   const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';

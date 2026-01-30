@@ -54,24 +54,24 @@ interface SocialLinksCellProps {
   /**
    * Social links to display
    */
-  links: SocialLink[] | null;
+  readonly links: SocialLink[] | null;
 
   /**
    * Maximum number of links to show
    * @default 3
    */
-  maxLinks?: number;
+  readonly maxLinks?: number;
 
   /**
    * Filter to show only specific platform types
    * @example 'music_streaming' | 'social_media'
    */
-  filterPlatformType?: string | string[];
+  readonly filterPlatformType?: string | string[];
 
   /**
    * Additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**
@@ -173,7 +173,7 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
             stackable={useCollapsedMode}
             defaultExpanded={isLast && useCollapsedMode}
             onClick={() => {
-              window.open(link.url, '_blank', 'noopener,noreferrer');
+              globalThis.open(link.url, '_blank', 'noopener,noreferrer');
             }}
           />
         );

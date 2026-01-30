@@ -2,21 +2,21 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export interface TableActionMenuItem {
-  id: string;
-  label: string;
-  icon?: LucideIcon | ReactNode;
-  onClick: () => void;
-  variant?: 'default' | 'destructive';
-  disabled?: boolean;
-  subText?: string;
+  readonly id: string;
+  readonly label: string;
+  readonly icon?: LucideIcon | ReactNode;
+  readonly onClick: () => void;
+  readonly variant?: 'default' | 'destructive';
+  readonly disabled?: boolean;
+  readonly subText?: string;
 }
 
 export interface TableActionMenuProps {
-  items: TableActionMenuItem[];
-  trigger?: 'button' | 'context' | 'custom';
-  triggerIcon?: LucideIcon;
-  align?: 'start' | 'center' | 'end';
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  children?: React.ReactNode;
+  readonly items: TableActionMenuItem[];
+  readonly trigger?: 'button' | 'context' | 'custom';
+  readonly triggerIcon?: LucideIcon;
+  readonly align?: 'start' | 'center' | 'end';
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+  readonly children?: React.ReactNode;
 }

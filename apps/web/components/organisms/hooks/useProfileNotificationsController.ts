@@ -100,6 +100,7 @@ function writeCachedStatus(
 }
 
 export function formatE164PhoneForDisplay(value: string): string {
+  if (!value) return '';
   const digits = value.replaceAll(/\D/g, '');
   if (!digits) return value;
 

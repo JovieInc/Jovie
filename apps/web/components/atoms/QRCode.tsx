@@ -17,7 +17,7 @@ export function getQrCodeUrl(data: string, size: number) {
 
     // Implement simple LRU eviction when cache is full
     if (qrCache.size >= MAX_CACHE_SIZE) {
-      const firstKey = qrCache.keys().next().value as string | undefined;
+      const firstKey = qrCache.keys().next().value;
       if (firstKey !== undefined) {
         qrCache.delete(firstKey);
       }
@@ -30,10 +30,10 @@ export function getQrCodeUrl(data: string, size: number) {
 }
 
 interface QRCodeProps {
-  data: string;
-  size?: number;
-  label?: string;
-  className?: string;
+  readonly data: string;
+  readonly size?: number;
+  readonly label?: string;
+  readonly className?: string;
 }
 
 export function QRCode({

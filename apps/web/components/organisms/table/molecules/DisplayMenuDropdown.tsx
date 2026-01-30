@@ -23,10 +23,10 @@ export interface ColumnVisibility {
 }
 
 interface ColumnToggleButtonProps {
-  columnId: string;
-  label: string;
-  isVisible: boolean;
-  onToggle: (columnId: string, visible: boolean) => void;
+  readonly columnId: string;
+  readonly label: string;
+  readonly isVisible: boolean;
+  readonly onToggle: (columnId: string, visible: boolean) => void;
 }
 
 const ColumnToggleButton = memo(function ColumnToggleButton({
@@ -59,51 +59,54 @@ export interface DisplayMenuDropdownProps {
   /**
    * Trigger element (usually a button)
    */
-  trigger?: ReactNode;
+  readonly trigger?: ReactNode;
   /**
    * Current view mode
    */
-  viewMode?: ViewMode;
+  readonly viewMode?: ViewMode;
   /**
    * Available view modes for this table
    */
-  availableViewModes?: ViewMode[];
+  readonly availableViewModes?: ViewMode[];
   /**
    * Callback when view mode changes
    */
-  onViewModeChange?: (mode: ViewMode) => void;
+  readonly onViewModeChange?: (mode: ViewMode) => void;
   /**
    * Current density setting
    */
-  density?: Density;
+  readonly density?: Density;
   /**
    * Callback when density changes
    */
-  onDensityChange?: (density: Density) => void;
+  readonly onDensityChange?: (density: Density) => void;
   /**
    * Current column visibility state
    */
-  columnVisibility?: ColumnVisibility;
+  readonly columnVisibility?: ColumnVisibility;
   /**
    * Callback when column visibility changes
    */
-  onColumnVisibilityChange?: (columnId: string, visible: boolean) => void;
+  readonly onColumnVisibilityChange?: (
+    columnId: string,
+    visible: boolean
+  ) => void;
   /**
    * Available columns to toggle
    */
-  availableColumns?: Array<{ id: string; label: string }>;
+  readonly availableColumns?: Array<{ id: string; label: string }>;
   /**
    * Whether grouping is enabled
    */
-  groupingEnabled?: boolean;
+  readonly groupingEnabled?: boolean;
   /**
    * Callback when grouping toggle changes
    */
-  onGroupingToggle?: (enabled: boolean) => void;
+  readonly onGroupingToggle?: (enabled: boolean) => void;
   /**
    * Label for grouping toggle (e.g., "Group by status")
    */
-  groupingLabel?: string;
+  readonly groupingLabel?: string;
 }
 
 /**
@@ -259,7 +262,7 @@ export function DisplayMenuDropdown({
                     columnId={column.id}
                     label={column.label}
                     isVisible={columnVisibility?.[column.id] ?? true}
-                    onToggle={onColumnVisibilityChange!}
+                    onToggle={onColumnVisibilityChange}
                   />
                 ))}
               </div>

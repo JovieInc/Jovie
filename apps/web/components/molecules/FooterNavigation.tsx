@@ -1,11 +1,11 @@
 import { FooterLink } from '@/components/ui/FooterLink';
 
 interface FooterNavigationProps {
-  variant?: 'light' | 'dark';
-  ariaLabel?: string;
-  className?: string;
-  linkClassName?: string;
-  links?: Array<{
+  readonly variant?: 'light' | 'dark';
+  readonly ariaLabel?: string;
+  readonly className?: string;
+  readonly linkClassName?: string;
+  readonly links?: Array<{
     href: string;
     label: string;
   }>;

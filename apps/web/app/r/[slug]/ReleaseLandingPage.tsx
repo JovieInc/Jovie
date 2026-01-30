@@ -69,7 +69,7 @@ export function ReleaseLandingPage({
   artist,
   providers,
   slug,
-}: ReleaseLandingPageProps) {
+}: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
         year: 'numeric',

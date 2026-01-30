@@ -11,7 +11,7 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import { copyToClipboard } from './utils';
 
 interface ProfileMenuActionsProps {
-  publicProfileHref: string;
+  readonly publicProfileHref: string;
 }
 
 export function ProfileMenuActions({

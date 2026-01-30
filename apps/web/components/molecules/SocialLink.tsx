@@ -8,9 +8,9 @@ import { hexToRgba } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
-  link: SocialLinkType;
-  handle: string;
-  artistName: string;
+  readonly link: SocialLinkType;
+  readonly handle: string;
+  readonly artistName: string;
 }
 
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
@@ -66,11 +66,11 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
         });
       } catch (error) {
         console.debug('Deep link failed, using fallback:', error);
-        window.open(link.url, '_blank', 'noopener,noreferrer');
+        globalThis.open(link.url, '_blank', 'noopener,noreferrer');
       }
     } else {
       // No deep link config, use original URL
-      window.open(link.url, '_blank', 'noopener,noreferrer');
+      globalThis.open(link.url, '_blank', 'noopener,noreferrer');
     }
   };
 

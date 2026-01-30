@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 // Types
@@ -31,28 +32,35 @@ interface ToggleMarketingResponse extends CreatorActionResponse {
   marketingOptOut?: boolean;
 }
 
-// Common fetch helper
+// Common fetch helper using fetchWithTimeout
 async function postJSON<T>(
   url: string,
   body: unknown,
   errorMessage: string
 ): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-  });
+  try {
+    const payload = await fetchWithTimeout<
+      { success?: boolean; error?: string } & T
+    >(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    error?: string;
-  } & T;
+    if (!payload.success) {
+      throw new Error(payload.error ?? errorMessage);
+    }
 
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? errorMessage);
+    return payload;
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error(errorMessage);
+    }
+    throw error;
   }
-
-  return payload;
 }
 
 // Mutation functions

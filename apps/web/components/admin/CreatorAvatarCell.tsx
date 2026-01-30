@@ -12,11 +12,11 @@ import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
 
 export interface CreatorAvatarCellProps
   extends Readonly<{
-    profileId: string;
-    username: string;
-    avatarUrl: string | null;
-    verified?: boolean;
-    isFeatured?: boolean;
+    readonly profileId: string;
+    readonly username: string;
+    readonly avatarUrl: string | null;
+    readonly verified?: boolean;
+    readonly isFeatured?: boolean;
   }> {}
 
 export function CreatorAvatarCell({
@@ -25,7 +25,7 @@ export function CreatorAvatarCell({
   avatarUrl,
   verified = false,
   isFeatured = false,
-}: CreatorAvatarCellProps) {
+}: Readonly<CreatorAvatarCellProps>) {
   const notifications = useNotifications();
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null

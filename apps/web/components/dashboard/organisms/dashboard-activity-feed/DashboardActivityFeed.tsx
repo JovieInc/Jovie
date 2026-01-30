@@ -31,7 +31,11 @@ function ActivityLoadingSkeleton() {
   );
 }
 
-function ActivityEmptyState({ isRefreshing }: { isRefreshing: boolean }) {
+function ActivityEmptyState({
+  isRefreshing,
+}: {
+  readonly isRefreshing: boolean;
+}) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
       <p className='text-sm text-tertiary-token'>
@@ -45,8 +49,8 @@ function ActivityList({
   activities,
   isRefreshing,
 }: {
-  activities: Activity[];
-  isRefreshing: boolean;
+  readonly activities: Activity[];
+  readonly isRefreshing: boolean;
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
@@ -59,7 +63,7 @@ function ActivityList({
   );
 }
 
-function ActivityItem({ activity }: { activity: Activity }) {
+function ActivityItem({ activity }: { readonly activity: Activity }) {
   const content = (
     <>
       <span

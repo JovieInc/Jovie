@@ -9,10 +9,10 @@ export type HeaderIconButtonSize = 'xs' | 'sm' | 'md';
 
 export interface HeaderIconButtonProps
   extends Omit<ButtonProps, 'children' | 'size' | 'variant'> {
-  children: React.ReactNode;
-  ariaLabel: string;
-  size?: HeaderIconButtonSize;
-  variant?: ButtonProps['variant'];
+  readonly children: React.ReactNode;
+  readonly ariaLabel: string;
+  readonly size?: HeaderIconButtonSize;
+  readonly variant?: ButtonProps['variant'];
 }
 
 export const HeaderIconButton = React.forwardRef<

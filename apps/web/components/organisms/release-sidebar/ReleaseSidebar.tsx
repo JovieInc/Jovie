@@ -88,7 +88,7 @@ export function ReleaseSidebar({
       id: 'open-release',
       label: 'Open release',
       icon: <ExternalLink className='h-4 w-4' />,
-      onClick: () => window.open(smartLinkUrl, '_blank'),
+      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
       className: CONTEXT_MENU_ITEM_CLASS,
     });
 
@@ -141,11 +141,7 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-          {!release ? (
-            <p className='text-xs text-sidebar-muted'>
-              Select a release in the table to view its details.
-            </p>
-          ) : (
+          {release ? (
             <>
               <ReleaseArtwork
                 artworkUrl={release.artworkUrl}
@@ -194,6 +190,10 @@ export function ReleaseSidebar({
                 </div>
               )}
             </>
+          ) : (
+            <p className='text-xs text-sidebar-muted'>
+              Select a release in the table to view its details.
+            </p>
           )}
         </div>
       </div>

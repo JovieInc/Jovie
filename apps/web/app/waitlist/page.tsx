@@ -27,6 +27,8 @@ import { FetchError } from '@/lib/queries/fetch';
 import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';
 import { useWaitlistStatusQuery } from '@/lib/queries/useWaitlistStatusQuery';
 
+type StepNumber = 0 | 1 | 2;
+
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const router = useRouter();
@@ -38,7 +40,7 @@ export default function WaitlistPage() {
   }, [searchParams]);
 
   const [isHydrating, setIsHydrating] = useState(true);
-  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [step, setStep] = useState<StepNumber>(0);
   const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoal | null>(null);
   const [primaryGoalFocusIndex, setPrimaryGoalFocusIndex] = useState(0);
   const [socialPlatform, setSocialPlatform] =
@@ -67,14 +69,14 @@ export default function WaitlistPage() {
   const selectedPrimaryGoalIndex = useMemo(() => {
     if (!primaryGoal) return 0;
     const index = PRIMARY_GOAL_OPTIONS.findIndex(o => o.value === primaryGoal);
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }, [primaryGoal]);
 
   const selectedSocialPlatformIndex = useMemo(() => {
     const index = SOCIAL_PLATFORM_OPTIONS.findIndex(
       o => o.value === socialPlatform
     );
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }, [socialPlatform]);
 
   useEffect(() => {
@@ -90,21 +92,21 @@ export default function WaitlistPage() {
   // Load all persisted form state on mount
   useEffect(() => {
     try {
-      const storedSubmitted = window.sessionStorage.getItem(
+      const storedSubmitted = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.submitted
       );
       if (storedSubmitted === 'true') {
         setIsSubmitted(true);
       }
 
-      const storedStep = window.sessionStorage.getItem(
+      const storedStep = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.step
       );
       if (storedStep === '0' || storedStep === '1' || storedStep === '2') {
-        setStep(Number.parseInt(storedStep, 10) as 0 | 1 | 2);
+        setStep(Number.parseInt(storedStep, 10) as StepNumber);
       }
 
-      const storedGoal = window.sessionStorage.getItem(
+      const storedGoal = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primaryGoal
       );
       if (
@@ -115,7 +117,7 @@ export default function WaitlistPage() {
         setPrimaryGoal(storedGoal);
       }
 
-      const storedPlatform = window.sessionStorage.getItem(
+      const storedPlatform = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.socialPlatform
       );
       if (
@@ -127,21 +129,21 @@ export default function WaitlistPage() {
         setSocialPlatform(storedPlatform);
       }
 
-      const storedSocialUrl = window.sessionStorage.getItem(
+      const storedSocialUrl = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primarySocialUrl
       );
       if (storedSocialUrl) {
         setPrimarySocialUrl(storedSocialUrl);
       }
 
-      const storedSpotifyUrl = window.sessionStorage.getItem(
+      const storedSpotifyUrl = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.spotifyUrl
       );
       if (storedSpotifyUrl) {
         setSpotifyUrl(storedSpotifyUrl);
       }
 
-      const storedHeardAbout = window.sessionStorage.getItem(
+      const storedHeardAbout = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.heardAbout
       );
       if (storedHeardAbout) {
@@ -157,9 +159,9 @@ export default function WaitlistPage() {
     const persist = (key: string, value: string | null) => {
       try {
         if (value) {
-          window.sessionStorage.setItem(key, value);
+          globalThis.sessionStorage.setItem(key, value);
         } else {
-          window.sessionStorage.removeItem(key);
+          globalThis.sessionStorage.removeItem(key);
         }
       } catch {
         // Ignore storage errors
@@ -185,7 +187,7 @@ export default function WaitlistPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     try {
-      const storedUserId = window.sessionStorage.getItem(
+      const storedUserId = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.userId
       );
       if (storedUserId && storedUserId !== userId) {
@@ -193,7 +195,7 @@ export default function WaitlistPage() {
         setIsSubmitted(false);
       }
       if (userId) {
-        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
+        globalThis.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
       }
     } catch {
       // Ignore storage errors
@@ -221,7 +223,10 @@ export default function WaitlistPage() {
 
       clearWaitlistStorage();
       try {
-        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
+        globalThis.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.submitted,
+          'true'
+        );
       } catch {
         // Ignore storage errors
       }
@@ -234,7 +239,7 @@ export default function WaitlistPage() {
   }, [waitlistStatus, router]);
 
   const validateStep = useCallback(
-    (targetStep: 0 | 1 | 2): FormErrors => {
+    (targetStep: StepNumber): FormErrors => {
       const errors: FormErrors = {};
 
       if (targetStep === 0) {
@@ -291,13 +296,13 @@ export default function WaitlistPage() {
 
     setFieldErrors({});
 
-    if (step < 2) setStep((step + 1) as 0 | 1 | 2);
+    if (step < 2) setStep((step + 1) as StepNumber);
   };
 
   const handleBack = () => {
     setError('');
     setFieldErrors({});
-    if (step > 0) setStep((step - 1) as 0 | 1 | 2);
+    if (step > 0) setStep((step - 1) as StepNumber);
   };
 
   const handlePrimaryGoalSelect = (goal: PrimaryGoal) => {
@@ -387,7 +392,7 @@ export default function WaitlistPage() {
         onSuccess: () => {
           clearWaitlistStorage();
           try {
-            window.sessionStorage.setItem(
+            globalThis.sessionStorage.setItem(
               WAITLIST_STORAGE_KEYS.submitted,
               'true'
             );

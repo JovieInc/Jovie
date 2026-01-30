@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils';
 export type BrandLogoTone = 'auto' | 'black' | 'white' | 'color';
 
 export interface BrandLogoProps {
-  size?: number;
-  className?: string;
-  tone?: BrandLogoTone;
-  alt?: string;
-  priority?: boolean;
-  rounded?: boolean;
-  style?: CSSProperties;
-  'aria-hidden'?: boolean;
+  readonly size?: number;
+  readonly className?: string;
+  readonly tone?: BrandLogoTone;
+  readonly alt?: string;
+  readonly priority?: boolean;
+  readonly rounded?: boolean;
+  readonly style?: CSSProperties;
+  readonly 'aria-hidden'?: boolean;
 }
 
 export function BrandLogo({

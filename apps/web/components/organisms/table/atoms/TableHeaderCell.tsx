@@ -3,11 +3,11 @@ import { SortableHeaderButton } from '../SortableHeaderButton';
 import type { TableCellProps } from './TableCell';
 
 export interface TableHeaderCellProps extends Omit<TableCellProps, 'as'> {
-  sortable?: boolean;
-  sortDirection?: 'asc' | 'desc' | null;
-  onSort?: () => void;
-  sticky?: boolean;
-  stickyTop?: number; // Offset in pixels for sticky positioning
+  readonly sortable?: boolean;
+  readonly sortDirection?: 'asc' | 'desc' | null;
+  readonly onSort?: () => void;
+  readonly sticky?: boolean;
+  readonly stickyTop?: number; // Offset in pixels for sticky positioning
 }
 
 export function TableHeaderCell({

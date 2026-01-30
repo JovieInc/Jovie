@@ -3,6 +3,7 @@
  *
  * Job processors for DSP-related background tasks:
  * - Artist discovery across platforms
+ * - Profile enrichment (photos, names, metadata)
  * - Track enrichment with DSP links
  * - Discography sync
  */
@@ -13,3 +14,12 @@ export {
   processDspArtistDiscoveryJob,
   processDspArtistDiscoveryJobStandalone,
 } from './dsp-artist-discovery';
+
+export {
+  enrichProfileFromDsp,
+  type ProfileEnrichmentPayload,
+  type ProfileEnrichmentResult,
+  processProfileEnrichmentJob,
+  processProfileEnrichmentJobStandalone,
+  profileEnrichmentPayloadSchema,
+} from './profile-enrichment';

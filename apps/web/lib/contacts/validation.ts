@@ -23,7 +23,7 @@ export function validateEmail(email: string | null | undefined): string | null {
   if (!trimmed) return null;
   // Limit input length to prevent ReDoS (RFC 5321 max email length is 254)
   if (trimmed.length > 254) {
-    throw new Error('Email address is too long');
+    throw new RangeError('Email address is too long');
   }
   if (!EMAIL_REGEX.test(trimmed)) {
     throw new Error('Please enter a valid email');
@@ -68,14 +68,14 @@ export function sanitizeContactInput(
   input: DashboardContactInput
 ): DashboardContactInput {
   if (!input.profileId) {
-    throw new Error('Profile ID is required');
+    throw new TypeError('Profile ID is required');
   }
 
   const email = validateEmail(input.email ?? null);
   const phone = normalizePhone(input.phone ?? null);
 
   if (!email && !phone) {
-    throw new Error('Add at least one contact channel (email or phone)');
+    throw new TypeError('Add at least one contact channel (email or phone)');
   }
 
   const territories = normalizeTerritories(input.territories ?? []);

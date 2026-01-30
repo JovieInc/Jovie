@@ -6,7 +6,7 @@ import { useSidebar } from '@/components/organisms/Sidebar';
 import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
 
 interface SidebarCollapseButtonProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function SidebarCollapseButton({

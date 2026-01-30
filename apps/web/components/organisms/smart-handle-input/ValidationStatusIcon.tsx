@@ -4,11 +4,11 @@ import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface ValidationStatusIconProps {
-  showAvailability: boolean;
-  checking: boolean;
-  available: boolean;
-  clientValid: boolean;
-  hasError: boolean;
+  readonly showAvailability: boolean;
+  readonly checking: boolean;
+  readonly available: boolean;
+  readonly clientValid: boolean;
+  readonly hasError: boolean;
 }
 
 export function ValidationStatusIcon({

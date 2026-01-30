@@ -18,7 +18,7 @@ export function InterstitialClient({
   shortId,
   titleAlias,
   domain,
-}: InterstitialClientProps) {
+}: Readonly<InterstitialClientProps>) {
   const [error, setError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -28,7 +28,7 @@ export function InterstitialClient({
         setIsVerified(true);
         // Short delay to show success state, then redirect
         setTimeout(() => {
-          window.location.replace(data.url);
+          globalThis.location.replace(data.url);
         }, 1000);
       },
       onError: err => {

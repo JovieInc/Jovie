@@ -22,25 +22,25 @@ import { cn } from '@/lib/utils';
 
 export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   /** Current avatar image URL */
-  src?: string | null;
+  readonly src?: string | null;
   /** Whether uploading is enabled (controlled by feature flag) */
-  uploadable?: boolean;
+  readonly uploadable?: boolean;
   /** Upload callback that returns a promise with the new image URL */
-  onUpload?: (file: File) => Promise<string>;
+  readonly onUpload?: (file: File) => Promise<string>;
   /** Progress percentage (0-100) for upload progress */
-  progress?: number;
+  readonly progress?: number;
   /** Error callback */
-  onError?: (error: string) => void;
+  readonly onError?: (error: string) => void;
   /** Success callback with new image URL */
-  onSuccess?: (imageUrl: string) => void;
+  readonly onSuccess?: (imageUrl: string) => void;
   /** Retry callback when upload fails with retryable error */
-  onRetryableError?: (error: string, code: UploadErrorCode) => void;
+  readonly onRetryableError?: (error: string, code: UploadErrorCode) => void;
   /** Maximum file size in bytes (default: 4MB, aligned with /api/images/upload) */
-  maxFileSize?: number;
+  readonly maxFileSize?: number;
   /** Accepted file types */
-  acceptedTypes?: readonly string[];
+  readonly acceptedTypes?: readonly string[];
   /** Whether to show hover overlay when uploadable */
-  showHoverOverlay?: boolean;
+  readonly showHoverOverlay?: boolean;
 }
 
 const SIZE_MAP = {

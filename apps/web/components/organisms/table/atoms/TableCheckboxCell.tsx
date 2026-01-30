@@ -11,24 +11,28 @@ const CHECKBOX_STYLES =
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  rowNumber?: number; // Shows when unchecked/not hovered
-  ariaLabel: string;
-  isHeader?: boolean;
-  indeterminate?: boolean;
-  className?: string;
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly rowNumber?: number; // Shows when unchecked/not hovered
+  readonly ariaLabel: string;
+  readonly isHeader?: boolean;
+  readonly indeterminate?: boolean;
+  readonly className?: string;
 }
 
 // TanStack Table props (recommended)
 export interface TableCheckboxCellTanStackProps<TData = unknown> {
-  table?: Table<TData>;
-  row?: Row<TData>;
-  rowNumber?: number;
-  isChecked?: boolean;
-  onToggleSelect?: () => void;
-  headerCheckboxState?: 'checked' | 'unchecked' | 'indeterminate' | boolean;
-  onToggleSelectAll?: () => void;
+  readonly table?: Table<TData>;
+  readonly row?: Row<TData>;
+  readonly rowNumber?: number;
+  readonly isChecked?: boolean;
+  readonly onToggleSelect?: () => void;
+  readonly headerCheckboxState?:
+    | 'checked'
+    | 'unchecked'
+    | 'indeterminate'
+    | boolean;
+  readonly onToggleSelectAll?: () => void;
 }
 
 export type TableCheckboxCellProps<TData = unknown> =
@@ -119,7 +123,7 @@ function TanStackRowCheckbox({
       >
         <Checkbox
           aria-label={
-            rowNumber !== undefined ? `Select row ${rowNumber}` : 'Select row'
+            rowNumber === undefined ? 'Select row' : `Select row ${rowNumber}`
           }
           checked={isChecked}
           onCheckedChange={onToggleSelect}

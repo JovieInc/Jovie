@@ -97,9 +97,7 @@ async function fetchUserDataWithFallback<
     }
 
     // Determine which legacy fields to fetch (intersection of requested and available)
-    const legacyFieldsToFetch = fields.filter(f =>
-      LEGACY_FIELDS.includes(f)
-    ) as UserBillingFieldKey[];
+    const legacyFieldsToFetch = fields.filter(f => LEGACY_FIELDS.includes(f));
 
     if (legacyFieldsToFetch.length === 0) {
       // All requested fields are new columns that don't exist yet

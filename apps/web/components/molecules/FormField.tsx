@@ -4,13 +4,13 @@ import React, { cloneElement, isValidElement, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FormFieldProps {
-  label?: string;
-  error?: string;
-  required?: boolean;
-  className?: string;
-  children: React.ReactNode;
-  id?: string;
-  helpText?: string;
+  readonly label?: string;
+  readonly error?: string;
+  readonly required?: boolean;
+  readonly className?: string;
+  readonly children: React.ReactNode;
+  readonly id?: string;
+  readonly helpText?: string;
 }
 
 export function FormField({
@@ -21,7 +21,7 @@ export function FormField({
   children,
   id: providedId,
   helpText,
-}: FormFieldProps) {
+}: Readonly<FormFieldProps>) {
   // Generate unique IDs for accessibility connections
   const uniqueId = useId();
   const id = providedId || `field-${uniqueId}`;

@@ -5,16 +5,16 @@ import { AuthButton } from '@/components/auth';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface OnboardingNameStepProps {
-  title: string;
-  prompt?: string;
-  fullName: string;
-  namePlaceholder: string;
-  isValid: boolean;
-  isTransitioning: boolean;
-  isSubmitting: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onNameChange: (value: string) => void;
-  onSubmit: () => void;
+  readonly title: string;
+  readonly prompt?: string;
+  readonly fullName: string;
+  readonly namePlaceholder: string;
+  readonly isValid: boolean;
+  readonly isTransitioning: boolean;
+  readonly isSubmitting: boolean;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly onNameChange: (value: string) => void;
+  readonly onSubmit: () => void;
 }
 
 export function OnboardingNameStep({

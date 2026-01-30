@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 type LogoLoaderVariant = 'color' | 'mono';
 
 interface LogoLoaderProps {
-  size?: number;
-  variant?: LogoLoaderVariant;
-  className?: string;
-  'aria-label'?: string;
+  readonly size?: number;
+  readonly variant?: LogoLoaderVariant;
+  readonly className?: string;
+  readonly 'aria-label'?: string;
 }
 
 const VARIANT_CLASSES: Record<LogoLoaderVariant, string> = {

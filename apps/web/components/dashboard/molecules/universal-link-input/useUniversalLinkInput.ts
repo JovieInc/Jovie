@@ -123,7 +123,7 @@ export function useUniversalLinkInput({
     setActiveSuggestionIndex(0);
     onQueryChange?.('');
     focusInput('start');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only reset on clearSignal change; focusInput and onQueryChange are stable callbacks
   }, [clearSignal]);
 
   const handleUrlChange = useCallback(
@@ -299,7 +299,7 @@ export function useUniversalLinkInput({
     onPrefillConsumed?.();
     onQueryChange?.(prefillUrl);
     focusInput('end');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run when prefillUrl changes; callbacks are stable and url/searchMode guards prevent re-runs
   }, [prefillUrl]);
 
   return {

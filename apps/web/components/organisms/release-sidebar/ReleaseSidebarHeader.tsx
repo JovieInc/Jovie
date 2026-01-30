@@ -14,11 +14,11 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import type { Release } from './types';
 
 interface ReleaseSidebarHeaderProps {
-  release: Release | null;
-  hasRelease: boolean;
-  onClose?: () => void;
-  onRefresh?: () => void;
-  onCopySmartLink: () => void;
+  readonly release: Release | null;
+  readonly hasRelease: boolean;
+  readonly onClose?: () => void;
+  readonly onRefresh?: () => void;
+  readonly onCopySmartLink: () => void;
 }
 
 export function ReleaseSidebarHeader({
@@ -91,7 +91,7 @@ export function ReleaseSidebarHeader({
       id: 'open',
       label: 'Open smart link',
       icon: ExternalLink,
-      href: release!.smartLinkPath,
+      href: release.smartLinkPath,
     });
   }
 
