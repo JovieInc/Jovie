@@ -16,7 +16,7 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { getLatestReleaseForProfile } from '@/lib/discography/queries';
-import { captureWarning } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   getProfileWithLinks as getCreatorProfileWithLinks,
   getTopProfilesForStaticGeneration,
@@ -207,7 +207,9 @@ const fetchProfileAndLinks = async (
       status: 'ok',
     };
   } catch (error) {
-    console.error('Error fetching creator profile:', error);
+    captureError('[profile] Error fetching creator profile', error, {
+      username,
+    });
     return {
       profile: null,
       links: [],

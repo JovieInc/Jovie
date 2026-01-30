@@ -38,7 +38,7 @@ When you **discover** new tech debt:
 |--------|-------|--------|--------------|
 | `@ts-nocheck` files | **0** | 0 | 2026-01-14 |
 | `@ts-ignore` in production | ~15 | <5 | 2026-01-14 |
-| Deprecated files | ~36 (4 removed, 4 imports migrated) | 0 | 2026-01-30 |
+| Deprecated files | ~40 → ~36 (4 removed, 4 imports migrated) | 0 | 2026-01-30 |
 | TODO comments | 6 | 0 | 2026-01-14 |
 | Empty catch blocks | **0** | 0 | 2026-01-14 |
 
@@ -126,12 +126,8 @@ Files marked `@deprecated` that should be migrated:
 | `lib/validation/schemas/dashboard.ts` | New validation location | TBD |
 | `lib/stripe/customer-sync.ts` | Refactored module | TBD |
 | `lib/ingestion/processor.ts` | Direct imports deprecated | TBD |
-| `lib/waitlist/access.ts` | `@/lib/auth/gate` | TBD |
 | `components/atoms/ArtistAvatar.tsx` | Use `Avatar` directly | TBD |
 | `components/organisms/Sidebar.tsx` | See component docs | TBD |
-| `components/dashboard/DashboardTipping.tsx` | New tipping module | TBD |
-| `app/app/dashboard/actions/profile-selection.ts` | `@/lib/db/server` | TBD |
-| `app/app/dashboard/actions/tipping-stats.ts` | `@/lib/db/server` | TBD |
 | `lib/hooks/useNotifications.ts` (useNotificationToast) | `useNotifications` | TBD |
 
 ### P2 - Medium (TODO Comments)
