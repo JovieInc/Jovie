@@ -5,7 +5,7 @@
  */
 
 export type ClerkEmailVerification = {
-  status?: 'verified' | 'unverified' | string;
+  status?: string;
 };
 
 export interface ClerkEmailAddressResource {

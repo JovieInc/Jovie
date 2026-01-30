@@ -30,7 +30,7 @@ export interface ClerkUserEventData {
 export interface ClerkWebhookEvent {
   data: ClerkUserEventData;
   object: 'event';
-  type: ClerkEventType | string;
+  type: string;
 }
 
 /**
