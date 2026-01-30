@@ -51,7 +51,7 @@ export function useProfileVisitTracking(artistId?: string) {
 export function usePopstateReset(callback: () => void) {
   useEffect(() => {
     const handlePopState = () => callback();
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [callback]);
 }

@@ -127,7 +127,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             label: 'Open in Clerk',
             icon: <ExternalLink className='h-3.5 w-3.5' />,
             onClick: () => {
-              window.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
+              globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
             },
           }
         );

@@ -67,7 +67,7 @@ export function ProfileSidebarHeader({
   };
 
   const handleOpenProfile = () => {
-    window.open(profileUrl, '_blank', 'noopener,noreferrer');
+    globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownloadVCard = () => {
