@@ -58,7 +58,7 @@ function validateContentLength(response: Response, maxBytes: number): void {
   if (!contentLengthHeader) return;
   const contentLength = Number(contentLengthHeader);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-    throw new Error('Response too large');
+    throw new TypeError('Response too large');
   }
 }
 
@@ -70,12 +70,12 @@ async function readResponseArrayBuffer(
   maxBytes: number
 ): Promise<Buffer> {
   if (response.bodyUsed) {
-    throw new Error('Response body has already been consumed');
+    throw new TypeError('Response body has already been consumed');
   }
   try {
     const arrayBuffer = await response.arrayBuffer();
     if (arrayBuffer.byteLength > maxBytes) {
-      throw new Error('Response too large');
+      throw new TypeError('Response too large');
     }
     return Buffer.from(arrayBuffer);
   } catch (error) {
@@ -83,7 +83,7 @@ async function readResponseArrayBuffer(
       error instanceof TypeError &&
       error.message.includes('detached ArrayBuffer')
     ) {
-      throw new Error('Response body was detached before reading');
+      throw new TypeError('Response body was detached before reading');
     }
     throw error;
   }
@@ -112,7 +112,7 @@ export async function readResponseBytesWithLimit(
     if (value) {
       received += value.byteLength;
       if (received > maxBytes) {
-        throw new Error('Response too large');
+        throw new TypeError('Response too large');
       }
       chunks.push(value);
     }
@@ -149,10 +149,10 @@ export async function fetchWithRedirects(
         const next = new URL(location, current).toString();
         const parsed = new URL(next);
         if (parsed.protocol !== 'https:') {
-          throw new Error('Invalid redirect protocol');
+          throw new TypeError('Invalid redirect protocol');
         }
         if (await isPrivateHostname(parsed.hostname)) {
-          throw new Error('Invalid redirect host');
+          throw new TypeError('Invalid redirect host');
         }
         current = parsed.toString();
         continue;
@@ -164,7 +164,7 @@ export async function fetchWithRedirects(
     }
   }
 
-  throw new Error('Too many redirects');
+  throw new TypeError('Too many redirects');
 }
 
 /**
@@ -175,10 +175,10 @@ export async function downloadImage(
 ): Promise<DownloadedImage> {
   const parsed = new URL(imageUrl);
   if (parsed.protocol !== 'https:') {
-    throw new Error('Invalid image URL');
+    throw new TypeError('Invalid image URL');
   }
   if (await isPrivateHostname(parsed.hostname)) {
-    throw new Error('Invalid image host');
+    throw new TypeError('Invalid image host');
   }
 
   const { response, finalUrl } = await fetchWithRedirects(imageUrl, {
@@ -211,7 +211,7 @@ export async function downloadImage(
     AVATAR_MAX_FILE_SIZE_BYTES
   );
   if (!validateMagicBytes(buffer, contentType)) {
-    throw new Error('Invalid image bytes');
+    throw new TypeError('Invalid image bytes');
   }
 
   return {

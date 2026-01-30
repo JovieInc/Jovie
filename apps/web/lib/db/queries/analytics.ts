@@ -236,7 +236,7 @@ export async function getUserAnalytics(
 
   const row = result[0];
   if (!row) {
-    throw new Error('User or creator profile not found for Clerk ID');
+    throw new TypeError('User or creator profile not found for Clerk ID');
   }
 
   const analytics = await getAnalyticsData(row.creatorProfileId, range);
@@ -301,13 +301,13 @@ export async function getUserDashboardAnalytics(
   const appUserId = userRow?.id;
   const userIsPro = Boolean(userRow?.isPro);
   if (!appUserId) {
-    throw new Error('User not found for Clerk ID');
+    throw new TypeError('User not found for Clerk ID');
   }
 
   const dynamicEnabled = userIsPro;
 
   if (!creatorProfile) {
-    throw new Error('Creator profile not found');
+    throw new TypeError('Creator profile not found');
   }
 
   const startDate = toStartDate(range);

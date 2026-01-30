@@ -26,7 +26,7 @@ export function useDashboardOverviewControls(): DashboardOverviewControlsValue {
   const value = useContext(DashboardOverviewControlsContext);
 
   if (!value) {
-    throw new Error(
+    throw new TypeError(
       'useDashboardOverviewControls must be used within DashboardOverviewControlsProvider'
     );
   }

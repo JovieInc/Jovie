@@ -72,7 +72,7 @@ export async function toggleCreatorVerifiedAction(
   const nextVerified = formData.get('nextVerified');
 
   if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new Error('profileId is required');
+    throw new TypeError('profileId is required');
   }
 
   const isVerified =
@@ -99,7 +99,7 @@ export async function bulkRerunCreatorIngestionAction(
 
   const profileIdsRaw = formData.get('profileIds');
   if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new Error('profileIds is required');
+    throw new TypeError('profileIds is required');
   }
 
   const parsed = JSON.parse(profileIdsRaw) as unknown;
@@ -112,11 +112,11 @@ export async function bulkRerunCreatorIngestionAction(
   });
 
   if (profileIds.length === 0) {
-    throw new Error('profileIds must contain at least one id');
+    throw new TypeError('profileIds must contain at least one id');
   }
 
   if (profileIds.length > 200) {
-    throw new Error('Too many profileIds');
+    throw new TypeError('Too many profileIds');
   }
 
   const queuedCount = await withSystemIngestionSession(async tx => {
@@ -168,7 +168,7 @@ export async function bulkSetCreatorsVerifiedAction(
   const nextVerifiedRaw = formData.get('nextVerified');
 
   if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new Error('profileIds is required');
+    throw new TypeError('profileIds is required');
   }
 
   const isVerified =
@@ -184,11 +184,11 @@ export async function bulkSetCreatorsVerifiedAction(
   });
 
   if (profileIds.length === 0) {
-    throw new Error('profileIds must contain at least one id');
+    throw new TypeError('profileIds must contain at least one id');
   }
 
   if (profileIds.length > 200) {
-    throw new Error('Too many profileIds');
+    throw new TypeError('Too many profileIds');
   }
 
   const updatedProfiles = await db
@@ -216,7 +216,7 @@ export async function updateCreatorAvatarAsAdmin(
   await requireAdmin();
 
   if (!profileId || !avatarUrl) {
-    throw new Error('profileId and avatarUrl are required');
+    throw new TypeError('profileId and avatarUrl are required');
   }
 
   const sanitizedAvatarUrl = validateAvatarUrl(avatarUrl);
@@ -244,7 +244,7 @@ export async function toggleCreatorFeaturedAction(
   const nextFeatured = formData.get('nextFeatured');
 
   if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new Error('profileId is required');
+    throw new TypeError('profileId is required');
   }
 
   const isFeatured =
@@ -274,7 +274,7 @@ export async function bulkSetCreatorsFeaturedAction(
   const nextFeaturedRaw = formData.get('nextFeatured');
 
   if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new Error('profileIds is required');
+    throw new TypeError('profileIds is required');
   }
 
   const isFeatured =
@@ -290,11 +290,11 @@ export async function bulkSetCreatorsFeaturedAction(
   });
 
   if (profileIds.length === 0) {
-    throw new Error('profileIds must contain at least one id');
+    throw new TypeError('profileIds must contain at least one id');
   }
 
   if (profileIds.length > 200) {
-    throw new Error('Too many profileIds');
+    throw new TypeError('Too many profileIds');
   }
 
   const updatedProfiles = await db
@@ -325,7 +325,7 @@ export async function toggleCreatorMarketingAction(
   const nextMarketingOptOut = formData.get('nextMarketingOptOut');
 
   if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new Error('profileId is required');
+    throw new TypeError('profileId is required');
   }
 
   const marketingOptOut =
@@ -353,7 +353,7 @@ export async function deleteCreatorOrUserAction(
   const profileId = formData.get('profileId');
 
   if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new Error('profileId is required');
+    throw new TypeError('profileId is required');
   }
 
   // Check if profile is claimed (has userId)
@@ -366,7 +366,7 @@ export async function deleteCreatorOrUserAction(
     .where(eq(creatorProfiles.id, profileId));
 
   if (!profile) {
-    throw new Error('Profile not found');
+    throw new TypeError('Profile not found');
   }
 
   if (profile.userId) {

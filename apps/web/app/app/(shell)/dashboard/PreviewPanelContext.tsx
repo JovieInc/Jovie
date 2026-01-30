@@ -169,7 +169,7 @@ export function PreviewPanelProvider({
 export function usePreviewPanelState(): PreviewPanelStateContextValue {
   const context = useContext(PreviewPanelStateContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanelState must be used within a PreviewPanelProvider'
     );
   }
@@ -184,7 +184,7 @@ export function usePreviewPanelState(): PreviewPanelStateContextValue {
 export function usePreviewPanelData(): PreviewPanelDataContextValue {
   const context = useContext(PreviewPanelDataContext);
   if (!context) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanelData must be used within a PreviewPanelProvider'
     );
   }
@@ -199,7 +199,7 @@ export function usePreviewPanel(): PreviewPanelContextValue {
   const stateContext = useContext(PreviewPanelStateContext);
   const dataContext = useContext(PreviewPanelDataContext);
   if (!stateContext || !dataContext) {
-    throw new Error(
+    throw new TypeError(
       'usePreviewPanel must be used within a PreviewPanelProvider'
     );
   }

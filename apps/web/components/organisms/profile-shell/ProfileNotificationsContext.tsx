@@ -9,7 +9,9 @@ export const ProfileNotificationsContext =
 export function useProfileNotifications(): ProfileNotificationsContextValue {
   const value = React.useContext(ProfileNotificationsContext);
   if (!value) {
-    throw new Error('useProfileNotifications must be used within ProfileShell');
+    throw new TypeError(
+      'useProfileNotifications must be used within ProfileShell'
+    );
   }
   return value;
 }

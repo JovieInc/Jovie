@@ -100,13 +100,13 @@ export async function batchUpdateSortOrder<T extends PgTable>(
   // Validate inputs to prevent SQL injection
   for (const order of orders) {
     if (typeof order.id !== 'string' || !/^[\w-]+$/.test(order.id)) {
-      throw new Error('Invalid ID format in batch update');
+      throw new TypeError('Invalid ID format in batch update');
     }
     if (
       typeof order.sortOrder !== 'number' ||
       !Number.isInteger(order.sortOrder)
     ) {
-      throw new Error('Invalid sortOrder in batch update');
+      throw new TypeError('Invalid sortOrder in batch update');
     }
   }
 
