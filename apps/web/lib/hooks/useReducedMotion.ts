@@ -27,14 +27,16 @@ export function useReducedMotion(): boolean {
     // Check if window is defined (client-side)
     if (typeof window === 'undefined') return;
     // Gracefully handle environments without matchMedia (e.g., some test runs)
-    if (typeof window.matchMedia !== 'function') {
+    if (typeof globalThis.matchMedia !== 'function') {
       // On client without matchMedia, default to false (no reduced motion preference)
       setPrefersReducedMotion(false);
       return;
     }
 
     // Create media query list
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const mediaQuery = globalThis.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    );
 
     // Set initial value
     setPrefersReducedMotion(mediaQuery.matches);

@@ -61,8 +61,8 @@ export function CookieBannerSection({
     if (typeof window === 'undefined') return;
 
     const handleOpen = () => setCustomize(true);
-    window.addEventListener('jv:cookie:open', handleOpen);
-    return () => window.removeEventListener('jv:cookie:open', handleOpen);
+    globalThis.addEventListener('jv:cookie:open', handleOpen);
+    return () => globalThis.removeEventListener('jv:cookie:open', handleOpen);
   }, []);
 
   const acceptAll = async () => {
