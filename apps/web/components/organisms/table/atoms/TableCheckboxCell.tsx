@@ -119,7 +119,7 @@ function TanStackRowCheckbox({
       >
         <Checkbox
           aria-label={
-            rowNumber !== undefined ? `Select row ${rowNumber}` : 'Select row'
+            rowNumber === undefined ? 'Select row' : `Select row ${rowNumber}`
           }
           checked={isChecked}
           onCheckedChange={onToggleSelect}

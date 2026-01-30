@@ -147,7 +147,7 @@ export function MultiLinkPasteDialog({
           <Icon name='Link' className='h-4 w-4 text-accent' />
         </div>
         <span>
-          Found {totalLinks} link{totalLinks !== 1 ? 's' : ''}
+          Found {totalLinks} link{totalLinks === 1 ? '' : 's'}
         </span>
       </DialogTitle>
 
@@ -181,7 +181,7 @@ export function MultiLinkPasteDialog({
           onClick={onConfirm}
           disabled={!hasSelectableLinks}
         >
-          Add {selectableCount} link{selectableCount !== 1 ? 's' : ''}
+          Add {selectableCount} link{selectableCount === 1 ? '' : 's'}
         </Button>
       </DialogActions>
     </Dialog>

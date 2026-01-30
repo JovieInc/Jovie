@@ -70,9 +70,9 @@ export function ComparisonSection() {
             <div
               key={comparison.category}
               className={`grid grid-cols-3 gap-0 ${
-                index !== comparisons.length - 1
-                  ? 'border-b border-gray-200 dark:border-white/10'
-                  : ''
+                index === comparisons.length - 1
+                  ? ''
+                  : 'border-b border-gray-200 dark:border-white/10'
               }`}
             >
               <div className='p-6 font-medium text-gray-900 dark:text-white'>

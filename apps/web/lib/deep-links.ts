@@ -179,14 +179,14 @@ const PLATFORM_MAP: Record<string, PlatformInfo['platform']> = {
 export function detectPlatform(userAgent?: string): PlatformInfo {
   const ua =
     userAgent ||
-    (typeof window !== 'undefined' ? window.navigator.userAgent : '');
+    (typeof window === 'undefined' ? '' : window.navigator.userAgent);
   const detectedPlatform = detectPlatformFromUA(ua);
 
   return {
     platform:
-      detectedPlatform != null
-        ? (PLATFORM_MAP[detectedPlatform] ?? 'desktop')
-        : 'desktop',
+      detectedPlatform == null
+        ? 'desktop'
+        : (PLATFORM_MAP[detectedPlatform] ?? 'desktop'),
     userAgent: ua,
   };
 }

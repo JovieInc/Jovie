@@ -25,9 +25,9 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
           if (isYearly) handleToggle();
         }}
         className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
-          !isYearly
-            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
-            : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
+          isYearly
+            ? 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
+            : 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
         }`}
         style={FONT_SYNTHESIS_STYLE}
       >

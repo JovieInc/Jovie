@@ -383,9 +383,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           {rows.length > 0 && (
             <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
-                {filteredRows.length !== rows.length
-                  ? `${filteredRows.length} of ${totalReleases}`
-                  : `${totalReleases}`}{' '}
+                {filteredRows.length === rows.length
+                  ? `${totalReleases}`
+                  : `${filteredRows.length} of ${totalReleases}`}{' '}
                 {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
                   <span className='ml-1.5 text-tertiary-token'>
