@@ -14,9 +14,9 @@ import { useCallback, useState } from 'react';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 interface UserActionsMenuProps {
-  user: AdminUserRow;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  readonly user: AdminUserRow;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {

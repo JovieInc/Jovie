@@ -5,7 +5,7 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import type { AdminUsagePoint } from '@/lib/admin/overview';
 
 interface MetricsChartProps {
-  points: AdminUsagePoint[];
+  readonly points: AdminUsagePoint[];
 }
 
 export function MetricsChart({ points }: Readonly<MetricsChartProps>) {

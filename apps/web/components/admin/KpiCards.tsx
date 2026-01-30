@@ -10,22 +10,22 @@ import {
 import { KpiItem } from './KpiItem';
 
 interface DataAvailability {
-  isConfigured: boolean;
-  isAvailable: boolean;
-  errorMessage?: string;
+  readonly isConfigured: boolean;
+  readonly isAvailable: boolean;
+  readonly errorMessage?: string;
 }
 
 interface KpiCardsProps {
-  mrrUsd: number;
-  balanceUsd: number;
-  burnRateUsd: number;
-  runwayMonths: number | null;
-  waitlistCount: number;
-  activeSubscribers: number;
+  readonly mrrUsd: number;
+  readonly balanceUsd: number;
+  readonly burnRateUsd: number;
+  readonly runwayMonths: number | null;
+  readonly waitlistCount: number;
+  readonly activeSubscribers: number;
   /** Stripe data availability status */
-  stripeAvailability?: DataAvailability;
+  readonly stripeAvailability?: DataAvailability;
   /** Mercury data availability status */
-  mercuryAvailability?: DataAvailability;
+  readonly mercuryAvailability?: DataAvailability;
 }
 
 function UnavailableBadge({ message }: Readonly<{ message?: string }>) {

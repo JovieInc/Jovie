@@ -4,7 +4,7 @@ import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipbo
 
 export interface ClaimLinkCopyButtonProps
   extends Readonly<{
-    claimToken: string;
+    readonly claimToken: string;
   }> {}
 
 export function ClaimLinkCopyButton({

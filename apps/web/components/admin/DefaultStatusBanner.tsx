@@ -2,21 +2,21 @@ import { Card, CardContent } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, HelpCircle } from 'lucide-react';
 
 interface DataAvailability {
-  isConfigured: boolean;
-  isAvailable: boolean;
-  errorMessage?: string;
+  readonly isConfigured: boolean;
+  readonly isAvailable: boolean;
+  readonly errorMessage?: string;
 }
 
 interface DefaultStatusBannerProps
   extends Readonly<{
-    status: 'alive' | 'dead';
-    detail: string;
-    runwayMonths: number | null;
-    mrrGrowth30dUsd: number;
+    readonly status: 'alive' | 'dead';
+    readonly detail: string;
+    readonly runwayMonths: number | null;
+    readonly mrrGrowth30dUsd: number;
     /** Stripe data availability status */
-    stripeAvailability?: DataAvailability;
+    readonly stripeAvailability?: DataAvailability;
     /** Mercury data availability status */
-    mercuryAvailability?: DataAvailability;
+    readonly mercuryAvailability?: DataAvailability;
   }> {}
 
 export function DefaultStatusBanner({

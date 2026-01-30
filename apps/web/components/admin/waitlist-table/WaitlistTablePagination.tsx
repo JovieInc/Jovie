@@ -5,12 +5,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface WaitlistTablePaginationProps {
-  page: number;
-  totalPages: number;
-  canPrev: boolean;
-  canNext: boolean;
-  prevHref?: string;
-  nextHref?: string;
+  readonly page: number;
+  readonly totalPages: number;
+  readonly canPrev: boolean;
+  readonly canNext: boolean;
+  readonly prevHref?: string;
+  readonly nextHref?: string;
 }
 
 export function WaitlistTablePagination({

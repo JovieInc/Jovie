@@ -5,30 +5,30 @@ import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface KanbanColumn<TData> {
-  id: string;
-  title: string;
-  items: TData[];
-  count: number;
-  accent?: string;
+  readonly id: string;
+  readonly title: string;
+  readonly items: TData[];
+  readonly count: number;
+  readonly accent?: string;
 }
 
 export interface KanbanBoardProps<TData> {
   /**
    * Columns to display in the Kanban board
    */
-  columns: KanbanColumn<TData>[];
+  readonly columns: KanbanColumn<TData>[];
   /**
    * Render function for card content
    */
-  renderCard: (item: TData, index: number) => React.ReactNode;
+  readonly renderCard: (item: TData, index: number) => React.ReactNode;
   /**
    * Get unique ID for each item
    */
-  getItemId: (item: TData) => string;
+  readonly getItemId: (item: TData) => string;
   /**
    * Callback when item is moved between columns
    */
-  onItemMove?: (
+  readonly onItemMove?: (
     itemId: string,
     fromColumnId: string,
     toColumnId: string
@@ -36,19 +36,19 @@ export interface KanbanBoardProps<TData> {
   /**
    * Optional empty state for columns with no items
    */
-  emptyState?: React.ReactNode;
+  readonly emptyState?: React.ReactNode;
   /**
    * Card height for virtualization (default: 120px)
    */
-  cardHeight?: number;
+  readonly cardHeight?: number;
   /**
    * Enable virtualization for large datasets (default: true)
    */
-  enableVirtualization?: boolean;
+  readonly enableVirtualization?: boolean;
   /**
    * Optional className for the board container
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**
@@ -122,17 +122,17 @@ export function KanbanBoard<TData>({
 }
 
 interface KanbanColumnProps<TData> {
-  column: KanbanColumn<TData>;
-  renderCard: (item: TData, index: number) => React.ReactNode;
-  getItemId: (item: TData) => string;
-  onItemMove?: (
+  readonly column: KanbanColumn<TData>;
+  readonly renderCard: (item: TData, index: number) => React.ReactNode;
+  readonly getItemId: (item: TData) => string;
+  readonly onItemMove?: (
     itemId: string,
     fromColumnId: string,
     toColumnId: string
   ) => void;
-  emptyState?: React.ReactNode;
-  cardHeight: number;
-  enableVirtualization: boolean;
+  readonly emptyState?: React.ReactNode;
+  readonly cardHeight: number;
+  readonly enableVirtualization: boolean;
 }
 
 function KanbanColumn<TData>({

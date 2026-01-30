@@ -11,7 +11,7 @@ import * as React from 'react';
 
 export interface AdminCreatorFiltersProps
   extends Readonly<{
-    initialPageSize: number;
+    readonly initialPageSize: number;
   }> {}
 
 export function AdminCreatorFilters({
