@@ -96,11 +96,9 @@ export function JovieProfileUI() {
       if (charIndex < emailToType.length) {
         setTypedText(emailToType.slice(0, charIndex + 1));
         charIndex++;
-      } else {
-        if (typingIntervalRef.current) {
-          clearInterval(typingIntervalRef.current);
-          typingIntervalRef.current = null;
-        }
+      } else if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
       }
     }, 100);
 
