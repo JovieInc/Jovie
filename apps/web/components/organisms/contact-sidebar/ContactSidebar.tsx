@@ -94,7 +94,7 @@ export const ContactSidebar = memo(function ContactSidebar({
         icon: <RefreshCw className='h-4 w-4' />,
         onClick: () => (onRefresh ?? (() => window.location.reload()))(),
       },
-      { type: 'separator' },
+      { id: 'separator-delete', type: 'separator' },
       {
         id: 'delete',
         label: 'Delete contact',
