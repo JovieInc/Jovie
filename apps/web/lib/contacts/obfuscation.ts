@@ -22,7 +22,7 @@ function base64Encode(value: string): string {
   if (typeof btoa !== 'undefined') {
     return btoa(value);
   }
-  throw new Error('Base64 encoding unavailable in this environment');
+  throw new SyntaxError('Base64 encoding unavailable in this environment');
 }
 
 function base64Decode(value: string): string {
@@ -32,7 +32,7 @@ function base64Decode(value: string): string {
   if (typeof atob !== 'undefined') {
     return atob(value);
   }
-  throw new Error('Base64 decoding unavailable in this environment');
+  throw new SyntaxError('Base64 decoding unavailable in this environment');
 }
 
 export function encodeContactPayload(payload: EncodedContactPayload): string {

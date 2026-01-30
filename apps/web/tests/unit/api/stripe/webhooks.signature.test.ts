@@ -38,7 +38,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
 
   it('returns 400 when signature is invalid', async () => {
     mockConstructEvent.mockImplementation(() => {
-      throw new Error('Invalid signature');
+      throw new SyntaxError('Invalid signature');
     });
 
     const request = new NextRequest(

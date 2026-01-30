@@ -36,11 +36,11 @@ function validateAvatarUrl(url: string): string {
     const parsed = new URL(url);
 
     if (parsed.protocol !== 'https:') {
-      throw new Error('Avatar URL must use https');
+      throw new SyntaxError('Avatar URL must use https');
     }
 
     if (!isAllowedAvatarHost(parsed.hostname)) {
-      throw new Error('Avatar URL host is not allowed');
+      throw new SyntaxError('Avatar URL host is not allowed');
     }
 
     return parsed.toString();

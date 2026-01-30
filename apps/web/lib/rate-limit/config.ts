@@ -350,7 +350,7 @@ export type RateLimiterName = keyof typeof RATE_LIMITERS;
 export function parseWindowToMs(window: string): number {
   const match = window.match(/^(\d+)\s*([smhd])$/);
   if (!match) {
-    throw new Error(`Invalid window format: ${window}`);
+    throw new SyntaxError(`Invalid window format: ${window}`);
   }
 
   const value = Number.parseInt(match[1], 10);

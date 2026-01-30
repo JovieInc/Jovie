@@ -72,7 +72,7 @@ export function encryptUrl(url: string): EncryptionResult {
     };
   } catch (error) {
     captureError('[url-encryption] Encryption failed', error);
-    throw new Error('Failed to encrypt URL');
+    throw new SyntaxError('Failed to encrypt URL');
   }
 }
 
@@ -118,7 +118,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
     return decryptedBuffer.toString('utf8');
   } catch (error) {
     captureError('[url-encryption] Decryption failed', error);
-    throw new Error('Failed to decrypt URL');
+    throw new SyntaxError('Failed to decrypt URL');
   }
 }
 

@@ -187,7 +187,7 @@ export function normalizeUrl(url: string): string {
     const lowered = trimmed.toLowerCase();
 
     if (isUnsafeUrl(lowered)) {
-      throw new Error('Unsafe URL');
+      throw new SyntaxError('Unsafe URL');
     }
 
     // Normalize stray spaces around dots

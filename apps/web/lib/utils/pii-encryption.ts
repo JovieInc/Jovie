@@ -98,7 +98,7 @@ export function encryptPII(value: string | null | undefined): string | null {
     return combined;
   } catch (error) {
     captureError('[PII Encryption] Failed to encrypt', error);
-    throw new Error('Failed to encrypt PII data');
+    throw new SyntaxError('Failed to encrypt PII data');
   }
 }
 
