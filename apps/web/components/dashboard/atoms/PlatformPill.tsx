@@ -27,27 +27,27 @@ export type PlatformPillState =
 export type PlatformPillTone = 'default' | 'faded';
 
 export interface PlatformPillProps {
-  platformIcon: string;
-  platformName: string;
-  primaryText: string;
-  secondaryText?: string;
-  state?: PlatformPillState;
-  tone?: PlatformPillTone;
-  badgeText?: string;
-  suffix?: React.ReactNode;
-  trailing?: React.ReactNode;
-  onClick?: () => void;
-  shimmerOnMount?: boolean;
+  readonly platformIcon: string;
+  readonly platformName: string;
+  readonly primaryText: string;
+  readonly secondaryText?: string;
+  readonly state?: PlatformPillState;
+  readonly tone?: PlatformPillTone;
+  readonly badgeText?: string;
+  readonly suffix?: React.ReactNode;
+  readonly trailing?: React.ReactNode;
+  readonly onClick?: () => void;
+  readonly shimmerOnMount?: boolean;
   /** Collapsed mode shows only icon, expands on hover to show text */
-  collapsed?: boolean;
+  readonly collapsed?: boolean;
   /** @deprecated Use collapsed instead */
-  compact?: boolean;
+  readonly compact?: boolean;
   /** Enable avatar-style stacking with negative margin overlap */
-  stackable?: boolean;
+  readonly stackable?: boolean;
   /** When stacked, expand this pill by default (for highest z-index item) */
-  defaultExpanded?: boolean;
-  className?: string;
-  testId?: string;
+  readonly defaultExpanded?: boolean;
+  readonly className?: string;
+  readonly testId?: string;
 }
 
 export const PlatformPill = React.forwardRef<

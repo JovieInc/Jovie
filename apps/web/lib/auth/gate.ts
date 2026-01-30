@@ -248,10 +248,10 @@ async function handleMissingDbUser(
   if (!email) {
     await captureError(
       'Cannot create user without email',
-      new Error('Email is required for user creation'),
+      new TypeError('Email is required for user creation'),
       { clerkUserId, operation: 'resolveUserState' }
     );
-    throw new Error('Email is required for user creation');
+    throw new TypeError('Email is required for user creation');
   }
 
   // Check waitlist status before creating user

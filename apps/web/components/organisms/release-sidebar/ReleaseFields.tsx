@@ -15,9 +15,9 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { formatReleaseDate } from './utils';
 
 interface ReleaseFieldsProps {
-  title: string;
-  releaseDate: string | undefined;
-  smartLinkPath: string;
+  readonly title: string;
+  readonly releaseDate: string | undefined;
+  readonly smartLinkPath: string;
 }
 
 export function ReleaseFields({

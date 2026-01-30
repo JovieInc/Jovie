@@ -4,8 +4,8 @@ import { DashboardFeedbackModal as DashboardFeedbackModalOrganism } from '@/comp
 import { track } from '@/lib/analytics';
 
 interface FeedbackModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
 }
 
 /**

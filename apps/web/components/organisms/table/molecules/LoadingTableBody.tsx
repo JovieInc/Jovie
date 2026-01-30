@@ -8,26 +8,26 @@ interface LoadingTableBodyProps {
    * Number of skeleton rows to render
    * Should match the page size to prevent layout shift
    */
-  rows: number;
+  readonly rows: number;
 
   /**
    * Number of columns in each row
    */
-  columns: number;
+  readonly columns: number;
 
   /**
    * Column configuration for skeleton cells
    */
-  columnConfig?: Array<{
-    width?: string;
-    variant?: 'text' | 'avatar' | 'badge' | 'button';
+  readonly columnConfig?: Array<{
+    readonly width?: string;
+    readonly variant?: 'text' | 'avatar' | 'badge' | 'button';
   }>;
 
   /**
    * Height of each skeleton row
    * @default '52px'
    */
-  rowHeight?: string;
+  readonly rowHeight?: string;
 }
 
 /**

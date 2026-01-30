@@ -16,12 +16,12 @@ export function useMediaQuery(
   useEffect(() => {
     if (
       typeof window === 'undefined' ||
-      typeof window.matchMedia !== 'function'
+      typeof globalThis.matchMedia !== 'function'
     ) {
       return undefined;
     }
 
-    const mediaQueryList = window.matchMedia(query);
+    const mediaQueryList = globalThis.matchMedia(query);
     setMatches(mediaQueryList.matches);
 
     const handleChange = (event: MediaQueryListEvent) => {

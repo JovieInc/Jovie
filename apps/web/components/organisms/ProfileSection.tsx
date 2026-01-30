@@ -4,15 +4,15 @@ import { Container } from '@/components/site/Container';
 import { Artist } from '@/types/db';
 
 interface ProfileSectionProps {
-  artist: Artist;
-  subtitle?: string;
-  children?: React.ReactNode;
-  containerVariant?: 'default' | 'glass' | 'solid';
-  backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
-  showGradientBlurs?: boolean;
-  avatarSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-  nameSize?: 'sm' | 'md' | 'lg' | 'xl';
-  maxWidthClass?: string;
+  readonly artist: Artist;
+  readonly subtitle?: string;
+  readonly children?: React.ReactNode;
+  readonly containerVariant?: 'default' | 'glass' | 'solid';
+  readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
+  readonly showGradientBlurs?: boolean;
+  readonly avatarSize?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  readonly nameSize?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly maxWidthClass?: string;
 }
 
 export function ProfileSection({

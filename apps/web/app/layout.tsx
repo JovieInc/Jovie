@@ -156,14 +156,7 @@ export default function RootLayout({
       {/* Spotify CDN - artist images */}
       <link rel='dns-prefetch' href='https://i.scdn.co' />
       <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
-      {/* Preload primary font */}
-      <link
-        rel='preload'
-        href='/fonts/Inter-Variable.woff2'
-        as='font'
-        type='font/woff2'
-        crossOrigin='anonymous'
-      />
+      {/* Note: Font preloading is handled automatically by Next.js localFont */}
       {/* Spotify API */}
       <link rel='dns-prefetch' href='https://api.spotify.com' />
       {/* Vercel Blob Storage - avatar images */}

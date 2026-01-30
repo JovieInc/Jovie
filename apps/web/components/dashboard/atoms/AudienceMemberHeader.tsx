@@ -4,11 +4,11 @@ import { Avatar } from '@/components/atoms/Avatar';
 import { cn } from '@/lib/utils';
 
 export interface AudienceMemberHeaderProps {
-  title: string;
-  subtitle: string;
-  avatarName: string;
-  avatarSrc?: string | null;
-  className?: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly avatarName: string;
+  readonly avatarSrc?: string | null;
+  readonly className?: string;
 }
 
 export function AudienceMemberHeader({

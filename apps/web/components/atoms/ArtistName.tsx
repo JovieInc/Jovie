@@ -12,13 +12,13 @@ import { cn } from '@/lib/utils';
  */
 
 interface ArtistNameProps {
-  name: string;
-  handle: string;
-  isVerified?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  showLink?: boolean;
-  className?: string;
-  as?: ElementType;
+  readonly name: string;
+  readonly handle: string;
+  readonly isVerified?: boolean;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly showLink?: boolean;
+  readonly className?: string;
+  readonly as?: ElementType;
 }
 
 const sizeClasses = {

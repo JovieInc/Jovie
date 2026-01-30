@@ -7,7 +7,7 @@ import {
   type ConsentState,
   getConsentState,
   isGPCEnabled,
-  setConsentState,
+  setConsentState as persistConsentState,
 } from '@/lib/tracking/consent';
 import { cn } from '@/lib/utils';
 
@@ -21,15 +21,13 @@ interface ConsentBannerProps {
  * Only shown when consent state is undecided.
  */
 export function ConsentBanner({ className }: ConsentBannerProps) {
-  const [consentState, setLocalConsentState] = useState<ConsentState | null>(
-    null
-  );
+  const [consentState, setConsentState] = useState<ConsentState | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     // Check consent state on mount
     const state = getConsentState();
-    setLocalConsentState(state);
+    setConsentState(state);
 
     // Only show banner if undecided (not GPC, not already decided)
     if (state === 'undecided') {
@@ -40,14 +38,14 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
   }, []);
 
   const handleAccept = () => {
+    persistConsentState('accepted');
     setConsentState('accepted');
-    setLocalConsentState('accepted');
     setIsVisible(false);
   };
 
   const handleReject = () => {
+    persistConsentState('rejected');
     setConsentState('rejected');
-    setLocalConsentState('rejected');
     setIsVisible(false);
   };
 

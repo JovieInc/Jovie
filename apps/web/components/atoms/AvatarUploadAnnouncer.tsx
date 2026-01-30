@@ -3,8 +3,8 @@
 import type { AvatarUploadStatus } from '@/components/molecules/AvatarProgressRing';
 
 export interface AvatarUploadAnnouncerProps {
-  progress: number;
-  status: AvatarUploadStatus;
+  readonly progress: number;
+  readonly status: AvatarUploadStatus;
 }
 
 export function AvatarUploadAnnouncer({

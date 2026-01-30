@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockCheckRateLimit = vi.hoisted(() => vi.fn());
-const mockGetRateLimitStatus = vi.hoisted(() => vi.fn());
+const mockGeneralLimiterLimit = vi.hoisted(() => vi.fn());
 const mockSubscribeToNotificationsDomain = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/utils/rate-limit', () => ({
-  checkRateLimit: mockCheckRateLimit,
+vi.mock('@/lib/rate-limit', () => ({
+  generalLimiter: {
+    limit: mockGeneralLimiterLimit,
+  },
   createRateLimitHeaders: vi.fn().mockReturnValue({}),
   getClientIP: vi.fn().mockReturnValue('127.0.0.1'),
-  getRateLimitStatus: mockGetRateLimitStatus,
 }));
 
 vi.mock('@/lib/notifications/domain', () => ({
@@ -25,16 +25,21 @@ describe('POST /api/notifications/subscribe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockCheckRateLimit.mockReturnValue(false);
-    mockGetRateLimitStatus.mockReturnValue({
+    mockGeneralLimiterLimit.mockResolvedValue({
+      success: true,
       limit: 100,
       remaining: 99,
-      resetTime: Date.now() + 60000,
+      reset: new Date(Date.now() + 60000),
     });
   });
 
   it('returns 429 when rate limited', async () => {
-    mockCheckRateLimit.mockReturnValue(true);
+    mockGeneralLimiterLimit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 60000),
+    });
 
     const { POST } = await import('@/app/api/notifications/subscribe/route');
     const request = new NextRequest(

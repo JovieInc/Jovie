@@ -2,11 +2,11 @@ import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { cn } from '@/lib/utils';
 
 interface FrostedContainerProps {
-  children: React.ReactNode;
-  variant?: 'default' | 'glass' | 'solid';
-  backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
-  showGradientBlurs?: boolean;
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly variant?: 'default' | 'glass' | 'solid';
+  readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
+  readonly showGradientBlurs?: boolean;
+  readonly className?: string;
 }
 
 export function FrostedContainer({

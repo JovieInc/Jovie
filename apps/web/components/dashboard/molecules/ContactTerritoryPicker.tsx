@@ -6,9 +6,9 @@ import { Input } from '@/components/atoms/Input';
 import { CONTACT_TERRITORY_PRESETS } from '@/lib/contacts/constants';
 
 interface TerritoryButtonProps {
-  territory: string;
-  isSelected: boolean;
-  onToggle: (territory: string) => void;
+  readonly territory: string;
+  readonly isSelected: boolean;
+  readonly onToggle: (territory: string) => void;
 }
 
 const TerritoryButton = memo(function TerritoryButton({
@@ -33,12 +33,12 @@ const TerritoryButton = memo(function TerritoryButton({
 });
 
 export interface ContactTerritoryPickerProps {
-  territories: string[];
-  customTerritory: string;
-  territorySummary: string;
-  onToggleTerritory: (territory: string) => void;
-  onCustomTerritoryChange: (value: string) => void;
-  onAddCustomTerritory: () => void;
+  readonly territories: string[];
+  readonly customTerritory: string;
+  readonly territorySummary: string;
+  readonly onToggleTerritory: (territory: string) => void;
+  readonly onCustomTerritoryChange: (value: string) => void;
+  readonly onAddCustomTerritory: () => void;
 }
 
 export function ContactTerritoryPicker({

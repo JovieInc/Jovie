@@ -19,22 +19,22 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
   useEffect(() => {
     const onOpen = () => {
-      const isMdUp = window.matchMedia('(min-width: 768px)').matches;
+      const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
       if (!isMdUp) return;
       setDismissed(false);
       setMode('open');
       setUrl(`${window.location.origin}/${handle}`);
     };
 
-    window.addEventListener('jovie:open-profile-qr', onOpen);
+    globalThis.addEventListener('jovie:open-profile-qr', onOpen);
     return () => {
-      window.removeEventListener('jovie:open-profile-qr', onOpen);
+      globalThis.removeEventListener('jovie:open-profile-qr', onOpen);
     };
   }, [handle]);
 
   useEffect(() => {
-    const isMdUp = window.matchMedia('(min-width: 768px)').matches;
-    const isLgUp = window.matchMedia('(min-width: 1024px)').matches;
+    const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
+    const isLgUp = globalThis.matchMedia('(min-width: 1024px)').matches;
     const hasDismissed =
       localStorage.getItem('viewOnMobileDismissed') === 'true';
 
@@ -58,8 +58,8 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
   useEffect(() => {
-    const mqlMd = window.matchMedia('(min-width: 768px)');
-    const mqlLg = window.matchMedia('(min-width: 1024px)');
+    const mqlMd = globalThis.matchMedia('(min-width: 768px)');
+    const mqlLg = globalThis.matchMedia('(min-width: 1024px)');
 
     const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
       void e;

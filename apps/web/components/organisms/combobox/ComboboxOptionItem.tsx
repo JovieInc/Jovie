@@ -6,8 +6,8 @@ import Image from 'next/image';
 import type { ComboboxOption } from './types';
 
 interface ComboboxOptionItemProps {
-  option: ComboboxOption;
-  index: number;
+  readonly option: ComboboxOption;
+  readonly index: number;
 }
 
 export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {

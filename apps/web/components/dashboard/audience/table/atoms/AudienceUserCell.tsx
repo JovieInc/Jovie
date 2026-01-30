@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
-  displayName: string | null;
-  type: AudienceMemberType;
-  email?: string | null;
-  phone?: string | null;
-  className?: string;
+  readonly displayName: string | null;
+  readonly type: AudienceMemberType;
+  readonly email?: string | null;
+  readonly phone?: string | null;
+  readonly className?: string;
 }
 
 /**

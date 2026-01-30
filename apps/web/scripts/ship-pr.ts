@@ -30,9 +30,9 @@ function sanitizeSlug(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/[^a-z0-9-]/g, '-')
+    .replaceAll(/-+/g, '-')
     .replace(/^-/, '')
     .replace(/-$/, '');
 }
@@ -59,28 +59,28 @@ function parseArgs(argv: string[]): CliOptions {
     }
     if (arg === '--slug') {
       const value = argv[i + 1];
-      if (!value) throw new Error('Missing value for --slug');
+      if (!value) throw new TypeError('Missing value for --slug');
       opts.slug = value;
       i += 1;
       continue;
     }
     if (arg === '--goal') {
       const value = argv[i + 1];
-      if (!value) throw new Error('Missing value for --goal');
+      if (!value) throw new TypeError('Missing value for --goal');
       opts.goal = value;
       i += 1;
       continue;
     }
     if (arg === '--kpi') {
       const value = argv[i + 1];
-      if (!value) throw new Error('Missing value for --kpi');
+      if (!value) throw new TypeError('Missing value for --kpi');
       opts.kpi = value;
       i += 1;
       continue;
     }
     if (arg === '--rollback') {
       const value = argv[i + 1];
-      if (!value) throw new Error('Missing value for --rollback');
+      if (!value) throw new TypeError('Missing value for --rollback');
       opts.rollback = value;
       i += 1;
       continue;

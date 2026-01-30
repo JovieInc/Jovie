@@ -18,7 +18,7 @@ function getStripe(): Stripe {
 
   const stripeSecretKey = env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) {
-    throw new Error('Missing STRIPE_SECRET_KEY');
+    throw new TypeError('Missing STRIPE_SECRET_KEY');
   }
 
   // Stripe constructor is synchronous - no race condition possible

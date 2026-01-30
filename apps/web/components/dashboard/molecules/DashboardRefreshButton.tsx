@@ -5,10 +5,10 @@ import { useTransition } from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export interface DashboardRefreshButtonProps {
-  ariaLabel?: string;
-  className?: string;
-  onRefresh?: () => void;
-  onRefreshed?: () => void;
+  readonly ariaLabel?: string;
+  readonly className?: string;
+  readonly onRefresh?: () => void;
+  readonly onRefreshed?: () => void;
 }
 
 export function DashboardRefreshButton({

@@ -61,12 +61,12 @@ export async function syncClerkProfile({
 
       const contentType = avatarResponse.headers.get('content-type') || '';
       if (!contentType.startsWith('image/')) {
-        throw new Error(`Invalid content type: ${contentType}`);
+        throw new TypeError(`Invalid content type: ${contentType}`);
       }
 
       const arrayBuffer = await avatarResponse.arrayBuffer();
       if (arrayBuffer.byteLength > 5 * 1024 * 1024) {
-        throw new Error('Avatar file size exceeds 5MB limit');
+        throw new RangeError('Avatar file size exceeds 5MB limit');
       }
 
       const blob = new Blob([arrayBuffer], { type: contentType });

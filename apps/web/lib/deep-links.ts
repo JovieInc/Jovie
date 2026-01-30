@@ -179,7 +179,7 @@ const PLATFORM_MAP: Record<string, PlatformInfo['platform']> = {
 export function detectPlatform(userAgent?: string): PlatformInfo {
   const ua =
     userAgent ||
-    (typeof window === 'undefined' ? '' : window.navigator.userAgent);
+    (typeof window === 'undefined' ? '' : globalThis.navigator.userAgent);
   const detectedPlatform = detectPlatformFromUA(ua);
 
   return {
@@ -286,7 +286,7 @@ export function openDeepLink(
     if (!deepLink.shouldTryNative || !deepLink.nativeUrl) {
       // Open fallback directly
       options.onFallback?.();
-      window.open(deepLink.fallbackUrl, '_blank', 'noopener,noreferrer');
+      globalThis.open(deepLink.fallbackUrl, '_blank', 'noopener,noreferrer');
       resolve(false);
       return;
     }
@@ -319,12 +319,12 @@ export function openDeepLink(
 
     // Set up listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handlePageBlur);
+    globalThis.addEventListener('blur', handlePageBlur);
 
     // Cleanup function
     const cleanup = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handlePageBlur);
+      globalThis.removeEventListener('blur', handlePageBlur);
     };
 
     // Try to open native app
@@ -357,7 +357,7 @@ export function openDeepLink(
       if (!appOpened) {
         // App didn't open, use fallback
         options.onFallback?.();
-        window.open(deepLink.fallbackUrl, '_blank', 'noopener,noreferrer');
+        globalThis.open(deepLink.fallbackUrl, '_blank', 'noopener,noreferrer');
         resolve(false);
       }
     }, timeout);

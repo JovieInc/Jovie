@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { type ExternalToast, toast } from 'sonner';
+import { type ExternalToast, toast as sonnerToast } from 'sonner';
 
 /**
  * Standard toast messages for consistent UX across the application
@@ -139,7 +139,7 @@ export function useNotifications() {
   // Success toast - short duration for quick confirmation
   const success = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return toast.success(message, {
+      return sonnerToast.success(message, {
         duration: TOAST_DURATIONS.DEFAULT,
         ...options,
       });
@@ -150,7 +150,7 @@ export function useNotifications() {
   // Error toast - longer duration for reading
   const error = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return toast.error(message, {
+      return sonnerToast.error(message, {
         duration: TOAST_DURATIONS.LONG,
         ...options,
       });
@@ -161,7 +161,7 @@ export function useNotifications() {
   // Warning toast - medium duration
   const warning = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return toast.warning(message, {
+      return sonnerToast.warning(message, {
         duration: TOAST_DURATIONS.MEDIUM,
         ...options,
       });
@@ -172,7 +172,7 @@ export function useNotifications() {
   // Info toast - standard duration
   const info = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return toast.info(message, {
+      return sonnerToast.info(message, {
         duration: TOAST_DURATIONS.DEFAULT,
         ...options,
       });
@@ -183,7 +183,7 @@ export function useNotifications() {
   // Loading toast - persists until dismissed
   const loading = useCallback(
     (message: string, options?: ToastOptions): string | number => {
-      return toast.loading(message, {
+      return sonnerToast.loading(message, {
         duration: TOAST_DURATIONS.PERSISTENT,
         ...options,
       });
@@ -193,7 +193,7 @@ export function useNotifications() {
 
   // Dismiss a specific toast or all toasts
   const dismiss = useCallback((toastId?: string | number): void => {
-    toast.dismiss(toastId);
+    sonnerToast.dismiss(toastId);
   }, []);
 
   // Undo action toast
@@ -204,7 +204,7 @@ export function useNotifications() {
       options?: ActionToastOptions
     ): string | number => {
       const { actionLabel, ...toastOptions } = options ?? {};
-      return toast(message, {
+      return sonnerToast(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
           label: actionLabel ?? 'Undo',
@@ -224,7 +224,7 @@ export function useNotifications() {
       options?: ActionToastOptions
     ): string | number => {
       const { actionLabel, ...toastOptions } = options ?? {};
-      return toast.error(message, {
+      return sonnerToast.error(message, {
         duration: TOAST_DURATIONS.ACTION,
         action: {
           label: actionLabel ?? 'Retry',
@@ -239,7 +239,7 @@ export function useNotifications() {
   // Promise toast - shows loading → success/error
   const promiseToast = useCallback(
     <T>(promise: Promise<T>, options?: PromiseToastOptions<T>): Promise<T> => {
-      toast.promise(promise, {
+      sonnerToast.promise(promise, {
         loading: options?.loading ?? TOAST_MESSAGES.PROCESSING,
         success: options?.success ?? TOAST_MESSAGES.SAVE_SUCCESS,
         error: options?.error ?? TOAST_MESSAGES.GENERIC_ERROR,
@@ -407,7 +407,7 @@ export function useNotifications() {
       handleError,
 
       // Direct access to toast for advanced use cases
-      toast,
+      toast: sonnerToast,
 
       // Message constants for custom usage
       messages: TOAST_MESSAGES,
@@ -445,7 +445,7 @@ export function useNotifications() {
  * @example
  * ```tsx
  * import { toast } from '@/lib/hooks/useNotifications';
- * toast.success('Done!');
+ * sonnerToast.success('Done!');
  * ```
  */
-export { toast };
+export { toast } from 'sonner';

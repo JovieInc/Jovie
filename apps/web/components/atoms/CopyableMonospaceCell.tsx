@@ -6,13 +6,13 @@ import { cn } from '@/lib/utils';
 
 interface CopyableMonospaceCellProps {
   /** The value to display and copy */
-  value: string | null | undefined;
+  readonly value: string | null | undefined;
   /** Label for the copy tooltip (e.g., "ISRC", "UPC") */
-  label: string;
+  readonly label: string;
   /** Maximum width for truncation (default: 100px) */
-  maxWidth?: number;
+  readonly maxWidth?: number;
   /** Additional class name */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

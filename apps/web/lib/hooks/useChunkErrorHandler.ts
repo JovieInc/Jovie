@@ -153,12 +153,12 @@ export function useChunkErrorHandler() {
       }
     };
 
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    globalThis.addEventListener('error', handleError);
+    globalThis.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener(
+      globalThis.removeEventListener('error', handleError);
+      globalThis.removeEventListener(
         'unhandledrejection',
         handleUnhandledRejection
       );

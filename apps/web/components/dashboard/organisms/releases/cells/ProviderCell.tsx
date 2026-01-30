@@ -252,7 +252,7 @@ function ProviderActionButtons({
         type='button'
         title='Open'
         onClick={() => {
-          window.open(provider.url, '_blank', 'noopener,noreferrer');
+          globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
         className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
       >

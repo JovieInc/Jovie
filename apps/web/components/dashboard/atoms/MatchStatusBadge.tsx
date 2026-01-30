@@ -4,9 +4,9 @@ import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 
 export interface MatchStatusBadgeProps {
-  status: DspMatchStatus;
-  size?: 'sm' | 'md';
-  className?: string;
+  readonly status: DspMatchStatus;
+  readonly size?: 'sm' | 'md';
+  readonly className?: string;
 }
 
 const STATUS_STYLES: Record<

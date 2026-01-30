@@ -260,9 +260,7 @@ export const sendNotification = async (
   message: NotificationMessage,
   target: NotificationTarget
 ): Promise<NotificationDispatchResult> => {
-  const channels = Array.from(
-    new Set(message.channels ?? DEFAULT_CHANNELS)
-  ) as NotificationDeliveryChannel[];
+  const channels = Array.from(new Set(message.channels ?? DEFAULT_CHANNELS));
 
   const preferences = await getNotificationPreferences(target);
   const dedupKey = message.dedupKey ?? message.id;

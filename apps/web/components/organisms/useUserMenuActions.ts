@@ -106,7 +106,7 @@ export function useUserMenuActions({
       );
 
       if (!monthPrice?.priceId) {
-        throw new Error('Monthly pricing option missing');
+        throw new TypeError('Monthly pricing option missing');
       }
 
       // Use TanStack Query mutation for checkout
@@ -115,7 +115,7 @@ export function useUserMenuActions({
       });
 
       if (!checkout.url) {
-        throw new Error('Checkout URL missing from response');
+        throw new TypeError('Checkout URL missing from response');
       }
 
       track('billing_upgrade_checkout_redirected', {
@@ -169,7 +169,7 @@ export function useUserMenuActions({
       const portal = await portalMutation.mutateAsync();
 
       if (!portal.url) {
-        throw new Error('Billing portal URL missing from response');
+        throw new TypeError('Billing portal URL missing from response');
       }
 
       track('billing_manage_billing_redirected', {

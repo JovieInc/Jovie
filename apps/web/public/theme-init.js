@@ -1,7 +1,7 @@
 (function () {
   try {
     var ls = localStorage.getItem('jovie-theme');
-    var mql = window.matchMedia('(prefers-color-scheme: dark)');
+    var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
     var systemPref = mql.matches ? 'dark' : 'light';
     var pref = ls && ls !== 'system' ? ls : systemPref;
     var root = document.documentElement;

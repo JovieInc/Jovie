@@ -4,9 +4,9 @@ import { useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
 export interface DashboardOverviewToolbarProps {
-  range: '7d' | '30d' | '90d';
-  onRangeChange: (next: '7d' | '30d' | '90d') => void;
-  onRefresh: () => void;
+  readonly range: '7d' | '30d' | '90d';
+  readonly onRangeChange: (next: '7d' | '30d' | '90d') => void;
+  readonly onRefresh: () => void;
 }
 
 export function DashboardOverviewToolbar({

@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils';
 
 interface BackgroundPatternProps {
-  variant?: 'grid' | 'dots' | 'gradient';
-  className?: string;
+  readonly variant?: 'grid' | 'dots' | 'gradient';
+  readonly className?: string;
 }
 
 export const BACKGROUND_PATTERNS = {

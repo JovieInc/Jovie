@@ -4,16 +4,16 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { VerticalDivider } from '../atoms/VerticalDivider';
 
 export interface DashboardHeaderProps {
-  breadcrumbs: DashboardBreadcrumbItem[];
-  leading?: ReactNode;
-  sidebarTrigger?: ReactNode;
+  readonly breadcrumbs: DashboardBreadcrumbItem[];
+  readonly leading?: ReactNode;
+  readonly sidebarTrigger?: ReactNode;
   /** Content shown after breadcrumb (left side) */
-  breadcrumbSuffix?: ReactNode;
+  readonly breadcrumbSuffix?: ReactNode;
   /** Content shown on right side */
-  action?: ReactNode;
-  showDivider?: boolean;
-  className?: string;
-  mobileTabs?: ReactNode;
+  readonly action?: ReactNode;
+  readonly showDivider?: boolean;
+  readonly className?: string;
+  readonly mobileTabs?: ReactNode;
 }
 
 export function DashboardHeader({

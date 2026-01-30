@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import type { AdminUsagePoint } from '@/lib/admin/overview';
 
 interface MetricsChartClientProps {
-  points: AdminUsagePoint[];
+  readonly points: AdminUsagePoint[];
 }
 
 const METRICS_CHART_LOADING_CARD_KEYS = Array.from(

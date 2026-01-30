@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
 interface ReliabilityCardProps {
-  summary: AdminReliabilitySummary;
+  readonly summary: AdminReliabilitySummary;
 }
 
 export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {

@@ -4,10 +4,10 @@ import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ErrorSummaryProps {
-  errors: { [key: string]: string };
-  title?: string;
-  className?: string;
-  onFocusField?: (fieldName: string) => void;
+  readonly errors: { [key: string]: string };
+  readonly title?: string;
+  readonly className?: string;
+  readonly onFocusField?: (fieldName: string) => void;
 }
 
 /**

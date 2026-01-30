@@ -106,10 +106,10 @@ async function confirmDspMatch(
 ): Promise<ConfirmDspMatchResponse> {
   // Validate matchId format to prevent invalid URL paths
   if (!isValidUuid(input.matchId)) {
-    throw new Error(`Invalid matchId format: ${input.matchId}`);
+    throw new TypeError(`Invalid matchId format: ${input.matchId}`);
   }
   if (!isValidUuid(input.profileId)) {
-    throw new Error(`Invalid profileId format: ${input.profileId}`);
+    throw new TypeError(`Invalid profileId format: ${input.profileId}`);
   }
 
   const response = await fetchWithTimeout<ConfirmDspMatchResponse>(
@@ -133,10 +133,10 @@ async function rejectDspMatch(
 ): Promise<RejectDspMatchResponse> {
   // Validate matchId format to prevent invalid URL paths
   if (!isValidUuid(input.matchId)) {
-    throw new Error(`Invalid matchId format: ${input.matchId}`);
+    throw new TypeError(`Invalid matchId format: ${input.matchId}`);
   }
   if (!isValidUuid(input.profileId)) {
-    throw new Error(`Invalid profileId format: ${input.profileId}`);
+    throw new TypeError(`Invalid profileId format: ${input.profileId}`);
   }
 
   const response = await fetchWithTimeout<RejectDspMatchResponse>(
@@ -163,7 +163,7 @@ async function triggerDspDiscovery(
 ): Promise<TriggerDiscoveryResponse> {
   // Validate profileId before making API call
   if (!isValidUuid(input.profileId)) {
-    throw new Error(`Invalid profile ID format: ${input.profileId}`);
+    throw new TypeError(`Invalid profile ID format: ${input.profileId}`);
   }
 
   const response = await fetchWithTimeout<TriggerDiscoveryResponse>(

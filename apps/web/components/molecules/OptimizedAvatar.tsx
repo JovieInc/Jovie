@@ -3,12 +3,12 @@
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
 
 interface OptimizedAvatarProps {
-  src: string | null | undefined;
-  alt: string;
-  size?: 64 | 128 | 256 | 384;
-  className?: string;
-  priority?: boolean;
-  fallbackSrc?: string;
+  readonly src: string | null | undefined;
+  readonly alt: string;
+  readonly size?: 64 | 128 | 256 | 384;
+  readonly className?: string;
+  readonly priority?: boolean;
+  readonly fallbackSrc?: string;
 }
 
 const SIZE_MAP: Record<
@@ -45,9 +45,9 @@ export function OptimizedAvatar({
 
 // Responsive avatar that adapts to screen size (thin wrapper for compatibility)
 interface ResponsiveAvatarProps extends Omit<OptimizedAvatarProps, 'size'> {
-  sizes?: string;
-  mobileSize?: number;
-  desktopSize?: number;
+  readonly sizes?: string;
+  readonly mobileSize?: number;
+  readonly desktopSize?: number;
 }
 
 export function ResponsiveAvatar({

@@ -5,11 +5,11 @@
 
 export interface SettingsLoadingSkeletonProps {
   /** Title skeleton width (default: 'w-48') */
-  titleWidth?: string;
+  readonly titleWidth?: string;
   /** Description skeleton width (default: 'w-80') */
-  descriptionWidth?: string;
+  readonly descriptionWidth?: string;
   /** Content to render inside the card */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 /**

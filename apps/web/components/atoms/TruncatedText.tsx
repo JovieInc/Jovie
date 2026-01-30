@@ -6,17 +6,17 @@ import { cn } from '@/lib/utils';
 
 interface TruncatedTextProps {
   /** The text content to display */
-  children: string;
+  readonly children: string;
   /** Number of lines before truncation (1 or 2) */
-  lines?: 1 | 2;
+  readonly lines?: 1 | 2;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
   /** Tooltip placement */
-  tooltipSide?: 'top' | 'bottom' | 'left' | 'right';
+  readonly tooltipSide?: 'top' | 'bottom' | 'left' | 'right';
   /** Tooltip alignment */
-  tooltipAlign?: 'start' | 'center' | 'end';
+  readonly tooltipAlign?: 'start' | 'center' | 'end';
   /** Always show tooltip regardless of truncation */
-  alwaysShowTooltip?: boolean;
+  readonly alwaysShowTooltip?: boolean;
 }
 
 /**

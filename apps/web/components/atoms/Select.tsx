@@ -2,17 +2,17 @@ import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SelectOption {
-  value: string;
-  label: string;
-  disabled?: boolean;
+  readonly value: string;
+  readonly label: string;
+  readonly disabled?: boolean;
 }
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: SelectOption[];
-  placeholder?: string;
-  label?: string;
-  error?: string;
-  required?: boolean;
+  readonly options: SelectOption[];
+  readonly placeholder?: string;
+  readonly label?: string;
+  readonly error?: string;
+  readonly required?: boolean;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(

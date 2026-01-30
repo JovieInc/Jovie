@@ -20,13 +20,13 @@ export function HeroHandlePreviewChip({
       setHandle(next && next.length > 0 ? next : fallbackHandle);
     };
 
-    window.addEventListener(
+    globalThis.addEventListener(
       'jovie-hero-handle-change',
       listener as EventListener
     );
 
     return () => {
-      window.removeEventListener(
+      globalThis.removeEventListener(
         'jovie-hero-handle-change',
         listener as EventListener
       );

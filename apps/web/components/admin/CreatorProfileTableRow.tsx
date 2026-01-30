@@ -77,24 +77,24 @@ const renderContextMenuItem = ({
 };
 
 export interface CreatorProfileTableRowProps {
-  profile: AdminCreatorProfileRow;
-  rowNumber: number;
-  isSelected: boolean;
-  isChecked: boolean;
-  isMobile: boolean;
-  verificationStatus: 'idle' | 'loading' | 'success' | 'error';
-  refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
-  isMenuOpen: boolean;
-  onRowClick: (id: string) => void;
-  onContextMenu: (id: string) => void;
-  onToggleSelect: (id: string) => void;
-  onMenuOpenChange: (open: boolean) => void;
-  onRefreshIngest: () => void | Promise<void>;
-  onToggleVerification: () => Promise<void>;
-  onToggleFeatured: () => Promise<void>;
-  onToggleMarketing: () => Promise<void>;
-  onSendInvite?: () => void;
-  onDelete: () => void | Promise<void>;
+  readonly profile: AdminCreatorProfileRow;
+  readonly rowNumber: number;
+  readonly isSelected: boolean;
+  readonly isChecked: boolean;
+  readonly isMobile: boolean;
+  readonly verificationStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly refreshIngestStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly isMenuOpen: boolean;
+  readonly onRowClick: (id: string) => void;
+  readonly onContextMenu: (id: string) => void;
+  readonly onToggleSelect: (id: string) => void;
+  readonly onMenuOpenChange: (open: boolean) => void;
+  readonly onRefreshIngest: () => void | Promise<void>;
+  readonly onToggleVerification: () => Promise<void>;
+  readonly onToggleFeatured: () => Promise<void>;
+  readonly onToggleMarketing: () => Promise<void>;
+  readonly onSendInvite?: () => void;
+  readonly onDelete: () => void | Promise<void>;
 }
 
 /**

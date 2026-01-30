@@ -12,21 +12,21 @@ import {
 } from '@/lib/admin/csv-configs/creators';
 
 export interface AdminCreatorsToolbarProps {
-  basePath: string;
-  search: string;
-  sort: string;
-  pageSize: number;
-  from: number;
-  to: number;
-  total: number;
-  clearHref: string;
-  profiles: AdminCreatorProfileRow[];
-  selectedIds?: Set<string>;
-  onBulkVerify?: () => void;
-  onBulkUnverify?: () => void;
-  onBulkFeature?: () => void;
-  onBulkDelete?: () => void;
-  onClearSelection?: () => void;
+  readonly basePath: string;
+  readonly search: string;
+  readonly sort: string;
+  readonly pageSize: number;
+  readonly from: number;
+  readonly to: number;
+  readonly total: number;
+  readonly clearHref: string;
+  readonly profiles: AdminCreatorProfileRow[];
+  readonly selectedIds?: ReadonlySet<string>;
+  readonly onBulkVerify?: () => void;
+  readonly onBulkUnverify?: () => void;
+  readonly onBulkFeature?: () => void;
+  readonly onBulkDelete?: () => void;
+  readonly onClearSelection?: () => void;
 }
 
 export function AdminCreatorsToolbar({

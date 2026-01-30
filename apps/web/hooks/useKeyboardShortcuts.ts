@@ -61,8 +61,8 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    globalThis.addEventListener('keydown', handler);
+    return () => globalThis.removeEventListener('keydown', handler);
   }, [shortcuts]);
 }
 

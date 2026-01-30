@@ -47,15 +47,15 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
     // Cancel pending RAF
     if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
+      globalThis.cancelAnimationFrame(rafRef.current);
     }
 
-    rafRef.current = requestAnimationFrame(() => {
+    rafRef.current = globalThis.requestAnimationFrame(() => {
       const section = sectionRef.current;
       if (!section) return;
 
       const rect = section.getBoundingClientRect();
-      const windowHeight = window.innerHeight;
+      const windowHeight = globalThis.innerHeight;
       const sectionHeight = rect.height;
       const scrollRange = windowHeight + sectionHeight;
       const scrollPosition = windowHeight - rect.top;
@@ -70,13 +70,13 @@ export function SeeItInActionCarousel({ creators }: Props) {
   useEffect(() => {
     if (!isVisible) return;
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    globalThis.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Initial calculation
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      globalThis.removeEventListener('scroll', handleScroll);
       if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
+        globalThis.cancelAnimationFrame(rafRef.current);
       }
     };
   }, [isVisible, handleScroll]);

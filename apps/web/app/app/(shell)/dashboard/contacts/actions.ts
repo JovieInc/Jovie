@@ -119,7 +119,7 @@ export async function saveContact(
         .limit(1);
 
       if (!existing) {
-        throw new Error('Contact not found');
+        throw new TypeError('Contact not found');
       }
 
       [saved] = await tx
@@ -173,7 +173,7 @@ export async function deleteContact(
       .limit(1);
 
     if (!existing) {
-      throw new Error('Contact not found');
+      throw new TypeError('Contact not found');
     }
 
     await tx.delete(creatorContacts).where(eq(creatorContacts.id, contactId));

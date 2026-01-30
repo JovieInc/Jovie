@@ -26,13 +26,13 @@ export function useTouchDevice() {
     // Also listen for first touch event as a fallback
     const handleTouch = () => {
       setIsTouchDevice(true);
-      window.removeEventListener('touchstart', handleTouch);
+      globalThis.removeEventListener('touchstart', handleTouch);
     };
 
-    window.addEventListener('touchstart', handleTouch, { passive: true });
+    globalThis.addEventListener('touchstart', handleTouch, { passive: true });
 
     return () => {
-      window.removeEventListener('touchstart', handleTouch);
+      globalThis.removeEventListener('touchstart', handleTouch);
     };
   }, []);
 

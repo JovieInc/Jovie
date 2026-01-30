@@ -3,13 +3,12 @@ import {
   buildInvalidRequestResponse,
   unsubscribeFromNotificationsDomain,
 } from '@/lib/notifications/domain';
-import { logger } from '@/lib/utils/logger';
 import {
-  checkRateLimit,
   createRateLimitHeaders,
+  generalLimiter,
   getClientIP,
-  getRateLimitStatus,
-} from '@/lib/utils/rate-limit';
+} from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -19,10 +18,9 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  */
 export async function POST(request: NextRequest) {
   const clientIp = getClientIP(request);
-  const rateLimited = checkRateLimit(clientIp);
-  const rateLimitStatus = getRateLimitStatus(clientIp);
+  const rateLimitResult = await generalLimiter.limit(clientIp);
 
-  if (rateLimited) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       {
         success: false,
@@ -33,7 +31,7 @@ export async function POST(request: NextRequest) {
         status: 429,
         headers: {
           ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitStatus),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
@@ -48,7 +46,7 @@ export async function POST(request: NextRequest) {
       status: invalidResponse.status,
       headers: {
         ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitStatus),
+        ...createRateLimitHeaders(rateLimitResult),
       },
     });
   }
@@ -59,7 +57,7 @@ export async function POST(request: NextRequest) {
       status: result.status,
       headers: {
         ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitStatus),
+        ...createRateLimitHeaders(rateLimitResult),
       },
     });
   } catch (error) {
@@ -74,7 +72,7 @@ export async function POST(request: NextRequest) {
         status: 500,
         headers: {
           ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitStatus),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );

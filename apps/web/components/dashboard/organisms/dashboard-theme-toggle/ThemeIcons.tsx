@@ -1,5 +1,5 @@
 interface ThemeIconProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function MoonIcon({ className = 'h-4 w-4' }: ThemeIconProps) {

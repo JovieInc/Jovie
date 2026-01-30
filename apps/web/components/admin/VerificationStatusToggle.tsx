@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils';
 
 interface VerificationStatusToggleProps
   extends Readonly<{
-    isVerified: boolean;
-    status: CreatorVerificationStatus;
-    onToggle: () => Promise<void> | void;
+    readonly isVerified: boolean;
+    readonly status: CreatorVerificationStatus;
+    readonly onToggle: () => Promise<void> | void;
   }> {}
 
 function getButtonStyles(

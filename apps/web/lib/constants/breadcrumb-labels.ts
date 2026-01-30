@@ -41,6 +41,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
  * Falls back to sentence case conversion if not in map.
  */
 export function getBreadcrumbLabel(segment: string): string {
+  if (!segment) return '';
   if (segment in BREADCRUMB_LABELS) {
     return BREADCRUMB_LABELS[segment];
   }

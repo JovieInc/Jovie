@@ -2,9 +2,9 @@ import { SocialLink } from '@/components/molecules/SocialLink';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialBarProps {
-  handle: string;
-  artistName: string;
-  socialLinks: SocialLinkType[];
+  readonly handle: string;
+  readonly artistName: string;
+  readonly socialLinks: SocialLinkType[];
 }
 
 export function SocialBar({ handle, artistName, socialLinks }: SocialBarProps) {

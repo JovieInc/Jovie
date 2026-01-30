@@ -44,7 +44,7 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
       .where(eq(users.clerkId, clerkUserId))
       .limit(1);
 
-    if (!user?.id) throw new Error('User not found');
+    if (!user?.id) throw new TypeError('User not found');
 
     // Upsert into user_settings
     await db

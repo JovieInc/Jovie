@@ -68,7 +68,7 @@ function renderStatusCell(status: AdminActivityStatus) {
 }
 
 interface ActivityTableUnifiedProps {
-  items: AdminActivityItem[];
+  readonly items: AdminActivityItem[];
 }
 
 /** Standard row class for activity table */

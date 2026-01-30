@@ -41,7 +41,7 @@ export function FeaturedArtistsDriftRow({
       if (!el) return;
 
       const rect = el.getBoundingClientRect();
-      const viewportH = window.innerHeight;
+      const viewportH = globalThis.innerHeight;
       const denom = viewportH + rect.height;
 
       if (denom <= 0) {
@@ -82,12 +82,12 @@ export function FeaturedArtistsDriftRow({
     // Initial update
     throttler.maybeExecute();
 
-    window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize, { passive: true });
+    globalThis.addEventListener('scroll', onScrollOrResize, { passive: true });
+    globalThis.addEventListener('resize', onScrollOrResize, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', onScrollOrResize);
-      window.removeEventListener('resize', onScrollOrResize);
+      globalThis.removeEventListener('scroll', onScrollOrResize);
+      globalThis.removeEventListener('resize', onScrollOrResize);
       throttler.cancel();
     };
   }, [prefersReducedMotion, throttler]);

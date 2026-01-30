@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
 
         // Validate that we got real URLs back
         if (!avatarUrl?.startsWith('https://')) {
-          throw new Error('Invalid blob URL returned from storage');
+          throw new TypeError('Invalid blob URL returned from storage');
         }
 
         // Update record with optimized URLs

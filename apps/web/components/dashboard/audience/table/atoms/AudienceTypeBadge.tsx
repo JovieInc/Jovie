@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceTypeBadgeProps {
-  type: AudienceMemberType;
-  className?: string;
+  readonly type: AudienceMemberType;
+  readonly className?: string;
 }
 
 export function AudienceTypeBadge({ type, className }: AudienceTypeBadgeProps) {

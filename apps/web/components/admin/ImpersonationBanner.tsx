@@ -10,9 +10,9 @@ import {
 
 export interface ImpersonationBannerProps {
   /** Optional callback when impersonation ends */
-  onEnd?: () => void;
+  readonly onEnd?: () => void;
   /** Optional class name for the banner container */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

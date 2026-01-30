@@ -6,7 +6,7 @@ import { PROFILE_URL } from '@/constants/domains';
 import { DashboardCard } from '../atoms/DashboardCard';
 
 interface ProfileLinkCardProps {
-  handle: string;
+  readonly handle: string;
 }
 
 export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {

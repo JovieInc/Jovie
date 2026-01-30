@@ -3,13 +3,10 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles, pixelEvents } from '@/lib/db/schema';
+import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
-import {
-  checkPublicRateLimit,
-  getPublicRateLimitStatus,
-} from '@/lib/utils/rate-limit';
 import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -38,15 +35,15 @@ export async function POST(request: NextRequest) {
     const clientIP = extractClientIP(request.headers);
 
     // Public rate limiting check (per-IP) - use 'visit' limiter for pixel events
-    if (checkPublicRateLimit(clientIP, 'visit')) {
-      const status = getPublicRateLimitStatus(clientIP, 'visit');
+    const rateLimitResult = await publicVisitLimiter.limit(clientIP);
+    if (!rateLimitResult.success) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         {
           status: 429,
           headers: {
             ...NO_STORE_HEADERS,
-            'Retry-After': String(status.retryAfterSeconds),
+            ...createRateLimitHeaders(rateLimitResult),
           },
         }
       );

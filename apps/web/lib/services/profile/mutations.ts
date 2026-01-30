@@ -65,7 +65,7 @@ export async function updateProfileByClerkId(
     .limit(1);
 
   if (!user) {
-    throw new Error('User not found');
+    throw new TypeError('User not found');
   }
 
   const [updated] = await db

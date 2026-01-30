@@ -182,9 +182,9 @@ describe('UserJourneyTracker', () => {
 
     it('should dispatch custom event when window exists', () => {
       const dispatchEventSpy = vi.fn();
-      global.window = {
-        dispatchEvent: dispatchEventSpy,
-      } as unknown as Window & typeof globalThis;
+      const originalDispatch = globalThis.dispatchEvent;
+      globalThis.dispatchEvent =
+        dispatchEventSpy as typeof globalThis.dispatchEvent;
 
       const tracker = new UserJourneyTracker('checkout', ['step1']);
       tracker.start();
@@ -196,8 +196,7 @@ describe('UserJourneyTracker', () => {
         })
       );
 
-      // @ts-expect-error - cleanup
-      delete global.window;
+      globalThis.dispatchEvent = originalDispatch;
     });
   });
 
@@ -352,9 +351,9 @@ describe('UserJourneyTracker', () => {
 
     it('should dispatch custom event when window exists', () => {
       const dispatchEventSpy = vi.fn();
-      global.window = {
-        dispatchEvent: dispatchEventSpy,
-      } as unknown as Window & typeof globalThis;
+      const originalDispatch = globalThis.dispatchEvent;
+      globalThis.dispatchEvent =
+        dispatchEventSpy as typeof globalThis.dispatchEvent;
 
       const tracker = new UserJourneyTracker('checkout', ['step1']);
       tracker.start();
@@ -366,8 +365,7 @@ describe('UserJourneyTracker', () => {
         })
       );
 
-      // @ts-expect-error - cleanup
-      delete global.window;
+      globalThis.dispatchEvent = originalDispatch;
     });
 
     it('should return self for chaining', () => {
@@ -486,18 +484,19 @@ describe('UserJourneyTracker', () => {
 
     it('should set up event listeners when window exists', () => {
       const addEventListenerSpy = vi.fn();
-      global.window = {
-        addEventListener: addEventListenerSpy,
-        dispatchEvent: vi.fn(),
-      } as unknown as Window & typeof globalThis;
+      const originalAddEventListener = globalThis.addEventListener;
+      const originalDispatch = globalThis.dispatchEvent;
+      globalThis.addEventListener =
+        addEventListenerSpy as typeof globalThis.addEventListener;
+      globalThis.dispatchEvent = vi.fn() as typeof globalThis.dispatchEvent;
 
       UserJourneyTracker.trackOnboardingFunnel();
 
       // Should set up listeners for each step + completion + abandonment
       expect(addEventListenerSpy).toHaveBeenCalled();
 
-      // @ts-expect-error - cleanup
-      delete global.window;
+      globalThis.addEventListener = originalAddEventListener;
+      globalThis.dispatchEvent = originalDispatch;
     });
   });
 });

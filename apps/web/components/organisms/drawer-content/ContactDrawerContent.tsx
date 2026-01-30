@@ -3,9 +3,9 @@
 import type { ReactNode } from 'react';
 
 export interface ContactDrawerContentProps {
-  contactId: string;
-  type: 'creator' | 'audience';
-  children?: ReactNode;
+  readonly contactId: string;
+  readonly type: 'creator' | 'audience';
+  readonly children?: ReactNode;
 }
 
 /**

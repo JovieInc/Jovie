@@ -426,7 +426,7 @@ export function setupNavigationUpgrade(
 
   // Listen for popstate (back/forward navigation)
   if (typeof window !== 'undefined') {
-    window.addEventListener('popstate', handleNavigation);
+    globalThis.addEventListener('popstate', handleNavigation);
   }
 
   // Return cleanup function
@@ -435,7 +435,7 @@ export function setupNavigationUpgrade(
       clearTimeout(debounceTimer);
     }
     if (typeof window !== 'undefined') {
-      window.removeEventListener('popstate', handleNavigation);
+      globalThis.removeEventListener('popstate', handleNavigation);
     }
   };
 }

@@ -4,12 +4,12 @@ import { Logo } from '@/components/atoms/Logo';
 import { cn } from '@/lib/utils';
 
 interface FooterBrandingProps {
-  artistHandle?: string;
-  variant?: 'light' | 'dark';
-  className?: string;
-  showCTA?: boolean;
-  size?: 'sm' | 'md';
-  mark?: 'wordmark' | 'icon';
+  readonly artistHandle?: string;
+  readonly variant?: 'light' | 'dark';
+  readonly className?: string;
+  readonly showCTA?: boolean;
+  readonly size?: 'sm' | 'md';
+  readonly mark?: 'wordmark' | 'icon';
 }
 
 export function FooterBranding({

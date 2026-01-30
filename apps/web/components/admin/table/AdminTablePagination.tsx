@@ -13,31 +13,31 @@ import Link from 'next/link';
 
 export interface AdminTablePaginationProps {
   /** Current page number (1-indexed) */
-  page: number;
+  readonly page: number;
   /** Total number of pages */
-  totalPages: number;
+  readonly totalPages: number;
   /** First item index on current page */
-  from: number;
+  readonly from: number;
   /** Last item index on current page */
-  to: number;
+  readonly to: number;
   /** Total number of items */
-  total: number;
+  readonly total: number;
   /** Whether previous page is available */
-  canPrev: boolean;
+  readonly canPrev: boolean;
   /** Whether next page is available */
-  canNext: boolean;
+  readonly canNext: boolean;
   /** URL for previous page */
-  prevHref?: string | null;
+  readonly prevHref?: string | null;
   /** URL for next page */
-  nextHref?: string | null;
+  readonly nextHref?: string | null;
   /** Current page size */
-  pageSize?: number;
+  readonly pageSize?: number;
   /** Callback when page size changes */
-  onPageSizeChange?: (pageSize: number) => void;
+  readonly onPageSizeChange?: (pageSize: number) => void;
   /** Available page size options */
-  pageSizeOptions?: number[];
+  readonly pageSizeOptions?: number[];
   /** Label for the entity being paginated (e.g., "users", "creators") */
-  entityLabel?: string;
+  readonly entityLabel?: string;
 }
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50];

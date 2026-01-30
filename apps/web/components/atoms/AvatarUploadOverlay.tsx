@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 
 export interface AvatarUploadOverlayProps {
   /** Size of the upload icon relative to avatar */
-  iconSize: number;
+  readonly iconSize: number;
   /** Whether this is a drag-over state (more prominent) */
-  isDragOver?: boolean;
+  readonly isDragOver?: boolean;
 }
 
 export function AvatarUploadOverlay({

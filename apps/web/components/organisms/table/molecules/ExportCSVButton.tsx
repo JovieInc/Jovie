@@ -16,47 +16,47 @@ export interface ExportCSVButtonProps<T extends object> {
    * Callback to get the data to export.
    * Can be async for lazy loading from an API.
    */
-  getData: () => T[] | Promise<T[]>;
+  readonly getData: () => T[] | Promise<T[]>;
   /**
    * Column configuration for CSV generation.
    * If not provided, all object keys will be used as columns.
    */
-  columns?: CSVColumn<T>[];
+  readonly columns?: CSVColumn<T>[];
   /**
    * Base filename for the download (without extension).
    * Will be appended with timestamp: 'filename-YYYY-MM-DD.csv'
    * @default 'export'
    */
-  filename?: string;
+  readonly filename?: string;
   /**
    * Whether the button is disabled.
    * @default false
    */
-  disabled?: boolean;
+  readonly disabled?: boolean;
   /**
    * Custom class name for styling.
    */
-  className?: string;
+  readonly className?: string;
   /**
    * Button variant.
    * @default 'outline'
    */
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  readonly variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   /**
    * Button size.
    * @default 'sm'
    */
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  readonly size?: 'default' | 'sm' | 'lg' | 'icon';
   /**
    * Custom button label.
    * @default 'Export CSV'
    */
-  label?: string;
+  readonly label?: string;
   /**
    * Accessible label for screen readers.
    * @default 'Export data to CSV file'
    */
-  ariaLabel?: string;
+  readonly ariaLabel?: string;
 }
 
 /**

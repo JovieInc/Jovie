@@ -5,7 +5,7 @@ import { Download, Printer } from 'lucide-react';
 import { APP_NAME } from '@/constants/app';
 
 export interface DocToolbarProps {
-  pdfTitle: string;
+  readonly pdfTitle: string;
 }
 
 export function DocToolbar({ pdfTitle }: DocToolbarProps) {
@@ -20,10 +20,10 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
     const restoreTitle = () => {
       document.title = previousTitle;
-      window.removeEventListener('afterprint', restoreTitle);
+      globalThis.removeEventListener('afterprint', restoreTitle);
     };
 
-    window.addEventListener('afterprint', restoreTitle);
+    globalThis.addEventListener('afterprint', restoreTitle);
 
     window.print();
 

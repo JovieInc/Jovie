@@ -106,19 +106,19 @@ function buildContentVariants(
 }
 
 interface AnimatedAccordionProps {
-  isOpen: boolean;
-  children: React.ReactNode;
-  className?: string;
+  readonly isOpen: boolean;
+  readonly children: React.ReactNode;
+  readonly className?: string;
   /**
    * Optional delay before starting the animation (in seconds)
    * @default 0
    */
-  delay?: number;
+  readonly delay?: number;
   /**
    * Optional duration for the animation (in seconds)
    * @default 0.3
    */
-  duration?: number;
+  readonly duration?: number;
 }
 
 export function AnimatedAccordion({

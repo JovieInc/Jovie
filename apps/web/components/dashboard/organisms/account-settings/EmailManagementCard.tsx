@@ -18,7 +18,7 @@ import type { ClerkUserResource } from './types';
 import { useEmailManagement } from './useEmailManagement';
 
 export interface EmailManagementCardProps {
-  user: ClerkUserResource;
+  readonly user: ClerkUserResource;
 }
 
 export function EmailManagementCard({ user }: EmailManagementCardProps) {

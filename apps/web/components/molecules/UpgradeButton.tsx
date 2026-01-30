@@ -7,11 +7,11 @@ import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
 import { useCheckoutMutation } from '@/lib/queries';
 
 interface UpgradeButtonProps {
-  className?: string;
-  children?: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
-  priceId?: string; // Default price ID for direct checkout
+  readonly className?: string;
+  readonly children?: React.ReactNode;
+  readonly variant?: 'primary' | 'secondary' | 'outline';
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly priceId?: string; // Default price ID for direct checkout
 }
 
 export function UpgradeButton({

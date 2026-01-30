@@ -1,11 +1,11 @@
 import { QRCode } from '@/components/atoms/QRCode';
 
 interface QRCodeCardProps {
-  data: string;
-  title?: string;
-  description?: string;
-  qrSize?: number;
-  className?: string;
+  readonly data: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly qrSize?: number;
+  readonly className?: string;
 }
 
 export function QRCodeCard({

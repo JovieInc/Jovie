@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 export type LoadingSpinnerTone = 'primary' | 'muted' | 'inverse';
 
 export interface LoadingSpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
-  tone?: LoadingSpinnerTone;
-  className?: string;
-  label?: string;
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly tone?: LoadingSpinnerTone;
+  readonly className?: string;
+  readonly label?: string;
 }
 
 const sizeClasses: Record<NonNullable<LoadingSpinnerProps['size']>, string> = {

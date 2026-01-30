@@ -15,12 +15,12 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { formatUsername } from './utils';
 
 interface ContactAvatarProps {
-  avatarUrl: string | null;
-  fullName: string;
-  username: string;
-  isVerified?: boolean;
-  canUploadAvatar: boolean;
-  onAvatarUpload?: (file: File) => Promise<string>;
+  readonly avatarUrl: string | null;
+  readonly fullName: string;
+  readonly username: string;
+  readonly isVerified?: boolean;
+  readonly canUploadAvatar: boolean;
+  readonly onAvatarUpload?: (file: File) => Promise<string>;
 }
 
 export const ContactAvatar = memo(function ContactAvatar({

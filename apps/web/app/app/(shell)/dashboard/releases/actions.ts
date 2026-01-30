@@ -56,7 +56,7 @@ async function requireProfile(): Promise<{
   }
 
   if (!data.selectedProfile) {
-    throw new Error('Missing creator profile');
+    throw new TypeError('Missing creator profile');
   }
 
   return {
@@ -174,17 +174,17 @@ export async function saveProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new Error('Unauthorized');
+      throw new TypeError('Unauthorized');
     }
 
     const profile = await requireProfile();
     if (profile.id !== params.profileId) {
-      throw new Error('Profile mismatch');
+      throw new TypeError('Profile mismatch');
     }
 
     const trimmedUrl = params.url.trim();
     if (!trimmedUrl) {
-      throw new Error('URL is required');
+      throw new TypeError('URL is required');
     }
 
     // Validate URL format and provider domain
@@ -200,7 +200,7 @@ export async function saveProviderOverride(params: {
 
     // Validate provider key
     if (!PROVIDER_CONFIG[params.provider]) {
-      throw new Error('Invalid provider');
+      throw new TypeError('Invalid provider');
     }
 
     // Save the provider link override
@@ -214,7 +214,7 @@ export async function saveProviderOverride(params: {
     // Fetch the updated release
     const release = await getReleaseById(params.releaseId);
     if (!release) {
-      throw new Error('Release not found');
+      throw new TypeError('Release not found');
     }
 
     const providerLabels = buildProviderLabels();
@@ -243,17 +243,17 @@ export async function resetProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new Error('Unauthorized');
+      throw new TypeError('Unauthorized');
     }
 
     const profile = await requireProfile();
     if (profile.id !== params.profileId) {
-      throw new Error('Profile mismatch');
+      throw new TypeError('Profile mismatch');
     }
 
     // Validate provider key
     if (!PROVIDER_CONFIG[params.provider]) {
-      throw new Error('Invalid provider');
+      throw new TypeError('Invalid provider');
     }
 
     // Get the current provider link to check for ingested URL
@@ -272,7 +272,7 @@ export async function resetProviderOverride(params: {
     // Fetch the updated release
     const release = await getReleaseById(params.releaseId);
     if (!release) {
-      throw new Error('Release not found');
+      throw new TypeError('Release not found');
     }
 
     const providerLabels = buildProviderLabels();
@@ -303,7 +303,7 @@ export async function syncFromSpotify(): Promise<{
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -399,7 +399,7 @@ export async function connectSpotifyArtist(params: {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -525,7 +525,7 @@ export async function loadTracksForRelease(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new TypeError('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -533,7 +533,7 @@ export async function loadTracksForRelease(params: {
   // Verify the release belongs to the user's profile
   const release = await getReleaseById(params.releaseId);
   if (release?.creatorProfileId !== profile.id) {
-    throw new Error('Release not found');
+    throw new TypeError('Release not found');
   }
 
   const providerLabels = buildProviderLabels();

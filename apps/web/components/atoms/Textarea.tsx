@@ -5,8 +5,8 @@ import React, { forwardRef } from 'react';
 // Legacy interface for backward compatibility
 interface LegacyTextareaProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label?: string;
-  error?: string;
+  readonly label?: string;
+  readonly error?: string;
 }
 
 // New interface for Catalyst UI Kit

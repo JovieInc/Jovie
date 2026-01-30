@@ -56,22 +56,22 @@ const SORTABLE_COLUMN_MAP: Partial<
 };
 
 export interface BulkAction {
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
+  readonly label: string;
+  readonly onClick: () => void;
+  readonly disabled?: boolean;
 }
 
 export interface AudienceTableHeaderProps {
-  mode: AudienceMode;
-  sort: string;
-  direction: 'asc' | 'desc';
-  headerCheckboxState: HeaderCheckboxState;
-  selectedCount: number;
-  headerElevated: boolean;
-  totalCount: number;
-  onSortChange: (sort: string) => void;
-  onToggleSelectAll: () => void;
-  bulkActions: BulkAction[];
+  readonly mode: AudienceMode;
+  readonly sort: string;
+  readonly direction: 'asc' | 'desc';
+  readonly headerCheckboxState: HeaderCheckboxState;
+  readonly selectedCount: number;
+  readonly headerElevated: boolean;
+  readonly totalCount: number;
+  readonly onSortChange: (sort: string) => void;
+  readonly onToggleSelectAll: () => void;
+  readonly bulkActions: BulkAction[];
 }
 
 export function AudienceTableHeader({
@@ -129,7 +129,7 @@ export function AudienceTableHeader({
                 {isSortable ? (
                   <SortableHeaderButton
                     label={column.label}
-                    direction={activeDirection as 'asc' | 'desc' | undefined}
+                    direction={activeDirection}
                     onClick={() => onSortChange(sortKey as unknown as string)}
                   />
                 ) : (

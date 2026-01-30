@@ -75,7 +75,7 @@ interface StoredPreferences {
 
 function getDefaultVisibilityForBreakpoint(): ColumnVisibility {
   if (typeof window === 'undefined') return DEFAULT_DESKTOP_VISIBILITY;
-  const width = window.innerWidth;
+  const width = globalThis.innerWidth;
   if (width < 768) return DEFAULT_MOBILE_VISIBILITY;
   if (width < 1024) return DEFAULT_TABLET_VISIBILITY;
   return DEFAULT_DESKTOP_VISIBILITY;

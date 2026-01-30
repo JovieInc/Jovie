@@ -8,11 +8,11 @@ import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { AudienceMember } from '@/types';
 
 export interface AudienceLastSeenCellProps {
-  row: AudienceMember;
-  lastSeenAt: string | null;
-  isMenuOpen: boolean;
-  onMenuOpenChange: (open: boolean) => void;
-  className?: string;
+  readonly row: AudienceMember;
+  readonly lastSeenAt: string | null;
+  readonly isMenuOpen: boolean;
+  readonly onMenuOpenChange: (open: boolean) => void;
+  readonly className?: string;
 }
 
 /**
