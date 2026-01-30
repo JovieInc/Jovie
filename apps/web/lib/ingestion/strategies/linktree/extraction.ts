@@ -68,9 +68,10 @@ export function extractLinktree(html: string): ExtractionResult {
     nextData?.props?.pageProps?.account?.displayName ??
     null;
 
-  const domAvatarMatch = html.match(
-    /id=["']profile-picture["'][^>]*\s(?:src|data-src)=["']([^"']+)["']/i
-  );
+  const domAvatarMatch =
+    /id=["']profile-picture["'][^>]*\s(?:src|data-src)=["']([^"']+)["']/i.exec(
+      html
+    );
   const domAvatar = sanitizeAvatarUrl(domAvatarMatch?.[1] ?? null);
 
   const nextAvatar = sanitizeAvatarUrl(

@@ -116,7 +116,7 @@ export function extractBeaconsSpecificData(html: string): {
   ];
 
   for (const pattern of namePatterns) {
-    const match = html.match(pattern);
+    const match = pattern.exec(html);
     if (match?.[1]) {
       const name = decodeHtmlEntities(match[1].trim());
       if (name && name.length > 0 && name.length < 100) {
@@ -136,7 +136,7 @@ export function extractBeaconsSpecificData(html: string): {
   ];
 
   for (const pattern of avatarPatterns) {
-    const match = html.match(pattern);
+    const match = pattern.exec(html);
     if (match?.[1]) {
       const url = match[1];
       if (url && !isDefaultBeaconsImage(url)) {

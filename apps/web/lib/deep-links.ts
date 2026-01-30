@@ -31,8 +31,8 @@ export interface DeepLinkConfig {
  */
 function createUrlExtractor(pattern: RegExp): (url: string) => string | null {
   return (url: string) => {
-    const match = url.match(pattern);
-    return match ? match[1] : null;
+    const match = pattern.exec(url);
+    return match?.[1] ?? null;
   };
 }
 
