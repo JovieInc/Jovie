@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AudienceDetailRowProps {
-  label: string;
-  value: ReactNode;
-  className?: string;
+  readonly label: string;
+  readonly value: ReactNode;
+  readonly className?: string;
 }
 
 export function AudienceDetailRow({

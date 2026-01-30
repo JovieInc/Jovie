@@ -4,11 +4,11 @@ import { Checkbox } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface AudienceRowSelectionCellProps {
-  rowNumber: number;
-  isChecked: boolean;
-  displayName: string | null;
-  onToggle: () => void;
-  className?: string;
+  readonly rowNumber: number;
+  readonly isChecked: boolean;
+  readonly displayName: string | null;
+  readonly onToggle: () => void;
+  readonly className?: string;
 }
 
 export function AudienceRowSelectionCell({

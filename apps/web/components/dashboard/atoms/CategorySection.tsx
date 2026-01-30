@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 export type CategorySectionVariant = 'card' | 'flat';
 
 export interface CategorySectionProps {
-  title: string;
-  children: ReactNode;
-  variant?: CategorySectionVariant;
-  className?: string;
-  gridClassName?: string;
+  readonly title: string;
+  readonly children: ReactNode;
+  readonly variant?: CategorySectionVariant;
+  readonly className?: string;
+  readonly gridClassName?: string;
 }
 
 export function CategorySection({

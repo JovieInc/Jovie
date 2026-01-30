@@ -11,10 +11,10 @@ import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
-  item: NavItem;
-  isActive: boolean;
-  shortcut?: KeyboardShortcut;
-  actions?: ReactNode;
+  readonly item: NavItem;
+  readonly isActive: boolean;
+  readonly shortcut?: KeyboardShortcut;
+  readonly actions?: ReactNode;
 }
 
 /**

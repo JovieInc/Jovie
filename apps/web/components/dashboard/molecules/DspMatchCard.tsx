@@ -18,26 +18,26 @@ import { isExternalDspImage } from '@/lib/utils/dsp-images';
 import { MatchConfidenceBreakdown } from './MatchConfidenceBreakdown';
 
 export interface DspMatchCardProps {
-  matchId: string;
-  providerId: DspProviderId;
-  externalArtistName: string;
-  externalArtistUrl?: string | null;
-  externalArtistImageUrl?: string | null;
-  confidenceScore: number;
-  confidenceBreakdown?: {
-    isrcMatchScore: number;
-    upcMatchScore: number;
-    nameSimilarityScore: number;
-    followerRatioScore: number;
-    genreOverlapScore: number;
+  readonly matchId: string;
+  readonly providerId: DspProviderId;
+  readonly externalArtistName: string;
+  readonly externalArtistUrl?: string | null;
+  readonly externalArtistImageUrl?: string | null;
+  readonly confidenceScore: number;
+  readonly confidenceBreakdown?: {
+    readonly isrcMatchScore: number;
+    readonly upcMatchScore: number;
+    readonly nameSimilarityScore: number;
+    readonly followerRatioScore: number;
+    readonly genreOverlapScore: number;
   };
-  matchingIsrcCount: number;
-  status: DspMatchStatus;
-  onConfirm?: (matchId: string) => void;
-  onReject?: (matchId: string) => void;
-  isConfirming?: boolean;
-  isRejecting?: boolean;
-  className?: string;
+  readonly matchingIsrcCount: number;
+  readonly status: DspMatchStatus;
+  readonly onConfirm?: (matchId: string) => void;
+  readonly onReject?: (matchId: string) => void;
+  readonly isConfirming?: boolean;
+  readonly isRejecting?: boolean;
+  readonly className?: string;
 }
 
 /**

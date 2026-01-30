@@ -4,8 +4,8 @@ import { Moon, Sun } from 'lucide-react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export interface DashboardThemeToggleButtonProps {
-  theme?: 'light' | 'dark';
-  onThemeChange?: (theme: 'light' | 'dark') => void;
+  readonly theme?: 'light' | 'dark';
+  readonly onThemeChange?: (theme: 'light' | 'dark') => void;
 }
 
 export function DashboardThemeToggleButton({

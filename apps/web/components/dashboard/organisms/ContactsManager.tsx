@@ -5,10 +5,10 @@ import { ContactsTable } from '@/components/dashboard/organisms/contacts-table';
 import type { DashboardContact } from '@/types/contacts';
 
 export interface ContactsManagerProps {
-  profileId: string;
-  artistName: string;
-  artistHandle: string;
-  initialContacts: DashboardContact[];
+  readonly profileId: string;
+  readonly artistName: string;
+  readonly artistHandle: string;
+  readonly initialContacts: DashboardContact[];
 }
 
 export function ContactsManager({

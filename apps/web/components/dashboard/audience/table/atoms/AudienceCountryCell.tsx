@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { formatCountryLabel } from '@/lib/utils/audience';
 
 export interface AudienceCountryCellProps {
-  geoCountry: string | null;
-  className?: string;
+  readonly geoCountry: string | null;
+  readonly className?: string;
 }
 
 export function AudienceCountryCell({

@@ -4,8 +4,8 @@ import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 import type { AudienceIntentLevel } from '@/types';
 
 export interface AudienceIntentBadgeProps {
-  intentLevel: AudienceIntentLevel;
-  className?: string;
+  readonly intentLevel: AudienceIntentLevel;
+  readonly className?: string;
 }
 
 const INTENT_BADGES: Record<

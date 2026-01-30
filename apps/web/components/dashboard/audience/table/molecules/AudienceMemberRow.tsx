@@ -15,18 +15,18 @@ import {
 } from '../atoms';
 
 export interface AudienceMemberRowProps {
-  row: AudienceMember;
-  rowNumber: number;
-  isSelected: boolean;
-  isChecked: boolean;
-  isMenuOpen: boolean;
-  virtualRowStart?: number;
-  measureRef?: (node: HTMLTableRowElement | null) => void;
-  dataIndex?: number;
-  onRowClick: () => void;
-  onRowContextMenu: (event: React.MouseEvent) => void;
-  onToggleSelect: () => void;
-  onMenuOpenChange: (open: boolean) => void;
+  readonly row: AudienceMember;
+  readonly rowNumber: number;
+  readonly isSelected: boolean;
+  readonly isChecked: boolean;
+  readonly isMenuOpen: boolean;
+  readonly virtualRowStart?: number;
+  readonly measureRef?: (node: HTMLTableRowElement | null) => void;
+  readonly dataIndex?: number;
+  readonly onRowClick: () => void;
+  readonly onRowContextMenu: (event: React.MouseEvent) => void;
+  readonly onToggleSelect: () => void;
+  readonly onMenuOpenChange: (open: boolean) => void;
 }
 
 export function AudienceMemberRow({

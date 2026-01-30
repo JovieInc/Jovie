@@ -20,7 +20,7 @@ const SettingsPolished = dynamic(
 );
 
 export interface DashboardSettingsProps {
-  focusSection?: string;
+  readonly focusSection?: string;
 }
 
 export const DashboardSettings = memo(function DashboardSettings({

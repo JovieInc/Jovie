@@ -3,14 +3,14 @@
 import { Input } from '@/components/atoms/Input';
 
 export interface ContactFormFieldsProps {
-  personName: string | null | undefined;
-  companyName: string | null | undefined;
-  email: string | null | undefined;
-  phone: string | null | undefined;
-  onPersonNameChange: (value: string) => void;
-  onCompanyNameChange: (value: string) => void;
-  onEmailChange: (value: string) => void;
-  onPhoneChange: (value: string) => void;
+  readonly personName: string | null | undefined;
+  readonly companyName: string | null | undefined;
+  readonly email: string | null | undefined;
+  readonly phone: string | null | undefined;
+  readonly onPersonNameChange: (value: string) => void;
+  readonly onCompanyNameChange: (value: string) => void;
+  readonly onEmailChange: (value: string) => void;
+  readonly onPhoneChange: (value: string) => void;
 }
 
 export function ContactFormFields({

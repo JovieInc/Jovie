@@ -22,20 +22,20 @@ import { cn } from '@/lib/utils';
 
 export interface CopyLinkInputProps {
   /** The URL to display and copy */
-  url: string;
+  readonly url: string;
   /** Size variant */
-  size?: 'sm' | 'md';
+  readonly size?: 'sm' | 'md';
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /**
    * Prevent click bubbling to parents (e.g. table row navigation).
    * Defaults to false.
    */
-  stopPropagation?: boolean;
+  readonly stopPropagation?: boolean;
   /** Callback when copy succeeds (does not need to write to clipboard) */
-  onCopy?: () => void;
+  readonly onCopy?: () => void;
   /** Test ID for the component */
-  testId?: string;
+  readonly testId?: string;
 }
 
 export function CopyLinkInput({

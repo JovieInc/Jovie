@@ -5,8 +5,8 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 
 export interface AudienceLocationCellProps {
-  locationLabel: string | null;
-  className?: string;
+  readonly locationLabel: string | null;
+  readonly className?: string;
 }
 
 export function AudienceLocationCell({

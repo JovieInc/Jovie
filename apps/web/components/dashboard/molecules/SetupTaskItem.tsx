@@ -1,12 +1,12 @@
 import { type ReactNode } from 'react';
 
 export interface SetupTaskItemProps {
-  index: number;
-  title: string;
-  complete: boolean;
-  completeLabel: string;
-  incompleteLabel: string;
-  action?: ReactNode;
+  readonly index: number;
+  readonly title: string;
+  readonly complete: boolean;
+  readonly completeLabel: string;
+  readonly incompleteLabel: string;
+  readonly action?: ReactNode;
 }
 
 export function SetupTaskItem({

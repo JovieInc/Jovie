@@ -15,9 +15,9 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AudienceMember } from '@/types';
 
 interface AudienceRowActionsMenuProps {
-  row: AudienceMember;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  readonly row: AudienceMember;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {

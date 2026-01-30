@@ -95,9 +95,9 @@ function getEmptyStateAction(
 }
 
 interface DashboardAnalyticsCardsProps {
-  profileUrl?: string;
-  range?: CityRange;
-  refreshSignal?: number;
+  readonly profileUrl?: string;
+  readonly range?: CityRange;
+  readonly refreshSignal?: number;
 }
 
 export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({

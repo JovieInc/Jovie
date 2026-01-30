@@ -26,9 +26,9 @@ const QR_DOWNLOAD_SIZE = 420;
 // =============================================================================
 
 interface StatCardProps {
-  label: string;
-  value: number;
-  description: string;
+  readonly label: string;
+  readonly value: number;
+  readonly description: string;
 }
 
 const StatCard = memo(function StatCard({
@@ -48,9 +48,9 @@ const StatCard = memo(function StatCard({
 });
 
 interface VenmoConnectedBadgeProps {
-  venmoHandle: string;
-  onEdit: () => void;
-  onDisconnect: () => void;
+  readonly venmoHandle: string;
+  readonly onEdit: () => void;
+  readonly onDisconnect: () => void;
 }
 
 const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
@@ -96,11 +96,11 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
 });
 
 interface VenmoEditFormProps {
-  venmoHandle: string;
-  onVenmoHandleChange: (value: string) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  isSaving: boolean;
+  readonly venmoHandle: string;
+  readonly onVenmoHandleChange: (value: string) => void;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+  readonly isSaving: boolean;
 }
 
 const VenmoEditForm = memo(function VenmoEditForm({
@@ -148,11 +148,11 @@ const VenmoEditForm = memo(function VenmoEditForm({
 });
 
 interface VenmoConnectCardProps {
-  venmoHandle: string;
-  onVenmoHandleChange: (value: string) => void;
-  onSave: () => void;
-  isSaving: boolean;
-  saveSuccess: string | null;
+  readonly venmoHandle: string;
+  readonly onVenmoHandleChange: (value: string) => void;
+  readonly onSave: () => void;
+  readonly isSaving: boolean;
+  readonly saveSuccess: string | null;
 }
 
 const VenmoConnectCard = memo(function VenmoConnectCard({
@@ -223,9 +223,9 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
 });
 
 interface TipLinkSectionProps {
-  tipUrl: string;
-  tipRelativePathLink: string;
-  displayHandle: string;
+  readonly tipUrl: string;
+  readonly tipRelativePathLink: string;
+  readonly displayHandle: string;
 }
 
 const TipLinkSection = memo(function TipLinkSection({
@@ -262,9 +262,9 @@ const TipLinkSection = memo(function TipLinkSection({
 });
 
 interface QRCodeSectionProps {
-  tipShareUrlQr: string;
-  qrDownloadUrl: string;
-  displayHandle: string;
+  readonly tipShareUrlQr: string;
+  readonly qrDownloadUrl: string;
+  readonly displayHandle: string;
 }
 
 const QRCodeSection = memo(function QRCodeSection({
