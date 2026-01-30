@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface CreateInviteInput {
@@ -23,26 +24,31 @@ export interface CreateInviteResponse {
 async function createInvite(
   input: CreateInviteInput
 ): Promise<CreateInviteResponse> {
-  const response = await fetch('/api/admin/creator-invite', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+  try {
+    const data = await fetchWithTimeout<{
+      ok?: boolean;
+      error?: string;
+      invite?: { id: string; email: string; status: string };
+    }>('/api/admin/creator-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
 
-  const data = (await response.json()) as {
-    ok?: boolean;
-    error?: string;
-    invite?: { id: string; email: string; status: string };
-  };
+    if (!data.ok) {
+      throw new Error(data.error ?? 'Failed to create invite');
+    }
 
-  if (!response.ok || !data.ok) {
-    throw new Error(data.error ?? 'Failed to create invite');
+    return {
+      success: true,
+      invite: data.invite,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to create invite');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    invite: data.invite,
-  };
 }
 
 /**

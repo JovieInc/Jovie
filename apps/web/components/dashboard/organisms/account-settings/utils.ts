@@ -4,6 +4,8 @@
  * Shared utility functions for account settings components.
  */
 
+import { fetchWithTimeout } from '@/lib/queries/fetch';
+
 /**
  * Format a date as a relative time string (e.g., "2 hours ago").
  */
@@ -49,16 +51,9 @@ export function extractErrorMessage(error: unknown): string {
  * Sync an email address to the database.
  */
 export async function syncEmailToDatabase(email: string): Promise<void> {
-  const response = await fetch('/api/account/email', {
+  await fetchWithTimeout<{ success: boolean }>('/api/account/email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({ error: '' }));
-    throw new Error(
-      data.error || 'Failed to sync email address with our database.'
-    );
-  }
 }

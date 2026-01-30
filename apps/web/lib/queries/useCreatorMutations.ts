@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 /**
@@ -62,18 +63,19 @@ export function useToggleFeaturedMutation() {
     mutationFn: async (
       input: ToggleFeaturedInput
     ): Promise<ToggleFeaturedResponse> => {
-      const response = await fetch('/app/admin/creators/toggle-featured', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(input),
-      });
+      const payload = await fetchWithTimeout<ToggleFeaturedResponse>(
+        '/app/admin/creators/toggle-featured',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(input),
+        }
+      );
 
-      const payload = (await response.json()) as ToggleFeaturedResponse;
-
-      if (!response.ok || !payload.success) {
+      if (!payload.success) {
         throw new Error(payload.error ?? 'Failed to update featured status');
       }
 
@@ -108,18 +110,19 @@ export function useToggleMarketingMutation() {
     mutationFn: async (
       input: ToggleMarketingInput
     ): Promise<ToggleMarketingResponse> => {
-      const response = await fetch('/app/admin/creators/toggle-marketing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(input),
-      });
+      const payload = await fetchWithTimeout<ToggleMarketingResponse>(
+        '/app/admin/creators/toggle-marketing',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(input),
+        }
+      );
 
-      const payload = (await response.json()) as ToggleMarketingResponse;
-
-      if (!response.ok || !payload.success) {
+      if (!payload.success) {
         throw new Error(
           payload.error ?? 'Failed to update marketing preferences'
         );
@@ -156,18 +159,19 @@ export function useDeleteCreatorMutation() {
     mutationFn: async (
       input: DeleteCreatorInput
     ): Promise<DeleteCreatorResponse> => {
-      const response = await fetch('/app/admin/creators/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(input),
-      });
+      const payload = await fetchWithTimeout<DeleteCreatorResponse>(
+        '/app/admin/creators/delete',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(input),
+        }
+      );
 
-      const payload = (await response.json()) as DeleteCreatorResponse;
-
-      if (!response.ok || !payload.success) {
+      if (!payload.success) {
         throw new Error(payload.error ?? 'Failed to delete creator');
       }
 

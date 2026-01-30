@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface IngestRefreshInput {
@@ -19,29 +20,34 @@ export interface IngestRefreshResponse {
 async function refreshIngest(
   input: IngestRefreshInput
 ): Promise<IngestRefreshResponse> {
-  const response = await fetch('/app/admin/creators/bulk-refresh', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ profileIds: [input.profileId] }),
-  });
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      queuedCount?: number;
+      error?: string;
+    }>('/app/admin/creators/bulk-refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ profileIds: [input.profileId] }),
+    });
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    queuedCount?: number;
-    error?: string;
-  };
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to queue ingestion');
+    }
 
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? 'Failed to queue ingestion');
+    return {
+      success: true,
+      queuedCount: payload.queuedCount,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to queue ingestion');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    queuedCount: payload.queuedCount,
-  };
 }
 
 /**

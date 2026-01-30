@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface ToggleVerificationInput {
@@ -20,32 +21,37 @@ export interface ToggleVerificationResponse {
 async function toggleVerification(
   input: ToggleVerificationInput
 ): Promise<ToggleVerificationResponse> {
-  const response = await fetch('/app/admin/creators/toggle-verify', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      isVerified?: boolean;
+      error?: string;
+    }>('/app/admin/creators/toggle-verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    success?: boolean;
-    isVerified?: boolean;
-    error?: string;
-  };
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to update verification status');
+    }
 
-  if (!response.ok || !payload.success) {
-    throw new Error(payload.error ?? 'Failed to update verification status');
+    return {
+      success: true,
+      isVerified:
+        typeof payload.isVerified === 'boolean'
+          ? payload.isVerified
+          : input.nextVerified,
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to update verification status');
+    }
+    throw error;
   }
-
-  return {
-    success: true,
-    isVerified:
-      typeof payload.isVerified === 'boolean'
-        ? payload.isVerified
-        : input.nextVerified,
-  };
 }
 
 /**
