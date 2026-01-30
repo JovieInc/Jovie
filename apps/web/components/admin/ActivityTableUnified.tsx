@@ -71,6 +71,9 @@ interface ActivityTableUnifiedProps {
   items: AdminActivityItem[];
 }
 
+/** Standard row class for activity table */
+const getRowClassName = () => 'group hover:bg-surface-2/50';
+
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
 export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
@@ -136,6 +139,7 @@ export function ActivityTableUnified({ items }: ActivityTableUnifiedProps) {
               </div>
             }
             getRowId={row => row.id}
+            getRowClassName={getRowClassName}
             enableVirtualization={true}
             minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'

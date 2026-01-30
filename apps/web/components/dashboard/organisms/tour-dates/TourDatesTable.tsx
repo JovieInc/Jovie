@@ -365,6 +365,17 @@ export function TourDatesTable({
       enableVirtualization={tourDates.length >= 20}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       className='text-[13px]'
+      emptyState={
+        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+          <Icon name='Calendar' className='h-6 w-6' />
+          <div>
+            <div className='font-medium'>No tour dates</div>
+            <div className='text-xs'>
+              Add your first tour date to get started.
+            </div>
+          </div>
+        </div>
+      }
     />
   );
 }
