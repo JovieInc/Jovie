@@ -405,12 +405,12 @@ export function WaitlistSpotifySearch({
               aria-hidden='true'
             >
               {results.map((artist, index) => (
-                <div
+                <button
                   key={artist.id}
-                  role='button'
+                  type='button'
                   tabIndex={0}
                   className={cn(
-                    'flex items-center gap-3 p-3 cursor-pointer transition-colors',
+                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
                     index === activeIndex
                       ? 'bg-[#f0f0f0] dark:bg-[#1e2025]'
                       : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
@@ -468,17 +468,17 @@ export function WaitlistSpotifySearch({
                       </svg>
                     </div>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}
 
           {/* Always-visible "Manually add URL" option */}
-          <div
-            role='button'
+          <button
+            type='button'
             tabIndex={0}
             className={cn(
-              'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-[#d7d9de] dark:border-[#2c2e33]',
+              'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-[#d7d9de] dark:border-[#2c2e33] border-l-0 border-r-0 border-b-0 bg-transparent w-full text-left',
               activeIndex === manualAddIndex
                 ? 'bg-[#f0f0f0] dark:bg-[#1e2025]'
                 : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
@@ -513,7 +513,7 @@ export function WaitlistSpotifySearch({
                 Paste a Spotify artist link
               </div>
             </div>
-          </div>
+          </button>
         </div>
       )}
 

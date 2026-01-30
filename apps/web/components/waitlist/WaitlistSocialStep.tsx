@@ -65,10 +65,11 @@ export function WaitlistSocialStep({
         <h1 className={FORM_LAYOUT.title}>Where do fans find you?</h1>
       </div>
 
-      <div onKeyDown={onPlatformKeyDown}>
+      <div>
         <fieldset
           className='flex items-center justify-center gap-2'
           disabled={isSubmitting}
+          onKeyDown={onPlatformKeyDown}
         >
           <legend className='sr-only'>Social platform</legend>
           {SOCIAL_PLATFORM_OPTIONS.map((option, index) => {
