@@ -11,7 +11,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,

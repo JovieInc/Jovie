@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-14
+> **Last Updated:** 2026-01-30
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -38,7 +38,7 @@ When you **discover** new tech debt:
 |--------|-------|--------|--------------|
 | `@ts-nocheck` files | **0** | 0 | 2026-01-14 |
 | `@ts-ignore` in production | ~15 | <5 | 2026-01-14 |
-| Deprecated files | 30+ | 0 | 2026-01-14 |
+| Deprecated files | ~36 (4 removed, 4 imports migrated) | 0 | 2026-01-30 |
 | TODO comments | 6 | 0 | 2026-01-14 |
 | Empty catch blocks | **0** | 0 | 2026-01-14 |
 
@@ -147,14 +147,11 @@ Files marked `@deprecated` that should be migrated:
 
 ### P2 - Medium (React Hooks Exhaustive Deps)
 
-Review these suppressions for potential bugs:
-
-| File | Line | Suppression |
-|------|------|-------------|
-| `components/dashboard/organisms/DashboardAnalyticsCards.tsx` | 75 | `react-hooks/exhaustive-deps` |
-| `components/dashboard/molecules/universal-link-input/useUniversalLinkInput.ts` | 119 | `react-hooks/exhaustive-deps` |
-| `components/dashboard/molecules/universal-link-input/useUniversalLinkInput.ts` | 302 | `react-hooks/exhaustive-deps` |
-| `components/dashboard/organisms/links/hooks/useLinksPersistence.ts` | 334 | `react-hooks/exhaustive-deps` |
+**Status: Reviewed 2026-01-30** - All dashboard suppressions have been reviewed and documented with explanatory comments. All suppressions are valid:
+- Stable TanStack Query mutate functions
+- Stable context setters (useState, useContext)
+- Intentional dependency subsets for controlled effect triggers
+- Cleanup-only effects that run once on unmount
 
 ### P3 - Low (TypeScript `any` in Production)
 
@@ -174,14 +171,14 @@ Consider splitting for maintainability:
 
 ### P3 - Low (Stale Documentation)
 
-Review and archive if completed:
-
-- `PERFORMANCE_ISSUES_REPORT.md`
-- `PROGRESSIVE_ONBOARDING.md`
-- `FEATURED_ARTISTS_IMAGE_IMPROVEMENTS.md`
-- `SHADECN_UI_REFACTOR_TASKS.md`
-- `COMPONENT_REFACTORING.md`
-- `PLAN-releases-page.md`
+**Status: Archived 2026-01-30** - 19 stale planning docs moved to `docs/archive/`:
+- `PERFORMANCE_ISSUES_REPORT.md`, `PROGRESSIVE_ONBOARDING.md`, `SHADECN_UI_REFACTOR_TASKS.md`
+- `PLAN-releases-page.md`, `COMPONENT_REFACTORING.md`, `FEATURED_ARTISTS_IMAGE_IMPROVEMENTS.md`
+- `ARTIST_CAROUSEL.md`, `ARTIST_PROFILE_ENHANCEMENTS.md`, `ARTIST_PROFILE_UPDATES.md`
+- `ARTIST_IMAGE_MAINTENANCE.md`, `AUTH_MIGRATION_SUMMARY.md`, `DASHBOARD_LAYOUT_PATTERNS.md`
+- `DROPDOWN_MIGRATION_SUMMARY.md`, `HOMEPAGE_PERFORMANCE_TASKS.md`, `PERFORMANCE_ENHANCEMENTS.md`
+- `PERFORMANCE_ISSUES_AUDIT.md`, `SEO_ENHANCEMENTS.md`, `TEST_PERFORMANCE_OPTIMIZATION.md`
+- `PLAN-clerk-elements-migration.md`
 
 ---
 
@@ -189,6 +186,7 @@ Review and archive if completed:
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-01-30 | Claude | Reviewed exhaustive-deps suppressions; archived 19 stale docs; deleted 4 deprecated files with no consumers; migrated 4 imports from deprecated paths |
 | 2026-01-03 | Claude | Initial tracker created from tech debt audit |
 | 2026-01-03 | Claude | Resolved P0: `@ts-nocheck` and empty catch block |
 | 2026-01-08 | Codex | Logged removal of dead waitlist status checks |

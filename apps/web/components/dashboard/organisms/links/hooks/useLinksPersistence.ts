@@ -384,7 +384,7 @@ export function useLinksPersistence({
     return () => {
       debouncedSave.flush();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Cleanup-only effect: runs once on unmount to flush pending saves
   }, []);
 
   return {

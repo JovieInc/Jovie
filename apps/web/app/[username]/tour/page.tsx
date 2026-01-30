@@ -6,7 +6,7 @@ import { cache } from 'react';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { PROFILE_URL } from '@/constants/app';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { TourDatesList } from './TourDatesList';
 
 interface Props {

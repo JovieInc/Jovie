@@ -2,7 +2,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/app/(shell)/dashboard/actions';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 
