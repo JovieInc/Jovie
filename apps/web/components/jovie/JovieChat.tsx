@@ -190,105 +190,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
 
   return (
     <div className='flex h-full flex-col'>
-      {!hasMessages ? (
-        // Empty state - centered content
-        <div className='flex flex-1 flex-col items-center justify-center px-4'>
-          <div className='w-full max-w-2xl space-y-8'>
-            {/* Error display */}
-            {chatError && (
-              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
-                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-                <div className='flex-1'>
-                  <p className='text-sm font-medium text-primary-token'>
-                    {chatError.message}
-                  </p>
-                  {chatError.retryAfter && (
-                    <p className='mt-1 text-xs text-secondary-token'>
-                      Try again in {chatError.retryAfter} seconds
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Input */}
-            <form onSubmit={handleSubmit} className='relative'>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder='What do you wanna ask Jovie?'
-                className={cn(
-                  'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-14',
-                  'text-primary-token placeholder:text-tertiary-token',
-                  'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
-                  'transition-colors duration-fast',
-                  'min-h-[120px]',
-                  isOverLimit
-                    ? 'border-error focus:border-error focus:ring-error/20'
-                    : 'border-subtle focus:border-accent focus:ring-accent/20'
-                )}
-                onKeyDown={handleKeyDown}
-                maxLength={MAX_MESSAGE_LENGTH + 100} // Allow slight overflow for UX
-                aria-label='Chat message input'
-                aria-describedby={isOverLimit ? 'char-limit-error' : undefined}
-              />
-              <Button
-                type='submit'
-                size='icon'
-                disabled={
-                  !input.trim() || isLoading || isSubmitting || isOverLimit
-                }
-                className='absolute bottom-3 right-3 h-10 w-10 rounded-lg'
-                aria-label='Send message'
-              >
-                {isLoading || isSubmitting ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
-                  <ArrowUp className='h-4 w-4' />
-                )}
-              </Button>
-
-              {/* Character count */}
-              {isNearLimit && (
-                <div
-                  id='char-limit-error'
-                  className={cn(
-                    'absolute bottom-3 left-3 text-xs',
-                    isOverLimit ? 'text-error' : 'text-tertiary-token'
-                  )}
-                >
-                  {characterCount}/{MAX_MESSAGE_LENGTH}
-                </div>
-              )}
-            </form>
-
-            {/* Suggested prompts */}
-            <div className='space-y-3'>
-              <p className='text-center text-sm text-tertiary-token'>
-                Try asking about:
-              </p>
-              <div className='flex flex-wrap justify-center gap-2'>
-                {SUGGESTED_PROMPTS.map(prompt => (
-                  <button
-                    key={prompt}
-                    type='button'
-                    onClick={() => handleSuggestedPrompt(prompt)}
-                    className={cn(
-                      'rounded-full border border-subtle bg-surface-1 px-4 py-2 text-sm',
-                      'text-secondary-token transition-colors duration-fast',
-                      'hover:border-default hover:bg-surface-2 hover:text-primary-token',
-                      'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2'
-                    )}
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
+      {hasMessages ? (
         // Chat view - messages + input at bottom
         <>
           {/* Messages area */}
@@ -415,6 +317,104 @@ export function JovieChat({ artistContext }: JovieChatProps) {
             </form>
           </div>
         </>
+      ) : (
+        // Empty state - centered content
+        <div className='flex flex-1 flex-col items-center justify-center px-4'>
+          <div className='w-full max-w-2xl space-y-8'>
+            {/* Error display */}
+            {chatError && (
+              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
+                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                <div className='flex-1'>
+                  <p className='text-sm font-medium text-primary-token'>
+                    {chatError.message}
+                  </p>
+                  {chatError.retryAfter && (
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      Try again in {chatError.retryAfter} seconds
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Input */}
+            <form onSubmit={handleSubmit} className='relative'>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder='What do you wanna ask Jovie?'
+                className={cn(
+                  'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-14',
+                  'text-primary-token placeholder:text-tertiary-token',
+                  'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
+                  'transition-colors duration-fast',
+                  'min-h-[120px]',
+                  isOverLimit
+                    ? 'border-error focus:border-error focus:ring-error/20'
+                    : 'border-subtle focus:border-accent focus:ring-accent/20'
+                )}
+                onKeyDown={handleKeyDown}
+                maxLength={MAX_MESSAGE_LENGTH + 100} // Allow slight overflow for UX
+                aria-label='Chat message input'
+                aria-describedby={isOverLimit ? 'char-limit-error' : undefined}
+              />
+              <Button
+                type='submit'
+                size='icon'
+                disabled={
+                  !input.trim() || isLoading || isSubmitting || isOverLimit
+                }
+                className='absolute bottom-3 right-3 h-10 w-10 rounded-lg'
+                aria-label='Send message'
+              >
+                {isLoading || isSubmitting ? (
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                ) : (
+                  <ArrowUp className='h-4 w-4' />
+                )}
+              </Button>
+
+              {/* Character count */}
+              {isNearLimit && (
+                <div
+                  id='char-limit-error'
+                  className={cn(
+                    'absolute bottom-3 left-3 text-xs',
+                    isOverLimit ? 'text-error' : 'text-tertiary-token'
+                  )}
+                >
+                  {characterCount}/{MAX_MESSAGE_LENGTH}
+                </div>
+              )}
+            </form>
+
+            {/* Suggested prompts */}
+            <div className='space-y-3'>
+              <p className='text-center text-sm text-tertiary-token'>
+                Try asking about:
+              </p>
+              <div className='flex flex-wrap justify-center gap-2'>
+                {SUGGESTED_PROMPTS.map(prompt => (
+                  <button
+                    key={prompt}
+                    type='button'
+                    onClick={() => handleSuggestedPrompt(prompt)}
+                    className={cn(
+                      'rounded-full border border-subtle bg-surface-1 px-4 py-2 text-sm',
+                      'text-secondary-token transition-colors duration-fast',
+                      'hover:border-default hover:bg-surface-2 hover:text-primary-token',
+                      'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2'
+                    )}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

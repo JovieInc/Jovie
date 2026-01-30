@@ -50,7 +50,7 @@ export function TableHeaderCell<TData>({
       aria-sort={ariaSort}
       className={cn(stickyHeaderClass)}
       style={{
-        width: header.getSize() !== 150 ? header.getSize() : undefined,
+        width: header.getSize() === 150 ? undefined : header.getSize(),
       }}
     >
       {(() => {

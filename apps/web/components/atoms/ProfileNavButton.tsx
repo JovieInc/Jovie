@@ -106,11 +106,11 @@ export function ProfileNavButton({
             Copy profile link
           </DropdownMenuItem>
 
-          {!hideBranding ? (
+          {hideBranding ? null : (
             <DropdownMenuItem asChild>
               <Link href='/waitlist'>Claim your profile</Link>
             </DropdownMenuItem>
-          ) : null}
+          )}
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Legal</DropdownMenuSubTrigger>

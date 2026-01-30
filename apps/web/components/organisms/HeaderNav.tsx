@@ -43,7 +43,9 @@ export function HeaderNav({
             <LogoLink logoSize={logoSize} variant={logoVariant} />
           </div>
 
-          {!hideNav ? (
+          {hideNav ? (
+            <div className='flex-1' aria-hidden='true' />
+          ) : (
             <>
               {/* Navigation - Center (hidden on mobile) */}
               <div className='hidden md:flex flex-1 justify-center ml-8'>
@@ -51,11 +53,11 @@ export function HeaderNav({
                   className='flex items-center'
                   aria-label='Primary navigation'
                 >
-                  {!hidePricingLink ? (
+                  {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
                     </Link>
-                  ) : null}
+                  )}
                 </nav>
               </div>
 
@@ -65,16 +67,14 @@ export function HeaderNav({
                   className='flex items-center'
                   aria-label='Primary navigation'
                 >
-                  {!hidePricingLink ? (
+                  {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
                     </Link>
-                  ) : null}
+                  )}
                 </nav>
               </div>
             </>
-          ) : (
-            <div className='flex-1' aria-hidden='true' />
           )}
 
           {/* Actions - Right side */}

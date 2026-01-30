@@ -168,9 +168,9 @@ export async function updateUserBillingStatus(
       plan: effectivePlan,
       stripeCustomerId: stripeCustomerId ?? currentUser.stripeCustomerId,
       stripeSubscriptionId:
-        stripeSubscriptionId !== undefined
-          ? stripeSubscriptionId
-          : currentUser.stripeSubscriptionId,
+        stripeSubscriptionId === undefined
+          ? currentUser.stripeSubscriptionId
+          : stripeSubscriptionId,
     };
 
     // Optimistic locking: Only update if billingVersion hasn't changed
@@ -342,9 +342,9 @@ async function retryUpdateWithFreshData(
           plan: effectivePlan,
           stripeCustomerId: stripeCustomerId ?? freshUser.stripeCustomerId,
           stripeSubscriptionId:
-            stripeSubscriptionId !== undefined
-              ? stripeSubscriptionId
-              : freshUser.stripeSubscriptionId,
+            stripeSubscriptionId === undefined
+              ? freshUser.stripeSubscriptionId
+              : stripeSubscriptionId,
         },
         stripeEventId,
         source,

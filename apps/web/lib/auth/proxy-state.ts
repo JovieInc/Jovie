@@ -102,14 +102,8 @@ export async function getUserState(
 
     let userState: ProxyUserState;
 
-    // No DB user → needs waitlist/signup
-    if (!result?.dbUserId) {
-      userState = {
-        needsWaitlist: true,
-        needsOnboarding: false,
-        isActive: false,
-      };
-    } else {
+    // DB user exists → check lifecycle state
+    if (result?.dbUserId) {
       // Check waitlist approval using userStatus lifecycle
       // userStatus progression: waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
       const isWaitlistApproved =
@@ -139,6 +133,13 @@ export async function getUserState(
           isActive: true,
         };
       }
+    } else {
+      // No DB user → needs waitlist/signup
+      userState = {
+        needsWaitlist: true,
+        needsOnboarding: false,
+        isActive: false,
+      };
     }
 
     // Cache the result in Redis (fire-and-forget)

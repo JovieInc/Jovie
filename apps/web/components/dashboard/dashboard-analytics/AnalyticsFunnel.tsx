@@ -80,7 +80,7 @@ export function AnalyticsFunnel({
                   relative overflow-hidden rounded-xl border border-subtle
                   bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]
                   px-6 py-5 text-center
-                  ${!isLast ? 'hover:border-[var(--color-border-default)]' : ''}
+                  ${isLast ? '' : 'hover:border-[var(--color-border-default)]'}
                   ${isLast ? 'ring-2 ring-accent/20 border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)]' : ''}
                   transition-all duration-200
                 `}

@@ -67,7 +67,7 @@ export function TipSection({
   // If no payment methods are supported, show QR fallback
   if (!onStripePayment && !venmoLink) {
     const currentUrl =
-      typeof window !== 'undefined' ? window.location.href : '';
+      typeof window === 'undefined' ? '' : window.location.href;
     return (
       <div className={`text-center space-y-4 ${className}`}>
         <QRCodeCard

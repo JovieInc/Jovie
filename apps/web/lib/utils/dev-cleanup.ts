@@ -148,9 +148,9 @@ export function startDevMemoryMonitor(options?: {
   const intervalMs = options?.intervalMs ?? 60_000;
   // Use bracket notation to avoid Edge Runtime static analyzer detecting Node.js API
   const memUsage =
-    typeof process !== 'undefined'
-      ? (process as { memoryUsage?: () => NodeJS.MemoryUsage })['memoryUsage']
-      : undefined;
+    typeof process === 'undefined'
+      ? undefined
+      : (process as { memoryUsage?: () => NodeJS.MemoryUsage })['memoryUsage'];
 
   if (typeof memUsage !== 'function') {
     return;

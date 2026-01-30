@@ -174,7 +174,7 @@ export async function getAdminUsageSeries(
     const rawRows = (result as { rows?: Record<string, unknown>[] }).rows ?? [];
     rows = rawRows.map(row => ({
       date: String(row.date),
-      activeUsers: row.active_users != null ? Number(row.active_users) : null,
+      activeUsers: row.active_users == null ? null : Number(row.active_users),
     }));
   } catch (error) {
     captureError('Error loading admin usage series', error, { days });

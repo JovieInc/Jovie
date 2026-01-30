@@ -350,7 +350,7 @@ const TableRow = memo(function TableRow<TData>({
           className={presets.tableCell}
           style={{
             width:
-              cell.column.getSize() !== 150 ? cell.column.getSize() : undefined,
+              cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
           }}
         >
           {flexRender(cell.column.columnDef.cell, cell.getContext())}

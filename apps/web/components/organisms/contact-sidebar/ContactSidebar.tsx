@@ -124,11 +124,7 @@ export const ContactSidebar = memo(function ContactSidebar({
       />
 
       <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-        {!contact ? (
-          <p className='text-xs text-sidebar-muted'>
-            Select a row in the table and press Space to view contact details.
-          </p>
-        ) : (
+        {contact ? (
           <>
             <ContactAvatar
               avatarUrl={contact.avatarUrl ?? null}
@@ -175,6 +171,10 @@ export const ContactSidebar = memo(function ContactSidebar({
               </div>
             )}
           </>
+        ) : (
+          <p className='text-xs text-sidebar-muted'>
+            Select a row in the table and press Space to view contact details.
+          </p>
         )}
       </div>
     </RightDrawer>
