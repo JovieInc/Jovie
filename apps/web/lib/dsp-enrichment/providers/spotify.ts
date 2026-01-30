@@ -361,7 +361,7 @@ export function extractSpotifyImageUrls(
       const prevDiff = Math.abs((prev.height || 0) - targetSize);
       const currDiff = Math.abs((curr.height || 0) - targetSize);
       return currDiff < prevDiff ? curr : prev;
-    });
+    }, sorted[0]);
   };
 
   return {
