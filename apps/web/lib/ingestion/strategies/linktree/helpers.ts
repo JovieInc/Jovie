@@ -78,8 +78,8 @@ export function extractStructuredLinks(
       if (!query || typeof query !== 'object') continue;
       const data = (query as { state?: { data?: unknown } }).state?.data;
       if (data && typeof data === 'object') {
-        candidateCollections.push((data as { links?: unknown }).links);
         candidateCollections.push(
+          (data as { links?: unknown }).links,
           (data as { page?: { links?: unknown } }).page?.links
         );
       }

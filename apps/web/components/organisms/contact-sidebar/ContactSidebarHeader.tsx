@@ -93,27 +93,27 @@ export function ContactSidebarHeader({
       onClick: handleCopyProfileUrl,
     });
 
-    // Refresh - overflow action
-    overflowActions.push({
-      id: 'refresh',
-      label: 'Refresh profile',
-      icon: RefreshCw,
-      onClick: () => {
-        if (onRefresh) {
-          onRefresh();
-          return;
-        }
-        window.location.reload();
+    // Refresh and Open profile - overflow actions
+    overflowActions.push(
+      {
+        id: 'refresh',
+        label: 'Refresh profile',
+        icon: RefreshCw,
+        onClick: () => {
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          window.location.reload();
+        },
       },
-    });
-
-    // Open profile - overflow action
-    overflowActions.push({
-      id: 'open',
-      label: 'Open profile',
-      icon: ExternalLink,
-      href: `/${contact!.username}`,
-    });
+      {
+        id: 'open',
+        label: 'Open profile',
+        icon: ExternalLink,
+        href: `/${contact!.username}`,
+      }
+    );
   }
 
   return (

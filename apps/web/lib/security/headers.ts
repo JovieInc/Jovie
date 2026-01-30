@@ -227,8 +227,7 @@ export function buildBaseSecurityHeaders(
   // - HSTS: Setting on localhost causes persistent browser HTTPS issues
   // - COOP: May cause development issues with cross-origin resources
   if (includeProductionHeaders) {
-    headers.push(STRICT_TRANSPORT_SECURITY);
-    headers.push(CROSS_ORIGIN_OPENER_POLICY);
+    headers.push(STRICT_TRANSPORT_SECURITY, CROSS_ORIGIN_OPENER_POLICY);
   }
 
   return headers;

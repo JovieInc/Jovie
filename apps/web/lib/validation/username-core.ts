@@ -337,16 +337,16 @@ export function generateUsernameSuggestions(
       .replaceAll(/(^-)|(-$)/g, '');
 
     if (artistSlug) {
-      suggestions.push(artistSlug);
-      suggestions.push(`${artistSlug}-music`);
-      suggestions.push(`${artistSlug}-official`);
+      suggestions.push(
+        artistSlug,
+        `${artistSlug}-music`,
+        `${artistSlug}-official`
+      );
     }
   }
 
   if (base) {
-    suggestions.push(`${base}-music`);
-    suggestions.push(`${base}-official`);
-    suggestions.push(`${base}-artist`);
+    suggestions.push(`${base}-music`, `${base}-official`, `${base}-artist`);
 
     // Add numbered variations
     for (let i = 1; i <= 3; i++) {
