@@ -7,7 +7,7 @@
 
 import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import {
   creatorContacts,
   creatorProfiles,
@@ -33,7 +33,7 @@ import {
  * @returns The calculated score and breakdown, or null if profile not found
  */
 export async function calculateAndStoreFitScore(
-  db: DbType,
+  db: DbOrTransaction,
   creatorProfileId: string
 ): Promise<{ score: number; breakdown: FitScoreBreakdown } | null> {
   // Fetch profile data with additional DSP IDs
@@ -148,7 +148,7 @@ export async function calculateAndStoreFitScore(
  * @returns Number of profiles scored
  */
 export async function calculateMissingFitScores(
-  db: DbType,
+  db: DbOrTransaction,
   limit = 100
 ): Promise<number> {
   const profiles = await db
@@ -237,7 +237,7 @@ export async function calculateMissingFitScores(
  * @returns Total number of profiles scored
  */
 export async function recalculateAllFitScores(
-  db: DbType,
+  db: DbOrTransaction,
   batchSize = 100
 ): Promise<number> {
   let totalScored = 0;
@@ -277,7 +277,7 @@ export async function recalculateAllFitScores(
  * @returns Array of profiles sorted by fit score descending
  */
 export async function getTopFitProfiles(
-  db: DbType,
+  db: DbOrTransaction,
   limit = 50,
   minScore = 0
 ): Promise<
@@ -322,7 +322,7 @@ export async function getTopFitProfiles(
  * @param hasPaidTier - Whether the link-in-bio has no branding (paid tier)
  */
 export async function updatePaidTierScore(
-  db: DbType,
+  db: DbOrTransaction,
   creatorProfileId: string,
   hasPaidTier: boolean
 ): Promise<void> {

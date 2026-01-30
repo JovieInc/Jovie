@@ -5,12 +5,15 @@ import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import path from 'path';
 import { beforeAll } from 'vitest';
 import ws from 'ws';
+import type { DbType } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 
 // Configure WebSocket for transaction support in tests
+// Tests use WebSocket driver (not HTTP) for proper transaction support during migrations
 neonConfig.webSocketConstructor = ws;
 
 let dbSetupComplete = false;
+// Tests use WebSocket driver internally for transaction support
 let db: NeonDatabase<typeof schema> | null = null;
 
 /**
@@ -73,7 +76,8 @@ export async function setupDatabase() {
     await db.execute('SET row_security = on;');
 
     // Make db available globally for tests
-    globalThis.db = db;
+    // Cast to DbType for compatibility - tests use WebSocket driver for transaction support
+    globalThis.db = db as unknown as DbType;
     dbSetupComplete = true;
 
     return db;

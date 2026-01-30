@@ -2,12 +2,12 @@ import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { type IsolationLevel, validateClerkUserId } from '@/lib/auth/session';
-import { type DbType, db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 
 export const SYSTEM_INGESTION_USER = 'system_ingestion';
 
 export async function withSystemIngestionSession<T>(
-  operation: (tx: DbType) => Promise<T>,
+  operation: (tx: DbOrTransaction) => Promise<T>,
   options?: { isolationLevel?: IsolationLevel }
 ): Promise<T> {
   validateClerkUserId(SYSTEM_INGESTION_USER);

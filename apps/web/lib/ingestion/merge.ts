@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { type DbType, socialLinks } from '@/lib/db';
+import { type DbOrTransaction, socialLinks } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
@@ -26,7 +26,7 @@ export { mergeEvidence } from './services/evidence-merger';
 
 // Process an existing link update
 async function processExistingLink(
-  tx: DbType,
+  tx: DbOrTransaction,
   existing: SocialLinkRow,
   link: {
     url: string;
@@ -77,7 +77,7 @@ async function processExistingLink(
 
 // Insert a new link
 interface InsertNewLinkOptions {
-  tx: DbType;
+  tx: DbOrTransaction;
   profileId: string;
   link: { url: string; title?: string | null; sourcePlatform?: string };
   detected: {
@@ -173,7 +173,7 @@ export function createInMemorySocialLinkRow({
  * Uses modular services to reduce cognitive complexity.
  */
 export async function normalizeAndMergeExtraction(
-  tx: DbType,
+  tx: DbOrTransaction,
   profile: {
     id: string;
     usernameNormalized: string | null;

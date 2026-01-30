@@ -1,5 +1,5 @@
 import { and, eq, inArray, lte } from 'drizzle-orm';
-import { creatorProfiles, type DbType } from '@/lib/db';
+import { creatorProfiles, type DbOrTransaction } from '@/lib/db';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -27,7 +27,7 @@ export const IngestionStatusManager = {
   /**
    * Mark a profile as processing (ingestion has started)
    */
-  async markProcessing(tx: DbType, profileId: string): Promise<void> {
+  async markProcessing(tx: DbOrTransaction, profileId: string): Promise<void> {
     logger.debug('Ingestion status: processing', { profileId });
     await tx
       .update(creatorProfiles)
@@ -38,7 +38,7 @@ export const IngestionStatusManager = {
   /**
    * Mark a profile as idle (ingestion completed successfully)
    */
-  async markIdle(tx: DbType, profileId: string): Promise<void> {
+  async markIdle(tx: DbOrTransaction, profileId: string): Promise<void> {
     logger.debug('Ingestion status: idle', { profileId });
     await tx
       .update(creatorProfiles)
@@ -50,7 +50,7 @@ export const IngestionStatusManager = {
    * Mark a profile as failed with an error message
    */
   async markFailed(
-    tx: DbType,
+    tx: DbOrTransaction,
     profileId: string,
     errorMessage: string
   ): Promise<void> {
@@ -68,7 +68,7 @@ export const IngestionStatusManager = {
   /**
    * Mark a profile as pending (queued for ingestion)
    */
-  async markPending(tx: DbType, profileId: string): Promise<void> {
+  async markPending(tx: DbOrTransaction, profileId: string): Promise<void> {
     logger.debug('Ingestion status: pending', { profileId });
     await tx
       .update(creatorProfiles)
@@ -79,7 +79,10 @@ export const IngestionStatusManager = {
   /**
    * Mark multiple profiles as pending (bulk operation)
    */
-  async markPendingBulk(tx: DbType, profileIds: string[]): Promise<void> {
+  async markPendingBulk(
+    tx: DbOrTransaction,
+    profileIds: string[]
+  ): Promise<void> {
     if (profileIds.length === 0) return;
     logger.debug('Ingestion status: pending (bulk)', {
       count: profileIds.length,
@@ -94,7 +97,7 @@ export const IngestionStatusManager = {
    * Mark a profile as idle or failed based on whether an error occurred
    */
   async markIdleOrFailed(
-    tx: DbType,
+    tx: DbOrTransaction,
     profileId: string,
     error: string | null
   ): Promise<void> {
@@ -111,7 +114,7 @@ export const IngestionStatusManager = {
    */
   // NOSONAR S2301: Boolean parameter is intentional - called from single location with computed value
   async handleJobFailure(
-    tx: DbType,
+    tx: DbOrTransaction,
     profileId: string,
     shouldRetry: boolean,
     errorMessage: string
@@ -144,7 +147,7 @@ export const IngestionStatusManager = {
    * for better performance.
    */
   async handleStuckJobs(
-    tx: DbType,
+    tx: DbOrTransaction,
     profileIds: string[],
     stuckBefore: Date,
     errorMessage: string = 'Processing timeout; requeued'

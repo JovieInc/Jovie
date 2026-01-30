@@ -7,7 +7,7 @@
 
 import { sql as drizzleSql, isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import type { DbType } from '@/lib/db';
+import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 import { handleOrphanedSubscription } from './orphaned-subscription-handler';
@@ -61,7 +61,7 @@ export interface ReconciliationStats {
  * Fetch a batch of users with subscriptions using cursor-based pagination
  */
 export async function fetchUserBatch(
-  db: DbType,
+  db: DbOrTransaction,
   lastUserId: string | null
 ): Promise<UserBatchItem[]> {
   return db
@@ -86,7 +86,7 @@ export async function fetchUserBatch(
  * Handle subscription retrieval errors
  */
 async function handleRetrievalError(
-  db: DbType,
+  db: DbOrTransaction,
   user: UserBatchItem,
   retrievalError: { type: string; message: string }
 ): Promise<ProcessUserResult> {
@@ -142,7 +142,7 @@ async function handleMismatch(
  * Process a single user for reconciliation
  */
 export async function processSingleUser(
-  db: DbType,
+  db: DbOrTransaction,
   stripe: Stripe,
   user: UserBatchItem
 ): Promise<ProcessUserResult> {
