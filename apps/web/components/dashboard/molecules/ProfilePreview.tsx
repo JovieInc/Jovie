@@ -5,17 +5,17 @@ import { cn } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
 export interface ProfilePreviewProps {
-  username: string;
-  displayName: string;
-  avatarUrl?: string | null;
-  links: Array<{
-    id: string;
-    title: string;
-    url: string;
-    platform: string;
-    isVisible: boolean;
+  readonly username: string;
+  readonly displayName: string;
+  readonly avatarUrl?: string | null;
+  readonly links: Array<{
+    readonly id: string;
+    readonly title: string;
+    readonly url: string;
+    readonly platform: string;
+    readonly isVisible: boolean;
   }>;
-  className?: string;
+  readonly className?: string;
 }
 
 export function ProfilePreview({

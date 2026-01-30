@@ -3,18 +3,18 @@ import { cn } from '@/lib/utils';
 import { cardTokens } from '../tokens/card-tokens';
 
 interface DashboardCardProps {
-  variant?:
+  readonly variant?:
     | 'default'
     | 'interactive'
     | 'settings'
     | 'analytics'
     | 'empty-state'
     | 'onboarding';
-  children: React.ReactNode;
-  className?: string;
-  onClick?: () => void;
-  hover?: boolean;
-  padding?: 'default' | 'large' | 'compact';
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly onClick?: () => void;
+  readonly hover?: boolean;
+  readonly padding?: 'default' | 'large' | 'compact';
 }
 
 export function DashboardCard({

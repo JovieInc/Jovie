@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 import type { AudienceAction } from '@/types';
 
 export interface AudienceActionsCellProps {
-  rowId: string;
-  actions: AudienceAction[];
-  maxActions?: number;
-  className?: string;
+  readonly rowId: string;
+  readonly actions: AudienceAction[];
+  readonly maxActions?: number;
+  readonly className?: string;
 }
 
 function resolveAudienceActionIcon(label: string): string {

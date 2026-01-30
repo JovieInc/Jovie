@@ -3,15 +3,15 @@ import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AnalyticsCardProps {
-  title: string;
-  value: number | string;
-  metadata?: ReactNode;
-  order?: string;
-  icon?: ComponentType<SVGProps<SVGSVGElement>>;
-  iconClassName?: string;
-  iconChipClassName?: string;
-  headerRight?: ReactNode;
-  children?: ReactNode;
+  readonly title: string;
+  readonly value: number | string;
+  readonly metadata?: ReactNode;
+  readonly order?: string;
+  readonly icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  readonly iconClassName?: string;
+  readonly iconChipClassName?: string;
+  readonly headerRight?: ReactNode;
+  readonly children?: ReactNode;
 }
 
 const FallbackIcon = BarChart3;

@@ -14,9 +14,9 @@ import {
 } from '@/components/organisms/Dialog';
 
 interface DashboardFeedbackModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit?: (feedback: string) => void | Promise<void>;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSubmit?: (feedback: string) => void | Promise<void>;
 }
 
 export function DashboardFeedbackModal({

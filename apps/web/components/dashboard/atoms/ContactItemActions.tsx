@@ -3,10 +3,10 @@
 import { Button } from '@jovie/ui';
 
 export interface ContactItemActionsProps {
-  isSaving?: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
+  readonly isSaving?: boolean;
+  readonly onSave: () => void;
+  readonly onCancel: () => void;
+  readonly onDelete: () => void;
 }
 
 export function ContactItemActions({

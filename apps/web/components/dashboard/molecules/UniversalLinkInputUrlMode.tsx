@@ -28,26 +28,28 @@ function getLinkDetectionStatus(
 }
 
 interface UniversalLinkInputUrlModeProps {
-  url: string;
-  placeholder: string;
-  disabled?: boolean;
-  detectedLink: DetectedLink | null;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onUrlChange: (value: string) => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
-  onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
-  onClear: () => void;
-  onPlatformSelect: (platform: (typeof PLATFORM_OPTIONS)[number]) => void;
-  onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
-  onRestoreFocus: (cursor?: CursorPosition) => void;
-  onFocus?: (event: React.FocusEvent<HTMLInputElement>) => void;
-  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
+  readonly url: string;
+  readonly placeholder: string;
+  readonly disabled?: boolean;
+  readonly detectedLink: DetectedLink | null;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly onUrlChange: (value: string) => void;
+  readonly onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
+  readonly onPaste?: (event: React.ClipboardEvent<HTMLInputElement>) => void;
+  readonly onClear: () => void;
+  readonly onPlatformSelect: (
+    platform: (typeof PLATFORM_OPTIONS)[number]
+  ) => void;
+  readonly onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
+  readonly onRestoreFocus: (cursor?: CursorPosition) => void;
+  readonly onFocus?: (event: React.FocusEvent<HTMLInputElement>) => void;
+  readonly onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
   /** When true, changes border radius to connect seamlessly with dropdown below */
-  isDropdownOpen?: boolean;
-  comboboxAria?: {
-    role?: 'combobox';
-    ariaExpanded?: boolean;
-    ariaControls?: string;
+  readonly isDropdownOpen?: boolean;
+  readonly comboboxAria?: {
+    readonly role?: 'combobox';
+    readonly ariaExpanded?: boolean;
+    readonly ariaControls?: string;
     ariaActivedescendant?: string;
     ariaAutocomplete?: 'list';
   };

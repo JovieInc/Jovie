@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 import type { AudienceIntentLevel } from '@/types';
 
 export interface AudienceVisitsCellProps {
-  visits: number;
-  intentLevel: AudienceIntentLevel;
-  className?: string;
+  readonly visits: number;
+  readonly intentLevel: AudienceIntentLevel;
+  readonly className?: string;
 }
 
 export function AudienceVisitsCell({

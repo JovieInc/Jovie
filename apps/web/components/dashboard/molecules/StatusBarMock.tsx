@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 
 export interface StatusBarMockProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function StatusBarMock({ className }: StatusBarMockProps) {

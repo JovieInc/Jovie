@@ -35,8 +35,8 @@ export function useDashboardOverviewControls(): DashboardOverviewControlsValue {
 }
 
 export interface DashboardOverviewControlsProviderProps {
-  children: ReactNode;
-  defaultRange?: DashboardOverviewRange;
+  readonly children: ReactNode;
+  readonly defaultRange?: DashboardOverviewRange;
 }
 
 export function DashboardOverviewControlsProvider({

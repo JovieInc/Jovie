@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export interface DashboardRemoveBrandingCardProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function DashboardRemoveBrandingCard({
