@@ -112,13 +112,13 @@ export const IngestionStatusManager = {
    * Handle job failure with retry logic
    * Only marks as failed if shouldRetry is false
    */
-  // NOSONAR S2301: Boolean parameter is intentional - called from single location with computed value
   async handleJobFailure(
     tx: DbOrTransaction,
     profileId: string,
     shouldRetry: boolean,
     errorMessage: string
   ): Promise<void> {
+    // NOSONAR S2301: Boolean parameter is intentional - called from single location with computed value
     if (shouldRetry) {
       // Update error message but keep status (job will be retried)
       logger.debug('Ingestion error (will retry)', {
