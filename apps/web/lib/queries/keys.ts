@@ -210,6 +210,14 @@ export const queryKeys = {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
   },
+
+  // Campaign invite queries (admin)
+  campaign: {
+    all: ['campaign-invites'] as const,
+    preview: (threshold: number, limit: number) =>
+      [...queryKeys.campaign.all, 'preview', { threshold, limit }] as const,
+    stats: () => [...queryKeys.campaign.all, 'stats'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

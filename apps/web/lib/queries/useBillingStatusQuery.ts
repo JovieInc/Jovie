@@ -67,3 +67,28 @@ export function useBillingStatusQuery() {
     ...FREQUENT_CACHE,
   });
 }
+
+/**
+ * Lightweight hook that only subscribes to the isPro status.
+ * Components using this will only re-render when isPro changes,
+ * not when other billing fields change.
+ *
+ * @example
+ * function UpgradeButton() {
+ *   const { data: isPro, isLoading } = useIsPro();
+ *   if (isLoading || isPro) return null;
+ *   return <Button>Upgrade to Pro</Button>;
+ * }
+ */
+export function useIsPro() {
+  return useQuery({
+    queryKey: queryKeys.billing.status(),
+    queryFn: fetchBillingStatus,
+    // FREQUENT_CACHE values (1 min stale, 10 min gc)
+    staleTime: 1 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    select: (data: BillingStatusData) => data.isPro,
+  });
+}

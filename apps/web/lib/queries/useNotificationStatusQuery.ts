@@ -41,15 +41,21 @@ export function useNotificationStatusQuery({
       email: emailValue,
       phone: phoneValue,
     }),
-    queryFn: () =>
-      getNotificationStatus({
-        artistId,
-        email: emailValue ?? undefined,
-        phone: phoneValue ?? undefined,
-      }),
+    queryFn: ({ signal }) =>
+      getNotificationStatus(
+        {
+          artistId,
+          email: emailValue ?? undefined,
+          phone: phoneValue ?? undefined,
+        },
+        signal
+      ),
+    // STANDARD_CACHE values (5 min stale, 30 min gc)
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
     enabled: enabled && Boolean(emailValue || phoneValue),
-    // STANDARD_CACHE: 5 min stale, 30 min gc
-    ...STANDARD_CACHE,
     retry: 2,
     retryDelay: getRetryDelay,
     // Prevent throwing on error - handle gracefully

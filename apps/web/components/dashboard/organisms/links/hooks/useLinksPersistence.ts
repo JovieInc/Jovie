@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
+import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
@@ -24,16 +25,12 @@ import {
 import { isIngestableUrl } from '../utils/platform-category';
 
 /**
- * Parse error message from a failed response
+ * Response type for social links save API
  */
-async function parseErrorMessage(response: Response): Promise<string> {
-  const data = (await response.json().catch(() => null)) as {
-    error?: string;
-  } | null;
-  if (data?.error && typeof data.error === 'string') {
-    return data.error;
-  }
-  return 'Failed to save links';
+interface SaveLinksResponse {
+  version?: number;
+  currentVersion?: number;
+  error?: string;
 }
 
 /**
@@ -229,42 +226,21 @@ export function useLinksPersistence({
           return;
         }
 
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            links: payload,
-            expectedVersion: linksVersion,
-          }),
-        });
-
-        // Handle 409 Conflict - links were modified elsewhere
-        if (response.status === 409) {
-          const conflictData = (await response.json().catch(() => null)) as {
-            currentVersion?: number;
-          } | null;
-          const conflictVersion = parseVersionFromBody(conflictData);
-          if (conflictVersion !== null) {
-            setLinksVersion(conflictVersion);
+        const successData = await fetchWithTimeout<SaveLinksResponse>(
+          '/api/dashboard/social-links',
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profileId,
+              links: payload,
+              expectedVersion: linksVersion,
+            }),
+            timeout: 15000, // 15s timeout for save operations
           }
-          toast.error(
-            'Your links were updated in another tab. Refreshing to show the latest version.',
-            { duration: 5000 }
-          );
-          await onSyncSuggestions?.();
-          return;
-        }
+        );
 
-        if (!response.ok) {
-          const message = await parseErrorMessage(response);
-          throw new Error(message);
-        }
-
-        // Parse success response and update version
-        const successData = (await response.json().catch(() => null)) as {
-          version?: number;
-        } | null;
+        // Update version from success response
         const newVersion = parseVersionFromBody(successData);
         if (newVersion !== null) {
           setLinksVersion(newVersion);
@@ -302,15 +278,33 @@ export function useLinksPersistence({
           `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
         );
       } catch (error) {
+        // Handle 409 Conflict - links were modified elsewhere
+        if (error instanceof FetchError && error.status === 409) {
+          toast.error(
+            'Your links were updated in another tab. Refreshing to show the latest version.',
+            { duration: 5000 }
+          );
+          await onSyncSuggestions?.();
+          return;
+        }
+
         void captureError('Failed to save social links', error, {
           profileId,
           linkCount: normalized.length,
           route: '/app/dashboard/links',
         });
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to save links. Please try again.';
+
+        // Extract user-friendly message
+        let message = 'Failed to save links. Please try again.';
+        if (error instanceof FetchError) {
+          if (error.status === 408) {
+            message = 'Request timed out. Please try again.';
+          } else if (error.status >= 500) {
+            message = 'Server error. Please try again later.';
+          }
+        } else if (error instanceof Error && error.message) {
+          message = error.message;
+        }
         toast.error(message);
       }
     },
