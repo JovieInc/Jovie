@@ -10,25 +10,25 @@ import { useThrottledCallback } from '@/lib/pacer';
 import { cn } from '@/lib/utils';
 
 interface ArtistContext {
-  displayName: string;
-  username: string;
-  bio: string | null;
-  genres: string[];
-  spotifyFollowers: number | null;
-  spotifyPopularity: number | null;
-  profileViews: number;
-  hasSocialLinks: boolean;
-  hasMusicLinks: boolean;
-  tippingStats: {
-    tipClicks: number;
-    tipsSubmitted: number;
-    totalReceivedCents: number;
-    monthReceivedCents: number;
+  readonly displayName: string;
+  readonly username: string;
+  readonly bio: string | null;
+  readonly genres: string[];
+  readonly spotifyFollowers: number | null;
+  readonly spotifyPopularity: number | null;
+  readonly profileViews: number;
+  readonly hasSocialLinks: boolean;
+  readonly hasMusicLinks: boolean;
+  readonly tippingStats: {
+    readonly tipClicks: number;
+    readonly tipsSubmitted: number;
+    readonly totalReceivedCents: number;
+    readonly monthReceivedCents: number;
   };
 }
 
 interface JovieChatProps {
-  artistContext: ArtistContext;
+  readonly artistContext: ArtistContext;
 }
 
 /** Maximum allowed message length */
@@ -56,8 +56,8 @@ function getMessageText(parts: Array<{ type: string; text?: string }>): string {
 }
 
 interface ChatError {
-  message: string;
-  retryAfter?: number;
+  readonly message: string;
+  readonly retryAfter?: number;
 }
 
 export function JovieChat({ artistContext }: JovieChatProps) {

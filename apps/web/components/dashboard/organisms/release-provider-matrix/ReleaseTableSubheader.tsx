@@ -24,9 +24,9 @@ export type PopularityLevel = 'low' | 'med' | 'high';
 
 /** Filter state for releases table */
 export interface ReleaseFilters {
-  releaseTypes: ReleaseType[];
-  popularity: PopularityLevel[];
-  labels: string[];
+  readonly releaseTypes: ReleaseType[];
+  readonly popularity: PopularityLevel[];
+  readonly labels: string[];
 }
 
 /** Default filter state */

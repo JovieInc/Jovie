@@ -11,10 +11,10 @@ import {
 } from '@/lib/queries/useTourDateMutations';
 
 interface TourDatesEmptyStateProps {
-  profileId: string;
-  hasApiKey: boolean;
-  onConnected?: (tourDates: TourDateViewModel[]) => void;
-  onApiKeySaved?: () => void;
+  readonly profileId: string;
+  readonly hasApiKey: boolean;
+  readonly onConnected?: (tourDates: TourDateViewModel[]) => void;
+  readonly onApiKeySaved?: () => void;
 }
 
 export function TourDatesEmptyState({

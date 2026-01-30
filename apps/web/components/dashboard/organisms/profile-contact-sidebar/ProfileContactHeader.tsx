@@ -3,9 +3,9 @@
 import { Avatar } from '@/components/atoms/Avatar/Avatar';
 
 export interface ProfileContactHeaderProps {
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
+  readonly displayName: string;
+  readonly username: string;
+  readonly avatarUrl: string | null;
 }
 
 export function ProfileContactHeader({
