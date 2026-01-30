@@ -9,6 +9,7 @@
  * moved to @/lib/db/server to comply with Next.js "use server" requirements.
  *
  * Non-async utilities are now in @/lib/db/server:
+ * - selectDashboardProfile()
  * - profileIsPublishable()
  * - createEmptyTippingStats()
  * - TippingStats interface
@@ -28,9 +29,6 @@ export {
   prefetchDashboardData,
 } from './dashboard-data';
 
-// Profile selection logic (server action only)
-export { selectDashboardProfile } from './profile-selection';
-
 // User dashboard settings server actions
 export { setSidebarCollapsed } from './settings';
 
@@ -41,6 +39,5 @@ export { getProfileSocialLinks } from './social-links';
 // - import type { DashboardData } from './dashboard-data';
 // - import type { DspPlatform, ProfileSocialLink } from './social-links';
 // - import { DSP_PLATFORMS } from './social-links';
-// - import type { TippingStats } from './tipping-stats';
-// - import { profileIsPublishable } from './profile-selection';
-// - import { createEmptyTippingStats } from './tipping-stats';
+// - import { selectDashboardProfile, profileIsPublishable, createEmptyTippingStats } from '@/lib/db/server';
+// - import type { TippingStats } from '@/lib/db/server';

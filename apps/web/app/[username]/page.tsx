@@ -11,7 +11,6 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { ConsentBanner, JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -19,6 +18,7 @@ import type {
 import { getLatestReleaseForProfile } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import {
+  getProfileWithLinks as getCreatorProfileWithLinks,
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from '@/lib/services/profile';
