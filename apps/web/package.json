@@ -92,7 +92,10 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "storybook:build": "storybook build",
-    "storybook:test": "test-storybook"
+    "storybook:test": "test-storybook",
+    "storybook:test:ci": "concurrently -k -s first -n 'SB,TEST' -c 'magenta,cyan' 'http-server storybook-static -p 6006 --silent' 'wait-on tcp:127.0.0.1:6006 && test-storybook --url http://127.0.0.1:6006'",
+    "test:a11y": "pnpm run storybook:build && pnpm run storybook:test:ci",
+    "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.23",
@@ -213,6 +216,7 @@
     "@vitest/coverage-v8": "^4.0.16",
     "autoprefixer": "^10.4.23",
     "axe-core": "^4.11.1",
+    "axe-playwright": "^2.2.2",
     "babel-plugin-react-compiler": "^19.1.0-rc.1",
     "danger": "^13.0.4",
     "drizzle-kit": "^0.31.8",
