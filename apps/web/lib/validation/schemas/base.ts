@@ -89,12 +89,12 @@ const PRIVATE_IP_PATTERNS = [
   // IPv6 patterns
   /^::1$/, // IPv6 loopback
   /^fe80:/i, // IPv6 link-local (fe80::/10)
-  /^fc[0-9a-f]{2}:/i, // IPv6 unique local fc00::/7 (fc00::/8)
-  /^fd[0-9a-f]{2}:/i, // IPv6 unique local fc00::/7 (fd00::/8)
+  /^fc[\da-f]{2}:/i, // IPv6 unique local fc00::/7 (fc00::/8)
+  /^fd[\da-f]{2}:/i, // IPv6 unique local fc00::/7 (fd00::/8)
   /^\[::1\]$/, // IPv6 loopback in bracket notation
   /^\[fe80:/i, // IPv6 link-local in bracket notation
-  /^\[fc[0-9a-f]{2}:/i, // IPv6 unique local in bracket notation
-  /^\[fd[0-9a-f]{2}:/i, // IPv6 unique local in bracket notation
+  /^\[fc[\da-f]{2}:/i, // IPv6 unique local in bracket notation
+  /^\[fd[\da-f]{2}:/i, // IPv6 unique local in bracket notation
 ];
 
 const BLOCKED_HOSTNAMES = new Set([
