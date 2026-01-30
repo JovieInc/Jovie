@@ -30,10 +30,10 @@ export function getQrCodeUrl(data: string, size: number) {
 }
 
 interface QRCodeProps {
-  data: string;
-  size?: number;
-  label?: string;
-  className?: string;
+  readonly data: string;
+  readonly size?: number;
+  readonly label?: string;
+  readonly className?: string;
 }
 
 export function QRCode({

@@ -2,11 +2,11 @@ import { cn } from '@/lib/utils';
 
 export interface SkipToContentProps {
   /** The ID of the target element to skip to (without the # prefix) */
-  targetId?: string;
+  readonly targetId?: string;
   /** The text to display in the skip link */
-  linkText?: string;
+  readonly linkText?: string;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

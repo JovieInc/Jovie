@@ -4,9 +4,9 @@ import { cn } from '@/lib/utils';
 
 interface LinearButtonProps
   extends Omit<ComponentPropsWithoutRef<'a'>, 'href'> {
-  variant?: 'primary' | 'secondary' | 'ghost';
-  href: string;
-  children: React.ReactNode;
+  readonly variant?: 'primary' | 'secondary' | 'ghost';
+  readonly href: string;
+  readonly children: React.ReactNode;
 }
 
 export const LinearButton = forwardRef<HTMLAnchorElement, LinearButtonProps>(

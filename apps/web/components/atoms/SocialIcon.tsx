@@ -34,11 +34,11 @@ import {
 // no-op
 
 interface SocialIconProps {
-  platform: string;
-  className?: string;
-  size?: number;
-  'aria-hidden'?: boolean;
-  'aria-label'?: string;
+  readonly platform: string;
+  readonly className?: string;
+  readonly size?: number;
+  readonly 'aria-hidden'?: boolean;
+  readonly 'aria-label'?: string;
 }
 
 // Map platform names to Simple Icons

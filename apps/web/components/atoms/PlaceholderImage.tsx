@@ -2,10 +2,10 @@ import { clsx } from 'clsx';
 import { forwardRef } from 'react';
 
 interface PlaceholderImageProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-  shape?: 'circle' | 'square' | 'rounded';
-  className?: string;
-  children?: React.ReactNode;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  readonly shape?: 'circle' | 'square' | 'rounded';
+  readonly className?: string;
+  readonly children?: React.ReactNode;
 }
 
 const sizeClasses = {

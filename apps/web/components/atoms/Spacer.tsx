@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils';
 
 interface SpacerProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  className?: string;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly className?: string;
 }
 
 const spacerSizes = {

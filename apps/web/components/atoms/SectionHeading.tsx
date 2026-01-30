@@ -2,12 +2,12 @@ import type { ElementType } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SectionHeadingProps {
-  level?: 1 | 2 | 3 | 4 | 5 | 6;
-  children: React.ReactNode;
-  className?: string;
-  align?: 'left' | 'center' | 'right';
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  id?: string;
+  readonly level?: 1 | 2 | 3 | 4 | 5 | 6;
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly align?: 'left' | 'center' | 'right';
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly id?: string;
 }
 
 export function SectionHeading({
