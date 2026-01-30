@@ -20,7 +20,7 @@ export function ErrorSummary({
   title = 'There is a problem',
   className,
   onFocusField,
-}: ErrorSummaryProps) {
+}: Readonly<ErrorSummaryProps>) {
   const errorCount = Object.keys(errors).length;
   const summaryRef = useRef<HTMLDivElement>(null);
 

@@ -27,7 +27,7 @@ export function TipSection({
   onStripePayment,
   onVenmoPayment,
   className = '',
-}: TipSectionProps) {
+}: Readonly<TipSectionProps>) {
   const [loading, setLoading] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'venmo' | null>(
     null

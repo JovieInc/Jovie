@@ -7,7 +7,6 @@ export interface KpiItemProps {
   metadata: ReactNode;
   icon: LucideIcon;
   iconClassName?: string;
-  iconChipClassName?: string;
 }
 
 export function KpiItem({

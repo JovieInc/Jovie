@@ -28,7 +28,7 @@ export function TourDatesManager({
   profileId,
   initialTourDates,
   connectionStatus,
-}: TourDatesManagerProps) {
+}: Readonly<TourDatesManagerProps>) {
   const [tourDates, setTourDates] =
     useState<TourDateViewModel[]>(initialTourDates);
   const [selectedTourDate, setSelectedTourDate] =

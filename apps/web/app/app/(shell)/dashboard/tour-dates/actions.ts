@@ -21,6 +21,8 @@ import { getDashboardData } from '../actions';
 // Types
 // ============================================================================
 
+type TicketStatus = 'available' | 'sold_out' | 'cancelled';
+
 export interface TourDateViewModel {
   id: string;
   profileId: string;
@@ -36,7 +38,7 @@ export interface TourDateViewModel {
   latitude: number | null;
   longitude: number | null;
   ticketUrl: string | null;
-  ticketStatus: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus: TicketStatus;
   lastSyncedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -512,7 +514,7 @@ export async function createTourDate(params: {
   region?: string;
   country: string;
   ticketUrl?: string;
-  ticketStatus?: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus?: TicketStatus;
 }): Promise<TourDateViewModel> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -526,7 +528,7 @@ export async function createTourDate(params: {
   // Validate startDate
   const parsedStartDate = new Date(params.startDate);
   if (Number.isNaN(parsedStartDate.getTime())) {
-    throw new Error('Invalid start date');
+    throw new SyntaxError('Invalid start date');
   }
 
   // Validate ticketUrl if provided
@@ -573,7 +575,7 @@ export async function updateTourDate(params: {
   region?: string | null;
   country?: string;
   ticketUrl?: string | null;
-  ticketStatus?: 'available' | 'sold_out' | 'cancelled';
+  ticketStatus?: TicketStatus;
 }): Promise<TourDateViewModel> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -605,7 +607,7 @@ export async function updateTourDate(params: {
   if (params.startDate !== undefined) {
     const parsedStartDate = new Date(params.startDate);
     if (Number.isNaN(parsedStartDate.getTime())) {
-      throw new Error('Invalid start date');
+      throw new SyntaxError('Invalid start date');
     }
     updateData.startDate = parsedStartDate;
   }
