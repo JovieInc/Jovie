@@ -39,7 +39,7 @@ const normalizeChannels = (
 ) => {
   return {
     ...DEFAULT_CHANNELS,
-    ...(channels ?? {}),
+    ...channels,
   };
 };
 
@@ -94,7 +94,7 @@ export const mergePreferences = (
   return {
     channels: {
       ...base.channels,
-      ...(overrides.channels ?? {}),
+      ...overrides.channels,
     },
     marketingEmails:
       overrides.marketingEmails ??

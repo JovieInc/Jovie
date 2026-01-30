@@ -100,7 +100,7 @@ export async function ensureStripeCustomer(): Promise<{
           if (existingClerkUserId !== clerkUserId) {
             await stripe.customers.update(customer.id, {
               metadata: {
-                ...(customer.metadata ?? {}),
+                ...customer.metadata,
                 clerk_user_id: clerkUserId,
                 created_via: 'jovie_app',
               },
