@@ -200,7 +200,7 @@ function createBulkParser<TKey extends string>(
 
         const parsed = JSON.parse(profileIdsRaw) as unknown;
         if (!isStringArray(parsed)) {
-          throw new Error('profileIds must be an array');
+          throw new TypeError('profileIds must be an array');
         }
 
         if (fieldName) {

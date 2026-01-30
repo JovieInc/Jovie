@@ -95,7 +95,7 @@ export async function copyAvatarToBlob(
     const contentType =
       response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
     if (!contentType || !SUPPORTED_IMAGE_MIME_TYPES_SET.has(contentType)) {
-      throw new Error(`Unsupported content type: ${contentType}`);
+      throw new TypeError(`Unsupported content type: ${contentType}`);
     }
 
     if (response.bodyUsed) {

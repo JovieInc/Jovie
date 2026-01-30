@@ -61,7 +61,7 @@ export async function syncClerkProfile({
 
       const contentType = avatarResponse.headers.get('content-type') || '';
       if (!contentType.startsWith('image/')) {
-        throw new Error(`Invalid content type: ${contentType}`);
+        throw new TypeError(`Invalid content type: ${contentType}`);
       }
 
       const arrayBuffer = await avatarResponse.arrayBuffer();

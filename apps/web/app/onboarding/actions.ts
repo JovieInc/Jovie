@@ -52,7 +52,7 @@ async function fetchAvatarImage(imageUrl: string): Promise<{
     source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
 
   if (!contentType?.startsWith('image/')) {
-    throw new Error(`Invalid content type: ${contentType}`);
+    throw new TypeError(`Invalid content type: ${contentType}`);
   }
 
   if (source.bodyUsed) {
