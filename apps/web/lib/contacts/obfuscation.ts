@@ -50,7 +50,7 @@ export function decodeContactPayload(
     if (!parsed || (parsed.type !== 'email' && parsed.type !== 'phone')) {
       return null;
     }
-    if (!parsed.value) return null;
+    if (!parsed.value || typeof parsed.value !== 'string') return null;
     return parsed;
   } catch (error) {
     Sentry.addBreadcrumb({
