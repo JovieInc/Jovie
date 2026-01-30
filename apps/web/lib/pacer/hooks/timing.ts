@@ -17,4 +17,8 @@ export const PACER_TIMING = {
   SCROLL_THROTTLE_MS: 16,
   /** Default timeout for validation requests */
   VALIDATION_TIMEOUT_MS: 5000,
+  /** Rate limit for handle validation (requests per window) */
+  HANDLE_CHECK_RATE_LIMIT: 10,
+  /** Rate limit window for handle validation (1 minute) */
+  HANDLE_CHECK_RATE_WINDOW_MS: 60_000,
 } as const;
