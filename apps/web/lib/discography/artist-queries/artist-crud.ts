@@ -110,7 +110,7 @@ export async function findOrCreateArtist(
 
     for (const field of fieldsToMerge) {
       if (input[field] && !existing[field]) {
-        updates[field] = input[field] as string;
+        updates[field] = input[field];
       }
     }
 
