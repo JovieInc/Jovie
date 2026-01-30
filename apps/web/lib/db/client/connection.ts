@@ -93,7 +93,7 @@ function initializePoolIfNeeded(
         // - Added min to keep connections warm (reduces cold start latency)
         // - Reduced idle timeout since Neon connections are cheap to recreate
         // - Connection timeout of 25s accommodates worst-case Neon cold starts (can exceed 15s)
-        max: isProduction ? 15 : 3, // Increased from 10 for higher concurrency
+        max: isProduction ? 25 : 3, // Increased from 15 for higher concurrency during cold starts
         min: isProduction ? 2 : 1, // Keep minimum connections warm
         idleTimeoutMillis: 20000, // 20s idle timeout (reduced from 30s - Neon connections are cheap)
         connectionTimeoutMillis: 25000, // 25s connection timeout (accommodates worst-case Neon cold start)
