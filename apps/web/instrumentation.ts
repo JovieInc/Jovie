@@ -1,11 +1,29 @@
 import * as Sentry from '@sentry/nextjs';
 
+// Track instrumentation lifecycle for cold start detection
+const INSTRUMENTATION_START_TIME = Date.now();
+let firstValidationAttemptTime: number | null = null;
+let validationResolvedTime: number | null = null;
+
 /**
  * Determine if an environment issue should be reported to Sentry.
  * Some "critical" issues are expected in certain contexts (e.g., builds, E2E tests)
  * and shouldn't pollute Sentry with noise.
  */
 function shouldReportToSentry(issues: string[]): boolean {
+  // Cold start grace period: if validation resolved quickly, it was a timing issue
+  if (validationResolvedTime && firstValidationAttemptTime) {
+    const resolutionTime = validationResolvedTime - firstValidationAttemptTime;
+
+    if (resolutionTime <= VALIDATION_RETRY_CONFIG.coldStartGracePeriod) {
+      console.log(
+        `[STARTUP] Skipping Sentry report - issues resolved within cold start grace period ` +
+          `(${resolutionTime}ms < ${VALIDATION_RETRY_CONFIG.coldStartGracePeriod}ms)`
+      );
+      return false;
+    }
+  }
+
   // Don't report if we're in a build/test context where env vars are expected to be missing
   const vercelEnv = process.env.VERCEL_ENV;
   const isBuildOrDev =
@@ -28,37 +46,82 @@ function shouldReportToSentry(issues: string[]): boolean {
 }
 
 /**
- * Run environment validation with retry logic for cold starts.
+ * Configuration for progressive retry with exponential backoff.
+ * Shorter than database retries (15s) since env vars initialize faster on Vercel.
+ */
+const VALIDATION_RETRY_CONFIG = {
+  intervals: [100, 250, 500, 1000, 2000] as const,
+  maxRetries: 5,
+  coldStartGracePeriod: 2000, // Don't report to Sentry if resolved within 2s
+} as const;
+
+/**
+ * Run environment validation with progressive retry logic for cold starts.
  * On Vercel cold starts, environment variables may not be immediately available,
- * so we retry once after a small delay to allow for initialization.
+ * so we retry with exponential backoff to allow for initialization.
  */
 async function runEnvironmentValidationWithRetry() {
   const { runStartupEnvironmentValidation } = await import(
     '@/lib/startup/environment-validator'
   );
 
+  // Track first validation attempt time
+  if (!firstValidationAttemptTime) {
+    firstValidationAttemptTime = Date.now();
+  }
+
   // First attempt
   let result = await runStartupEnvironmentValidation();
 
-  // If we have critical issues, retry once after a short delay
-  // This handles race conditions on Vercel cold starts where env vars
-  // may not be fully loaded during the first register() call
+  // If we have critical issues, retry with progressive backoff
   if (result && result.critical.length > 0) {
-    console.log(
-      '[STARTUP] Critical issues detected, retrying after 100ms delay...'
-    );
+    for (
+      let attempt = 0;
+      attempt < VALIDATION_RETRY_CONFIG.maxRetries;
+      attempt++
+    ) {
+      const delay = VALIDATION_RETRY_CONFIG.intervals[attempt];
+      const timeSinceInstrumentation = Date.now() - INSTRUMENTATION_START_TIME;
 
-    // Wait for environment to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
+      console.log(
+        `[STARTUP] Critical issues detected (attempt ${attempt + 1}/${VALIDATION_RETRY_CONFIG.maxRetries}), ` +
+          `retrying after ${delay}ms delay (${timeSinceInstrumentation}ms since instrumentation start)...`
+      );
 
-    // Retry validation
-    result = await runStartupEnvironmentValidation();
+      // Wait for environment to initialize
+      await new Promise(resolve => setTimeout(resolve, delay));
 
-    if (result && result.critical.length > 0) {
-      console.warn('[STARTUP] Critical issues persist after retry');
-    } else {
-      console.log('[STARTUP] Retry successful - environment now valid');
+      // Retry validation
+      result = await runStartupEnvironmentValidation();
+
+      const isLastAttempt = attempt === VALIDATION_RETRY_CONFIG.maxRetries - 1;
+      const validationPassed = !result || result.critical.length === 0;
+
+      // Track resolution time when validation passes or we've exhausted retries
+      if (validationPassed || isLastAttempt) {
+        validationResolvedTime = Date.now();
+        const totalRetryTime =
+          validationResolvedTime - firstValidationAttemptTime;
+
+        if (validationPassed) {
+          const timeSinceInstrumentation =
+            validationResolvedTime - INSTRUMENTATION_START_TIME;
+          console.log(
+            `[STARTUP] Retry successful on attempt ${attempt + 2} - environment now valid ` +
+              `(resolved in ${totalRetryTime}ms, ${timeSinceInstrumentation}ms since instrumentation start)`
+          );
+          break;
+        }
+
+        // Last attempt failed
+        console.warn(
+          `[STARTUP] Critical issues persist after all retries (${totalRetryTime}ms total retry time)`
+        );
+      }
     }
+  } else {
+    // No critical issues on first attempt
+    validationResolvedTime = Date.now();
   }
 
   return result;
@@ -76,6 +139,16 @@ export async function register() {
       if (result && result.critical.length > 0) {
         // Only report to Sentry if the issues are truly blocking in production
         if (shouldReportToSentry(result.critical)) {
+          // Calculate timing metadata
+          const timeSinceInstrumentation =
+            Date.now() - INSTRUMENTATION_START_TIME;
+          const retryDuration =
+            validationResolvedTime && firstValidationAttemptTime
+              ? validationResolvedTime - firstValidationAttemptTime
+              : null;
+          const hadRetries =
+            firstValidationAttemptTime !== validationResolvedTime;
+
           Sentry.captureMessage(
             `Critical environment issues at startup: ${result.critical.join(', ')}`,
             {
@@ -83,11 +156,18 @@ export async function register() {
               tags: {
                 context: 'startup_environment_validation',
                 vercel_env: process.env.VERCEL_ENV || 'unknown',
+                is_cold_start_timing: hadRetries ? 'true' : 'false',
               },
               extra: {
                 critical_issues: result.critical,
                 warning_issues: result.warnings,
                 error_issues: result.errors,
+                timing: {
+                  time_since_instrumentation_ms: timeSinceInstrumentation,
+                  retry_duration_ms: retryDuration,
+                  first_attempt_timestamp: firstValidationAttemptTime,
+                  resolved_timestamp: validationResolvedTime,
+                },
               },
             }
           );

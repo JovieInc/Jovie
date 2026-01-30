@@ -9,6 +9,23 @@ let validationCompleted = false;
 let validationResult: ReturnType<typeof validateAndLogEnvironment> | null =
   null;
 
+// Track validation attempt timing for cold start detection
+let firstValidationTime: number | null = null;
+let lastValidationTime: number | null = null;
+
+// Cold start retry window (must match instrumentation.ts retry intervals)
+const RETRY_WINDOW_MS = 5000;
+
+/**
+ * Reset validation state (useful for testing)
+ */
+export function resetValidationState(): void {
+  validationCompleted = false;
+  validationResult = null;
+  firstValidationTime = null;
+  lastValidationTime = null;
+}
+
 function logEnvironmentInfo() {
   const envInfo = getEnvironmentInfo();
   console.log('[STARTUP] Environment Info:', {
@@ -65,8 +82,19 @@ function logValidationSummary(
  * This should be called early in the application lifecycle
  */
 export async function runStartupEnvironmentValidation() {
-  // Avoid duplicate validation
-  if (validationCompleted) {
+  // Track timing
+  const currentTime = Date.now();
+  if (!firstValidationTime) {
+    firstValidationTime = currentTime;
+  }
+  lastValidationTime = currentTime;
+
+  // Return cached result if available
+  if (validationCompleted && validationResult) {
+    const timeSinceFirst = currentTime - (firstValidationTime || currentTime);
+    console.log(
+      `[STARTUP] Using cached validation result (validated ${timeSinceFirst}ms ago)`
+    );
     return validationResult;
   }
 
@@ -82,24 +110,59 @@ export async function runStartupEnvironmentValidation() {
       isProduction
     );
 
+    const timeSinceFirstValidation =
+      currentTime - (firstValidationTime || currentTime);
+    const withinRetryWindow = timeSinceFirstValidation < RETRY_WINDOW_MS;
+
     if (hasCriticalIssues && isProduction) {
-      validationCompleted = true;
-      throw new Error('Critical environment validation failed');
+      // Allow retries during the cold start window
+      if (withinRetryWindow) {
+        console.warn(
+          `[STARTUP] Critical issues detected but within retry window ` +
+            `(${timeSinceFirstValidation}ms < ${RETRY_WINDOW_MS}ms) - allowing retry`
+        );
+      } else {
+        validationCompleted = true;
+        throw new Error('Critical environment validation failed');
+      }
     }
 
     logValidationSummary(validationResult);
 
-    validationCompleted = true;
+    // Only mark as completed if we're past the retry window or no critical issues
+    if (!hasCriticalIssues || !withinRetryWindow) {
+      validationCompleted = true;
+    }
+
     return validationResult;
   } catch (error) {
     console.error('[STARTUP] Environment validation failed:', error);
-    validationResult = {
-      valid: false,
-      errors: ['Environment validation crashed'],
-      warnings: [],
-      critical: ['Failed to validate environment'],
-    };
-    validationCompleted = true;
+
+    const timeSinceFirstValidation =
+      lastValidationTime && firstValidationTime
+        ? lastValidationTime - firstValidationTime
+        : 0;
+    const withinRetryWindow = timeSinceFirstValidation < RETRY_WINDOW_MS;
+
+    // Treat as transient failure during retry window, real error after
+    validationResult = withinRetryWindow
+      ? {
+          valid: false,
+          errors: ['Environment validation error (transient)'],
+          warnings: [],
+          critical: [], // Don't mark as critical during retry window
+        }
+      : {
+          valid: false,
+          errors: ['Environment validation crashed'],
+          warnings: [],
+          critical: ['Failed to validate environment'],
+        };
+
+    if (!withinRetryWindow) {
+      validationCompleted = true;
+    }
+
     return validationResult;
   }
 }
