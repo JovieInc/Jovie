@@ -113,7 +113,7 @@ export function useDspMatchesQuery({
     queryKey: queryKeys.dspEnrichment.matches(profileId, status),
     queryFn: ({ signal }) => fetchDspMatches(profileId, status, signal),
     enabled: enabled && !!profileId,
-    // STANDARD_CACHE preset
+    // STANDARD_CACHE preset (inline to preserve type inference)
     staleTime: 5 * 60 * 1000, // 5 min
     gcTime: 30 * 60 * 1000, // 30 min
     refetchOnMount: true,

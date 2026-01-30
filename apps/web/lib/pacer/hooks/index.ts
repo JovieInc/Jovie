@@ -25,11 +25,15 @@ export { useAsyncValidation } from './useAsyncValidation';
 // Auto-save hook
 export type { UseAutoSaveOptions, UseAutoSaveReturn } from './useAutoSave';
 export { useAutoSave } from './useAutoSave';
-
+// Rate-limited validation hook
+export type {
+  UseRateLimitedValidationOptions,
+  UseRateLimitedValidationReturn,
+} from './useRateLimitedValidation';
+export { useRateLimitedValidation } from './useRateLimitedValidation';
 // Throttled event handler
 export type { UseThrottledEventHandlerOptions } from './useThrottledEventHandler';
 export { useThrottledEventHandler } from './useThrottledEventHandler';
-
 // Throttled scroll
 export type {
   UseThrottledScrollOptions,
