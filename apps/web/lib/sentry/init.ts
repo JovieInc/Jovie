@@ -49,27 +49,24 @@ import type { FullSentryConfig } from './client-full';
 import type { LiteSentryConfig } from './client-lite';
 import { getCurrentPathname, getSdkMode } from './route-detector';
 import {
-  _resetSentryModeForTesting,
   getSentryMode,
   isFullModeActive,
-  isLiteModeActive,
   isSentryInitialized,
   type SentryMode,
   setCurrentMode,
 } from './state';
 
-// Re-export state functions for backwards compatibility
-export {
-  type SentryMode,
-  getSentryMode,
-  isSentryInitialized,
-  isFullModeActive,
-  isLiteModeActive,
-  _resetSentryModeForTesting,
-};
-
 // Re-export route detection functions for backwards compatibility
 export { isDashboardRoute, isPublicRoute } from './route-detector';
+// Re-export state functions for backwards compatibility
+export {
+  _resetSentryModeForTesting,
+  getSentryMode,
+  isFullModeActive,
+  isLiteModeActive,
+  isSentryInitialized,
+  type SentryMode,
+} from './state';
 
 /**
  * Options for the Sentry initialization factory.

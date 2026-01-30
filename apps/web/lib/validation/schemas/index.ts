@@ -294,9 +294,9 @@ export {
 // Namespace Exports
 // =============================================================================
 
-import * as account from './account';
-import * as admin from './admin';
-import * as audience from './audience';
+export * as account from './account';
+export * as admin from './admin';
+export * as audience from './audience';
 /**
  * Re-export modules as namespaces for alternative import patterns.
  *
@@ -307,27 +307,12 @@ import * as audience from './audience';
  * ingestion.linktreePayloadSchema.safeParse(data);
  * ```
  */
-import * as base from './base';
-import * as dashboard from './dashboard';
-import * as ingestion from './ingestion';
-import * as media from './media';
-import * as notifications from './notifications';
-import * as onboarding from './onboarding';
-import * as payments from './payments';
-import * as pixels from './pixels';
-import * as tip from './tip';
-
-export {
-  base,
-  audience,
-  dashboard,
-  admin,
-  payments,
-  media,
-  account,
-  notifications,
-  onboarding,
-  ingestion,
-  pixels,
-  tip,
-};
+export * as base from './base';
+export * as dashboard from './dashboard';
+export * as ingestion from './ingestion';
+export * as media from './media';
+export * as notifications from './notifications';
+export * as onboarding from './onboarding';
+export * as payments from './payments';
+export * as pixels from './pixels';
+export * as tip from './tip';
