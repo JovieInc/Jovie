@@ -26,17 +26,22 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/organisms/Sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { label: 'Overview', href: '/app/admin', icon: LayoutDashboard },
-  { label: 'Waitlist', href: '/app/admin/waitlist', icon: UserPlus },
-  { label: 'Creators', href: '/app/admin/creators', icon: Users },
-  { label: 'Campaigns', href: '/app/admin/campaigns', icon: Mail },
-  { label: 'Users', href: '/app/admin/users', icon: User },
-  { label: 'Usage', href: '/app/admin#usage', icon: BarChart2 },
-  { label: 'Reliability', href: '/app/admin#errors', icon: ShieldCheck },
-  { label: 'Activity', href: '/app/admin/activity', icon: Activity },
+  { label: 'Overview', href: APP_ROUTES.ADMIN, icon: LayoutDashboard },
+  { label: 'Waitlist', href: APP_ROUTES.ADMIN_WAITLIST, icon: UserPlus },
+  { label: 'Creators', href: APP_ROUTES.ADMIN_CREATORS, icon: Users },
+  { label: 'Campaigns', href: `${APP_ROUTES.ADMIN}/campaigns`, icon: Mail },
+  { label: 'Users', href: APP_ROUTES.ADMIN_USERS, icon: User },
+  { label: 'Usage', href: `${APP_ROUTES.ADMIN}#usage`, icon: BarChart2 },
+  {
+    label: 'Reliability',
+    href: `${APP_ROUTES.ADMIN}#errors`,
+    icon: ShieldCheck,
+  },
+  { label: 'Activity', href: APP_ROUTES.ADMIN_ACTIVITY, icon: Activity },
 ];
 
 interface AdminSidebarProps {
@@ -67,7 +72,7 @@ export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {
       <SidebarHeader>
         <div className='flex items-center gap-3 px-2 py-1'>
           <Link
-            href='/app/admin'
+            href={APP_ROUTES.ADMIN}
             aria-label='Go to admin dashboard'
             className='flex size-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
           >

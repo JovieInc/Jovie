@@ -212,11 +212,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           '/', // Dashboard at root
           '/analytics',
           '/audience',
+          '/chat',
           '/contacts',
           '/earnings',
           '/links',
           '/profile',
           '/releases',
+          '/tour-dates',
           '/settings',
           '/admin',
           '/onboarding',

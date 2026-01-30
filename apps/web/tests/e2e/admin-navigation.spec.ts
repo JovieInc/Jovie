@@ -493,7 +493,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     const adminNavHeader = page.locator('text=Admin').first();
     if (await adminNavHeader.isVisible()) {
       // The section is visible, check if we need to expand it
-      const adminLink = page.locator('a[href="/app/admin"]').first();
+      const adminLink = page.locator('a[href="/admin"]').first();
       if (!(await adminLink.isVisible())) {
         // Click to expand the admin section
         await adminNavHeader.click();
@@ -503,10 +503,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // Use client-side navigation by clicking links
     const navLinks = [
-      { selector: 'a[href="/app/admin"]', name: 'Admin Dashboard' },
-      { selector: 'a[href="/app/dashboard/profile"]', name: 'Profile' },
-      { selector: 'a[href="/app/admin/users"]', name: 'Admin Users' },
-      { selector: 'a[href="/app/dashboard/analytics"]', name: 'Analytics' },
+      { selector: 'a[href="/admin"]', name: 'Admin Dashboard' },
+      { selector: 'a[href="/profile"]', name: 'Profile' },
+      { selector: 'a[href="/admin/users"]', name: 'Admin Users' },
+      { selector: 'a[href="/analytics"]', name: 'Analytics' },
     ];
 
     for (const link of navLinks) {

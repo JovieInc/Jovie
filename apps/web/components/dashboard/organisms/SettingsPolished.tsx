@@ -13,6 +13,7 @@ import { SettingsNotificationsSection } from '@/components/dashboard/organisms/S
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
@@ -39,7 +40,7 @@ export function SettingsPolished({
 
   const handleBilling = async () => {
     setIsBillingLoading(true);
-    await router.push('/app/settings/billing');
+    await router.push(APP_ROUTES.SETTINGS_BILLING);
   };
 
   const renderAccountSection = () => (
