@@ -62,7 +62,7 @@ export function extractTikTokHandle(url: string): string | null {
   const validated = validateTikTokUrl(url);
   if (!validated) return null;
   const parsed = new URL(validated);
-  const handle = parsed.pathname.split('/').filter(Boolean)[0] ?? '';
+  const handle = parsed.pathname.split('/').find(Boolean) ?? '';
   return handle.replace(/^@/, '') || null;
 }
 
