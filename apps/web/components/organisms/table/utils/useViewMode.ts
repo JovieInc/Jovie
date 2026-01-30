@@ -53,7 +53,7 @@ export function useViewMode({
   defaultMode = 'list',
   availableModes = ['list'],
 }: UseViewModeOptions) {
-  const [viewMode, setViewModeState] = useState<ViewMode>(defaultMode);
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultMode);
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Hydrate from localStorage on mount
@@ -61,14 +61,14 @@ export function useViewMode({
     const stored = localStorage.getItem(storageKey) as ViewMode | null;
 
     if (stored && availableModes.includes(stored)) {
-      setViewModeState(stored);
+      setViewMode(stored);
     }
 
     setIsHydrated(true);
   }, [storageKey, availableModes]);
 
   // Update localStorage when view mode changes
-  const setViewMode = (mode: ViewMode) => {
+  const updateViewMode = (mode: ViewMode) => {
     if (!availableModes.includes(mode)) {
       console.warn(
         `View mode "${mode}" is not available. Available modes:`,
@@ -77,13 +77,13 @@ export function useViewMode({
       return;
     }
 
-    setViewModeState(mode);
+    setViewMode(mode);
     localStorage.setItem(storageKey, mode);
   };
 
   return {
     viewMode,
-    setViewMode,
+    setViewMode: updateViewMode,
     availableModes,
     isHydrated,
   };
