@@ -12,7 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 
 interface ConsentBannerProps {
-  className?: string;
+  readonly className?: string;
 }
 
 /**

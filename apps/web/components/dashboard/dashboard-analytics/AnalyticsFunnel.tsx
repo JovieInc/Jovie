@@ -9,9 +9,9 @@ interface FunnelStage {
 }
 
 interface AnalyticsFunnelProps {
-  profileViews: number;
-  uniqueUsers: number;
-  subscribers: number;
+  readonly profileViews: number;
+  readonly uniqueUsers: number;
+  readonly subscribers: number;
 }
 
 function formatNumber(num: number): string {

@@ -8,9 +8,9 @@ import { hexToRgba } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
-  link: SocialLinkType;
-  handle: string;
-  artistName: string;
+  readonly link: SocialLinkType;
+  readonly handle: string;
+  readonly artistName: string;
 }
 
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
