@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { LoadingButton } from '@/components/molecules/LoadingButton';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { captureError } from '@/lib/error-tracking';
 
 interface TipSectionProps {
   handle: string;
@@ -19,6 +20,7 @@ interface TipSectionProps {
 }
 
 export function TipSection({
+  handle,
   amounts = [2, 5, 10],
   venmoLink,
   venmoUsername,
@@ -39,7 +41,11 @@ export function TipSection({
       await onStripePayment(amount);
       toast.success(`Thanks for the $${amount} tip!`, { duration: 5000 });
     } catch (error) {
-      console.error('Tip failed', error);
+      captureError('Tip payment failed', error, {
+        handle,
+        amount,
+        paymentMethod: 'stripe',
+      });
       toast.error('Payment failed. Please try again.', { duration: 7000 });
     } finally {
       setLoading(null);

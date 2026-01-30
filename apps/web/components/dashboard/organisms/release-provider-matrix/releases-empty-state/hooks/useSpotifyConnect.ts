@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Spotify Connect Hook
  *
