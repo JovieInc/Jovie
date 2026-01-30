@@ -18,7 +18,7 @@ export function InterstitialClient({
   shortId,
   titleAlias,
   domain,
-}: InterstitialClientProps) {
+}: Readonly<InterstitialClientProps>) {
   const [error, setError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
 

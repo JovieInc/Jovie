@@ -152,7 +152,7 @@ function pickProviderUrl(
 export default async function ReleaseSmartLinkPage({
   params,
   searchParams,
-}: PageProps) {
+}: Readonly<PageProps>) {
   const { slug } = await params;
   const { dsp } = await searchParams;
 

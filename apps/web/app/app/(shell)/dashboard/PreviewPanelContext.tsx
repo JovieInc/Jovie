@@ -61,7 +61,7 @@ export function PreviewPanelProvider({
   children,
   defaultOpen = false,
   enabled = true,
-}: PreviewPanelProviderProps) {
+}: Readonly<PreviewPanelProviderProps>) {
   // Check if screen is large (md breakpoint: 768px)
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
     if (typeof window === 'undefined') return true; // SSR default

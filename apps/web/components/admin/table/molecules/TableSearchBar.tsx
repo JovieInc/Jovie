@@ -20,7 +20,7 @@ export function TableSearchBar({
   placeholder = 'Search...',
   debounceMs = 300,
   className,
-}: TableSearchBarProps) {
+}: Readonly<TableSearchBarProps>) {
   const [localValue, setLocalValue] = useState(value);
 
   // Sync external value changes to local state

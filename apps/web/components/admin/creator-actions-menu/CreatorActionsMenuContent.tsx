@@ -56,7 +56,7 @@ export function CreatorActionsMenuContent({
   onCopyClaimLink,
   renderItem,
   renderSeparator,
-}: CreatorActionsMenuContentProps) {
+}: Readonly<CreatorActionsMenuContentProps>) {
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
 
   return (

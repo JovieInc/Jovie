@@ -69,7 +69,7 @@ export function AdminCreatorProfilesUnified({
   sort,
   mode = 'admin',
   basePath = '/app/admin/creators',
-}: AdminCreatorProfilesWithSidebarProps) {
+}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const router = useRouter();
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);

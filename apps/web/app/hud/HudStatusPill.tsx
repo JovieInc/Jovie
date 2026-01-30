@@ -12,7 +12,7 @@ const TONE_CLASSES: Record<HudStatusPillProps['tone'], string> = {
   neutral: 'border-white/15 bg-white/5 text-white/80',
 };
 
-export function HudStatusPill({ label, tone }: HudStatusPillProps) {
+export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
   const classes = TONE_CLASSES[tone];
 
   return (

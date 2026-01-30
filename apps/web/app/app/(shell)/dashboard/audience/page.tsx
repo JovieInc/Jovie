@@ -20,9 +20,9 @@ export const runtime = 'nodejs';
 
 export default async function AudiencePage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<SearchParams>;
-}) {
+}>) {
   const { userId } = await getCachedAuth();
 
   // Handle unauthenticated users

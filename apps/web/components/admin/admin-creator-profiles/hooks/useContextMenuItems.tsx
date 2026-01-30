@@ -57,10 +57,7 @@ export function useContextMenuItems({
       const items: ContextMenuItemType[] = [];
 
       // Refresh ingest (if available)
-      const hasIngestStatus = Object.prototype.hasOwnProperty.call(
-        ingestRefreshStatuses,
-        profile.id
-      );
+      const hasIngestStatus = Object.hasOwn(ingestRefreshStatuses, profile.id);
       if (hasIngestStatus) {
         const refreshIngestStatus = ingestRefreshStatuses[profile.id] ?? 'idle';
         items.push({

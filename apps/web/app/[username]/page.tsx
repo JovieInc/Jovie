@@ -407,7 +407,7 @@ export default async function ArtistPage({
       <ConsentBanner />
       {showClaimBanner && (
         <ClaimBanner
-          claimToken={claimTokenParam!}
+          claimToken={claimTokenParam}
           profileHandle={profile.username}
           displayName={profile.display_name || undefined}
         />

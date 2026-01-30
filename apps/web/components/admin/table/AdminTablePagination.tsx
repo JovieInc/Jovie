@@ -60,7 +60,7 @@ export function AdminTablePagination({
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   entityLabel,
-}: AdminTablePaginationProps) {
+}: Readonly<AdminTablePaginationProps>) {
   const showPageSizeSelector = pageSize !== undefined && onPageSizeChange;
 
   return (

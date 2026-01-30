@@ -30,7 +30,7 @@ export function MetricsChart({ points }: MetricsChartProps) {
     );
   }
 
-  const latest = chartData[chartData.length - 1];
+  const latest = chartData.at(-1)!;
   const start = chartData[0];
   const delta = latest.users - start.users;
   const deltaPct = start.users > 0 ? (delta / start.users) * 100 : 0;

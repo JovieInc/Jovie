@@ -9,7 +9,7 @@ import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
 export function AdminCreatorsPageWrapper(
-  props: AdminCreatorProfilesWithSidebarProps
+  props: Readonly<AdminCreatorProfilesWithSidebarProps>
 ) {
   const router = useRouter();
   const { setHeaderActions } = useHeaderActions();

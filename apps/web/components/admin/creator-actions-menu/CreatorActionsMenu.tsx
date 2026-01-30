@@ -56,7 +56,7 @@ function MenuItems({
   onSendInvite,
   onDelete,
   handleCopyClaimLink,
-}: MenuItemsProps) {
+}: Readonly<MenuItemsProps>) {
   return (
     <>
       {onRefreshIngest && (
@@ -160,7 +160,7 @@ export function CreatorActionsMenu({
   onDelete,
   open,
   onOpenChange,
-}: CreatorActionsMenuProps) {
+}: Readonly<CreatorActionsMenuProps>) {
   const [copySuccess, setCopySuccess] = useState(false);
 
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';

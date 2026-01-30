@@ -13,7 +13,7 @@ interface DashboardDataProviderProps {
 export function DashboardDataProvider({
   value,
   children,
-}: DashboardDataProviderProps) {
+}: Readonly<DashboardDataProviderProps>) {
   return (
     <DashboardDataContext.Provider value={value}>
       {children}
