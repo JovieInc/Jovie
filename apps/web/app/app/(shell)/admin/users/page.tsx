@@ -45,7 +45,7 @@ export const runtime = 'nodejs';
 
 export default async function AdminUsersPage({
   searchParams,
-}: AdminUsersPageProps) {
+}: Readonly<AdminUsersPageProps>) {
   const { page, pageSize, sort, q } =
     await adminUsersSearchParams.parse(searchParams);
 

@@ -82,9 +82,9 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
 
 export default async function HudPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: SearchParams;
-}) {
+}>) {
   const kioskTokenRaw = searchParams.kiosk;
   const kioskToken = typeof kioskTokenRaw === 'string' ? kioskTokenRaw : null;
 

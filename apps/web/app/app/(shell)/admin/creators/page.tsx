@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
 
 export default async function AdminCreatorsPage({
   searchParams,
-}: AdminCreatorsPageProps) {
+}: Readonly<AdminCreatorsPageProps>) {
   const { page, pageSize, sort, q } =
     await adminCreatorsSearchParams.parse(searchParams);
 

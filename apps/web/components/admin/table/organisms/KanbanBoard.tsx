@@ -84,7 +84,7 @@ export function KanbanBoard<TData>({
   cardHeight = 120,
   enableVirtualization = true,
   className,
-}: KanbanBoardProps<TData>) {
+}: Readonly<KanbanBoardProps<TData>>) {
   const totalItems = useMemo(
     () => columns.reduce((sum, col) => sum + col.items.length, 0),
     [columns]
@@ -143,7 +143,7 @@ function KanbanColumn<TData>({
   emptyState,
   cardHeight,
   enableVirtualization,
-}: KanbanColumnProps<TData>) {
+}: Readonly<KanbanColumnProps<TData>>) {
   const containerRef = useRef<HTMLFieldSetElement>(null);
   const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
 

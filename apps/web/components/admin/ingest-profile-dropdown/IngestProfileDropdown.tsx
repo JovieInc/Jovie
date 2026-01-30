@@ -14,7 +14,7 @@ import { useIngestProfile } from './useIngestProfile';
 
 export function IngestProfileDropdown({
   onIngestPending,
-}: IngestProfileDropdownProps) {
+}: Readonly<IngestProfileDropdownProps>) {
   const {
     open,
     setOpen,

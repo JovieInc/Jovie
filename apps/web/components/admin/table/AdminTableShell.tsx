@@ -36,7 +36,7 @@ export function AdminTableShell({
   className,
   scrollContainerProps,
   scrollContainerRef: externalRef,
-}: AdminTableShellProps) {
+}: Readonly<AdminTableShellProps>) {
   const internalRef = React.useRef<HTMLDivElement | null>(null);
   const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);

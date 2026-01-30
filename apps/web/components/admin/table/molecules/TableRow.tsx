@@ -25,7 +25,7 @@ export function TableRow({
   rowRef,
   dataIndex,
   style: customStyle,
-}: TableRowProps) {
+}: Readonly<TableRowProps>) {
   const isVirtual = virtualRow !== undefined;
 
   const combinedStyle: React.CSSProperties = {

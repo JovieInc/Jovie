@@ -20,7 +20,7 @@ export interface AdminCreatorsTableHeaderActionsProps {
  */
 export function AdminCreatorsTableHeaderActions({
   onIngestPending,
-}: AdminCreatorsTableHeaderActionsProps) {
+}: Readonly<AdminCreatorsTableHeaderActionsProps>) {
   const { tableMeta } = useTableMeta();
   const [isDrawerOpen, setIsDrawerOpen] = useState(
     () => (tableMeta.rightPanelWidth ?? 0) > 0

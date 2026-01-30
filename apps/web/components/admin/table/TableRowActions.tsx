@@ -20,7 +20,7 @@ export function TableRowActions({
   refreshIngestStatus,
   onToggleVerification,
   onRefreshIngest,
-}: TableRowActionsProps) {
+}: Readonly<TableRowActionsProps>) {
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
 

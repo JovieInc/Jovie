@@ -65,7 +65,7 @@ export function AdminCreatorProfilesWithSidebar({
   sort,
   mode = 'admin',
   basePath = '/app/admin/creators',
-}: AdminCreatorProfilesWithSidebarProps) {
+}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const router = useRouter();
   const notifications = useNotifications();
   const {

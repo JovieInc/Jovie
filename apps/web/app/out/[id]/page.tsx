@@ -22,7 +22,7 @@ interface PageProps
 
 export async function generateMetadata({
   params: _params, // eslint-disable-line @typescript-eslint/no-unused-vars
-}: PageProps): Promise<Metadata> {
+}: Readonly<PageProps>): Promise<Metadata> {
   // Generic metadata to avoid exposing sensitive information to crawlers
   return {
     title: 'Link Confirmation Required',
@@ -38,7 +38,9 @@ export async function generateMetadata({
   };
 }
 
-export default async function InterstitialPage({ params }: PageProps) {
+export default async function InterstitialPage({
+  params,
+}: Readonly<PageProps>) {
   const { id: shortId } = await params;
 
   if (!shortId || shortId.length > 20) {

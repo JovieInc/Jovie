@@ -67,14 +67,14 @@ export default function WaitlistPage() {
   const selectedPrimaryGoalIndex = useMemo(() => {
     if (!primaryGoal) return 0;
     const index = PRIMARY_GOAL_OPTIONS.findIndex(o => o.value === primaryGoal);
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }, [primaryGoal]);
 
   const selectedSocialPlatformIndex = useMemo(() => {
     const index = SOCIAL_PLATFORM_OPTIONS.findIndex(
       o => o.value === socialPlatform
     );
-    return index >= 0 ? index : 0;
+    return Math.max(index, 0);
   }, [socialPlatform]);
 
   useEffect(() => {

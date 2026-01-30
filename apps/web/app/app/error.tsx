@@ -7,7 +7,7 @@ interface ErrorProps {
   reset: () => void;
 }
 
-export default function AppError({ error, reset }: ErrorProps) {
+export default function AppError({ error, reset }: Readonly<ErrorProps>) {
   return (
     <ErrorBoundary
       error={error}

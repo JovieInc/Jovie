@@ -37,7 +37,7 @@ import {
 
 const columnHelper = createColumnHelper<AdminUserRow>();
 
-export function AdminUsersTableUnified(props: AdminUsersTableProps) {
+export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { users, page, pageSize, total, search, sort } = props;
 
   const { router, pagination } = useAdminUsersTable(props);

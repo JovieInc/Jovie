@@ -15,7 +15,7 @@ export function SortableHeaderButton({
   direction,
   onClick,
   className,
-}: SortableHeaderButtonProps) {
+}: Readonly<SortableHeaderButtonProps>) {
   return (
     <button
       type='button'
