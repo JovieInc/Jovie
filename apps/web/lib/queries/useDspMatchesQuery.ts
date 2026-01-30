@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 
+import { STANDARD_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -113,11 +114,8 @@ export function useDspMatchesQuery({
     queryKey: queryKeys.dspEnrichment.matches(profileId, status),
     queryFn: ({ signal }) => fetchDspMatches(profileId, status, signal),
     enabled: enabled && !!profileId,
-    // STANDARD_CACHE preset
-    staleTime: 5 * 60 * 1000, // 5 min
-    gcTime: 30 * 60 * 1000, // 30 min
-    refetchOnMount: true,
-    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
+    // STANDARD_CACHE: 5 min stale, 30 min gc
+    ...STANDARD_CACHE,
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

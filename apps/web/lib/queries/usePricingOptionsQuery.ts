@@ -7,6 +7,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { STABLE_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
@@ -62,9 +63,6 @@ export function usePricingOptionsQuery() {
     queryKey: queryKeys.billing.pricingOptions(),
     queryFn: fetchPricingOptions,
     // STABLE_CACHE: 15 min stale, 1 hour gc - pricing rarely changes
-    staleTime: 15 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    ...STABLE_CACHE,
   });
 }

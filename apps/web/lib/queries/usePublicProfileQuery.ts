@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { STABLE_CACHE } from './cache-strategies';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -101,9 +102,6 @@ export function usePublicProfileQuery({
       fetchPublicProfile(username!, signal),
     enabled: enabled && Boolean(username),
     // STABLE_CACHE: 15 min stale, 1 hr gc - public profiles rarely change
-    staleTime: 15 * 60 * 1000, // 15 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    ...STABLE_CACHE,
   });
 }

@@ -36,3 +36,10 @@ export type {
   UseThrottledScrollReturn,
 } from './useThrottledScroll';
 export { useThrottledScroll } from './useThrottledScroll';
+
+// Rate-limited validation hook
+export type {
+  UseRateLimitedValidationOptions,
+  UseRateLimitedValidationReturn,
+} from './useRateLimitedValidation';
+export { useRateLimitedValidation } from './useRateLimitedValidation';

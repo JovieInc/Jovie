@@ -12,10 +12,8 @@ import {
   unsubscribeFromNotifications,
 } from '@/lib/notifications/client';
 
+import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
-
-// STANDARD_CACHE values (5 min stale, 30 min gc)
-const MINUTE = 60 * 1000;
 
 /**
  * Exponential backoff retry delay for failed queries
@@ -49,8 +47,8 @@ export function useNotificationStatusQuery({
         phone: phoneValue ?? undefined,
       }),
     enabled: enabled && Boolean(emailValue || phoneValue),
-    staleTime: 5 * MINUTE,
-    gcTime: 30 * MINUTE,
+    // STANDARD_CACHE: 5 min stale, 30 min gc
+    ...STANDARD_CACHE,
     retry: 2,
     retryDelay: getRetryDelay,
     // Prevent throwing on error - handle gracefully
