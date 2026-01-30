@@ -61,7 +61,7 @@ export function TipSection({
     )}`;
 
     onVenmoPayment(url);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    globalThis.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // If no payment methods are supported, show QR fallback

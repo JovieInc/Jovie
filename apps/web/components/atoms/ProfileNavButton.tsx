@@ -84,9 +84,10 @@ export function ProfileNavButton({
           <DropdownMenuItem
             onSelect={() => {
               try {
-                const isMdUp = window.matchMedia('(min-width: 768px)').matches;
+                const isMdUp =
+                  globalThis.matchMedia('(min-width: 768px)').matches;
                 if (isMdUp) {
-                  window.dispatchEvent(
+                  globalThis.dispatchEvent(
                     new CustomEvent('jovie:open-profile-qr')
                   );
                 }

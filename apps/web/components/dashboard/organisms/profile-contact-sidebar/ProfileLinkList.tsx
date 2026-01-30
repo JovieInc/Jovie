@@ -79,7 +79,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   }, [link.url]);
 
   const handleOpen = useCallback(() => {
-    window.open(link.url, '_blank', 'noopener,noreferrer');
+    globalThis.open(link.url, '_blank', 'noopener,noreferrer');
   }, [link.url]);
 
   const handleRemove = useCallback(() => {

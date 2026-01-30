@@ -42,14 +42,14 @@ export function PerformanceDashboard({
     };
 
     // Add event listener
-    window.addEventListener(
+    globalThis.addEventListener(
       'web-vitals',
       handleWebVitalMetric as EventListener
     );
 
     // Clean up
     return () => {
-      window.removeEventListener(
+      globalThis.removeEventListener(
         'web-vitals',
         handleWebVitalMetric as EventListener
       );

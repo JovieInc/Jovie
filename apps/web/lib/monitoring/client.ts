@@ -46,13 +46,13 @@ export function initAllMonitoring(): void {
       typeof globalThis !== 'undefined' &&
       globalThis.jovieWebVitalsListener
     ) {
-      window.removeEventListener(
+      globalThis.removeEventListener(
         'web-vitals',
         globalThis.jovieWebVitalsListener
       );
     }
 
-    window.addEventListener('web-vitals', handler);
+    globalThis.addEventListener('web-vitals', handler);
     if (typeof globalThis !== 'undefined') {
       globalThis.jovieWebVitalsListener = handler;
     }

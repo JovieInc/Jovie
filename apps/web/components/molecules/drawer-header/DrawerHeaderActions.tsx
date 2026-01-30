@@ -47,7 +47,7 @@ export function DrawerHeaderActions({
       onClick:
         action.onClick ||
         (action.href
-          ? () => window.open(action.href, '_blank', 'noopener,noreferrer')
+          ? () => globalThis.open(action.href, '_blank', 'noopener,noreferrer')
           : () => {}),
     }));
 

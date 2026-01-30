@@ -99,12 +99,14 @@ export function AuthLayout({
     ];
 
     events.forEach(event =>
-      window.addEventListener(event, resetTimer, { passive: true })
+      globalThis.addEventListener(event, resetTimer, { passive: true })
     );
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      events.forEach(event =>
+        globalThis.removeEventListener(event, resetTimer)
+      );
     };
   }, [logoSpinDelayMs]);
 

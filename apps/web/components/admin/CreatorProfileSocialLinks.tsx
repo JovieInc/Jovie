@@ -16,7 +16,7 @@ export const CreatorProfileSocialLinks = memo(
     socialLinks,
   }: CreatorProfileSocialLinksProps) {
     const handleOpenLink = useCallback((url: string) => {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
     }, []);
 
     if (!socialLinks || socialLinks.length === 0) {

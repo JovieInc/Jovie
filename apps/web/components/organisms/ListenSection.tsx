@@ -47,7 +47,7 @@ export function ListenSection({
     // Auto open preferred URL if provided
     if (initialPreferredUrl) {
       try {
-        window.open(initialPreferredUrl, '_blank', 'noopener,noreferrer');
+        globalThis.open(initialPreferredUrl, '_blank', 'noopener,noreferrer');
       } catch {
         // noop - silent fail for better UX
       }
@@ -102,7 +102,7 @@ export function ListenSection({
       }
 
       // Fallback: use regular URL opening
-      window.open(url, '_blank', 'noopener,noreferrer');
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       captureError('Error handling DSP click', error, {
         handle,
@@ -111,7 +111,7 @@ export function ListenSection({
       });
       // Last resort: try to open the URL anyway
       try {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        globalThis.open(url, '_blank', 'noopener,noreferrer');
       } catch {
         // noop - complete failure, but don't crash the app
       }

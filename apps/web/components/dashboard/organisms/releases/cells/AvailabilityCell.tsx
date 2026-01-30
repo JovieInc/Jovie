@@ -326,7 +326,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           type='button'
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
-                            window.open(
+                            globalThis.open(
                               provider.url,
                               '_blank',
                               'noopener,noreferrer'

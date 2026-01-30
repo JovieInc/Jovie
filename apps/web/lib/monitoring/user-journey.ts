@@ -95,7 +95,7 @@ export class UserJourneyTracker {
           ...data,
         },
       });
-      window.dispatchEvent(event);
+      globalThis.dispatchEvent(event);
     }
 
     return this;
@@ -170,7 +170,7 @@ export class UserJourneyTracker {
           ...data,
         },
       });
-      window.dispatchEvent(event);
+      globalThis.dispatchEvent(event);
     }
 
     return this;
@@ -221,7 +221,7 @@ export class UserJourneyTracker {
       if (globalThis.jovieOnboardingJourneyListeners) {
         globalThis.jovieOnboardingJourneyListeners.forEach(
           ({ eventName, handler }) => {
-            window.removeEventListener(eventName, handler);
+            globalThis.removeEventListener(eventName, handler);
           }
         );
         globalThis.jovieOnboardingJourneyListeners = undefined;
@@ -239,7 +239,7 @@ export class UserJourneyTracker {
           journey.goToStep(step, customEvent.detail || {});
         };
 
-        window.addEventListener(eventName, handler);
+        globalThis.addEventListener(eventName, handler);
         listeners.push({ eventName, handler });
       });
 
@@ -250,7 +250,7 @@ export class UserJourneyTracker {
           const customEvent = event as CustomEvent;
           journey.complete(true, customEvent.detail || {});
         };
-        window.addEventListener(eventName, handler);
+        globalThis.addEventListener(eventName, handler);
         listeners.push({ eventName, handler });
       }
 
@@ -264,7 +264,7 @@ export class UserJourneyTracker {
             customEvent.detail || {}
           );
         };
-        window.addEventListener(eventName, handler);
+        globalThis.addEventListener(eventName, handler);
         listeners.push({ eventName, handler });
       }
 

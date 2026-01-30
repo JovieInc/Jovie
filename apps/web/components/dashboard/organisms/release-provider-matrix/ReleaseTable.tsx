@@ -247,7 +247,7 @@ export function ReleaseTable({
             label: `Open in ${providerLabels[provider.key] || provider.key}`,
             icon: menuIcon('ExternalLink'),
             onClick: () => {
-              window.open(provider.url!, '_blank', 'noopener,noreferrer');
+              globalThis.open(provider.url!, '_blank', 'noopener,noreferrer');
             },
           });
         }

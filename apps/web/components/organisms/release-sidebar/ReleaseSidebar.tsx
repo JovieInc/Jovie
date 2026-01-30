@@ -88,7 +88,7 @@ export function ReleaseSidebar({
       id: 'open-release',
       label: 'Open release',
       icon: <ExternalLink className='h-4 w-4' />,
-      onClick: () => window.open(smartLinkUrl, '_blank'),
+      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
       className: CONTEXT_MENU_ITEM_CLASS,
     });
 
