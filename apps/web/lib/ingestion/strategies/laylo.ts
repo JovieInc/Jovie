@@ -44,7 +44,7 @@ async function fetchJson<T>(url: string, options?: FetchOptions): Promise<T> {
     ...options,
     headers: {
       Accept: 'application/json',
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     allowedHosts: LAYLO_CONFIG.validHosts,
   });

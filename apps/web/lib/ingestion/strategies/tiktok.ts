@@ -80,7 +80,7 @@ export async function fetchTikTokDocument(
     timeoutMs: TIKTOK_CONFIG.defaultTimeoutMs,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     allowedHosts: TIKTOK_CONFIG.validHosts,
   });

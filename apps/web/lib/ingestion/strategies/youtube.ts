@@ -95,7 +95,7 @@ export async function fetchYouTubeAboutDocument(
     ...options,
     headers: {
       Accept: 'text/html,application/xhtml+xml',
-      ...(options?.headers ?? {}),
+      ...options?.headers,
     },
     allowedHosts: YOUTUBE_CONFIG.validHosts,
   });
