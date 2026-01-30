@@ -76,7 +76,7 @@ async function fetchArtistSearch(
     const data = await response.json().catch(() => ({}));
     const errorCode = data?.code || 'UNKNOWN';
     if (errorCode === 'RATE_LIMITED') {
-      throw new Error('Too many requests. Please wait a moment.');
+      throw new RangeError('Too many requests. Please wait a moment.');
     }
     throw new Error(data?.error || 'Search failed');
   }

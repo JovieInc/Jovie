@@ -23,7 +23,7 @@ export function validateEmail(email: string | null | undefined): string | null {
   if (!trimmed) return null;
   // Limit input length to prevent ReDoS (RFC 5321 max email length is 254)
   if (trimmed.length > 254) {
-    throw new Error('Email address is too long');
+    throw new RangeError('Email address is too long');
   }
   if (!EMAIL_REGEX.test(trimmed)) {
     throw new Error('Please enter a valid email');
