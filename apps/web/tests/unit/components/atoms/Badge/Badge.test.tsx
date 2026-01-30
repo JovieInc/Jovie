@@ -5,6 +5,7 @@
  */
 
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { Badge } from '@/components/atoms/Badge';
 
@@ -87,7 +88,7 @@ describe('Badge Component', () => {
 
   describe('ref forwarding', () => {
     it('forwards ref to the badge element', () => {
-      const ref = { current: null as HTMLSpanElement | null };
+      const ref = React.createRef<HTMLSpanElement>();
 
       render(<Badge ref={ref}>Ref Badge</Badge>);
 

@@ -537,8 +537,8 @@ describe('Fit Score Calculator', () => {
       expect(SCORE_WEIGHTS.GENRE_MATCH).toBe(5);
     });
 
-    it('should have version 1', () => {
-      expect(FIT_SCORE_VERSION).toBe(1);
+    it('should have correct version', () => {
+      expect(FIT_SCORE_VERSION).toBe(2);
     });
 
     it('should have expected link-in-bio platforms', () => {
