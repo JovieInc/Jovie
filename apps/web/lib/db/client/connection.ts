@@ -104,10 +104,12 @@ function initializePoolIfNeeded(
 
       // Handle pool errors to prevent unhandled rejections
       // and allow the pool to recover from transient failures
+      // Log as breadcrumb instead of exception to prevent Sentry feedback loops
+      // during transient connection errors (e.g., Neon cold starts)
       _pool.on('error', (err: Error) => {
         logDbError('pool_error', err, {
           message: 'Pool encountered an error, will attempt to recover',
-        });
+        }, { asBreadcrumb: true });
         // Don't throw - let the pool attempt to recover
       });
 
