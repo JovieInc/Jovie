@@ -15,7 +15,7 @@ const VERY_SLOW_QUERY_THRESHOLD_MS = 500;
 
 /**
  * Log a database error with context and metadata
- * 
+ *
  * @param context - Error context identifier
  * @param error - The error object or message
  * @param metadata - Additional metadata about the error
@@ -45,9 +45,10 @@ export function logDbError(
 
   // For transient errors like pool errors, log as breadcrumb to avoid Sentry feedback loops
   if (options?.asBreadcrumb) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     Sentry.addBreadcrumb({
       category: 'database',
-      message: `[${context}] ${error instanceof Error ? error.message : String(error)}`,
+      message: `[${context}] ${errorMessage}`,
       level: 'error',
       data: errorInfo,
     });
