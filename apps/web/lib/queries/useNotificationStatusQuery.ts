@@ -11,6 +11,7 @@ import {
   subscribeToNotifications,
   unsubscribeFromNotifications,
 } from '@/lib/notifications/client';
+import type { NotificationStatusResponse } from '@/types/notifications';
 
 import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
@@ -34,7 +35,7 @@ export function useNotificationStatusQuery({
   const emailValue = email ?? null;
   const phoneValue = phone ?? null;
 
-  return useQuery({
+  return useQuery<NotificationStatusResponse, Error>({
     queryKey: queryKeys.notifications.status({
       artistId,
       email: emailValue,

@@ -59,7 +59,7 @@ const fetchPricingOptions = createQueryFn<PricingOptionsResponse>(
  * ```
  */
 export function usePricingOptionsQuery() {
-  return useQuery({
+  return useQuery<PricingOptionsResponse, Error>({
     queryKey: queryKeys.billing.pricingOptions(),
     queryFn: fetchPricingOptions,
     // STABLE_CACHE: 15 min stale, 1 hour gc - pricing rarely changes

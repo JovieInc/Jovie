@@ -1,5 +1,3 @@
-import type { UseQueryOptions } from '@tanstack/react-query';
-
 /**
  * Cache strategy presets for different data types.
  *
@@ -15,6 +13,20 @@ import type { UseQueryOptions } from '@tanstack/react-query';
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
+
+/**
+ * Helper type for cache strategy options.
+ * Uses plain object to avoid TypeScript inference issues with spreads.
+ */
+interface CacheStrategyOptions {
+  staleTime?: number;
+  gcTime?: number;
+  refetchOnMount?: boolean | 'always';
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  refetchInterval?: number | false;
+  refetchIntervalInBackground?: boolean;
+}
 
 /**
  * Real-time data that should always be fresh.
@@ -39,7 +51,7 @@ const HOUR = 60 * MINUTE;
  *   refetchInterval: 30 * 1000, // Poll every 30s
  * });
  */
-export const REALTIME_CACHE: Partial<UseQueryOptions> = {
+export const REALTIME_CACHE: CacheStrategyOptions = {
   staleTime: 0, // Always stale
   gcTime: 5 * MINUTE,
   refetchOnMount: 'always',
@@ -52,7 +64,7 @@ export const REALTIME_CACHE: Partial<UseQueryOptions> = {
  * Frequently changing data that benefits from short cache.
  * Use for: dashboard stats, recent activity, billing status
  */
-export const FREQUENT_CACHE: Partial<UseQueryOptions> = {
+export const FREQUENT_CACHE: CacheStrategyOptions = {
   staleTime: 1 * MINUTE,
   gcTime: 10 * MINUTE,
   refetchOnMount: true,
@@ -64,7 +76,7 @@ export const FREQUENT_CACHE: Partial<UseQueryOptions> = {
  * Use for: user profile, settings, links list
  * This is the default strategy.
  */
-export const STANDARD_CACHE: Partial<UseQueryOptions> = {
+export const STANDARD_CACHE: CacheStrategyOptions = {
   staleTime: 5 * MINUTE,
   gcTime: 30 * MINUTE,
   refetchOnMount: true,
@@ -75,7 +87,7 @@ export const STANDARD_CACHE: Partial<UseQueryOptions> = {
  * Slowly changing data that can be cached longer.
  * Use for: feature flags, app config, creator profiles list
  */
-export const STABLE_CACHE: Partial<UseQueryOptions> = {
+export const STABLE_CACHE: CacheStrategyOptions = {
   staleTime: 15 * MINUTE,
   gcTime: 1 * HOUR,
   refetchOnMount: false,
@@ -89,7 +101,7 @@ export const STABLE_CACHE: Partial<UseQueryOptions> = {
  * Note: gcTime is set longer than staleTime to provide a buffer window
  * for unmount/remount scenarios without losing cached data.
  */
-export const STATIC_CACHE: Partial<UseQueryOptions> = {
+export const STATIC_CACHE: CacheStrategyOptions = {
   staleTime: 1 * HOUR,
   gcTime: 2 * HOUR,
   refetchOnMount: false,
@@ -104,7 +116,7 @@ export const STATIC_CACHE: Partial<UseQueryOptions> = {
  * Avoids refetching entire datasets on mount/focus which would
  * reset scroll position and cause jarring UX.
  */
-export const PAGINATED_CACHE: Partial<UseQueryOptions> = {
+export const PAGINATED_CACHE: CacheStrategyOptions = {
   staleTime: 5 * MINUTE,
   gcTime: 30 * MINUTE,
   refetchOnMount: false, // Don't refetch entire list on mount

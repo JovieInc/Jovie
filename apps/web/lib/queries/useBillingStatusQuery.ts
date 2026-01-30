@@ -60,7 +60,7 @@ async function fetchBillingStatus({
  * }
  */
 export function useBillingStatusQuery() {
-  return useQuery({
+  return useQuery<BillingStatusData, Error>({
     queryKey: queryKeys.billing.status(),
     queryFn: fetchBillingStatus,
     // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
