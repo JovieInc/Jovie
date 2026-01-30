@@ -99,24 +99,29 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
     handlePreviewChange,
   } = usePendingPreview({ onAdd: handleAdd });
 
-  const existingPlatforms = useMemo(
-    () => new Set(links.map(l => l.platform.id)),
-    [links]
-  );
+  // Combined memoization to reduce iterations over links array
+  const { existingPlatforms, existingNormalizedUrlPlatforms } = useMemo(() => {
+    const platforms = new Set<string>();
+    const urlPlatforms = new Map<string, Set<string>>();
 
-  const existingNormalizedUrlPlatforms = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    links.forEach(link => {
+    for (const link of links) {
+      platforms.add(link.platform.id);
+
       const normalizedUrl = link.normalizedUrl;
-      if (!normalizedUrl) return;
-      const existing = map.get(normalizedUrl);
-      if (existing) {
-        existing.add(link.platform.id);
-        return;
+      if (normalizedUrl) {
+        const existing = urlPlatforms.get(normalizedUrl);
+        if (existing) {
+          existing.add(link.platform.id);
+        } else {
+          urlPlatforms.set(normalizedUrl, new Set([link.platform.id]));
+        }
       }
-      map.set(normalizedUrl, new Set([link.platform.id]));
-    });
-    return map;
+    }
+
+    return {
+      existingPlatforms: platforms,
+      existingNormalizedUrlPlatforms: urlPlatforms,
+    };
   }, [links]);
 
   // Suggestion handlers
