@@ -32,7 +32,7 @@ export async function uploadBufferToBlob(
 
   if (!put || !token) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('Blob storage not configured');
+      throw new TypeError('Blob storage not configured');
     }
     logger.warn(
       '[DEV] BLOB_READ_WRITE_TOKEN missing, returning mock URL for:',

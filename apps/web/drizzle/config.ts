@@ -17,7 +17,7 @@ let _db: ReturnType<typeof createDrizzleClient> | null = null;
  */
 function createDrizzleClient() {
   if (!env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not defined');
+    throw new TypeError('DATABASE_URL is not defined');
   }
 
   // Normalize URL: remove "+neon" marker if present

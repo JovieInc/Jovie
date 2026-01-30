@@ -81,7 +81,7 @@ export function encryptPII(value: string | null | undefined): string | null {
       return value;
     }
 
-    throw new Error('PII encryption key not configured');
+    throw new TypeError('PII encryption key not configured');
   }
 
   try {
@@ -133,7 +133,7 @@ export function decryptPII(
     if (env.NODE_ENV === 'development' || isTestEnv()) {
       return encryptedValue;
     }
-    throw new Error('PII encryption key not configured');
+    throw new TypeError('PII encryption key not configured');
   }
 
   // Check if value is encrypted (contains our separator pattern)

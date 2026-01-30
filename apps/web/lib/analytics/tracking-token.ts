@@ -97,7 +97,7 @@ export function isTrackingTokenEnabled(): boolean {
 function generateSignature(profileId: string, timestamp: number): string {
   const secret = getTrackingSecret();
   if (!secret) {
-    throw new Error('TRACKING_TOKEN_SECRET not configured');
+    throw new TypeError('TRACKING_TOKEN_SECRET not configured');
   }
 
   const data = `${profileId}:${timestamp}`;
@@ -122,7 +122,7 @@ export function generateTrackingToken(profileId: string): string {
       });
       return `${profileId}:${Date.now()}:dev`;
     }
-    throw new Error('Tracking token signing not configured');
+    throw new TypeError('Tracking token signing not configured');
   }
 
   const timestamp = Date.now();
