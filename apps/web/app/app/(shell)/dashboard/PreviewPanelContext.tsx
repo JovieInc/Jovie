@@ -25,18 +25,31 @@ export interface PreviewPanelData {
   profilePath: string;
 }
 
-interface PreviewPanelContextValue {
+// Split contexts to prevent cascading re-renders:
+// - StateContext: isOpen, open, close, toggle (changes rarely)
+// - DataContext: previewData, setPreviewData (changes frequently)
+
+interface PreviewPanelStateContextValue {
   isOpen: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
+}
+
+interface PreviewPanelDataContextValue {
   previewData: PreviewPanelData | null;
   setPreviewData: (data: PreviewPanelData) => void;
 }
 
-const PreviewPanelContext = createContext<PreviewPanelContextValue | null>(
-  null
-);
+// Combined type for backwards compatibility
+interface PreviewPanelContextValue
+  extends PreviewPanelStateContextValue,
+    PreviewPanelDataContextValue {}
+
+const PreviewPanelStateContext =
+  createContext<PreviewPanelStateContextValue | null>(null);
+const PreviewPanelDataContext =
+  createContext<PreviewPanelDataContextValue | null>(null);
 
 interface PreviewPanelProviderProps {
   children: React.ReactNode;
@@ -120,35 +133,88 @@ export function PreviewPanelProvider({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [enabled]);
 
-  const value = useMemo<PreviewPanelContextValue>(
+  // Separate memoized values for each context to prevent cascading re-renders
+  const stateValue = useMemo<PreviewPanelStateContextValue>(
     () => ({
       isOpen: effectiveIsOpen,
       open,
       close,
       toggle,
+    }),
+    [effectiveIsOpen, open, close, toggle]
+  );
+
+  const dataValue = useMemo<PreviewPanelDataContextValue>(
+    () => ({
       previewData,
       setPreviewData,
     }),
-    [effectiveIsOpen, open, close, toggle, previewData]
+    [previewData]
   );
 
   return (
-    <PreviewPanelContext.Provider value={value}>
-      {children}
-    </PreviewPanelContext.Provider>
+    <PreviewPanelStateContext.Provider value={stateValue}>
+      <PreviewPanelDataContext.Provider value={dataValue}>
+        {children}
+      </PreviewPanelDataContext.Provider>
+    </PreviewPanelStateContext.Provider>
   );
 }
 
-export function usePreviewPanel(): PreviewPanelContextValue {
-  const context = useContext(PreviewPanelContext);
+/**
+ * Hook for accessing preview panel state (isOpen, open, close, toggle).
+ * Use this when you only need to read/control the open state.
+ * Components using this hook won't re-render when preview data changes.
+ */
+export function usePreviewPanelState(): PreviewPanelStateContextValue {
+  const context = useContext(PreviewPanelStateContext);
   if (!context) {
     throw new Error(
-      'usePreviewPanel must be used within a PreviewPanelProvider'
+      'usePreviewPanelState must be used within a PreviewPanelProvider'
     );
   }
   return context;
 }
 
+/**
+ * Hook for accessing preview panel data (previewData, setPreviewData).
+ * Use this when you need to read/write the preview data.
+ * Components using this hook won't re-render when open state changes.
+ */
+export function usePreviewPanelData(): PreviewPanelDataContextValue {
+  const context = useContext(PreviewPanelDataContext);
+  if (!context) {
+    throw new Error(
+      'usePreviewPanelData must be used within a PreviewPanelProvider'
+    );
+  }
+  return context;
+}
+
+/**
+ * Combined hook for backwards compatibility.
+ * Prefer using usePreviewPanelState or usePreviewPanelData for better performance.
+ */
+export function usePreviewPanel(): PreviewPanelContextValue {
+  const stateContext = useContext(PreviewPanelStateContext);
+  const dataContext = useContext(PreviewPanelDataContext);
+  if (!stateContext || !dataContext) {
+    throw new Error(
+      'usePreviewPanel must be used within a PreviewPanelProvider'
+    );
+  }
+  return { ...stateContext, ...dataContext };
+}
+
+/**
+ * Optional context hook that returns null if not within provider.
+ * For backwards compatibility with optional preview panel usage.
+ */
 export function usePreviewPanelContext(): PreviewPanelContextValue | null {
-  return useContext(PreviewPanelContext);
+  const stateContext = useContext(PreviewPanelStateContext);
+  const dataContext = useContext(PreviewPanelDataContext);
+  if (!stateContext || !dataContext) {
+    return null;
+  }
+  return { ...stateContext, ...dataContext };
 }
