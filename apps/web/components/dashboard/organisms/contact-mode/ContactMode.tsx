@@ -12,6 +12,7 @@ import { Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   getContactRoleLabel,
   summarizeTerritories,
@@ -181,7 +182,7 @@ export function ContactMode({
         <Button
           size='sm'
           variant='secondary'
-          onClick={() => router.push('/app/dashboard/contacts')}
+          onClick={() => router.push(APP_ROUTES.CONTACTS)}
         >
           Add contacts
         </Button>
@@ -213,7 +214,7 @@ export function ContactMode({
         <Button
           size='sm'
           variant='ghost'
-          onClick={() => router.push('/app/dashboard/contacts')}
+          onClick={() => router.push(APP_ROUTES.CONTACTS)}
           className='w-full text-xs text-secondary-token'
         >
           Manage contacts

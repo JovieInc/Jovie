@@ -5,6 +5,7 @@ import { CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { APP_ROUTES } from '@/constants/routes';
 import { useBillingStatusQuery } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
@@ -17,7 +18,7 @@ export function SettingsBillingSection() {
 
   const handleBilling = async () => {
     setIsBillingLoading(true);
-    await router.push('/app/settings/billing');
+    await router.push(APP_ROUTES.SETTINGS_BILLING);
   };
 
   return (

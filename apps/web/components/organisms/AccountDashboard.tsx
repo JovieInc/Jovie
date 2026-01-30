@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { CreditCard, Settings, User } from 'lucide-react';
 import Link from 'next/link';
+import { APP_ROUTES } from '@/constants/routes';
 
 export function AccountDashboard() {
   return (
@@ -36,7 +37,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/app/settings/billing'>Manage Billing</Link>
+              <Link href={APP_ROUTES.SETTINGS_BILLING}>Manage Billing</Link>
             </Button>
           </div>
         </div>
@@ -58,7 +59,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/app/dashboard/profile'>Edit Profile</Link>
+              <Link href={APP_ROUTES.PROFILE}>Edit Profile</Link>
             </Button>
           </div>
         </div>
@@ -80,7 +81,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/app/settings'>View Settings</Link>
+              <Link href={APP_ROUTES.SETTINGS}>View Settings</Link>
             </Button>
           </div>
         </div>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -267,7 +268,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             <div className='flex items-center justify-between'>
               <p className='text-xs text-tertiary-token'>Unique users</p>
               <Link
-                href='/app/dashboard/audience'
+                href={APP_ROUTES.AUDIENCE}
                 className='text-xs font-medium text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
               >
                 View audience

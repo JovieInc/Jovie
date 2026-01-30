@@ -32,7 +32,7 @@ export interface PaymentFailedTemplateData {
  * Build the billing portal URL
  */
 export function buildBillingUrl(): string {
-  return getAppUrl('/app/billing');
+  return getAppUrl('/billing');
 }
 
 /**

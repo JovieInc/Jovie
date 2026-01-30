@@ -15,47 +15,48 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import { APP_ROUTES } from '@/constants/routes';
 import type { NavItem } from './types';
 
 export const primaryNavigation: NavItem[] = [
   {
     name: 'Dashboard',
-    href: '/app',
+    href: APP_ROUTES.DASHBOARD,
     id: 'overview',
     icon: Home,
     description: 'Dashboard overview and quick stats',
   },
   {
     name: 'Profile',
-    href: '/app/dashboard/profile',
+    href: APP_ROUTES.PROFILE,
     id: 'links',
     icon: UserCircle,
     description: 'Update your profile and links',
   },
   {
     name: 'Contacts',
-    href: '/app/dashboard/contacts',
+    href: APP_ROUTES.CONTACTS,
     id: 'contacts',
     icon: IdCard,
     description: 'Manage your team and contact routes',
   },
   {
     name: 'Releases',
-    href: '/app/dashboard/releases',
+    href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
   },
   {
     name: 'Tour Dates',
-    href: '/app/dashboard/tour-dates',
+    href: APP_ROUTES.TOUR_DATES,
     id: 'tour-dates',
     icon: CalendarDays,
     description: 'Sync and manage your tour dates',
   },
   {
     name: 'Audience',
-    href: '/app/dashboard/audience',
+    href: APP_ROUTES.AUDIENCE,
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
@@ -65,14 +66,14 @@ export const primaryNavigation: NavItem[] = [
 export const secondaryNavigation: NavItem[] = [
   {
     name: 'Earnings',
-    href: '/app/dashboard/earnings',
+    href: APP_ROUTES.EARNINGS,
     id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
   },
   {
     name: 'Chat',
-    href: '/app/dashboard/chat',
+    href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
     description: 'Ask Jovie about your career',
@@ -82,37 +83,37 @@ export const secondaryNavigation: NavItem[] = [
 export const settingsNavigation: NavItem[] = [
   {
     name: 'Account',
-    href: '/app/settings',
+    href: APP_ROUTES.SETTINGS,
     id: 'account',
     icon: ShieldCheck,
   },
   {
     name: 'Appearance',
-    href: '/app/settings/appearance',
+    href: APP_ROUTES.SETTINGS_APPEARANCE,
     id: 'appearance',
     icon: Paintbrush,
   },
   {
     name: 'Notifications',
-    href: '/app/settings/notifications',
+    href: APP_ROUTES.SETTINGS_NOTIFICATIONS,
     id: 'notifications',
     icon: Bell,
   },
   {
     name: 'Branding',
-    href: '/app/settings/branding',
+    href: APP_ROUTES.SETTINGS_BRANDING,
     id: 'branding',
     icon: Sparkles,
   },
   {
     name: 'Ad Pixels',
-    href: '/app/settings/ad-pixels',
+    href: APP_ROUTES.SETTINGS_AD_PIXELS,
     id: 'ad-pixels',
     icon: Rocket,
   },
   {
     name: 'Billing',
-    href: '/app/settings/billing',
+    href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     icon: Banknote,
   },
@@ -121,35 +122,35 @@ export const settingsNavigation: NavItem[] = [
 export const adminNavigation: NavItem[] = [
   {
     name: 'Dashboard',
-    href: '/app/admin',
+    href: APP_ROUTES.ADMIN,
     id: 'admin_overview',
     icon: ShieldCheck,
     description: 'Internal metrics and operations',
   },
   {
     name: 'Waitlist',
-    href: '/app/admin/waitlist',
+    href: APP_ROUTES.ADMIN_WAITLIST,
     id: 'admin_waitlist',
     icon: UserPlus,
     description: 'Review and manage waitlist signups',
   },
   {
     name: 'Creators',
-    href: '/app/admin/creators',
+    href: APP_ROUTES.ADMIN_CREATORS,
     id: 'admin_creators',
     icon: Users,
     description: 'Manage creator profiles and verification',
   },
   {
     name: 'Users',
-    href: '/app/admin/users',
+    href: APP_ROUTES.ADMIN_USERS,
     id: 'admin_users',
     icon: UserCircle,
     description: 'Review signed up users and billing status',
   },
   {
     name: 'Activity',
-    href: '/app/admin/activity',
+    href: APP_ROUTES.ADMIN_ACTIVITY,
     id: 'admin_activity',
     icon: PieChart,
     description: 'Review recent system and creator activity',

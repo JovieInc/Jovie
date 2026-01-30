@@ -77,7 +77,7 @@ export const Sizes: Story = {
 export const StateTransitions: Story = {
   render: () => (
     <div className='flex flex-wrap gap-4'>
-      <CTAButton href='/app/dashboard'>Explore</CTAButton>
+      <CTAButton href='/'>Explore</CTAButton>
       <CTAButton isLoading>Saving</CTAButton>
       <CTAButton isSuccess>Saved</CTAButton>
     </div>
