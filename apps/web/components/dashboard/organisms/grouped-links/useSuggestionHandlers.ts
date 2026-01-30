@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback } from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { SuggestedLink } from '../links/hooks';

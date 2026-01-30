@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';

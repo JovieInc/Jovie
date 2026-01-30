@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { captureError } from '@/lib/error-tracking';
 
 export type ClipboardStatus = 'idle' | 'success' | 'error';
 
@@ -126,7 +127,11 @@ export function useClipboard(
         if (onError) {
           onError(lastError ?? new Error('Copy failed'));
         } else {
-          console.error('Failed to copy to clipboard');
+          captureError(
+            'Failed to copy to clipboard',
+            lastError ?? new Error('Copy failed'),
+            { text: text.substring(0, 100) } // Include truncated text for context
+          );
         }
       }
 
