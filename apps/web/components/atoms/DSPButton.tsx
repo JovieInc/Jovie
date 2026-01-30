@@ -8,14 +8,14 @@ const sizeMap = { sm: 'sm', md: 'default', lg: 'lg' } as const;
 
 export interface DSPButtonProps
   extends Omit<ButtonProps, 'children' | 'onClick' | 'size'> {
-  name: string;
-  dspKey: string;
-  url: string;
-  backgroundColor: string;
-  textColor: string;
-  logoSvg: string;
-  onClick?: (dspKey: string, url: string) => void;
-  size?: keyof typeof sizeMap;
+  readonly name: string;
+  readonly dspKey: string;
+  readonly url: string;
+  readonly backgroundColor: string;
+  readonly textColor: string;
+  readonly logoSvg: string;
+  readonly onClick?: (dspKey: string, url: string) => void;
+  readonly size?: keyof typeof sizeMap;
 }
 
 /**

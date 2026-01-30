@@ -2,9 +2,9 @@ import { getCopyrightText } from '@/constants/app';
 import { cn } from '@/lib/utils';
 
 interface CopyrightProps {
-  className?: string;
-  variant?: 'light' | 'dark';
-  year?: number;
+  readonly className?: string;
+  readonly variant?: 'light' | 'dark';
+  readonly year?: number;
 }
 
 const baseStyles = 'text-sm font-medium tracking-tight';

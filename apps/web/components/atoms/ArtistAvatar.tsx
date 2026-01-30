@@ -8,12 +8,12 @@ import type { AvatarProps } from './Avatar';
  * @deprecated Use `Avatar` directly. This wrapper preserves legacy sizing while delegating to the unified Avatar.
  */
 export interface ArtistAvatarProps {
-  src?: string | null;
-  alt?: string;
-  name: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  priority?: boolean;
-  className?: string;
+  readonly src?: string | null;
+  readonly alt?: string;
+  readonly name: string;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl';
+  readonly priority?: boolean;
+  readonly className?: string;
 }
 
 const SIZE_MAP: Record<

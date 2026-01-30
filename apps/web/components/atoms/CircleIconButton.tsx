@@ -41,17 +41,17 @@ export type CircleIconButtonVariant =
 export interface CircleIconButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Button content (typically an icon) */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
   /** Accessible label for screen readers */
-  ariaLabel: string;
+  readonly ariaLabel: string;
   /** Button size - xs: 32px, sm: 36px, md: 40px, lg: 44px */
-  size?: CircleIconButtonSize;
+  readonly size?: CircleIconButtonSize;
   /** Visual variant */
-  variant?: CircleIconButtonVariant;
+  readonly variant?: CircleIconButtonVariant;
   /** Render as child element (for Link, etc.) */
-  asChild?: boolean;
+  readonly asChild?: boolean;
   /** Additional class names */
-  className?: string;
+  readonly className?: string;
 }
 
 const sizeStyles: Record<CircleIconButtonSize, string> = {

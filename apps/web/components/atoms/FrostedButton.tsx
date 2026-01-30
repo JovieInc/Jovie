@@ -6,10 +6,10 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface FrostedButtonProps extends Omit<ButtonProps, 'variant'> {
-  href?: string;
-  external?: boolean;
-  tone?: 'solid' | 'ghost' | 'outline';
-  prefetch?: boolean;
+  readonly href?: string;
+  readonly external?: boolean;
+  readonly tone?: 'solid' | 'ghost' | 'outline';
+  readonly prefetch?: boolean;
 }
 
 const toneToVariant: Record<

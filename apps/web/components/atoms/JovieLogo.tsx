@@ -3,15 +3,15 @@ import { APP_NAME } from '@/constants/app';
 import { cn } from '@/lib/utils';
 
 interface JovieLogoProps {
-  href?: string;
-  artistHandle?: string;
-  className?: string;
-  variant?: 'light' | 'dark';
-  showText?: boolean;
-  ariaLabel?: string;
-  target?: React.AnchorHTMLAttributes<HTMLAnchorElement>['target'];
-  title?: string;
-  size?: 'sm' | 'md';
+  readonly href?: string;
+  readonly artistHandle?: string;
+  readonly className?: string;
+  readonly variant?: 'light' | 'dark';
+  readonly showText?: boolean;
+  readonly ariaLabel?: string;
+  readonly target?: React.AnchorHTMLAttributes<HTMLAnchorElement>['target'];
+  readonly title?: string;
+  readonly size?: 'sm' | 'md';
 }
 
 export function JovieLogo({

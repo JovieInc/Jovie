@@ -15,13 +15,13 @@ const variantClasses = {
 
 export interface GradientTextProps {
   /** Text content to display with gradient */
-  children: ReactNode;
+  readonly children: ReactNode;
   /** Gradient color scheme variant */
-  variant?: keyof typeof variantClasses;
+  readonly variant?: keyof typeof variantClasses;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
   /** Element type to render */
-  as?: ElementType;
+  readonly as?: ElementType;
 }
 
 export function GradientText({
