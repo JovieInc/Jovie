@@ -200,15 +200,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       if (isAppSubdomain(hostname)) {
         // Redirect /dashboard to / (dashboard is at root on app.jov.ie)
         // This handles SSO callbacks that redirect to /app/dashboard → app.jov.ie/dashboard
-        if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
-          const targetPath =
-            pathname === '/dashboard'
-              ? '/'
-              : pathname.replace('/dashboard', '');
-          // Normalize path to prevent open redirect (e.g., //evil.com being treated as protocol-relative)
-          const normalizedPath = '/' + targetPath.replace(/^\/+/, '');
+        // Note: Only redirect exact /dashboard, NOT /dashboard/* paths (those routes live at /app/dashboard/*)
+        if (pathname === '/dashboard') {
           const targetUrl = new URL('https://app.jov.ie');
-          targetUrl.pathname = normalizedPath;
+          targetUrl.pathname = '/';
           targetUrl.search = req.nextUrl.search;
           return NextResponse.redirect(targetUrl, 301);
         }
@@ -233,7 +228,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
         const isAppPath =
           appPaths.some(p => pathname === p || pathname.startsWith(`${p}/`)) ||
-          pathname.startsWith('/api/');
+          pathname.startsWith('/api/') ||
+          pathname.startsWith('/app/'); // Allow /app/* paths on app.jov.ie for RSC requests
 
         if (!isAppPath) {
           // Redirect non-app paths to root jov.ie
