@@ -4,12 +4,12 @@ import { Button, SimpleTooltip } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface TableIconButtonProps {
-  icon: React.ReactNode;
-  onClick: () => void;
-  ariaLabel: string;
-  tooltip?: string;
-  variant?: 'ghost' | 'danger';
-  className?: string;
+  readonly icon: React.ReactNode;
+  readonly onClick: () => void;
+  readonly ariaLabel: string;
+  readonly tooltip?: string;
+  readonly variant?: 'ghost' | 'danger';
+  readonly className?: string;
 }
 
 export function TableIconButton({

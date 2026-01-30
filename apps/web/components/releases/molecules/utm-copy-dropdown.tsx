@@ -50,21 +50,21 @@ import {
 
 export interface UTMCopyDropdownProps {
   /** The base URL to copy (smart link URL) */
-  url: string;
+  readonly url: string;
   /** Context for UTM parameter resolution */
-  context: UTMContext;
+  readonly context: UTMContext;
   /** Label for the release (shown in toast) */
-  releaseLabel: string;
+  readonly releaseLabel: string;
   /** Test ID for the component */
-  testId?: string;
+  readonly testId?: string;
   /** Callback when copy succeeds */
-  onCopy?: (url: string, withUTM: boolean, presetId?: string) => void;
+  readonly onCopy?: (url: string, withUTM: boolean, presetId?: string) => void;
   /** Whether to stop event propagation */
-  stopPropagation?: boolean;
+  readonly stopPropagation?: boolean;
   /** Size variant */
-  size?: 'sm' | 'md';
+  readonly size?: 'sm' | 'md';
   /** Additional class name */
-  className?: string;
+  readonly className?: string;
 }
 
 // ============================================================================

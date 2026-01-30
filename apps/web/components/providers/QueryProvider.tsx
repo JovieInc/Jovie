@@ -100,7 +100,7 @@ function getQueryClient(): QueryClient {
 }
 
 interface QueryProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 /**

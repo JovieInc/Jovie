@@ -4,7 +4,7 @@ import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import type { ReactNode } from 'react';
 
 interface NuqsProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 /**

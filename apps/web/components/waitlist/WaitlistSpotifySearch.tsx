@@ -21,12 +21,12 @@ import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import type { FormErrors } from './types';
 
 interface WaitlistSpotifySearchProps {
-  spotifyUrl: string;
-  onUrlChange: (url: string) => void;
-  fieldErrors: FormErrors;
-  isSubmitting: boolean;
-  isHydrating: boolean;
-  setInputRef: (el: HTMLInputElement | null) => void;
+  readonly spotifyUrl: string;
+  readonly onUrlChange: (url: string) => void;
+  readonly fieldErrors: FormErrors;
+  readonly isSubmitting: boolean;
+  readonly isHydrating: boolean;
+  readonly setInputRef: (el: HTMLInputElement | null) => void;
 }
 
 const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];

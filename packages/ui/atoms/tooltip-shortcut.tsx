@@ -9,20 +9,20 @@ export interface TooltipShortcutProps {
   /**
    * The label text to display in the tooltip
    */
-  label: string;
+  readonly label: string;
   /**
    * Optional keyboard shortcut to display (e.g., "⌘S", "⌘/Ctrl B")
    */
-  shortcut?: string;
+  readonly shortcut?: string;
   /**
    * Which side of the trigger to show the tooltip
    * @default 'top'
    */
-  side?: 'top' | 'right' | 'bottom' | 'left';
+  readonly side?: 'top' | 'right' | 'bottom' | 'left';
   /**
    * The trigger element (button, link, etc.)
    */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 /**
