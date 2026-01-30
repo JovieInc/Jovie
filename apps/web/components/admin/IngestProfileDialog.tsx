@@ -16,7 +16,7 @@ export function IngestProfileDialog({
   open,
   onOpenChange,
   onSuccess,
-}: IngestProfileDialogProps) {
+}: Readonly<IngestProfileDialogProps>) {
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -50,7 +50,7 @@ export function IngestProfileDialog({
   // Handle delayed close after successful ingest
   useEffect(() => {
     if (success) {
-      const timeoutId = window.setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         onOpenChange(false);
         onSuccess();
       }, 1500);

@@ -90,21 +90,21 @@ export default function WaitlistPage() {
   // Load all persisted form state on mount
   useEffect(() => {
     try {
-      const storedSubmitted = window.sessionStorage.getItem(
+      const storedSubmitted = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.submitted
       );
       if (storedSubmitted === 'true') {
         setIsSubmitted(true);
       }
 
-      const storedStep = window.sessionStorage.getItem(
+      const storedStep = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.step
       );
       if (storedStep === '0' || storedStep === '1' || storedStep === '2') {
         setStep(Number.parseInt(storedStep, 10) as 0 | 1 | 2);
       }
 
-      const storedGoal = window.sessionStorage.getItem(
+      const storedGoal = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primaryGoal
       );
       if (
@@ -115,7 +115,7 @@ export default function WaitlistPage() {
         setPrimaryGoal(storedGoal);
       }
 
-      const storedPlatform = window.sessionStorage.getItem(
+      const storedPlatform = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.socialPlatform
       );
       if (
@@ -127,21 +127,21 @@ export default function WaitlistPage() {
         setSocialPlatform(storedPlatform);
       }
 
-      const storedSocialUrl = window.sessionStorage.getItem(
+      const storedSocialUrl = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.primarySocialUrl
       );
       if (storedSocialUrl) {
         setPrimarySocialUrl(storedSocialUrl);
       }
 
-      const storedSpotifyUrl = window.sessionStorage.getItem(
+      const storedSpotifyUrl = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.spotifyUrl
       );
       if (storedSpotifyUrl) {
         setSpotifyUrl(storedSpotifyUrl);
       }
 
-      const storedHeardAbout = window.sessionStorage.getItem(
+      const storedHeardAbout = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.heardAbout
       );
       if (storedHeardAbout) {
@@ -157,9 +157,9 @@ export default function WaitlistPage() {
     const persist = (key: string, value: string | null) => {
       try {
         if (value) {
-          window.sessionStorage.setItem(key, value);
+          globalThis.sessionStorage.setItem(key, value);
         } else {
-          window.sessionStorage.removeItem(key);
+          globalThis.sessionStorage.removeItem(key);
         }
       } catch {
         // Ignore storage errors
@@ -185,7 +185,7 @@ export default function WaitlistPage() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     try {
-      const storedUserId = window.sessionStorage.getItem(
+      const storedUserId = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.userId
       );
       if (storedUserId && storedUserId !== userId) {
@@ -193,7 +193,7 @@ export default function WaitlistPage() {
         setIsSubmitted(false);
       }
       if (userId) {
-        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
+        globalThis.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
       }
     } catch {
       // Ignore storage errors
@@ -221,7 +221,10 @@ export default function WaitlistPage() {
 
       clearWaitlistStorage();
       try {
-        window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
+        globalThis.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.submitted,
+          'true'
+        );
       } catch {
         // Ignore storage errors
       }
@@ -387,7 +390,7 @@ export default function WaitlistPage() {
         onSuccess: () => {
           clearWaitlistStorage();
           try {
-            window.sessionStorage.setItem(
+            globalThis.sessionStorage.setItem(
               WAITLIST_STORAGE_KEYS.submitted,
               'true'
             );

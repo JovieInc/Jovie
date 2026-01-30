@@ -35,7 +35,7 @@ export function UserActionsMenu({
   user,
   open,
   onOpenChange,
-}: UserActionsMenuProps) {
+}: Readonly<UserActionsMenuProps>) {
   const [copySuccess, setCopySuccess] = useState(false);
 
   const handleCopyClerkId = useCallback(async () => {

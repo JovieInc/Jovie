@@ -29,7 +29,7 @@ export function AdminCreatorsFooter({
   canNext,
   prevHref,
   nextHref,
-}: AdminCreatorsFooterProps) {
+}: Readonly<AdminCreatorsFooterProps>) {
   return (
     <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
       <div className='flex items-center gap-2'>

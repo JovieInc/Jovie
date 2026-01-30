@@ -43,17 +43,17 @@ interface AdminSidebarProps {
   className?: string;
 }
 
-export function AdminSidebar({ className }: AdminSidebarProps) {
+export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {
   const pathname = usePathname();
   const [hash, setHash] = useState<string>('');
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     // Track hash so items like /admin#usage don't double-highlight
-    const updateHash = () => setHash(window.location.hash || '');
+    const updateHash = () => setHash(globalThis.location.hash || '');
     updateHash();
-    window.addEventListener('hashchange', updateHash);
-    return () => window.removeEventListener('hashchange', updateHash);
+    globalThis.addEventListener('hashchange', updateHash);
+    return () => globalThis.removeEventListener('hashchange', updateHash);
   }, []);
 
   const pathWithHash = hash ? `${pathname}${hash}` : pathname;

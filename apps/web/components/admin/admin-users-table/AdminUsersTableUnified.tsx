@@ -82,55 +82,55 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     (user: AdminUserRow): ContextMenuItemType[] => {
       const items: ContextMenuItemType[] = [];
 
-      // Copy Clerk user ID
-      items.push({
-        id: 'copy-clerk-id',
-        label: 'Copy Clerk user ID',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(user.clerkId);
-          toast.success('Clerk ID copied', { duration: 2000 });
+      // Copy Clerk user ID, Copy email, Copy User ID
+      items.push(
+        {
+          id: 'copy-clerk-id',
+          label: 'Copy Clerk user ID',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(user.clerkId);
+            toast.success('Clerk ID copied', { duration: 2000 });
+          },
         },
-      });
-
-      // Copy email
-      items.push({
-        id: 'copy-email',
-        label: 'Copy email',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          if (user.email) {
-            navigator.clipboard.writeText(user.email);
-            toast.success('Email copied', { duration: 2000 });
-          }
+        {
+          id: 'copy-email',
+          label: 'Copy email',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            if (user.email) {
+              navigator.clipboard.writeText(user.email);
+              toast.success('Email copied', { duration: 2000 });
+            }
+          },
+          disabled: !user.email,
         },
-        disabled: !user.email,
-      });
-
-      // Copy User ID
-      items.push({
-        id: 'copy-user-id',
-        label: 'Copy User ID',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          navigator.clipboard.writeText(user.id);
-          toast.success('User ID copied', { duration: 2000 });
-        },
-      });
+        {
+          id: 'copy-user-id',
+          label: 'Copy User ID',
+          icon: <Copy className='h-3.5 w-3.5' />,
+          onClick: () => {
+            navigator.clipboard.writeText(user.id);
+            toast.success('User ID copied', { duration: 2000 });
+          },
+        }
+      );
 
       // Open in Clerk (if has Clerk ID)
       const hasClerkConsoleUrl = user.clerkId.length > 0;
       if (hasClerkConsoleUrl) {
         const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(user.clerkId)}`;
-        items.push({ type: 'separator' as const });
-        items.push({
-          id: 'open-in-clerk',
-          label: 'Open in Clerk',
-          icon: <ExternalLink className='h-3.5 w-3.5' />,
-          onClick: () => {
-            window.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
-          },
-        });
+        items.push(
+          { type: 'separator' as const },
+          {
+            id: 'open-in-clerk',
+            label: 'Open in Clerk',
+            icon: <ExternalLink className='h-3.5 w-3.5' />,
+            onClick: () => {
+              window.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
+            },
+          }
+        );
       }
 
       return items;

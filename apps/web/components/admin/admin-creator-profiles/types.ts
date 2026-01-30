@@ -2,7 +2,7 @@ import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from '@/lib/admin/creator-profiles';
-import type { Contact, ContactSidebarMode } from '@/types';
+import type { ContactSidebarMode } from '@/types';
 
 export interface AdminCreatorProfilesWithSidebarProps {
   profiles: AdminCreatorProfileRow[];
@@ -33,5 +33,8 @@ export type AdminCreatorSocialLinksResponse =
 
 export type IngestRefreshStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export type { AdminCreatorProfileRow, AdminCreatorProfilesSort };
-export type { Contact, ContactSidebarMode };
+export type {
+  AdminCreatorProfileRow,
+  AdminCreatorProfilesSort,
+} from '@/lib/admin/creator-profiles';
+export type { Contact, ContactSidebarMode } from '@/types';

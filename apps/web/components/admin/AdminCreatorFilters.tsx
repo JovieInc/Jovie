@@ -16,7 +16,7 @@ export interface AdminCreatorFiltersProps
 
 export function AdminCreatorFilters({
   initialPageSize,
-}: AdminCreatorFiltersProps) {
+}: Readonly<AdminCreatorFiltersProps>) {
   const [pageSizeValue, setPageSizeValue] = React.useState<string>(
     String(initialPageSize)
   );

@@ -22,7 +22,7 @@ export function SendInviteDialog({
   open,
   onOpenChange,
   onSuccess,
-}: SendInviteDialogProps) {
+}: Readonly<SendInviteDialogProps>) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

@@ -7,7 +7,9 @@ export interface ClaimLinkCopyButtonProps
     claimToken: string;
   }> {}
 
-export function ClaimLinkCopyButton({ claimToken }: ClaimLinkCopyButtonProps) {
+export function ClaimLinkCopyButton({
+  claimToken,
+}: Readonly<ClaimLinkCopyButtonProps>) {
   if (!claimToken) {
     return null;
   }

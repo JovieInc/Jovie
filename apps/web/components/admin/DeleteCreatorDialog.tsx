@@ -28,7 +28,7 @@ export function DeleteCreatorDialog({
   open,
   onOpenChange,
   onConfirm,
-}: DeleteCreatorDialogProps) {
+}: Readonly<DeleteCreatorDialogProps>) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

@@ -65,7 +65,7 @@ export function VerificationStatusToggle({
   isVerified,
   status,
   onToggle,
-}: VerificationStatusToggleProps) {
+}: Readonly<VerificationStatusToggleProps>) {
   const isLoading = status === 'loading';
   const isSuccess = status === 'success';
   const isError = status === 'error';
