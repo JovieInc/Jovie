@@ -41,7 +41,7 @@ export function TableSearchBar({
 
   return (
     <div className={cn('relative flex items-center', className)}>
-      <Search className='absolute left-3 h-4 w-4 text-tertiary-token pointer-events-none' />
+      <Search className='absolute left-3 h-3.5 w-3.5 text-tertiary-token pointer-events-none' />
       <Input
         type='search'
         value={localValue}

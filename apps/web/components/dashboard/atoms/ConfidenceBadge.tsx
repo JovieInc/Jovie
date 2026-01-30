@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 
 export interface ConfidenceBadgeProps {
   score: number; // 0-1 decimal
@@ -18,7 +18,7 @@ const CONFIDENCE_THRESHOLDS = {
 
 const CONFIDENCE_STYLES: Record<
   ConfidenceLevel,
-  { label: string; className: string; dotClassName: string }
+  { label: string } & DotBadgeVariant
 > = {
   high: {
     label: 'High',
@@ -65,32 +65,21 @@ export function ConfidenceBadge({
   const style = CONFIDENCE_STYLES[level];
   const percentage = Math.round(score * 100);
 
-  const sizeClasses = {
-    sm: 'px-1.5 py-0.5 text-[10px]',
-    md: 'px-2 py-0.5 text-[11px]',
-  };
-
-  return (
-    <span
-      className={cn(
-        'inline-flex w-fit items-center rounded-full border font-medium tracking-wide',
-        sizeClasses[size],
-        style.className,
-        className
-      )}
-      title={`${percentage}% confidence`}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'mr-1.5 inline-block shrink-0 rounded-full',
-          size === 'sm' ? 'size-1' : 'size-1.5',
-          style.dotClassName
-        )}
-      />
+  const label = (
+    <>
       <span>{percentage}%</span>
       {showLabel && <span className='ml-1'>{style.label}</span>}
-    </span>
+    </>
+  );
+
+  return (
+    <DotBadge
+      label={label}
+      size={size}
+      variant={style}
+      title={`${percentage}% confidence`}
+      className={className}
+    />
   );
 }
 

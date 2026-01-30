@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   AdminActivitySection,
   AdminActivitySectionSkeleton,
@@ -17,22 +18,26 @@ export const runtime = 'nodejs';
 
 export default function AdminPage() {
   return (
-    <div className='space-y-8'>
-      <header>
-        <h1 className='sr-only'>Admin Dashboard</h1>
-      </header>
+    <PageShell>
+      <PageContent>
+        <div className='space-y-8'>
+          <header>
+            <h1 className='sr-only'>Admin Dashboard</h1>
+          </header>
 
-      <Suspense fallback={<AdminKpiSectionSkeleton />}>
-        <AdminKpiSection />
-      </Suspense>
+          <Suspense fallback={<AdminKpiSectionSkeleton />}>
+            <AdminKpiSection />
+          </Suspense>
 
-      <Suspense fallback={<AdminUsageSectionSkeleton />}>
-        <AdminUsageSection />
-      </Suspense>
+          <Suspense fallback={<AdminUsageSectionSkeleton />}>
+            <AdminUsageSection />
+          </Suspense>
 
-      <Suspense fallback={<AdminActivitySectionSkeleton />}>
-        <AdminActivitySection />
-      </Suspense>
-    </div>
+          <Suspense fallback={<AdminActivitySectionSkeleton />}>
+            <AdminActivitySection />
+          </Suspense>
+        </div>
+      </PageContent>
+    </PageShell>
   );
 }

@@ -113,7 +113,10 @@ export function DeleteCreatorDialog({
 
         {/* Warning banner */}
         <div className='flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2'>
-          <Icon name='AlertCircle' className='h-4 w-4 text-red-500 shrink-0' />
+          <Icon
+            name='AlertCircle'
+            className='h-3.5 w-3.5 text-red-500 shrink-0'
+          />
           <p className='text-xs font-medium text-red-500'>
             This action cannot be undone
           </p>
@@ -124,7 +127,7 @@ export function DeleteCreatorDialog({
           <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
             <Icon
               name='XCircle'
-              className='h-4 w-4 text-destructive shrink-0'
+              className='h-3.5 w-3.5 text-destructive shrink-0'
             />
             <p className='text-xs font-medium text-destructive'>{error}</p>
           </div>
@@ -146,12 +149,15 @@ export function DeleteCreatorDialog({
           >
             {isDeleting ? (
               <>
-                <Icon name='Loader2' className='mr-2 h-4 w-4 animate-spin' />
+                <Icon
+                  name='Loader2'
+                  className='mr-2 h-3.5 w-3.5 animate-spin'
+                />
                 Deleting...
               </>
             ) : (
               <>
-                <Icon name='Trash2' className='mr-2 h-4 w-4' />
+                <Icon name='Trash2' className='mr-2 h-3.5 w-3.5' />
                 {isClaimed ? 'Delete Account' : 'Delete Profile'}
               </>
             )}

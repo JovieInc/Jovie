@@ -1,7 +1,7 @@
 'use client';
 
+import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
-import { cn } from '@/lib/utils';
 
 export interface MatchStatusBadgeProps {
   status: DspMatchStatus;
@@ -11,7 +11,7 @@ export interface MatchStatusBadgeProps {
 
 const STATUS_STYLES: Record<
   DspMatchStatus,
-  { label: string; className: string; dotClassName: string }
+  { label: string } & DotBadgeVariant
 > = {
   suggested: {
     label: 'Suggested',
@@ -58,29 +58,12 @@ export function MatchStatusBadge({
 }: MatchStatusBadgeProps) {
   const style = STATUS_STYLES[status];
 
-  const sizeClasses = {
-    sm: 'px-1.5 py-0.5 text-[10px]',
-    md: 'px-2 py-0.5 text-[11px]',
-  };
-
   return (
-    <span
-      className={cn(
-        'inline-flex w-fit items-center rounded-full border font-medium tracking-wide',
-        sizeClasses[size],
-        style.className,
-        className
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'mr-1.5 inline-block shrink-0 rounded-full',
-          size === 'sm' ? 'size-1' : 'size-1.5',
-          style.dotClassName
-        )}
-      />
-      {style.label}
-    </span>
+    <DotBadge
+      label={style.label}
+      size={size}
+      variant={style}
+      className={className}
+    />
   );
 }

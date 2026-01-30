@@ -145,7 +145,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
     return [
       {
         label: 'Copy Clerk IDs',
-        icon: <Copy className='h-4 w-4' />,
+        icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const ids = selectedUsers.map(u => u.clerkId).join('\n');
           navigator.clipboard.writeText(ids);
@@ -154,7 +154,7 @@ export function AdminUsersTableUnified(props: AdminUsersTableProps) {
       },
       {
         label: 'Copy Emails',
-        icon: <Copy className='h-4 w-4' />,
+        icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const emails = selectedUsers
             .map(u => u.email)
