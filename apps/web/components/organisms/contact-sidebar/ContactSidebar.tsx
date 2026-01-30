@@ -82,7 +82,7 @@ export const ContactSidebar = memo(function ContactSidebar({
           id: 'open-profile',
           label: 'Open profile',
           icon: <ExternalLink className='h-4 w-4' />,
-          onClick: () => window.open(`/${username}`, '_blank'),
+          onClick: () => globalThis.open(`/${username}`, '_blank'),
         }
       );
     }
