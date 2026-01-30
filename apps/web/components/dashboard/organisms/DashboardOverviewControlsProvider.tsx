@@ -43,11 +43,11 @@ export function DashboardOverviewControlsProvider({
   children,
   defaultRange = '7d',
 }: DashboardOverviewControlsProviderProps) {
-  const [range, setRangeState] = useState<DashboardOverviewRange>(defaultRange);
+  const [range, setRange] = useState<DashboardOverviewRange>(defaultRange);
   const [refreshSignal, setRefreshSignal] = useState(0);
 
-  const setRange = useCallback((newRange: DashboardOverviewRange) => {
-    setRangeState(newRange);
+  const updateRange = useCallback((newRange: DashboardOverviewRange) => {
+    setRange(newRange);
   }, []);
 
   const triggerRefresh = useCallback(() => {
@@ -57,11 +57,11 @@ export function DashboardOverviewControlsProvider({
   const value = useMemo<DashboardOverviewControlsValue>(() => {
     return {
       range,
-      setRange,
+      setRange: updateRange,
       refreshSignal,
       triggerRefresh,
     };
-  }, [range, setRange, refreshSignal, triggerRefresh]);
+  }, [range, updateRange, refreshSignal, triggerRefresh]);
 
   return (
     <DashboardOverviewControlsContext.Provider value={value}>
