@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * TanStack Query mutations for tour dates
  */

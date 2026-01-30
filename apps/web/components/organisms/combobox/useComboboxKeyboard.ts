@@ -1,3 +1,5 @@
+'use client';
+
 import { type KeyboardEvent, useCallback } from 'react';
 import type { ComboboxOption } from './types';
 

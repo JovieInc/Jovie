@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -211,7 +212,10 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
       notifications.success('Copied to clipboard', { duration: 2000 });
       setTimeout(() => setCopied(false), CLIPBOARD_FEEDBACK_DELAY_MS);
     } catch (e) {
-      console.error('Copy failed', e);
+      void captureError('Failed to copy profile URL to clipboard', e, {
+        profileUrl,
+        route: '/app/dashboard',
+      });
       notifications.error('Failed to copy');
     }
   };

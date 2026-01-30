@@ -6,6 +6,7 @@ import { LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import type { AvailableDSP } from '@/lib/dsp';
+import { captureError } from '@/lib/error-tracking';
 
 export interface ListenSectionProps {
   /** Artist handle for tracking */
@@ -103,7 +104,11 @@ export function ListenSection({
       // Fallback: use regular URL opening
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      console.error('Error handling DSP click:', error);
+      captureError('Error handling DSP click', error, {
+        handle,
+        dspKey,
+        url,
+      });
       // Last resort: try to open the URL anyway
       try {
         window.open(url, '_blank', 'noopener,noreferrer');
