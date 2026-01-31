@@ -11,7 +11,6 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -22,6 +21,7 @@ import {
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from '@/lib/services/profile';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,

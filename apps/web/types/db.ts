@@ -4,6 +4,7 @@
 
 // Import SocialPlatform from the canonical source
 export type { SocialPlatform } from '@/constants/platforms';
+
 import { toISOStringSafe } from '@/lib/utils/date';
 
 // Creator type enum
