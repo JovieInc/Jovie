@@ -13,7 +13,6 @@ import {
 } from '@/lib/notifications/client';
 import type { NotificationStatusResponse } from '@/types/notifications';
 
-import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 /**
@@ -50,7 +49,7 @@ export function useNotificationStatusQuery({
         },
         signal
       ),
-    // STANDARD_CACHE values (5 min stale, 30 min gc)
+    // STANDARD_CACHE: 5 min stale, 30 min gc
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: true,
