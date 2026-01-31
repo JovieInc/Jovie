@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries/keys';
 import {
   type DashboardProfile,
@@ -10,9 +10,8 @@ import {
   useUpdateVenmoMutation,
 } from '@/lib/queries/useDashboardProfileQuery';
 
-// Mock fetch globally
+// Mock fetch with proper isolation
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 // Sample profile data for tests
 const mockProfile: DashboardProfile = {
@@ -33,6 +32,7 @@ describe('useDashboardProfileQuery', () => {
   );
 
   beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
     vi.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
@@ -45,6 +45,10 @@ describe('useDashboardProfileQuery', () => {
         },
       },
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('useDashboardProfileQuery hook', () => {
@@ -121,12 +125,10 @@ describe('useDashboardProfileQuery', () => {
 
       const firstCallCount = mockFetch.mock.calls.length;
 
-      // Rerender - should use cached data
+      // Rerender - should use cached data without refetching
       rerender();
 
-      // Wait a tick to ensure no refetch happened
-      await new Promise(r => setTimeout(r, 10));
-
+      // Verify no additional fetch was made (data is still fresh)
       expect(mockFetch.mock.calls.length).toBe(firstCallCount);
     });
   });

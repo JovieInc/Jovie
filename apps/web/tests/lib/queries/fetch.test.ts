@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMutationFn,
   createQueryFn,
@@ -6,13 +6,17 @@ import {
   fetchWithTimeout,
 } from '@/lib/queries/fetch';
 
-// Mock global fetch
+// Mock global fetch with proper isolation
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe('fetch utilities', () => {
   beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('FetchError', () => {

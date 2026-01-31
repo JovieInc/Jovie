@@ -28,8 +28,9 @@ This is the most critical gap. The queries directory contains all React Query ho
 - All dashboard query hooks
 
 **Recommended Actions:**
-```
-tests/lib/queries/
+
+```text
+apps/web/tests/lib/queries/
 ├── useDashboardProfileQuery.test.ts
 ├── useBillingMutations.test.ts
 ├── useAudienceQueries.test.ts
@@ -60,8 +61,9 @@ tests/lib/queries/
 | `useBreakpoint.ts` | Responsive breakpoints | Low |
 
 **Recommended Test File Structure:**
-```
-tests/hooks/
+
+```text
+apps/web/tests/hooks/
 ├── useSignInFlow.test.ts
 ├── useSignUpFlow.test.ts
 ├── useClerkSafe.test.tsx
@@ -119,8 +121,9 @@ The entire email subsystem is untested:
 - Bounce/complaint handling
 
 **Recommended Coverage:**
-```
-tests/lib/email/
+
+```text
+apps/web/tests/lib/email/
 ├── delivery.test.ts
 ├── templates.test.ts
 ├── campaigns.test.ts
@@ -308,8 +311,9 @@ Untested areas:
 ## Suggested Test File Templates
 
 ### Query Hook Test Template
+
 ```typescript
-// tests/lib/queries/useDashboardProfileQuery.test.ts
+// apps/web/tests/lib/queries/useDashboardProfileQuery.test.ts
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
@@ -330,8 +334,9 @@ describe('useDashboardProfileQuery', () => {
 ```
 
 ### API Route Test Template
+
 ```typescript
-// tests/unit/api/stripe/plan-change.test.ts
+// apps/web/tests/unit/api/stripe/plan-change.test.ts
 import { POST, GET, DELETE } from '@/app/api/stripe/plan-change/route';
 import { createMockRequest } from '@/tests/test-utils';
 
