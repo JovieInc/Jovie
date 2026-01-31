@@ -156,8 +156,13 @@ describe('@critical session.ts', () => {
       });
 
       // The implementation passes the db object directly (neon-http driver doesn't support transactions)
+      // Verify the db object was passed (has execute, select, transaction methods)
       expect(operation).toHaveBeenCalledWith(
-        expect.objectContaining({ execute: expect.any(Function) }),
+        expect.objectContaining({
+          execute: expect.any(Function),
+          select: expect.any(Function),
+          transaction: expect.any(Function),
+        }),
         'user_123'
       );
       expect(result).toBe('tx_result');
