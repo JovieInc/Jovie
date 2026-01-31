@@ -15,53 +15,53 @@ export interface PendingPreview {
  */
 export interface LinkCategoryGridProps<T extends DetectedLink = DetectedLink> {
   /** Array of all links */
-  links: T[];
+  readonly links: T[];
 
   /** Callback when links are reordered via drag-and-drop */
-  onLinksChange: (links: T[]) => void;
+  readonly onLinksChange: (links: T[]) => void;
 
   /** Handler for toggling link visibility */
-  onToggle: (idx: number) => void;
+  readonly onToggle: (idx: number) => void;
 
   /** Handler for removing a link */
-  onRemove: (idx: number) => void;
+  readonly onRemove: (idx: number) => void;
 
   /** Handler for editing a link */
-  onEdit: (idx: number) => void;
+  readonly onEdit: (idx: number) => void;
 
   /** ID of the currently open action menu */
-  openMenuId: string | null;
+  readonly openMenuId: string | null;
 
   /** Callback when any menu opens/closes */
-  onAnyMenuOpen: (id: string | null) => void;
+  readonly onAnyMenuOpen: (id: string | null) => void;
 
   /** ID of the most recently added link (for highlight animation) */
-  lastAddedId: string | null;
+  readonly lastAddedId: string | null;
 
   /** Function to build the primary label for a pill */
-  buildPillLabel: (link: DetectedLink) => string;
+  readonly buildPillLabel: (link: DetectedLink) => string;
 
   /** Link currently being added (shows loading state) */
-  addingLink: T | null;
+  readonly addingLink: T | null;
 
   /** Preview of a link about to be added */
-  pendingPreview: PendingPreview | null;
+  readonly pendingPreview: PendingPreview | null;
 
   /** Handler for adding the pending preview link */
-  onAddPendingPreview: (link: DetectedLink) => void;
+  readonly onAddPendingPreview: (link: DetectedLink) => void;
 
   /** Handler for canceling the pending preview */
-  onCancelPendingPreview: () => void;
+  readonly onCancelPendingPreview: () => void;
 
   /** Callback when hint message should be shown (for invalid drag moves) */
-  onHint: (message: string | null) => void;
+  readonly onHint: (message: string | null) => void;
 
   /** DnD modifiers (optional) */
-  modifiers?: Modifier[];
+  readonly modifiers?: Modifier[];
 
   /** Optional additional CSS classes */
-  className?: string;
+  readonly className?: string;
 
   /** Optional scroll container ref for virtualization */
-  scrollContainerRef?: RefObject<HTMLDivElement | null>;
+  readonly scrollContainerRef?: RefObject<HTMLDivElement | null>;
 }

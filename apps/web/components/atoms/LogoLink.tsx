@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 
 interface LogoLinkProps
   extends Readonly<{
-    href?: string;
-    className?: string;
-    logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-    variant?: LogoVariant;
-    'data-testid'?: string;
+    readonly href?: string;
+    readonly className?: string;
+    readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly variant?: LogoVariant;
+    readonly 'data-testid'?: string;
   }> {}
 
 export function LogoLink({

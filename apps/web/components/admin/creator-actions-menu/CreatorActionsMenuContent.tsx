@@ -16,11 +16,11 @@ import { cn } from '@/lib/utils';
 import type { CreatorActionsMenuProps } from './types';
 
 interface MenuItemProps {
-  onClick?: () => void;
-  href?: string;
-  disabled?: boolean;
-  destructive?: boolean;
-  children: React.ReactNode;
+  readonly onClick?: () => void;
+  readonly href?: string;
+  readonly disabled?: boolean;
+  readonly destructive?: boolean;
+  readonly children: React.ReactNode;
 }
 
 interface CreatorActionsMenuContentProps
@@ -36,10 +36,10 @@ interface CreatorActionsMenuContentProps
     | 'onSendInvite'
     | 'onDelete'
   > {
-  copySuccess: boolean;
-  onCopyClaimLink: () => Promise<void>;
-  renderItem: (props: MenuItemProps) => React.ReactNode;
-  renderSeparator: () => React.ReactNode;
+  readonly copySuccess: boolean;
+  readonly onCopyClaimLink: () => Promise<void>;
+  readonly renderItem: (props: MenuItemProps) => React.ReactNode;
+  readonly renderSeparator: () => React.ReactNode;
 }
 
 export function CreatorActionsMenuContent({

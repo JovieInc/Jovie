@@ -5,14 +5,14 @@ import type { FormErrors } from './types';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 
 interface WaitlistAdditionalInfoStepProps {
-  spotifyUrl: string;
-  heardAbout: string;
-  fieldErrors: FormErrors;
-  isSubmitting: boolean;
-  isHydrating: boolean;
-  onSpotifyUrlChange: (value: string) => void;
-  onHeardAboutChange: (value: string) => void;
-  setSpotifyUrlInputRef: (el: HTMLInputElement | null) => void;
+  readonly spotifyUrl: string;
+  readonly heardAbout: string;
+  readonly fieldErrors: FormErrors;
+  readonly isSubmitting: boolean;
+  readonly isHydrating: boolean;
+  readonly onSpotifyUrlChange: (value: string) => void;
+  readonly onHeardAboutChange: (value: string) => void;
+  readonly setSpotifyUrlInputRef: (el: HTMLInputElement | null) => void;
 }
 
 export function WaitlistAdditionalInfoStep({

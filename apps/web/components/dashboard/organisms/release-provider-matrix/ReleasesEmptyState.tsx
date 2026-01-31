@@ -18,8 +18,11 @@ import {
 } from './releases-empty-state';
 
 interface ReleasesEmptyStateProps {
-  onConnected?: (releases: ReleaseViewModel[], artistName: string) => void;
-  onImportStart?: (artistName: string) => void;
+  readonly onConnected?: (
+    releases: ReleaseViewModel[],
+    artistName: string
+  ) => void;
+  readonly onImportStart?: (artistName: string) => void;
 }
 
 export function ReleasesEmptyState({

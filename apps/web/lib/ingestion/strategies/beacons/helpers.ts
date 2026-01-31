@@ -152,12 +152,12 @@ export function extractBeaconsSpecificData(html: string): {
 export type StructuredLink = { url?: string | null; title?: string | null };
 
 interface BeaconsPageProps {
-  props?: {
-    pageProps?: {
-      links?: unknown;
-      profile?: { links?: unknown };
-      data?: { links?: unknown };
-      dehydratedState?: { queries?: unknown };
+  readonly props?: {
+    readonly pageProps?: {
+      readonly links?: unknown;
+      readonly profile?: { links?: unknown };
+      readonly data?: { links?: unknown };
+      readonly dehydratedState?: { queries?: unknown };
     };
   };
 }

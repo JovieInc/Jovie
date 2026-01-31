@@ -6,8 +6,8 @@ import type { DashboardData } from './actions';
 const DashboardDataContext = createContext<DashboardData | null>(null);
 
 interface DashboardDataProviderProps {
-  value: DashboardData;
-  children: React.ReactNode;
+  readonly value: DashboardData;
+  readonly children: React.ReactNode;
 }
 
 export function DashboardDataProvider({

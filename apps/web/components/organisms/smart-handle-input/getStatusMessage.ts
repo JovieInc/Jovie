@@ -2,9 +2,9 @@ import type { ClientValidationResult } from '@/lib/validation/client-username';
 import type { HandleValidationState } from './types';
 
 interface GetStatusMessageProps {
-  handleValidation: HandleValidationState;
-  clientValidation: ClientValidationResult;
-  value: string;
+  readonly handleValidation: HandleValidationState;
+  readonly clientValidation: ClientValidationResult;
+  readonly value: string;
 }
 
 export function getStatusMessage({

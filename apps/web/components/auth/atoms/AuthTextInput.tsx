@@ -16,7 +16,7 @@ const variantClasses: Record<AuthTextInputVariant, string> = {
 
 export interface AuthTextInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  variant?: AuthTextInputVariant;
+  readonly variant?: AuthTextInputVariant;
 }
 
 export const AuthTextInput = React.forwardRef<

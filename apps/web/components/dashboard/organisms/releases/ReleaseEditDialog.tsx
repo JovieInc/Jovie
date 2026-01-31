@@ -20,14 +20,14 @@ interface ProviderInfo {
 }
 
 interface ReleaseEditDialogProps {
-  release: ReleaseViewModel | null;
-  providerList: ProviderInfo[];
-  drafts: Partial<Record<ProviderKey, string>>;
-  isSaving: boolean;
-  onDraftChange: (provider: ProviderKey, value: string) => void;
-  onSave: (provider: ProviderKey) => void;
-  onReset: (provider: ProviderKey) => void;
-  onClose: () => void;
+  readonly release: ReleaseViewModel | null;
+  readonly providerList: ProviderInfo[];
+  readonly drafts: Partial<Record<ProviderKey, string>>;
+  readonly isSaving: boolean;
+  readonly onDraftChange: (provider: ProviderKey, value: string) => void;
+  readonly onSave: (provider: ProviderKey) => void;
+  readonly onReset: (provider: ProviderKey) => void;
+  readonly onClose: () => void;
 }
 
 function getProviderHelperText(

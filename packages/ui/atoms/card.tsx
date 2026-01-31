@@ -24,7 +24,7 @@ const cardVariants = cva(
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof cardVariants> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
@@ -43,7 +43,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 Card.displayName = 'Card';
 
 export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(
@@ -63,7 +63,7 @@ CardHeader.displayName = 'CardHeader';
 
 export interface CardTitleProps
   extends React.HTMLAttributes<HTMLHeadingElement> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
@@ -86,7 +86,7 @@ CardTitle.displayName = 'CardTitle';
 
 export interface CardDescriptionProps
   extends React.HTMLAttributes<HTMLParagraphElement> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const CardDescription = React.forwardRef<
@@ -106,7 +106,7 @@ const CardDescription = React.forwardRef<
 CardDescription.displayName = 'CardDescription';
 
 export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
@@ -119,7 +119,7 @@ const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
 CardContent.displayName = 'CardContent';
 
 export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {
-  asChild?: boolean;
+  readonly asChild?: boolean;
 }
 
 const CardFooter = React.forwardRef<HTMLDivElement, CardFooterProps>(

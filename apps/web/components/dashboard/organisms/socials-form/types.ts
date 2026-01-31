@@ -7,7 +7,7 @@ export interface SocialLink {
 }
 
 export interface SocialsFormProps {
-  artist: Artist;
+  readonly artist: Artist;
 }
 
 export interface UseSocialsFormReturn {

@@ -32,19 +32,19 @@ export interface ProfileNotificationsContextValue {
 }
 
 export interface ProfileShellProps {
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
-  contacts?: PublicContact[];
-  subtitle?: string;
-  children?: React.ReactNode;
-  showSocialBar?: boolean;
-  showTipButton?: boolean;
-  showBackButton?: boolean;
-  showFooter?: boolean;
-  showNotificationButton?: boolean;
-  maxWidthClass?: string;
-  backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
-  showGradientBlurs?: boolean;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts?: PublicContact[];
+  readonly subtitle?: string;
+  readonly children?: React.ReactNode;
+  readonly showSocialBar?: boolean;
+  readonly showTipButton?: boolean;
+  readonly showBackButton?: boolean;
+  readonly showFooter?: boolean;
+  readonly showNotificationButton?: boolean;
+  readonly maxWidthClass?: string;
+  readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
+  readonly showGradientBlurs?: boolean;
 }
 
 export const SOCIAL_NETWORK_PLATFORMS = [

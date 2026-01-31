@@ -52,9 +52,9 @@ const PreviewPanelDataContext =
   createContext<PreviewPanelDataContextValue | null>(null);
 
 interface PreviewPanelProviderProps {
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-  enabled?: boolean;
+  readonly children: React.ReactNode;
+  readonly defaultOpen?: boolean;
+  readonly enabled?: boolean;
 }
 
 export function PreviewPanelProvider({

@@ -5,15 +5,15 @@ interface FormErrorProps {
   /**
    * Error message to display
    */
-  message?: string | null;
+  readonly message?: string | null;
   /**
    * Optional CSS class names
    */
-  className?: string;
+  readonly className?: string;
   /**
    * Optional error ID for aria-describedby
    */
-  id?: string;
+  readonly id?: string;
 }
 
 /**

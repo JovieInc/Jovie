@@ -5,15 +5,15 @@ import type {
 import type { ContactSidebarMode } from '@/types';
 
 export interface AdminCreatorProfilesWithSidebarProps {
-  profiles: AdminCreatorProfileRow[];
-  page: number;
-  pageSize: number;
-  total: number;
-  search: string;
-  sort: AdminCreatorProfilesSort;
-  mode?: ContactSidebarMode;
+  readonly profiles: AdminCreatorProfileRow[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly search: string;
+  readonly sort: AdminCreatorProfilesSort;
+  readonly mode?: ContactSidebarMode;
   /** Base path for pagination/sort links. Defaults to '/app/admin/creators' */
-  basePath?: string;
+  readonly basePath?: string;
 }
 
 export type AdminCreatorSocialLinksResponse =

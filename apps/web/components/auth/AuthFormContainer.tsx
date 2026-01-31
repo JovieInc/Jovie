@@ -4,8 +4,8 @@ import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
 import { Container } from '@/components/site/Container';
 
 interface AuthFormContainerProps {
-  children: ReactNode;
-  title: string;
+  readonly children: ReactNode;
+  readonly title: string;
 }
 
 export function AuthFormContainer({

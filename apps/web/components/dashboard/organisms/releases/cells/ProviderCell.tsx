@@ -22,12 +22,12 @@ import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface ProviderConfig {
-  readonly label: string;
+  label: string;
   readonly accent: string;
 }
 
 interface ProviderStatusDotProps {
-  readonly status: 'available' | 'manual' | 'missing';
+  status: 'available' | 'manual' | 'missing';
   readonly accent: string;
 }
 
@@ -67,7 +67,7 @@ const ProviderStatusDot = memo(function ProviderStatusDot({
 });
 
 interface AddProviderUrlPopoverProps {
-  readonly providerLabel: string;
+  providerLabel: string;
   readonly providerKey: ProviderKey;
   readonly accent: string;
   readonly onSave: (url: string) => Promise<void>;
@@ -229,7 +229,7 @@ function AddProviderUrlPopover({
 }
 
 interface ProviderActionButtonsProps {
-  readonly provider: { url: string; path?: string };
+  provider: { url: string; path?: string };
   readonly releaseTitle: string;
   readonly providerLabel: string;
   readonly testId: string;
@@ -298,14 +298,10 @@ function ProviderActionButtons({
 }
 
 interface ProviderCellProps {
-  readonly release: ReleaseViewModel;
+  release: ReleaseViewModel;
   readonly provider: ProviderKey;
   readonly config: ProviderConfig;
-  readonly onCopy: (
-    path: string,
-    label: string,
-    testId: string
-  ) => Promise<string>;
+  onCopy: (path: string, label: string, testId: string) => Promise<string>;
   readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,

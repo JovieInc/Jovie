@@ -1,10 +1,10 @@
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 
 export interface ArtistContactsButtonProps {
-  contacts: PublicContact[];
-  artistHandle: string;
-  artistName: string;
-  onNavigate?: (url: string) => void;
+  readonly contacts: PublicContact[];
+  readonly artistHandle: string;
+  readonly artistName: string;
+  readonly onNavigate?: (url: string) => void;
 }
 
 export interface UseArtistContactsReturn {

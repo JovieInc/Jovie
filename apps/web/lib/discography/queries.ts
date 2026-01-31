@@ -214,15 +214,17 @@ export async function getReleasesForProfile(
     getTrackSummariesForReleases(releaseIds),
     hasProviderLinksTable().then(async hasTable => {
       if (!hasTable) return [];
-      const links = await db
+      if (releaseIds.length === 0) return [];
+      // Use SQL filtering instead of JavaScript for better performance
+      return db
         .select()
         .from(providerLinks)
-        .where(eq(providerLinks.ownerType, 'release'));
-      // Filter links to only those belonging to our releases
-      const releaseIdSet = new Set(releaseIds);
-      return links.filter(
-        link => link.releaseId && releaseIdSet.has(link.releaseId)
-      );
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            inArray(providerLinks.releaseId, releaseIds)
+          )
+        );
     }),
   ]);
 
@@ -599,29 +601,57 @@ export interface TrackWithProviders {
   providerLinks: DbProviderLink[];
 }
 
+export interface TracksWithProvidersResult {
+  tracks: TrackWithProviders[];
+  total: number;
+  hasMore: boolean;
+}
+
 /**
  * Get tracks for a release with their provider links
  * Used for expandable release rows in the releases table
+ *
+ * @param releaseId - The release ID to fetch tracks for
+ * @param options - Pagination options (limit and offset)
+ * @returns Object with tracks, total count, and hasMore flag
  */
 export async function getTracksForReleaseWithProviders(
-  releaseId: string
-): Promise<TrackWithProviders[]> {
+  releaseId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<TracksWithProvidersResult> {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+
   if (!(await hasDiscogTracksTable())) {
-    return [];
+    return { tracks: [], total: 0, hasMore: false };
   }
 
-  // Fetch tracks
+  // Get total count for pagination
+  const [countResult] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(discogTracks)
+    .where(eq(discogTracks.releaseId, releaseId));
+
+  const total = Number(countResult?.count ?? 0);
+
+  if (total === 0) {
+    return { tracks: [], total: 0, hasMore: false };
+  }
+
+  // Fetch paginated tracks
   const tracks = await db
     .select()
     .from(discogTracks)
     .where(eq(discogTracks.releaseId, releaseId))
-    .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
+    .orderBy(discogTracks.discNumber, discogTracks.trackNumber)
+    .limit(limit)
+    .offset(offset);
 
   if (tracks.length === 0) {
-    return [];
+    return { tracks: [], total, hasMore: false };
   }
 
-  // Fetch provider links for all tracks
+  // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
   let trackProviderLinks: DbProviderLink[] = [];
 
@@ -647,7 +677,7 @@ export async function getTracksForReleaseWithProviders(
   }
 
   // Combine tracks with their links
-  return tracks.map(track => ({
+  const tracksWithProviders = tracks.map(track => ({
     id: track.id,
     releaseId: track.releaseId,
     creatorProfileId: track.creatorProfileId,
@@ -661,4 +691,10 @@ export async function getTracksForReleaseWithProviders(
     previewUrl: track.previewUrl,
     providerLinks: linksByTrack.get(track.id) ?? [],
   }));
+
+  return {
+    tracks: tracksWithProviders,
+    total,
+    hasMore: offset + limit < total,
+  };
 }

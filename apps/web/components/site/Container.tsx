@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 
 interface ContainerProps {
-  children: React.ReactNode;
-  className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
+  readonly children: React.ReactNode;
+  readonly className?: string;
+  readonly size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
 }
 
 const containerSizes = {

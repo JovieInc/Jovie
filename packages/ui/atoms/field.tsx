@@ -14,27 +14,27 @@ export interface FieldProps {
   /**
    * Label text for the field
    */
-  label?: React.ReactNode;
+  readonly label?: React.ReactNode;
   /**
    * Help text/description shown below the control
    */
-  description?: React.ReactNode;
+  readonly description?: React.ReactNode;
   /**
    * Error message shown in red below the control
    */
-  error?: React.ReactNode;
+  readonly error?: React.ReactNode;
   /**
    * Whether the field is required
    */
-  required?: boolean;
+  readonly required?: boolean;
   /**
    * Custom id for the input (auto-generated if not provided)
    */
-  id?: string;
+  readonly id?: string;
   /**
    * The form control (Input, Select, Textarea, etc.)
    */
-  children: React.ReactElement<
+  readonly children: React.ReactElement<
     React.HTMLAttributes<HTMLElement> & { variant?: string }
   >;
   /**

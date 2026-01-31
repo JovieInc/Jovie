@@ -23,19 +23,23 @@ interface ProviderConfig {
 
 interface ReleaseTableRowProps {
   release: ReleaseViewModel;
-  index: number;
-  totalRows: number;
-  primaryProviders: ProviderKey[];
-  providerConfig: Record<ProviderKey, ProviderConfig>;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
-  onEdit: (release: ReleaseViewModel) => void;
-  onAddUrl?: (
+  readonly index: number;
+  readonly totalRows: number;
+  readonly primaryProviders: ProviderKey[];
+  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  isAddingUrl?: boolean;
-  artistName?: string | null;
+  readonly isAddingUrl?: boolean;
+  readonly artistName?: string | null;
 }
 
 export const ReleaseTableRow = memo(function ReleaseTableRow({

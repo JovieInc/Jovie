@@ -9,13 +9,13 @@ import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 export interface CTAButtonProps extends Omit<ButtonProps, 'loading' | 'size'> {
-  href?: string;
-  external?: boolean;
-  icon?: React.ReactNode;
-  isLoading?: boolean;
-  isSuccess?: boolean;
-  size?: 'sm' | 'md' | 'lg' | 'icon' | 'default';
-  prefetch?: boolean;
+  readonly href?: string;
+  readonly external?: boolean;
+  readonly icon?: React.ReactNode;
+  readonly isLoading?: boolean;
+  readonly isSuccess?: boolean;
+  readonly size?: 'sm' | 'md' | 'lg' | 'icon' | 'default';
+  readonly prefetch?: boolean;
 }
 
 // Helper to compute data-state attribute

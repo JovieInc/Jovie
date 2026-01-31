@@ -9,9 +9,9 @@ import { useEffect, useState } from 'react';
  */
 interface SsoCallbackHandlerProps {
   /** URL to redirect to after successful sign-in */
-  signInFallbackRedirectUrl: string;
+  readonly signInFallbackRedirectUrl: string;
   /** URL to redirect to after successful sign-up */
-  signUpFallbackRedirectUrl: string;
+  readonly signUpFallbackRedirectUrl: string;
 }
 
 /**

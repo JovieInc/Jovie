@@ -5,18 +5,18 @@ export interface ComboboxOption {
 }
 
 export interface ComboboxProps {
-  options: ComboboxOption[];
-  value: ComboboxOption | null;
-  onChange: (option: ComboboxOption | null) => void;
-  onInputChange: (value: string) => void;
-  onSubmit?: () => void;
-  placeholder?: string;
-  label?: string;
-  className?: string;
-  disabled?: boolean;
-  maxDisplayedOptions?: number;
-  isLoading?: boolean;
-  error?: string | null;
-  ctaText?: string;
-  showCta?: boolean;
+  readonly options: ComboboxOption[];
+  readonly value: ComboboxOption | null;
+  readonly onChange: (option: ComboboxOption | null) => void;
+  readonly onInputChange: (value: string) => void;
+  readonly onSubmit?: () => void;
+  readonly placeholder?: string;
+  readonly label?: string;
+  readonly className?: string;
+  readonly disabled?: boolean;
+  readonly maxDisplayedOptions?: number;
+  readonly isLoading?: boolean;
+  readonly error?: string | null;
+  readonly ctaText?: string;
+  readonly showCta?: boolean;
 }

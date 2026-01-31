@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export interface UseTableKeyboardNavProps {
-  rowCount: number;
-  onRowActivate: (index: number) => void;
-  onRowSelect?: (index: number) => void;
-  initialFocusIndex?: number;
-  enabled?: boolean;
+  readonly rowCount: number;
+  readonly onRowActivate: (index: number) => void;
+  readonly onRowSelect?: (index: number) => void;
+  readonly initialFocusIndex?: number;
+  readonly enabled?: boolean;
 }
 
 export interface UseTableKeyboardNavReturn {

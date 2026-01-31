@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 interface PricingToggleProps {
-  onChange: (isYearly: boolean) => void;
+  readonly onChange: (isYearly: boolean) => void;
 }
 
 const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;

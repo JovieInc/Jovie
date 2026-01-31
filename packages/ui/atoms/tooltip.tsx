@@ -50,12 +50,12 @@ interface TooltipContentProps
   /**
    * Whether to show the arrow pointer. Defaults to false for cleaner Linear-style appearance.
    */
-  showArrow?: boolean;
+  readonly showArrow?: boolean;
   /**
    * Test ID for the tooltip content.
    * @default "tooltip-content"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 /**

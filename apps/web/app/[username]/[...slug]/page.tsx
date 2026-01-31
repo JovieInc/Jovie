@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 interface Props {
-  params: Promise<{
-    username: string;
-    slug: string[];
+  readonly params: Promise<{
+    readonly username: string;
+    readonly slug: string[];
   }>;
 }
 

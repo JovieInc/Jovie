@@ -4,8 +4,8 @@ import ErrorBoundary from '@/components/atoms/ErrorBoundary';
 
 interface ErrorProps
   extends Readonly<{
-    error: Error & { digest?: string };
-    reset: () => void;
+    readonly error: Error & { digest?: string };
+    readonly reset: () => void;
   }> {}
 
 export default function WaitlistError({ error, reset }: Readonly<ErrorProps>) {

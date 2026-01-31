@@ -1,5 +1,5 @@
 export interface ClaimHandleFormProps {
-  onHandleChange?: (handle: string) => void;
+  readonly onHandleChange?: (handle: string) => void;
 }
 
 export interface HandleAvailabilityState {

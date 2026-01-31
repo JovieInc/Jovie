@@ -7,7 +7,7 @@ import { calculateDistanceKm, NEAR_YOU_THRESHOLD_KM } from '@/lib/geo';
 import { TourDateCard } from './TourDateCard';
 
 interface TourDatesListProps {
-  tourDates: TourDateViewModel[];
+  readonly tourDates: TourDateViewModel[];
 }
 
 interface TourDateWithDistance extends TourDateViewModel {

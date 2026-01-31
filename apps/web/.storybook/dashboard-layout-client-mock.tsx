@@ -29,7 +29,7 @@ export function useTableMeta(): TableMetaContextValue {
 }
 
 export interface DashboardLayoutClientProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 export default function DashboardLayoutClient({

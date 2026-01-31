@@ -1,5 +1,5 @@
 export interface AuthGoogleIconProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function AuthGoogleIcon({ className }: Readonly<AuthGoogleIconProps>) {

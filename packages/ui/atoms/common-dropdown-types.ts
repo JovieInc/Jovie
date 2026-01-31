@@ -133,114 +133,114 @@ export interface CommonDropdownProps {
   /**
    * Dropdown variant - controls behavior and rendering
    */
-  variant?: CommonDropdownVariant;
+  readonly variant?: CommonDropdownVariant;
 
   /**
    * Items to render in the dropdown
    */
-  items: CommonDropdownItem[];
+  readonly items: CommonDropdownItem[];
 
   /**
    * Trigger element (custom button, icon, or children for context menu)
    */
-  trigger?: ReactNode;
+  readonly trigger?: ReactNode;
 
   /**
    * Default trigger type when no custom trigger provided
    * - 'button': Icon button (MoreVertical icon)
    * - 'select': Select-style button with ChevronDown
    */
-  defaultTriggerType?: 'button' | 'select';
+  readonly defaultTriggerType?: 'button' | 'select';
 
   /**
    * Icon for default button trigger
    */
-  triggerIcon?: LucideIcon;
+  readonly triggerIcon?: LucideIcon;
 
   /**
    * Alignment of dropdown content relative to trigger
    */
-  align?: 'start' | 'center' | 'end';
+  readonly align?: 'start' | 'center' | 'end';
 
   /**
    * Side of trigger where dropdown appears
    */
-  side?: 'top' | 'right' | 'bottom' | 'left';
+  readonly side?: 'top' | 'right' | 'bottom' | 'left';
 
   /**
    * Offset from trigger (in pixels)
    */
-  sideOffset?: number;
+  readonly sideOffset?: number;
 
   /**
    * Controlled open state
    */
-  open?: boolean;
+  readonly open?: boolean;
 
   /**
    * Callback when open state changes
    */
-  onOpenChange?: (open: boolean) => void;
+  readonly onOpenChange?: (open: boolean) => void;
 
   /**
    * Disable portal rendering (render in DOM position)
    */
-  disablePortal?: boolean;
+  readonly disablePortal?: boolean;
 
   /**
    * Portal container props
    */
-  portalProps?: Record<string, unknown>;
+  readonly portalProps?: Record<string, unknown>;
 
   /**
    * Additional className for content
    */
-  contentClassName?: string;
+  readonly contentClassName?: string;
 
   /**
    * Additional className for trigger
    */
-  triggerClassName?: string;
+  readonly triggerClassName?: string;
 
   /**
    * Accessibility label
    */
-  'aria-label'?: string;
+  readonly 'aria-label'?: string;
 
   /**
    * Enable search/filter functionality
    */
-  searchable?: boolean;
+  readonly searchable?: boolean;
 
   /**
    * Search placeholder text
    */
-  searchPlaceholder?: string;
+  readonly searchPlaceholder?: string;
 
   /**
    * Filter function for searchable dropdowns
    */
-  onSearch?: (query: string) => void;
+  readonly onSearch?: (query: string) => void;
 
   /**
    * Loading state (shows spinner)
    */
-  isLoading?: boolean;
+  readonly isLoading?: boolean;
 
   /**
    * Empty state message when no items
    */
-  emptyMessage?: string;
+  readonly emptyMessage?: string;
 
   /**
    * Disable the entire dropdown
    */
-  disabled?: boolean;
+  readonly disabled?: boolean;
 
   /**
    * Children (used for context menu variant)
    */
-  children?: ReactNode;
+  readonly children?: ReactNode;
 }
 
 /**
@@ -248,16 +248,16 @@ export interface CommonDropdownProps {
  */
 export interface CommonDropdownSelectProps
   extends Omit<CommonDropdownProps, 'variant' | 'items'> {
-  variant: 'select';
-  value: string;
-  onValueChange: (value: string) => void;
-  options: Array<{
-    value: string;
-    label: string;
-    icon?: LucideIcon;
-    disabled?: boolean;
+  readonly variant: 'select';
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  readonly options: Array<{
+    readonly value: string;
+    readonly label: string;
+    readonly icon?: LucideIcon;
+    readonly disabled?: boolean;
   }>;
-  placeholder?: string;
+  readonly placeholder?: string;
 }
 
 // Type guard utilities

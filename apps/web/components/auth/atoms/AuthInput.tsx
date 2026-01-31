@@ -11,12 +11,12 @@ interface AuthInputProps
     React.InputHTMLAttributes<HTMLInputElement>,
     'type' | 'size' | 'children'
   > {
-  type: 'email' | 'text';
-  variant?: AuthInputVariant;
+  readonly type: 'email' | 'text';
+  readonly variant?: AuthInputVariant;
   /**
    * Error state - applies error styling
    */
-  error?: boolean;
+  readonly error?: boolean;
 }
 
 const authInputClasses = cn(

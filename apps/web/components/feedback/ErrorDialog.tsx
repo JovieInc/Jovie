@@ -8,14 +8,14 @@ import {
 import { ErrorBanner } from './ErrorBanner';
 
 export interface ErrorDialogProps {
-  open: boolean;
-  title: string;
-  description: string;
-  onClose: () => void;
-  primaryActionLabel?: string;
-  onPrimaryAction?: () => void;
-  secondaryActionLabel?: string;
-  onSecondaryAction?: () => void;
+  readonly open: boolean;
+  readonly title: string;
+  readonly description: string;
+  readonly onClose: () => void;
+  readonly primaryActionLabel?: string;
+  readonly onPrimaryAction?: () => void;
+  readonly secondaryActionLabel?: string;
+  readonly onSecondaryAction?: () => void;
 }
 
 export function ErrorDialog({

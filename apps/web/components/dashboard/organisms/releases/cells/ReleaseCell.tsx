@@ -8,10 +8,10 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 interface ReleaseCellProps {
-  release: ReleaseViewModel;
-  artistName?: string | null;
+  readonly release: ReleaseViewModel;
+  readonly artistName?: string | null;
   /** Whether to show release type inline (when type column is hidden) */
-  showType?: boolean;
+  readonly showType?: boolean;
 }
 
 /**

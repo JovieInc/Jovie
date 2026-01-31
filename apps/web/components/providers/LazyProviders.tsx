@@ -20,8 +20,8 @@ const Analytics = dynamic(
 );
 
 export interface LazyProvidersProps {
-  children: React.ReactNode;
-  enableAnalytics?: boolean;
+  readonly children: React.ReactNode;
+  readonly enableAnalytics?: boolean;
 }
 
 /**

@@ -2,8 +2,8 @@ import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ProviderStatusDotProps {
-  status: 'available' | 'manual' | 'missing';
-  accent: string;
+  readonly status: 'available' | 'manual' | 'missing';
+  readonly accent: string;
 }
 
 export const ProviderStatusDot = memo(function ProviderStatusDot({

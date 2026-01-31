@@ -21,7 +21,7 @@ interface FeatureItem {
 }
 
 export interface ProfileFeatureCardsModalClientProps {
-  features: readonly FeatureItem[];
+  readonly features: readonly FeatureItem[];
 }
 
 export function ProfileFeatureCardsModalClient({

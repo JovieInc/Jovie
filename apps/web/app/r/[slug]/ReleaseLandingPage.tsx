@@ -22,17 +22,17 @@ interface Provider {
 
 interface ReleaseLandingPageProps
   extends Readonly<{
-    release: {
-      title: string;
-      artworkUrl: string | null;
-      releaseDate: string | null;
+    readonly release: {
+      readonly title: string;
+      readonly artworkUrl: string | null;
+      readonly releaseDate: string | null;
     };
-    artist: {
-      name: string;
-      avatarUrl: string | null;
+    readonly artist: {
+      readonly name: string;
+      readonly avatarUrl: string | null;
     };
-    providers: Provider[];
-    slug: string;
+    readonly providers: Provider[];
+    readonly slug: string;
   }> {}
 
 /**

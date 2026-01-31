@@ -17,19 +17,19 @@ import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
 
 interface AuthLayoutProps {
-  children: ReactNode;
-  formTitle: string;
-  formTitleClassName?: string;
-  footerPrompt?: string;
-  footerLinkText?: string;
-  footerLinkHref?: string;
-  showFooterPrompt?: boolean;
-  showFormTitle?: boolean;
-  logoSpinDelayMs?: number;
-  showSkipLink?: boolean;
-  showLogo?: boolean;
-  showLogoutButton?: boolean;
-  logoutRedirectUrl?: string;
+  readonly children: ReactNode;
+  readonly formTitle: string;
+  readonly formTitleClassName?: string;
+  readonly footerPrompt?: string;
+  readonly footerLinkText?: string;
+  readonly footerLinkHref?: string;
+  readonly showFooterPrompt?: boolean;
+  readonly showFormTitle?: boolean;
+  readonly logoSpinDelayMs?: number;
+  readonly showSkipLink?: boolean;
+  readonly showLogo?: boolean;
+  readonly showLogoutButton?: boolean;
+  readonly logoutRedirectUrl?: string;
 }
 
 const LINK_FOCUS_CLASSES =

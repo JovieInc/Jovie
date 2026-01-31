@@ -261,8 +261,8 @@ const getProfileAndLinks = cache(
 );
 
 interface Props {
-  params: Promise<{
-    username: string;
+  readonly params: Promise<{
+    readonly username: string;
   }>;
   searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';

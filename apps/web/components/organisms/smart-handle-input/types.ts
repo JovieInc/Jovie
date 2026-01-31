@@ -1,14 +1,14 @@
 export interface SmartHandleInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  onValidationChange?: (validation: HandleValidationState) => void;
-  placeholder?: string;
-  prefix?: string;
-  showAvailability?: boolean;
-  formatHints?: boolean;
-  disabled?: boolean;
-  artistName?: string;
-  className?: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onValidationChange?: (validation: HandleValidationState) => void;
+  readonly placeholder?: string;
+  readonly prefix?: string;
+  readonly showAvailability?: boolean;
+  readonly formatHints?: boolean;
+  readonly disabled?: boolean;
+  readonly artistName?: string;
+  readonly className?: string;
 }
 
 export interface HandleValidationState {

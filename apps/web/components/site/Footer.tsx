@@ -4,12 +4,12 @@ type FooterVersion = 1 | 2 | 'minimal' | 'regular';
 
 interface SiteFooterProps
   extends Readonly<{
-    version?: FooterVersion;
-    className?: string;
-    brandingMark?: 'wordmark' | 'icon';
-    containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-    themeShortcutKey?: string;
-    showThemeToggle?: boolean;
+    readonly version?: FooterVersion;
+    readonly className?: string;
+    readonly brandingMark?: 'wordmark' | 'icon';
+    readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
+    readonly themeShortcutKey?: string;
+    readonly showThemeToggle?: boolean;
   }> {}
 
 export function Footer({

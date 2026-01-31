@@ -1,13 +1,15 @@
 export interface LinkActionsProps {
-  onToggle: () => void;
-  onRemove: () => void;
-  onEdit?: () => void;
-  isVisible: boolean;
-  showDragHandle?: boolean;
-  onDragHandlePointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
-  className?: string;
-  isOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  readonly onToggle: () => void;
+  readonly onRemove: () => void;
+  readonly onEdit?: () => void;
+  readonly isVisible: boolean;
+  readonly showDragHandle?: boolean;
+  readonly onDragHandlePointerDown?: (
+    e: React.PointerEvent<HTMLButtonElement>
+  ) => void;
+  readonly className?: string;
+  readonly isOpen?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 export interface MenuItem {

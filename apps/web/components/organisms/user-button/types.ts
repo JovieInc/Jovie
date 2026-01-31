@@ -1,10 +1,10 @@
 import type { Artist } from '@/types/db';
 
 export interface UserButtonProps {
-  artist?: Artist | null;
-  profileHref?: string;
-  settingsHref?: string;
-  showUserInfo?: boolean;
+  readonly artist?: Artist | null;
+  readonly profileHref?: string;
+  readonly settingsHref?: string;
+  readonly showUserInfo?: boolean;
 }
 
 export interface UserDisplayInfo {

@@ -5,7 +5,7 @@ import type React from 'react';
 import { Toaster } from 'sonner';
 
 interface ToastProviderProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 /**

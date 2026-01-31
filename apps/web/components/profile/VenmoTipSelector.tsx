@@ -4,11 +4,11 @@ import { useCallback } from 'react';
 import { TipSelector } from '@/components/molecules/TipSelector';
 
 type VenmoTipSelectorProps = {
-  venmoLink: string;
-  venmoUsername?: string | null;
-  amounts?: number[];
-  className?: string;
-  onContinue?: (url: string) => void;
+  readonly venmoLink: string;
+  readonly venmoUsername?: string | null;
+  readonly amounts?: number[];
+  readonly className?: string;
+  readonly onContinue?: (url: string) => void;
 };
 
 export default function VenmoTipSelector({

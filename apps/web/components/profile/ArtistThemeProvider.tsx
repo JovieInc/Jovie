@@ -26,8 +26,8 @@ const ArtistThemeContext = createContext<ArtistThemeContextType | undefined>(
 );
 
 interface ArtistThemeProviderProps {
-  children: React.ReactNode;
-  artist: Artist;
+  readonly children: React.ReactNode;
+  readonly artist: Artist;
 }
 
 export function ArtistThemeProvider({

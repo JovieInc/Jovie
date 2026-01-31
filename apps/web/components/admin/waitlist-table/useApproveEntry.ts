@@ -6,7 +6,10 @@ import { useApproveWaitlistMutation } from '@/lib/queries/useWaitlistMutations';
 import type { ApproveStatus } from './types';
 
 interface UseApproveEntryProps {
-  onRowUpdate: (entryId: string, updates: Partial<WaitlistEntryRow>) => void;
+  readonly onRowUpdate: (
+    entryId: string,
+    updates: Partial<WaitlistEntryRow>
+  ) => void;
 }
 
 export function useApproveEntry({ onRowUpdate }: UseApproveEntryProps) {

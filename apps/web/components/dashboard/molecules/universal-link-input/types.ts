@@ -9,16 +9,19 @@ import type { RankedPlatformOption } from './utils';
 export type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
 
 export interface UniversalLinkInputProps {
-  onAdd: (link: DetectedLink) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  existingPlatforms?: string[];
-  prefillUrl?: string;
-  onPrefillConsumed?: () => void;
-  creatorName?: string;
-  onQueryChange?: (value: string) => void;
-  onPreviewChange?: (link: DetectedLink | null, isDuplicate: boolean) => void;
-  clearSignal?: number;
+  readonly onAdd: (link: DetectedLink) => void;
+  readonly placeholder?: string;
+  readonly disabled?: boolean;
+  readonly existingPlatforms?: string[];
+  readonly prefillUrl?: string;
+  readonly onPrefillConsumed?: () => void;
+  readonly creatorName?: string;
+  readonly onQueryChange?: (value: string) => void;
+  readonly onPreviewChange?: (
+    link: DetectedLink | null,
+    isDuplicate: boolean
+  ) => void;
+  readonly clearSignal?: number;
 }
 
 export interface UniversalLinkInputRef {

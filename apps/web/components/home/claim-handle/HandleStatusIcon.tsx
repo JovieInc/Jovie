@@ -3,11 +3,11 @@
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface HandleStatusIconProps {
-  showChecking: boolean;
-  handle: string;
-  available: boolean | null;
-  handleError: string | null;
-  unavailable: boolean;
+  readonly showChecking: boolean;
+  readonly handle: string;
+  readonly available: boolean | null;
+  readonly handleError: string | null;
+  readonly unavailable: boolean;
 }
 
 export function HandleStatusIcon({

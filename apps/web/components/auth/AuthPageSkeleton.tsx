@@ -2,13 +2,13 @@ import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { AuthLayout } from './AuthLayout';
 
 interface AuthPageSkeletonProps {
-  formTitle: string;
-  formTitleClassName?: string;
-  showFormTitle?: boolean;
-  showFooterPrompt?: boolean;
-  footerPrompt?: string;
-  footerLinkText?: string;
-  footerLinkHref?: string;
+  readonly formTitle: string;
+  readonly formTitleClassName?: string;
+  readonly showFormTitle?: boolean;
+  readonly showFooterPrompt?: boolean;
+  readonly footerPrompt?: string;
+  readonly footerLinkText?: string;
+  readonly footerLinkHref?: string;
 }
 
 export function AuthPageSkeleton({

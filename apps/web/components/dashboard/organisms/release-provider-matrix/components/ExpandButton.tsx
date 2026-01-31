@@ -6,13 +6,13 @@ import { cn } from '@/lib/utils';
 
 interface ExpandButtonProps {
   /** Whether the row is currently expanded */
-  isExpanded: boolean;
+  readonly isExpanded: boolean;
   /** Whether the row is currently loading */
-  isLoading: boolean;
+  readonly isLoading: boolean;
   /** Number of tracks in the release */
-  totalTracks: number;
+  readonly totalTracks: number;
   /** Click handler */
-  onClick: (e: React.MouseEvent) => void;
+  readonly onClick: (e: React.MouseEvent) => void;
 }
 
 /**

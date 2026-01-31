@@ -11,10 +11,10 @@ import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 
 interface ClientProvidersProps {
-  children: React.ReactNode;
-  initialThemeMode?: ThemeMode;
-  publishableKey: string | undefined;
-  skipCoreProviders?: boolean;
+  readonly children: React.ReactNode;
+  readonly initialThemeMode?: ThemeMode;
+  readonly publishableKey: string | undefined;
+  readonly skipCoreProviders?: boolean;
 }
 
 function isMockPublishableKey(publishableKey: string): boolean {

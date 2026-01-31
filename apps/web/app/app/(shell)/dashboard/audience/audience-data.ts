@@ -123,10 +123,18 @@ export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
   searchParams: Record<string, string | string[] | undefined>;
+  includeDetails?: boolean;
+  memberId?: string;
 }): Promise<AudienceServerData> {
   noStore();
 
-  const { userId: _userId, selectedProfileId, searchParams } = params;
+  const {
+    userId: _userId,
+    selectedProfileId,
+    searchParams,
+    includeDetails = false,
+    memberId,
+  } = params;
   const modeParamRaw = searchParams.mode;
   const modeParam = Array.isArray(modeParamRaw)
     ? modeParamRaw[0]
@@ -185,8 +193,13 @@ export async function getAudienceServerData(params: {
           geoCity: audienceMembers.geoCity,
           geoCountry: audienceMembers.geoCountry,
           deviceType: audienceMembers.deviceType,
-          latestActions: audienceMembers.latestActions,
-          referrerHistory: audienceMembers.referrerHistory,
+          // Only fetch large JSON fields when explicitly requested (sidebar detail view)
+          latestActions: includeDetails
+            ? audienceMembers.latestActions
+            : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
+          referrerHistory: includeDetails
+            ? audienceMembers.referrerHistory
+            : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
           email: audienceMembers.email,
           phone: audienceMembers.phone,
           spotifyConnected: audienceMembers.spotifyConnected,
@@ -203,7 +216,11 @@ export async function getAudienceServerData(params: {
         .where(
           and(
             ownershipFilter,
-            eq(audienceMembers.creatorProfileId, selectedProfileId)
+            eq(audienceMembers.creatorProfileId, selectedProfileId),
+            // Optional filter by specific member ID (for detail view)
+            memberId
+              ? eq(audienceMembers.id, memberId)
+              : drizzleSql<boolean>`true`
           )
         );
 
@@ -220,7 +237,11 @@ export async function getAudienceServerData(params: {
         .where(
           and(
             ownershipFilter,
-            eq(audienceMembers.creatorProfileId, selectedProfileId)
+            eq(audienceMembers.creatorProfileId, selectedProfileId),
+            // Optional filter by specific member ID (for detail view)
+            memberId
+              ? eq(audienceMembers.id, memberId)
+              : drizzleSql<boolean>`true`
           )
         );
 

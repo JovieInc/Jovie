@@ -1,9 +1,9 @@
 export interface AppleStyleOnboardingFormProps {
-  initialDisplayName?: string;
-  initialHandle?: string;
-  userEmail?: string | null;
-  userId: string;
-  skipNameStep?: boolean;
+  readonly initialDisplayName?: string;
+  readonly initialHandle?: string;
+  readonly userEmail?: string | null;
+  readonly userId: string;
+  readonly skipNameStep?: boolean;
 }
 
 export interface OnboardingState {

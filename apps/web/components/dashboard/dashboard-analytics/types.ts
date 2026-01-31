@@ -8,10 +8,10 @@ export interface RangeOption {
 }
 
 export interface RangeToggleProps {
-  value: Range;
-  onChange: (v: Range) => void;
-  tabsBaseId: string;
-  panelId: string;
+  readonly value: Range;
+  readonly onChange: (v: Range) => void;
+  readonly tabsBaseId: string;
+  readonly panelId: string;
 }
 
 export const RANGE_OPTIONS: readonly RangeOption[] = [
