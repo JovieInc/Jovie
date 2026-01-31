@@ -74,6 +74,19 @@ function normalizeLocationLabel(
   return parts.length ? parts.join(', ') : 'Unknown';
 }
 
+/**
+ * Safely converts a Date object or ISO string to ISO string format.
+ * Handles both Date objects (from database) and already-serialized strings (from SSR).
+ */
+function toISOStringOrNull(
+  value: Date | string | null | undefined
+): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  return null;
+}
+
 function isAudienceAction(value: unknown): value is AudienceAction {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
@@ -225,17 +238,6 @@ export async function getAudienceServerData(params: {
           member.geoCountry
         );
 
-        // Handle both Date objects and already-serialized strings
-        let lastSeenAt: string | null;
-        if (member.lastSeenAt) {
-          lastSeenAt =
-            typeof member.lastSeenAt === 'string'
-              ? member.lastSeenAt
-              : member.lastSeenAt.toISOString();
-        } else {
-          lastSeenAt = null;
-        }
-
         return {
           id: member.id,
           type: member.type,
@@ -254,7 +256,7 @@ export async function getAudienceServerData(params: {
           purchaseCount: member.purchaseCount,
           tags: Array.isArray(member.tags) ? member.tags : [],
           deviceType: member.deviceType,
-          lastSeenAt,
+          lastSeenAt: toISOStringOrNull(member.lastSeenAt),
         };
       });
 
@@ -343,16 +345,7 @@ export async function getAudienceServerData(params: {
     const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
       const country = subscriber.countryCode;
       const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
-      // Handle both Date objects and already-serialized strings
-      let createdAt: string | null;
-      if (subscriber.createdAt) {
-        createdAt =
-          typeof subscriber.createdAt === 'string'
-            ? subscriber.createdAt
-            : subscriber.createdAt.toISOString();
-      } else {
-        createdAt = null;
-      }
+      const createdAt = toISOStringOrNull(subscriber.createdAt);
       const displayName = subscriber.email || subscriber.phone || 'Contact';
       const type = subscriber.channel === 'email' ? 'email' : 'sms';
 
