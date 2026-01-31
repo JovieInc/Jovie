@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OtpInput } from '@/components/auth/atoms/otp-input';
 
 // Mock haptic feedback hook
@@ -13,6 +13,14 @@ vi.mock('@/hooks/useHapticFeedback', () => ({
 }));
 
 describe('OtpInput', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
   it('renders 6 digit input boxes', () => {
     render(<OtpInput />);
 
