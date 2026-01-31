@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AppBadgeProps extends BadgeProps {
-  emphasis?: 'default' | 'subtle';
+  readonly emphasis?: 'default' | 'subtle';
 }
 
 export const Badge = React.forwardRef<HTMLSpanElement, AppBadgeProps>(

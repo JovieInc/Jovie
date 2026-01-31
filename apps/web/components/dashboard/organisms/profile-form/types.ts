@@ -1,8 +1,8 @@
 import type { Artist } from '@/types/db';
 
 export interface ProfileFormProps {
-  artist: Artist;
-  onUpdate: (artist: Artist) => void;
+  readonly artist: Artist;
+  readonly onUpdate: (artist: Artist) => void;
 }
 
 export interface ProfileFormData {

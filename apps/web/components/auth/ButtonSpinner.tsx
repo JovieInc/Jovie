@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 
 interface ButtonSpinnerProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function ButtonSpinner({ className }: Readonly<ButtonSpinnerProps>) {

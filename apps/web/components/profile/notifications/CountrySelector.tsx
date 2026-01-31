@@ -73,9 +73,9 @@ export const COUNTRY_OPTIONS: CountryOption[] = [
 ];
 
 interface CountryOptionButtonProps {
-  option: CountryOption;
-  isSelected: boolean;
-  onSelect: (option: CountryOption) => void;
+  readonly option: CountryOption;
+  readonly isSelected: boolean;
+  readonly onSelect: (option: CountryOption) => void;
 }
 
 const CountryOptionButton = memo(function CountryOptionButton({
@@ -107,10 +107,10 @@ const CountryOptionButton = memo(function CountryOptionButton({
 });
 
 interface CountrySelectorProps {
-  country: CountryOption;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelect: (country: CountryOption) => void;
+  readonly country: CountryOption;
+  readonly isOpen: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onSelect: (country: CountryOption) => void;
 }
 
 export function CountrySelector({

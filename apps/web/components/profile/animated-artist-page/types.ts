@@ -3,14 +3,14 @@ import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 export interface AnimatedArtistPageProps {
-  mode: string;
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
-  contacts: PublicContact[];
-  subtitle: string;
-  showTipButton: boolean;
-  showBackButton: boolean;
-  enableDynamicEngagement?: boolean;
+  readonly mode: string;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
+  readonly subtitle: string;
+  readonly showTipButton: boolean;
+  readonly showBackButton: boolean;
+  readonly enableDynamicEngagement?: boolean;
 }
 
 export interface UseAnimatedArtistPageReturn {

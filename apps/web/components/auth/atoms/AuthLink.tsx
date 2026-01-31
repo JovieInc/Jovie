@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 interface AuthLinkProps {
-  href: string;
-  children: ReactNode;
+  readonly href: string;
+  readonly children: ReactNode;
 }
 
 export function AuthLink({ href, children }: Readonly<AuthLinkProps>) {

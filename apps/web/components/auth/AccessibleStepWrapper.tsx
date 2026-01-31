@@ -4,19 +4,19 @@ interface AccessibleStepWrapperProps {
   /**
    * Current step number (1-indexed)
    */
-  currentStep: number;
+  readonly currentStep: number;
   /**
    * Total number of steps in the flow
    */
-  totalSteps: number;
+  readonly totalSteps: number;
   /**
    * Title describing the current step
    */
-  stepTitle: string;
+  readonly stepTitle: string;
   /**
    * Content to render for this step
    */
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 /**

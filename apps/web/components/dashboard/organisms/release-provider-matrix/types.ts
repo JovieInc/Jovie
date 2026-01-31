@@ -1,7 +1,7 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 export interface ReleaseProviderMatrixProps {
-  releases: ReleaseViewModel[];
+  readonly releases: ReleaseViewModel[];
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
   primaryProviders: ProviderKey[];
   spotifyConnected?: boolean;

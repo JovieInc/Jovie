@@ -11,8 +11,8 @@ interface LegacyTextareaProps
 
 // New interface for Catalyst UI Kit
 type TextareaProps = {
-  className?: string;
-  resizable?: boolean;
+  readonly className?: string;
+  readonly resizable?: boolean;
 } & Omit<Headless.TextareaProps, 'as' | 'className'>;
 
 export const Textarea = forwardRef(function Textarea(

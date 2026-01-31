@@ -10,8 +10,8 @@ import { MoonIcon, SunIcon, SystemIcon } from './ThemeIcons';
 
 interface ThemeToggleIconProps
   extends Readonly<{
-    theme?: string;
-    resolvedTheme?: string;
+    readonly theme?: string;
+    readonly resolvedTheme?: string;
   }> {}
 
 export function ThemeToggleIcon({

@@ -32,10 +32,10 @@ export interface ConfirmMatchDialogProps {
     readonly providerId: DspProviderId;
     readonly externalArtistName: string;
     readonly externalArtistUrl?: string | null;
-    externalArtistImageUrl?: string | null;
-    confidenceScore: number;
-    confidenceBreakdown?: ConfidenceBreakdownData;
-    matchingIsrcCount: number;
+    readonly externalArtistImageUrl?: string | null;
+    readonly confidenceScore: number;
+    readonly confidenceBreakdown?: ConfidenceBreakdownData;
+    readonly matchingIsrcCount: number;
   } | null;
 }
 

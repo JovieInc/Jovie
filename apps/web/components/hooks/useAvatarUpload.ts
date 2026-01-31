@@ -11,13 +11,13 @@ import {
 } from '@/lib/avatar/validation';
 
 export interface UseAvatarUploadProps {
-  src?: string | null;
-  onUpload?: (file: File) => Promise<string>;
-  onError?: (error: string) => void;
-  onSuccess?: (imageUrl: string) => void;
-  onRetryableError?: (error: string, code: UploadErrorCode) => void;
-  maxFileSize?: number;
-  acceptedTypes?: readonly string[];
+  readonly src?: string | null;
+  readonly onUpload?: (file: File) => Promise<string>;
+  readonly onError?: (error: string) => void;
+  readonly onSuccess?: (imageUrl: string) => void;
+  readonly onRetryableError?: (error: string, code: UploadErrorCode) => void;
+  readonly maxFileSize?: number;
+  readonly acceptedTypes?: readonly string[];
 }
 
 export interface UseAvatarUploadReturn {

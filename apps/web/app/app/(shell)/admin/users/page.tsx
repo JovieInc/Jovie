@@ -34,7 +34,7 @@ const AdminUsersTableUnified = dynamic(
 );
 
 interface AdminUsersPageProps {
-  searchParams: Promise<SearchParams>;
+  readonly searchParams: Promise<SearchParams>;
 }
 
 export const metadata: Metadata = {

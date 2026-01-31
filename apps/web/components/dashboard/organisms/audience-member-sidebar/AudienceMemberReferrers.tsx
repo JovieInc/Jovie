@@ -11,7 +11,7 @@ import type { AudienceMember } from '@/types';
 
 interface AudienceMemberReferrersProps
   extends Readonly<{
-    member: AudienceMember;
+    readonly member: AudienceMember;
   }> {}
 
 export function AudienceMemberReferrers({

@@ -8,8 +8,8 @@ export interface PhoneMockupLink {
 
 export interface PhoneMockupPreviewProps
   extends Readonly<{
-    username: string;
-    avatarUrl?: string | null;
-    links: PhoneMockupLink[];
-    className?: string;
+    readonly username: string;
+    readonly avatarUrl?: string | null;
+    readonly links: PhoneMockupLink[];
+    readonly className?: string;
   }> {}

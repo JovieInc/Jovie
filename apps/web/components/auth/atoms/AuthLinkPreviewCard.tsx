@@ -4,10 +4,10 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AuthLinkPreviewCardProps {
-  label: string;
-  hrefText: string;
-  trailing?: React.ReactNode;
-  className?: string;
+  readonly label: string;
+  readonly hrefText: string;
+  readonly trailing?: React.ReactNode;
+  readonly className?: string;
 }
 
 export function AuthLinkPreviewCard({

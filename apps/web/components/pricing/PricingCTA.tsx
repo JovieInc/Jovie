@@ -10,8 +10,8 @@ const BUTTON_TAP_SCALE = 0.98;
 
 interface PricingCTAProps
   extends Readonly<{
-    onUpgrade: () => void;
-    isLoading: boolean;
+    readonly onUpgrade: () => void;
+    readonly isLoading: boolean;
   }> {}
 
 export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {

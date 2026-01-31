@@ -9,13 +9,13 @@ export interface ErrorBannerAction {
 }
 
 export interface ErrorBannerProps {
-  title: string;
-  description?: string;
-  actions?: ErrorBannerAction[];
-  className?: string;
-  testId?: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly actions?: ErrorBannerAction[];
+  readonly className?: string;
+  readonly testId?: string;
   /** Optional callback to dismiss the banner. When provided, renders a close button. */
-  onDismiss?: () => void;
+  readonly onDismiss?: () => void;
 }
 
 export function ErrorBanner({

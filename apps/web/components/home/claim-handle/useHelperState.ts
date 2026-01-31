@@ -4,12 +4,12 @@ import { useMemo } from 'react';
 import type { HelperState } from './types';
 
 interface UseHelperStateProps {
-  handle: string;
-  handleError: string | null;
-  checkingAvail: boolean;
-  available: boolean | null;
-  availError: string | null;
-  displayDomain: string;
+  readonly handle: string;
+  readonly handleError: string | null;
+  readonly checkingAvail: boolean;
+  readonly available: boolean | null;
+  readonly availError: string | null;
+  readonly displayDomain: string;
 }
 
 export function useHelperState({

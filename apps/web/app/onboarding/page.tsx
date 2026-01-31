@@ -10,8 +10,8 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 interface OnboardingPageProps {
-  searchParams?: Promise<{
-    handle?: string;
+  readonly searchParams?: Promise<{
+    readonly handle?: string;
   }>;
 }
 

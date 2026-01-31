@@ -15,10 +15,10 @@ import type { ClientValidationResult } from '@/lib/validation/client-username';
 import type { HandleValidationState } from './types';
 
 interface UseHandleApiValidationProps {
-  value: string;
-  clientValidation: ClientValidationResult;
-  usernameSuggestions: string[];
-  showAvailability: boolean;
+  readonly value: string;
+  readonly clientValidation: ClientValidationResult;
+  readonly usernameSuggestions: string[];
+  readonly showAvailability: boolean;
 }
 
 interface HandleCheckResponse {

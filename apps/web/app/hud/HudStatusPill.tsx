@@ -1,8 +1,8 @@
 import { cn } from '@/lib/utils';
 
 export interface HudStatusPillProps {
-  label: string;
-  tone: 'good' | 'warning' | 'bad' | 'neutral';
+  readonly label: string;
+  readonly tone: 'good' | 'warning' | 'bad' | 'neutral';
 }
 
 const TONE_CLASSES: Record<HudStatusPillProps['tone'], string> = {

@@ -7,13 +7,13 @@ export type LogoVariant = 'word' | 'wordAlt' | 'icon' | 'full' | 'fullAlt';
 
 interface LogoProps
   extends Readonly<{
-    className?: string;
-    size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-    variant?: LogoVariant;
-    tone?: BrandLogoTone;
-    priority?: boolean;
-    'aria-hidden'?: boolean;
-    'data-testid'?: string;
+    readonly className?: string;
+    readonly size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly variant?: LogoVariant;
+    readonly tone?: BrandLogoTone;
+    readonly priority?: boolean;
+    readonly 'aria-hidden'?: boolean;
+    readonly 'data-testid'?: string;
   }> {}
 
 export function Logo({

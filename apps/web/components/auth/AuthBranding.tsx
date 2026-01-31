@@ -1,16 +1,16 @@
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
 interface AuthBrandingProps {
-  title: string;
-  description: string;
+  readonly title: string;
+  readonly description: string;
   gradientVariant?:
     | 'blue-purple-cyan'
     | 'purple-cyan-blue'
     | 'purple-pink-orange'
     | 'green-blue-purple'
     | 'red-orange-yellow';
-  textColorClass?: string;
-  showText?: boolean;
+  readonly textColorClass?: string;
+  readonly showText?: boolean;
 }
 
 // Static gradient mappings to ensure Tailwind classes are preserved during build

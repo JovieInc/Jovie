@@ -6,10 +6,10 @@ import { cn, getExternalLinkProps, isExternalUrl } from '@/lib/utils';
 
 export interface FooterLinkProps
   extends Omit<React.ComponentProps<typeof Link>, 'href' | 'className'> {
-  href: string;
-  className?: string;
-  tone?: 'light' | 'dark';
-  external?: boolean;
+  readonly href: string;
+  readonly className?: string;
+  readonly tone?: 'light' | 'dark';
+  readonly external?: boolean;
 }
 
 export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(

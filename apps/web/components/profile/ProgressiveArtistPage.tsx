@@ -20,13 +20,13 @@ const AnimatedArtistPage = dynamic(
 );
 
 interface ProgressiveArtistPageProps {
-  mode: string;
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
-  contacts: PublicContact[];
-  subtitle: string;
-  showTipButton: boolean;
-  showBackButton: boolean;
+  readonly mode: string;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
+  readonly subtitle: string;
+  readonly showTipButton: boolean;
+  readonly showBackButton: boolean;
 }
 
 export function ProgressiveArtistPage(props: ProgressiveArtistPageProps) {

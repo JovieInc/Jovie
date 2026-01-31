@@ -32,15 +32,19 @@ interface ProviderConfig {
 
 interface AvailabilityCellProps {
   release: ReleaseViewModel;
-  allProviders: ProviderKey[];
-  providerConfig: Record<ProviderKey, ProviderConfig>;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
-  onAddUrl?: (
+  readonly allProviders: ProviderKey[];
+  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
-  isAddingUrl?: boolean;
+  readonly isAddingUrl?: boolean;
 }
 
 /**

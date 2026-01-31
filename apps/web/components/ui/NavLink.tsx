@@ -7,10 +7,10 @@ import { cn, getExternalLinkProps, isExternalUrl } from '@/lib/utils';
 
 export interface NavLinkProps
   extends Omit<React.ComponentProps<typeof Link>, 'href' | 'className'> {
-  href: string;
-  className?: string;
-  variant?: 'default' | 'primary';
-  external?: boolean;
+  readonly href: string;
+  readonly className?: string;
+  readonly variant?: 'default' | 'primary';
+  readonly external?: boolean;
 }
 
 export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(

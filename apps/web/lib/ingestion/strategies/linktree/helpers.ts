@@ -8,21 +8,24 @@
  * Linktree Next.js page props structure.
  */
 export type LinktreePageProps = {
-  props?: {
-    pageProps?: {
-      seo?: { title?: string | null; image?: string | null };
-      links?: unknown;
-      allLinks?: unknown;
-      user?: {
-        fullName?: string | null;
-        profilePicture?: { url?: string | null } | null;
+  readonly props?: {
+    readonly pageProps?: {
+      readonly seo?: { title?: string | null; image?: string | null };
+      readonly links?: unknown;
+      readonly allLinks?: unknown;
+      readonly user?: {
+        readonly fullName?: string | null;
+        readonly profilePicture?: { url?: string | null } | null;
       };
-      account?: { displayName?: string | null; profilePicture?: string | null };
-      page?: { links?: unknown };
-      data?: { links?: unknown };
-      profile?: { links?: unknown };
-      linkData?: unknown;
-      dehydratedState?: { queries?: unknown };
+      readonly account?: {
+        displayName?: string | null;
+        profilePicture?: string | null;
+      };
+      readonly page?: { links?: unknown };
+      readonly data?: { links?: unknown };
+      readonly profile?: { links?: unknown };
+      readonly linkData?: unknown;
+      readonly dehydratedState?: { queries?: unknown };
     };
   };
   query?: { handle?: string };

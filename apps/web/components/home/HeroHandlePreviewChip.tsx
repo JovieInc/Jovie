@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 interface HeroHandlePreviewChipProps {
-  fallbackHandle?: string;
+  readonly fallbackHandle?: string;
 }
 
 export function HeroHandlePreviewChip({

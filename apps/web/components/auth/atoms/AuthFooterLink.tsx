@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 import { AuthLink } from './AuthLink';
 
 interface AuthFooterLinkProps {
-  prompt: string;
-  href: string;
-  linkText: ReactNode;
+  readonly prompt: string;
+  readonly href: string;
+  readonly linkText: ReactNode;
 }
 
 export function AuthFooterLink({

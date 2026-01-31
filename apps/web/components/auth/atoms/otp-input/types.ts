@@ -4,34 +4,34 @@ export interface OtpInputProps {
   /**
    * Current value of the OTP
    */
-  value?: string;
+  readonly value?: string;
   /**
    * Called when the OTP value changes
    */
-  onChange?: (value: string) => void;
+  readonly onChange?: (value: string) => void;
   /**
    * Called when all digits are entered
    */
-  onComplete?: (value: string) => void;
+  readonly onComplete?: (value: string) => void;
   /**
    * Whether to focus the first digit on mount
    * @default true
    */
-  autoFocus?: boolean;
+  readonly autoFocus?: boolean;
   /**
    * Accessible label for the OTP input
    */
-  'aria-label'?: string;
+  readonly 'aria-label'?: string;
   /**
    * Whether the input is disabled
    */
-  disabled?: boolean;
+  readonly disabled?: boolean;
   /**
    * Error state
    */
-  error?: boolean;
+  readonly error?: boolean;
   /**
    * Error message ID for aria-describedby association
    */
-  errorId?: string;
+  readonly errorId?: string;
 }

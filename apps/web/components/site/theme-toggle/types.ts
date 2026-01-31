@@ -1,7 +1,7 @@
 export interface ThemeToggleProps {
-  appearance?: 'icon' | 'segmented';
-  className?: string;
-  shortcutKey?: string;
+  readonly appearance?: 'icon' | 'segmented';
+  readonly className?: string;
+  readonly shortcutKey?: string;
 }
 
 export type ThemeValue = 'light' | 'dark' | 'system';

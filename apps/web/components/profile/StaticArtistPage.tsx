@@ -65,19 +65,19 @@ function extractVenmoUsername(url: string | null): string | null {
 }
 
 interface StaticArtistPageProps {
-  mode: string;
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
-  contacts: PublicContact[];
-  subtitle: string;
-  showTipButton: boolean;
-  showBackButton: boolean;
-  showFooter?: boolean;
-  autoOpenCapture?: boolean;
-  primaryAction?: PrimaryAction;
-  spotifyPreferred?: boolean;
-  enableDynamicEngagement?: boolean;
-  latestRelease?: DiscogRelease | null;
+  readonly mode: string;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
+  readonly subtitle: string;
+  readonly showTipButton: boolean;
+  readonly showBackButton: boolean;
+  readonly showFooter?: boolean;
+  readonly autoOpenCapture?: boolean;
+  readonly primaryAction?: PrimaryAction;
+  readonly spotifyPreferred?: boolean;
+  readonly enableDynamicEngagement?: boolean;
+  readonly latestRelease?: DiscogRelease | null;
 }
 
 function renderContent(

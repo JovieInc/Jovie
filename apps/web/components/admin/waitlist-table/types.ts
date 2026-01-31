@@ -10,17 +10,17 @@ export interface Column<T> {
 }
 
 export interface WaitlistTableProps {
-  entries: WaitlistEntryRow[];
-  page: number;
-  pageSize: number;
-  total: number;
-  groupingEnabled?: boolean;
+  readonly entries: WaitlistEntryRow[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly groupingEnabled?: boolean;
   // Optional external selection state (for bulk actions in parent)
-  externalSelection?: {
-    selectedIds: Set<string>;
-    headerCheckboxState: boolean | 'indeterminate';
-    toggleSelect: (id: string) => void;
-    toggleSelectAll: () => void;
+  readonly externalSelection?: {
+    readonly selectedIds: Set<string>;
+    readonly headerCheckboxState: boolean | 'indeterminate';
+    readonly toggleSelect: (id: string) => void;
+    readonly toggleSelectAll: () => void;
   };
 }
 

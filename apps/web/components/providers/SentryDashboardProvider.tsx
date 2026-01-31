@@ -23,28 +23,28 @@ interface SentryDashboardProviderProps {
   /**
    * Child components to render
    */
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 
   /**
    * Optional callback when SDK upgrade starts
    */
-  onUpgradeStart?: () => void;
+  readonly onUpgradeStart?: () => void;
 
   /**
    * Optional callback when SDK upgrade completes successfully
    */
-  onUpgradeComplete?: (result: UpgradeResult) => void;
+  readonly onUpgradeComplete?: (result: UpgradeResult) => void;
 
   /**
    * Optional callback when SDK upgrade fails
    */
-  onUpgradeFailed?: (error: Error) => void;
+  readonly onUpgradeFailed?: (error: Error) => void;
 
   /**
    * Whether to show debug information in development mode
    * Default: false
    */
-  debug?: boolean;
+  readonly debug?: boolean;
 }
 
 /**

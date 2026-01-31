@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { memo } from 'react';
 
 interface PopularityIconProps {
-  popularity: number | null | undefined;
+  readonly popularity: number | null | undefined;
 }
 
 /**

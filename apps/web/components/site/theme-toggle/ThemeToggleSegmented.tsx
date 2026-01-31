@@ -11,13 +11,13 @@ import { SmallMoonIcon, SmallSunIcon, SmallSystemIcon } from './ThemeIcons';
 
 interface ThemeToggleSegmentedProps
   extends Readonly<{
-    currentTheme: string;
-    indicatorX: number;
-    setTheme: (theme: 'light' | 'dark' | 'system') => void;
-    shortcutDescriptionId?: string;
-    shortcutDescription?: string;
-    className?: string;
-    wrapButton: (button: React.ReactElement) => React.ReactElement;
+    readonly currentTheme: string;
+    readonly indicatorX: number;
+    readonly setTheme: (theme: 'light' | 'dark' | 'system') => void;
+    readonly shortcutDescriptionId?: string;
+    readonly shortcutDescription?: string;
+    readonly className?: string;
+    readonly wrapButton: (button: React.ReactElement) => React.ReactElement;
   }> {}
 
 const baseButtonClass =

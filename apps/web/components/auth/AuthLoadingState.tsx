@@ -6,8 +6,8 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 type AuthMode = 'signin' | 'signup';
 
 interface AuthLoadingStateProps {
-  mode: AuthMode;
-  isStalled: boolean;
+  readonly mode: AuthMode;
+  readonly isStalled: boolean;
 }
 
 const modeLabels: Record<AuthMode, { loading: string; stall: string }> = {

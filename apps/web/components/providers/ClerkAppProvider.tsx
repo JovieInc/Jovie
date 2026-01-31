@@ -3,7 +3,7 @@
 import type React from 'react';
 
 export interface ClerkAppProviderProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 // Legacy stub: Root-level ClerkProvider is now applied in app/layout.tsx.

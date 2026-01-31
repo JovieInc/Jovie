@@ -10,10 +10,10 @@ import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
-  artist: Artist;
-  handle: string;
-  dspsOverride?: AvailableDSP[];
-  enableDynamicEngagement?: boolean;
+  readonly artist: Artist;
+  readonly handle: string;
+  readonly dspsOverride?: AvailableDSP[];
+  readonly enableDynamicEngagement?: boolean;
 }
 
 /**

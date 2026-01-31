@@ -16,14 +16,14 @@ const NAME_HOVER_OPACITY = 0.8;
 
 export interface ArtistCardProps
   extends Readonly<{
-    handle: string;
-    name: string;
-    src: string;
-    alt?: string;
-    size?: 'sm' | 'md' | 'lg' | 'xl';
-    showName?: boolean;
-    className?: string;
-    isVerified?: boolean;
+    readonly handle: string;
+    readonly name: string;
+    readonly src: string;
+    readonly alt?: string;
+    readonly size?: 'sm' | 'md' | 'lg' | 'xl';
+    readonly showName?: boolean;
+    readonly className?: string;
+    readonly isVerified?: boolean;
   }> {}
 
 export function ArtistCard({

@@ -11,13 +11,13 @@ export interface StarterEmptyStateAction {
 }
 
 export interface StarterEmptyStateProps {
-  title: string;
-  description: string;
-  icon?: React.ReactNode;
-  primaryAction?: StarterEmptyStateAction;
-  secondaryAction?: StarterEmptyStateAction;
-  className?: string;
-  testId?: string;
+  readonly title: string;
+  readonly description: string;
+  readonly icon?: React.ReactNode;
+  readonly primaryAction?: StarterEmptyStateAction;
+  readonly secondaryAction?: StarterEmptyStateAction;
+  readonly className?: string;
+  readonly testId?: string;
 }
 
 export function StarterEmptyState({

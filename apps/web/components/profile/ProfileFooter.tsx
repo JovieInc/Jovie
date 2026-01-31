@@ -2,7 +2,7 @@ import { Footer } from '@/components/organisms/footer-module';
 import { Artist } from '@/types/db';
 
 interface ProfileFooterProps {
-  artist: Artist;
+  readonly artist: Artist;
 }
 
 export function ProfileFooter({ artist }: ProfileFooterProps) {

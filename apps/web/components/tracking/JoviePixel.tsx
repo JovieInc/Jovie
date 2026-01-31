@@ -7,7 +7,7 @@ import {
 } from '@/lib/tracking/consent';
 
 interface JoviePixelProps {
-  profileId: string;
+  readonly profileId: string;
 }
 
 interface PixelEventPayload {

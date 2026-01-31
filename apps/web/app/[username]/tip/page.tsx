@@ -4,8 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
 interface Props {
-  params: Promise<{
-    username: string;
+  readonly params: Promise<{
+    readonly username: string;
   }>;
 }
 

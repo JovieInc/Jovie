@@ -10,9 +10,9 @@ const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric' });
 const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
 interface TourDateCardProps {
-  tourDate: TourDateViewModel;
-  isNearYou?: boolean;
-  distanceKm?: number | null;
+  readonly tourDate: TourDateViewModel;
+  readonly isNearYou?: boolean;
+  readonly distanceKm?: number | null;
 }
 
 export function TourDateCard({

@@ -21,7 +21,7 @@ const HeaderActionsContext = createContext<
 >(undefined);
 
 export interface HeaderActionsProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
 /**

@@ -6,17 +6,17 @@ export type { AudienceMode };
 export type AudienceRow = AudienceMember;
 
 export interface DashboardAudienceTableProps {
-  mode: AudienceMode;
-  rows: AudienceRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  sort: string;
-  direction: 'asc' | 'desc';
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
-  onSortChange: (sort: string) => void;
-  profileUrl?: string;
+  readonly mode: AudienceMode;
+  readonly rows: AudienceRow[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: string;
+  readonly direction: 'asc' | 'desc';
+  readonly onPageChange: (page: number) => void;
+  readonly onPageSizeChange: (pageSize: number) => void;
+  readonly onSortChange: (sort: string) => void;
+  readonly profileUrl?: string;
 }
 
 export interface BulkAction {

@@ -6,8 +6,8 @@ interface FooterNavigationProps {
   readonly className?: string;
   readonly linkClassName?: string;
   readonly links?: Array<{
-    href: string;
-    label: string;
+    readonly href: string;
+    readonly label: string;
   }>;
 }
 

@@ -10,7 +10,7 @@ const BLUR_DATA_URL =
 
 interface Props
   extends Readonly<{
-    creators: FeaturedCreator[];
+    readonly creators: FeaturedCreator[];
   }> {}
 
 /**

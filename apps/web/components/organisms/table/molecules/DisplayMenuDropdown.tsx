@@ -23,7 +23,7 @@ export interface ColumnVisibility {
 }
 
 interface ColumnToggleButtonProps {
-  readonly columnId: string;
+  columnId: string;
   readonly label: string;
   readonly isVisible: boolean;
   readonly onToggle: (columnId: string, visible: boolean) => void;

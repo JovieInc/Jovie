@@ -11,7 +11,7 @@ const CHECKBOX_STYLES =
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
-  readonly checked: boolean;
+  checked: boolean;
   readonly onChange: (checked: boolean) => void;
   readonly rowNumber?: number; // Shows when unchecked/not hovered
   readonly ariaLabel: string;
@@ -22,7 +22,7 @@ export interface TableCheckboxCellLegacyProps {
 
 // TanStack Table props (recommended)
 export interface TableCheckboxCellTanStackProps<TData = unknown> {
-  readonly table?: Table<TData>;
+  table?: Table<TData>;
   readonly row?: Row<TData>;
   readonly rowNumber?: number;
   readonly isChecked?: boolean;

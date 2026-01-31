@@ -5,7 +5,7 @@ import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { PendingPreview } from './types';
 
 interface UsePendingPreviewProps {
-  onAdd: (link: DetectedLink) => Promise<void> | void;
+  readonly onAdd: (link: DetectedLink) => Promise<void> | void;
 }
 
 export function usePendingPreview({ onAdd }: UsePendingPreviewProps) {

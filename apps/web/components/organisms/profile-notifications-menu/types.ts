@@ -7,16 +7,18 @@ import type {
 import type { ProfileNotificationsState } from '../hooks/useProfileNotificationsController';
 
 export interface ProfileNotificationsMenuProps {
-  channelBusy: Partial<Record<NotificationChannel, boolean>>;
-  hasActiveSubscriptions: boolean;
-  notificationsState: ProfileNotificationsState;
-  onAddChannel: (channel?: NotificationChannel) => void;
-  onOpenChange: (open: boolean) => void;
-  onUnsubscribe: (channel: NotificationChannel) => Promise<void> | void;
-  open: boolean;
-  subscribedChannels: NotificationSubscriptionState;
-  subscriptionDetails: NotificationContactValues;
-  triggerRef?: React.RefObject<HTMLButtonElement | null>;
+  readonly channelBusy: Partial<Record<NotificationChannel, boolean>>;
+  readonly hasActiveSubscriptions: boolean;
+  readonly notificationsState: ProfileNotificationsState;
+  readonly onAddChannel: (channel?: NotificationChannel) => void;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onUnsubscribe: (
+    channel: NotificationChannel
+  ) => Promise<void> | void;
+  readonly open: boolean;
+  readonly subscribedChannels: NotificationSubscriptionState;
+  readonly subscriptionDetails: NotificationContactValues;
+  readonly triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export interface UseNotificationConfirmReturn {

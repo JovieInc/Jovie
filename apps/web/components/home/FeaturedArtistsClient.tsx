@@ -1,7 +1,7 @@
 import { NewFeaturedArtists } from './NewFeaturedArtists';
 
 export interface FeaturedArtistsClientProps {
-  showFades?: boolean;
+  readonly showFades?: boolean;
 }
 
 export function FeaturedArtistsClient({

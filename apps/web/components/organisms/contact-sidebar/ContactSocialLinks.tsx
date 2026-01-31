@@ -23,7 +23,7 @@ import {
 } from './utils';
 
 interface ContactSocialLinksProps {
-  readonly contact: Contact;
+  contact: Contact;
   readonly fullName: string;
   readonly isEditable: boolean;
   readonly isAddingLink: boolean;

@@ -41,15 +41,15 @@ export interface InputProps
   /**
    * Loading state - shows spinner
    */
-  loading?: boolean;
+  readonly loading?: boolean;
   /**
    * Status icon to display (e.g., check mark for validation)
    */
-  statusIcon?: React.ReactNode;
+  readonly statusIcon?: React.ReactNode;
   /**
    * Trailing content (e.g., action button)
    */
-  trailing?: React.ReactNode;
+  readonly trailing?: React.ReactNode;
 }
 
 /**

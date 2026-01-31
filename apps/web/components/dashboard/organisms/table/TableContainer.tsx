@@ -3,14 +3,14 @@ import { cn } from '@/lib/utils';
 
 export interface TableContainerProps {
   /** Whether the table is empty (shows empty state instead of table) */
-  isEmpty: boolean;
+  readonly isEmpty: boolean;
   /** Empty state component to show when isEmpty is true */
-  emptyState: ReactNode;
+  readonly emptyState: ReactNode;
   /** Optional toolbar component (shows above table/empty state) */
-  toolbar?: ReactNode;
+  readonly toolbar?: ReactNode;
   /** Table content (shown when isEmpty is false) */
-  children: ReactNode;
-  className?: string;
+  readonly children: ReactNode;
+  readonly className?: string;
 }
 
 /**

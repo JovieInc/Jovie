@@ -41,15 +41,17 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 interface DialogContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  portalProps?: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Portal>;
-  overlayProps?: DialogOverlayProps;
-  disablePortal?: boolean;
-  hideClose?: boolean;
+  readonly portalProps?: React.ComponentPropsWithoutRef<
+    typeof DialogPrimitive.Portal
+  >;
+  readonly overlayProps?: DialogOverlayProps;
+  readonly disablePortal?: boolean;
+  readonly hideClose?: boolean;
   /**
    * Test ID for the dialog content.
    * @default "dialog-content"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const DialogContent = React.forwardRef<
@@ -122,7 +124,7 @@ interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the dialog header.
    * @default "dialog-header"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const DialogHeader = ({
@@ -143,7 +145,7 @@ interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the dialog footer.
    * @default "dialog-footer"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const DialogFooter = ({

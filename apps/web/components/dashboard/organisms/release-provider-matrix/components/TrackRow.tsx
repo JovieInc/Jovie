@@ -16,13 +16,13 @@ interface ProviderConfig {
 }
 
 interface TrackRowProps {
-  track: TrackViewModel;
-  providerConfig: Record<ProviderKey, ProviderConfig>;
-  allProviders: ProviderKey[];
+  readonly track: TrackViewModel;
+  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
+  readonly allProviders: ProviderKey[];
   /** Number of visible columns (for proper spacing) */
-  columnCount: number;
+  readonly columnCount: number;
   /** Column visibility state from TanStack table */
-  columnVisibility?: Record<string, boolean>;
+  readonly columnVisibility?: Record<string, boolean>;
 }
 
 /**
@@ -194,12 +194,12 @@ export const TrackRow = memo(function TrackRow({
  * TrackRowsContainer - Renders track rows for an expanded release
  */
 interface TrackRowsContainerProps {
-  tracks: TrackViewModel[];
-  providerConfig: Record<ProviderKey, ProviderConfig>;
-  allProviders: ProviderKey[];
-  columnCount: number;
+  readonly tracks: TrackViewModel[];
+  readonly providerConfig: Record<ProviderKey, ProviderConfig>;
+  readonly allProviders: ProviderKey[];
+  readonly columnCount: number;
   /** Column visibility state from TanStack table */
-  columnVisibility?: Record<string, boolean>;
+  readonly columnVisibility?: Record<string, boolean>;
 }
 
 export const TrackRowsContainer = memo(function TrackRowsContainer({

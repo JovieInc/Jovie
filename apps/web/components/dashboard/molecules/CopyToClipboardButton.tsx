@@ -7,14 +7,14 @@ import { useClipboard } from '@/hooks/useClipboard';
 
 export interface CopyToClipboardButtonProps
   extends Readonly<{
-    relativePath: string; // e.g. '/artist-handle'
-    idleLabel?: string;
-    successLabel?: string;
-    errorLabel?: string;
-    className?: string;
-    iconName?: string;
-    onCopySuccess?: () => void;
-    onCopyError?: () => void;
+    readonly relativePath: string; // e.g. '/artist-handle'
+    readonly idleLabel?: string;
+    readonly successLabel?: string;
+    readonly errorLabel?: string;
+    readonly className?: string;
+    readonly iconName?: string;
+    readonly onCopySuccess?: () => void;
+    readonly onCopyError?: () => void;
   }> {}
 
 function getButtonLabel(

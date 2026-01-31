@@ -1,10 +1,10 @@
 export type ThemeValue = 'light' | 'dark' | 'system';
 
 export interface DashboardThemeToggleProps {
-  onThemeChange?: (theme: ThemeValue) => void;
-  onThemeSave?: (theme: ThemeValue) => Promise<void>;
-  showSystemOption?: boolean;
-  variant?: 'default' | 'compact';
+  readonly onThemeChange?: (theme: ThemeValue) => void;
+  readonly onThemeSave?: (theme: ThemeValue) => Promise<void>;
+  readonly showSystemOption?: boolean;
+  readonly variant?: 'default' | 'compact';
 }
 
 export interface UseDashboardThemeReturn {

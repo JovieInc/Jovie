@@ -8,7 +8,7 @@ import { QRCode } from '@/components/atoms/QRCode';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 interface DesktopQrOverlayProps {
-  handle: string;
+  readonly handle: string;
 }
 
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {

@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
 
 interface ProfileViewTrackerProps {
-  handle: string;
-  artistId: string;
-  source?: string;
+  readonly handle: string;
+  readonly artistId: string;
+  readonly source?: string;
 }
 
 /**

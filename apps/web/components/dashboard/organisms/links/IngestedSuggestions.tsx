@@ -18,35 +18,35 @@ export interface IngestedSuggestionsProps {
    * Array of pending suggestions to display.
    * These are AI-discovered links that the user can accept or dismiss.
    */
-  suggestions: SuggestedLink[];
+  readonly suggestions: SuggestedLink[];
 
   /**
    * Callback when a suggestion is accepted.
    * The component will remove the suggestion from the list after this callback completes.
    */
-  onAccept: (suggestion: SuggestedLink) => void | Promise<void>;
+  readonly onAccept: (suggestion: SuggestedLink) => void | Promise<void>;
 
   /**
    * Callback when a suggestion is dismissed.
    * The component will remove the suggestion from the list after this callback completes.
    */
-  onDismiss: (suggestion: SuggestedLink) => void | Promise<void>;
+  readonly onDismiss: (suggestion: SuggestedLink) => void | Promise<void>;
 
   /**
    * Profile ID for analytics tracking (optional).
    */
-  profileId?: string;
+  readonly profileId?: string;
 
   /**
    * Function to generate a unique key for each suggestion.
    * Defaults to using suggestionId or platform::normalizedUrl combo.
    */
-  suggestionKey?: (suggestion: SuggestedLink) => string;
+  readonly suggestionKey?: (suggestion: SuggestedLink) => string;
 
   /**
    * Optional additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

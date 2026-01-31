@@ -30,16 +30,16 @@ import type { CreatorActionsMenuProps } from './types';
 import { copyTextToClipboard } from './utils';
 
 interface MenuItemsProps {
-  profile: CreatorActionsMenuProps['profile'];
-  copySuccess: boolean;
-  isLoading: boolean;
-  onRefreshIngest?: () => void;
-  onToggleVerification: () => void;
-  onToggleFeatured: () => void;
-  onToggleMarketing: () => void;
-  onSendInvite?: () => void;
-  onDelete: () => void;
-  handleCopyClaimLink: () => void;
+  readonly profile: CreatorActionsMenuProps['profile'];
+  readonly copySuccess: boolean;
+  readonly isLoading: boolean;
+  readonly onRefreshIngest?: () => void;
+  readonly onToggleVerification: () => void;
+  readonly onToggleFeatured: () => void;
+  readonly onToggleMarketing: () => void;
+  readonly onSendInvite?: () => void;
+  readonly onDelete: () => void;
+  readonly handleCopyClaimLink: () => void;
 }
 
 /**
