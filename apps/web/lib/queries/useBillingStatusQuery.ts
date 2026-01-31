@@ -40,6 +40,14 @@ async function fetchBillingStatus({
   };
 }
 
+// Shared query options for billing status queries
+const billingStatusQueryOptions = {
+  queryKey: queryKeys.billing.status(),
+  queryFn: fetchBillingStatus,
+  // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
+  ...FREQUENT_CACHE,
+} as const;
+
 /**
  * Query hook for fetching user billing status.
  *
@@ -60,12 +68,7 @@ async function fetchBillingStatus({
  * }
  */
 export function useBillingStatusQuery() {
-  return useQuery<BillingStatusData, Error>({
-    queryKey: queryKeys.billing.status(),
-    queryFn: fetchBillingStatus,
-    // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
-    ...FREQUENT_CACHE,
-  });
+  return useQuery<BillingStatusData, Error>(billingStatusQueryOptions);
 }
 
 /**
@@ -82,10 +85,7 @@ export function useBillingStatusQuery() {
  */
 export function useIsPro() {
   return useQuery({
-    queryKey: queryKeys.billing.status(),
-    queryFn: fetchBillingStatus,
-    // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
-    ...FREQUENT_CACHE,
+    ...billingStatusQueryOptions,
     select: data => data.isPro,
   });
 }

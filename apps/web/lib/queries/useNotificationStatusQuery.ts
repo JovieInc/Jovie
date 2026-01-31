@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { env } from '@/lib/env-client';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   getNotificationStatus,
@@ -53,7 +54,7 @@ export function useNotificationStatusQuery({
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: true,
-    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
+    refetchOnWindowFocus: !env.IS_DEV,
     enabled: enabled && Boolean(emailValue || phoneValue),
     retry: 2,
     retryDelay: getRetryDelay,
