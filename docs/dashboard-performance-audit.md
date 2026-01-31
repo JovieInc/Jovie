@@ -350,12 +350,12 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 
 ### Medium Priority (Code Quality)
 
-| # | Issue | File | Effort |
+| # | Issue | File | Status |
 |---|-------|------|--------|
-| 6 | Fix referrer NULL handling | `analytics.ts` | Low |
-| 7 | Consider Redis for analytics cache | `route.ts` | High |
-| 8 | Refactor barrel exports to selective | `links/index.ts` | Medium |
-| 9 | Add `useCallback` to mapped handlers | Multiple files | Medium |
+| 6 | Fix referrer NULL handling | `analytics.ts` | ✅ Done |
+| 7 | Consider Redis for analytics cache | `route.ts` | Pending (High effort) |
+| 8 | Refactor barrel exports to selective | `links/index.ts` | ✅ Done |
+| 9 | Extract table column handlers | `columns.tsx` | ✅ Done |
 
 ### Low Priority (Nice-to-Have)
 

@@ -24,6 +24,19 @@ function copyToClipboard(text: string, label: string) {
   toast.success(`${label} copied`);
 }
 
+/**
+ * Click handler for copy buttons using data attributes.
+ * Avoids creating new function instances on every render.
+ */
+function handleCopyClick(e: React.MouseEvent<HTMLButtonElement>) {
+  e.stopPropagation();
+  const text = e.currentTarget.dataset.copyText;
+  const label = e.currentTarget.dataset.copyLabel;
+  if (text && label) {
+    copyToClipboard(text, label);
+  }
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table column defs require any for mixed accessor types
 export function createContactColumns(): ColumnDef<EditableContact, any>[] {
   return [
@@ -71,10 +84,9 @@ export function createContactColumns(): ColumnDef<EditableContact, any>[] {
         return (
           <button
             type='button'
-            onClick={e => {
-              e.stopPropagation();
-              copyToClipboard(email, 'Email');
-            }}
+            onClick={handleCopyClick}
+            data-copy-text={email}
+            data-copy-label='Email'
             className='group flex items-center gap-1.5 text-secondary-token hover:text-primary-token transition-colors'
           >
             <Mail className='h-3.5 w-3.5 text-tertiary-token group-hover:text-primary-token' />
@@ -95,10 +107,9 @@ export function createContactColumns(): ColumnDef<EditableContact, any>[] {
         return (
           <button
             type='button'
-            onClick={e => {
-              e.stopPropagation();
-              copyToClipboard(phone, 'Phone');
-            }}
+            onClick={handleCopyClick}
+            data-copy-text={phone}
+            data-copy-label='Phone'
             className='group flex items-center gap-1.5 text-secondary-token hover:text-primary-token transition-colors'
           >
             <Phone className='h-3.5 w-3.5 text-tertiary-token group-hover:text-primary-token' />
