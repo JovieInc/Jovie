@@ -107,12 +107,12 @@ type TableMetaContextValue = {
 const TableMetaContext = createContext<TableMetaContextValue | null>(null);
 
 interface DashboardLayoutClientProps {
-  dashboardData: DashboardData;
-  persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
-  children: React.ReactNode;
+  readonly dashboardData: DashboardData;
+  readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
+  readonly children: React.ReactNode;
   /** If true, content area uses full width without max-w constraint */
-  fullWidth?: boolean;
-  previewEnabled?: boolean;
+  readonly fullWidth?: boolean;
+  readonly previewEnabled?: boolean;
 }
 
 export default function DashboardLayoutClient({

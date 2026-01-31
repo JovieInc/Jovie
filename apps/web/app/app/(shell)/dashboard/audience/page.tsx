@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
+import { Suspense } from 'react';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { audienceSearchParams } from '@/lib/nuqs';
+import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -18,21 +19,19 @@ import { getAudienceServerData } from './audience-data';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export default async function AudiencePage({
+async function AudienceContent({
   searchParams,
 }: Readonly<{
   searchParams: Promise<SearchParams>;
 }>) {
-  const { userId } = await getCachedAuth();
-
-  // Handle unauthenticated users
-  if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/audience');
-  }
-
   try {
-    // Fetch dashboard data server-side
+    // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
+
+    // Handle unauthenticated users
+    if (!dashboardData.user?.id) {
+      redirect('/sign-in?redirect_url=/app/dashboard/audience');
+    }
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
@@ -52,7 +51,7 @@ export default async function AudiencePage({
     const parsedParams = await audienceSearchParams.parse(searchParams);
 
     const audienceData = await getAudienceServerData({
-      userId,
+      userId: dashboardData.user.id,
       selectedProfileId: artist?.id ?? null,
       searchParams: {
         page: String(parsedParams.page),
@@ -76,10 +75,34 @@ export default async function AudiencePage({
     );
   } catch (error) {
     throwIfRedirect(error);
-    console.error('Error loading audience data:', error);
+    logger.error('[AudiencePage] Failed to load audience data', { error });
 
     return (
       <PageErrorState message='Failed to load audience data. Please refresh the page.' />
     );
   }
+}
+
+function AudienceSkeleton() {
+  return (
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
+        <div className='h-10 w-32 animate-pulse rounded bg-surface-1' />
+      </div>
+      <div className='h-96 animate-pulse rounded-lg bg-surface-1' />
+    </div>
+  );
+}
+
+export default async function AudiencePage({
+  searchParams,
+}: Readonly<{
+  searchParams: Promise<SearchParams>;
+}>) {
+  return (
+    <Suspense fallback={<AudienceSkeleton />}>
+      <AudienceContent searchParams={searchParams} />
+    </Suspense>
+  );
 }

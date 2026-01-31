@@ -14,7 +14,7 @@ import { formatActionLabel, resolveAudienceActionIcon } from './utils';
 
 interface AudienceMemberActionsProps
   extends Readonly<{
-    member: AudienceMember;
+    readonly member: AudienceMember;
   }> {}
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {

@@ -1,9 +1,9 @@
 export interface FooterProps {
-  variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
-  artistHandle?: string;
-  hideBranding?: boolean;
-  artistSettings?: {
-    hide_branding?: boolean;
+  readonly variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
+  readonly artistHandle?: string;
+  readonly hideBranding?: boolean;
+  readonly artistSettings?: {
+    readonly hide_branding?: boolean;
   };
   showThemeToggle?: boolean;
   className?: string;

@@ -5,19 +5,19 @@ import { cn } from '@/lib/utils';
 
 export interface TableToolbarProps {
   /** Number of selected rows */
-  selectedCount?: number;
+  readonly selectedCount?: number;
   /** Total number of rows */
-  totalCount: number;
+  readonly totalCount: number;
   /** Callback to select all rows */
-  onSelectAll?: () => void;
+  readonly onSelectAll?: () => void;
   /** Callback to deselect all rows */
-  onDeselectAll?: () => void;
+  readonly onDeselectAll?: () => void;
   /** Bulk actions shown when items are selected */
-  bulkActions?: ReactNode;
+  readonly bulkActions?: ReactNode;
   /** Primary actions shown when no items are selected */
-  actions?: ReactNode;
+  readonly actions?: ReactNode;
   /** Additional CSS classes */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

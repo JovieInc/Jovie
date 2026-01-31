@@ -4,35 +4,35 @@ export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
 > {
   initialLinks: T[];
-  className?: string;
-  onLinksChange?: (links: T[]) => void;
-  onLinkAdded?: (links: T[]) => void;
-  creatorName?: string;
-  isMusicProfile?: boolean;
-  suggestedLinks?: Array<
+  readonly className?: string;
+  readonly onLinksChange?: (links: T[]) => void;
+  readonly onLinkAdded?: (links: T[]) => void;
+  readonly creatorName?: string;
+  readonly isMusicProfile?: boolean;
+  readonly suggestedLinks?: Array<
     T & {
       suggestionId?: string;
-      state?: 'active' | 'suggested' | 'rejected';
-      confidence?: number | null;
-      sourcePlatform?: string | null;
-      sourceType?: string | null;
-      evidence?: { sources?: string[]; signals?: string[] } | null;
+      readonly state?: 'active' | 'suggested' | 'rejected';
+      readonly confidence?: number | null;
+      readonly sourcePlatform?: string | null;
+      readonly sourceType?: string | null;
+      readonly evidence?: { sources?: string[]; signals?: string[] } | null;
     }
   >;
-  onAcceptSuggestion?: (
+  readonly onAcceptSuggestion?: (
     suggestion: T & {
       suggestionId?: string;
     }
   ) => Promise<DetectedLink | null> | DetectedLink | null | void;
-  onDismissSuggestion?: (
+  readonly onDismissSuggestion?: (
     suggestion: T & {
       suggestionId?: string;
     }
   ) => Promise<void> | void;
-  suggestionsEnabled?: boolean;
-  profileId?: string;
+  readonly suggestionsEnabled?: boolean;
+  readonly profileId?: string;
   /** When true, hides categories and shows simplified prompt above input */
-  sidebarOpen?: boolean;
+  readonly sidebarOpen?: boolean;
 }
 
 export interface PendingPreview {

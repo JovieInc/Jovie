@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { PROFILE_URL } from '@/constants/app';
 
 interface QRCodeCardProps {
-  handle: string;
+  readonly handle: string;
 }
 
 export function QRCodeCard({ handle }: QRCodeCardProps) {

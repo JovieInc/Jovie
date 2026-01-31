@@ -3,9 +3,9 @@ import { ListenSection } from '@/components/organisms/ListenSection';
 import type { AvailableDSP } from '@/lib/dsp';
 
 type ListenDSPButtonsProps = {
-  handle: string;
-  dsps: AvailableDSP[];
-  initialPreferredUrl?: string | null;
+  readonly handle: string;
+  readonly dsps: AvailableDSP[];
+  readonly initialPreferredUrl?: string | null;
 };
 
 export function ListenDSPButtons({

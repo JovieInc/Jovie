@@ -26,31 +26,31 @@ interface MethodSelectorProps {
   /**
    * Called when email option is selected
    */
-  onEmailClick: () => void;
+  readonly onEmailClick: () => void;
   /**
    * Called when Google OAuth is selected
    */
-  onGoogleClick: () => void;
+  readonly onGoogleClick: () => void;
   /**
    * Called when Spotify OAuth is selected
    */
-  onSpotifyClick: () => void;
+  readonly onSpotifyClick: () => void;
   /**
    * Current loading state
    */
-  loadingState: LoadingState;
+  readonly loadingState: LoadingState;
   /**
    * Last used auth method for personalization
    */
-  lastMethod?: AuthMethod | null;
+  readonly lastMethod?: AuthMethod | null;
   /**
    * Mode - affects copy and footer link
    */
-  mode: 'signin' | 'signup';
+  readonly mode: 'signin' | 'signup';
   /**
    * Error message to display
    */
-  error?: string | null;
+  readonly error?: string | null;
 }
 
 /**

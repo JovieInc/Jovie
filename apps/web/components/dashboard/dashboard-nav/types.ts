@@ -9,5 +9,5 @@ export interface NavItem {
 }
 
 export interface DashboardNavProps {
-  collapsed?: boolean;
+  readonly collapsed?: boolean;
 }

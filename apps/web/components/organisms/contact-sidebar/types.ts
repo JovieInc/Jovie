@@ -16,19 +16,21 @@ export interface SocialLink {
 }
 
 export interface ContactSidebarProps {
-  contact: Contact | null;
-  mode: ContactSidebarMode;
-  isOpen: boolean;
-  onClose?: () => void;
-  onRefresh?: () => void;
-  onContactChange?: (contact: Contact) => void;
-  onSave?: (contact: Contact) => void | Promise<void> | Promise<boolean>;
-  isSaving?: boolean;
+  readonly contact: Contact | null;
+  readonly mode: ContactSidebarMode;
+  readonly isOpen: boolean;
+  readonly onClose?: () => void;
+  readonly onRefresh?: () => void;
+  readonly onContactChange?: (contact: Contact) => void;
+  readonly onSave?: (
+    contact: Contact
+  ) => void | Promise<void> | Promise<boolean>;
+  readonly isSaving?: boolean;
   /**
    * Optional avatar upload handler. When provided and mode === 'admin',
    * the avatar becomes uploadable and this callback is used to obtain
    * the new avatar URL. The updated URL will be merged into the contact
    * and emitted via onContactChange.
    */
-  onAvatarUpload?: (file: File, contact: Contact) => Promise<string>;
+  readonly onAvatarUpload?: (file: File, contact: Contact) => Promise<string>;
 }

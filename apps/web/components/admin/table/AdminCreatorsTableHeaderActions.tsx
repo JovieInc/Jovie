@@ -11,7 +11,7 @@ export interface AdminCreatorsTableHeaderActionsProps {
    * Callback when an ingestion job is pending.
    * Used to refresh the table after a profile is ingested.
    */
-  onIngestPending?: () => void;
+  readonly onIngestPending?: () => void;
 }
 
 /**

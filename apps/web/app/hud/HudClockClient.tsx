@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 export interface HudClockClientProps
   extends Readonly<{
-    locale?: string;
+    readonly locale?: string;
   }> {}
 
 export function HudClockClient({ locale }: HudClockClientProps) {

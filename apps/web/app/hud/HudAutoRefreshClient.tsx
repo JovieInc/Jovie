@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export interface HudAutoRefreshClientProps {
-  intervalMs: number;
+  readonly intervalMs: number;
 }
 
 export function HudAutoRefreshClient({

@@ -44,7 +44,7 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 interface AdminWaitlistPageProps {
-  searchParams: Promise<SearchParams>;
+  readonly searchParams: Promise<SearchParams>;
 }
 
 export default async function AdminWaitlistPage({

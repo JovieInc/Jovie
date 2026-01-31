@@ -3,13 +3,17 @@ import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 export interface ProviderCopyButtonProps {
-  testId: string;
-  path: string | undefined;
-  releaseTitle: string;
-  providerLabel: string;
-  isCopied: boolean;
-  isManual: boolean;
-  onCopy: (path: string, label: string, testId: string) => Promise<void>;
+  readonly testId: string;
+  readonly path: string | undefined;
+  readonly releaseTitle: string;
+  readonly providerLabel: string;
+  readonly isCopied: boolean;
+  readonly isManual: boolean;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<void>;
 }
 
 /**

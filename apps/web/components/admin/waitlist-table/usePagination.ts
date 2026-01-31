@@ -3,9 +3,9 @@
 import { useMemo } from 'react';
 
 interface UsePaginationProps {
-  page: number;
-  pageSize: number;
-  total: number;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
 }
 
 export function usePagination({ page, pageSize, total }: UsePaginationProps) {

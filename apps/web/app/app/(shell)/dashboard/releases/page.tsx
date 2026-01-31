@@ -1,15 +1,17 @@
 import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getDashboardData } from '../actions';
 import { checkSpotifyConnection, loadReleaseMatrix } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
 
 export const runtime = 'nodejs';
 
 export default async function ReleasesPage() {
-  const { userId } = await getCachedAuth();
+  // Fetch dashboard data to verify authentication (actions handle their own auth via requireProfile)
+  const dashboardData = await getDashboardData();
 
-  if (!userId) {
+  // Handle unauthenticated users
+  if (!dashboardData.user?.id) {
     redirect('/sign-in?redirect_url=/app/dashboard/releases');
   }
 

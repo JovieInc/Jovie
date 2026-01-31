@@ -10,9 +10,9 @@ import { useUserMenuActions } from '../useUserMenuActions';
 import type { UserDisplayInfo } from './types';
 
 export interface UseUserButtonProps {
-  artist?: Artist | null;
-  profileHref?: string;
-  settingsHref?: string;
+  readonly artist?: Artist | null;
+  readonly profileHref?: string;
+  readonly settingsHref?: string;
 }
 
 /** Normalized billing status shape for consumers */

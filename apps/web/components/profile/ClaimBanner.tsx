@@ -7,11 +7,11 @@ import { useUserSafe } from '@/hooks/useClerkSafe';
 
 export interface ClaimBannerProps {
   /** The claim token for this profile */
-  claimToken: string;
+  readonly claimToken: string;
   /** The profile handle/username */
-  profileHandle: string;
+  readonly profileHandle: string;
   /** Optional: Override the display name shown in the banner */
-  displayName?: string;
+  readonly displayName?: string;
 }
 
 /**

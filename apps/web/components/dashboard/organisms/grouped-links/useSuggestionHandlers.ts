@@ -7,13 +7,15 @@ import { sectionOf } from '../links/utils';
 
 interface UseSuggestionHandlersProps<T extends DetectedLink> {
   existingNormalizedUrlPlatforms: Map<string, Set<string>>;
-  setLinks: React.Dispatch<React.SetStateAction<T[]>>;
-  insertLinkWithSectionOrdering: (prev: T[], link: T) => T[];
-  onLinkAdded?: (links: T[]) => void;
-  handleAcceptSuggestionFromHook: (
+  readonly setLinks: React.Dispatch<React.SetStateAction<T[]>>;
+  readonly insertLinkWithSectionOrdering: (prev: T[], link: T) => T[];
+  readonly onLinkAdded?: (links: T[]) => void;
+  readonly handleAcceptSuggestionFromHook: (
     suggestion: SuggestedLink
   ) => Promise<DetectedLink | null>;
-  handleDismissSuggestionFromHook: (suggestion: SuggestedLink) => Promise<void>;
+  readonly handleDismissSuggestionFromHook: (
+    suggestion: SuggestedLink
+  ) => Promise<void>;
 }
 
 export function useSuggestionHandlers<T extends DetectedLink>({

@@ -19,35 +19,38 @@ export interface YouTubeCrossCategoryPromptProps {
    * The YouTube link candidate to add to another section.
    * If null, the prompt will not render.
    */
-  candidate: DetectedLink | null;
+  readonly candidate: DetectedLink | null;
 
   /**
    * The target section to add the YouTube link to.
    * Only 'social' or 'dsp' are valid cross-category targets for YouTube.
    */
-  target: YouTubeTargetSection;
+  readonly target: YouTubeTargetSection;
 
   /**
    * Callback when user confirms adding the link to the target section.
    * Receives the candidate link and the target section.
    */
-  onConfirm: (candidate: DetectedLink, target: YouTubeTargetSection) => void;
+  readonly onConfirm: (
+    candidate: DetectedLink,
+    target: YouTubeTargetSection
+  ) => void;
 
   /**
    * Callback when user cancels the cross-category prompt.
    */
-  onCancel: () => void;
+  readonly onCancel: () => void;
 
   /**
    * Optional additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 
   /**
    * Whether to enable entry/exit animations.
    * Defaults to true.
    */
-  animate?: boolean;
+  readonly animate?: boolean;
 }
 
 /**

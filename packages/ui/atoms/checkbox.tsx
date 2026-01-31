@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
 
 export interface CheckboxProps
   extends React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root> {
-  indeterminate?: boolean;
+  readonly indeterminate?: boolean;
 }
 
 /**

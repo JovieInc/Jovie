@@ -15,8 +15,8 @@ export const revalidate = 0;
 
 interface PageProps
   extends Readonly<{
-    params: Promise<{
-      id: string;
+    readonly params: Promise<{
+      readonly id: string;
     }>;
   }> {}
 

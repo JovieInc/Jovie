@@ -9,7 +9,7 @@ export interface KbdProps extends React.HTMLAttributes<HTMLSpanElement> {
    * Visual variant. Use 'tooltip' when inside a tooltip for proper contrast.
    * @default 'default'
    */
-  variant?: 'default' | 'tooltip';
+  readonly variant?: 'default' | 'tooltip';
 }
 
 const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(

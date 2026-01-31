@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { TourDatesManager } from '@/components/dashboard/organisms/tour-dates';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../actions';
 import { checkBandsintownConnection, loadTourDates } from './actions';
 
@@ -10,13 +9,12 @@ export const metadata = {
 };
 
 export default async function TourDatesPage() {
-  const { userId } = await getCachedAuth();
+  const dashboardData = await getDashboardData();
 
-  if (!userId) {
+  // Handle unauthenticated users
+  if (!dashboardData.user?.id) {
     redirect('/sign-in?redirect_url=/app/dashboard/tour-dates');
   }
-
-  const dashboardData = await getDashboardData();
 
   if (dashboardData.needsOnboarding) {
     redirect('/onboarding');

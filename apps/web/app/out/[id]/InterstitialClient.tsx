@@ -9,9 +9,9 @@ import { useCallback, useState } from 'react';
 import { useLinkVerificationMutation } from '@/lib/queries';
 
 interface InterstitialClientProps {
-  shortId: string;
-  titleAlias: string;
-  domain: string;
+  readonly shortId: string;
+  readonly titleAlias: string;
+  readonly domain: string;
 }
 
 export function InterstitialClient({

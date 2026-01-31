@@ -58,7 +58,7 @@ export interface AuthButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof authButtonVariants> {
   /** Whether to trigger haptic feedback on press */
-  hapticFeedback?: boolean;
+  readonly hapticFeedback?: boolean;
 }
 
 export const AuthButton = React.forwardRef<HTMLButtonElement, AuthButtonProps>(

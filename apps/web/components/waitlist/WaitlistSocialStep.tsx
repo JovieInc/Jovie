@@ -11,17 +11,20 @@ import {
 } from './types';
 
 interface WaitlistSocialStepProps {
-  socialPlatform: SocialPlatform;
-  primarySocialUrl: string;
-  fieldErrors: FormErrors;
-  isSubmitting: boolean;
-  isHydrating: boolean;
-  onPlatformSelect: (platform: SocialPlatform) => void;
-  onPlatformKeyDown: (e: React.KeyboardEvent) => void;
-  onUrlChange: (value: string) => void;
-  onNext: () => void;
-  setPlatformButtonRef: (index: number, el: HTMLInputElement | null) => void;
-  setUrlInputRef: (el: HTMLInputElement | null) => void;
+  readonly socialPlatform: SocialPlatform;
+  readonly primarySocialUrl: string;
+  readonly fieldErrors: FormErrors;
+  readonly isSubmitting: boolean;
+  readonly isHydrating: boolean;
+  readonly onPlatformSelect: (platform: SocialPlatform) => void;
+  readonly onPlatformKeyDown: (e: React.KeyboardEvent) => void;
+  readonly onUrlChange: (value: string) => void;
+  readonly onNext: () => void;
+  readonly setPlatformButtonRef: (
+    index: number,
+    el: HTMLInputElement | null
+  ) => void;
+  readonly setUrlInputRef: (el: HTMLInputElement | null) => void;
 }
 
 export function WaitlistSocialStep({

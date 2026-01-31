@@ -28,19 +28,15 @@ import {
 } from './utils/column-renderers';
 
 interface ProviderConfig {
-  readonly label: string;
+  label: string;
   readonly accent: string;
 }
 
 interface ReleaseTableProps {
-  readonly releases: ReleaseViewModel[];
+  releases: ReleaseViewModel[];
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly artistName?: string | null;
-  readonly onCopy: (
-    path: string,
-    label: string,
-    testId: string
-  ) => Promise<string>;
+  onCopy: (path: string, label: string, testId: string) => Promise<string>;
   readonly onEdit: (release: ReleaseViewModel) => void;
   readonly onAddUrl?: (
     releaseId: string,

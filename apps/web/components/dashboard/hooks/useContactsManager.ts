@@ -82,9 +82,9 @@ function toggleTerritoryForContact(
 }
 
 export interface UseContactsManagerProps {
-  profileId: string;
-  artistHandle: string;
-  initialContacts: DashboardContact[];
+  readonly profileId: string;
+  readonly artistHandle: string;
+  readonly initialContacts: DashboardContact[];
 }
 
 export interface UseContactsManagerReturn {

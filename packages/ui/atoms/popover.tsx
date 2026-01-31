@@ -12,14 +12,16 @@ const PopoverAnchor = PopoverPrimitive.Anchor;
 
 interface PopoverContentProps
   extends React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> {
-  showArrow?: boolean;
-  portalProps?: React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Portal>;
-  disablePortal?: boolean;
+  readonly showArrow?: boolean;
+  readonly portalProps?: React.ComponentPropsWithoutRef<
+    typeof PopoverPrimitive.Portal
+  >;
+  readonly disablePortal?: boolean;
   /**
    * Test ID for the popover content.
    * @default "popover-content"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const PopoverContent = React.forwardRef<

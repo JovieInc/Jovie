@@ -1,9 +1,9 @@
 import type { Artist } from '@/types/db';
 
 export interface SettingsProfileSectionProps {
-  artist: Artist;
-  onArtistUpdate?: (updatedArtist: Artist) => void;
-  onRefresh: () => void;
+  readonly artist: Artist;
+  readonly onArtistUpdate?: (updatedArtist: Artist) => void;
+  readonly onRefresh: () => void;
 }
 
 export interface ProfileSaveStatus {

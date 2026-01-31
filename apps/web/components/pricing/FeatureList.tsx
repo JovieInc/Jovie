@@ -7,8 +7,8 @@ interface Feature {
 }
 
 interface FeatureListProps {
-  features: Feature[];
-  title: string;
+  readonly features: Feature[];
+  readonly title: string;
 }
 
 export function FeatureList({ features, title }: FeatureListProps) {

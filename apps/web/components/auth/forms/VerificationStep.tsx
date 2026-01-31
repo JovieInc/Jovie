@@ -11,47 +11,47 @@ interface VerificationStepProps
     /**
      * The email address the code was sent to
      */
-    email: string;
+    readonly email: string;
     /**
      * Current code value
      */
-    code: string;
+    readonly code: string;
     /**
      * Called when code changes
      */
-    onCodeChange: (code: string) => void;
+    readonly onCodeChange: (code: string) => void;
     /**
      * Called when form is submitted. Returns true if successful.
      */
-    onSubmit: (code: string) => Promise<boolean | void>;
+    readonly onSubmit: (code: string) => Promise<boolean | void>;
     /**
      * Called when resend is requested. Returns true if successful.
      */
-    onResend: () => Promise<boolean | void>;
+    readonly onResend: () => Promise<boolean | void>;
     /**
      * Whether verification is in progress
      */
-    isVerifying: boolean;
+    readonly isVerifying: boolean;
     /**
      * Whether signup completion (session propagation) is in progress
      */
-    isCompleting?: boolean;
+    readonly isCompleting?: boolean;
     /**
      * Whether resend is in progress
      */
-    isResending: boolean;
+    readonly isResending: boolean;
     /**
      * Error message to display
      */
-    error: string | null;
+    readonly error: string | null;
     /**
      * Called when back button is clicked
      */
-    onBack: () => void;
+    readonly onBack: () => void;
     /**
      * Mode - affects copy
      */
-    mode: 'signin' | 'signup';
+    readonly mode: 'signin' | 'signup';
   }> {}
 
 /**

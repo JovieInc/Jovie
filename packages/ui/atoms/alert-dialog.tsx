@@ -39,7 +39,7 @@ interface AlertDialogContentProps
    * Test ID for the alert dialog content.
    * @default "alert-dialog-content"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const AlertDialogContent = React.forwardRef<
@@ -75,7 +75,7 @@ interface AlertDialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the alert dialog header.
    * @default "alert-dialog-header"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const AlertDialogHeader = ({
@@ -96,7 +96,7 @@ interface AlertDialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the alert dialog footer.
    * @default "alert-dialog-footer"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 const AlertDialogFooter = ({

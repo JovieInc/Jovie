@@ -25,6 +25,6 @@ export interface Activity {
 }
 
 export interface DashboardActivityFeedProps {
-  profileId: string;
-  range?: ActivityRange;
+  readonly profileId: string;
+  readonly range?: ActivityRange;
 }

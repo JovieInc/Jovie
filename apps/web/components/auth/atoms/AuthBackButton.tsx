@@ -7,15 +7,15 @@ import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 interface AuthBackButtonProps {
-  onClick?: () => void;
-  href?: string;
-  className?: string;
-  ariaLabel?: string;
+  readonly onClick?: () => void;
+  readonly href?: string;
+  readonly className?: string;
+  readonly ariaLabel?: string;
   /**
    * When true, renders inline instead of fixed positioning.
    * Use this when the button is part of a form flow to prevent overlap.
    */
-  inline?: boolean;
+  readonly inline?: boolean;
 }
 
 export function AuthBackButton({

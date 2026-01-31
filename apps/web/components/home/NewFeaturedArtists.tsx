@@ -5,7 +5,7 @@ import { getFeaturedCreators } from '@/lib/featured-creators';
 import { FeaturedArtistsDriftRow } from './FeaturedArtistsDriftRow';
 
 export interface NewFeaturedArtistsProps {
-  showFades?: boolean;
+  readonly showFades?: boolean;
 }
 
 export async function NewFeaturedArtists({

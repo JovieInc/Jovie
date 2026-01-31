@@ -4,17 +4,17 @@ import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type ArtistPageShellProps = {
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
-  contacts: PublicContact[];
-  subtitle?: string;
-  children?: React.ReactNode;
-  showSocialBar?: boolean;
-  showTipButton?: boolean;
-  showBackButton?: boolean;
-  showFooter?: boolean;
-  maxWidthClass?: string;
-  showNotificationButton?: boolean;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
+  readonly subtitle?: string;
+  readonly children?: React.ReactNode;
+  readonly showSocialBar?: boolean;
+  readonly showTipButton?: boolean;
+  readonly showBackButton?: boolean;
+  readonly showFooter?: boolean;
+  readonly maxWidthClass?: string;
+  readonly showNotificationButton?: boolean;
 };
 
 // Using React.memo to prevent unnecessary re-renders when only children content changes

@@ -1,5 +1,5 @@
 export interface AuthSpotifyIconProps {
-  className?: string;
+  readonly className?: string;
 }
 
 export function AuthSpotifyIcon({ className }: Readonly<AuthSpotifyIconProps>) {

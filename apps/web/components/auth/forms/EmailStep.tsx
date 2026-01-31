@@ -10,31 +10,31 @@ interface EmailStepProps {
   /**
    * Current email value
    */
-  email: string;
+  readonly email: string;
   /**
    * Called when email changes
    */
-  onEmailChange: (email: string) => void;
+  readonly onEmailChange: (email: string) => void;
   /**
    * Called when form is submitted. Returns true if successful.
    */
-  onSubmit: (email: string) => Promise<boolean | void>;
+  readonly onSubmit: (email: string) => Promise<boolean | void>;
   /**
    * Whether the form is submitting
    */
-  isLoading: boolean;
+  readonly isLoading: boolean;
   /**
    * Error message to display
    */
-  error: string | null;
+  readonly error: string | null;
   /**
    * Called when back button is clicked
    */
-  onBack?: () => void;
+  readonly onBack?: () => void;
   /**
    * Mode - affects copy
    */
-  mode: 'signin' | 'signup';
+  readonly mode: 'signin' | 'signup';
 }
 
 /**

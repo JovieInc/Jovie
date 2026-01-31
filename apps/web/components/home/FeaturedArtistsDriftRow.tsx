@@ -19,8 +19,8 @@ import { PACER_TIMING } from '@/lib/pacer/hooks';
 
 export interface FeaturedArtistsDriftRowProps
   extends Readonly<{
-    creators: FeaturedCreator[];
-    showFades?: boolean;
+    readonly creators: FeaturedCreator[];
+    readonly showFades?: boolean;
   }> {}
 
 const MAX_SHIFT_PX = 56;

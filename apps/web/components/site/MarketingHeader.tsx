@@ -15,9 +15,9 @@ import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 
 export interface MarketingHeaderProps
   extends Readonly<{
-    logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-    scrollThresholdPx?: number;
-    hideNav?: boolean;
+    readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+    readonly scrollThresholdPx?: number;
+    readonly hideNav?: boolean;
   }> {}
 
 /**

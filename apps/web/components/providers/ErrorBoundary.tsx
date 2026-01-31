@@ -6,10 +6,10 @@ import { toast } from 'sonner';
 import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 
 interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  showToast?: boolean;
+  readonly children: ReactNode;
+  readonly fallback?: ReactNode;
+  readonly onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  readonly showToast?: boolean;
 }
 
 interface State {

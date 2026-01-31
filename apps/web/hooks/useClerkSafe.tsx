@@ -20,8 +20,8 @@ type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
 const ClerkAvailabilityContext = createContext<boolean>(false);
 
 interface ClerkAvailabilityProviderProps {
-  children: ReactNode;
-  isAvailable: boolean;
+  readonly children: ReactNode;
+  readonly isAvailable: boolean;
 }
 
 /**

@@ -74,12 +74,12 @@ export interface SheetContentProps
    * Whether to hide the close button.
    * @default false
    */
-  hideClose?: boolean;
+  readonly hideClose?: boolean;
   /**
    * Test ID for the sheet content.
    * @default "sheet-content"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 export const SheetContent = React.forwardRef<
@@ -125,7 +125,7 @@ interface SheetHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the sheet header.
    * @default "sheet-header"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 export const SheetHeader = ({
@@ -146,7 +146,7 @@ interface SheetFooterProps extends React.HTMLAttributes<HTMLDivElement> {
    * Test ID for the sheet footer.
    * @default "sheet-footer"
    */
-  testId?: string;
+  readonly testId?: string;
 }
 
 export const SheetFooter = ({

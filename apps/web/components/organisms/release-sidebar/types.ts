@@ -21,9 +21,9 @@ export interface DspLink extends ProviderLink {
 export type ReleaseSidebarMode = 'admin' | 'view';
 
 export interface ReleaseSidebarProps {
-  release: Release | null;
-  mode: ReleaseSidebarMode;
-  isOpen: boolean;
+  readonly release: Release | null;
+  readonly mode: ReleaseSidebarMode;
+  readonly isOpen: boolean;
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
   /** Artist name to display in the sidebar header */
   artistName?: string | null;

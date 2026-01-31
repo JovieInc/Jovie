@@ -11,7 +11,7 @@ interface PerformanceMetric {
 }
 
 interface PerformanceDashboardProps {
-  showDebug?: boolean;
+  readonly showDebug?: boolean;
 }
 
 export function PerformanceDashboard({

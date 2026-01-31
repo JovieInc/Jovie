@@ -1,7 +1,12 @@
 'use server';
 
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
-import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidatePath,
+  revalidateTag,
+  unstable_cache,
+} from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -181,10 +186,25 @@ async function upsertBandsintownEvents(
 // ============================================================================
 
 /**
- * Load tour dates for the current profile
+ * Core tour dates fetch logic (cacheable)
+ */
+async function fetchTourDatesCore(
+  profileId: string
+): Promise<TourDateViewModel[]> {
+  const dates = await db
+    .select()
+    .from(tourDates)
+    .where(eq(tourDates.profileId, profileId))
+    .orderBy(tourDates.startDate);
+
+  return dates.map(mapTourDateToViewModel);
+}
+
+/**
+ * Load tour dates for the current profile with caching (30s TTL)
+ * Cache is invalidated on mutations (create, update, delete, sync)
  */
 export async function loadTourDates(): Promise<TourDateViewModel[]> {
-  noStore();
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -193,13 +213,15 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
 
   const profile = await requireProfile();
 
-  const dates = await db
-    .select()
-    .from(tourDates)
-    .where(eq(tourDates.profileId, profile.id))
-    .orderBy(tourDates.startDate);
-
-  return dates.map(mapTourDateToViewModel);
+  // Cache with 30s TTL and tags for invalidation
+  return unstable_cache(
+    () => fetchTourDatesCore(profile.id),
+    ['tour-dates', userId, profile.id],
+    {
+      revalidate: 30,
+      tags: [`tour-dates:${userId}:${profile.id}`],
+    }
+  )();
 }
 
 /**
@@ -493,6 +515,8 @@ export async function syncFromBandsintown(): Promise<{
     source: 'bandsintown',
   });
 
+  // Invalidate cache and revalidate path
+  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
   revalidatePath('/app/dashboard/tour-dates');
 
   return {
@@ -557,6 +581,8 @@ export async function createTourDate(params: {
     source: 'manual',
   });
 
+  // Invalidate cache and revalidate path
+  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
   revalidatePath('/app/dashboard/tour-dates');
 
   return mapTourDateToViewModel(created);
@@ -629,6 +655,8 @@ export async function updateTourDate(params: {
     .where(eq(tourDates.id, params.id))
     .returning();
 
+  // Invalidate cache and revalidate path
+  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
   revalidatePath('/app/dashboard/tour-dates');
 
   return mapTourDateToViewModel(updated);
@@ -663,6 +691,8 @@ export async function deleteTourDate(
     tourDateId: id,
   });
 
+  // Invalidate cache and revalidate path
+  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
   revalidatePath('/app/dashboard/tour-dates');
 
   return { success: true };

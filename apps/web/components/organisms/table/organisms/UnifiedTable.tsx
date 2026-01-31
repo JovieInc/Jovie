@@ -149,7 +149,7 @@ export interface UnifiedTableProps<TData> {
    * When provided, table will render with grouped rows and sticky group headers
    */
   readonly groupingConfig?: {
-    readonly getGroupKey: (row: TData) => string;
+    getGroupKey: (row: TData) => string;
     readonly getGroupLabel: (key: string) => string;
   };
 
@@ -239,7 +239,7 @@ export interface UnifiedTableProps<TData> {
  * Internal memoized row component to prevent inline handler recreation
  */
 interface TableRowProps<TData> {
-  readonly row: Row<TData>;
+  row: Row<TData>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
@@ -248,7 +248,7 @@ interface TableRowProps<TData> {
   readonly focusedIndex: number;
   readonly onRowClick?: (row: TData) => void;
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
-  readonly onKeyDown: (
+  onKeyDown: (
     event: React.KeyboardEvent,
     rowIndex: number,
     rowData: TData

@@ -28,7 +28,7 @@ function getLinkDetectionStatus(
 }
 
 interface UniversalLinkInputUrlModeProps {
-  readonly url: string;
+  url: string;
   readonly placeholder: string;
   readonly disabled?: boolean;
   readonly detectedLink: DetectedLink | null;
@@ -47,11 +47,11 @@ interface UniversalLinkInputUrlModeProps {
   /** When true, changes border radius to connect seamlessly with dropdown below */
   readonly isDropdownOpen?: boolean;
   readonly comboboxAria?: {
-    readonly role?: 'combobox';
+    role?: 'combobox';
     readonly ariaExpanded?: boolean;
     readonly ariaControls?: string;
-    ariaActivedescendant?: string;
-    ariaAutocomplete?: 'list';
+    readonly ariaActivedescendant?: string;
+    readonly ariaAutocomplete?: 'list';
   };
 }
 

@@ -8,14 +8,14 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 type EmptyStateType = 'no-venmo' | 'pending-metrics';
 
 interface TippingEmptyStateProps {
-  type: EmptyStateType;
-  className?: string;
-  animate?: boolean;
+  readonly type: EmptyStateType;
+  readonly className?: string;
+  readonly animate?: boolean;
 }
 
 interface TippingSkeletonProps {
-  className?: string;
-  rows?: number;
+  readonly className?: string;
+  readonly rows?: number;
 }
 
 const EMPTY_STATE_CONFIG = {

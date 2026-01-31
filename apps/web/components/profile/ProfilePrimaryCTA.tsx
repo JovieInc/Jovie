@@ -46,12 +46,12 @@ function useSpotifyPreferred(): boolean {
 }
 
 type ProfilePrimaryCTAProps = {
-  artist: Artist;
-  socialLinks: LegacySocialLink[];
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
   /** @deprecated Use client-side cookie reading instead */
-  spotifyPreferred?: boolean;
-  autoOpenCapture?: boolean;
-  showCapture?: boolean;
+  readonly spotifyPreferred?: boolean;
+  readonly autoOpenCapture?: boolean;
+  readonly showCapture?: boolean;
 };
 
 export function ProfilePrimaryCTA({

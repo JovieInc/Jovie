@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface KanbanColumn<TData> {
-  readonly id: string;
+  id: string;
   readonly title: string;
   readonly items: TData[];
   readonly count: number;
@@ -122,7 +122,7 @@ export function KanbanBoard<TData>({
 }
 
 interface KanbanColumnProps<TData> {
-  readonly column: KanbanColumn<TData>;
+  column: KanbanColumn<TData>;
   readonly renderCard: (item: TData, index: number) => React.ReactNode;
   readonly getItemId: (item: TData) => string;
   readonly onItemMove?: (

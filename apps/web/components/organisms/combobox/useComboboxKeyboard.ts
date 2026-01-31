@@ -4,13 +4,13 @@ import { type KeyboardEvent, useCallback } from 'react';
 import type { ComboboxOption } from './types';
 
 interface UseComboboxKeyboardProps {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  activeIndex: number;
-  setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
-  filteredOptions: ComboboxOption[];
-  handleSelect: (option: ComboboxOption | null) => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly isOpen: boolean;
+  readonly setIsOpen: (open: boolean) => void;
+  readonly activeIndex: number;
+  readonly setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
+  readonly filteredOptions: ComboboxOption[];
+  readonly handleSelect: (option: ComboboxOption | null) => void;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 export function useComboboxKeyboard({

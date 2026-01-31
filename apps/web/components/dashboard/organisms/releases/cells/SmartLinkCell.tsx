@@ -7,9 +7,13 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface SmartLinkCellProps {
-  release: ReleaseViewModel;
+  readonly release: ReleaseViewModel;
   /** @deprecated Not used - clipboard write happens in CopyLinkInput */
-  onCopy?: (path: string, label: string, testId: string) => Promise<string>;
+  readonly onCopy?: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
 }
 
 /**

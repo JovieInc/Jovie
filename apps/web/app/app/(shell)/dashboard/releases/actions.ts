@@ -1,7 +1,12 @@
 'use server';
 
 import { eq } from 'drizzle-orm';
-import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidatePath,
+  revalidateTag,
+  unstable_cache,
+} from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
@@ -146,8 +151,26 @@ function mapReleaseToViewModel(
   };
 }
 
+/**
+ * Core release matrix fetch logic (cacheable)
+ */
+async function fetchReleaseMatrixCore(
+  profileId: string,
+  profileHandle: string
+): Promise<ReleaseViewModel[]> {
+  const providerLabels = buildProviderLabels();
+  const releases = await getReleasesFromDb(profileId);
+
+  return releases.map(release =>
+    mapReleaseToViewModel(release, providerLabels, profileId, profileHandle)
+  );
+}
+
+/**
+ * Load release matrix with caching (30s TTL)
+ * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
+ */
 export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
-  noStore();
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -155,12 +178,16 @@ export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   }
 
   const profile = await requireProfile();
-  const providerLabels = buildProviderLabels();
-  const releases = await getReleasesFromDb(profile.id);
 
-  return releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
-  );
+  // Cache with 30s TTL and tags for invalidation
+  return unstable_cache(
+    () => fetchReleaseMatrixCore(profile.id, profile.handle),
+    ['releases-matrix', userId, profile.id],
+    {
+      revalidate: 30,
+      tags: [`releases:${userId}:${profile.id}`],
+    }
+  )();
 }
 
 export async function saveProviderOverride(params: {
@@ -218,7 +245,11 @@ export async function saveProviderOverride(params: {
     }
 
     const providerLabels = buildProviderLabels();
+
+    // Invalidate cache and revalidate path
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
     revalidatePath('/app/dashboard/releases');
+
     return mapReleaseToViewModel(
       release,
       providerLabels,
@@ -276,7 +307,11 @@ export async function resetProviderOverride(params: {
     }
 
     const providerLabels = buildProviderLabels();
+
+    // Invalidate cache and revalidate path
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
     revalidatePath('/app/dashboard/releases');
+
     return mapReleaseToViewModel(
       release,
       providerLabels,
@@ -320,6 +355,8 @@ export async function syncFromSpotify(): Promise<{
 
   const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
 
+  // Invalidate cache and revalidate path
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
   revalidatePath('/app/dashboard/releases');
 
   if (result.success) {
@@ -537,7 +574,7 @@ export async function loadTracksForRelease(params: {
   }
 
   const providerLabels = buildProviderLabels();
-  const tracks = await getTracksForReleaseWithProviders(params.releaseId);
+  const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
 
   return tracks.map(track =>
     mapTrackToViewModel(

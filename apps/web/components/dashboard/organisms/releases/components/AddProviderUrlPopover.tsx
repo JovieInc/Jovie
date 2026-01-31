@@ -11,10 +11,10 @@ import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
 export interface AddProviderUrlPopoverProps {
-  providerLabel: string;
-  accent: string;
-  onSave: (url: string) => Promise<void>;
-  isSaving?: boolean;
+  readonly providerLabel: string;
+  readonly accent: string;
+  readonly onSave: (url: string) => Promise<void>;
+  readonly isSaving?: boolean;
 }
 
 export function AddProviderUrlPopover({

@@ -34,8 +34,8 @@ interface CloseButtonIconProps
      * Size of the X icon.
      * @default 4
      */
-    size?: number;
-    className?: string;
+    readonly size?: number;
+    readonly className?: string;
   }> {}
 
 /**

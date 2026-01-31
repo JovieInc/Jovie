@@ -48,7 +48,7 @@ export interface ProfileEditorSectionProps {
   /** Handle avatar upload */
   readonly onAvatarUpload: (file: File) => Promise<string>;
   /** Handle input key down */
-  readonly onInputKeyDown: (
+  onInputKeyDown: (
     e: React.KeyboardEvent,
     field: 'displayName' | 'username'
   ) => void;

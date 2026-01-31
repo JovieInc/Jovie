@@ -10,13 +10,13 @@ import {
 } from './types';
 
 interface GoalButtonProps {
-  value: PrimaryGoal;
-  label: string;
-  isSelected: boolean;
-  isTabStop: boolean;
-  isSubmitting: boolean;
-  onSelect: (goal: PrimaryGoal) => void;
-  onButtonRef: (el: HTMLButtonElement | null) => void;
+  readonly value: PrimaryGoal;
+  readonly label: string;
+  readonly isSelected: boolean;
+  readonly isTabStop: boolean;
+  readonly isSubmitting: boolean;
+  readonly onSelect: (goal: PrimaryGoal) => void;
+  readonly onButtonRef: (el: HTMLButtonElement | null) => void;
 }
 
 const GoalButton = memo(function GoalButton({
@@ -50,14 +50,14 @@ const GoalButton = memo(function GoalButton({
 });
 
 interface WaitlistPrimaryGoalStepProps {
-  primaryGoal: PrimaryGoal | null;
-  primaryGoalFocusIndex: number;
-  fieldErrors: FormErrors;
-  isSubmitting: boolean;
-  isHydrating: boolean;
-  onSelect: (goal: PrimaryGoal) => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
-  setButtonRef: (index: number, el: HTMLButtonElement | null) => void;
+  readonly primaryGoal: PrimaryGoal | null;
+  readonly primaryGoalFocusIndex: number;
+  readonly fieldErrors: FormErrors;
+  readonly isSubmitting: boolean;
+  readonly isHydrating: boolean;
+  readonly onSelect: (goal: PrimaryGoal) => void;
+  readonly onKeyDown: (e: React.KeyboardEvent) => void;
+  readonly setButtonRef: (index: number, el: HTMLButtonElement | null) => void;
 }
 
 export function WaitlistPrimaryGoalStep({

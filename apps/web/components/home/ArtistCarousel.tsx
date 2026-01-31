@@ -13,7 +13,7 @@ interface Artist {
 }
 
 interface ArtistCarouselProps {
-  artists: Artist[];
+  readonly artists: Artist[];
 }
 
 export function ArtistCarousel({ artists }: ArtistCarouselProps) {

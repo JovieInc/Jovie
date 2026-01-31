@@ -6,7 +6,7 @@ import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
 import { adminCreatorsSearchParams } from '@/lib/nuqs';
 
 interface AdminCreatorsPageProps {
-  searchParams: Promise<SearchParams>;
+  readonly searchParams: Promise<SearchParams>;
 }
 
 export const metadata: Metadata = {

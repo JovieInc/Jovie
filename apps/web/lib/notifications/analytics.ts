@@ -2,33 +2,33 @@ import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import type { NotificationChannel } from '@/types/notifications';
 
 type BaseEventProps = {
-  artist_id: string | null;
-  channel?: string;
-  source?: string;
+  readonly artist_id: string | null;
+  readonly channel?: string;
+  readonly source?: string;
 };
 
 type ErrorEventProps = BaseEventProps & {
-  error_type: string;
-  validation_errors?: string[];
-  error_message?: string;
-  method?: string;
+  readonly error_type: string;
+  readonly validation_errors?: string[];
+  readonly error_message?: string;
+  readonly method?: string;
 };
 
 type SubscribeSuccessProps = {
-  artist_id: string;
-  channel: NotificationChannel;
-  email_domain?: string;
-  phone_present: boolean;
-  country_code?: string;
-  source: string;
-  creator_is_pro: boolean;
-  dynamic_enabled: boolean;
+  readonly artist_id: string;
+  readonly channel: NotificationChannel;
+  readonly email_domain?: string;
+  readonly phone_present: boolean;
+  readonly country_code?: string;
+  readonly source: string;
+  readonly creator_is_pro: boolean;
+  readonly dynamic_enabled: boolean;
 };
 
 type UnsubscribeSuccessProps = {
-  artist_id: string;
-  method: string;
-  channel: NotificationChannel;
+  readonly artist_id: string;
+  readonly method: string;
+  readonly channel: NotificationChannel;
 };
 
 /**

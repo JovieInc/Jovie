@@ -3,11 +3,15 @@ import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 export interface NotFoundCopyButtonProps {
-  testId: string;
-  releaseTitle: string;
-  smartLinkPath: string;
-  isCopied: boolean;
-  onCopy: (path: string, label: string, testId: string) => Promise<void>;
+  readonly testId: string;
+  readonly releaseTitle: string;
+  readonly smartLinkPath: string;
+  readonly isCopied: boolean;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<void>;
 }
 
 /**

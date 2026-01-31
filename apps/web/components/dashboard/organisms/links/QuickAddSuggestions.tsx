@@ -18,25 +18,25 @@ export interface QuickAddSuggestionsProps {
    * Set of platform IDs that the user has already added.
    * These platforms will be filtered out of the suggestions.
    */
-  existingPlatforms: Set<string>;
+  readonly existingPlatforms: Set<string>;
 
   /**
    * Whether the profile is music-focused.
    * When true, streaming platforms (Spotify, Apple Music) are prioritized.
    * When false, social platforms (Instagram, TikTok) are prioritized.
    */
-  isMusicProfile?: boolean;
+  readonly isMusicProfile?: boolean;
 
   /**
    * Callback when a platform is selected.
    * Receives the prefill URL for the selected platform.
    */
-  onPlatformSelect: (prefillUrl: string) => void;
+  readonly onPlatformSelect: (prefillUrl: string) => void;
 
   /**
    * Optional additional CSS classes
    */
-  className?: string;
+  readonly className?: string;
 }
 
 /**

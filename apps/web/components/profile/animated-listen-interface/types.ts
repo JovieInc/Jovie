@@ -1,7 +1,7 @@
 import type { Artist } from '@/types/db';
 
 export interface AnimatedListenInterfaceProps {
-  artist: Artist;
-  handle: string;
-  enableDynamicEngagement?: boolean;
+  readonly artist: Artist;
+  readonly handle: string;
+  readonly enableDynamicEngagement?: boolean;
 }

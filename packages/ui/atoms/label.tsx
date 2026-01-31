@@ -28,7 +28,7 @@ export interface LabelProps
   /**
    * Whether the field is required. Adds a visual indicator.
    */
-  required?: boolean;
+  readonly required?: boolean;
 }
 
 /**

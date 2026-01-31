@@ -3,8 +3,8 @@ import { PROFILE_URL } from '@/constants/app';
 import { Artist, SocialLink } from '@/types/db';
 
 interface ArtistSEOProps {
-  artist: Artist;
-  socialLinks: SocialLink[];
+  readonly artist: Artist;
+  readonly socialLinks: SocialLink[];
 }
 
 export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {

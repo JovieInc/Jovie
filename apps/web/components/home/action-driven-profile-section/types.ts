@@ -22,8 +22,8 @@ export interface ProfileArtist {
 }
 
 export interface ActionDrivenProfileSectionClientProps {
-  pillars: readonly PillarConfig[];
-  profileArtist: ProfileArtist;
+  readonly pillars: readonly PillarConfig[];
+  readonly profileArtist: ProfileArtist;
 }
 
 export interface UsePillarTabsReturn {
