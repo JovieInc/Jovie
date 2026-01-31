@@ -537,7 +537,7 @@ export async function loadTracksForRelease(params: {
   }
 
   const providerLabels = buildProviderLabels();
-  const tracks = await getTracksForReleaseWithProviders(params.releaseId);
+  const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
 
   return tracks.map(track =>
     mapTrackToViewModel(
