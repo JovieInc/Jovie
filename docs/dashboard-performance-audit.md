@@ -23,29 +23,19 @@ This audit identifies performance bottlenecks in the Jovie dashboard. While the 
 
 ## 1. Re-rendering Issues
 
-### 1.1 Critical: Context Value Not Memoized
+### 1.1 ~~Critical: Context Value Not Memoized~~ (ALREADY FIXED)
 
 **File:** `apps/web/app/app/(shell)/dashboard/DashboardLayoutClient.tsx`
-**Lines:** 127-130
+**Line:** 260
 
+**Status:** Already properly memoized with `useMemo`:
 ```typescript
-const [tableMeta, setTableMeta] = useState<TableMeta>({
-  rowCount: null,
-  toggle: null,
-});
-// Used in provider without useMemo wrapper
-```
-
-**Impact:** Every state update creates a new object reference, triggering all context consumers to re-render.
-
-**Fix:** Wrap the context value in `useMemo`:
-```typescript
-const tableMetaValue = useMemo(() => tableMeta, [tableMeta.rowCount, tableMeta.toggle]);
+value={useMemo(() => ({ tableMeta, setTableMeta }), [tableMeta])}
 ```
 
 ---
 
-### 1.2 Critical: Set Created in Render
+### 1.2 ~~Critical: Set Created in Render~~ (FIXED 2026-01-31)
 
 **File:** `apps/web/components/dashboard/organisms/DashboardPreview.tsx`
 **Lines:** 25-33
@@ -350,13 +340,13 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 
 ### High Priority (Performance Impact)
 
-| # | Issue | File | Effort |
+| # | Issue | File | Status |
 |---|-------|------|--------|
-| 1 | Add JSON metadata index | Migration | Low |
-| 2 | Add geographic indexes | Migration | Low |
-| 3 | Memoize DashboardLayoutClient context | `DashboardLayoutClient.tsx` | Low |
-| 4 | Move DSP_PLATFORMS Set to module scope | `DashboardPreview.tsx` | Low |
-| 5 | Extract table column handlers | `columns.tsx` | Medium |
+| 1 | Add JSON metadata index | Migration `0020` | ✅ Done |
+| 2 | Add geographic indexes | Migration `0020` | ✅ Done |
+| 3 | Memoize DashboardLayoutClient context | `DashboardLayoutClient.tsx` | ✅ Already done |
+| 4 | Move DSP_PLATFORMS Set to module scope | `DashboardPreview.tsx` | ✅ Done |
+| 5 | Extract table column handlers | `columns.tsx` | Pending (Medium effort) |
 
 ### Medium Priority (Code Quality)
 
