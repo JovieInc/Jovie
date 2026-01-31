@@ -3,14 +3,16 @@ import { describe, expect, it } from 'vitest';
 /**
  * Unit tests for proxy.ts URL mapping logic
  *
- * These tests verify the getDashboardUrl behavior that determines
- * whether the dashboard is served at /app (local/preview) or / (production).
+ * Single Domain Architecture:
+ * - All traffic is served from jov.ie (no subdomains)
+ * - Dashboard is always at /app/* on all environments
+ * - meetjovie.com redirects to jov.ie (handled by middleware)
  *
  * The functions are recreated here since they're private in proxy.ts.
  * If the logic in proxy.ts changes, these tests should fail and
  * alert us to potential routing issues.
  *
- * @see apps/web/proxy.ts lines 60-79
+ * @see apps/web/proxy.ts
  */
 
 // Recreate proxy.ts helper functions for testing
@@ -23,19 +25,17 @@ function isDevOrPreview(hostname: string): boolean {
   );
 }
 
-function isAppSubdomain(hostname: string): boolean {
+function isMainHost(hostname: string): boolean {
   return (
-    hostname === 'app.jov.ie' ||
-    (isDevOrPreview(hostname) && hostname.startsWith('app.'))
+    hostname === 'jov.ie' ||
+    hostname === 'www.jov.ie' ||
+    hostname === 'main.jov.ie' ||
+    isDevOrPreview(hostname)
   );
 }
 
-function getDashboardUrl(hostname: string): string {
-  if (isDevOrPreview(hostname) && !isAppSubdomain(hostname)) {
-    return '/app';
-  }
-  return '/';
-}
+// Single domain: dashboard is always at /app
+const DASHBOARD_URL = '/app';
 
 describe('Proxy URL Mapping', () => {
   describe('isDevOrPreview', () => {
@@ -52,80 +52,80 @@ describe('Proxy URL Mapping', () => {
       expect(isDevOrPreview('my-branch-jovie.vercel.app')).toBe(true);
     });
 
-    it('returns true for main.* subdomains', () => {
+    it('returns true for main.jov.ie (staging)', () => {
       expect(isDevOrPreview('main.jov.ie')).toBe(true);
     });
 
-    it('returns false for production domains', () => {
+    it('returns false for production domain', () => {
       expect(isDevOrPreview('jov.ie')).toBe(false);
-      expect(isDevOrPreview('app.jov.ie')).toBe(false);
+      expect(isDevOrPreview('www.jov.ie')).toBe(false);
     });
   });
 
-  describe('isAppSubdomain', () => {
-    it('returns true for app.jov.ie', () => {
-      expect(isAppSubdomain('app.jov.ie')).toBe(true);
+  describe('isMainHost', () => {
+    it('returns true for jov.ie (production)', () => {
+      expect(isMainHost('jov.ie')).toBe(true);
     });
 
-    it('returns false for jov.ie', () => {
-      expect(isAppSubdomain('jov.ie')).toBe(false);
+    it('returns true for www.jov.ie', () => {
+      expect(isMainHost('www.jov.ie')).toBe(true);
     });
 
-    it('returns false for localhost', () => {
-      expect(isAppSubdomain('localhost')).toBe(false);
+    it('returns true for main.jov.ie (staging)', () => {
+      expect(isMainHost('main.jov.ie')).toBe(true);
+    });
+
+    it('returns true for localhost', () => {
+      expect(isMainHost('localhost')).toBe(true);
+    });
+
+    it('returns true for vercel preview URLs', () => {
+      expect(isMainHost('jovie-abc123.vercel.app')).toBe(true);
+    });
+
+    it('returns false for meetjovie.com (legacy redirect domain)', () => {
+      expect(isMainHost('meetjovie.com')).toBe(false);
     });
   });
 
-  describe('getDashboardUrl', () => {
-    it('returns /app for localhost (local development)', () => {
-      expect(getDashboardUrl('localhost')).toBe('/app');
-    });
-
-    it('returns /app for 127.0.0.1', () => {
-      expect(getDashboardUrl('127.0.0.1')).toBe('/app');
-    });
-
-    it('returns / for app.jov.ie (production app subdomain)', () => {
-      expect(getDashboardUrl('app.jov.ie')).toBe('/');
-    });
-
-    it('returns /app for vercel preview deployments', () => {
-      expect(getDashboardUrl('jovie-abc123.vercel.app')).toBe('/app');
-      expect(getDashboardUrl('feature-branch.vercel.app')).toBe('/app');
-    });
-
-    it('returns /app for main.jov.ie (staging)', () => {
-      expect(getDashboardUrl('main.jov.ie')).toBe('/app');
-    });
-
-    it('returns / for jov.ie (profile domain)', () => {
-      expect(getDashboardUrl('jov.ie')).toBe('/');
-    });
-
-    it('returns / for www.jov.ie', () => {
-      expect(getDashboardUrl('www.jov.ie')).toBe('/');
+  describe('DASHBOARD_URL', () => {
+    it('dashboard is always at /app in single domain architecture', () => {
+      expect(DASHBOARD_URL).toBe('/app');
     });
   });
 
   describe('URL consistency between environments', () => {
     /**
-     * This test documents the expected URL mapping behavior
-     * that can cause local vs production issues if not handled correctly
+     * Single domain architecture means dashboard is at /app everywhere:
+     * - localhost:3100/app/* (local development)
+     * - *.vercel.app/app/* (preview deployments)
+     * - main.jov.ie/app/* (staging)
+     * - jov.ie/app/* (production)
      */
-    it('local dashboard at /app, production at /', () => {
-      const localUrl = getDashboardUrl('localhost');
-      const productionUrl = getDashboardUrl('app.jov.ie');
+    it('dashboard path is consistent across all environments', () => {
+      // In single domain architecture, all environments use /app
+      const dashboardPath = DASHBOARD_URL;
 
-      expect(localUrl).toBe('/app');
-      expect(productionUrl).toBe('/');
-      expect(localUrl).not.toBe(productionUrl);
+      expect(dashboardPath).toBe('/app');
     });
 
-    it('preview deployments match local behavior', () => {
-      const localUrl = getDashboardUrl('localhost');
-      const previewUrl = getDashboardUrl('pr-123-jovie.vercel.app');
+    it('all valid hosts resolve to same dashboard path', () => {
+      // These are all valid hosts that should serve the app
+      const validHosts = [
+        'localhost',
+        '127.0.0.1',
+        'jovie-abc123.vercel.app',
+        'main.jov.ie',
+        'jov.ie',
+        'www.jov.ie',
+      ];
 
-      expect(previewUrl).toBe(localUrl);
+      validHosts.forEach(host => {
+        expect(isMainHost(host)).toBe(true);
+      });
+
+      // Dashboard is always at /app
+      expect(DASHBOARD_URL).toBe('/app');
     });
   });
 });

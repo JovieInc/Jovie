@@ -228,9 +228,8 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.storeRedirectUrl();
 
       try {
-        // Use absolute URLs to ensure OAuth callback happens on app.jov.ie
-        // This ensures the Clerk session cookie is set on the correct domain
-        // where the user will be authenticated (app subdomain, not root domain)
+        // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
+        // behavior across local, preview, and production environments
         await signIn.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
           redirectUrl: `${APP_URL}/signin/sso-callback`,

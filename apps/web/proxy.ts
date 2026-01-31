@@ -121,7 +121,7 @@ function categorizePath(pathname: string): PathCategory {
   const isProtectedPath =
     isDashboardPath || isSettingsPath || isWaitlistPath || isOnboardingPath;
 
-  // App paths (allowed on app.jov.ie subdomain)
+  // App paths (dashboard and protected routes at /app/*)
   const isAppPath =
     pathname === '/' ||
     isDashboardPath ||
