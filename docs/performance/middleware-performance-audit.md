@@ -8,13 +8,13 @@
 
 The middleware architecture in Jovie is **well-optimized** following recent performance improvements in PR #2854. The architecture demonstrates solid performance patterns with edge-first execution, Redis caching, and comprehensive monitoring. Several minor optimization opportunities remain.
 
-**Overall Grade: B+**
+### Overall Grade: B+
 
 ---
 
 ## Architecture Overview
 
-```
+```text
 Request Flow:
 ┌─────────────────────────────────────────────────────┐
 │  Next.js Edge (Vercel Edge Network)                 │
@@ -113,7 +113,7 @@ const [result] = await Promise.race([
 
 #### Architecture
 
-```
+```text
 RateLimiter
 ├── Redis backend (Upstash) - Primary
 └── Memory backend - Fallback
@@ -351,6 +351,7 @@ The middleware implements multiple security layers:
 ### Completed Optimizations
 
 #### 1. Pre-computed Static CSP Parts
+
 **File:** `apps/web/lib/security/content-security-policy.ts`
 
 Created `STATIC_CSP_PARTS` constant that pre-computes all static CSP directive strings at module load time:
@@ -359,6 +360,7 @@ Created `STATIC_CSP_PARTS` constant that pre-computes all static CSP directive s
 - Eliminates repeated `.filter(Boolean).join(' ')` operations per request
 
 #### 2. Pre-compiled Retry Regex Patterns
+
 **File:** `apps/web/lib/db/client/retry.ts`
 
 Moved `retryablePatterns` array to module-level `RETRYABLE_ERROR_PATTERNS` constant:
@@ -367,6 +369,7 @@ Moved `retryablePatterns` array to module-level `RETRYABLE_ERROR_PATTERNS` const
 - Same patterns, but no longer recreated on each `isRetryableError()` call
 
 #### 3. Cache Hit Rate Metrics
+
 **File:** `apps/web/lib/auth/proxy-state.ts`
 
 Added Sentry breadcrumbs for performance visibility:
