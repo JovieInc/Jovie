@@ -13,24 +13,6 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const baseUrl = (process.env.BASE_URL ?? 'http://localhost:3100').trim();
-const baseHostname = (() => {
-  try {
-    return new URL(baseUrl).hostname;
-  } catch {
-    return '';
-  }
-})();
-const isMarketingBaseUrl =
-  baseHostname === 'meetjovie.com' || baseHostname === 'www.meetjovie.com';
-
-const describePublicProfile = isMarketingBaseUrl
-  ? test.describe.skip
-  : test.describe;
-const describeErrorHandling = isMarketingBaseUrl
-  ? test.describe.skip
-  : test.describe;
-
 const MIN_CONTENT_LENGTH = {
   homepage: 100,
   criticalPage: 50,
@@ -136,7 +118,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   // PUBLIC PROFILE - Single essential test (listen mode moved to full suite)
   // =========================================================================
-  describePublicProfile('Public Profile', () => {
+  test.describe('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
 
@@ -216,7 +198,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   // ERROR HANDLING - Consolidated test (was 2 separate tests)
   // =========================================================================
-  describeErrorHandling('Error Handling', () => {
+  test.describe('Error Handling', () => {
     test('handles non-existent routes gracefully without 500 errors', async ({
       page,
     }, testInfo) => {

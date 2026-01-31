@@ -9,7 +9,7 @@ import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayCli
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
-import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
+import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import type {
   CreatorContact as DbCreatorContact,
@@ -39,8 +39,8 @@ function generateProfileStructuredData(
   socialLinks: LegacySocialLink[]
 ) {
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${PROFILE_URL}/${profile.username}`;
-  const imageUrl = profile.avatar_url || `${PROFILE_URL}/og/default.png`;
+  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const imageUrl = profile.avatar_url || `${BASE_URL}/og/default.png`;
 
   // Extract social profile URLs for sameAs
   const socialUrls = socialLinks
@@ -91,7 +91,7 @@ function generateProfileStructuredData(
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: PROFILE_URL,
+        item: BASE_URL,
       },
       {
         '@type': 'ListItem',
@@ -448,7 +448,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const artistName = profile.display_name || profile.username;
-  const profileUrl = `${PROFILE_URL}/${profile.username}`;
+  const profileUrl = `${BASE_URL}/${profile.username}`;
 
   // Build SEO-optimized title with genre context if available
   const genreContext =
@@ -487,7 +487,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords,
     authors: [{ name: artistName }],
     creator: artistName,
-    metadataBase: new URL(PROFILE_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: profileUrl,
     },

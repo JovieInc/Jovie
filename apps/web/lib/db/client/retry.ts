@@ -14,33 +14,37 @@ const DB_CONFIG = {
 } as const;
 
 /**
+ * Pre-compiled regex patterns for retryable error detection.
+ * Compiled once at module load time for optimal performance.
+ */
+const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
+  /connection.*reset/i,
+  /connection.*terminated/i,
+  /connection.*closed/i,
+  /server conn crashed\??/i,
+  /connection.*unexpectedly/i,
+  /timeout/i,
+  /network/i,
+  /temporary/i,
+  /transient/i,
+  /econnreset/i,
+  /econnrefused/i,
+  /etimedout/i,
+  /socket hang up/i,
+  /database is starting up/i,
+  /too many connections/i,
+  /connection pool exhausted/i,
+  /client has encountered a connection error/i,
+  /terminating connection due to administrator command/i,
+] as const;
+
+/**
  * Check if an error is retryable (transient)
  */
 export function isRetryableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
-  const retryablePatterns = [
-    /connection.*reset/i,
-    /connection.*terminated/i,
-    /connection.*closed/i,
-    /server conn crashed\??/i,
-    /connection.*unexpectedly/i,
-    /timeout/i,
-    /network/i,
-    /temporary/i,
-    /transient/i,
-    /econnreset/i,
-    /econnrefused/i,
-    /etimedout/i,
-    /socket hang up/i,
-    /database is starting up/i,
-    /too many connections/i,
-    /connection pool exhausted/i,
-    /client has encountered a connection error/i,
-    /terminating connection due to administrator command/i,
-  ];
-
-  return retryablePatterns.some(
+  return RETRYABLE_ERROR_PATTERNS.some(
     pattern => pattern.test(error.message) || pattern.test(error.name)
   );
 }

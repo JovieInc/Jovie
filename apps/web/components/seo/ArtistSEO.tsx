@@ -1,5 +1,5 @@
 import Script from 'next/script';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { Artist, SocialLink } from '@/types/db';
 
 interface ArtistSEOProps {
@@ -8,8 +8,8 @@ interface ArtistSEOProps {
 }
 
 export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {
-  const profileUrl = `${PROFILE_URL}/${artist.handle}`;
-  const imageUrl = artist.image_url || `${PROFILE_URL}/og/default.png`;
+  const profileUrl = `${BASE_URL}/${artist.handle}`;
+  const imageUrl = artist.image_url || `${BASE_URL}/og/default.png`;
 
   // Generate additional structured data for music
   const musicStructuredData = {
@@ -51,7 +51,7 @@ export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: PROFILE_URL,
+        item: BASE_URL,
       },
       {
         '@type': 'ListItem',

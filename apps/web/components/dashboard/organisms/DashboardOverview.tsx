@@ -16,7 +16,7 @@ import {
   getIncompleteTaskLabelClass,
 } from '@/components/dashboard/organisms/dashboard-overview-helpers';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import {
   trimLeadingSlashes,
   trimTrailingSlashes,
@@ -27,7 +27,7 @@ function buildProfileUrl(
   handle: string | null | undefined
 ): string | undefined {
   if (!handle) return undefined;
-  const base = trimTrailingSlashes(PROFILE_URL);
+  const base = trimTrailingSlashes(BASE_URL);
   const path = trimLeadingSlashes(handle);
   return `${base}/${path}`;
 }
