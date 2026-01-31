@@ -335,14 +335,51 @@ The middleware implements multiple security layers:
 
 ## Recommendations Summary
 
-| Priority | Recommendation | Effort | Impact |
-|----------|---------------|--------|--------|
-| P1 | Pre-compute static CSP parts | Low | 0.1-0.3ms/req |
-| P1 | Pre-compile retry regex patterns | Very Low | Negligible |
-| P2 | Consider route trie for path matching | Medium | Future-proofing |
-| P2 | Lazy load CSP reporting module | Low | Reduced bundle |
-| P3 | Add cache hit rate metrics | Low | Observability |
-| P3 | Add percentile tracking | Medium | Better monitoring |
+| Priority | Recommendation | Effort | Impact | Status |
+|----------|---------------|--------|--------|--------|
+| P1 | Pre-compute static CSP parts | Low | 0.1-0.3ms/req | ✅ Implemented |
+| P1 | Pre-compile retry regex patterns | Very Low | Negligible | ✅ Implemented |
+| P2 | Consider route trie for path matching | Medium | Future-proofing | ⏳ Deferred |
+| P2 | Lazy load CSP reporting module | Low | Reduced bundle | ⏳ Deferred |
+| P3 | Add cache hit rate metrics | Low | Observability | ✅ Implemented |
+| P3 | Add percentile tracking | Medium | Better monitoring | ⏳ Deferred |
+
+---
+
+## Implementation Details
+
+### Completed Optimizations
+
+#### 1. Pre-computed Static CSP Parts
+**File:** `apps/web/lib/security/content-security-policy.ts`
+
+Created `STATIC_CSP_PARTS` constant that pre-computes all static CSP directive strings at module load time:
+- Static directives (`default-src`, `base-uri`, `object-src`, etc.) computed once
+- Only nonce and dev-specific parts (`'unsafe-eval'`, localhost) interpolated at runtime
+- Eliminates repeated `.filter(Boolean).join(' ')` operations per request
+
+#### 2. Pre-compiled Retry Regex Patterns
+**File:** `apps/web/lib/db/client/retry.ts`
+
+Moved `retryablePatterns` array to module-level `RETRYABLE_ERROR_PATTERNS` constant:
+- 18 regex patterns now compiled once at module load
+- Marked as `readonly` for immutability
+- Same patterns, but no longer recreated on each `isRetryableError()` call
+
+#### 3. Cache Hit Rate Metrics
+**File:** `apps/web/lib/auth/proxy-state.ts`
+
+Added Sentry breadcrumbs for performance visibility:
+- **Cache hit:** Logs duration and user state category (active/onboarding/waitlist)
+- **Cache miss:** Logs cache lookup duration
+- **DB query:** Logs query duration with slow query warning (>1000ms)
+- User IDs redacted in breadcrumb data for privacy
+
+### Deferred Items
+
+- **Route trie:** Current route count (~15) doesn't justify complexity
+- **Lazy CSP reporting:** Marginal benefit vs. implementation effort
+- **Percentile tracking:** Requires additional infrastructure (consider Vercel Analytics)
 
 ---
 

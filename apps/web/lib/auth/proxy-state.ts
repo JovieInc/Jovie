@@ -1,5 +1,6 @@
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
@@ -49,10 +50,39 @@ export async function getUserState(
   // Try Redis cache first to avoid cold Neon DB queries
   if (redis) {
     try {
+      const cacheStart = Date.now();
       const cached = await redis.get<ProxyUserState>(cacheKey);
+      const cacheDuration = Date.now() - cacheStart;
+
       if (cached) {
+        // Track cache hit for performance monitoring
+        Sentry.addBreadcrumb({
+          category: 'proxy-state',
+          message: 'Cache hit',
+          level: 'info',
+          data: {
+            cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
+            durationMs: cacheDuration,
+            userState: cached.isActive
+              ? 'active'
+              : cached.needsOnboarding
+                ? 'onboarding'
+                : 'waitlist',
+          },
+        });
         return cached;
       }
+
+      // Track cache miss
+      Sentry.addBreadcrumb({
+        category: 'proxy-state',
+        message: 'Cache miss',
+        level: 'info',
+        data: {
+          cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
+          durationMs: cacheDuration,
+        },
+      });
     } catch (cacheError) {
       // Log but don't fail - fall through to DB query
       captureWarning('[proxy-state] Redis cache read failed', {
@@ -65,6 +95,7 @@ export async function getUserState(
     // Single query with join - optimized for proxy performance
     // Filter out deleted and banned users to prevent misrouting
     // Wrapped with timeout to prevent hanging on Neon cold starts
+    const dbQueryStart = Date.now();
     const queryPromise = db
       .select({
         dbUserId: users.id,
@@ -99,6 +130,20 @@ export async function getUserState(
         )
       ),
     ]);
+
+    const dbQueryDuration = Date.now() - dbQueryStart;
+
+    // Track DB query performance (only on cache miss path)
+    Sentry.addBreadcrumb({
+      category: 'proxy-state',
+      message: 'DB query completed',
+      level: dbQueryDuration > 1000 ? 'warning' : 'info',
+      data: {
+        durationMs: dbQueryDuration,
+        userFound: !!result?.dbUserId,
+        slow: dbQueryDuration > 1000,
+      },
+    });
 
     let userState: ProxyUserState;
 
