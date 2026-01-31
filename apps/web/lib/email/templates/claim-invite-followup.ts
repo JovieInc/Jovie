@@ -8,7 +8,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
+import { BASE_URL, getAppUrl, getProfileUrl } from '@/constants/domains';
 import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
@@ -110,7 +110,7 @@ export function getFollowUpText(data: FollowUpTemplateData): string {
   const messages = {
     1: `Hey ${creatorName},
 
-We noticed you haven't claimed your ${APP_NAME} profile yet. Your page at ${PROFILE_URL}/${username} is ready and waiting.
+We noticed you haven't claimed your ${APP_NAME} profile yet. Your page at ${BASE_URL}/${username} is ready and waiting.
 
 Claim it now: ${claimUrl}
 
@@ -122,7 +122,7 @@ It only takes 30 seconds to claim, and it's free forever.
 
 This is your last chance to claim your ${APP_NAME} profile before someone else does.
 
-Your page: ${PROFILE_URL}/${username}
+Your page: ${BASE_URL}/${username}
 
 Claim now (30 seconds): ${claimUrl}
 
@@ -136,7 +136,7 @@ We'll be removing unclaimed profiles soon. If you'd like to keep yours, claim it
 
 ${claimUrl}
 
-Your profile at ${PROFILE_URL}/${username} has been set up and is ready to use.
+Your profile at ${BASE_URL}/${username} has been set up and is ready to use.
 
 This is the last email we'll send about this.
 
@@ -279,7 +279,7 @@ function getFollowUpContent(
           Hey ${creatorName}, your profile is waiting!
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          We noticed you haven't claimed your ${APP_NAME} profile yet. It's all set up at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${PROFILE_URL}/${username}</a>
+          We noticed you haven't claimed your ${APP_NAME} profile yet. It's all set up at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
@@ -296,7 +296,7 @@ function getFollowUpContent(
           Last chance, ${creatorName}!
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          Your ${APP_NAME} profile is still unclaimed. Don't let someone else take <a href="${previewUrl}" style="color: #000; font-weight: 600;">${PROFILE_URL}/${username}</a>
+          Your ${APP_NAME} profile is still unclaimed. Don't let someone else take <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #e53e3e; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
@@ -313,7 +313,7 @@ function getFollowUpContent(
           Final notice
         </h1>
         <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #333; text-align: center;">
-          We'll be removing unclaimed profiles soon. If you'd like to keep yours at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${PROFILE_URL}/${username}</a>, claim it now.
+          We'll be removing unclaimed profiles soon. If you'd like to keep yours at <a href="${previewUrl}" style="color: #000; font-weight: 600;">${BASE_URL}/${username}</a>, claim it now.
         </p>
         <div style="text-align: center; margin-bottom: 24px;">
           <a href="${claimUrl}" style="display: inline-block; padding: 14px 32px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">

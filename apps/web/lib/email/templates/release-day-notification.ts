@@ -5,7 +5,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { escapeHtml } from '../utils';
@@ -29,14 +29,14 @@ export interface ReleaseDayNotificationData {
  * Build the release page URL with encoded path segments
  */
 function buildReleaseUrl(username: string, slug: string): string {
-  return `${PROFILE_URL}/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
+  return `${BASE_URL}/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`;
 }
 
 /**
  * Build the manage notifications URL with encoded path segments
  */
 function buildManageNotificationsUrl(username: string): string {
-  return `${PROFILE_URL}/${encodeURIComponent(username)}`;
+  return `${BASE_URL}/${encodeURIComponent(username)}`;
 }
 
 /**
