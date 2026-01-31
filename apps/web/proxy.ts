@@ -10,6 +10,7 @@ import {
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState } from '@/lib/auth/proxy-state';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -23,7 +24,7 @@ import {
   getCspReportUri,
 } from '@/lib/security/csp-reporting';
 import { ensureSentry } from '@/lib/sentry/ensure';
-import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
+import { createBotResponse } from '@/lib/utils/bot-detection';
 
 // ============================================================================
 // Multi-Domain Routing Configuration
@@ -33,37 +34,164 @@ import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 // - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
 // ============================================================================
 
+// Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
+const META_BOT_REGEX =
+  /facebookexternalhit|facebot|facebook|instagram|whatsapp/i;
+const SENSITIVE_API_REGEX = /^\/api\/link\//;
+
 /**
- * Check if a hostname matches the profile domain (jov.ie)
+ * Fast bot detection using pre-compiled regex
  */
-function isProfileHost(hostname: string): boolean {
-  return (
-    hostname === PROFILE_HOSTNAME ||
-    hostname === `www.${PROFILE_HOSTNAME}` ||
-    hostname === `main.${PROFILE_HOSTNAME}`
-  );
+function detectMetaBot(userAgent: string): boolean {
+  return META_BOT_REGEX.test(userAgent);
+}
+
+// ============================================================================
+// Path Categorization (computed once per request)
+// ============================================================================
+
+interface PathCategory {
+  needsNonce: boolean;
+  isAppPath: boolean;
+  isDashboardPath: boolean;
+  isSettingsPath: boolean;
+  isProtectedPath: boolean;
+  isAuthPath: boolean;
+  isAuthCallbackPath: boolean;
+  isSensitiveAPI: boolean;
+}
+
+/** Check if pathname matches a route (exact or prefix) */
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+/** Check if pathname matches any of the given routes */
+function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
+  return routes.some(route => matchesRoute(pathname, route));
+}
+
+// Route groups for path categorization
+const DASHBOARD_ROUTES = [
+  '/profile',
+  '/contacts',
+  '/releases',
+  '/tour-dates',
+  '/audience',
+  '/earnings',
+  '/links',
+  '/chat',
+  '/analytics',
+] as const;
+
+const SETTINGS_ROUTES = [
+  '/settings',
+  '/admin',
+  '/billing',
+  '/account',
+] as const;
+
+/**
+ * Categorize a pathname once for all routing decisions.
+ * Eliminates redundant path matching throughout the middleware.
+ */
+function categorizePath(pathname: string): PathCategory {
+  // Auth paths
+  const isAuthPath =
+    pathname === '/signin' ||
+    pathname === '/sign-in' ||
+    pathname === '/signup' ||
+    pathname === '/sign-up';
+
+  const isAuthCallbackPath =
+    pathname === '/sso-callback' ||
+    pathname === '/signup/sso-callback' ||
+    pathname === '/signin/sso-callback';
+
+  // Dashboard paths (used for app subdomain rewrites)
+  const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
+
+  // Settings-like paths
+  const isSettingsPath = matchesAnyRoute(pathname, SETTINGS_ROUTES);
+
+  // Onboarding/waitlist paths
+  const isOnboardingPath = matchesRoute(pathname, '/onboarding');
+  const isWaitlistPath = matchesRoute(pathname, '/waitlist');
+
+  // Protected paths (require auth)
+  const isProtectedPath =
+    isDashboardPath || isSettingsPath || isWaitlistPath || isOnboardingPath;
+
+  // App paths (allowed on app.jov.ie subdomain)
+  const isAppPath =
+    pathname === '/' ||
+    isDashboardPath ||
+    isSettingsPath ||
+    isOnboardingPath ||
+    isWaitlistPath ||
+    pathname === '/monitoring' ||
+    pathname.startsWith('/monitoring/') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/app/');
+
+  // Paths that need CSP nonce (app/protected routes, not marketing)
+  const needsNonce =
+    pathname.startsWith('/api/') ||
+    pathname === '/app' ||
+    pathname.startsWith('/app/') ||
+    isSettingsPath ||
+    isOnboardingPath ||
+    isWaitlistPath;
+
+  // Sensitive API paths for bot blocking
+  const isSensitiveAPI = SENSITIVE_API_REGEX.test(pathname);
+
+  return {
+    needsNonce,
+    isAppPath,
+    isDashboardPath,
+    isSettingsPath,
+    isProtectedPath,
+    isAuthPath,
+    isAuthCallbackPath,
+    isSensitiveAPI,
+  };
+}
+
+// ============================================================================
+// Host Detection (cached per request)
+// ============================================================================
+
+interface HostInfo {
+  isProfileHost: boolean;
+  isAppSubdomain: boolean;
+  isDevOrPreview: boolean;
+  isMeetJovie: boolean;
 }
 
 /**
- * Check if a hostname matches the app subdomain (app.jov.ie)
+ * Analyze hostname once for all routing decisions.
  */
-function isAppSubdomain(hostname: string): boolean {
-  return (
-    hostname === 'app.jov.ie' ||
-    (isDevOrPreview(hostname) && hostname.startsWith('app.'))
-  );
-}
-
-/**
- * Check if we're in a development/preview environment
- */
-function isDevOrPreview(hostname: string): boolean {
-  return (
+function analyzeHost(hostname: string): HostInfo {
+  const isDevOrPreview =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
-    hostname.startsWith('main.')
-  );
+    hostname.startsWith('main.');
+
+  const isProfileHost =
+    hostname === PROFILE_HOSTNAME ||
+    hostname === `www.${PROFILE_HOSTNAME}` ||
+    hostname === `main.${PROFILE_HOSTNAME}`;
+
+  const isAppSubdomain =
+    hostname === 'app.jov.ie' ||
+    (isDevOrPreview && hostname.startsWith('app.'));
+
+  const isMeetJovie =
+    hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
+
+  return { isProfileHost, isAppSubdomain, isDevOrPreview, isMeetJovie };
 }
 
 /**
@@ -71,8 +199,8 @@ function isDevOrPreview(hostname: string): boolean {
  * In production on app.jov.ie, dashboard is at '/'.
  * In dev/preview, dashboard is at '/app'.
  */
-function getDashboardUrl(hostname: string): string {
-  if (isDevOrPreview(hostname) && !isAppSubdomain(hostname)) {
+function getDashboardUrl(hostInfo: HostInfo): string {
+  if (hostInfo.isDevOrPreview && !hostInfo.isAppSubdomain) {
     return '/app';
   }
   return '/';
@@ -101,174 +229,93 @@ function isMockOrMissingClerkConfig(): boolean {
   );
 }
 
-const generateNonce = () => {
+/**
+ * Generate a cryptographic nonce for CSP.
+ * Uses loop instead of spread operator to reduce GC pressure.
+ */
+function generateNonce(): string {
   const nonceBytes = new Uint8Array(16);
   crypto.getRandomValues(nonceBytes);
-  return btoa(String.fromCharCode(...nonceBytes));
-};
+  let binary = '';
+  for (let i = 0; i < 16; i++) {
+    binary += String.fromCharCode(nonceBytes[i]);
+  }
+  return btoa(binary);
+}
 
 async function handleRequest(req: NextRequest, userId: string | null) {
   try {
-    // Start performance timing
     const startTime = Date.now();
-
-    const requestHeaders = new Headers(req.headers);
-
-    // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
-    const isSensitiveAPI = pathname.startsWith('/api/link/');
+    const hostname = req.nextUrl.hostname;
 
-    // Only generate a per-request CSP nonce for app/protected routes.
-    // Marketing pages are intended to be statically cached and should not
-    // depend on request-specific headers.
-    const needsNonce =
-      pathname.startsWith('/api/') ||
-      pathname === '/app' ||
-      pathname.startsWith('/app/') ||
-      pathname === '/admin' ||
-      pathname.startsWith('/admin/') ||
-      pathname === '/onboarding' ||
-      pathname.startsWith('/onboarding/') ||
-      pathname === '/settings' ||
-      pathname.startsWith('/settings/') ||
-      pathname === '/billing' ||
-      pathname.startsWith('/billing/') ||
-      pathname === '/account' ||
-      pathname.startsWith('/account/') ||
-      pathname === '/waitlist' ||
-      pathname.startsWith('/waitlist/');
+    // ========================================================================
+    // Compute path and host info ONCE at the top
+    // ========================================================================
+    const pathInfo = categorizePath(pathname);
+    const hostInfo = analyzeHost(hostname);
 
-    const nonce = needsNonce ? generateNonce() : null;
-    if (nonce) {
-      await ensureSentry();
-      requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
-    }
+    // ========================================================================
+    // Early exits that don't need CSP or user state (no DB/Redis calls)
+    // ========================================================================
 
-    const contentSecurityPolicy = nonce
-      ? buildContentSecurityPolicy({ nonce })
-      : null;
-
-    // Compute CSP report URI once and pass to report-only builder
-    const cspReportUri = nonce ? getCspReportUri() : null;
-    const contentSecurityPolicyReportOnly = nonce
-      ? buildContentSecurityPolicyReportOnly({
-          nonce,
-          reportUri: cspReportUri,
-        })
-      : null;
-
-    // Block Sentry example pages in production (dev-only testing routes)
+    // Block Sentry example pages in production
     if (
       process.env.NODE_ENV === 'production' &&
       (pathname === '/sentry-example-page' ||
         pathname === '/api/sentry-example-api')
     ) {
-      return NextResponse.rewrite(new URL('/404', req.url), {
-        request: { headers: requestHeaders },
-      });
+      return NextResponse.rewrite(new URL('/404', req.url));
     }
 
     // Allow sidebar demo to bypass authentication
     if (pathname === '/sidebar-demo') {
-      return NextResponse.next({ request: { headers: requestHeaders } });
+      return NextResponse.next();
     }
 
-    if (isSensitiveAPI) {
-      const botResult = detectBot(req, pathname);
-
-      // Only block Meta crawlers on sensitive API endpoints to avoid anti-cloaking penalties
-      if (botResult.shouldBlock) {
+    // Fast bot blocking using pre-compiled regex (no array iteration)
+    if (pathInfo.isSensitiveAPI) {
+      const userAgent = req.headers.get('user-agent') || '';
+      if (detectMetaBot(userAgent)) {
         return createBotResponse(204);
       }
     }
 
-    // ========================================================================
-    // Multi-Domain Routing
-    // ========================================================================
-    const hostname = req.nextUrl.hostname;
-
-    // 301 redirect ALL meetjovie.com traffic to jov.ie (kept for email marketing only)
-    if (hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com') {
+    // 301 redirect ALL meetjovie.com traffic to jov.ie
+    if (hostInfo.isMeetJovie) {
       const targetUrl = new URL(pathname, 'https://jov.ie');
       targetUrl.search = req.nextUrl.search;
       return NextResponse.redirect(targetUrl, 301);
     }
 
-    // Skip domain routing in development/preview environments
-    if (!isDevOrPreview(hostname)) {
-      // app.jov.ie: Only allow app paths (no /app prefix)
-      if (isAppSubdomain(hostname)) {
-        // Redirect /dashboard to / (dashboard is at root on app.jov.ie)
-        // This handles SSO callbacks that redirect to /app/dashboard → app.jov.ie/dashboard
-        // Note: Only redirect exact /dashboard, NOT /dashboard/* paths (those routes live at /app/dashboard/*)
+    // ========================================================================
+    // Domain routing redirects (no auth needed)
+    // ========================================================================
+    if (!hostInfo.isDevOrPreview) {
+      // app.jov.ie: Only allow app paths
+      if (hostInfo.isAppSubdomain) {
         if (pathname === '/dashboard') {
           const targetUrl = new URL('https://app.jov.ie');
           targetUrl.pathname = '/';
           targetUrl.search = req.nextUrl.search;
           return NextResponse.redirect(targetUrl, 301);
         }
-
-        const appPaths = [
-          '/', // Dashboard at root
-          '/analytics',
-          '/audience',
-          '/chat',
-          '/contacts',
-          '/earnings',
-          '/links',
-          '/profile',
-          '/releases',
-          '/tour-dates',
-          '/settings',
-          '/admin',
-          '/onboarding',
-          '/billing',
-          '/account',
-          '/waitlist',
-          '/monitoring', // Sentry tunnel endpoint
-        ];
-
-        const isAppPath =
-          appPaths.some(p => pathname === p || pathname.startsWith(`${p}/`)) ||
-          pathname.startsWith('/api/') ||
-          pathname.startsWith('/app/'); // Allow /app/* paths on app.jov.ie for RSC requests
-
-        if (!isAppPath) {
-          // Redirect non-app paths to root jov.ie
+        if (!pathInfo.isAppPath) {
           return NextResponse.redirect(
             new URL(pathname, 'https://jov.ie'),
             301
           );
         }
-        // Continue to auth middleware below
       }
 
-      // jov.ie root: Marketing + Profiles
-      if (isProfileHost(hostname)) {
-        // Redirect app paths to app subdomain (legacy /app/* or direct app paths)
-        const appPaths = [
-          '/settings',
-          '/admin',
-          '/analytics',
-          '/audience',
-          '/contacts',
-          '/earnings',
-          '/links',
-          '/profile',
-          '/releases',
-          '/account',
-          '/billing',
-        ];
-        if (
-          appPaths.some(p => pathname === p || pathname.startsWith(`${p}/`))
-        ) {
+      // jov.ie root: Redirect app paths to app subdomain
+      if (hostInfo.isProfileHost) {
+        if (pathInfo.isDashboardPath || pathInfo.isSettingsPath) {
           return NextResponse.redirect(
             new URL(pathname, 'https://app.jov.ie'),
             301
           );
         }
-
-        // Legacy /app/* prefix redirect
         if (pathname.startsWith('/app/')) {
           const withoutPrefix = pathname.replace(/^\/app/, '');
           return NextResponse.redirect(
@@ -279,75 +326,100 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
     }
 
-    let res: NextResponse;
+    // ========================================================================
+    // Unauthenticated user handling (no getUserState call needed)
+    // ========================================================================
+    if (!userId) {
+      // Normalize legacy auth paths
+      if (pathname === '/sign-in') {
+        const url = req.nextUrl.clone();
+        url.pathname = '/signin';
+        return NextResponse.redirect(url);
+      }
+      if (pathname === '/sign-up') {
+        const url = req.nextUrl.clone();
+        url.pathname = '/signup';
+        return NextResponse.redirect(url);
+      }
 
-    const isAuthPath =
-      pathname === '/signin' ||
-      pathname === '/sign-in' ||
-      pathname === '/signup' ||
-      pathname === '/sign-up';
+      // Check if path requires authentication
+      const needsAuth =
+        pathInfo.isProtectedPath ||
+        (hostInfo.isAppSubdomain && pathname === '/');
 
-    const isAuthCallbackPath =
-      pathname === '/sso-callback' ||
-      pathname === '/signup/sso-callback' ||
-      pathname === '/signin/sso-callback';
+      if (needsAuth) {
+        const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
+        const authUrl = new URL(authPage, req.url);
+        authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
+        return NextResponse.redirect(authUrl);
+      }
 
-    // Detect RSC prefetch requests - these should NOT trigger redirects
-    // RSC prefetch happens when Link components preload routes in the background
-    // Redirecting prefetch requests causes "too many redirects" errors
-    // Note: RSC header alone indicates RSC navigation, not prefetch
-    // Only Next-Router-Prefetch='1' or _rsc param indicates actual prefetch
+      // Unauthenticated user on public path - build response with CSP if needed
+      return buildFinalResponse(
+        req,
+        NextResponse.next(),
+        pathInfo,
+        startTime,
+        null
+      );
+    }
+
+    // ========================================================================
+    // Authenticated user handling - SINGLE getUserState call
+    // ========================================================================
     const isRSCPrefetch =
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
 
-    // Let SSO callback routes complete without middleware interference
-    // The AuthenticateWithRedirectCallback component will handle routing based on user state
-    // Skip redirects for RSC prefetch requests to avoid "too many redirects" errors
-    if (userId && isAuthPath && !isAuthCallbackPath && !isRSCPrefetch) {
-      // Check complete user state to determine where authenticated user should go
-      const userState = await getUserState(userId);
-      // Sanitize redirect_url to strip hash fragments and validate path
+    // Fetch user state ONCE for all authenticated routing decisions
+    let userState: ProxyUserState | null = null;
+
+    // Only fetch state if we need it for routing decisions
+    const needsUserState =
+      pathInfo.isAuthPath ||
+      pathname === '/waitlist' ||
+      pathname === '/onboarding' ||
+      pathname === '/signin' ||
+      pathname === '/signup' ||
+      !pathname.startsWith('/api/');
+
+    if (needsUserState) {
+      userState = await getUserState(userId);
+    }
+
+    let res: NextResponse;
+    const requestHeaders = new Headers(req.headers);
+
+    // Handle authenticated user on auth pages (signin/signup)
+    if (
+      pathInfo.isAuthPath &&
+      !pathInfo.isAuthCallbackPath &&
+      !isRSCPrefetch &&
+      userState
+    ) {
       const redirectUrl = sanitizeRedirectUrl(
         req.nextUrl.searchParams.get('redirect_url')
       );
 
-      // If user needs waitlist/onboarding, send them there (ignore redirect_url)
       if (userState.needsWaitlist) {
-        res = NextResponse.redirect(new URL('/waitlist', req.url));
-      } else if (userState.needsOnboarding) {
-        res = NextResponse.redirect(new URL('/onboarding', req.url));
-      } else if (redirectUrl) {
-        // User is fully active - honor sanitized redirect_url for things like /claim/token
-        res = NextResponse.redirect(new URL(redirectUrl, req.url));
-      } else {
-        // Fully active user, no redirect_url - go to dashboard
-        res = NextResponse.redirect(
-          new URL(getDashboardUrl(hostname), req.url)
-        );
+        return NextResponse.redirect(new URL('/waitlist', req.url));
       }
-    } else if (!userId && pathname === '/sign-in') {
-      // Normalize legacy /sign-in to /signin
-      const url = req.nextUrl.clone();
-      url.pathname = '/signin';
-      res = NextResponse.redirect(url);
-    } else if (!userId && pathname === '/sign-up') {
-      // Normalize legacy /sign-up to /signup
-      const url = req.nextUrl.clone();
-      url.pathname = '/signup';
-      res = NextResponse.redirect(url);
-    } else if (userId) {
-      // Check complete user state to route correctly - eliminates redirect loops
-      const userState = await getUserState(userId);
+      if (userState.needsOnboarding) {
+        return NextResponse.redirect(new URL('/onboarding', req.url));
+      }
+      if (redirectUrl) {
+        return NextResponse.redirect(new URL(redirectUrl, req.url));
+      }
+      return NextResponse.redirect(new URL(getDashboardUrl(hostInfo), req.url));
+    }
 
-      // Route based on complete state - NO MORE LOOPS
-      // IMPORTANT: Never rewrite API routes - they handle their own auth
+    // Route based on user state
+    if (userState) {
       if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/')
       ) {
-        // User needs waitlist - rewrite to waitlist page
         res = NextResponse.rewrite(new URL('/waitlist', req.url), {
           request: { headers: requestHeaders },
         });
@@ -356,20 +428,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname !== '/onboarding' &&
         !pathname.startsWith('/api/')
       ) {
-        // ENG-002: Check for recent onboarding completion cookie to prevent redirect loop
-        // This cookie is set after completing onboarding to bypass the race condition
-        // where the DB query might see stale data before transaction is fully visible
         const onboardingJustCompleted =
           req.cookies.get('jovie_onboarding_complete')?.value === '1';
 
         if (onboardingJustCompleted) {
-          // User just completed onboarding - let them through to dashboard
-          // The cookie will expire in 30s, and by then DB will have fresh data
           res = NextResponse.next({ request: { headers: requestHeaders } });
-          // Clear the cookie since it's a one-time bypass
           res.cookies.delete('jovie_onboarding_complete');
         } else {
-          // User needs onboarding - rewrite to onboarding page
           res = NextResponse.rewrite(new URL('/onboarding', req.url), {
             request: { headers: requestHeaders },
           });
@@ -379,62 +444,33 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname === '/waitlist' &&
         !isRSCPrefetch
       ) {
-        // Active user trying to access waitlist → redirect to dashboard
-        // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(
-          new URL(getDashboardUrl(hostname), req.url)
+        return NextResponse.redirect(
+          new URL(getDashboardUrl(hostInfo), req.url)
         );
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
         !isRSCPrefetch
       ) {
-        // Active user trying to access onboarding → redirect to dashboard
-        // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(
-          new URL(getDashboardUrl(hostname), req.url)
+        return NextResponse.redirect(
+          new URL(getDashboardUrl(hostInfo), req.url)
         );
       } else if (
         (pathname === '/signin' || pathname === '/signup') &&
         !isRSCPrefetch
       ) {
-        // Fully authenticated user hitting auth pages → redirect to dashboard
-        // Skip for RSC prefetch to avoid "too many redirects" errors
-        res = NextResponse.redirect(
-          new URL(getDashboardUrl(hostname), req.url)
+        return NextResponse.redirect(
+          new URL(getDashboardUrl(hostInfo), req.url)
         );
       } else {
-        // All other paths - user is authenticated and on correct page
-        // On app.jov.ie, rewrite clean paths to internal Next.js routes
-        if (isAppSubdomain(hostname)) {
-          // Map clean paths to internal routes
-          // Dashboard routes: /profile → /app/dashboard/profile
-          const dashboardPaths = [
-            '/profile',
-            '/contacts',
-            '/releases',
-            '/tour-dates',
-            '/audience',
-            '/earnings',
-            '/links',
-            '/chat',
-            '/analytics',
-          ];
-          const isDashboardPath = dashboardPaths.some(
-            p => pathname === p || pathname.startsWith(`${p}/`)
-          );
-
+        // Handle app subdomain rewrites
+        if (hostInfo.isAppSubdomain) {
           let rewritePath: string | null = null;
           if (pathname === '/') {
             rewritePath = '/app';
-          } else if (isDashboardPath) {
+          } else if (pathInfo.isDashboardPath) {
             rewritePath = `/app/dashboard${pathname}`;
-          } else if (
-            pathname.startsWith('/settings') ||
-            pathname.startsWith('/admin') ||
-            pathname.startsWith('/billing') ||
-            pathname.startsWith('/account')
-          ) {
+          } else if (pathInfo.isSettingsPath) {
             rewritePath = `/app${pathname}`;
           }
 
@@ -450,122 +486,112 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         }
       }
     } else {
-      // Handle unauthenticated users
-      const protectedPaths = [
-        '/waitlist',
-        '/analytics',
-        '/audience',
-        '/chat',
-        '/contacts',
-        '/earnings',
-        '/links',
-        '/profile',
-        '/releases',
-        '/tour-dates',
-        '/settings',
-        '/admin',
-        '/account',
-        '/billing',
-      ];
-
-      // On app.jov.ie, root path is also protected (it's the dashboard)
-      const isProtectedPath = protectedPaths.some(
-        p => pathname === p || pathname.startsWith(`${p}/`)
-      );
-      const needsAuth =
-        isProtectedPath || (isAppSubdomain(hostname) && pathname === '/');
-
-      if (needsAuth) {
-        // Redirect to signup for waitlist (new users creating accounts)
-        // Redirect to signin for everything else (existing users)
-        const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, req.url);
-        authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
-        res = NextResponse.redirect(authUrl);
-      } else {
-        res = NextResponse.next({ request: { headers: requestHeaders } });
-      }
+      res = NextResponse.next({ request: { headers: requestHeaders } });
     }
 
-    if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
-      res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      });
-    }
-
-    if (userId && res.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
-      res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      });
-    }
-
-    // Add performance monitoring headers
-    const duration = Date.now() - startTime;
-    res.headers.set('Server-Timing', `middleware;dur=${duration}`);
-    if (contentSecurityPolicy) {
-      res.headers.set('Content-Security-Policy', contentSecurityPolicy);
-    }
-
-    // Add CSP violation reporting headers (report-only mode)
-    if (contentSecurityPolicyReportOnly && cspReportUri) {
-      res.headers.set(
-        'Content-Security-Policy-Report-Only',
-        contentSecurityPolicyReportOnly
-      );
-      res.headers.set('Report-To', buildReportToHeader(cspReportUri));
-      res.headers.set(
-        'Reporting-Endpoints',
-        buildReportingEndpointsHeader(cspReportUri)
-      );
-    }
-
-    // Add performance monitoring for API routes
-    if (pathname.startsWith('/api/')) {
-      // Track API performance
-      res.headers.set('X-API-Response-Time', `${duration}`);
-
-      // Log performance data in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] ${req.method} ${pathname} - ${duration}ms`);
-      }
-    }
-
-    // Add anti-indexing and no-cache headers for link and API routes (even on 404s)
-    if (
-      pathname.startsWith('/go/') ||
-      pathname.startsWith('/out/') ||
-      pathname.startsWith('/api/')
-    ) {
-      res.headers.set(
-        'X-Robots-Tag',
-        'noindex, nofollow, nosnippet, noarchive'
-      );
-      res.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.headers.set('Pragma', 'no-cache');
-      res.headers.set('Expires', '0');
-      res.headers.set('Referrer-Policy', 'no-referrer');
-    }
-
-    return res;
+    return buildFinalResponse(req, res, pathInfo, startTime, userId);
   } catch (error) {
-    // Log errors for observability - silent failures can mask security issues
     await captureError('Middleware error in proxy', error, {
       pathname: req.nextUrl.pathname,
       context: 'proxy_middleware',
     });
-
-    // Fallback to basic middleware behavior
-    // Note: Individual pages have their own auth checks (resolveUserState)
     return NextResponse.next();
   }
+}
+
+/**
+ * Build the final response with CSP headers and cookies.
+ * CSP is deferred until after redirect decisions to avoid wasted computation.
+ */
+function buildFinalResponse(
+  req: NextRequest,
+  res: NextResponse,
+  pathInfo: PathCategory,
+  startTime: number,
+  userId: string | null
+): NextResponse {
+  const pathname = req.nextUrl.pathname;
+
+  // Generate nonce and build CSP only for paths that need it
+  // This is deferred until after redirect decisions
+  if (pathInfo.needsNonce) {
+    const nonce = generateNonce();
+
+    // Fire-and-forget Sentry initialization (non-blocking)
+    ensureSentry().catch(() => {});
+
+    res.headers.set(SCRIPT_NONCE_HEADER, nonce);
+    res.headers.set(
+      'Content-Security-Policy',
+      buildContentSecurityPolicy({ nonce })
+    );
+
+    const cspReportUri = getCspReportUri();
+    if (cspReportUri) {
+      const reportOnlyPolicy = buildContentSecurityPolicyReportOnly({
+        nonce,
+        reportUri: cspReportUri,
+      });
+      if (reportOnlyPolicy) {
+        res.headers.set(
+          'Content-Security-Policy-Report-Only',
+          reportOnlyPolicy
+        );
+        res.headers.set('Report-To', buildReportToHeader(cspReportUri));
+        res.headers.set(
+          'Reporting-Endpoints',
+          buildReportingEndpointsHeader(cspReportUri)
+        );
+      }
+    }
+  }
+
+  // Set audience tracking cookies
+  if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
+    res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+    });
+  }
+
+  if (userId && res.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
+    res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+    });
+  }
+
+  // Performance monitoring
+  const duration = Date.now() - startTime;
+  res.headers.set('Server-Timing', `middleware;dur=${duration}`);
+
+  if (pathname.startsWith('/api/')) {
+    res.headers.set('X-API-Response-Time', `${duration}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API] ${req.method} ${pathname} - ${duration}ms`);
+    }
+  }
+
+  // Anti-indexing headers for link and API routes
+  if (
+    pathname.startsWith('/go/') ||
+    pathname.startsWith('/out/') ||
+    pathname.startsWith('/api/')
+  ) {
+    res.headers.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
+    res.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.headers.set('Pragma', 'no-cache');
+    res.headers.set('Expires', '0');
+    res.headers.set('Referrer-Policy', 'no-referrer');
+  }
+
+  return res;
 }
 
 const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
