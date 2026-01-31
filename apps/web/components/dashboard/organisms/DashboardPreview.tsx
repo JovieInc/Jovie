@@ -9,6 +9,20 @@ import { PROFILE_URL } from '@/constants/domains';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
+/**
+ * DSP platforms excluded from social link preview (shown separately in music section).
+ * Defined at module scope to avoid creating a new Set instance on every render.
+ */
+const DSP_PLATFORMS = new Set([
+  'spotify',
+  'apple_music',
+  'youtube_music',
+  'soundcloud',
+  'bandcamp',
+  'tidal',
+  'deezer',
+]);
+
 interface DashboardPreviewProps {
   readonly artist: Artist;
   readonly socialLinksOverride?: LegacySocialLink[];
@@ -20,17 +34,6 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
 }) => {
   // Fetch links via TanStack Query (skip if override provided)
   const { data: socialLinks = [] } = useDashboardSocialLinksQuery(artist.id);
-
-  // DSP platforms excluded from social link preview (shown separately)
-  const DSP_PLATFORMS = new Set([
-    'spotify',
-    'apple_music',
-    'youtube_music',
-    'soundcloud',
-    'bandcamp',
-    'tidal',
-    'deezer',
-  ]);
 
   // Convert social links to LegacySocialLink format for preview
   const previewSocialLinks = useMemo((): LegacySocialLink[] => {

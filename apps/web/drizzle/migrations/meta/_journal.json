@@ -141,6 +141,13 @@
       "when": 1769900000000,
       "tag": "0019_creator_provenance_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1770000000000,
+      "tag": "0020_dashboard_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -148,6 +148,7 @@ export async function getAnalyticsData(
             top_referrers as (
               select referrer, count(*) as count
               from ranged_events
+              where referrer is not null
               group by referrer
               order by count desc
               limit 5
@@ -374,6 +375,7 @@ export async function getUserDashboardAnalytics(
             top_referrers as (
               select referrer, count(*) as count
               from ranged_events
+              where referrer is not null
               group by referrer
               order by count desc
               limit 5
