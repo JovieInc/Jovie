@@ -3,7 +3,6 @@ import type { SearchParams } from 'nuqs/server';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { audienceSearchParams } from '@/lib/nuqs';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
@@ -23,16 +22,14 @@ export default async function AudiencePage({
 }: Readonly<{
   searchParams: Promise<SearchParams>;
 }>) {
-  const { userId } = await getCachedAuth();
-
-  // Handle unauthenticated users
-  if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/audience');
-  }
-
   try {
-    // Fetch dashboard data server-side
+    // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
+
+    // Handle unauthenticated users
+    if (!dashboardData.user?.id) {
+      redirect('/sign-in?redirect_url=/app/dashboard/audience');
+    }
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
@@ -52,7 +49,7 @@ export default async function AudiencePage({
     const parsedParams = await audienceSearchParams.parse(searchParams);
 
     const audienceData = await getAudienceServerData({
-      userId,
+      userId: dashboardData.user.id,
       selectedProfileId: artist?.id ?? null,
       searchParams: {
         page: String(parsedParams.page),

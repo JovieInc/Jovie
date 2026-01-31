@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { ContactsManager } from '@/components/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
@@ -10,14 +9,13 @@ import { getProfileContactsForOwner } from './actions';
 export const runtime = 'nodejs';
 
 export default async function ContactsPage() {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/contacts');
-  }
-
   try {
     const dashboardData = await getDashboardData();
+
+    // Handle unauthenticated users
+    if (!dashboardData.user?.id) {
+      redirect('/sign-in?redirect_url=/app/dashboard/contacts');
+    }
 
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
