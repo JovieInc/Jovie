@@ -5,6 +5,7 @@ const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imp
 const noHandlerInitializationRule = require('./eslint-rules/no-handler-initialization');
 const serverOnlyImportsRule = require('./eslint-rules/server-only-imports');
 const useClientDirectiveRule = require('./eslint-rules/use-client-directive');
+const readonlyComponentPropsRule = require('./eslint-rules/readonly-component-props');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -19,6 +20,7 @@ const baseConfig = {
         'no-handler-initialization': noHandlerInitializationRule,
         'server-only-imports': serverOnlyImportsRule,
         'use-client-directive': useClientDirectiveRule,
+        'readonly-component-props': readonlyComponentPropsRule,
       },
     },
   },
@@ -111,6 +113,8 @@ const baseConfig = {
     '@jovie/server-only-imports': 'error',
     // Warn initially for gradual adoption - promote to 'error' once violations are fixed
     '@jovie/use-client-directive': 'warn',
+    // Enforce readonly modifiers on React component props for type safety
+    '@jovie/readonly-component-props': 'error',
   },
 };
 
