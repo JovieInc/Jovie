@@ -105,18 +105,26 @@ export function useOtpInput({
     [controlledValue, onChange, onComplete, haptic]
   );
 
+  // Handle multi-character input from iOS autofill/paste
+  const handleMultiDigitInput = useCallback(
+    (digits: string) => {
+      const isComplete = digits.length >= OTP_LENGTH;
+      updateValue(digits.slice(0, OTP_LENGTH), isComplete);
+      if (!isComplete) {
+        inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus();
+        haptic.medium();
+      }
+    },
+    [updateValue, haptic]
+  );
+
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
       const digits = inputValue.replaceAll(/\D/g, '');
 
       // Handle multi-character input (iOS autofill inserts full OTP)
       if (digits.length > 1) {
-        updateValue(digits.slice(0, OTP_LENGTH), digits.length >= OTP_LENGTH);
-        if (digits.length < OTP_LENGTH) {
-          const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-          inputRefs.current[focusIndex]?.focus();
-          haptic.medium();
-        }
+        handleMultiDigitInput(digits);
         return;
       }
 
@@ -133,7 +141,7 @@ export function useOtpInput({
         }
       }
     },
-    [currentValue, updateValue, haptic]
+    [currentValue, updateValue, handleMultiDigitInput]
   );
 
   const handleKeyDown = useCallback(
@@ -188,39 +196,27 @@ export function useOtpInput({
         inputType === 'insertFromPaste'
       ) {
         const target = event.target as HTMLInputElement;
-        const inputValue = target.value;
-        const digits = inputValue.replaceAll(/\D/g, '');
+        const digits = target.value.replaceAll(/\D/g, '');
 
         if (digits.length > 1) {
-          updateValue(digits.slice(0, OTP_LENGTH), digits.length >= OTP_LENGTH);
-          if (digits.length < OTP_LENGTH) {
-            const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-            inputRefs.current[focusIndex]?.focus();
-            haptic.medium();
-          }
+          handleMultiDigitInput(digits);
         }
       }
     },
-    [currentValue, updateValue, haptic]
+    [currentValue, updateValue, handleMultiDigitInput]
   );
 
   const handlePaste = useCallback(
     (event: React.ClipboardEvent) => {
       event.preventDefault();
       const pastedData = event.clipboardData.getData('text');
-      const digits = pastedData.replaceAll(/\D/g, '').slice(0, OTP_LENGTH);
+      const digits = pastedData.replaceAll(/\D/g, '');
 
       if (digits) {
-        updateValue(digits, digits.length === OTP_LENGTH);
-
-        if (digits.length < OTP_LENGTH) {
-          const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-          inputRefs.current[focusIndex]?.focus();
-          haptic.medium();
-        }
+        handleMultiDigitInput(digits);
       }
     },
-    [updateValue, haptic]
+    [handleMultiDigitInput]
   );
 
   const handleAutofillChange = useCallback(
