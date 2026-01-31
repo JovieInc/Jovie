@@ -51,7 +51,7 @@ Request Flow:
 #### Strengths
 
 | Pattern | Implementation | Impact |
-|---------|----------------|--------|
+| -------- | -------------- | ------ |
 | Pre-compiled regex | `META_BOT_REGEX` for bot detection | O(1) vs O(n) array iteration |
 | Path categorization | Single `categorizePath()` call | Eliminates redundant matching |
 | Host caching | `analyzeHost()` computed once | Removes duplicate hostname checks |
@@ -82,7 +82,7 @@ function categorizePath(pathname: string): PathCategory {
 #### Strengths
 
 | Feature | Value | Rationale |
-|---------|-------|-----------|
+| ------- | ----- | --------- |
 | Redis cache TTL | 30 seconds | Balance freshness vs cold DB latency |
 | DB query timeout | 5 seconds | Prevent proxy hanging on Neon cold starts |
 | Fire-and-forget cache write | Non-blocking | Don't slow down response for cache update |
@@ -150,7 +150,7 @@ if (Math.random() < 0.1) {
 #### Features
 
 | Component | Metrics Captured |
-|-----------|-----------------|
+| --------- | ---------------- |
 | Middleware | Server-Timing header, X-API-Response-Time |
 | API Routes | Sentry breadcrumbs, duration, status codes |
 | Request Tracing | X-Request-ID header propagation |
@@ -307,7 +307,7 @@ if (cspReportUri) {
 ### Middleware Latency (from PR #2854)
 
 | Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
+| ------ | ------ | ----- | ----------- |
 | Duplicate getUserState calls | 2 calls | 1 call | 50-200ms on cache miss |
 | Sentry initialization | Blocking | Non-blocking | Variable |
 | Path categorization | Multiple passes | Single pass | ~1-2ms |
@@ -336,7 +336,7 @@ The middleware implements multiple security layers:
 ## Recommendations Summary
 
 | Priority | Recommendation | Effort | Impact | Status |
-|----------|---------------|--------|--------|--------|
+| -------- | -------------- | ------ | ------ | ------ |
 | P1 | Pre-compute static CSP parts | Low | 0.1-0.3ms/req | ✅ Implemented |
 | P1 | Pre-compile retry regex patterns | Very Low | Negligible | ✅ Implemented |
 | P2 | Consider route trie for path matching | Medium | Future-proofing | ⏳ Deferred |
