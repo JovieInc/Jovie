@@ -334,15 +334,50 @@ export async function getProfileWithLinks(
   }
 
   // Cache the result in Redis (fire-and-forget)
+  // Serialize Date objects to ISO strings to prevent TransformStream serialization errors
   if (redis && result) {
     redis
-      .set(cacheKey, result, { ex: PROFILE_CACHE_TTL_SECONDS })
+      .set(cacheKey, serializeProfileDates(result), {
+        ex: PROFILE_CACHE_TTL_SECONDS,
+      })
       .catch(error => {
         captureWarning('[profile-service] Redis cache write failed', { error });
       });
   }
 
   return result;
+}
+
+/**
+ * Serialize Date objects to ISO strings for Redis storage.
+ * This prevents TransformStream serialization issues when caching complex objects.
+ */
+function serializeProfileDates(profile: ProfileWithLinks): unknown {
+  return {
+    ...profile,
+    createdAt: profile.createdAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+    socialLinks: profile.socialLinks.map(link => ({
+      ...link,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })),
+    contacts: profile.contacts.map(contact => ({
+      ...contact,
+      createdAt: contact.createdAt.toISOString(),
+      updatedAt: contact.updatedAt.toISOString(),
+    })),
+    latestRelease: profile.latestRelease
+      ? {
+          ...profile.latestRelease,
+          releaseDate: profile.latestRelease.releaseDate
+            ? profile.latestRelease.releaseDate.toISOString()
+            : null,
+          createdAt: profile.latestRelease.createdAt.toISOString(),
+          updatedAt: profile.latestRelease.updatedAt.toISOString(),
+        }
+      : null,
+  };
 }
 
 /**
