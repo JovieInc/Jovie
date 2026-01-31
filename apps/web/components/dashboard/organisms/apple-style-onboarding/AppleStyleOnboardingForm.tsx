@@ -8,7 +8,7 @@ import {
   OnboardingHandleStep,
   OnboardingNameStep,
 } from '@/components/dashboard/organisms/onboarding';
-import { PROFILE_HOSTNAME, PROFILE_URL } from '@/constants/domains';
+import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
 import type { AppleStyleOnboardingFormProps } from './types';
@@ -24,8 +24,8 @@ export function AppleStyleOnboardingForm({
   userId,
   skipNameStep = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
-  const PRODUCTION_PROFILE_DOMAIN = PROFILE_HOSTNAME;
-  const PRODUCTION_PROFILE_BASE_URL = PROFILE_URL;
+  const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
+  const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);

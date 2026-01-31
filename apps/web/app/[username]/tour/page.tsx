@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { TourDatesList } from './TourDatesList';
 
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      url: `${PROFILE_URL}/${username}/tour`,
+      url: `${BASE_URL}/${username}/tour`,
       siteName: 'Jovie',
       type: 'website',
     },
