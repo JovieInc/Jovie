@@ -18,12 +18,9 @@ const PREVIEW_HOSTNAMES = new Set(['main.jov.ie', 'main.meetjovie.com']);
 /**
  * Dynamically get the base URL for the current browser origin.
  *
- * IMPORTANT: This function returns the current window origin, which is NOT
- * correct for profile links when running on a subdomain (e.g., app.jov.ie).
- *
  * For profile-related URLs (profile links, QR codes, vCards, etc.), use
- * PROFILE_URL from '@/constants/domains' instead. PROFILE_URL always points
- * to the correct profile domain regardless of which subdomain you're on.
+ * PROFILE_URL from '@/constants/domains' instead - it always returns the
+ * canonical production URL (jov.ie) regardless of the current environment.
  *
  * Use getBaseUrl() only when you need the current origin for same-origin
  * operations (API calls, internal navigation, etc.).

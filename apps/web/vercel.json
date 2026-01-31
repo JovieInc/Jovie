@@ -38,11 +38,5 @@
       "destination": "https://us.i.posthog.com/$1"
     }
   ],
-  "redirects": [
-    {
-      "source": "/app/:path*",
-      "destination": "https://app.jov.ie/:path*",
-      "permanent": true
-    }
-  ]
+  "redirects": []
 }

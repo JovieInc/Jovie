@@ -1,14 +1,15 @@
 /**
  * Centralized route constants for the Jovie application.
  *
- * IMPORTANT: These paths are domain-relative and work on app.jov.ie:
- * - On app.jov.ie: Clean paths like '/audience' work directly
- * - On jov.ie: Legacy '/app/*' paths redirect to app.jov.ie
+ * Single Domain Architecture:
+ * - All routes are served from jov.ie
+ * - Dashboard routes are at /app/* (e.g., /app/profile, /app/settings)
+ * - Marketing and profile pages are at root (e.g., /, /username)
  *
  * For external links (emails, Stripe callbacks), use getAppUrl() from constants/domains.ts
  */
 
-// App routes - used for navigation on app.jov.ie (no /app prefix needed)
+// App routes - dashboard paths within /app/*
 export const APP_ROUTES = {
   // Dashboard
   DASHBOARD: '/',
