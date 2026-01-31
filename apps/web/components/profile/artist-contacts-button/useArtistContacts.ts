@@ -18,7 +18,8 @@ export function useArtistContacts({
   onNavigate,
 }: UseArtistContactsOptions): UseArtistContactsReturn {
   const [open, setOpen] = useState(false);
-  const navigate = onNavigate ?? ((url: string) => window.location.assign(url));
+  const navigate =
+    onNavigate ?? ((url: string) => globalThis.location.assign(url));
 
   const available = useMemo(
     () => contacts.filter(contact => contact.channels.length > 0),

@@ -10,7 +10,7 @@ export interface DocToolbarProps {
 
 export function DocToolbar({ pdfTitle }: DocToolbarProps) {
   const handlePrint = () => {
-    window.print();
+    globalThis.print?.();
   };
 
   const handleDownloadPdf = () => {
@@ -25,7 +25,7 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
     globalThis.addEventListener('afterprint', restoreTitle);
 
-    window.print();
+    globalThis.print?.();
 
     setTimeout(() => {
       restoreTitle();

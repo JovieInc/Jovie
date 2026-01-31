@@ -138,7 +138,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         icon: <Copy className='h-4 w-4' />,
         onClick: () => {
           const links = selectedReleases
-            .map(r => `${window.location.origin}${r.smartLinkPath}`)
+            .map(r => `${globalThis.location.origin}${r.smartLinkPath}`)
             .join('\n');
           navigator.clipboard.writeText(links);
           clearSelection();

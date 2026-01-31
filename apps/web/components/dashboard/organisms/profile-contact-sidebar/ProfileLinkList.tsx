@@ -4,7 +4,10 @@ import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
@@ -89,7 +92,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   const platformName = formatPlatformName(link.platform);
 
   // Get platform brand color
-  const iconMeta = getPlatformIcon(link.platform);
+  const iconMeta = getPlatformIconMetadata(link.platform);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
 
   return (

@@ -5,7 +5,7 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import { db, type TransactionType } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import {
   type ArtistRole,
   artists,
@@ -35,7 +35,7 @@ export async function upsertReleaseArtist(
     sourceType?: 'manual' | 'admin' | 'ingested';
     metadata?: Record<string, unknown>;
   },
-  tx?: TransactionType
+  tx?: DbOrTransaction
 ): Promise<typeof releaseArtists.$inferSelect> {
   const database = tx ?? db;
   const now = new Date();
@@ -119,7 +119,7 @@ export async function getArtistsForRelease(
  */
 export async function deleteReleaseArtists(
   releaseId: string,
-  tx?: TransactionType
+  tx?: DbOrTransaction
 ): Promise<void> {
   const database = tx ?? db;
   await database

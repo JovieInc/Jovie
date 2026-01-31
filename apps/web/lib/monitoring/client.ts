@@ -24,7 +24,7 @@ export function initAllMonitoring(): void {
 
   try {
     const performanceTracker = new PerformanceTracker();
-    performanceTracker.trackPageLoad(window.location.pathname);
+    performanceTracker.trackPageLoad(globalThis.location.pathname);
 
     const regressionDetector = new RegressionDetector();
 

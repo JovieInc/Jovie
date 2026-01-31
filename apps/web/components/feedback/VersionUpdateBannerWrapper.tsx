@@ -57,7 +57,7 @@ export function VersionUpdateBannerWrapper() {
   }, []);
 
   const handleReload = useCallback(() => {
-    window.location.reload();
+    globalThis.location.reload();
   }, []);
 
   const handleDismiss = useCallback(() => {

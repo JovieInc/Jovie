@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { db, waitlistEntries } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -67,11 +68,46 @@ async function getStripeMrr(): Promise<{
   activeSubscribers: number;
   error?: string;
 }> {
+  const CACHE_KEY = 'admin:stripe:mrr';
+  const CACHE_TTL = 300; // 5 minutes
+  const redis = getRedis();
+
+  // Try cache first
+  if (redis) {
+    try {
+      const cached = await redis.get(CACHE_KEY);
+      if (cached) {
+        return JSON.parse(cached as string);
+      }
+    } catch (cacheError) {
+      // Log but don't fail - fall through to fresh fetch
+      logger.warn('Redis cache read failed for Stripe MRR', {
+        error: cacheError,
+      });
+    }
+  }
+
+  // Fetch fresh data
   try {
     const { getAdminStripeOverviewMetrics } = await import(
       '@/lib/admin/stripe-metrics'
     );
-    return await getAdminStripeOverviewMetrics();
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    const result = {
+      mrrUsd: metrics.mrrUsd,
+      activeSubscribers: metrics.activeSubscribers,
+      error: metrics.errorMessage,
+    };
+
+    // Cache the result (fire-and-forget)
+    if (redis && !result.error) {
+      redis.setex(CACHE_KEY, CACHE_TTL, JSON.stringify(result)).catch(err => {
+        logger.warn('Redis cache write failed for Stripe MRR', { error: err });
+      });
+    }
+
+    return result;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown error fetching MRR';

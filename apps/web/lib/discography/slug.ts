@@ -118,10 +118,8 @@ export async function generateUniqueSlug(
 ): Promise<string> {
   const baseSlug = generateBaseSlug(title);
 
-  // Handle empty slug edge case
   if (!baseSlug) {
-    const fallbackSlug = `untitled-${Date.now().toString(36)}`;
-    return fallbackSlug;
+    return `untitled-${Date.now().toString(36)}`;
   }
 
   const excludeOptions =
@@ -308,31 +306,31 @@ export async function updateSlugWithRedirect(params: {
     throw new Error(`Slug "${sanitizedSlug}" is already in use`);
   }
 
-  // Create redirect + update slug atomically to avoid partial state.
-  return await db.transaction(async tx => {
-    await tx
-      .insert(contentSlugRedirects)
-      .values({
-        creatorProfileId,
-        oldSlug: currentSlug,
-        contentType,
-        releaseId: contentType === 'release' ? contentId : null,
-        trackId: contentType === 'track' ? contentId : null,
-      })
-      .onConflictDoNothing(); // Ignore if redirect already exists
+  // Create redirect + update slug
+  // The neon-http driver does not support transactions
+  // Execute operations directly without ACID guarantees
+  await db
+    .insert(contentSlugRedirects)
+    .values({
+      creatorProfileId,
+      oldSlug: currentSlug,
+      contentType,
+      releaseId: contentType === 'release' ? contentId : null,
+      trackId: contentType === 'track' ? contentId : null,
+    })
+    .onConflictDoNothing(); // Ignore if redirect already exists
 
-    if (contentType === 'release') {
-      await tx
-        .update(discogReleases)
-        .set({ slug: sanitizedSlug, updatedAt: new Date() })
-        .where(eq(discogReleases.id, contentId));
-    } else {
-      await tx
-        .update(discogTracks)
-        .set({ slug: sanitizedSlug, updatedAt: new Date() })
-        .where(eq(discogTracks.id, contentId));
-    }
+  if (contentType === 'release') {
+    await db
+      .update(discogReleases)
+      .set({ slug: sanitizedSlug, updatedAt: new Date() })
+      .where(eq(discogReleases.id, contentId));
+  } else {
+    await db
+      .update(discogTracks)
+      .set({ slug: sanitizedSlug, updatedAt: new Date() })
+      .where(eq(discogTracks.id, contentId));
+  }
 
-    return sanitizedSlug;
-  });
+  return sanitizedSlug;
 }

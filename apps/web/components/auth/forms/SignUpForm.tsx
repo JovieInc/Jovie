@@ -48,7 +48,7 @@ export function SignUpForm() {
   // Handle password-related hash fragments that Clerk may add
   // Since Jovie is passwordless, we strip these invalid hashes
   useEffect(() => {
-    const hash = window.location.hash;
+    const hash = globalThis.location.hash;
     const passwordHashFragments = [
       '#reset-password',
       '#/reset-password',
@@ -60,10 +60,10 @@ export function SignUpForm() {
 
     if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
       // Clear the hash from the URL without triggering a reload
-      window.history.replaceState(
+      globalThis.history.replaceState(
         null,
         '',
-        window.location.pathname + window.location.search
+        globalThis.location.pathname + globalThis.location.search
       );
     }
   }, []);
@@ -71,12 +71,12 @@ export function SignUpForm() {
   // Store redirect URL from query params on mount
   useEffect(() => {
     try {
-      const redirectUrl = new URL(window.location.href).searchParams.get(
+      const redirectUrl = new URL(globalThis.location.href).searchParams.get(
         'redirect_url'
       );
       const sanitized = sanitizeRedirectUrl(redirectUrl);
       if (sanitized) {
-        window.sessionStorage.setItem(
+        globalThis.sessionStorage.setItem(
           AUTH_STORAGE_KEYS.REDIRECT_URL,
           sanitized
         );
@@ -89,7 +89,7 @@ export function SignUpForm() {
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
     (emailToPass: string) => {
-      const signInUrl = new URL('/signin', window.location.origin);
+      const signInUrl = new URL('/signin', globalThis.location.origin);
       // Pass email to prefill sign-in form
       if (emailToPass) {
         signInUrl.searchParams.set('email', emailToPass);

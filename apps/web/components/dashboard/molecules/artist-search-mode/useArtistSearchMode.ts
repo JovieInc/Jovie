@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getPlatformIcon } from '@/components/atoms/SocialIcon';
+import { getPlatformIconMetadata } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { isBrandDark } from '@/lib/utils/color';
@@ -74,7 +74,9 @@ export function useArtistSearchMode({
       ARTIST_SEARCH_PLATFORMS.find(platform => platform.provider === provider),
     [provider]
   );
-  const platformIcon = getPlatformIcon(searchPlatform?.icon || 'spotify');
+  const platformIcon = getPlatformIconMetadata(
+    searchPlatform?.icon || 'spotify'
+  );
   const brandHex = platformIcon?.hex ? `#${platformIcon.hex}` : '#1DB954';
   const iconIsDark = isBrandDark(brandHex);
   const iconColor = iconIsDark ? '#ffffff' : brandHex;

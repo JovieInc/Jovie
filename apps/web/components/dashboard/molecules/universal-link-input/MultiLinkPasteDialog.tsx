@@ -10,7 +10,10 @@
 import { Button } from '@jovie/ui';
 
 import { Icon } from '@/components/atoms/Icon';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import {
   Dialog,
   DialogActions,
@@ -71,7 +74,7 @@ function LinkItem({
   const { detectedLink, isDuplicate, isSelected } = info;
   const { platform, normalizedUrl } = detectedLink;
 
-  const iconMeta = getPlatformIcon(platform.icon);
+  const iconMeta = getPlatformIconMetadata(platform.icon);
   const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
   const isDark = isBrandDark(iconHex);
 

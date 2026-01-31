@@ -30,9 +30,9 @@ const PREVIEW_HOSTNAMES = new Set(['main.jov.ie', 'main.meetjovie.com']);
  */
 export function getBaseUrl(): string {
   // If we have NEXT_PUBLIC_APP_URL from env, use that first
-  if (typeof window !== 'undefined' && window.location) {
+  if (typeof window !== 'undefined' && globalThis.location) {
     // Client-side: use current origin for local/preview environments
-    const { protocol, hostname, port } = window.location;
+    const { protocol, hostname, port } = globalThis.location;
 
     const portSuffix = port ? `:${port}` : '';
 
@@ -64,7 +64,7 @@ export function isDevelopment(): boolean {
  */
 export function isPreview(): boolean {
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
+    const hostname = globalThis.location.hostname;
     return hostname.includes('vercel.app') || PREVIEW_HOSTNAMES.has(hostname);
   }
   // VERCEL_ENV is only available server-side
@@ -76,7 +76,7 @@ export function isPreview(): boolean {
  */
 export function isProduction(): boolean {
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
+    const hostname = globalThis.location.hostname;
     return PRODUCTION_HOSTNAMES.has(hostname);
   }
   return (

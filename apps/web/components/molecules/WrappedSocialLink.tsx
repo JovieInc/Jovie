@@ -50,7 +50,7 @@ export function WrappedSocialLink({
     if (!href || href.startsWith('/')) return false;
     if (
       typeof window !== 'undefined' &&
-      href.includes(window.location.hostname)
+      href.includes(globalThis.location.hostname)
     )
       return false;
     return true;

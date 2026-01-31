@@ -32,7 +32,7 @@ export function BillingPortalLink({
           source: 'billing_dashboard',
         });
         // Redirect to Stripe billing portal
-        window.location.href = data.url;
+        globalThis.location.href = data.url;
       },
       onError: error => {
         const errorMessage =

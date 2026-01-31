@@ -78,7 +78,7 @@ export function useContactSidebar({
     try {
       const url = new URL(
         `/${contact.username}`,
-        window.location.origin
+        globalThis.location.origin
       ).toString();
       await navigator.clipboard.writeText(url);
     } catch (error) {

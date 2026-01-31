@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<Props, State> {
         duration: 6000,
         action: {
           label: 'Reload',
-          onClick: () => window.location.reload(),
+          onClick: () => globalThis.location.reload(),
         },
       });
     }
@@ -88,7 +88,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Track error for monitoring with gtag as backup
     if (typeof window !== 'undefined' && 'gtag' in window) {
       // @ts-expect-error - gtag is not typed
-      window.gtag('event', 'exception', {
+      globalThis.gtag('event', 'exception', {
         description: error.message,
         fatal: false,
       });
@@ -188,7 +188,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className='flex justify-center'>
                 <button
                   type='button'
-                  onClick={() => window.location.reload()}
+                  onClick={() => globalThis.location.reload()}
                   className='btn btn-md btn-primary btn-press'
                 >
                   Reload page

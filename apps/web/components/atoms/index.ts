@@ -1,12 +1,12 @@
 // Atomic Design - Atoms
 // Basic building blocks that can't be broken down further
 
-// WrappedSocialLink re-exported from molecules (has business logic - useState, useEffect, API calls)
-export {
-  LegacySocialLink,
-  WrappedDSPButton,
-  WrappedSocialLink,
-} from '@/components/molecules/WrappedSocialLink';
+// WrappedSocialLink is a client component - import directly from '@/components/molecules/WrappedSocialLink'
+// export {
+//   LegacySocialLink,
+//   WrappedDSPButton,
+//   WrappedSocialLink,
+// } from '@/components/molecules/WrappedSocialLink';
 
 export * from './AmountSelector';
 export * from './ArtistAvatar';
@@ -58,7 +58,8 @@ export * from './Sheet';
 // SidebarCollapseButton moved to molecules (imports from organisms)
 export * from './Skeleton';
 export * from './SkipToContent';
-export * from './SocialIcon';
+// SocialIcon is a client component - import directly from './SocialIcon' to avoid server/client boundary issues
+// export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';
 export * from './TableErrorFallback';

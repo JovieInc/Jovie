@@ -334,15 +334,50 @@ export async function getProfileWithLinks(
   }
 
   // Cache the result in Redis (fire-and-forget)
+  // Serialize Date objects to ISO strings to prevent TransformStream serialization errors
   if (redis && result) {
     redis
-      .set(cacheKey, result, { ex: PROFILE_CACHE_TTL_SECONDS })
+      .set(cacheKey, serializeProfileDates(result), {
+        ex: PROFILE_CACHE_TTL_SECONDS,
+      })
       .catch(error => {
         captureWarning('[profile-service] Redis cache write failed', { error });
       });
   }
 
   return result;
+}
+
+/**
+ * Serialize Date objects to ISO strings for Redis storage.
+ * This prevents TransformStream serialization issues when caching complex objects.
+ */
+function serializeProfileDates(profile: ProfileWithLinks): unknown {
+  return {
+    ...profile,
+    createdAt: profile.createdAt.toISOString(),
+    updatedAt: profile.updatedAt.toISOString(),
+    socialLinks: profile.socialLinks.map(link => ({
+      ...link,
+      createdAt: link.createdAt.toISOString(),
+      updatedAt: link.updatedAt.toISOString(),
+    })),
+    contacts: profile.contacts.map(contact => ({
+      ...contact,
+      createdAt: contact.createdAt.toISOString(),
+      updatedAt: contact.updatedAt.toISOString(),
+    })),
+    latestRelease: profile.latestRelease
+      ? {
+          ...profile.latestRelease,
+          releaseDate: profile.latestRelease.releaseDate
+            ? profile.latestRelease.releaseDate.toISOString()
+            : null,
+          createdAt: profile.latestRelease.createdAt.toISOString(),
+          updatedAt: profile.latestRelease.updatedAt.toISOString(),
+        }
+      : null,
+  };
 }
 
 /**
@@ -382,113 +417,102 @@ function reviveProfileDates(profile: ProfileWithLinks): ProfileWithLinks {
 async function fetchProfileFromDatabase(
   normalizedUsername: string
 ): Promise<ProfileWithLinks | null> {
-  // Fetch profile, user, links, contacts, and latest release in parallel
-  // Using Promise.all at the database driver level for true parallelism
-  const [profileResult, linksResult, contactsResult, latestRelease] =
-    await Promise.all([
-      // Profile with user data
-      db
-        .select({
-          id: creatorProfiles.id,
-          userId: creatorProfiles.userId,
-          userIsPro: users.isPro,
-          userClerkId: users.clerkId,
-          creatorType: creatorProfiles.creatorType,
-          username: creatorProfiles.username,
-          usernameNormalized: creatorProfiles.usernameNormalized,
-          displayName: creatorProfiles.displayName,
-          bio: creatorProfiles.bio,
-          avatarUrl: creatorProfiles.avatarUrl,
-          spotifyUrl: creatorProfiles.spotifyUrl,
-          appleMusicUrl: creatorProfiles.appleMusicUrl,
-          youtubeUrl: creatorProfiles.youtubeUrl,
-          spotifyId: creatorProfiles.spotifyId,
-          isPublic: creatorProfiles.isPublic,
-          isVerified: creatorProfiles.isVerified,
-          isClaimed: creatorProfiles.isClaimed,
-          isFeatured: creatorProfiles.isFeatured,
-          marketingOptOut: creatorProfiles.marketingOptOut,
-          settings: creatorProfiles.settings,
-          theme: creatorProfiles.theme,
-          profileViews: creatorProfiles.profileViews,
-          genres: creatorProfiles.genres,
-          spotifyPopularity: creatorProfiles.spotifyPopularity,
-          createdAt: creatorProfiles.createdAt,
-          updatedAt: creatorProfiles.updatedAt,
-        })
-        .from(creatorProfiles)
-        .leftJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
-        .limit(1),
+  // Step 1: Fetch profile first (single query with user JOIN)
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      userIsPro: users.isPro,
+      userClerkId: users.clerkId,
+      creatorType: creatorProfiles.creatorType,
+      username: creatorProfiles.username,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      displayName: creatorProfiles.displayName,
+      bio: creatorProfiles.bio,
+      avatarUrl: creatorProfiles.avatarUrl,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      spotifyId: creatorProfiles.spotifyId,
+      isPublic: creatorProfiles.isPublic,
+      isVerified: creatorProfiles.isVerified,
+      isClaimed: creatorProfiles.isClaimed,
+      isFeatured: creatorProfiles.isFeatured,
+      marketingOptOut: creatorProfiles.marketingOptOut,
+      settings: creatorProfiles.settings,
+      theme: creatorProfiles.theme,
+      profileViews: creatorProfiles.profileViews,
+      genres: creatorProfiles.genres,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+      createdAt: creatorProfiles.createdAt,
+      updatedAt: creatorProfiles.updatedAt,
+    })
+    .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+    .limit(1);
 
-      // Social links - executed in parallel with profile query
-      db
-        .select({
-          id: socialLinks.id,
-          creatorProfileId: socialLinks.creatorProfileId,
-          platform: socialLinks.platform,
-          platformType: socialLinks.platformType,
-          url: socialLinks.url,
-          displayText: socialLinks.displayText,
-          clicks: socialLinks.clicks,
-          isActive: socialLinks.isActive,
-          sortOrder: socialLinks.sortOrder,
-          createdAt: socialLinks.createdAt,
-          updatedAt: socialLinks.updatedAt,
-        })
-        .from(socialLinks)
-        .innerJoin(
-          creatorProfiles,
-          eq(socialLinks.creatorProfileId, creatorProfiles.id)
-        )
-        .where(
-          and(
-            eq(creatorProfiles.usernameNormalized, normalizedUsername),
-            eq(socialLinks.isActive, true),
-            ne(socialLinks.state, 'rejected')
-          )
-        )
-        .orderBy(socialLinks.sortOrder)
-        .limit(MAX_SOCIAL_LINKS),
-
-      // Contacts - executed in parallel with profile query
-      db
-        .select({
-          id: creatorContacts.id,
-          creatorProfileId: creatorContacts.creatorProfileId,
-          role: creatorContacts.role,
-          customLabel: creatorContacts.customLabel,
-          personName: creatorContacts.personName,
-          companyName: creatorContacts.companyName,
-          territories: creatorContacts.territories,
-          email: creatorContacts.email,
-          phone: creatorContacts.phone,
-          preferredChannel: creatorContacts.preferredChannel,
-          isActive: creatorContacts.isActive,
-          sortOrder: creatorContacts.sortOrder,
-          createdAt: creatorContacts.createdAt,
-          updatedAt: creatorContacts.updatedAt,
-        })
-        .from(creatorContacts)
-        .innerJoin(
-          creatorProfiles,
-          eq(creatorContacts.creatorProfileId, creatorProfiles.id)
-        )
-        .where(
-          and(
-            eq(creatorProfiles.usernameNormalized, normalizedUsername),
-            eq(creatorContacts.isActive, true)
-          )
-        )
-        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
-        .limit(MAX_CONTACTS),
-
-      // Latest release - executed in parallel (uses username, not profile ID)
-      getLatestReleaseByUsername(normalizedUsername),
-    ]);
-
-  const profile = profileResult[0];
   if (!profile) return null;
+
+  // Step 2: Fetch related data using profile ID (3 parallel queries, no redundant JOINs)
+  const [linksResult, contactsResult, latestRelease] = await Promise.all([
+    // Social links - use profile ID directly (no JOIN to creatorProfiles needed)
+    db
+      .select({
+        id: socialLinks.id,
+        creatorProfileId: socialLinks.creatorProfileId,
+        platform: socialLinks.platform,
+        platformType: socialLinks.platformType,
+        url: socialLinks.url,
+        displayText: socialLinks.displayText,
+        clicks: socialLinks.clicks,
+        isActive: socialLinks.isActive,
+        sortOrder: socialLinks.sortOrder,
+        createdAt: socialLinks.createdAt,
+        updatedAt: socialLinks.updatedAt,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profile.id),
+          eq(socialLinks.isActive, true),
+          ne(socialLinks.state, 'rejected')
+        )
+      )
+      .orderBy(socialLinks.sortOrder)
+      .limit(MAX_SOCIAL_LINKS),
+
+    // Contacts - use profile ID directly (no JOIN to creatorProfiles needed)
+    db
+      .select({
+        id: creatorContacts.id,
+        creatorProfileId: creatorContacts.creatorProfileId,
+        role: creatorContacts.role,
+        customLabel: creatorContacts.customLabel,
+        personName: creatorContacts.personName,
+        companyName: creatorContacts.companyName,
+        territories: creatorContacts.territories,
+        email: creatorContacts.email,
+        phone: creatorContacts.phone,
+        preferredChannel: creatorContacts.preferredChannel,
+        isActive: creatorContacts.isActive,
+        sortOrder: creatorContacts.sortOrder,
+        createdAt: creatorContacts.createdAt,
+        updatedAt: creatorContacts.updatedAt,
+      })
+      .from(creatorContacts)
+      .where(
+        and(
+          eq(creatorContacts.creatorProfileId, profile.id),
+          eq(creatorContacts.isActive, true)
+        )
+      )
+      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+      .limit(MAX_CONTACTS),
+
+    // Latest release - still uses username (existing function)
+    getLatestReleaseByUsername(normalizedUsername),
+  ]);
 
   return {
     ...profile,

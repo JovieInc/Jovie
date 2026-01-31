@@ -424,7 +424,7 @@ export function getCurrentPathname(): string | undefined {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  return window.location.pathname;
+  return globalThis.location.pathname;
 }
 
 /**

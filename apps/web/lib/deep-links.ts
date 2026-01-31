@@ -339,8 +339,8 @@ export function openDeepLink(
         document.body.appendChild(iframe);
         setTimeout(() => iframe.remove(), 100);
       } else {
-        // For Android and others, use window.location
-        window.location.href = deepLink.nativeUrl;
+        // For Android and others, use globalThis.location
+        globalThis.location.href = deepLink.nativeUrl;
       }
     } catch (error) {
       Sentry.addBreadcrumb({

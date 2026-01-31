@@ -44,7 +44,7 @@ interface StatusCache {
 function readStoredContacts(): NotificationContactValues | null {
   if (typeof window === 'undefined') return null;
   try {
-    const storedRaw = window.localStorage.getItem(STORAGE_KEY);
+    const storedRaw = globalThis.localStorage.getItem(STORAGE_KEY);
     if (!storedRaw) return null;
     const parsed = JSON.parse(storedRaw) as NotificationContactValues;
     const hasStoredContact = Boolean(parsed.email || parsed.sms);
@@ -61,7 +61,7 @@ function readStoredContacts(): NotificationContactValues | null {
 function readCachedStatus(artistId: string): StatusCache | null {
   if (typeof window === 'undefined') return null;
   try {
-    const cached = window.localStorage.getItem(STATUS_CACHE_KEY);
+    const cached = globalThis.localStorage.getItem(STATUS_CACHE_KEY);
     if (!cached) return null;
 
     const parsed = JSON.parse(cached) as StatusCache;
@@ -93,7 +93,7 @@ function writeCachedStatus(
       details,
       timestamp: Date.now(),
     };
-    window.localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify(cache));
+    globalThis.localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify(cache));
   } catch {
     // Ignore storage errors
   }
@@ -201,11 +201,11 @@ export function useProfileNotificationsController({
       const hasAny = Boolean(next.email || next.sms);
 
       if (!hasAny) {
-        window.localStorage.removeItem(STORAGE_KEY);
+        globalThis.localStorage.removeItem(STORAGE_KEY);
         return;
       }
 
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch (error) {
       console.error('Failed to persist notification contacts', error);
     }
@@ -219,7 +219,7 @@ export function useProfileNotificationsController({
     if (!notificationsEnabled) return;
     if (typeof window === 'undefined') return;
 
-    const storedRaw = window.localStorage.getItem(STORAGE_KEY);
+    const storedRaw = globalThis.localStorage.getItem(STORAGE_KEY);
     if (!storedRaw) {
       setHasStoredContacts(false);
       setHydrationStatus('done');

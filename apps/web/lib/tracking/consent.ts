@@ -77,7 +77,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
   const expires = new Date();
   expires.setFullYear(expires.getFullYear() + 1);
   // Add Secure flag for HTTPS environments
-  const isSecure = window.location.protocol === 'https:';
+  const isSecure = globalThis.location.protocol === 'https:';
   document.cookie = `${CONSENT_COOKIE_NAME}=${state}; path=/; expires=${expires.toUTCString()}; SameSite=Lax${isSecure ? '; Secure' : ''}`;
 }
 

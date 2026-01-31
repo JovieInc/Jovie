@@ -1,11 +1,9 @@
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
 import {
   count,
   desc,
   sql as drizzleSql,
-  eq,
   ilike,
   inArray,
   or,
@@ -18,7 +16,7 @@ import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 
 // Default claim token expiration: 30 days
-const CLAIM_TOKEN_EXPIRY_DAYS = 30;
+const _CLAIM_TOKEN_EXPIRY_DAYS = 30;
 
 export interface AdminCreatorProfileRow {
   id: string;
@@ -86,16 +84,11 @@ function sanitizeSearchInput(rawSearch?: string): string | undefined {
   return escapeLikePattern(sanitized);
 }
 
-// Parse confidence value from various formats
 function parseConfidenceValue(rawValue: unknown): number | null {
-  let parsedValue: number;
-  if (typeof rawValue === 'number') {
-    parsedValue = rawValue;
-  } else if (rawValue == null) {
-    return null;
-  } else {
-    parsedValue = Number(rawValue);
-  }
+  if (rawValue == null) return null;
+
+  const parsedValue =
+    typeof rawValue === 'number' ? rawValue : Number(rawValue);
 
   if (Number.isNaN(parsedValue)) return null;
   return Math.min(1, Math.max(0, parsedValue));
@@ -175,47 +168,12 @@ function mapRowToProfile(
   };
 }
 
-/**
- * Backfill claim tokens for unclaimed profiles that don't have one.
- * Updates the database and returns a map of profile IDs to their new tokens.
- */
-async function backfillMissingClaimTokens(
-  profiles: Array<{
-    id: string;
-    isClaimed: boolean | null;
-    claimToken: string | null;
-  }>
-): Promise<Map<string, { token: string; expiresAt: Date }>> {
-  const needsToken = profiles.filter(row => !row.isClaimed && !row.claimToken);
-  const tokensById = new Map<string, { token: string; expiresAt: Date }>();
-
-  if (needsToken.length === 0) {
-    return tokensById;
-  }
-
-  await Promise.all(
-    needsToken.map(async row => {
-      const token = randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
-      tokensById.set(row.id, { token, expiresAt });
-
-      await db
-        .update(creatorProfiles)
-        .set({
-          claimToken: token,
-          claimTokenExpiresAt: expiresAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, row.id));
-    })
-  );
-
-  return tokensById;
-}
+// Token backfill function removed - tokens are now generated at profile creation time
+// See migration 0021_backfill_claim_tokens.sql for one-time historical backfill
 
 /**
  * Fetches confidence scores and social links for a list of profile IDs.
+ * Includes url and displayText fields needed by PlatformPill components.
  */
 async function fetchRelatedProfileData(profileIds: string[]): Promise<{
   confidenceMap: Map<string, number>;
@@ -255,6 +213,7 @@ async function fetchRelatedProfileData(profileIds: string[]): Promise<{
       .from(socialLinks)
       .where(inArray(socialLinks.creatorProfileId, profileIds))
       .groupBy(socialLinks.creatorProfileId),
+    // Include url and displayText for PlatformPill components
     db
       .select({
         id: socialLinks.id,
@@ -351,22 +310,6 @@ export async function getAdminCreatorProfiles(
     ]);
 
     const pageRows = rows;
-
-    // Legacy backfill: Ensure unclaimed profiles have a claim token.
-    // NOTE: New profiles should have tokens generated at creation time.
-    // This backfill is temporary for legacy rows without tokens.
-    const tokensById = await backfillMissingClaimTokens(pageRows);
-
-    // Update in-memory rows so callers immediately see the new tokens.
-    for (const row of pageRows) {
-      const tokenData = tokensById.get(row.id);
-      if (tokenData) {
-        (row as { claimToken?: string | null }).claimToken = tokenData.token;
-        (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
-          tokenData.expiresAt;
-      }
-    }
-
     const profileIds = pageRows.map(row => row.id);
     const { confidenceMap, socialLinksMap } =
       await fetchRelatedProfileData(profileIds);

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { getPlatformIcon } from '@/components/atoms/SocialIcon';
+import { getPlatformIconMetadata } from '@/components/atoms/SocialIcon';
 import {
   CollapsedContent,
   ExpandedContent,
@@ -96,7 +96,7 @@ export const PlatformPill = React.forwardRef<
   }, [shimmerOnMount]);
 
   const iconMeta = React.useMemo(
-    () => getPlatformIcon(platformIcon),
+    () => getPlatformIconMetadata(platformIcon),
     [platformIcon]
   );
 
@@ -139,12 +139,11 @@ export const PlatformPill = React.forwardRef<
     className,
   });
 
-  function getAriaLabel(): string | undefined {
-    if (!isInteractive) return undefined;
-    if (collapsed) return `${platformName}: ${primaryText}`;
-    return `Select ${platformName}`;
-  }
-  const ariaLabel = getAriaLabel();
+  const ariaLabel = !isInteractive
+    ? undefined
+    : collapsed
+      ? `${platformName}: ${primaryText}`
+      : `Select ${platformName}`;
 
   return (
     <button

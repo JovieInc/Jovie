@@ -18,7 +18,7 @@ export function LegalSidebar({ toc, className }: LegalSidebarProps) {
     if (!el) return;
 
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.history.replaceState(null, '', `#${id}`);
+    globalThis.history.replaceState(null, '', `#${id}`);
   };
 
   return (
