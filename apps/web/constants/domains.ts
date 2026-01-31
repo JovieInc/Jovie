@@ -1,12 +1,10 @@
 /**
  * Domain Configuration for Jovie
  *
- * This file centralizes all domain-related constants for the unified jov.ie setup:
- * - jov.ie: Homepage + Public creator profiles (canonical, indexed)
- * - app.jov.ie: Dashboard + App (authenticated)
+ * Single domain architecture: everything on jov.ie
+ * - jov.ie: Homepage, marketing, auth, profiles, and dashboard (at /app/*)
  *
- * Note: We use jov.ie for auth (root domain) and app.jov.ie for dashboard.
- * Clerk sessions work across both via cookie domain .jov.ie (no satellite costs).
+ * Legacy app.jov.ie redirects to jov.ie for backwards compatibility.
  *
  * Environment variables can override defaults for local development or staging.
  */
@@ -62,12 +60,12 @@ export function getTipUrl(handle: string, source?: 'qr' | 'link'): string {
 
 /**
  * Build an app/dashboard URL
- * @param path - Path within the app (e.g., '/dashboard', '/settings')
- * @returns Full URL like https://app.jov.ie/dashboard
+ * @param path - Path within the app (e.g., '/profile', '/settings')
+ * @returns Full URL like https://jov.ie/app/profile
  */
 export function getAppUrl(path: string = ''): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${APP_URL}${normalizedPath}`;
+  return `${APP_URL}/app${normalizedPath}`;
 }
 
 /**

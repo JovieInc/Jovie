@@ -17,7 +17,8 @@ export const publicEnv = {
     return process.env.NEXT_PUBLIC_CLERK_MOCK || undefined;
   },
   get NEXT_PUBLIC_APP_URL() {
-    return process.env.NEXT_PUBLIC_APP_URL || 'https://app.jov.ie';
+    // Single domain architecture: app routes are at jov.ie/app/*
+    return process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
   },
   get NEXT_PUBLIC_PROFILE_URL() {
     return process.env.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
@@ -26,7 +27,8 @@ export const publicEnv = {
     return process.env.NEXT_PUBLIC_PROFILE_HOSTNAME || 'jov.ie';
   },
   get NEXT_PUBLIC_APP_HOSTNAME() {
-    return process.env.NEXT_PUBLIC_APP_HOSTNAME || 'app.jov.ie';
+    // Kept for backwards compatibility - now same as profile hostname
+    return process.env.NEXT_PUBLIC_APP_HOSTNAME || 'jov.ie';
   },
   get NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN() {
     return process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN || 'jov.ie';
