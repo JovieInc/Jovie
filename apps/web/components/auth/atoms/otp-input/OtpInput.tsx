@@ -138,11 +138,11 @@ export function OtpInput({
                 type='text'
                 inputMode='numeric'
                 pattern='[0-9]*'
-                maxLength={1}
                 value={digit}
                 onChange={e => handleInputChange(index, e.target.value)}
                 onKeyDown={e => handleKeyDown(index, e)}
                 onInput={e => handleInput(index, e)}
+                onPaste={handlePaste}
                 onFocus={() => handleFocus(index)}
                 onBlur={handleBlur}
                 disabled={disabled}

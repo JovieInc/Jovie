@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OtpInput } from '@/components/auth/atoms/otp-input';
 
 // Mock haptic feedback hook
@@ -13,6 +13,14 @@ vi.mock('@/hooks/useHapticFeedback', () => ({
 }));
 
 describe('OtpInput', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
   it('renders 6 digit input boxes', () => {
     render(<OtpInput />);
 
@@ -298,5 +306,79 @@ describe('OtpInput', () => {
     fireEvent.change(autofillInput, { target: { value: '654321' } });
 
     expect(onComplete).toHaveBeenCalledWith('654321');
+  });
+
+  // iOS-specific tests
+  it('handles paste on individual input (iOS compatibility)', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput onComplete={onComplete} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+
+    // Simulate paste event on individual input (iOS Safari)
+    const clipboardData = {
+      getData: () => '123456',
+    };
+    fireEvent.paste(firstInput, { clipboardData });
+
+    expect(onComplete).toHaveBeenCalledWith('123456');
+  });
+
+  it('handles iOS autofill via insertReplacementText', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput onComplete={onComplete} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+
+    // Simulate iOS OTP keyboard autofill (insertReplacementText)
+    fireEvent.input(firstInput, {
+      target: { value: '987654' },
+      nativeEvent: { inputType: 'insertReplacementText' },
+    });
+
+    expect(onComplete).toHaveBeenCalledWith('987654');
+  });
+
+  it('handles iOS paste via insertFromPaste input type', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput onComplete={onComplete} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+
+    // Simulate iOS paste via input event
+    fireEvent.input(firstInput, {
+      target: { value: '246810' },
+      nativeEvent: { inputType: 'insertFromPaste' },
+    });
+
+    expect(onComplete).toHaveBeenCalledWith('246810');
+  });
+
+  it('handles multi-character input change (iOS autofill)', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput onComplete={onComplete} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+
+    // Simulate iOS autofill inserting full OTP via onChange
+    fireEvent.change(firstInput, { target: { value: '135792' } });
+
+    expect(onComplete).toHaveBeenCalledWith('135792');
+  });
+
+  it('handles partial multi-character input and focuses next empty input', () => {
+    const onChange = vi.fn();
+    render(<OtpInput onChange={onChange} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+
+    // Simulate partial paste/autofill
+    fireEvent.change(firstInput, { target: { value: '123' } });
+
+    expect(onChange).toHaveBeenCalledWith('123');
+
+    // Should focus the 4th input (index 3)
+    const fourthInput = screen.getByLabelText('Digit 4 of 6');
+    expect(document.activeElement).toBe(fourthInput);
   });
 });

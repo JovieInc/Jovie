@@ -105,9 +105,30 @@ export function useOtpInput({
     [controlledValue, onChange, onComplete, haptic]
   );
 
+  // Handle multi-character input from iOS autofill/paste
+  const handleMultiDigitInput = useCallback(
+    (digits: string) => {
+      const isComplete = digits.length >= OTP_LENGTH;
+      updateValue(digits.slice(0, OTP_LENGTH), isComplete);
+      if (!isComplete) {
+        inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus();
+        haptic.medium();
+      }
+    },
+    [updateValue, haptic]
+  );
+
   const handleInputChange = useCallback(
     (index: number, inputValue: string) => {
-      const digit = inputValue.replaceAll(/\D/g, '').slice(-1);
+      const digits = inputValue.replaceAll(/\D/g, '');
+
+      // Handle multi-character input (iOS autofill inserts full OTP)
+      if (digits.length > 1) {
+        handleMultiDigitInput(digits);
+        return;
+      }
+
+      const digit = digits.slice(-1);
 
       if (digit) {
         const chars = currentValue.split('');
@@ -120,7 +141,7 @@ export function useOtpInput({
         }
       }
     },
-    [currentValue, updateValue]
+    [currentValue, updateValue, handleMultiDigitInput]
   );
 
   const handleKeyDown = useCallback(
@@ -152,8 +173,11 @@ export function useOtpInput({
   const handleInput = useCallback(
     (index: number, event: React.FormEvent<HTMLInputElement>) => {
       const nativeEvent = event.nativeEvent as InputEvent;
+      const inputType = nativeEvent.inputType;
+
+      // Handle backspace when current input is empty
       if (
-        nativeEvent.inputType === 'deleteContentBackward' &&
+        inputType === 'deleteContentBackward' &&
         !currentValue[index] &&
         index > 0
       ) {
@@ -161,28 +185,38 @@ export function useOtpInput({
         chars[index - 1] = '';
         updateValue(chars.join('').replaceAll(/\s/g, ''));
         inputRefs.current[index - 1]?.focus();
+        return;
+      }
+
+      // Handle iOS autofill and paste via input event
+      // iOS uses insertReplacementText for OTP keyboard shortcut autofill
+      // and insertFromPaste for clipboard paste
+      if (
+        inputType === 'insertReplacementText' ||
+        inputType === 'insertFromPaste'
+      ) {
+        const target = event.target as HTMLInputElement;
+        const digits = target.value.replaceAll(/\D/g, '');
+
+        if (digits.length > 1) {
+          handleMultiDigitInput(digits);
+        }
       }
     },
-    [currentValue, updateValue]
+    [currentValue, updateValue, handleMultiDigitInput]
   );
 
   const handlePaste = useCallback(
     (event: React.ClipboardEvent) => {
       event.preventDefault();
       const pastedData = event.clipboardData.getData('text');
-      const digits = pastedData.replaceAll(/\D/g, '').slice(0, OTP_LENGTH);
+      const digits = pastedData.replaceAll(/\D/g, '');
 
       if (digits) {
-        updateValue(digits, digits.length === OTP_LENGTH);
-
-        if (digits.length < OTP_LENGTH) {
-          const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-          inputRefs.current[focusIndex]?.focus();
-          haptic.medium();
-        }
+        handleMultiDigitInput(digits);
       }
     },
-    [updateValue, haptic]
+    [handleMultiDigitInput]
   );
 
   const handleAutofillChange = useCallback(

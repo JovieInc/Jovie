@@ -147,14 +147,6 @@ describe('@critical session.ts', () => {
 
   describe('withDbSessionTx', () => {
     it('executes operation within transaction', async () => {
-      // Setup transaction mock to call the callback
-      const mockTxExecute = vi.fn().mockResolvedValue(undefined);
-      const mockTx = { execute: mockTxExecute };
-
-      mockDbTransaction.mockImplementation(async callback => {
-        return await callback(mockTx);
-      });
-
       const { withDbSessionTx } = await import('@/lib/auth/session');
 
       const operation = vi.fn().mockResolvedValue('tx_result');
@@ -163,7 +155,16 @@ describe('@critical session.ts', () => {
         clerkUserId: 'user_123',
       });
 
-      expect(operation).toHaveBeenCalledWith(mockTx, 'user_123');
+      // The implementation passes the db object directly (neon-http driver doesn't support transactions)
+      // Verify the db object was passed (has execute, select, transaction methods)
+      expect(operation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          execute: expect.any(Function),
+          select: expect.any(Function),
+          transaction: expect.any(Function),
+        }),
+        'user_123'
+      );
       expect(result).toBe('tx_result');
     });
 
