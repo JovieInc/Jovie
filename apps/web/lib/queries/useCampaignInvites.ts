@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
+import { queryKeys } from './keys';
 
 const MINUTE = 60 * 1000;
 const SECONDS = 1000;
@@ -69,23 +70,20 @@ export interface CampaignStatsResponse {
   updatedAt: string;
 }
 
-// Query keys
-export const campaignQueryKeys = {
-  all: ['campaign-invites'] as const,
-  preview: (threshold: number, limit: number) =>
-    [...campaignQueryKeys.all, 'preview', { threshold, limit }] as const,
-  stats: () => [...campaignQueryKeys.all, 'stats'] as const,
-};
+// Re-export campaign keys for backwards compatibility
+export const campaignQueryKeys = queryKeys.campaign;
 
 /**
  * Query function for fetching campaign invite preview.
  */
 async function fetchCampaignPreview(
   threshold: number,
-  limit: number
+  limit: number,
+  signal?: AbortSignal
 ): Promise<CampaignPreviewResponse> {
   return fetchWithTimeout<CampaignPreviewResponse>(
-    `/api/admin/creator-invite/bulk?threshold=${threshold}&limit=${limit}`
+    `/api/admin/creator-invite/bulk?threshold=${threshold}&limit=${limit}`,
+    { signal }
   );
 }
 
@@ -125,7 +123,7 @@ export function useCampaignPreviewQuery({
 }) {
   return useQuery({
     queryKey: campaignQueryKeys.preview(threshold, limit),
-    queryFn: () => fetchCampaignPreview(threshold, limit),
+    queryFn: ({ signal }) => fetchCampaignPreview(threshold, limit, signal),
     enabled,
     staleTime: 1 * MINUTE,
     gcTime: 5 * MINUTE,
@@ -167,9 +165,12 @@ export function useSendCampaignInvitesMutation() {
 /**
  * Query function for fetching campaign stats.
  */
-async function fetchCampaignStats(): Promise<CampaignStatsResponse> {
+async function fetchCampaignStats(
+  signal?: AbortSignal
+): Promise<CampaignStatsResponse> {
   return fetchWithTimeout<CampaignStatsResponse>(
-    '/api/admin/creator-invite/bulk/stats'
+    '/api/admin/creator-invite/bulk/stats',
+    { signal }
   );
 }
 
@@ -189,7 +190,7 @@ export function useCampaignStatsQuery({
 } = {}) {
   return useQuery({
     queryKey: campaignQueryKeys.stats(),
-    queryFn: fetchCampaignStats,
+    queryFn: ({ signal }) => fetchCampaignStats(signal),
     enabled,
     staleTime: 30 * SECONDS,
     gcTime: 5 * MINUTE,

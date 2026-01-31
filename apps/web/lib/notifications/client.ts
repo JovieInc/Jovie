@@ -87,12 +87,14 @@ const parseResponseJson = async <T>(
 const requestNotifications = async <T>(
   url: string,
   payload: Record<string, unknown>,
-  fallbackError: string
+  fallbackError: string,
+  signal?: AbortSignal
 ): Promise<T> => {
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal,
   });
 
   const data = await parseResponseJson<T>(response);
@@ -140,7 +142,8 @@ export const unsubscribeFromNotifications = async (
   );
 
 export const getNotificationStatus = async (
-  payload: NotificationStatusPayload
+  payload: NotificationStatusPayload,
+  signal?: AbortSignal
 ): Promise<NotificationStatusResponse> =>
   requestNotifications<NotificationStatusResponse>(
     '/api/notifications/status',
@@ -149,7 +152,8 @@ export const getNotificationStatus = async (
       email: payload.email,
       phone: payload.phone,
     },
-    NOTIFICATION_COPY.errors.generic
+    NOTIFICATION_COPY.errors.generic,
+    signal
   );
 
 export const getNotificationSubscribeSuccessMessage = (

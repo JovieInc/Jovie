@@ -11,6 +11,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
+import { env } from '@/lib/env-client';
 
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -117,7 +118,7 @@ export function useDspMatchesQuery({
     staleTime: 5 * 60 * 1000, // 5 min
     gcTime: 30 * 60 * 1000, // 30 min
     refetchOnMount: true,
-    refetchOnWindowFocus: process.env.NODE_ENV === 'production',
+    refetchOnWindowFocus: !env.IS_DEV,
     retry: 3,
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

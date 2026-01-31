@@ -104,6 +104,7 @@ export {
 export {
   type BillingStatusData,
   useBillingStatusQuery,
+  useIsPro,
 } from './useBillingStatusQuery';
 // Build info / version monitoring
 export {

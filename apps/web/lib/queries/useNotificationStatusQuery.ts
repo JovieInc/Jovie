@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { env } from '@/lib/env-client';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   getNotificationStatus,
@@ -13,7 +14,6 @@ import {
 } from '@/lib/notifications/client';
 import type { NotificationStatusResponse } from '@/types/notifications';
 
-import { STANDARD_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 /**
@@ -41,15 +41,21 @@ export function useNotificationStatusQuery({
       email: emailValue,
       phone: phoneValue,
     }),
-    queryFn: () =>
-      getNotificationStatus({
-        artistId,
-        email: emailValue ?? undefined,
-        phone: phoneValue ?? undefined,
-      }),
-    enabled: enabled && Boolean(emailValue || phoneValue),
+    queryFn: ({ signal }) =>
+      getNotificationStatus(
+        {
+          artistId,
+          email: emailValue ?? undefined,
+          phone: phoneValue ?? undefined,
+        },
+        signal
+      ),
     // STANDARD_CACHE: 5 min stale, 30 min gc
-    ...STANDARD_CACHE,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: !env.IS_DEV,
+    enabled: enabled && Boolean(emailValue || phoneValue),
     retry: 2,
     retryDelay: getRetryDelay,
     // Prevent throwing on error - handle gracefully
