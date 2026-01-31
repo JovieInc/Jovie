@@ -1,215 +1,167 @@
-# Domain Migration: Multi-Domain Setup
+# Domain Architecture: Single Domain Setup
 
-This document outlines the domain migration from a single-domain setup (`jov.ie`) to a multi-domain architecture.
+This document outlines Jovie's single-domain architecture where everything is served from `jov.ie`.
 
 ## Domain Model
 
-| Domain | Purpose | Auth | Cookies |
-|--------|---------|------|---------|
-| `jov.ie` | Public creator profiles | None | Viewer subscription cookies |
-| `meetjovie.com` | Marketing + Dashboard + App | Clerk | Session cookies |
-
-> **Note:** We use `meetjovie.com` for both marketing and app to avoid Clerk's
-> satellite domain costs for subdomains like `app.meetjovie.com`.
+| Domain | Purpose | Notes |
+|--------|---------|-------|
+| `jov.ie` | Everything | Marketing, auth, profiles, dashboard |
+| `meetjovie.com` | Legacy redirect | 301 redirects to jov.ie |
+| `clerk.jov.ie` | Clerk proxy | Custom Clerk frontend API |
 
 ## URL Routing
 
-### Profile Domain (`jov.ie`)
+All routes are served from `jov.ie`:
+
+### Public Routes
+- `jov.ie/` - Homepage
+- `jov.ie/blog` - Blog
+- `jov.ie/pricing` - Pricing page
+- `jov.ie/support` - Support page
+- `jov.ie/legal/*` - Legal pages (privacy, terms)
+- `jov.ie/about` - About page
+- `jov.ie/features` - Features page
+
+### Profile Routes
 - `jov.ie/{username}` - Public profile page
 - `jov.ie/{username}/tip` - Tip page
 - `jov.ie/{username}/listen` - Listen page (DSP routing)
 - `jov.ie/{username}/subscribe` - Subscription page
-- `jov.ie/api/*` - API endpoints (for viewer subscriptions)
 
-### Marketing Domain (`meetjovie.com`)
-- `meetjovie.com/` - Homepage
-- `meetjovie.com/blog` - Blog
-- `meetjovie.com/pricing` - Pricing page
-- `meetjovie.com/support` - Support page
-- `meetjovie.com/legal/*` - Legal pages (privacy, terms)
-- `meetjovie.com/about` - About page
-- `meetjovie.com/features` - Features page
+### App Routes (Dashboard)
+- `jov.ie/app/` - Main dashboard (redirects to /app/profile)
+- `jov.ie/app/profile` - Profile management
+- `jov.ie/app/audience` - Audience analytics
+- `jov.ie/app/earnings` - Earnings dashboard
+- `jov.ie/app/settings/*` - Settings pages
+- `jov.ie/app/admin/*` - Admin pages
 
-### App Routes (on `meetjovie.com`)
-- `meetjovie.com/app/dashboard` - Main dashboard
-- `meetjovie.com/app/settings/*` - Settings pages
-- `meetjovie.com/signin` - Sign in
-- `meetjovie.com/signup` - Sign up
-- `meetjovie.com/waitlist` - Waitlist
-- `meetjovie.com/onboarding/*` - Onboarding flow
-- `meetjovie.com/claim/*` - Profile claim flow
-- `meetjovie.com/billing/*` - Billing pages
+### Auth Routes
+- `jov.ie/signin` - Sign in
+- `jov.ie/signup` - Sign up
+- `jov.ie/waitlist` - Waitlist
+- `jov.ie/onboarding/*` - Onboarding flow
+
+### API Routes
+- `jov.ie/api/*` - All API endpoints
 
 ## Environment Variables
 
-Add these to your Vercel/Doppler configuration:
-
 ```bash
-# Domain Configuration
+# Domain Configuration (all point to jov.ie)
 NEXT_PUBLIC_PROFILE_URL=https://jov.ie
-NEXT_PUBLIC_MARKETING_URL=https://meetjovie.com
-NEXT_PUBLIC_APP_URL=https://meetjovie.com
+NEXT_PUBLIC_APP_URL=https://jov.ie
 NEXT_PUBLIC_PROFILE_HOSTNAME=jov.ie
-NEXT_PUBLIC_MARKETING_HOSTNAME=meetjovie.com
-NEXT_PUBLIC_APP_HOSTNAME=meetjovie.com
-NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN=meetjovie.com
+NEXT_PUBLIC_APP_HOSTNAME=jov.ie
+NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN=jov.ie
 ```
 
 ## Vercel Configuration
 
-### 1. Add Domains in Vercel Dashboard
+### Domains in Vercel Dashboard
 
-1. Go to your project settings → Domains
-2. Add the following domains:
-   - `jov.ie` (primary for profiles)
-   - `www.jov.ie` (redirect to `jov.ie`)
-   - `meetjovie.com` (primary for marketing)
-   - `www.meetjovie.com` (redirect to `meetjovie.com`)
-   - `app.meetjovie.com` (primary for app)
+1. `jov.ie` (primary)
+2. `www.jov.ie` (redirect to `jov.ie`)
+3. `meetjovie.com` (redirect to `jov.ie`)
+4. `www.meetjovie.com` (redirect to `jov.ie`)
 
-### 2. DNS Configuration
+### DNS Configuration
 
-For `meetjovie.com` (at your DNS provider):
-
+For `jov.ie`:
 ```
 Type    Name    Value
 A       @       76.76.21.21
 CNAME   www     cname.vercel-dns.com
-CNAME   app     cname.vercel-dns.com
-```
-
-For `jov.ie` (at your DNS provider):
-
-```
-Type    Name    Value
-A       @       76.76.21.21
-CNAME   www     cname.vercel-dns.com
+CNAME   clerk   frontend-api.clerk.services
 ```
 
 ## Clerk Configuration
 
-### 1. Update Allowed Origins
+### Clerk Proxy
 
-In Clerk Dashboard → Settings → Paths:
+We use a custom Clerk proxy at `clerk.jov.ie` to avoid satellite domain costs:
 
-- Add `https://app.meetjovie.com` to allowed origins
-- Add `https://meetjovie.com` to allowed origins (for redirects)
+1. DNS: `clerk.jov.ie` CNAME → `frontend-api.clerk.services`
+2. Environment: `NEXT_PUBLIC_CLERK_FRONTEND_API=https://clerk.jov.ie`
 
-### 2. Update Redirect URLs
+### Redirect URLs
 
-- Sign-in redirect: `https://app.meetjovie.com/waitlist`
-- Sign-up redirect: `https://app.meetjovie.com/waitlist`
-- After sign-out: `https://meetjovie.com`
-
-### 3. Clerk Proxy (Optional)
-
-If using a custom Clerk proxy domain:
-
-1. Add CNAME record: `clerk.meetjovie.com` → `frontend-api.clerk.dev`
-2. Update `NEXT_PUBLIC_CLERK_FRONTEND_API=https://clerk.meetjovie.com`
+- Sign-in redirect: `/waitlist` or `/app/profile`
+- Sign-up redirect: `/waitlist` or `/onboarding`
+- After sign-out: `/`
 
 ## Stripe Configuration
 
-### 1. Update Webhook Endpoints
+### Webhook Endpoints
 
-In Stripe Dashboard → Developers → Webhooks:
+- Main webhook: `https://jov.ie/api/webhooks/stripe`
+- Tip webhook: `https://jov.ie/api/webhooks/stripe/tip`
 
-- Update webhook URL to: `https://app.meetjovie.com/api/webhooks/stripe`
-- Update tip webhook URL to: `https://app.meetjovie.com/api/webhooks/stripe/tip`
+### Checkout URLs
 
-### 2. Update Success/Cancel URLs
+- Success: `https://jov.ie/billing/success`
+- Cancel: `https://jov.ie/billing/cancel`
+- Customer portal return: `https://jov.ie/billing`
 
-In your checkout session creation code, ensure URLs point to:
+## SEO Configuration
 
-- Success: `https://app.meetjovie.com/billing/success`
-- Cancel: `https://app.meetjovie.com/billing/cancel`
+### Robots.txt
 
-### 3. Customer Portal Return URL
-
-- Return URL: `https://app.meetjovie.com/billing`
-
-## SEO Considerations
+Single robots.txt for `jov.ie`:
+- Allow: `/` (marketing and profiles)
+- Disallow: `/app/` (authenticated dashboard)
+- Disallow: `/api/` (API endpoints)
+- Disallow: `/out/` (redirect links)
 
 ### Canonical URLs
 
-- Profile pages: Canonical is `https://jov.ie/{username}`
-- Marketing pages: Canonical is `https://meetjovie.com/{path}`
-- App pages: No indexing (noindex, nofollow)
+- All pages use `https://jov.ie/{path}` as canonical
+- Profile pages: `https://jov.ie/{username}`
 
 ### Sitemap
 
-The sitemap at `meetjovie.com/sitemap.xml` includes:
-- Marketing pages on `meetjovie.com`
-- Blog pages on `meetjovie.com`
-- Profile pages on `jov.ie`
+Located at `jov.ie/sitemap.xml`:
+- Marketing pages
+- Blog posts
+- Public profile pages
 
-### Redirects for Legacy Domains
+## Legacy Domain Handling
 
-If you own `jovie.app` or `jovie.ai`, set up 301 redirects:
+### meetjovie.com
 
-```
-jovie.app/* → meetjovie.com/*
-jovie.ai/* → meetjovie.com/*
-```
+All traffic to `meetjovie.com` is 301 redirected to `jov.ie`:
+- `meetjovie.com/*` → `jov.ie/*`
+- `www.meetjovie.com/*` → `jov.ie/*`
 
-## Viewer Subscription Cookies
+This redirect is handled in the middleware (`proxy.ts`).
 
-Viewer subscription cookies are scoped to `jov.ie` and will NOT carry over to `meetjovie.com`. This is intentional:
+## Development
 
-- Viewer subscriptions are managed on profile pages (`jov.ie`)
-- The subscribe/manage endpoints remain on `jov.ie/api/*`
-- Cookies set on `jov.ie` are accessible on all `jov.ie` profile pages
+### Local Development
 
-## Email Configuration
+- URL: `http://localhost:3100`
+- Dashboard: `http://localhost:3100/app/*`
+- Profiles: `http://localhost:3100/{username}`
 
-Update email sending domains:
+### Preview Deployments
 
-- `support@meetjovie.com` - Support emails
-- `legal@meetjovie.com` - Legal emails
-- `privacy@meetjovie.com` - Privacy emails
-- `notifications@meetjovie.com` - Notification emails
+Vercel preview deployments work the same way:
+- `*.vercel.app/app/*` - Dashboard
+- `*.vercel.app/{username}` - Profiles
 
-Ensure SPF, DKIM, and DMARC records are configured for `meetjovie.com`.
+### Staging
 
-## Verification Checklist
+- URL: `https://main.jov.ie`
+- Same routing as production
 
-After deployment, verify:
+## Files Reference
 
-- [ ] `jov.ie/{username}` loads profile correctly
-- [ ] `jov.ie/{username}/tip` loads tip page
-- [ ] `jov.ie/{username}/subscribe` works (viewer subscription)
-- [ ] `meetjovie.com` loads marketing homepage
-- [ ] `meetjovie.com/blog` loads blog
-- [ ] `meetjovie.com/pricing` loads pricing
-- [ ] `meetjovie.com/support` loads support page
-- [ ] `meetjovie.com/legal/privacy` loads privacy policy
-- [ ] `meetjovie.com/legal/terms` loads terms of service
-- [ ] `app.meetjovie.com` redirects to dashboard (or signin if not authenticated)
-- [ ] `app.meetjovie.com/signin` shows sign-in page
-- [ ] `app.meetjovie.com/signup` shows sign-up page
-- [ ] Sign-in flow works and redirects correctly
-- [ ] Sign-up flow works and redirects correctly
-- [ ] Dashboard loads after authentication
-- [ ] Stripe checkout works
-- [ ] Stripe webhooks are received
-- [ ] Email notifications are sent from correct domain
+Key files for domain configuration:
 
-## Rollback Plan
-
-If issues arise:
-
-1. Revert environment variables to use `jov.ie` for all domains
-2. Remove domain routing logic from `proxy.ts`
-3. Update Clerk/Stripe settings back to `jov.ie`
-
-## Files Changed
-
-Key files modified in this migration:
-
-- `constants/domains.ts` - New centralized domain configuration
-- `constants/app.ts` - Updated to use domain config
-- `lib/env-public.ts` - Added new domain env vars
-- `proxy.ts` - Added hostname-based routing
-- `app/sitemap.ts` - Multi-domain sitemap
-- `app/robots.ts` - Updated for marketing domain
-- Various components - Updated hardcoded `jov.ie` references
+- `constants/domains.ts` - Domain constants and helpers
+- `lib/env-public.ts` - Environment variable defaults
+- `proxy.ts` - Middleware with domain routing
+- `app/robots.ts` - SEO robots.txt
+- `app/sitemap.ts` - SEO sitemap
+- `vercel.json` - Vercel configuration

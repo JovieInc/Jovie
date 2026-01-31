@@ -166,8 +166,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     expect(displayedUrl).toBeTruthy();
 
     // Verify the URL follows a valid profile URL format
-    // Profile URLs now use PROFILE_URL (not the current origin) to ensure correct domain
-    // regardless of which subdomain (app.jov.ie vs jov.ie) the dashboard is served from
+    // Profile URLs use PROFILE_URL constant to ensure correct domain (jov.ie)
     expect(displayedUrl).toMatch(/^https?:\/\/.+\/.+$/);
   });
 
