@@ -72,27 +72,27 @@ export function ReleaseSidebarHeader({
       onClick: handleCopySmartLink,
     });
 
-    // Refresh - overflow action
-    overflowActions.push({
-      id: 'refresh',
-      label: 'Refresh release',
-      icon: RefreshCw,
-      onClick: () => {
-        if (onRefresh) {
-          onRefresh();
-          return;
-        }
-        window.location.reload();
+    // Refresh and Open smart link - overflow actions
+    overflowActions.push(
+      {
+        id: 'refresh',
+        label: 'Refresh release',
+        icon: RefreshCw,
+        onClick: () => {
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          window.location.reload();
+        },
       },
-    });
-
-    // Open smart link - overflow action
-    overflowActions.push({
-      id: 'open',
-      label: 'Open smart link',
-      icon: ExternalLink,
-      href: release.smartLinkPath,
-    });
+      {
+        id: 'open',
+        label: 'Open smart link',
+        icon: ExternalLink,
+        href: release.smartLinkPath,
+      }
+    );
   }
 
   // Copy release ID - available for all releases with an ID

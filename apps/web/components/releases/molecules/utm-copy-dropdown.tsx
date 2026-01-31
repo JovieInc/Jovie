@@ -264,25 +264,25 @@ export function UTMCopyDropdown({
     const items: CommonDropdownItem[] = [];
 
     // Plain copy option
-    items.push({
-      type: 'action',
-      id: 'copy-plain',
-      label: 'Copy Link',
-      icon: Link2,
-      subText: 'No tracking',
-      onClick: handlePlainCopy,
-    });
-
-    items.push({
-      type: 'separator',
-      id: 'sep-1',
-    });
-
-    items.push({
-      type: 'label',
-      id: 'label-utm',
-      label: 'Copy with UTM',
-    });
+    items.push(
+      {
+        type: 'action',
+        id: 'copy-plain',
+        label: 'Copy Link',
+        icon: Link2,
+        subText: 'No tracking',
+        onClick: handlePlainCopy,
+      },
+      {
+        type: 'separator',
+        id: 'sep-1',
+      },
+      {
+        type: 'label',
+        id: 'label-utm',
+        label: 'Copy with UTM',
+      }
+    );
 
     // Quick presets section (recent + popular combined)
     const quickPresets = [
