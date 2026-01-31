@@ -138,6 +138,52 @@ const nextConfig = {
           },
         ],
       },
+      // Marketing pages (pre-rendered at build) - long-lived cache
+      {
+        source: '/',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source:
+          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog|legal/:path*)',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+        ],
+      },
+      // App routes and dynamic pages - no cache
+      {
+        source:
+          '/(app|go|r|onboarding|account|billing|hud|signin|signup|sso-callback)/:path*',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'private, no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      // Dynamic profile pages - no cache
+      {
+        source: '/:username/:path*',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      // Catch-all for other routes - revalidate on each request
       {
         source: '/(.*)',
         headers: [
