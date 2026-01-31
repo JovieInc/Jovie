@@ -108,25 +108,53 @@ describe('useDashboardProfileQuery', () => {
       });
     });
 
-    it('does not refetch while data is fresh (STANDARD_CACHE)', async () => {
+    it('does not refetch on remount while data is fresh (STANDARD_CACHE)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockProfile),
       });
 
-      const { result, rerender } = renderHook(
-        () => useDashboardProfileQuery(),
-        { wrapper }
+      // Create a QueryClient with cache settings that allow testing remount behavior
+      const testQueryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+            gcTime: 10 * 60 * 1000, // 10 minutes - cache persists after unmount
+          },
+        },
+      });
+
+      const testWrapper = ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
       );
+
+      // First mount - should fetch
+      const { result, unmount } = renderHook(() => useDashboardProfileQuery(), {
+        wrapper: testWrapper,
+      });
 
       await waitFor(() => {
         expect(result.current.isSuccess).toBe(true);
       });
 
       const firstCallCount = mockFetch.mock.calls.length;
+      expect(firstCallCount).toBe(1);
 
-      // Rerender - should use cached data without refetching
-      rerender();
+      // Unmount the hook
+      unmount();
+
+      // Remount - should NOT refetch because data is still fresh
+      const { result: result2 } = renderHook(() => useDashboardProfileQuery(), {
+        wrapper: testWrapper,
+      });
+
+      // Data should be available immediately from cache
+      await waitFor(() => {
+        expect(result2.current.isSuccess).toBe(true);
+      });
 
       // Verify no additional fetch was made (data is still fresh)
       expect(mockFetch.mock.calls.length).toBe(firstCallCount);

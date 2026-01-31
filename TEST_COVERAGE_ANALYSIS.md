@@ -31,12 +31,14 @@ This is the most critical gap. The queries directory contains all React Query ho
 
 ```text
 apps/web/tests/lib/queries/
-├── useDashboardProfileQuery.test.ts
-├── useBillingMutations.test.ts
-├── useAudienceQueries.test.ts
-├── useAnalyticsQueries.test.ts
+├── useDashboardProfileQuery.test.tsx
+├── useBillingMutations.test.tsx
+├── useAudienceQueries.test.tsx
+├── useAnalyticsQueries.test.tsx
 └── ...
 ```
+
+> **Note:** Use `.test.tsx` for files testing React hooks that render JSX (query/mutation hooks), and `.test.ts` for pure utility functions.
 
 **Priority:** P0 - These hooks are used throughout the application
 
@@ -64,13 +66,15 @@ apps/web/tests/lib/queries/
 
 ```text
 apps/web/tests/hooks/
-├── useSignInFlow.test.ts
-├── useSignUpFlow.test.ts
+├── useSignInFlow.test.tsx
+├── useSignUpFlow.test.tsx
 ├── useClerkSafe.test.tsx
-├── useCreator.test.ts
-├── useKeyboardShortcuts.test.ts
+├── useCreator.test.tsx
+├── useKeyboardShortcuts.test.tsx
 └── ...
 ```
+
+> **Note:** Hook tests typically use `.test.tsx` since they require React's `renderHook` and JSX wrapper components.
 
 ---
 
