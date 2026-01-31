@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Suppress SonarCloud typescript:S7764 violations for `typeof window` checks
  *
@@ -13,8 +14,8 @@
  *   SONAR_TOKEN="your-token" node scripts/suppress-sonar-typeof-window.mjs
  */
 
-import { readFile } from 'fs/promises';
 import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 
 const SONAR_TOKEN = process.env.SONAR_TOKEN;
 const SONAR_PROJECT = 'JovieInc_Jovie';
@@ -26,8 +27,12 @@ if (!SONAR_TOKEN) {
   console.error('  export SONAR_TOKEN="your-sonarcloud-token"');
   console.error('  node scripts/suppress-sonar-typeof-window.mjs');
   console.error('\nOr:');
-  console.error('  SONAR_TOKEN="your-token" node scripts/suppress-sonar-typeof-window.mjs');
-  console.error('\nGet your token from: https://sonarcloud.io/account/security');
+  console.error(
+    '  SONAR_TOKEN="your-token" node scripts/suppress-sonar-typeof-window.mjs'
+  );
+  console.error(
+    '\nGet your token from: https://sonarcloud.io/account/security'
+  );
   process.exit(1);
 }
 
@@ -59,25 +64,46 @@ for (const issue of s7764Issues) {
     const lineContent = lines[lineIndex] || '';
 
     // Check if it's a typeof window check (SSR safety pattern)
-    if (lineContent.includes('typeof window') || lineContent.includes('typeof globalThis')) {
-      typeofWindowChecks.push({ ...issue, filePath, lineContent: lineContent.trim() });
+    if (
+      lineContent.includes('typeof window') ||
+      lineContent.includes('typeof globalThis')
+    ) {
+      typeofWindowChecks.push({
+        ...issue,
+        filePath,
+        lineContent: lineContent.trim(),
+      });
     } else {
-      actualWindowUsage.push({ ...issue, filePath, lineContent: lineContent.trim() });
+      actualWindowUsage.push({
+        ...issue,
+        filePath,
+        lineContent: lineContent.trim(),
+      });
     }
   } catch (error) {
     console.warn(`⚠️  Could not read ${filePath}: ${error.message}`);
     // Assume it might be a typeof check if we can't read it
-    typeofWindowChecks.push({ ...issue, filePath, lineContent: '(could not read)' });
+    typeofWindowChecks.push({
+      ...issue,
+      filePath,
+      lineContent: '(could not read)',
+    });
   }
 }
 
 console.log(`📊 Analysis:`);
-console.log(`  - typeof window/globalThis checks: ${typeofWindowChecks.length} (will suppress)`);
-console.log(`  - Actual window.* usage: ${actualWindowUsage.length} (already fixed or need manual review)`);
+console.log(
+  `  - typeof window/globalThis checks: ${typeofWindowChecks.length} (will suppress)`
+);
+console.log(
+  `  - Actual window.* usage: ${actualWindowUsage.length} (already fixed or need manual review)`
+);
 console.log('');
 
 if (actualWindowUsage.length > 0) {
-  console.log(`⚠️  Warning: Found ${actualWindowUsage.length} issues that are NOT typeof checks:`);
+  console.log(
+    `⚠️  Warning: Found ${actualWindowUsage.length} issues that are NOT typeof checks:`
+  );
   actualWindowUsage.slice(0, 5).forEach(issue => {
     console.log(`  - ${issue.filePath}:${issue.line} - "${issue.lineContent}"`);
   });
@@ -93,7 +119,9 @@ if (typeofWindowChecks.length === 0) {
 }
 
 // Suppress typeof window checks via SonarCloud API
-console.log(`🔧 Suppressing ${typeofWindowChecks.length} typeof window checks...\n`);
+console.log(
+  `🔧 Suppressing ${typeofWindowChecks.length} typeof window checks...\n`
+);
 
 const dryRun = process.argv.includes('--dry-run');
 if (dryRun) {
@@ -115,24 +143,23 @@ for (const issue of typeofWindowChecks) {
   } else {
     try {
       // Mark issue as "won't fix" with resolution
-      const response = await fetch(
-        `${SONAR_API_BASE}/issues/do_transition`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${SONAR_TOKEN}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            issue: issueKey,
-            transition: 'wontfix',
-          }),
-        }
-      );
+      const response = await fetch(`${SONAR_API_BASE}/issues/do_transition`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${SONAR_TOKEN}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          issue: issueKey,
+          transition: 'wontfix',
+        }),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.log(`    ❌ Failed to suppress: ${response.status} ${errorText}`);
+        console.log(
+          `    ❌ Failed to suppress: ${response.status} ${errorText}`
+        );
         failureCount++;
         continue;
       }
@@ -143,7 +170,7 @@ for (const issue of typeofWindowChecks) {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${SONAR_TOKEN}`,
+            Authorization: `Bearer ${SONAR_TOKEN}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
@@ -163,7 +190,6 @@ for (const issue of typeofWindowChecks) {
 
       // Rate limit: 1 request per 100ms to avoid overwhelming the API
       await new Promise(resolve => setTimeout(resolve, 100));
-
     } catch (error) {
       console.log(`    ❌ Error: ${error.message}`);
       failureCount++;
@@ -181,8 +207,12 @@ console.log(`  Mode: ${dryRun ? 'DRY RUN (no changes made)' : 'APPLIED'}`);
 console.log('━'.repeat(60));
 
 if (!dryRun && successCount > 0) {
-  console.log('\n✅ Done! The SonarCloud dashboard should update within a few minutes.');
-  console.log(`   View: https://sonarcloud.io/project/issues?resolved=false&id=${SONAR_PROJECT}`);
+  console.log(
+    '\n✅ Done! The SonarCloud dashboard should update within a few minutes.'
+  );
+  console.log(
+    `   View: https://sonarcloud.io/project/issues?resolved=false&id=${SONAR_PROJECT}`
+  );
 }
 
 if (failureCount > 0) {

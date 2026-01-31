@@ -5,7 +5,7 @@
  */
 
 import { eq, or } from 'drizzle-orm';
-import { db, type TransactionType } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { type Artist, artists, type NewArtist } from '@/lib/db/schema';
 import { normalizeArtistName } from '../artist-parser';
 import type { FindOrCreateArtistInput } from './types';
@@ -24,7 +24,7 @@ export async function findArtist(
     deezerId?: string | null;
     name?: string;
   },
-  tx?: TransactionType
+  tx?: DbOrTransaction
 ): Promise<Artist | null> {
   const database = tx ?? db;
   const conditions = [];
@@ -80,7 +80,7 @@ export async function findArtist(
  */
 export async function findOrCreateArtist(
   input: FindOrCreateArtistInput,
-  tx?: TransactionType
+  tx?: DbOrTransaction
 ): Promise<Artist> {
   const database = tx ?? db;
 

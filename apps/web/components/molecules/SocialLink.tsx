@@ -1,7 +1,10 @@
 'use client';
 
 import { memo, useMemo, useState } from 'react';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { hexToRgba } from '@/lib/utils/color';
@@ -17,7 +20,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   // Hooks must be called unconditionally (before any early returns)
   const [hover, setHover] = useState(false);
   const brandHex = useMemo(
-    () => getPlatformIcon(link.platform ?? '')?.hex,
+    () => getPlatformIconMetadata(link.platform ?? '')?.hex,
     [link.platform]
   );
 

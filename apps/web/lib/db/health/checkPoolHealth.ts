@@ -22,9 +22,9 @@ export async function checkPoolHealth(
     logDbInfo('healthCheck', 'Connection pool stats', poolState);
   }
 
-  await database.transaction(async tx => {
-    await tx.execute(drizzleSql`SELECT 'transaction_test' as test`);
-  });
+  // The neon-http driver does not support transactions
+  // Execute a simple query instead to verify connectivity
+  await database.execute(drizzleSql`SELECT 'health_check' as test`);
 
   return true;
 }

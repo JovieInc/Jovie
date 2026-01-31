@@ -465,10 +465,10 @@ function shouldSkipEnrichment(
   },
   forceRefresh: boolean
 ): boolean {
-  const hasExistingData = Boolean(
+  if (forceRefresh) return false;
+  return Boolean(
     profile.avatarUrl && profile.displayName && profile.spotifyFollowers
   );
-  return !forceRefresh && hasExistingData;
 }
 
 /**
@@ -553,13 +553,14 @@ export async function processProfileEnrichmentJob(
 }
 
 /**
- * Process enrichment job with standalone database transaction.
+ * Process enrichment job with standalone database operations.
  * Used when called from API routes.
+ * The neon-http driver does not support transactions.
  */
 export async function processProfileEnrichmentJobStandalone(
   jobPayload: unknown
 ): Promise<ProfileEnrichmentResult> {
-  return db.transaction(tx => processProfileEnrichmentJob(tx, jobPayload));
+  return processProfileEnrichmentJob(db, jobPayload);
 }
 
 /**

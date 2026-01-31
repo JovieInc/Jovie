@@ -183,7 +183,7 @@ function safeRandomHandle(): string {
  * Ported from approve/route.ts for profile auto-creation on signup
  */
 async function findAvailableHandle(
-  tx: TransactionType,
+  dbOrTx: TransactionType | typeof db,
   base: string
 ): Promise<string> {
   const normalizedBase = normalizeUsername(base).slice(0, 30);
@@ -194,7 +194,7 @@ async function findAvailableHandle(
     const candidate = `${normalizedBase.slice(0, 30 - suffix.length)}${suffix}`;
     if (!validateUsername(candidate).isValid) continue;
 
-    const [existing] = await tx
+    const [existing] = await dbOrTx
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, candidate))
@@ -331,50 +331,51 @@ export async function POST(request: Request) {
 
     if (existing) {
       // Avoid overwriting invited/claimed/rejected states.
-      // Wrap in transaction to ensure atomicity between waitlist and user updates
-      await db.transaction(async tx => {
-        if (existing.status === 'new') {
-          const updateValues = {
-            fullName,
-            primaryGoal: primaryGoal ?? null,
-            primarySocialUrl,
-            primarySocialPlatform: platform,
-            primarySocialUrlNormalized: normalizedUrl,
-            spotifyUrl: spotifyUrl ?? null,
-            spotifyUrlNormalized,
-            heardAbout: sanitizedHeardAbout,
-            selectedPlan: selectedPlan ?? null,
-            updatedAt: new Date(),
-          };
+      // The neon-http driver does not support transactions
+      // Execute operations directly without ACID guarantees
+      if (existing.status === 'new') {
+        const updateValues = {
+          fullName,
+          primaryGoal: primaryGoal ?? null,
+          primarySocialUrl,
+          primarySocialPlatform: platform,
+          primarySocialUrlNormalized: normalizedUrl,
+          spotifyUrl: spotifyUrl ?? null,
+          spotifyUrlNormalized,
+          heardAbout: sanitizedHeardAbout,
+          selectedPlan: selectedPlan ?? null,
+          updatedAt: new Date(),
+        };
 
-          await tx
-            .update(waitlistEntries)
-            .set(updateValues)
-            .where(eq(waitlistEntries.id, existing.id));
-        }
+        await db
+          .update(waitlistEntries)
+          .set(updateValues)
+          .where(eq(waitlistEntries.id, existing.id));
+      }
 
-        // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
-        await tx
-          .insert(users)
-          .values({
-            clerkId: userId,
-            email: emailRaw,
+      // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
+      // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
+      await db
+        .insert(users)
+        .values({
+          clerkId: userId,
+          email: emailRaw,
+          userStatus: 'waitlist_pending',
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
             userStatus: 'waitlist_pending',
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: {
-              userStatus: 'waitlist_pending',
-              updatedAt: new Date(),
-            },
-          });
-      });
+            updatedAt: new Date(),
+          },
+        });
 
       return successResponse({ status: existing.status });
     }
 
-    // Insert waitlist entry and update user in transaction for atomicity
+    // Insert waitlist entry and update user
+    // The neon-http driver does not support transactions
+    // Execute operations directly without ACID guarantees
     const insertValues = {
       fullName,
       email,
@@ -389,72 +390,70 @@ export async function POST(request: Request) {
       status: 'new' as const,
     };
 
-    await db.transaction(async tx => {
-      try {
-        // 1. Insert waitlist entry
-        const [entry] = await tx
-          .insert(waitlistEntries)
-          .values(insertValues)
-          .returning({ id: waitlistEntries.id });
+    try {
+      // 1. Insert waitlist entry
+      const [entry] = await db
+        .insert(waitlistEntries)
+        .values(insertValues)
+        .returning({ id: waitlistEntries.id });
 
-        if (!entry) {
-          throw new Error('Failed to create waitlist entry');
-        }
-
-        // 2. Auto-generate handle from social URL or email
-        const handleCandidate =
-          extractHandleFromUrl(normalizedUrl) ??
-          email.split('@')[0] ??
-          safeRandomHandle();
-
-        const baseHandle = validateUsername(handleCandidate).isValid
-          ? handleCandidate
-          : safeRandomHandle();
-
-        const usernameNormalized = await findAvailableHandle(tx, baseHandle);
-
-        // 3. Create unclaimed profile immediately (simplified signup flow)
-        // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
-        const trimmedName = fullName.trim();
-        const displayName = trimmedName
-          ? trimmedName.slice(0, 50)
-          : 'Jovie creator';
-
-        await tx.insert(creatorProfiles).values({
-          creatorType: 'creator',
-          username: usernameNormalized,
-          usernameNormalized,
-          displayName,
-          isPublic: false, // Not public until approved
-          isClaimed: false, // Not claimed until approved
-          // userId omitted - defaults to NULL, will be linked on approval
-          waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
-          settings: {},
-          theme: {},
-          ingestionStatus: 'idle',
-        });
-
-        // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-        // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
-        await tx
-          .insert(users)
-          .values({
-            clerkId: userId,
-            email: emailRaw,
-            userStatus: 'waitlist_pending',
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: {
-              userStatus: 'waitlist_pending',
-              updatedAt: new Date(),
-            },
-          });
-      } catch (txError) {
-        logger.error('Waitlist API transaction error', txError);
-        throw txError;
+      if (!entry) {
+        throw new Error('Failed to create waitlist entry');
       }
-    });
+
+      // 2. Auto-generate handle from social URL or email
+      const handleCandidate =
+        extractHandleFromUrl(normalizedUrl) ??
+        email.split('@')[0] ??
+        safeRandomHandle();
+
+      const baseHandle = validateUsername(handleCandidate).isValid
+        ? handleCandidate
+        : safeRandomHandle();
+
+      const usernameNormalized = await findAvailableHandle(db, baseHandle);
+
+      // 3. Create unclaimed profile immediately (simplified signup flow)
+      // NOTE: Requires PR #1735 (waitlistEntryId column) to be merged first
+      const trimmedName = fullName.trim();
+      const displayName = trimmedName
+        ? trimmedName.slice(0, 50)
+        : 'Jovie creator';
+
+      await db.insert(creatorProfiles).values({
+        creatorType: 'creator',
+        username: usernameNormalized,
+        usernameNormalized,
+        displayName,
+        isPublic: false, // Not public until approved
+        isClaimed: false, // Not claimed until approved
+        // userId omitted - defaults to NULL, will be linked on approval
+        waitlistEntryId: entry.id, // Link to waitlist entry (added in PR #1735)
+        settings: {},
+        theme: {},
+        ingestionStatus: 'idle',
+      });
+
+      // 4. Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
+      // Use upsert to create row if Clerk user doesn't exist yet (race condition during signup)
+      await db
+        .insert(users)
+        .values({
+          clerkId: userId,
+          email: emailRaw,
+          userStatus: 'waitlist_pending',
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: {
+            userStatus: 'waitlist_pending',
+            updatedAt: new Date(),
+          },
+        });
+    } catch (error) {
+      logger.error('Waitlist API operation error', error);
+      throw error;
+    }
 
     // Send Slack notification for new waitlist entry (fire-and-forget)
     notifySlackWaitlist(fullName, email).catch(err => {

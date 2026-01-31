@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
   campaignEnrollments,
+  campaignSequences,
   creatorClaimInvites,
   creatorProfiles,
   emailEngagement,
@@ -88,19 +89,17 @@ interface DripCampaignStats {
  */
 type DateRange = '7d' | '30d' | '90d' | 'all';
 
+const DATE_RANGE_DAYS: Record<Exclude<DateRange, 'all'>, number> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+};
+
 function getDateRangeFilter(range: DateRange): Date | null {
   if (range === 'all') return null;
 
-  const now = new Date();
-  let days: number;
-  if (range === '7d') {
-    days = 7;
-  } else if (range === '30d') {
-    days = 30;
-  } else {
-    days = 90;
-  }
-  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const days = DATE_RANGE_DAYS[range];
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
 async function buildInviteStats(dateFilter: Date | null): Promise<InviteStats> {
@@ -168,26 +167,37 @@ async function buildInviteStats(dateFilter: Date | null): Promise<InviteStats> {
 
 async function buildEngagementStats(
   dateFilter: Date | null,
-  sentCount: number
+  sentCount: number,
+  campaignId?: string
 ): Promise<EngagementStats> {
-  const engagementQuery = dateFilter
-    ? db
-        .select({
-          eventType: emailEngagement.eventType,
-          count: count(),
-          uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
-        })
-        .from(emailEngagement)
-        .where(gte(emailEngagement.createdAt, dateFilter))
-        .groupBy(emailEngagement.eventType)
-    : db
-        .select({
-          eventType: emailEngagement.eventType,
-          count: count(),
-          uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
-        })
-        .from(emailEngagement)
-        .groupBy(emailEngagement.eventType);
+  // Build where conditions array
+  const whereConditions = [];
+  if (dateFilter) {
+    whereConditions.push(gte(emailEngagement.createdAt, dateFilter));
+  }
+  if (campaignId) {
+    whereConditions.push(eq(emailEngagement.referenceId, campaignId));
+  }
+
+  const engagementQuery =
+    whereConditions.length > 0
+      ? db
+          .select({
+            eventType: emailEngagement.eventType,
+            count: count(),
+            uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
+          })
+          .from(emailEngagement)
+          .where(sql`${sql.join(whereConditions, sql` AND `)}`)
+          .groupBy(emailEngagement.eventType)
+      : db
+          .select({
+            eventType: emailEngagement.eventType,
+            count: count(),
+            uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
+          })
+          .from(emailEngagement)
+          .groupBy(emailEngagement.eventType);
 
   const engagementResult = await engagementQuery;
 
@@ -306,32 +316,66 @@ async function buildSuppressionStats(dateFilter: Date | null) {
 }
 
 async function buildDripCampaignStats(): Promise<DripCampaignStats[]> {
-  const campaigns = await db.query.campaignSequences.findMany();
-  const dripCampaignStats: DripCampaignStats[] = [];
-
-  for (const campaign of campaigns) {
-    const enrollmentResult = await db
-      .select({
-        status: campaignEnrollments.status,
-        count: count(),
-      })
-      .from(campaignEnrollments)
-      .where(eq(campaignEnrollments.campaignSequenceId, campaign.id))
-      .groupBy(campaignEnrollments.status);
-
-    dripCampaignStats.push(
-      aggregateCampaignStats(
-        campaign.campaignKey,
-        campaign.name,
-        enrollmentResult
-      )
+  // Single query with JOIN instead of N+1 loop queries
+  const enrollmentsBySequence = await db
+    .select({
+      campaignId: campaignEnrollments.campaignSequenceId,
+      campaignKey: campaignSequences.campaignKey,
+      campaignName: campaignSequences.name,
+      status: campaignEnrollments.status,
+      count: count(),
+    })
+    .from(campaignEnrollments)
+    .innerJoin(
+      campaignSequences,
+      eq(campaignEnrollments.campaignSequenceId, campaignSequences.id)
+    )
+    .groupBy(
+      campaignEnrollments.campaignSequenceId,
+      campaignSequences.campaignKey,
+      campaignSequences.name,
+      campaignEnrollments.status
     );
+
+  // Group results by campaign
+  const campaignMap = new Map<
+    string,
+    {
+      key: string;
+      name: string;
+      active: number;
+      completed: number;
+      stopped: number;
+    }
+  >();
+
+  for (const row of enrollmentsBySequence) {
+    const existing = campaignMap.get(row.campaignId) ?? {
+      key: row.campaignKey,
+      name: row.campaignName,
+      active: 0,
+      completed: 0,
+      stopped: 0,
+    };
+
+    const countValue = Number(row.count);
+    if (row.status === 'active') existing.active = countValue;
+    else if (row.status === 'completed') existing.completed = countValue;
+    else if (row.status === 'stopped') existing.stopped = countValue;
+
+    campaignMap.set(row.campaignId, existing);
   }
 
-  return dripCampaignStats;
+  return Array.from(campaignMap.values()).map(stats => ({
+    campaignKey: stats.key,
+    campaignName: stats.name,
+    activeEnrollments: stats.active,
+    completedEnrollments: stats.completed,
+    stoppedEnrollments: stats.stopped,
+  }));
 }
 
-function aggregateCampaignStats(
+function _aggregateCampaignStats(
   campaignKey: string,
   campaignName: string,
   enrollmentResult: { status: string | null; count: bigint | number }[]
@@ -373,7 +417,33 @@ export async function GET(request: Request) {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const campaignId = searchParams.get('campaignId');
     const { range, dateFilter } = parseRange(request);
+
+    // If campaignId specified, return filtered results for that campaign only
+    if (campaignId) {
+      const inviteStats = await buildInviteStats(dateFilter);
+      const sentCount = inviteStats.sent + inviteStats.bounced;
+      const engagementStats = await buildEngagementStats(
+        dateFilter,
+        sentCount,
+        campaignId
+      );
+
+      return NextResponse.json(
+        {
+          ok: true,
+          campaignId,
+          range,
+          engagement: engagementStats,
+          updatedAt: new Date().toISOString(),
+        },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Otherwise return summary stats (existing behavior)
     const inviteStats = await buildInviteStats(dateFilter);
     const sentCount = inviteStats.sent + inviteStats.bounced;
     const engagementStats = await buildEngagementStats(dateFilter, sentCount);

@@ -78,6 +78,17 @@ const baseConfig = {
             ],
             message: "Use Button from '@jovie/ui' instead of local atoms.",
           },
+          {
+            group: [
+              '@/components/atoms',
+              '@/components/molecules',
+              '@/components/organisms',
+              '@/components/dashboard',
+              '@/lib/db/schema',
+            ],
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file: e.g., @/components/atoms/Button instead of @/components/atoms',
+          },
         ],
       },
     ],

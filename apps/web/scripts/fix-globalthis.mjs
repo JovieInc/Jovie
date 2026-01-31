@@ -1,5 +1,5 @@
-import { readFile, writeFile } from 'fs/promises';
 import { exec } from 'child_process';
+import { readFile, writeFile } from 'fs/promises';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
@@ -35,121 +35,123 @@ const patterns = [
   {
     regex: /\bwindow\.location\b/g,
     replacement: 'globalThis.location',
-    description: 'window.location → globalThis.location'
+    description: 'window.location → globalThis.location',
   },
   // Pattern 2: window.addEventListener
   {
     regex: /\bwindow\.addEventListener\b/g,
     replacement: 'globalThis.addEventListener',
-    description: 'window.addEventListener → globalThis.addEventListener'
+    description: 'window.addEventListener → globalThis.addEventListener',
   },
   // Pattern 3: window.removeEventListener
   {
     regex: /\bwindow\.removeEventListener\b/g,
     replacement: 'globalThis.removeEventListener',
-    description: 'window.removeEventListener → globalThis.removeEventListener'
+    description: 'window.removeEventListener → globalThis.removeEventListener',
   },
   // Pattern 4: window.print() (needs optional chaining)
   {
     regex: /\bwindow\.print\(\)/g,
     replacement: 'globalThis.print?.()',
-    description: 'window.print() → globalThis.print?.()'
+    description: 'window.print() → globalThis.print?.()',
   },
   // Pattern 5: window.open(
   {
     regex: /\bwindow\.open\(/g,
     replacement: 'globalThis.open(',
-    description: 'window.open( → globalThis.open('
+    description: 'window.open( → globalThis.open(',
   },
   // Pattern 6: window.navigator
   {
     regex: /\bwindow\.navigator\b/g,
     replacement: 'globalThis.navigator',
-    description: 'window.navigator → globalThis.navigator'
+    description: 'window.navigator → globalThis.navigator',
   },
   // Pattern 7: window.matchMedia
   {
     regex: /\bwindow\.matchMedia\b/g,
     replacement: 'globalThis.matchMedia',
-    description: 'window.matchMedia → globalThis.matchMedia'
+    description: 'window.matchMedia → globalThis.matchMedia',
   },
   // Pattern 8: window.innerWidth
   {
     regex: /\bwindow\.innerWidth\b/g,
     replacement: 'globalThis.innerWidth',
-    description: 'window.innerWidth → globalThis.innerWidth'
+    description: 'window.innerWidth → globalThis.innerWidth',
   },
   // Pattern 9: window.innerHeight
   {
     regex: /\bwindow\.innerHeight\b/g,
     replacement: 'globalThis.innerHeight',
-    description: 'window.innerHeight → globalThis.innerHeight'
+    description: 'window.innerHeight → globalThis.innerHeight',
   },
   // Pattern 10: window.scrollTo
   {
     regex: /\bwindow\.scrollTo\b/g,
     replacement: 'globalThis.scrollTo',
-    description: 'window.scrollTo → globalThis.scrollTo'
+    description: 'window.scrollTo → globalThis.scrollTo',
   },
   // Pattern 11: window.sessionStorage
   {
     regex: /\bwindow\.sessionStorage\b/g,
     replacement: 'globalThis.sessionStorage',
-    description: 'window.sessionStorage → globalThis.sessionStorage'
+    description: 'window.sessionStorage → globalThis.sessionStorage',
   },
   // Pattern 12: window.localStorage
   {
     regex: /\bwindow\.localStorage\b/g,
     replacement: 'globalThis.localStorage',
-    description: 'window.localStorage → globalThis.localStorage'
+    description: 'window.localStorage → globalThis.localStorage',
   },
   // Pattern 13: window.document
   {
     regex: /\bwindow\.document\b/g,
     replacement: 'globalThis.document',
-    description: 'window.document → globalThis.document'
+    description: 'window.document → globalThis.document',
   },
   // Pattern 14: window.requestAnimationFrame
   {
     regex: /\bwindow\.requestAnimationFrame\b/g,
     replacement: 'globalThis.requestAnimationFrame',
-    description: 'window.requestAnimationFrame → globalThis.requestAnimationFrame'
+    description:
+      'window.requestAnimationFrame → globalThis.requestAnimationFrame',
   },
   // Pattern 15: window.cancelAnimationFrame
   {
     regex: /\bwindow\.cancelAnimationFrame\b/g,
     replacement: 'globalThis.cancelAnimationFrame',
-    description: 'window.cancelAnimationFrame → globalThis.cancelAnimationFrame'
+    description:
+      'window.cancelAnimationFrame → globalThis.cancelAnimationFrame',
   },
   // Pattern 15b: window.history
   {
     regex: /\bwindow\.history\b/g,
     replacement: 'globalThis.history',
-    description: 'window.history → globalThis.history'
+    description: 'window.history → globalThis.history',
   },
   // Pattern 15c: window.gtag (analytics)
   {
     regex: /\bwindow\.gtag\b/g,
     replacement: 'globalThis.gtag',
-    description: 'window.gtag → globalThis.gtag'
+    description: 'window.gtag → globalThis.gtag',
   },
   // Pattern 15d: window.dataLayer (GTM)
   {
     regex: /\bwindow\.dataLayer\b/g,
     replacement: 'globalThis.dataLayer',
-    description: 'window.dataLayer → globalThis.dataLayer'
+    description: 'window.dataLayer → globalThis.dataLayer',
   },
   // Pattern 16: Custom window properties (e.g., window.JVConsent)
   {
     regex: /\bwindow\.([A-Z][a-zA-Z0-9]*)\b/g,
     replacement: 'globalThis.$1',
-    description: 'window.CustomProp → globalThis.CustomProp'
+    description: 'window.CustomProp → globalThis.CustomProp',
   },
   // Pattern 17: global. (Node.js global)
   {
     regex: /\bglobal\./g,
     replacement: 'globalThis.',
-    description: 'global. → globalThis.'
+    description: 'global. → globalThis.',
   },
   // Pattern 18: DO NOT auto-replace Interface Window - requires manual handling
   // Global var declarations should be used instead, which we do NOT auto-replace
@@ -160,7 +162,9 @@ const dryRun = process.argv.includes('--dry-run');
 const batchArg = process.argv.find(arg => arg.startsWith('--batch='));
 const batch = batchArg ? batchArg.split('=')[1] : null;
 
-console.log(`Processing ${fileGroups.size} files with globalThis violations...`);
+console.log(
+  `Processing ${fileGroups.size} files with globalThis violations...`
+);
 console.log(`Mode: ${dryRun ? 'DRY RUN' : 'APPLY CHANGES'}`);
 if (batch) {
   console.log(`Batch filter: ${batch}`);
@@ -233,5 +237,7 @@ if (!dryRun && filesProcessed > 0) {
   console.log(`\n🔍 Next steps:`);
   console.log(`  1. Run: pnpm --filter @jovie/web run lint`);
   console.log(`  2. Review changes with: git diff`);
-  console.log(`  3. Commit: git commit -m "fix: migrate window/global to globalThis (batch N)"`);
+  console.log(
+    `  3. Commit: git commit -m "fix: migrate window/global to globalThis (batch N)"`
+  );
 }

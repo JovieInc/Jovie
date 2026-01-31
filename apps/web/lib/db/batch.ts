@@ -130,9 +130,9 @@ export async function batchUpdateSortOrder<T extends PgTable>(
 }
 
 /**
- * Generic batch update using a transaction.
- * Falls back to individual updates within a single transaction
- * for complex update patterns.
+ * Generic batch update with sequential operations.
+ * Executes individual updates sequentially for complex update patterns.
+ * The neon-http driver does not support transactions.
  *
  * @param updates - Array of id and data pairs
  * @param updateFn - Function to perform single update
@@ -147,12 +147,10 @@ export async function batchUpdateInTransaction<T>(
 ): Promise<number> {
   if (updates.length === 0) return 0;
 
-  return db.transaction(async tx => {
-    for (const update of updates) {
-      await updateFn(tx, update.id, update.data);
-    }
-    return updates.length;
-  });
+  for (const update of updates) {
+    await updateFn(db, update.id, update.data);
+  }
+  return updates.length;
 }
 
 /**

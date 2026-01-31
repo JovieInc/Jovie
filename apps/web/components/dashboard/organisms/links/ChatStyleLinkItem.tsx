@@ -23,7 +23,10 @@ import {
 import { GripVertical, MoreHorizontal } from 'lucide-react';
 import React, { useCallback, useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
 import {
@@ -107,7 +110,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
   const identity = canonicalIdentity(link);
   const handle = identity.startsWith('@') ? identity : undefined;
-  const iconMeta = getPlatformIcon(link.platform.icon);
+  const iconMeta = getPlatformIconMetadata(link.platform.icon);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
   const isDark = isBrandDark(brandColor);
 

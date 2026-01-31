@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { type DbOrTransaction, type DbType, db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 
 /**
@@ -65,7 +65,7 @@ export async function withDbSession<T>(
   options?: { clerkUserId?: string }
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
-  return await operation(userId);
+  return operation(userId);
 }
 
 /**
@@ -92,35 +92,10 @@ export async function withDbSessionTx<T>(
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
   const userId = await resolveClerkUserId(options?.clerkUserId);
-  const isolationLevel = options?.isolationLevel ?? 'read_committed';
 
-  // In tests, db may be a lightweight mock without transaction support.
-  if (typeof (db as DbType).transaction !== 'function') {
-    // Fall back to using the mocked db object directly.
-    return await operation(db, userId);
-  }
-
-  return await db.transaction(async tx => {
-    // Set transaction isolation level if not default
-    // CRITICAL: For onboarding, use SERIALIZABLE to prevent race conditions
-    // where two users claim the same handle simultaneously
-    if (isolationLevel !== 'read_committed') {
-      const isolationSql =
-        isolationLevel === 'serializable'
-          ? drizzleSql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`
-          : drizzleSql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`;
-      await tx.execute(isolationSql);
-    }
-
-    // Important: SET LOCAL must be inside the transaction to take effect.
-    // In unit tests, drizzleSql may be mocked without .raw; guard accordingly.
-    // Combined into single query for performance (saves one DB round trip)
-    await tx.execute(
-      drizzleSql`SELECT set_config('app.user_id', ${userId}, true), set_config('app.clerk_user_id', ${userId}, true)`
-    );
-    // Transaction client now properly typed with neon-serverless driver
-    return await operation(tx, userId);
-  });
+  // The neon-http driver does not support transactions.
+  // Execute the operation directly without wrapping in a transaction.
+  return operation(db, userId);
 }
 
 /**
@@ -394,8 +369,6 @@ export async function withSessionContext<T>(
     requireProfile: options?.requireProfile,
   });
 
-  // Set up RLS session
   await setupDbSession(context.clerkUserId);
-
-  return await operation(context);
+  return operation(context);
 }
