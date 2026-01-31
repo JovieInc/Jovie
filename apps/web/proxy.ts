@@ -30,7 +30,6 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // Single Domain Architecture
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
-// - app.jov.ie: 301 redirects to jov.ie (backwards compatibility)
 // - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
 // ============================================================================
 
@@ -164,14 +163,13 @@ function categorizePath(pathname: string): PathCategory {
 
 interface HostInfo {
   isMainHost: boolean;
-  isLegacyAppSubdomain: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
 }
 
 /**
  * Analyze hostname once for all routing decisions.
- * Single domain architecture: everything on jov.ie, with backwards compat redirects.
+ * Single domain architecture: everything on jov.ie.
  */
 function analyzeHost(hostname: string): HostInfo {
   const isDevOrPreview =
@@ -186,14 +184,10 @@ function analyzeHost(hostname: string): HostInfo {
     hostname === `main.${PROFILE_HOSTNAME}` ||
     isDevOrPreview;
 
-  // Legacy app subdomain - redirect to main domain for backwards compatibility
-  const isLegacyAppSubdomain =
-    hostname === 'app.jov.ie' || hostname === 'app.main.jov.ie';
-
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
 
-  return { isMainHost, isLegacyAppSubdomain, isDevOrPreview, isMeetJovie };
+  return { isMainHost, isDevOrPreview, isMeetJovie };
 }
 
 /** Dashboard is always at /app in single-domain architecture */
@@ -291,27 +285,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // 301 redirect ALL meetjovie.com traffic to jov.ie
     if (hostInfo.isMeetJovie) {
       const targetUrl = new URL(pathname, 'https://jov.ie');
-      targetUrl.search = req.nextUrl.search;
-      return NextResponse.redirect(targetUrl, 301);
-    }
-
-    // ========================================================================
-    // Backwards compatibility: Redirect legacy app.jov.ie to jov.ie
-    // ========================================================================
-    if (hostInfo.isLegacyAppSubdomain) {
-      // Map legacy app subdomain paths to new single-domain structure
-      let targetPath = pathname;
-
-      if (pathname === '/' || pathname === '/dashboard') {
-        // Legacy dashboard root → /app
-        targetPath = '/app';
-      } else if (pathInfo.isDashboardPath || pathInfo.isSettingsPath) {
-        // /profile, /settings, etc. → /app/profile, /app/settings
-        targetPath = `/app${pathname}`;
-      }
-      // Other paths (signin, signup, etc.) stay as-is
-
-      const targetUrl = new URL(targetPath, 'https://jov.ie');
       targetUrl.search = req.nextUrl.search;
       return NextResponse.redirect(targetUrl, 301);
     }
