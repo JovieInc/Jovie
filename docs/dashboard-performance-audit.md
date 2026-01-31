@@ -12,7 +12,7 @@ This audit identifies performance bottlenecks in the Jovie dashboard. While the 
 ### Key Findings Summary
 
 | Category | Severity | Issues Found |
-|----------|----------|--------------|
+| -------- | -------- | ------------ |
 | Re-rendering | High | 5 critical patterns |
 | Database Queries | High | 4 missing indexes |
 | Caching | Medium | Multi-instance coherency gap |
@@ -29,9 +29,11 @@ This audit identifies performance bottlenecks in the Jovie dashboard. While the 
 **Line:** 260
 
 **Status:** Already properly memoized with `useMemo`:
+
 ```typescript
 value={useMemo(() => ({ tableMeta, setTableMeta }), [tableMeta])}
 ```
+
 
 ---
 
@@ -269,7 +271,7 @@ Barrel exports 20 separate cell components. Consider namespace imports or direct
 The dashboard correctly uses `force-dynamic` for user-specific pages:
 
 | File | Justification |
-|------|---------------|
+| ---- | ------------- |
 | `(shell)/layout.tsx` | User-specific dashboard data |
 | `(shell)/page.tsx` | Dashboard overview with user data |
 | `dashboard/analytics/page.tsx` | User analytics |
@@ -314,7 +316,7 @@ Batches queries with `Promise.all()` to avoid waterfalls. Previously 3 queries, 
 ### Lazy Loading ✓
 
 | Component | File | Benefit |
-|-----------|------|---------|
+| --------- | ---- | ------- |
 | `LazyEnhancedDashboardLinks` | `organisms/LazyEnhancedDashboardLinks.tsx` | Defers dnd-kit bundle |
 | `DashboardAudienceClient` | `organisms/DashboardAudienceClient.tsx` | Defers table rendering |
 | `ReleaseSidebar` | `release-provider-matrix/ReleaseProviderMatrix.tsx` | ~30-50KB reduction |
@@ -341,7 +343,7 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 ### High Priority (Performance Impact)
 
 | # | Issue | File | Status |
-|---|-------|------|--------|
+| - | ----- | ---- | ------ |
 | 1 | Add JSON metadata index | Migration `0020` | ✅ Done |
 | 2 | Add geographic indexes | Migration `0020` | ✅ Done |
 | 3 | Memoize DashboardLayoutClient context | `DashboardLayoutClient.tsx` | ✅ Already done |
@@ -351,7 +353,7 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 ### Medium Priority (Code Quality)
 
 | # | Issue | File | Status |
-|---|-------|------|--------|
+| - | ----- | ---- | ------ |
 | 6 | Fix referrer NULL handling | `analytics.ts` | ✅ Done |
 | 7 | Consider Redis for analytics cache | `route.ts` | Pending (High effort) |
 | 8 | Refactor barrel exports to selective | `links/index.ts` | ✅ Done |
@@ -360,7 +362,7 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 ### Low Priority (Nice-to-Have)
 
 | # | Issue | File | Effort |
-|---|-------|------|--------|
+| - | ----- | ---- | ------ |
 | 10 | Add cache versioning | `route.ts` | Low |
 | 11 | Review animation frame batching | `DashboardAnalyticsCards.tsx` | Medium |
 | 12 | Document link_type semantic issue | `analytics.ts` | Low |
@@ -370,7 +372,7 @@ Analytics queries consolidated from 9 → 1 and 8 → 1 with CTEs:
 ## 8. Metrics to Track
 
 | Metric | Current | Target |
-|--------|---------|--------|
+| ------ | ------- | ------ |
 | Context re-renders per navigation | ~5-10 | 1-2 |
 | Analytics query p95 latency | ~50ms | ~30ms (with indexes) |
 | Dashboard initial load (LCP) | ~1.2s | <1.0s |
