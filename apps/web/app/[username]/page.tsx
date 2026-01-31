@@ -11,6 +11,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -176,8 +177,8 @@ const fetchProfileAndLinks = async (
           .trim(),
       display_title: result.displayName || result.username,
       profile_completion_pct: 80, // Calculate based on filled fields
-      created_at: result.createdAt.toISOString(),
-      updated_at: result.updatedAt.toISOString(),
+      created_at: toISOStringSafe(result.createdAt),
+      updated_at: toISOStringSafe(result.updatedAt),
     };
 
     const links: LegacySocialLink[] =
@@ -187,7 +188,7 @@ const fetchProfileAndLinks = async (
         platform: link.platform.toLowerCase(),
         url: link.url,
         clicks: link.clicks || 0,
-        created_at: link.createdAt.toISOString(),
+        created_at: toISOStringSafe(link.createdAt),
       })) ?? [];
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];

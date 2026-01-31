@@ -4,6 +4,7 @@
 
 // Import SocialPlatform from the canonical source
 export type { SocialPlatform } from '@/constants/platforms';
+import { toISOStringSafe } from '@/lib/utils/date';
 
 // Creator type enum
 export type CreatorType = 'artist' | 'podcaster' | 'influencer' | 'creator';
@@ -427,6 +428,6 @@ export function convertDrizzleCreatorProfileToArtist(
     is_verified: profile.isVerified ?? false,
     is_featured: profile.isFeatured ?? false,
     marketing_opt_out: profile.marketingOptOut ?? false,
-    created_at: profile.createdAt.toISOString(),
+    created_at: toISOStringSafe(profile.createdAt),
   };
 }

@@ -1,4 +1,19 @@
 /**
+ * Safely converts a date value to an ISO string.
+ * Handles both Date objects and string representations (from cache/JSON).
+ * This is useful when data may come from cache where Date objects are serialized as strings.
+ *
+ * @param date - A Date object or ISO string representation
+ * @returns The ISO string representation
+ */
+export function toISOStringSafe(date: Date | string): string {
+  if (typeof date === 'string') {
+    return date;
+  }
+  return date.toISOString();
+}
+
+/**
  * Formats a date to a user-friendly relative format:
  * - "Today" for today
  * - "Yesterday" for yesterday
