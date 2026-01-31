@@ -1,7 +1,12 @@
 'use server';
 
 import { and, asc, eq } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidatePath,
+  revalidateTag,
+  unstable_cache,
+} from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -54,15 +59,13 @@ async function assertProfileOwnership(
   return profile;
 }
 
-export async function getProfileContactsForOwner(
-  profileId: string
+/**
+ * Core contacts fetch logic (cacheable)
+ */
+async function fetchContactsCore(
+  profileId: string,
+  userId: string
 ): Promise<DashboardContact[]> {
-  noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
   return withDbSessionTx(async (tx, clerkUserId) => {
     await assertProfileOwnership(tx, profileId, clerkUserId);
 
@@ -76,13 +79,41 @@ export async function getProfileContactsForOwner(
   });
 }
 
+/**
+ * Get profile contacts with caching (30s TTL)
+ * Cache is invalidated on mutations (save, delete)
+ */
+export async function getProfileContactsForOwner(
+  profileId: string
+): Promise<DashboardContact[]> {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  // Cache with 30s TTL and tags for invalidation
+  return unstable_cache(
+    () => fetchContactsCore(profileId, userId),
+    ['contacts', userId, profileId],
+    {
+      revalidate: 30,
+      tags: [`contacts:${userId}:${profileId}`],
+    }
+  )();
+}
+
 export async function saveContact(
   input: DashboardContactInput
 ): Promise<DashboardContact> {
   noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
   const sanitized = sanitizeContactInput(input);
 
-  return withDbSessionTx(async (tx, clerkUserId) => {
+  const result = await withDbSessionTx(async (tx, clerkUserId) => {
     const profile = await assertProfileOwnership(
       tx,
       sanitized.profileId,
@@ -146,6 +177,12 @@ export async function saveContact(
 
     return mapContact(saved);
   });
+
+  // Invalidate contacts cache after transaction completes
+  revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
+  revalidatePath('/app/dashboard/contacts');
+
+  return result;
 }
 
 export async function deleteContact(
@@ -181,4 +218,8 @@ export async function deleteContact(
     // Use centralized cache invalidation
     await invalidateProfileCache(profile.usernameNormalized);
   });
+
+  // Invalidate contacts cache after transaction completes
+  revalidateTag(`contacts:${userId}:${profileId}`, 'max');
+  revalidatePath('/app/dashboard/contacts');
 }
