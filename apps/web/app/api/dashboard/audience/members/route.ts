@@ -87,6 +87,11 @@ export async function GET(request: NextRequest) {
           .where(eq(audienceMembers.creatorProfileId, profileId)),
       ]);
 
+      const serializeDate = (value?: Date | string | null) => {
+        if (!value) return null;
+        return typeof value === 'string' ? value : value.toISOString();
+      };
+
       const members = rows.map(member => ({
         id: member.id,
         type: member.type,
@@ -108,8 +113,8 @@ export async function GET(request: NextRequest) {
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
         tags: Array.isArray(member.tags) ? member.tags : [],
-        lastSeenAt: member.lastSeenAt?.toISOString(),
-        createdAt: member.createdAt?.toISOString(),
+        lastSeenAt: serializeDate(member.lastSeenAt),
+        createdAt: serializeDate(member.createdAt),
       }));
 
       return NextResponse.json(
