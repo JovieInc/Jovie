@@ -281,10 +281,22 @@ export function useLinksPersistence({
         // Handle 409 Conflict - links were modified elsewhere
         if (error instanceof FetchError && error.status === 409) {
           toast.error(
-            'Your links were updated in another tab. Refreshing to show the latest version.',
+            'Your links were updated in another tab. Syncing suggestions and refreshing.',
             { duration: 5000 }
           );
-          await onSyncSuggestions?.();
+          try {
+            await onSyncSuggestions?.();
+            // Force refresh links to show latest
+            await queryClient.invalidateQueries({ queryKey: ['links'] });
+          } catch (syncError) {
+            void captureError(
+              'Failed to sync suggestions after 409',
+              syncError,
+              {
+                profileId,
+              }
+            );
+          }
           return;
         }
 
@@ -301,6 +313,9 @@ export function useLinksPersistence({
             message = 'Request timed out. Please try again.';
           } else if (error.status >= 500) {
             message = 'Server error. Please try again later.';
+          } else {
+            // For 4xx errors (except 408), preserve the error message
+            message = error.message || message;
           }
         } else if (error instanceof Error && error.message) {
           message = error.message;
