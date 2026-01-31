@@ -4,7 +4,10 @@
 
 This report analyzes the test coverage of the Jovie codebase and identifies areas requiring improvement. The project has a sophisticated testing infrastructure using Vitest (unit tests) and Playwright (E2E tests), but several critical areas have gaps in coverage.
 
-**Overall Statistics:**
+**Overall Statistics (snapshot: 2026-01-31, pre-PR baseline):**
+
+> _The counts below represent the codebase state **before** this PR. Tests added in this PR (e.g., `apps/web/tests/lib/queries/*.test.tsx`) are not reflected in these figures._
+
 - **Total Test Files:** 351 (348 in apps/web + 3 in packages/ui)
 - **Lines of Test Code:** ~68,000
 - **Testing Frameworks:** Vitest 4.x, Playwright 1.55, Testing Library

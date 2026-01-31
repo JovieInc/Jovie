@@ -32,8 +32,8 @@ describe('useDashboardProfileQuery', () => {
   );
 
   beforeEach(() => {
+    mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
-    vi.clearAllMocks();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
