@@ -84,6 +84,14 @@
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
+      },
+      "style": {
+        "noRestrictedGlobals": {
+          "level": "warn",
+          "options": {
+            "deniedGlobals": ["global"]
+          }
+        }
       }
     }
   },

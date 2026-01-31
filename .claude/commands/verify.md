@@ -115,7 +115,25 @@ grep -rn "from '@/lib/db/client'" apps/web --include="*.ts" --include="*.tsx" | 
 grep -rn "from '@neondatabase" apps/web --include="*.ts" --include="*.tsx" | grep -v "lib/db/"
 ```
 
-## 5. React Hook Best Practices
+## 5. TanStack Query Patterns
+
+**Verify proper cache configuration and AbortSignal usage:**
+
+- [ ] All `useQuery` calls have `staleTime` configured (or use a cache preset)
+- [ ] All `queryFn` destructure and pass `signal` parameter
+- [ ] No aggressive refetch settings for stable data (`refetchOnMount: false`, `refetchOnWindowFocus: false`)
+- [ ] Cache presets from `lib/queries/cache.ts` used consistently
+
+**Quick grep checks:**
+```bash
+# Find useQuery without staleTime (review these)
+grep -rn "useQuery({" apps/web --include="*.tsx" --include="*.ts" | grep -v staleTime | grep -v CACHE
+
+# Find queryFn without signal (review these)
+grep -rn "queryFn:" apps/web --include="*.tsx" --include="*.ts" | grep -v signal
+```
+
+## 6. React Hook Best Practices
 
 **Prevent render loops and memory leaks:**
 

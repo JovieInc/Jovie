@@ -6,6 +6,11 @@ const noHandlerInitializationRule = require('./eslint-rules/no-handler-initializ
 const serverOnlyImportsRule = require('./eslint-rules/server-only-imports');
 const useClientDirectiveRule = require('./eslint-rules/use-client-directive');
 const readonlyComponentPropsRule = require('./eslint-rules/readonly-component-props');
+const noDbTransactionRule = require('./eslint-rules/no-db-transaction');
+const noManualDbPoolingRule = require('./eslint-rules/no-manual-db-pooling');
+const noHardcodedRoutesRule = require('./eslint-rules/no-hardcoded-routes');
+const requireQueryCacheConfigRule = require('./eslint-rules/require-query-cache-config');
+const requireAbortSignalRule = require('./eslint-rules/require-abort-signal');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -21,6 +26,11 @@ const baseConfig = {
         'server-only-imports': serverOnlyImportsRule,
         'use-client-directive': useClientDirectiveRule,
         'readonly-component-props': readonlyComponentPropsRule,
+        'no-db-transaction': noDbTransactionRule,
+        'no-manual-db-pooling': noManualDbPoolingRule,
+        'no-hardcoded-routes': noHardcodedRoutesRule,
+        'require-query-cache-config': requireQueryCacheConfigRule,
+        'require-abort-signal': requireAbortSignalRule,
       },
     },
   },
@@ -115,6 +125,14 @@ const baseConfig = {
     '@jovie/use-client-directive': 'warn',
     // Enforce readonly modifiers on React component props for type safety
     '@jovie/readonly-component-props': 'error',
+    // Database guardrails - Neon HTTP driver restrictions
+    '@jovie/no-db-transaction': 'error',
+    '@jovie/no-manual-db-pooling': 'error',
+    // Route management - prevent hardcoded paths
+    '@jovie/no-hardcoded-routes': 'error',
+    // TanStack Query best practices - warn initially for gradual adoption
+    '@jovie/require-query-cache-config': 'warn',
+    '@jovie/require-abort-signal': 'warn',
   },
 };
 
