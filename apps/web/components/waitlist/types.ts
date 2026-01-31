@@ -44,7 +44,7 @@ export const PRIMARY_GOAL_OPTIONS: Array<{
 export function clearWaitlistStorage(): void {
   try {
     Object.values(WAITLIST_STORAGE_KEYS).forEach(key => {
-      window.sessionStorage.removeItem(key);
+      globalThis.sessionStorage.removeItem(key);
     });
   } catch {
     // Ignore storage errors

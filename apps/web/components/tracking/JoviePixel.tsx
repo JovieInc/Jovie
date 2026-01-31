@@ -61,7 +61,7 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
         },
         consent: hasConsent,
         referrer: document.referrer || undefined,
-        pageUrl: window.location.href,
+        pageUrl: globalThis.location.href,
       };
 
       const body = JSON.stringify(payload);
@@ -174,7 +174,7 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
 function getUTMParams(): Record<string, string> {
   if (typeof window === 'undefined') return {};
 
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(globalThis.location.search);
   const utm: Record<string, string> = {};
 
   const utmKeys = [

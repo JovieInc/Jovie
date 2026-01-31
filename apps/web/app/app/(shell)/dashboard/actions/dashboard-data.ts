@@ -51,47 +51,34 @@ function trySerialize(value: unknown): string | null {
   }
 }
 
-function serializeErrorObject(error: Error): string {
-  return (
-    trySerialize({
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-    }) ??
-    trySerialize({
-      message: String(error.message),
-      name: error.name,
-    }) ??
-    String(error)
-  );
-}
-
-function serializePlainObject(
-  obj: Record<string, unknown>,
-  error: unknown
-): string {
-  return (
-    trySerialize({
-      message: typeof obj.message === 'string' ? obj.message : undefined,
-      code: typeof obj.code === 'string' ? obj.code : undefined,
-      name: typeof obj.name === 'string' ? obj.name : undefined,
-      cause: obj.cause,
-    }) ??
-    trySerialize({
-      message: typeof obj.message === 'string' ? obj.message : String(error),
-      name: typeof obj.name === 'string' ? obj.name : undefined,
-    }) ??
-    String(error)
-  );
-}
-
 function safeSerializeError(error: unknown): string {
   if (error instanceof Error) {
-    return serializeErrorObject(error);
+    return (
+      trySerialize({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }) ??
+      trySerialize({ message: String(error.message), name: error.name }) ??
+      String(error)
+    );
   }
 
   if (typeof error === 'object' && error !== null) {
-    return serializePlainObject(error as Record<string, unknown>, error);
+    const obj = error as Record<string, unknown>;
+    return (
+      trySerialize({
+        message: typeof obj.message === 'string' ? obj.message : undefined,
+        code: typeof obj.code === 'string' ? obj.code : undefined,
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+        cause: obj.cause,
+      }) ??
+      trySerialize({
+        message: typeof obj.message === 'string' ? obj.message : String(error),
+        name: typeof obj.name === 'string' ? obj.name : undefined,
+      }) ??
+      String(error)
+    );
   }
 
   return trySerialize({ value: String(error) }) ?? String(error);
@@ -427,7 +414,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       tippingStats = await Sentry.startSpan(
         { op: 'task', name: 'dashboard.getTippingStats' },
         async () =>
-          fetchTippingStatsWithSession(chromeData.selectedProfile!.id, userId)
+          getCachedTippingStats(chromeData.selectedProfile!.id, userId)
       );
     }
 
@@ -458,6 +445,13 @@ async function resolveDashboardData(): Promise<DashboardData> {
 const getCachedChromeData = unstableCache(
   async (clerkUserId: string) => fetchChromeDataWithSession(clerkUserId),
   ['dashboard-chrome'],
+  { revalidate: 30 }
+);
+
+const getCachedTippingStats = unstableCache(
+  async (profileId: string, clerkUserId: string) =>
+    fetchTippingStatsWithSession(profileId, clerkUserId),
+  ['dashboard-tipping-stats'],
   { revalidate: 30 }
 );
 

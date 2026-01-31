@@ -57,7 +57,7 @@ export function UpgradeButton({
               price_id: priceId,
             });
             // Redirect to Stripe checkout
-            window.location.href = data.url;
+            globalThis.location.href = data.url;
           },
           onError: error => {
             const errorMessage =

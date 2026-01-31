@@ -7,7 +7,10 @@ import {
 } from '@jovie/ui';
 import { ChevronDown, Search } from 'lucide-react';
 
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { isBrandDark } from '@/lib/utils/color';
 
 import {
@@ -34,7 +37,7 @@ export function UniversalLinkInputPlatformSelector({
   onRestoreFocus,
   disabled = false,
 }: PlatformSelectorProps) {
-  const currentIconMeta = getPlatformIcon(currentPlatformIcon);
+  const currentIconMeta = getPlatformIconMetadata(currentPlatformIcon);
   const currentIconHex = currentIconMeta?.hex
     ? `#${currentIconMeta.hex}`
     : '#6b7280';
@@ -78,7 +81,7 @@ export function UniversalLinkInputPlatformSelector({
         }}
       >
         {ARTIST_SEARCH_PLATFORMS.map(platform => {
-          const meta = getPlatformIcon(platform.icon);
+          const meta = getPlatformIconMetadata(platform.icon);
           const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
           const darkBrand = isBrandDark(hex);
 
@@ -106,7 +109,7 @@ export function UniversalLinkInputPlatformSelector({
         <DropdownMenuSeparator />
 
         {PLATFORM_OPTIONS.map(platform => {
-          const meta = getPlatformIcon(platform.icon);
+          const meta = getPlatformIconMetadata(platform.icon);
           const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
           const darkBrand = isBrandDark(hex);
           return (

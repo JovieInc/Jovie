@@ -23,7 +23,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       if (!isMdUp) return;
       setDismissed(false);
       setMode('open');
-      setUrl(`${window.location.origin}/${handle}`);
+      setUrl(`${globalThis.location.origin}/${handle}`);
     };
 
     globalThis.addEventListener('jovie:open-profile-qr', onOpen);
@@ -48,7 +48,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     if (isLgUp && !hasDismissed) {
       setMode('open');
-      setUrl(`${window.location.origin}/${handle}`);
+      setUrl(`${globalThis.location.origin}/${handle}`);
       return;
     }
 
@@ -74,7 +74,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
       if (isLgUp && !dismissed) {
         setMode('open');
-        setUrl(`${window.location.origin}/${handle}`);
+        setUrl(`${globalThis.location.origin}/${handle}`);
         return;
       }
 
@@ -135,7 +135,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const reopen = () => {
     setMode('open');
     try {
-      setUrl(`${window.location.origin}/${handle}`);
+      setUrl(`${globalThis.location.origin}/${handle}`);
     } catch (error) {
       console.error('[DesktopQrOverlay] Failed to set URL:', error);
     }

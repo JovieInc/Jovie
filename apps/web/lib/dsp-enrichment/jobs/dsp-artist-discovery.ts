@@ -443,11 +443,12 @@ export async function processDspArtistDiscoveryJob(
 }
 
 /**
- * Process discovery job with standalone database transaction.
+ * Process discovery job with standalone database operations.
  * Used when called from API routes.
+ * The neon-http driver does not support transactions.
  */
 export async function processDspArtistDiscoveryJobStandalone(
   jobPayload: unknown
 ): Promise<DspArtistDiscoveryResult> {
-  return db.transaction(tx => processDspArtistDiscoveryJob(tx, jobPayload));
+  return processDspArtistDiscoveryJob(db, jobPayload);
 }

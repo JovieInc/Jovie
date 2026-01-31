@@ -86,7 +86,7 @@ export function useReleaseSidebar({
     try {
       const url = new URL(
         release.smartLinkPath,
-        window.location.origin
+        globalThis.location.origin
       ).toString();
       await navigator.clipboard.writeText(url);
       track('release_smart_link_copied', { releaseId: release.id });

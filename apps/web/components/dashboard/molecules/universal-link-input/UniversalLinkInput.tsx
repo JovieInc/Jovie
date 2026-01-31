@@ -17,7 +17,10 @@ import {
 } from '@floating-ui/react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -89,7 +92,7 @@ function PlatformSuggestionItem({
   readonly onMouseEnter: () => void;
   readonly onClick: () => void;
 }) {
-  const iconMeta = getPlatformIcon(option.icon);
+  const iconMeta = getPlatformIconMetadata(option.icon);
   const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
   const isDark = isBrandDark(iconHex);
 

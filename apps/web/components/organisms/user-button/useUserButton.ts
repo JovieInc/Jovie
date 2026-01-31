@@ -69,11 +69,11 @@ export function useUserButton({
 
   const redirectToUrl = (url: string) => {
     if (typeof window === 'undefined') return;
-    if (typeof window.location.assign === 'function') {
-      window.location.assign(url);
+    if (typeof globalThis.location.assign === 'function') {
+      globalThis.location.assign(url);
       return;
     }
-    window.location.href = url;
+    globalThis.location.href = url;
   };
 
   useEffect(() => {

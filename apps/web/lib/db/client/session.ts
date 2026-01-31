@@ -24,11 +24,7 @@ export async function withDb<T>(
   context = 'withDb'
 ): Promise<{ data?: T; error?: Error }> {
   try {
-    const result = await withRetry(async () => {
-      const db = getDb();
-      return await operation(db);
-    }, context);
-
+    const result = await withRetry(() => operation(getDb()), context);
     return { data: result };
   } catch (error) {
     logDbError('withDb', error, { context });
@@ -61,7 +57,9 @@ export async function setSessionUser(userId: string): Promise<void> {
 }
 
 /**
- * Helper to get a database transaction with retry logic
+ * Helper to execute database operations with retry logic.
+ * The neon-http driver does not support transactions.
+ * This executes the operation directly without transaction guarantees.
  */
 export async function withTransaction<T>(
   operation: (tx: TransactionType) => Promise<T>,
@@ -74,13 +72,12 @@ export async function withTransaction<T>(
         db = initializeDb();
         setInternalDb(db);
       }
-      return await db.transaction(async tx => {
-        // The transaction callback receives a properly typed transaction client
-        return await operation(tx);
-      });
+      // Execute operation directly without transaction wrapper
+      // Pass db as if it were a transaction for API compatibility
+      return await operation(db as unknown as TransactionType);
     }, context);
 
-    logDbInfo('withTransaction', 'Transaction completed successfully', {
+    logDbInfo('withTransaction', 'Operation completed successfully', {
       context,
     });
     return { data: result };

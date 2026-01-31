@@ -141,7 +141,7 @@ export function AppleStyleOnboardingForm({
   ]);
 
   const goToDashboard = useCallback(() => {
-    window.location.href = '/app/dashboard';
+    globalThis.location.href = '/app/dashboard';
   }, []);
 
   const renderStepContent = () => {
