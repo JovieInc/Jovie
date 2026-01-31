@@ -161,8 +161,7 @@ export const buildContentSecurityPolicyReportOnly = (
   const directives = buildCspDirectives(options);
 
   // Add reporting directives
-  directives.push(`report-uri ${reportUri}`);
-  directives.push(`report-to ${CSP_REPORT_GROUP}`);
+  directives.push(`report-uri ${reportUri}`, `report-to ${CSP_REPORT_GROUP}`);
 
   return directives.join('; ');
 };

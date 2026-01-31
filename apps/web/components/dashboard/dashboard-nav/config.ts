@@ -15,7 +15,9 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+
 import { APP_ROUTES } from '@/constants/routes';
+
 import type { NavItem } from './types';
 
 export const primaryNavigation: NavItem[] = [

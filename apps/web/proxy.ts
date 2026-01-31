@@ -405,11 +405,46 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         );
       } else {
         // All other paths - user is authenticated and on correct page
-        // On app.jov.ie, rewrite root to /app to show dashboard instead of marketing
-        if (isAppSubdomain(hostname) && pathname === '/') {
-          res = NextResponse.rewrite(new URL('/app', req.url), {
-            request: { headers: requestHeaders },
-          });
+        // On app.jov.ie, rewrite clean paths to internal Next.js routes
+        if (isAppSubdomain(hostname)) {
+          // Map clean paths to internal routes
+          // Dashboard routes: /profile → /app/dashboard/profile
+          const dashboardPaths = [
+            '/profile',
+            '/contacts',
+            '/releases',
+            '/tour-dates',
+            '/audience',
+            '/earnings',
+            '/links',
+            '/chat',
+            '/analytics',
+          ];
+          const isDashboardPath = dashboardPaths.some(
+            p => pathname === p || pathname.startsWith(`${p}/`)
+          );
+
+          let rewritePath: string | null = null;
+          if (pathname === '/') {
+            rewritePath = '/app';
+          } else if (isDashboardPath) {
+            rewritePath = `/app/dashboard${pathname}`;
+          } else if (
+            pathname.startsWith('/settings') ||
+            pathname.startsWith('/admin') ||
+            pathname.startsWith('/billing') ||
+            pathname.startsWith('/account')
+          ) {
+            rewritePath = `/app${pathname}`;
+          }
+
+          if (rewritePath) {
+            res = NextResponse.rewrite(new URL(rewritePath, req.url), {
+              request: { headers: requestHeaders },
+            });
+          } else {
+            res = NextResponse.next({ request: { headers: requestHeaders } });
+          }
         } else {
           res = NextResponse.next({ request: { headers: requestHeaders } });
         }
@@ -420,11 +455,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         '/waitlist',
         '/analytics',
         '/audience',
+        '/chat',
         '/contacts',
         '/earnings',
         '/links',
         '/profile',
         '/releases',
+        '/tour-dates',
         '/settings',
         '/admin',
         '/account',

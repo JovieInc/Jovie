@@ -48,9 +48,7 @@ export function cloudinaryUrl(
   const quality = opts.quality ?? 'auto';
   const dpr = opts.dpr ?? 'auto';
 
-  parts.push(`f_${format}`); // format
-  parts.push(`q_${quality}`); // quality
-  parts.push(`dpr_${dpr}`); // device pixel ratio
+  parts.push(`f_${format}`, `q_${quality}`, `dpr_${dpr}`);
 
   if (opts.width) parts.push(`w_${opts.width}`);
   if (opts.height) parts.push(`h_${opts.height}`);

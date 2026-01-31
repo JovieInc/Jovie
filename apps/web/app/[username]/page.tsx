@@ -8,7 +8,7 @@ import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { ConsentBanner, JoviePixel } from '@/components/tracking';
+import { JoviePixel } from '@/components/tracking';
 import { PAGE_SUBTITLES, PROFILE_URL } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import type {
@@ -404,7 +404,6 @@ export default async function ArtistPage({
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
-      <ConsentBanner />
       {showClaimBanner && (
         <ClaimBanner
           claimToken={claimTokenParam}

@@ -198,8 +198,10 @@ function extractDehydratedLinks(queries: unknown): unknown[] {
     const data = (query as { state?: { data?: unknown } }).state?.data;
     if (!data || typeof data !== 'object') continue;
 
-    links.push((data as { links?: unknown }).links);
-    links.push((data as { page?: { links?: unknown } }).page?.links);
+    links.push(
+      (data as { links?: unknown }).links,
+      (data as { page?: { links?: unknown } }).page?.links
+    );
   }
   return links;
 }
