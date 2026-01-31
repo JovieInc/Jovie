@@ -146,8 +146,8 @@ export function useArtistSearchQuery(
     enabled: debouncedQuery.length >= minQueryLength,
     staleTime: 1 * 60 * 1000, // 1 min
     gcTime: 10 * 60 * 1000, // 10 min
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnMount: false, // Search results are user-initiated, no auto-refetch needed
+    refetchOnWindowFocus: false, // Avoid unnecessary API calls on tab switch
   });
 
   // Derive state from query status
