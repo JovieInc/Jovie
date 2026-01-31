@@ -27,10 +27,9 @@ import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse } from '@/lib/utils/bot-detection';
 
 // ============================================================================
-// Multi-Domain Routing Configuration
+// Single Domain Architecture
 // ============================================================================
-// - jov.ie (PROFILE_HOSTNAME): Marketing homepage + Public creator profiles
-// - app.jov.ie (APP_HOSTNAME): Dashboard + App (authenticated)
+// - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
 // - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
 // ============================================================================
 
@@ -163,14 +162,14 @@ function categorizePath(pathname: string): PathCategory {
 // ============================================================================
 
 interface HostInfo {
-  isProfileHost: boolean;
-  isAppSubdomain: boolean;
+  isMainHost: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
 }
 
 /**
  * Analyze hostname once for all routing decisions.
+ * Single domain architecture: everything on jov.ie.
  */
 function analyzeHost(hostname: string): HostInfo {
   const isDevOrPreview =
@@ -179,32 +178,20 @@ function analyzeHost(hostname: string): HostInfo {
     hostname.includes('vercel.app') ||
     hostname.startsWith('main.');
 
-  const isProfileHost =
+  const isMainHost =
     hostname === PROFILE_HOSTNAME ||
     hostname === `www.${PROFILE_HOSTNAME}` ||
-    hostname === `main.${PROFILE_HOSTNAME}`;
-
-  const isAppSubdomain =
-    hostname === 'app.jov.ie' ||
-    (isDevOrPreview && hostname.startsWith('app.'));
+    hostname === `main.${PROFILE_HOSTNAME}` ||
+    isDevOrPreview;
 
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
 
-  return { isProfileHost, isAppSubdomain, isDevOrPreview, isMeetJovie };
+  return { isMainHost, isDevOrPreview, isMeetJovie };
 }
 
-/**
- * Get the dashboard URL based on environment.
- * In production on app.jov.ie, dashboard is at '/'.
- * In dev/preview, dashboard is at '/app'.
- */
-function getDashboardUrl(hostInfo: HostInfo): string {
-  if (hostInfo.isDevOrPreview && !hostInfo.isAppSubdomain) {
-    return '/app';
-  }
-  return '/';
-}
+/** Dashboard is always at /app in single-domain architecture */
+const DASHBOARD_URL = '/app';
 
 const CLERK_SENSITIVE_PATTERNS = [
   'dummy',
@@ -256,6 +243,20 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const hostInfo = analyzeHost(hostname);
 
     // ========================================================================
+    // Generate CSP nonce early and set on request headers
+    // Next.js Server Components read the nonce from request headers via headers().get('x-nonce')
+    // ========================================================================
+    const requestHeaders = new Headers(req.headers);
+    let nonce: string | null = null;
+
+    if (pathInfo.needsNonce) {
+      nonce = generateNonce();
+      requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
+      // Fire-and-forget Sentry initialization (non-blocking)
+      ensureSentry().catch(() => {});
+    }
+
+    // ========================================================================
     // Early exits that don't need CSP or user state (no DB/Redis calls)
     // ========================================================================
 
@@ -289,44 +290,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     // ========================================================================
-    // Domain routing redirects (no auth needed)
-    // ========================================================================
-    if (!hostInfo.isDevOrPreview) {
-      // app.jov.ie: Only allow app paths
-      if (hostInfo.isAppSubdomain) {
-        if (pathname === '/dashboard') {
-          const targetUrl = new URL('https://app.jov.ie');
-          targetUrl.pathname = '/';
-          targetUrl.search = req.nextUrl.search;
-          return NextResponse.redirect(targetUrl, 301);
-        }
-        if (!pathInfo.isAppPath) {
-          return NextResponse.redirect(
-            new URL(pathname, 'https://jov.ie'),
-            301
-          );
-        }
-      }
-
-      // jov.ie root: Redirect app paths to app subdomain
-      if (hostInfo.isProfileHost) {
-        if (pathInfo.isDashboardPath || pathInfo.isSettingsPath) {
-          return NextResponse.redirect(
-            new URL(pathname, 'https://app.jov.ie'),
-            301
-          );
-        }
-        if (pathname.startsWith('/app/')) {
-          const withoutPrefix = pathname.replace(/^\/app/, '');
-          return NextResponse.redirect(
-            new URL(withoutPrefix, 'https://app.jov.ie'),
-            301
-          );
-        }
-      }
-    }
-
-    // ========================================================================
     // Unauthenticated user handling (no getUserState call needed)
     // ========================================================================
     if (!userId) {
@@ -343,9 +306,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
 
       // Check if path requires authentication
-      const needsAuth =
-        pathInfo.isProtectedPath ||
-        (hostInfo.isAppSubdomain && pathname === '/');
+      const needsAuth = pathInfo.isProtectedPath;
 
       if (needsAuth) {
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
@@ -357,10 +318,11 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       // Unauthenticated user on public path - build response with CSP if needed
       return buildFinalResponse(
         req,
-        NextResponse.next(),
+        NextResponse.next({ request: { headers: requestHeaders } }),
         pathInfo,
         startTime,
-        null
+        null,
+        nonce
       );
     }
 
@@ -388,7 +350,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     let res: NextResponse;
-    const requestHeaders = new Headers(req.headers);
 
     // Handle authenticated user on auth pages (signin/signup)
     if (
@@ -410,7 +371,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       if (redirectUrl) {
         return NextResponse.redirect(new URL(redirectUrl, req.url));
       }
-      return NextResponse.redirect(new URL(getDashboardUrl(hostInfo), req.url));
+      return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
     }
 
     // Route based on user state
@@ -444,52 +405,27 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         pathname === '/waitlist' &&
         !isRSCPrefetch
       ) {
-        return NextResponse.redirect(
-          new URL(getDashboardUrl(hostInfo), req.url)
-        );
+        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
         !isRSCPrefetch
       ) {
-        return NextResponse.redirect(
-          new URL(getDashboardUrl(hostInfo), req.url)
-        );
+        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (
         (pathname === '/signin' || pathname === '/signup') &&
         !isRSCPrefetch
       ) {
-        return NextResponse.redirect(
-          new URL(getDashboardUrl(hostInfo), req.url)
-        );
+        return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else {
-        // Handle app subdomain rewrites
-        if (hostInfo.isAppSubdomain) {
-          let rewritePath: string | null = null;
-          if (pathname === '/') {
-            rewritePath = '/app';
-          } else if (pathInfo.isDashboardPath) {
-            rewritePath = `/app/dashboard${pathname}`;
-          } else if (pathInfo.isSettingsPath) {
-            rewritePath = `/app${pathname}`;
-          }
-
-          if (rewritePath) {
-            res = NextResponse.rewrite(new URL(rewritePath, req.url), {
-              request: { headers: requestHeaders },
-            });
-          } else {
-            res = NextResponse.next({ request: { headers: requestHeaders } });
-          }
-        } else {
-          res = NextResponse.next({ request: { headers: requestHeaders } });
-        }
+        // Single domain: no rewrites needed, routes are at their canonical paths
+        res = NextResponse.next({ request: { headers: requestHeaders } });
       }
     } else {
       res = NextResponse.next({ request: { headers: requestHeaders } });
     }
 
-    return buildFinalResponse(req, res, pathInfo, startTime, userId);
+    return buildFinalResponse(req, res, pathInfo, startTime, userId, nonce);
   } catch (error) {
     await captureError('Middleware error in proxy', error, {
       pathname: req.nextUrl.pathname,
@@ -501,25 +437,22 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
 /**
  * Build the final response with CSP headers and cookies.
- * CSP is deferred until after redirect decisions to avoid wasted computation.
+ * The nonce is pre-generated and set on request headers for Server Components.
+ * Here we set it on response headers for the CSP policy.
  */
 function buildFinalResponse(
   req: NextRequest,
   res: NextResponse,
   pathInfo: PathCategory,
   startTime: number,
-  userId: string | null
+  userId: string | null,
+  nonce: string | null
 ): NextResponse {
   const pathname = req.nextUrl.pathname;
 
-  // Generate nonce and build CSP only for paths that need it
-  // This is deferred until after redirect decisions
-  if (pathInfo.needsNonce) {
-    const nonce = generateNonce();
-
-    // Fire-and-forget Sentry initialization (non-blocking)
-    ensureSentry().catch(() => {});
-
+  // Set CSP headers using the pre-generated nonce
+  // The nonce was already set on request headers for Server Components
+  if (nonce && pathInfo.needsNonce) {
     res.headers.set(SCRIPT_NONCE_HEADER, nonce);
     res.headers.set(
       'Content-Security-Policy',

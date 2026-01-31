@@ -1,12 +1,8 @@
 /**
  * Domain Configuration for Jovie
  *
- * This file centralizes all domain-related constants for the unified jov.ie setup:
- * - jov.ie: Homepage + Public creator profiles (canonical, indexed)
- * - app.jov.ie: Dashboard + App (authenticated)
- *
- * Note: We use jov.ie for auth (root domain) and app.jov.ie for dashboard.
- * Clerk sessions work across both via cookie domain .jov.ie (no satellite costs).
+ * Single domain architecture: everything on jov.ie
+ * - jov.ie: Homepage, marketing, auth, profiles, and dashboard (at /app/*)
  *
  * Environment variables can override defaults for local development or staging.
  */
@@ -14,26 +10,28 @@
 import { publicEnv } from '@/lib/env-public';
 
 // ============================================================================
-// Domain Hostnames (without protocol)
+// Domain Configuration
 // ============================================================================
 
-/** Profile domain hostname - where public creator profiles and homepage live */
-export const PROFILE_HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
+/** Main domain hostname (jov.ie) */
+export const HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
 
-/** App/dashboard domain hostname (subdomain for dashboard and app) */
+/** @deprecated Use HOSTNAME instead */
+export const PROFILE_HOSTNAME = HOSTNAME;
+
+/** @deprecated Use HOSTNAME instead - now same as PROFILE_HOSTNAME */
 export const APP_HOSTNAME = publicEnv.NEXT_PUBLIC_APP_HOSTNAME;
 
 /** Admin email domain - emails ending with this domain get admin access */
 export const ADMIN_EMAIL_DOMAIN = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
 
-// ============================================================================
-// Full URLs (with protocol)
-// ============================================================================
+/** Base URL (https://jov.ie) */
+export const BASE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
 
-/** Profile base URL - for building profile links */
-export const PROFILE_URL = publicEnv.NEXT_PUBLIC_PROFILE_URL;
+/** @deprecated Use BASE_URL instead */
+export const PROFILE_URL = BASE_URL;
 
-/** App/dashboard base URL */
+/** @deprecated Use BASE_URL instead */
 export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL;
 
 // ============================================================================
@@ -42,49 +40,42 @@ export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL;
 
 /**
  * Build a full profile URL for a given handle
- * @param handle - The creator's handle/username
  * @returns Full URL like https://jov.ie/handle
  */
 export function getProfileUrl(handle: string): string {
-  return `${PROFILE_URL}/${handle}`;
+  return `${BASE_URL}/${handle}`;
 }
 
 /**
  * Build a tip page URL for a given handle
- * @param handle - The creator's handle/username
- * @param source - Optional source tracking param (e.g., 'qr' or 'link')
  * @returns Full URL like https://jov.ie/handle/tip?source=qr
  */
 export function getTipUrl(handle: string, source?: 'qr' | 'link'): string {
-  const baseUrl = `${PROFILE_URL}/${handle}/tip`;
+  const baseUrl = `${BASE_URL}/${handle}/tip`;
   return source ? `${baseUrl}?source=${source}` : baseUrl;
 }
 
 /**
  * Build an app/dashboard URL
- * @param path - Path within the app (e.g., '/dashboard', '/settings')
- * @returns Full URL like https://app.jov.ie/dashboard
+ * @returns Full URL like https://jov.ie/app/profile
  */
 export function getAppUrl(path: string = ''): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${APP_URL}${normalizedPath}`;
+  return `${BASE_URL}/app${normalizedPath}`;
 }
 
 /**
- * Check if a hostname matches the profile domain
+ * Check if a hostname matches the main domain
  */
-export function isProfileDomain(hostname: string): boolean {
-  return (
-    hostname === PROFILE_HOSTNAME || hostname === `www.${PROFILE_HOSTNAME}`
-  );
+export function isMainDomain(hostname: string): boolean {
+  return hostname === HOSTNAME || hostname === `www.${HOSTNAME}`;
 }
 
-/**
- * Check if a hostname matches the app domain
- */
-export function isAppDomain(hostname: string): boolean {
-  return hostname === APP_HOSTNAME;
-}
+/** @deprecated Use isMainDomain instead */
+export const isProfileDomain = isMainDomain;
+
+/** @deprecated Use isMainDomain instead */
+export const isAppDomain = isMainDomain;
 
 /**
  * Check if we're in a preview/staging environment
@@ -92,7 +83,7 @@ export function isAppDomain(hostname: string): boolean {
 export function isPreviewEnvironment(hostname: string): boolean {
   return (
     hostname.includes('vercel.app') ||
-    hostname === `main.${PROFILE_HOSTNAME}` ||
+    hostname === `main.${HOSTNAME}` ||
     hostname === 'localhost'
   );
 }
@@ -101,18 +92,7 @@ export function isPreviewEnvironment(hostname: string): boolean {
  * Check if we're in production
  */
 export function isProductionEnvironment(hostname: string): boolean {
-  return hostname === PROFILE_HOSTNAME || hostname === APP_HOSTNAME;
-}
-
-/**
- * Get the appropriate base URL based on the current hostname
- * Useful for generating correct URLs in server components
- */
-export function getBaseUrlForHostname(hostname: string): string {
-  if (isProfileDomain(hostname)) return PROFILE_URL;
-  if (isAppDomain(hostname)) return APP_URL;
-  // Fallback for preview/development
-  return `https://${hostname}`;
+  return hostname === HOSTNAME;
 }
 
 // ============================================================================

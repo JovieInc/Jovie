@@ -100,7 +100,6 @@ const buildCspDirectives = ({
       'wss://*.clerk.com', // Clerk WebSocket connections
       'wss://clerk.jov.ie', // Clerk proxy WebSocket
       'https://jov.ie',
-      'https://app.jov.ie',
       'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
       'https://clerk-telemetry.com', // Clerk telemetry (all environments)
       isDev ? 'http://localhost:25011' : null, // Neon local dev controller
