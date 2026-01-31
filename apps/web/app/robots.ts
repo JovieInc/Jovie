@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
-import { PROFILE_URL } from '@/constants/app';
-import { PROFILE_HOSTNAME } from '@/constants/domains';
+import { BASE_URL } from '@/constants/app';
+import { HOSTNAME } from '@/constants/domains';
 
 // Single domain robots.txt configuration
 // Everything is served from jov.ie:
@@ -14,8 +14,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   const headersList = await headers();
   const host = headersList.get('host') || '';
 
-  const isMainDomain =
-    host === PROFILE_HOSTNAME || host === `www.${PROFILE_HOSTNAME}`;
+  const isMainDomain = host === HOSTNAME || host === `www.${HOSTNAME}`;
 
   // jov.ie - allow marketing + profiles, block app/api routes
   if (isMainDomain) {
@@ -27,8 +26,8 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
           disallow: ['/app/', '/api/', '/out/'],
         },
       ],
-      sitemap: `${PROFILE_URL}/sitemap.xml`,
-      host: PROFILE_URL,
+      sitemap: `${BASE_URL}/sitemap.xml`,
+      host: BASE_URL,
     };
   }
 

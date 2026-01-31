@@ -14,7 +14,7 @@ import Script from 'next/script';
 import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { UnreleasedReleaseHero } from '@/components/release';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   creatorProfiles,
@@ -57,8 +57,8 @@ function generateMusicStructuredData(
   const titleSlug = (content.title ?? content.slug)
     .toLowerCase()
     .replaceAll(/\s+/g, '-');
-  const contentUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${titleSlug}`;
-  const artistUrl = `${PROFILE_URL}/${creator.usernameNormalized}`;
+  const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${titleSlug}`;
+  const artistUrl = `${BASE_URL}/${creator.usernameNormalized}`;
 
   // Build sameAs array from provider links
   const sameAs = content.providerLinks.map(link => link.url);
@@ -91,7 +91,7 @@ function generateMusicStructuredData(
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: PROFILE_URL,
+        item: BASE_URL,
       },
       {
         '@type': 'ListItem',
@@ -462,7 +462,7 @@ export async function generateMetadata({
 
   const artistName = creator.displayName ?? creator.username;
   const contentType = content.type === 'release' ? 'album' : 'song';
-  const canonicalUrl = `${PROFILE_URL}/${creator.usernameNormalized}/${content.slug}`;
+  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
   // Check if release is unreleased
   const isUnreleased =
@@ -515,7 +515,7 @@ export async function generateMetadata({
     keywords,
     authors: [{ name: artistName }],
     creator: artistName,
-    metadataBase: new URL(PROFILE_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: canonicalUrl,
     },

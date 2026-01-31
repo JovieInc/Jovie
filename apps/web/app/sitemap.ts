@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
-import { PROFILE_URL } from '@/constants/app';
-import { PROFILE_HOSTNAME } from '@/constants/domains';
+import { BASE_URL } from '@/constants/app';
+import { HOSTNAME } from '@/constants/domains';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
@@ -19,8 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = await headers();
   const host = headersList.get('host') || '';
 
-  const isProfileDomain =
-    host === PROFILE_HOSTNAME || host === `www.${PROFILE_HOSTNAME}`;
+  const isProfileDomain = host === HOSTNAME || host === `www.${HOSTNAME}`;
 
   if (isProfileDomain) {
     return buildProfileSitemap();
@@ -38,7 +37,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
     // During build, return homepage only (profiles fetched at runtime)
     return [
       {
-        url: PROFILE_URL,
+        url: BASE_URL,
         lastModified: new Date(),
         changeFrequency: 'daily' as const,
         priority: 1,
@@ -52,7 +51,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
     if (!env.DATABASE_URL) {
       return [
         {
-          url: PROFILE_URL,
+          url: BASE_URL,
           lastModified: new Date(),
           changeFrequency: 'daily' as const,
           priority: 1,
@@ -74,7 +73,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Profile homepage
   const homePage = {
-    url: PROFILE_URL,
+    url: BASE_URL,
     lastModified: new Date(),
     changeFrequency: 'daily' as const,
     priority: 1,
@@ -82,7 +81,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Creator profile pages on jov.ie
   const profilePages = profiles.map(profile => ({
-    url: `${PROFILE_URL}/${profile.username}`,
+    url: `${BASE_URL}/${profile.username}`,
     lastModified: profile.updatedAt || new Date(),
     changeFrequency: 'weekly' as const,
     priority: 0.8,
@@ -99,25 +98,25 @@ async function buildMarketingSitemap(): Promise<MetadataRoute.Sitemap> {
 
   const marketingPages = [
     {
-      url: PROFILE_URL,
+      url: BASE_URL,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 1,
     },
     {
-      url: `${PROFILE_URL}/blog`,
+      url: `${BASE_URL}/blog`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     },
     {
-      url: `${PROFILE_URL}/legal/privacy`,
+      url: `${BASE_URL}/legal/privacy`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
     {
-      url: `${PROFILE_URL}/legal/terms`,
+      url: `${BASE_URL}/legal/terms`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
@@ -125,7 +124,7 @@ async function buildMarketingSitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const blogPages = blogSlugs.map(slug => ({
-    url: `${PROFILE_URL}/blog/${slug}`,
+    url: `${BASE_URL}/blog/${slug}`,
     lastModified: new Date(),
     changeFrequency: 'monthly' as const,
     priority: 0.6,
