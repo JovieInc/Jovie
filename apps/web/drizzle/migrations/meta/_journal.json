@@ -145,8 +145,15 @@
     {
       "idx": 20,
       "version": "7",
+      "when": 1770000000000,
+      "tag": "0020_dashboard_performance_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
       "when": 1738282000000,
-      "tag": "0020_optimize_provider_links_query",
+      "tag": "0021_optimize_provider_links_query",
       "breakpoints": true
     }
   ]

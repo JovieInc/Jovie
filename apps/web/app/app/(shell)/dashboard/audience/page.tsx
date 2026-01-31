@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
+import { Suspense } from 'react';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
 import { audienceSearchParams } from '@/lib/nuqs';
+import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -17,7 +19,7 @@ import { getAudienceServerData } from './audience-data';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export default async function AudiencePage({
+async function AudienceContent({
   searchParams,
 }: Readonly<{
   searchParams: Promise<SearchParams>;
@@ -73,10 +75,34 @@ export default async function AudiencePage({
     );
   } catch (error) {
     throwIfRedirect(error);
-    console.error('Error loading audience data:', error);
+    logger.error('[AudiencePage] Failed to load audience data', { error });
 
     return (
       <PageErrorState message='Failed to load audience data. Please refresh the page.' />
     );
   }
+}
+
+function AudienceSkeleton() {
+  return (
+    <div className='space-y-6'>
+      <div className='flex items-center justify-between'>
+        <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
+        <div className='h-10 w-32 animate-pulse rounded bg-surface-1' />
+      </div>
+      <div className='h-96 animate-pulse rounded-lg bg-surface-1' />
+    </div>
+  );
+}
+
+export default async function AudiencePage({
+  searchParams,
+}: Readonly<{
+  searchParams: Promise<SearchParams>;
+}>) {
+  return (
+    <Suspense fallback={<AudienceSkeleton />}>
+      <AudienceContent searchParams={searchParams} />
+    </Suspense>
+  );
 }

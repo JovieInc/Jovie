@@ -444,12 +444,21 @@ export async function GET(request: Request) {
     }
 
     // Otherwise return summary stats (existing behavior)
-    const inviteStats = await buildInviteStats(dateFilter);
+    // Parallelize all independent queries for better performance
+    const [inviteStats, suppressionStats, dripCampaignStats] =
+      await Promise.all([
+        buildInviteStats(dateFilter),
+        buildSuppressionStats(dateFilter),
+        buildDripCampaignStats(),
+      ]);
+
     const sentCount = inviteStats.sent + inviteStats.bounced;
-    const engagementStats = await buildEngagementStats(dateFilter, sentCount);
-    const conversionStats = await buildConversionStats(dateFilter, sentCount);
-    const suppressionStats = await buildSuppressionStats(dateFilter);
-    const dripCampaignStats = await buildDripCampaignStats();
+
+    // Fetch dependent stats (requires sentCount from inviteStats)
+    const [engagementStats, conversionStats] = await Promise.all([
+      buildEngagementStats(dateFilter, sentCount),
+      buildConversionStats(dateFilter, sentCount),
+    ]);
 
     return NextResponse.json(
       {
