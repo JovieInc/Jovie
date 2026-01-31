@@ -10,6 +10,7 @@ import {
   MENU_SEPARATOR_BASE,
 } from '@jovie/ui/lib/dropdown-styles';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, ChevronRight, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -258,6 +259,107 @@ function SubmenuCheckboxItem({
         </span>
       )}
     </button>
+  );
+}
+
+// ============================================================================
+// VIRTUALIZED LABEL LIST
+// ============================================================================
+
+interface VirtualizedLabelListProps {
+  readonly options: Array<{ label: string; count: number }>;
+  readonly selectedLabels: string[];
+  readonly onToggle: (label: string) => void;
+  readonly searchInputRef: React.RefObject<HTMLInputElement | null>;
+  readonly emptyMessage: string;
+}
+
+function VirtualizedLabelList({
+  options,
+  selectedLabels,
+  onToggle,
+  searchInputRef,
+  emptyMessage,
+}: VirtualizedLabelListProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Use virtualization only if we have more than 20 items
+  const useVirtualization = options.length > 20;
+
+  const rowVirtualizer = useVirtualizer({
+    count: options.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 32, // Estimated height of each item in pixels
+    overscan: 5, // Number of items to render outside of the visible area
+    enabled: useVirtualization,
+  });
+
+  if (options.length === 0) {
+    return (
+      <div className='flex-1 overflow-y-auto p-1'>
+        <div className='py-6 text-center text-xs text-tertiary-token'>
+          {emptyMessage}
+        </div>
+      </div>
+    );
+  }
+
+  if (!useVirtualization) {
+    // For small lists, render normally without virtualization
+    return (
+      <div className='flex-1 overflow-y-auto p-1'>
+        {options.map(opt => (
+          <SubmenuCheckboxItem
+            key={opt.label}
+            label={opt.label}
+            icon={<Icon name='Building2' className='h-3.5 w-3.5' />}
+            count={opt.count}
+            checked={selectedLabels.includes(opt.label)}
+            onCheckedChange={() => onToggle(opt.label)}
+            searchInputRef={searchInputRef}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  // For large lists, use virtualization
+  return (
+    <div ref={parentRef} className='flex-1 overflow-y-auto p-1'>
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map(virtualItem => {
+          const opt = options[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <SubmenuCheckboxItem
+                label={opt.label}
+                icon={<Icon name='Building2' className='h-3.5 w-3.5' />}
+                count={opt.count}
+                checked={selectedLabels.includes(opt.label)}
+                onCheckedChange={() => onToggle(opt.label)}
+                searchInputRef={searchInputRef}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -665,34 +767,17 @@ export function ReleaseFilterDropdown({
                             placeholder='Search labels...'
                             inputRef={labelSearchRef}
                           />
-                          <div className='flex-1 overflow-y-auto p-1'>
-                            {filteredLabelOptions.length === 0 ? (
-                              <div className='py-6 text-center text-xs text-tertiary-token'>
-                                {counts.byLabel.length === 0
-                                  ? 'No labels available'
-                                  : 'No labels found'}
-                              </div>
-                            ) : (
-                              filteredLabelOptions.map(opt => (
-                                <SubmenuCheckboxItem
-                                  key={opt.label}
-                                  label={opt.label}
-                                  icon={
-                                    <Icon
-                                      name='Building2'
-                                      className='h-3.5 w-3.5'
-                                    />
-                                  }
-                                  count={opt.count}
-                                  checked={filters.labels.includes(opt.label)}
-                                  onCheckedChange={() =>
-                                    handleLabelToggle(opt.label)
-                                  }
-                                  searchInputRef={labelSearchRef}
-                                />
-                              ))
-                            )}
-                          </div>
+                          <VirtualizedLabelList
+                            options={filteredLabelOptions}
+                            selectedLabels={filters.labels}
+                            onToggle={handleLabelToggle}
+                            searchInputRef={labelSearchRef}
+                            emptyMessage={
+                              counts.byLabel.length === 0
+                                ? 'No labels available'
+                                : 'No labels found'
+                            }
+                          />
                         </DropdownMenuPrimitive.SubContent>
                       </DropdownMenuPrimitive.Portal>
                     </DropdownMenuPrimitive.Sub>

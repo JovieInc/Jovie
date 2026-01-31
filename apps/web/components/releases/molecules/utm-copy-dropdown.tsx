@@ -198,10 +198,27 @@ export function UTMCopyDropdown({
       const category = UTM_PRESET_CATEGORIES.find(c => c.id === categoryId);
       if (!category) return [];
 
-      // Check if we have any recent/popular items for this category
+      // Single-pass filtering for recent and popular items
       const categoryPresetIds = new Set(category.presets.map(p => p.id));
-      const categoryRecent = recent.filter(p => categoryPresetIds.has(p.id));
-      const categoryPopular = popular.filter(p => categoryPresetIds.has(p.id));
+      const categoryRecent: typeof recent = [];
+      const categoryPopularCandidates: typeof popular = [];
+
+      // First pass: collect recent matches
+      for (const preset of recent) {
+        if (categoryPresetIds.has(preset.id)) {
+          categoryRecent.push(preset);
+        }
+      }
+
+      // Create set of recent IDs for deduplication
+      const recentIds = new Set(categoryRecent.map(p => p.id));
+
+      // Second pass: collect popular matches (excluding recent)
+      for (const preset of popular) {
+        if (categoryPresetIds.has(preset.id) && !recentIds.has(preset.id)) {
+          categoryPopularCandidates.push(preset);
+        }
+      }
 
       const sections: SearchableSubmenuSection[] = [];
 
@@ -218,14 +235,12 @@ export function UTMCopyDropdown({
         });
       }
 
-      // Add popular section if we have any (and they're not in recent)
-      const recentIds = new Set(categoryRecent.map(p => p.id));
-      const filteredPopular = categoryPopular.filter(p => !recentIds.has(p.id));
-      if (filteredPopular.length > 0) {
+      // Add popular section if we have any
+      if (categoryPopularCandidates.length > 0) {
         sections.push({
           id: 'popular',
           label: 'Popular',
-          items: filteredPopular.map(preset => ({
+          items: categoryPopularCandidates.map(preset => ({
             id: preset.id,
             label: preset.label,
             description: preset.description,
@@ -234,10 +249,11 @@ export function UTMCopyDropdown({
       }
 
       // Add all items section
-      const usedIds = new Set([
-        ...categoryRecent.map(p => p.id),
-        ...filteredPopular.map(p => p.id),
-      ]);
+      // Reuse recentIds and build used set efficiently
+      const usedIds = new Set(recentIds);
+      for (const preset of categoryPopularCandidates) {
+        usedIds.add(preset.id);
+      }
       const remaining = category.presets.filter(p => !usedIds.has(p.id));
 
       if (remaining.length > 0 || sections.length === 0) {
