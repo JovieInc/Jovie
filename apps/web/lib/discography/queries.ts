@@ -214,15 +214,17 @@ export async function getReleasesForProfile(
     getTrackSummariesForReleases(releaseIds),
     hasProviderLinksTable().then(async hasTable => {
       if (!hasTable) return [];
-      const links = await db
+      if (releaseIds.length === 0) return [];
+      // Use SQL filtering instead of JavaScript for better performance
+      return db
         .select()
         .from(providerLinks)
-        .where(eq(providerLinks.ownerType, 'release'));
-      // Filter links to only those belonging to our releases
-      const releaseIdSet = new Set(releaseIds);
-      return links.filter(
-        link => link.releaseId && releaseIdSet.has(link.releaseId)
-      );
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            inArray(providerLinks.releaseId, releaseIds)
+          )
+        );
     }),
   ]);
 
