@@ -11,6 +11,13 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
+// Cache billing status briefly to reduce Stripe API calls while maintaining freshness
+// private: Only browser can cache (not CDNs), max-age: 60s, stale-while-revalidate: 5 min
+const CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+} as const;
+
+// No caching for error responses
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
@@ -34,7 +41,7 @@ export async function GET() {
           stripeCustomerId: null,
           stripeSubscriptionId: null,
         },
-        { headers: NO_STORE_HEADERS }
+        { headers: CACHE_HEADERS }
       );
     }
 
@@ -47,7 +54,7 @@ export async function GET() {
         stripeCustomerId,
         stripeSubscriptionId,
       },
-      { headers: NO_STORE_HEADERS }
+      { headers: CACHE_HEADERS }
     );
   } catch (error) {
     logger.error('Error getting billing status:', error);

@@ -1,4 +1,3 @@
-import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
 import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
 import {
   canonicalIdentity,
@@ -37,77 +36,6 @@ const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_tiktok: 2,
   import_twitter: 2,
 };
-
-/**
- * Enqueue a single ingestion job within a transaction.
- * Returns the job ID if created or found, null if depth exceeded.
- */
-async function enqueueIngestionJobTx(params: {
-  tx: DbOrTransaction;
-  jobType: SupportedRecursiveJobType;
-  creatorProfileId: string;
-  sourceUrl: string;
-  depth: number;
-}): Promise<string | null> {
-  const { tx, jobType, creatorProfileId, sourceUrl, depth } = params;
-
-  const maxDepth = MAX_DEPTH_BY_JOB_TYPE[jobType];
-  if (depth > maxDepth) return null;
-
-  const detected = detectPlatform(sourceUrl);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
-  });
-
-  const payload = {
-    creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth,
-  };
-
-  const existing = await tx
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, jobType),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const [inserted] = await tx
-    .insert(ingestionJobs)
-    .values({
-      jobType,
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-      maxAttempts: 3,
-      updatedAt: new Date(),
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  // Returns null when conflict occurred (job already exists)
-  return inserted?.id ?? null;
-}
 
 /**
  * Determines the job type and validated URL for a given link.
@@ -164,8 +92,7 @@ function classifyLink(
  * Enqueue follow-up ingestion jobs for discovered links.
  * Detects platform types and creates appropriate jobs for recursive ingestion.
  *
- * Jobs are enqueued sequentially within the transaction to ensure reliable
- * execution (Promise.all is not supported within Drizzle transactions).
+ * Uses batch insert for O(1) database operations instead of O(N) sequential inserts.
  */
 export async function enqueueFollowupIngestionJobs(params: {
   tx: DbOrTransaction;
@@ -182,19 +109,48 @@ export async function enqueueFollowupIngestionJobs(params: {
     jobType: SupportedRecursiveJobType;
     sourceUrl: string;
   };
-  const jobsToEnqueue = extraction.links
+  const classifiedJobs = extraction.links
     .filter(link => link.url)
     .map(link => classifyLink(link.url))
     .filter((job): job is ClassifiedJob => job !== null);
 
-  // Enqueue jobs sequentially (Promise.all not supported in Drizzle tx)
-  for (const job of jobsToEnqueue) {
-    await enqueueIngestionJobTx({
-      tx,
-      jobType: job.jobType,
-      creatorProfileId,
-      sourceUrl: job.sourceUrl,
-      depth: nextDepth,
+  // Build batch of job values, filtering by max depth
+  const jobValues = classifiedJobs
+    .filter(job => {
+      const maxDepth = MAX_DEPTH_BY_JOB_TYPE[job.jobType];
+      return nextDepth <= maxDepth;
+    })
+    .map(job => {
+      const detected = detectPlatform(job.sourceUrl);
+      const dedupKey = canonicalIdentity({
+        platform: detected.platform,
+        normalizedUrl: detected.normalizedUrl,
+      });
+
+      return {
+        jobType: job.jobType,
+        payload: {
+          creatorProfileId,
+          sourceUrl: detected.normalizedUrl,
+          dedupKey,
+          depth: nextDepth,
+        },
+        dedupKey,
+        status: 'pending' as const,
+        runAt: new Date(),
+        priority: 0,
+        attempts: 0,
+        maxAttempts: 3,
+        updatedAt: new Date(),
+      };
     });
-  }
+
+  // Skip if no valid jobs to enqueue
+  if (jobValues.length === 0) return;
+
+  // Batch insert all jobs in a single statement with conflict handling
+  await tx
+    .insert(ingestionJobs)
+    .values(jobValues)
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey });
 }
