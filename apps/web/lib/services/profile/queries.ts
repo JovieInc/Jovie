@@ -18,6 +18,7 @@ import {
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { redis } from '@/lib/redis';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   ProfileData,
   ProfileSocialLink,
@@ -355,26 +356,26 @@ export async function getProfileWithLinks(
 function serializeProfileDates(profile: ProfileWithLinks): unknown {
   return {
     ...profile,
-    createdAt: profile.createdAt.toISOString(),
-    updatedAt: profile.updatedAt.toISOString(),
+    createdAt: toISOStringSafe(profile.createdAt),
+    updatedAt: toISOStringSafe(profile.updatedAt),
     socialLinks: profile.socialLinks.map(link => ({
       ...link,
-      createdAt: link.createdAt.toISOString(),
-      updatedAt: link.updatedAt.toISOString(),
+      createdAt: toISOStringSafe(link.createdAt),
+      updatedAt: toISOStringSafe(link.updatedAt),
     })),
     contacts: profile.contacts.map(contact => ({
       ...contact,
-      createdAt: contact.createdAt.toISOString(),
-      updatedAt: contact.updatedAt.toISOString(),
+      createdAt: toISOStringSafe(contact.createdAt),
+      updatedAt: toISOStringSafe(contact.updatedAt),
     })),
     latestRelease: profile.latestRelease
       ? {
           ...profile.latestRelease,
           releaseDate: profile.latestRelease.releaseDate
-            ? profile.latestRelease.releaseDate.toISOString()
+            ? toISOStringSafe(profile.latestRelease.releaseDate)
             : null,
-          createdAt: profile.latestRelease.createdAt.toISOString(),
-          updatedAt: profile.latestRelease.updatedAt.toISOString(),
+          createdAt: toISOStringSafe(profile.latestRelease.createdAt),
+          updatedAt: toISOStringSafe(profile.latestRelease.updatedAt),
         }
       : null,
   };

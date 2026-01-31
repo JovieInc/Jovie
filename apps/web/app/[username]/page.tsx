@@ -21,6 +21,7 @@ import {
   getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from '@/lib/services/profile';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -176,8 +177,8 @@ const fetchProfileAndLinks = async (
           .trim(),
       display_title: result.displayName || result.username,
       profile_completion_pct: 80, // Calculate based on filled fields
-      created_at: result.createdAt.toISOString(),
-      updated_at: result.updatedAt.toISOString(),
+      created_at: toISOStringSafe(result.createdAt),
+      updated_at: toISOStringSafe(result.updatedAt),
     };
 
     const links: LegacySocialLink[] =
@@ -187,7 +188,7 @@ const fetchProfileAndLinks = async (
         platform: link.platform.toLowerCase(),
         url: link.url,
         clicks: link.clicks || 0,
-        created_at: link.createdAt.toISOString(),
+        created_at: toISOStringSafe(link.createdAt),
       })) ?? [];
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
