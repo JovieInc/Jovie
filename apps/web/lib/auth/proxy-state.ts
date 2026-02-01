@@ -22,6 +22,109 @@ const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decis
 const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
 
 /**
+ * Try to get user state from Redis cache
+ */
+async function tryGetCachedState(
+  cacheKey: string,
+  clerkUserId: string
+): Promise<ProxyUserState | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    const cacheStart = Date.now();
+    const cached = await redis.get<ProxyUserState>(cacheKey);
+    const cacheDuration = Date.now() - cacheStart;
+
+    if (cached) {
+      Sentry.addBreadcrumb({
+        category: 'proxy-state',
+        message: 'Cache hit',
+        level: 'info',
+        data: {
+          cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
+          durationMs: cacheDuration,
+          userState: cached.isActive
+            ? 'active'
+            : cached.needsOnboarding
+              ? 'onboarding'
+              : 'waitlist',
+        },
+      });
+      return cached;
+    }
+
+    Sentry.addBreadcrumb({
+      category: 'proxy-state',
+      message: 'Cache miss',
+      level: 'info',
+      data: {
+        cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
+        durationMs: cacheDuration,
+      },
+    });
+  } catch (cacheError) {
+    captureWarning('[proxy-state] Redis cache read failed', { error: cacheError });
+  }
+
+  return null;
+}
+
+/**
+ * Determine user state from database query result
+ */
+function determineUserState(
+  result: {
+    dbUserId: string;
+    userStatus: string | null;
+    profileId: string | null;
+    profileComplete: Date | null;
+  } | undefined
+): ProxyUserState {
+  // No DB user → needs waitlist/signup
+  if (!result?.dbUserId) {
+    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+  }
+
+  // Check waitlist approval using userStatus lifecycle
+  const approvedStatuses = [
+    'waitlist_approved',
+    'profile_claimed',
+    'onboarding_incomplete',
+    'active',
+  ];
+  const isWaitlistApproved = approvedStatuses.includes(result.userStatus ?? '');
+
+  if (!isWaitlistApproved) {
+    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+  }
+
+  // Has approval but no profile or incomplete → needs onboarding
+  if (!result.profileId || !result.profileComplete) {
+    return { needsWaitlist: false, needsOnboarding: true, isActive: false };
+  }
+
+  // Fully active user
+  return { needsWaitlist: false, needsOnboarding: false, isActive: true };
+}
+
+/**
+ * Cache user state in Redis (fire-and-forget)
+ */
+function cacheUserState(cacheKey: string, userState: ProxyUserState): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  redis
+    .set(cacheKey, userState, { ex: USER_STATE_CACHE_TTL_SECONDS })
+    .catch(cacheError => {
+      captureWarning('[proxy-state] Redis cache write failed', {
+        error: cacheError,
+      });
+    });
+}
+
+/**
  * Lightweight user state check for proxy.ts
  *
  * This performs a single optimized query to determine user state for routing.
@@ -45,61 +148,21 @@ export async function getUserState(
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
-  const redis = getRedis();
 
   // Try Redis cache first to avoid cold Neon DB queries
-  if (redis) {
-    try {
-      const cacheStart = Date.now();
-      const cached = await redis.get<ProxyUserState>(cacheKey);
-      const cacheDuration = Date.now() - cacheStart;
-
-      if (cached) {
-        // Track cache hit for performance monitoring
-        Sentry.addBreadcrumb({
-          category: 'proxy-state',
-          message: 'Cache hit',
-          level: 'info',
-          data: {
-            cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
-            durationMs: cacheDuration,
-            userState: cached.isActive
-              ? 'active'
-              : cached.needsOnboarding
-                ? 'onboarding'
-                : 'waitlist',
-          },
-        });
-        return cached;
-      }
-
-      // Track cache miss
-      Sentry.addBreadcrumb({
-        category: 'proxy-state',
-        message: 'Cache miss',
-        level: 'info',
-        data: {
-          cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
-          durationMs: cacheDuration,
-        },
-      });
-    } catch (cacheError) {
-      // Log but don't fail - fall through to DB query
-      captureWarning('[proxy-state] Redis cache read failed', {
-        error: cacheError,
-      });
-    }
+  const cached = await tryGetCachedState(cacheKey, clerkUserId);
+  if (cached) {
+    return cached;
   }
 
   try {
     // Single query with join - optimized for proxy performance
     // Filter out deleted and banned users to prevent misrouting
-    // Wrapped with timeout to prevent hanging on Neon cold starts
     const dbQueryStart = Date.now();
     const queryPromise = db
       .select({
         dbUserId: users.id,
-        userStatus: users.userStatus, // Single source of truth for user lifecycle state
+        userStatus: users.userStatus,
         profileId: creatorProfiles.id,
         profileComplete: creatorProfiles.onboardingCompletedAt,
       })
@@ -114,8 +177,8 @@ export async function getUserState(
       .where(
         and(
           eq(users.clerkId, clerkUserId),
-          isNull(users.deletedAt), // Exclude soft-deleted users
-          ne(users.userStatus, 'banned') // Exclude banned users
+          isNull(users.deletedAt),
+          ne(users.userStatus, 'banned')
         )
       )
       .limit(1);
@@ -145,68 +208,19 @@ export async function getUserState(
       },
     });
 
-    let userState: ProxyUserState;
-
-    // DB user exists → check lifecycle state
-    if (result?.dbUserId) {
-      // Check waitlist approval using userStatus lifecycle
-      // userStatus progression: waitlist_pending → waitlist_approved → profile_claimed → onboarding_incomplete → active
-      const isWaitlistApproved =
-        result.userStatus === 'waitlist_approved' ||
-        result.userStatus === 'profile_claimed' ||
-        result.userStatus === 'onboarding_incomplete' ||
-        result.userStatus === 'active';
-
-      if (!isWaitlistApproved) {
-        userState = {
-          needsWaitlist: true,
-          needsOnboarding: false,
-          isActive: false,
-        };
-      } else if (!result.profileId || !result.profileComplete) {
-        // Has waitlist approval but no profile or incomplete profile → needs onboarding
-        userState = {
-          needsWaitlist: false,
-          needsOnboarding: true,
-          isActive: false,
-        };
-      } else {
-        // Fully active user
-        userState = {
-          needsWaitlist: false,
-          needsOnboarding: false,
-          isActive: true,
-        };
-      }
-    } else {
-      // No DB user → needs waitlist/signup
-      userState = {
-        needsWaitlist: true,
-        needsOnboarding: false,
-        isActive: false,
-      };
-    }
+    const userState = determineUserState(result);
 
     // Cache the result in Redis (fire-and-forget)
-    if (redis) {
-      redis
-        .set(cacheKey, userState, { ex: USER_STATE_CACHE_TTL_SECONDS })
-        .catch(cacheError => {
-          captureWarning('[proxy-state] Redis cache write failed', {
-            error: cacheError,
-          });
-        });
-    }
+    cacheUserState(cacheKey, userState);
 
     return userState;
   } catch (error) {
-    // Log error with context for debugging
     await captureError('Database query failed in proxy state check', error, {
       clerkUserId,
       operation: 'getProxyUserState',
     });
 
-    // Safe fallback: treat as needing waitlist to avoid exposing app to unauthorized access
+    // Safe fallback: treat as needing waitlist
     return { needsWaitlist: true, needsOnboarding: false, isActive: false };
   }
 }
