@@ -68,7 +68,8 @@ export const RELEASES_CSV_COLUMNS: CSVColumn<ReleaseViewModel>[] = [
   {
     header: 'Popularity',
     accessor: 'spotifyPopularity',
-    formatter: v => (v == null ? '' : String(v)),
+    formatter: v =>
+      v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v),
   },
   {
     header: 'Smart Link',
