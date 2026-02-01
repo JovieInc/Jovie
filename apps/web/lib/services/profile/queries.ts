@@ -17,7 +17,7 @@ import {
 } from '@/lib/db/schema';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   ProfileData,
@@ -298,6 +298,7 @@ export async function getProfileWithLinks(
 ): Promise<ProfileWithLinks | null> {
   const normalizedUsername = username.toLowerCase();
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${normalizedUsername}`;
+  const redis = getRedis();
 
   // Try Redis cache first (unless explicitly skipped)
   if (redis && !options?.skipCache) {
@@ -530,6 +531,7 @@ async function fetchProfileFromDatabase(
 export async function invalidateProfileEdgeCache(
   usernameNormalized: string
 ): Promise<void> {
+  const redis = getRedis();
   if (!redis) return;
 
   const cacheKey = `${PROFILE_CACHE_KEY_PREFIX}${usernameNormalized.toLowerCase()}`;
