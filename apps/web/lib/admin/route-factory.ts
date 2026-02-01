@@ -142,6 +142,9 @@ function convertPayloadToFormData(payload: Record<string, unknown>): FormData {
       formData.set(key, JSON.stringify(value));
     } else if (typeof value === 'boolean') {
       formData.set(key, value ? 'true' : 'false');
+    } else if (typeof value === 'object' && value !== null) {
+      // Objects are JSON-stringified to avoid [object Object]
+      formData.set(key, JSON.stringify(value));
     } else {
       formData.set(key, String(value));
     }
