@@ -1,7 +1,6 @@
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Input } from '@/components/atoms/Input';
 import { Form } from '@/components/organisms/Form';
 
 describe('Form', () => {

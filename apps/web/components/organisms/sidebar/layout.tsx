@@ -1,8 +1,8 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import React from 'react';
 import { Divider } from '@/components/atoms/Divider';
-import { Input } from '@/components/atoms/Input';
 import { cn } from '@/lib/utils';
 
 export const SidebarInset = React.forwardRef<

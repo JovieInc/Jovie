@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { Input } from '@/components/atoms/Input';
+import { Button, Input } from '@jovie/ui';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import type { ProfileFormProps } from './types';

@@ -73,16 +73,20 @@ vi.mock('@/components/organisms/AvatarUploadable', () => ({
   ),
 }));
 
-vi.mock('@/components/atoms/Input', () => ({
-  Input: Object.assign(
-    React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
-      function InputMock(props, ref) {
-        return <input ref={ref} {...props} />;
-      }
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return {
+    ...actual,
+    Input: Object.assign(
+      React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
+        function InputMock(props, ref) {
+          return <input ref={ref} {...props} />;
+        }
+      ),
+      { displayName: 'Input' }
     ),
-    { displayName: 'Input' }
-  ),
-}));
+  };
+});
 
 vi.mock('@/lib/utils', () => ({
   cn: (...inputs: Array<string | undefined | null | false>) =>
