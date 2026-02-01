@@ -9,6 +9,10 @@ import {
   notificationSubscriptions,
 } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
+import {
+  formatLocationString,
+  safeDecodeURIComponent,
+} from '@/lib/utils/string-utils';
 import { recentActivityQuerySchema } from '@/lib/validation/schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -47,23 +51,11 @@ function getActorLabel(actor: ActorKind): string {
   return 'Someone';
 }
 
-function safeDecodeLocationPart(value: string): string {
-  if (!value) return value;
-  const maybeEncoded = value.includes('%') || value.includes('+');
-  if (!maybeEncoded) return value;
-  try {
-    return decodeURIComponent(value.replaceAll('+', ' '));
-  } catch {
-    return value;
-  }
-}
-
-function formatLocation(parts: Array<string | null | undefined>): string {
-  const filtered = (parts.filter(Boolean) as string[]).map(
-    safeDecodeLocationPart
-  );
-  if (filtered.length === 0) return '';
-  return ` from ${filtered.join(', ')}`;
+function formatActivityLocation(
+  parts: Array<string | null | undefined>
+): string {
+  const location = formatLocationString(parts);
+  return location ? ` from ${location}` : '';
 }
 
 function titleCase(value: string): string {
@@ -208,7 +200,7 @@ export async function GET(request: NextRequest) {
       const clickActivities: ActivityRow[] = clickRows.map(row => {
         const actor = getActorKind(row.memberType ?? null);
         const actorLabel = getActorLabel(actor);
-        const locationLabel = formatLocation([
+        const locationLabel = formatActivityLocation([
           row.clickCity ?? row.memberCity,
           row.clickCountry ?? row.memberCountry,
         ]);
@@ -229,7 +221,7 @@ export async function GET(request: NextRequest) {
         .map(row => {
           const actor = getActorKind(row.memberType ?? null);
           const actorLabel = getActorLabel(actor);
-          const locationLabel = formatLocation([row.city, row.country]);
+          const locationLabel = formatActivityLocation([row.city, row.country]);
           const timestamp = (row.lastSeenAt as Date).toISOString();
           return {
             id: `visit:${row.id}:${timestamp}`,
@@ -243,7 +235,7 @@ export async function GET(request: NextRequest) {
 
       const subscribeActivities: ActivityRow[] = subscribeRows.map(row => {
         const resolveLocationLabel = (): string => {
-          if (row.city) return ` from ${safeDecodeLocationPart(row.city)}`;
+          if (row.city) return ` from ${safeDecodeURIComponent(row.city)}`;
           if (row.countryCode) return ` from ${row.countryCode.toUpperCase()}`;
           return '';
         };

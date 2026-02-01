@@ -3,6 +3,7 @@
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
+import { formatLocationString } from '@/lib/utils/string-utils';
 
 // Pre-configured formatters for date display
 const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short' });
@@ -21,9 +22,12 @@ export function TourDateCard({
   distanceKm,
 }: Readonly<TourDateCardProps>) {
   const date = new Date(tourDate.startDate);
-  const location = [tourDate.city, tourDate.region, tourDate.country]
-    .filter(Boolean)
-    .join(', ');
+  // Decode URL-encoded location parts (e.g., %20 -> space)
+  const location = formatLocationString([
+    tourDate.city,
+    tourDate.region,
+    tourDate.country,
+  ]);
 
   const isSoldOut = tourDate.ticketStatus === 'sold_out';
   const isCancelled = tourDate.ticketStatus === 'cancelled';
