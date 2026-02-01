@@ -265,9 +265,7 @@ export function LiquidGlassMenu({
               {/* Admin section - only visible when adminItems provided */}
               {hasAdminItems && (
                 <>
-                  <div
-                    className='my-2 mx-1 border-t border-default/30'
-                  />
+                  <div className='my-2 mx-1 border-t border-default/30' />
                   <p className='px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
                     Admin
                   </p>
@@ -290,7 +288,9 @@ export function LiquidGlassMenu({
                         <Icon
                           className={cn(
                             'size-5 shrink-0',
-                            active ? 'text-primary-token' : 'text-tertiary-token'
+                            active
+                              ? 'text-primary-token'
+                              : 'text-tertiary-token'
                           )}
                           aria-hidden='true'
                         />
