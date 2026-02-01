@@ -99,15 +99,15 @@ export function isProductionEnvironment(hostname: string): boolean {
 // Email Addresses (using company domain)
 // ============================================================================
 
-export const SUPPORT_EMAIL = `support@${PROFILE_HOSTNAME}`;
-export const LEGAL_EMAIL = `legal@${PROFILE_HOSTNAME}`;
-export const PRIVACY_EMAIL = `privacy@${PROFILE_HOSTNAME}`;
+export const SUPPORT_EMAIL = `support@${HOSTNAME}`;
+export const LEGAL_EMAIL = `legal@${HOSTNAME}`;
+export const PRIVACY_EMAIL = `privacy@${HOSTNAME}`;
 
 // ============================================================================
 // User Agent for external requests
 // ============================================================================
 
-export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${PROFILE_URL})`;
+export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${BASE_URL})`;
 
 // ============================================================================
 // Clerk Configuration

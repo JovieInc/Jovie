@@ -42,85 +42,124 @@ const INLINE_SCRIPT_HASHES = {
 };
 
 /**
+ * Pre-computed static CSP directive parts.
+ * These are computed once at module load time to avoid repeated string operations.
+ * Only the nonce and dev-specific parts are interpolated at runtime.
+ */
+const STATIC_CSP_PARTS = {
+  // Directives that never change
+  defaultSrc: "default-src 'self'",
+  baseUri: "base-uri 'self'",
+  objectSrc: "object-src 'none'",
+  frameAncestors: "frame-ancestors 'none'",
+  formAction: "form-action 'self'",
+  styleSrc: "style-src 'self' 'unsafe-inline'",
+  fontSrc: "font-src 'self' data:",
+  workerSrc: "worker-src 'self' blob:",
+  manifestSrc: "manifest-src 'self'",
+
+  // Pre-computed script-src prefix (before nonce)
+  scriptSrcPrefix: "script-src 'self'",
+  // Pre-computed script-src suffix (after nonce, excludes dev-only 'unsafe-eval')
+  scriptSrcSuffix: [
+    INLINE_SCRIPT_HASHES.clerk,
+    INLINE_SCRIPT_HASHES.nextThemes,
+    'https://va.vercel-scripts.com',
+    'https://vitals.vercel-insights.com',
+    'https://vercel.live',
+    'https://clerk.jov.ie',
+    'https://clerk.com',
+    'https://cdn.clerk.com',
+    'https://*.clerk.com',
+    'https://*.clerk.services',
+    'https://*.clerk.accounts.dev',
+    'https://challenges.cloudflare.com',
+  ].join(' '),
+
+  // Pre-computed img-src (fully static)
+  imgSrc: [
+    "img-src 'self' data: blob:",
+    'https://i.scdn.co',
+    'https://res.cloudinary.com',
+    'https://images.clerk.dev',
+    'https://img.clerk.com',
+    'https://images.unsplash.com',
+    'https://linktr.ee',
+    'https://api.qrserver.com',
+    'https://*.public.blob.vercel-storage.com',
+    'https://*.blob.vercel-storage.com',
+  ].join(' '),
+
+  // Pre-computed connect-src prefix (excludes dev-only localhost)
+  connectSrcBase: [
+    "connect-src 'self'",
+    'https://clerk.jov.ie',
+    'https://clerk.com',
+    'https://cdn.clerk.com',
+    'https://*.clerk.com',
+    'https://*.clerk.services',
+    'https://*.clerk.accounts.dev',
+    'https://api.stripe.com',
+    'https://*.ingest.sentry.io',
+    'wss://*.clerk.com',
+    'wss://clerk.jov.ie',
+    'https://jov.ie',
+    'https://challenges.cloudflare.com',
+    'https://clerk-telemetry.com',
+  ].join(' '),
+
+  // Pre-computed frame-src prefix (excludes dev-only vercel.live)
+  frameSrcBase: [
+    "frame-src 'self'",
+    'https://js.stripe.com',
+    'https://checkout.stripe.com',
+    'https://*.clerk.com',
+    'https://*.clerk.accounts.dev',
+    'https://clerk.jov.ie',
+    'https://challenges.cloudflare.com',
+  ].join(' '),
+} as const;
+
+/**
  * Builds the array of CSP directives (without report directives).
  * This is the core policy shared by both enforcing and report-only modes.
+ *
+ * Performance optimized: Static parts are pre-computed at module load time.
+ * Only nonce and dev-specific parts are interpolated at runtime.
  */
 const buildCspDirectives = ({
   nonce,
   isDev = isDevelopment(),
 }: BuildCspOptions): string[] => {
+  // Build script-src with nonce and optional dev 'unsafe-eval'
+  const scriptSrc = isDev
+    ? `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' 'unsafe-eval' ${STATIC_CSP_PARTS.scriptSrcSuffix}`
+    : `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
+
+  // Build connect-src with optional dev localhost
+  const connectSrc = isDev
+    ? `${STATIC_CSP_PARTS.connectSrcBase} http://localhost:25011`
+    : STATIC_CSP_PARTS.connectSrcBase;
+
+  // Build frame-src with optional dev vercel.live
+  const frameSrc = isDev
+    ? `${STATIC_CSP_PARTS.frameSrcBase} https://vercel.live`
+    : STATIC_CSP_PARTS.frameSrcBase;
+
   return [
-    "default-src 'self'",
-    "base-uri 'self'",
-    "object-src 'none'",
-    "frame-ancestors 'none'",
-    "form-action 'self'",
-    [
-      "script-src 'self'",
-      `'nonce-${nonce}'`,
-      INLINE_SCRIPT_HASHES.clerk,
-      INLINE_SCRIPT_HASHES.nextThemes,
-      isDev ? "'unsafe-eval'" : null,
-      'https://va.vercel-scripts.com',
-      'https://vitals.vercel-insights.com',
-      'https://vercel.live',
-      'https://clerk.jov.ie',
-      'https://clerk.com',
-      'https://cdn.clerk.com',
-      'https://*.clerk.com',
-      'https://*.clerk.services',
-      'https://*.clerk.accounts.dev',
-      'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
-    ]
-      .filter(Boolean)
-      .join(' '),
-    "style-src 'self' 'unsafe-inline'",
-    [
-      "img-src 'self' data: blob:",
-      'https://i.scdn.co',
-      'https://res.cloudinary.com',
-      'https://images.clerk.dev',
-      'https://img.clerk.com',
-      'https://images.unsplash.com',
-      'https://linktr.ee',
-      'https://api.qrserver.com',
-      'https://*.public.blob.vercel-storage.com',
-      'https://*.blob.vercel-storage.com',
-    ].join(' '),
-    [
-      "connect-src 'self'",
-      'https://clerk.jov.ie',
-      'https://clerk.com',
-      'https://cdn.clerk.com',
-      'https://*.clerk.com',
-      'https://*.clerk.services',
-      'https://*.clerk.accounts.dev',
-      'https://api.stripe.com',
-      'https://*.ingest.sentry.io',
-      'wss://*.clerk.com', // Clerk WebSocket connections
-      'wss://clerk.jov.ie', // Clerk proxy WebSocket
-      'https://jov.ie',
-      'https://challenges.cloudflare.com', // Clerk Turnstile CAPTCHA
-      'https://clerk-telemetry.com', // Clerk telemetry (all environments)
-      isDev ? 'http://localhost:25011' : null, // Neon local dev controller
-    ]
-      .filter(Boolean)
-      .join(' '),
-    "font-src 'self' data:",
-    [
-      "frame-src 'self'",
-      'https://js.stripe.com',
-      'https://checkout.stripe.com',
-      'https://*.clerk.com',
-      'https://*.clerk.accounts.dev',
-      'https://clerk.jov.ie',
-      'https://challenges.cloudflare.com',
-      isDev ? 'https://vercel.live' : null, // Vercel toolbar (dev only)
-    ]
-      .filter(Boolean)
-      .join(' '),
-    "worker-src 'self' blob:",
-    "manifest-src 'self'",
+    STATIC_CSP_PARTS.defaultSrc,
+    STATIC_CSP_PARTS.baseUri,
+    STATIC_CSP_PARTS.objectSrc,
+    STATIC_CSP_PARTS.frameAncestors,
+    STATIC_CSP_PARTS.formAction,
+    scriptSrc,
+    STATIC_CSP_PARTS.styleSrc,
+    STATIC_CSP_PARTS.imgSrc,
+    connectSrc,
+    STATIC_CSP_PARTS.fontSrc,
+    frameSrc,
+    STATIC_CSP_PARTS.workerSrc,
+    STATIC_CSP_PARTS.manifestSrc,
   ];
 };
 

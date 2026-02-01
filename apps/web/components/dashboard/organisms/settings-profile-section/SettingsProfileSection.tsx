@@ -5,7 +5,7 @@ import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -29,7 +29,7 @@ export function SettingsProfileSection({
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
-  const profileDomain = PROFILE_URL.replace(/^https?:\/\//, '');
+  const profileDomain = BASE_URL.replace(/^https?:\/\//, '');
 
   const {
     formData,

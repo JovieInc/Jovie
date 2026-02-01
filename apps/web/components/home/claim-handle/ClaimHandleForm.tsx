@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
-import { PROFILE_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { cn } from '@/lib/utils';
 import { ClaimHandleStyles } from './ClaimHandleStyles';
 import { HandleStatusIcon } from './HandleStatusIcon';
@@ -135,7 +135,7 @@ export function ClaimHandleForm({
   const inputRef = useRef<HTMLInputElement>(null);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const displayDomain = PROFILE_URL.replace(/^https?:\/\//, '');
+  const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
   const [handle, setHandle] = useState('');
   const [navigating, setNavigating] = useState(false);

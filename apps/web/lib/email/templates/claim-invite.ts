@@ -5,7 +5,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { getAppUrl, getProfileUrl, PROFILE_URL } from '@/constants/domains';
+import { BASE_URL, getAppUrl, getProfileUrl } from '@/constants/domains';
 import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
@@ -71,7 +71,7 @@ export function getClaimInviteText(data: ClaimInviteTemplateData): string {
 
   return `Hey ${creatorName},
 
-We built you a ${APP_NAME} profile at ${PROFILE_URL}/${username}
+We built you a ${APP_NAME} profile at ${BASE_URL}/${username}
 
 ${APP_NAME} is a smart link-in-bio for musicians. Your profile is already set up with your links, music, and socials.
 
@@ -80,7 +80,7 @@ Preview your profile: ${previewUrl}
 Claim it now (takes 30 seconds): ${claimUrl}
 
 Why claim?
-- Shorter, cleaner URL than Linktree (${PROFILE_URL}/${username})
+- Shorter, cleaner URL than Linktree (${BASE_URL}/${username})
 - Automatically syncs your latest releases
 - Capture fan emails and grow your audience
 - Free forever, no credit card required
@@ -225,7 +225,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
               <div style="background: #f9f9f9; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
                 <p style="margin: 0 0 8px; font-size: 14px; color: #666;">Your profile URL:</p>
                 <a href="${trackedPreviewUrl}" style="font-size: 18px; font-weight: 600; color: #000; text-decoration: none;">
-                  ${PROFILE_URL}/${safeUsername}
+                  ${BASE_URL}/${safeUsername}
                 </a>
               </div>
 
