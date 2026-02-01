@@ -87,13 +87,14 @@ export const ContactSidebar = memo(function ContactSidebar({
       );
     }
 
+    items.push({
+      id: 'refresh',
+      label: 'Refresh',
+      icon: <RefreshCw className='h-4 w-4' />,
+      onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
+    });
+
     items.push(
-      {
-        id: 'refresh',
-        label: 'Refresh',
-        icon: <RefreshCw className='h-4 w-4' />,
-        onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
-      },
       { type: 'separator' },
       {
         id: 'delete',
