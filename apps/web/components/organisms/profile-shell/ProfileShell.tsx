@@ -128,8 +128,8 @@ export function ProfileShell({
                 {children}
                 {/* Show social bar when explicitly enabled, tip button shown, or user is subscribed */}
                 {(showSocialBar || showTipButton || hasActiveSubscriptions) && (
-                  <div className='flex items-center justify-between gap-4'>
-                    <div className='flex flex-1 justify-start'>
+                  <div className='flex flex-col items-center gap-4'>
+                    <div className='flex justify-center'>
                       {/* Show social links when enabled OR when user has active subscriptions */}
                       {(showSocialBar || hasActiveSubscriptions) && (
                         <div
