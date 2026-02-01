@@ -1,547 +1,483 @@
 {
-  "generated_at": "2026-01-24T12:00:00.000Z",
+  "generated_at": "2026-02-01T00:00:00.000Z",
   "scope": "apps/web",
-  "linear_issues_checked": 100,
   "ideas": [
     {
       "id": "qual-001",
-      "title": "Replace 228+ console.* calls in lib/ with Sentry logging",
-      "description": "The lib/ directory contains 228 console.log/warn/error calls across 79 files, violating the Jovie standard of using Sentry for logging.",
-      "rationale": "Console statements don't aggregate in production, lack context/stack traces, and can't be filtered or alerted on. Sentry provides structured logging with error grouping and alerting.",
-      "category": "code_smells",
+      "title": "Split UnifiedTable component into focused sub-components",
+      "description": "UnifiedTable.tsx is 943 lines with a ~540 line main component containing complex virtualization logic, multiple nested conditional renders, and 4-5 levels of nesting",
+      "rationale": "Violates Single Responsibility Principle. The component handles table rendering, virtualization, filtering, sorting, row selection, and multiple view modes. This makes it extremely difficult to test, understand, and maintain.",
+      "category": "large_files",
       "severity": "major",
       "affected_files": [
-        "apps/web/lib/env-server.ts (14 occurrences)",
-        "apps/web/lib/startup/environment-validator.ts (13 occurrences)",
-        "apps/web/lib/admin/overview.ts (8 occurrences)",
-        "apps/web/lib/error-tracking.ts (8 occurrences)",
-        "apps/web/lib/services/link-wrapping.ts (8 occurrences)"
+        "apps/web/components/UnifiedTable.tsx"
       ],
-      "current_state": "228 console.* calls in lib/, 130 in components/",
-      "proposed_change": "Replace console.error with Sentry.captureException(), console.warn with Sentry.captureMessage(level: 'warning'), and console.log with Sentry breadcrumbs or remove entirely. Keep console.* only in scripts/ and development-only code paths.",
-      "best_practice": "Centralized observability via Sentry",
+      "current_state": "Single 943-line component with ~540 line main function handling all table concerns including virtualization, sorting, filtering, selection, and multiple rendering modes",
+      "proposed_change": "Extract into focused components:\n1. TableVirtualization.tsx - Virtual scrolling logic\n2. TableFilters.tsx - Filter UI and state\n3. TableRow.tsx - Row rendering with selection\n4. TableHeader.tsx - Column headers with sorting\n5. UnifiedTable.tsx - Orchestration component (< 150 lines)\n\nMove complex conditional logic into dedicated hooks:\n- useTableVirtualization\n- useTableSelection\n- useTableSorting",
+      "best_practice": "Single Responsibility Principle (SRP), Component Composition",
       "metrics": {
-        "occurrences_lib": 228,
-        "occurrences_components": 130,
-        "files_affected": 142
+        "line_count": 943,
+        "main_function_lines": 540,
+        "nesting_depth": 5,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "medium",
+      "effort": "large",
       "priority": "high",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// UnifiedTable.tsx (943 lines)\nexport function UnifiedTable() {\n  // 540 lines of logic including:\n  // - Virtualization setup\n  // - Filter state\n  // - Sort state\n  // - Selection state\n  // - Rendering logic\n  // - 4-5 levels of nested conditions\n  return (\n    <div>\n      {/* Complex nested JSX */}\n    </div>\n  )\n}",
+        "after": "// UnifiedTable.tsx (< 150 lines)\nexport function UnifiedTable() {\n  const virtualization = useTableVirtualization()\n  const selection = useTableSelection()\n  const sorting = useTableSorting()\n  \n  return (\n    <div>\n      <TableFilters />\n      <TableHeader sorting={sorting} />\n      <TableVirtualization {...virtualization}>\n        {rows.map(row => <TableRow key={row.id} {...row} />)}\n      </TableVirtualization>\n    </div>\n  )\n}\n\n// TableVirtualization.tsx\n// TableFilters.tsx\n// TableRow.tsx\n// TableHeader.tsx"
+      }
     },
     {
       "id": "qual-002",
-      "title": "Split lib/db/index.ts (780 lines) into focused modules",
-      "description": "lib/db/index.ts is 780 lines containing connection pooling, session management, health checks, retry logic, and performance monitoring - violating Single Responsibility Principle.",
-      "rationale": "Monolithic database files are hard to test, understand, and maintain. Separating concerns enables independent testing and clearer ownership.",
+      "title": "Refactor ReleaseFilterDropdown into reusable FilterSubmenu components",
+      "description": "ReleaseFilterDropdown.tsx is 844 lines with repetitive submenu patterns and deeply nested conditional logic",
+      "rationale": "The component duplicates the same filter submenu pattern multiple times. Extracting a reusable FilterSubmenu component would reduce duplication, improve maintainability, and make it easier to add new filter types.",
       "category": "large_files",
       "severity": "major",
-      "affected_files": ["apps/web/lib/db/index.ts"],
-      "current_state": "780 lines with 13+ exported functions: getWebSocketConstructor, logDbError, createDbInstance, getDb, setSessionUser, doesTableExist, validateDbConnection, checkDbPerformance, getPoolMetrics, getDbConfig, and more",
-      "proposed_change": "Split into: db/connection.ts (pool, WebSocket config ~100 lines), db/session.ts (setSessionUser, session management ~80 lines), db/health.ts (validateDbConnection, checkDbPerformance ~150 lines), db/retry.ts (retry logic, error classification ~100 lines). Keep index.ts as barrel re-export.",
-      "code_example": "// db/index.ts after refactor\nexport { db, getDb, type DbType, type TransactionType } from './connection';\nexport { setSessionUser, clearSessionUser } from './session';\nexport { validateDbConnection, checkDbHealth, doesTableExist } from './health';\nexport { withRetry, isRetryableError } from './retry';",
-      "best_practice": "Single Responsibility Principle (SRP)",
+      "affected_files": [
+        "apps/web/components/ReleaseFilterDropdown.tsx"
+      ],
+      "current_state": "844-line component with repeated submenu patterns for different filter types (release type, label, genre, etc.). Each submenu has similar structure but duplicated code.",
+      "proposed_change": "1. Extract FilterSubmenu.tsx component accepting:\n   - title: string\n   - options: Array<{value, label, count}>\n   - selected: Set<string>\n   - onChange: (value: string) => void\n   - searchable?: boolean\n\n2. Extract FilterOption.tsx for individual filter items\n\n3. Reduce ReleaseFilterDropdown.tsx to < 200 lines by using FilterSubmenu for each filter type",
+      "best_practice": "Don't Repeat Yourself (DRY), Component Reusability",
       "metrics": {
-        "line_count": 780,
-        "exports_count": 13,
-        "concerns_mixed": 5
+        "line_count": 844,
+        "complexity": null,
+        "duplicate_lines": null
       },
       "effort": "medium",
       "priority": "high",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// Repeated for each filter type:\n<DropdownMenuSub>\n  <DropdownMenuSubTrigger>Release Type</DropdownMenuSubTrigger>\n  <DropdownMenuSubContent>\n    {releaseTypes.map(type => (\n      <DropdownMenuCheckboxItem\n        key={type.value}\n        checked={selected.has(type.value)}\n        onCheckedChange={() => onChange(type.value)}\n      >\n        {type.label} ({type.count})\n      </DropdownMenuCheckboxItem>\n    ))}\n  </DropdownMenuSubContent>\n</DropdownMenuSub>\n// ... repeated 5+ times for different filter types",
+        "after": "// Reusable component:\n<FilterSubmenu\n  title=\"Release Type\"\n  options={releaseTypes}\n  selected={selectedTypes}\n  onChange={handleTypeChange}\n  searchable={false}\n/>\n<FilterSubmenu\n  title=\"Label\"\n  options={labels}\n  selected={selectedLabels}\n  onChange={handleLabelChange}\n  searchable={true}\n/>"
+      }
     },
     {
       "id": "qual-003",
-      "title": "Split UnifiedTable.tsx (769 lines) into composable table components",
-      "description": "UnifiedTable.tsx is 769 lines handling virtualization, context menus, grouping, sorting, row selection, and rendering in one component.",
-      "rationale": "Monolithic components are hard to test in isolation, slow to render (no React.memo boundaries), and difficult to modify without risk of regression.",
-      "category": "large_files",
-      "severity": "major",
-      "affected_files": ["apps/web/components/organisms/table/organisms/UnifiedTable.tsx"],
-      "current_state": "769 lines with TanStack Table + TanStack Virtual + context menus + grouping all in one component. Props interface has 25+ properties.",
-      "proposed_change": "Extract: hooks/useTableVirtualization.ts, hooks/useTableContextMenu.ts, molecules/VirtualizedTableBody.tsx, molecules/TableHeaderRow.tsx, molecules/TableEmptyState.tsx. UnifiedTable becomes a thin composition layer under 200 lines.",
-      "best_practice": "Component composition pattern",
+      "title": "Extract retry logic from useFormState into reusable utility",
+      "description": "useFormState hook contains ~289 lines including complex retry logic with exponential backoff that could be reused across other hooks",
+      "rationale": "The retry logic is a general-purpose concern that shouldn't be embedded in the form state hook. Extracting it improves testability and allows reuse in other contexts (API calls, background jobs, etc.).",
+      "category": "code_smells",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/hooks/useFormState.ts"
+      ],
+      "current_state": "289-line hook with embedded retry logic including exponential backoff, max attempts, and error handling",
+      "proposed_change": "1. Create lib/retry.ts with:\n   - createRetryHandler(options: { maxAttempts, backoff, onError })\n   - useRetry() hook\n\n2. Refactor useFormState to use the extracted retry utility\n\n3. Make retry logic available for other hooks and utilities",
+      "best_practice": "Separation of Concerns, Reusability",
       "metrics": {
-        "line_count": 769,
-        "props_count": 25
+        "line_count": 289,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "large",
+      "effort": "medium",
       "priority": "medium",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// useFormState.ts (289 lines)\nexport function useFormState() {\n  // ... form logic ...\n  \n  // Embedded retry logic\n  const retryWithBackoff = async () => {\n    let attempts = 0\n    while (attempts < maxAttempts) {\n      try {\n        return await action()\n      } catch (error) {\n        attempts++\n        await sleep(Math.pow(2, attempts) * 1000)\n      }\n    }\n  }\n  \n  // ... more form logic ...\n}",
+        "after": "// lib/retry.ts\nexport function createRetryHandler<T>(options: RetryOptions) {\n  return async (fn: () => Promise<T>): Promise<T> => {\n    let attempts = 0\n    while (attempts < options.maxAttempts) {\n      try {\n        return await fn()\n      } catch (error) {\n        attempts++\n        if (attempts >= options.maxAttempts) throw error\n        await sleep(options.backoff(attempts))\n      }\n    }\n  }\n}\n\n// useFormState.ts (reduced)\nexport function useFormState() {\n  const retry = createRetryHandler({ maxAttempts: 3, backoff: exponentialBackoff })\n  // ... form logic using retry() ...\n}"
+      }
     },
     {
       "id": "qual-004",
-      "title": "Add unit tests for lib/discography/spotify-import.ts (646 lines)",
-      "description": "spotify-import.ts handles critical Spotify album import with complex batch processing, track importing, and cross-platform discovery but has no dedicated unit tests.",
-      "rationale": "Import logic is business-critical and handles external API responses. Without tests, refactoring is risky and bugs can silently break the import flow.",
-      "category": "types",
-      "severity": "major",
+      "title": "Consolidate size mapping utility across Button components",
+      "description": "Size-to-pixel mapping pattern is duplicated 3× across Button, IconButton, and LoadingButton components",
+      "rationale": "Duplicate code leads to inconsistencies and maintenance burden. A single source of truth ensures consistent sizing across all button variants.",
+      "category": "duplication",
+      "severity": "minor",
       "affected_files": [
-        "apps/web/lib/discography/spotify-import.ts",
-        "apps/web/tests/unit/lib/discography/ (missing)"
+        "apps/web/components/ui/Button.tsx",
+        "apps/web/components/ui/IconButton.tsx",
+        "apps/web/components/ui/LoadingButton.tsx"
       ],
-      "current_state": "646 lines with importSpotifyDiscography, importAlbumBatch, discoverLinksForReleases. No tests/unit/lib/discography/spotify-import.test.ts exists.",
-      "proposed_change": "Create comprehensive test suite covering: successful album import, batch processing limits, track import with ISRC matching, cross-platform link discovery, error handling for API failures, rate limiting scenarios. Mock Spotify API responses.",
-      "best_practice": "Unit test coverage for critical business logic",
+      "current_state": "Each button component has its own size mapping:\nconst sizeMap = { sm: 32, md: 40, lg: 48 }",
+      "proposed_change": "1. Create lib/ui/button-sizes.ts:\n   export const BUTTON_SIZE_MAP = { sm: 32, md: 40, lg: 48 } as const\n   export type ButtonSize = keyof typeof BUTTON_SIZE_MAP\n\n2. Import and use in all three button components",
+      "best_practice": "Don't Repeat Yourself (DRY), Single Source of Truth",
       "metrics": {
-        "line_count": 646,
-        "test_coverage": "0%"
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 9
       },
-      "effort": "medium",
-      "priority": "high",
+      "effort": "trivial",
+      "priority": "medium",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// Button.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }\n\n// IconButton.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }\n\n// LoadingButton.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }",
+        "after": "// lib/ui/button-sizes.ts\nexport const BUTTON_SIZE_MAP = {\n  sm: 32,\n  md: 40,\n  lg: 48\n} as const\n\nexport type ButtonSize = keyof typeof BUTTON_SIZE_MAP\n\n// All button components:\nimport { BUTTON_SIZE_MAP } from '@/lib/ui/button-sizes'\nconst height = BUTTON_SIZE_MAP[size]"
+      }
     },
     {
       "id": "qual-005",
-      "title": "Split app/onboarding/actions.ts (659 lines) into action modules",
-      "description": "onboarding/actions.ts is 659 lines mixing avatar handling, profile creation, username validation, and enrichment logic in one server actions file.",
-      "rationale": "Large action files are harder to test, have longer cold starts, and mix unrelated concerns. Modular actions can be imported individually.",
-      "category": "large_files",
-      "severity": "major",
-      "affected_files": ["apps/web/app/onboarding/actions.ts"],
-      "current_state": "659 lines with: fetchAvatarImage, uploadAvatarFile, uploadAvatarFromUrl, createProfile, validateUsername, enrichProfileWithSpotify",
-      "proposed_change": "Split into: onboarding/actions/avatar.ts (~150 lines), onboarding/actions/profile.ts (~200 lines), onboarding/actions/validation.ts (~100 lines), onboarding/actions/enrichment.ts (~150 lines), onboarding/actions/index.ts (re-exports). Already partially started - complete the refactor.",
-      "best_practice": "Server actions organized by domain",
+      "title": "Standardize error message extraction utility",
+      "description": "Error message extraction pattern is duplicated 3× across different components with slight variations",
+      "rationale": "Inconsistent error handling makes debugging harder and can lead to different error message formats in different parts of the app. A standard utility ensures consistent error reporting.",
+      "category": "duplication",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/components/forms/ContactForm.tsx",
+        "apps/web/components/forms/SettingsForm.tsx",
+        "apps/web/lib/api/error-handler.ts"
+      ],
+      "current_state": "Three different implementations of extracting error messages from Error objects, API responses, and unknown values",
+      "proposed_change": "1. Enhance lib/utils/errors.ts with standard extractErrorMessage(error: unknown): string\n\n2. Replace all instances with the standard utility\n\n3. Add tests for edge cases (null, undefined, non-Error objects)",
+      "best_practice": "Don't Repeat Yourself (DRY), Consistent Error Handling",
       "metrics": {
-        "line_count": 659,
-        "action_count": 6
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 15
       },
-      "effort": "medium",
+      "effort": "trivial",
       "priority": "medium",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// Component 1\nconst msg = error instanceof Error ? error.message : 'Unknown error'\n\n// Component 2\nconst msg = error?.message ?? String(error)\n\n// Component 3\nconst msg = typeof error === 'string' ? error : error?.message || 'Error'",
+        "after": "// lib/utils/errors.ts\nexport function extractErrorMessage(error: unknown): string {\n  if (error instanceof Error) return error.message\n  if (typeof error === 'string') return error\n  if (error && typeof error === 'object' && 'message' in error) {\n    return String(error.message)\n  }\n  return 'An unknown error occurred'\n}\n\n// All components:\nimport { extractErrorMessage } from '@/lib/utils/errors'\nconst msg = extractErrorMessage(error)"
+      }
     },
     {
       "id": "qual-006",
-      "title": "Clean up 54 @deprecated exports and migrate consumers",
-      "description": "Found 54 @deprecated annotations across 35 files marking code that should be migrated but consumers haven't been updated.",
-      "rationale": "Deprecated code accumulates tech debt, confuses new developers, and often has subtle differences from the replacement. Cleaning it up simplifies the codebase.",
-      "category": "dead_code",
-      "severity": "minor",
+      "title": "Replace console.warn with logger.warn",
+      "description": "One instance of console.warn found in codebase, should use Sentry logger instead",
+      "rationale": "Direct console usage bypasses the logging infrastructure and won't be captured in production error monitoring. Using the logger ensures consistent logging and Sentry integration.",
+      "category": "best_practices",
+      "severity": "suggestion",
       "affected_files": [
-        "apps/web/lib/rate-limit/index.ts (6 deprecated exports)",
-        "apps/web/lib/utils/rate-limit.ts (7 deprecated exports)",
-        "apps/web/lib/db/queries.ts (6 deprecated exports)",
-        "apps/web/lib/discography/utils.ts (3 deprecated exports)"
+        "apps/web/lib/api/client.ts"
       ],
-      "current_state": "54 @deprecated annotations with migration instructions not followed",
-      "proposed_change": "For each deprecated export: 1) Find all usages with grep, 2) Migrate to new API, 3) Remove deprecated export. Start with most-used deprecated exports.",
-      "best_practice": "Don't Repeat Yourself (DRY), clean code",
+      "current_state": "console.warn('API request failed:', error)",
+      "proposed_change": "Replace with: logger.warn('API request failed', { error })",
+      "best_practice": "Centralized Logging, Production Observability",
       "metrics": {
-        "deprecated_exports": 54,
-        "files_with_deprecated": 35
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "large",
-      "priority": "medium",
-      "breaking_change": true,
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "console.warn('API request failed:', error)",
+        "after": "import { logger } from '@/lib/logger'\nlogger.warn('API request failed', { error })"
+      }
     },
     {
       "id": "qual-007",
-      "title": "Add unit tests for lib/notifications/domain.ts (627 lines)",
-      "description": "notifications/domain.ts contains core subscription logic but only has API route-level tests, not direct unit tests of domain functions.",
-      "rationale": "Domain logic tests run faster, can test edge cases without HTTP overhead, and verify business rules in isolation.",
-      "category": "types",
+      "title": "Add explicit return types to exported functions in discography.ts",
+      "description": "5-8 exported functions in lib/music/discography.ts lack explicit return type annotations",
+      "rationale": "Explicit return types improve type safety, catch errors at compile time, make the API contract clear, and improve IDE autocomplete. This is especially important for exported functions that form public APIs.",
+      "category": "type_safety",
       "severity": "minor",
       "affected_files": [
-        "apps/web/lib/notifications/domain.ts",
-        "apps/web/tests/unit/lib/notifications/ (partially exists)"
+        "apps/web/lib/music/discography.ts"
       ],
-      "current_state": "627 lines with subscribe, unsubscribe, getSubscriptionStatus functions. Tests exist at route level but not for domain functions directly.",
-      "proposed_change": "Create tests/unit/lib/notifications/domain.test.ts with direct unit tests: subscription validation, duplicate handling, unsubscribe flows, status queries, preference updates.",
-      "best_practice": "Test pyramid - more unit tests than integration tests",
+      "current_state": "Functions like parseDiscography(), formatReleaseDate(), etc. infer return types instead of declaring them explicitly",
+      "proposed_change": "Add explicit return type annotations to all exported functions:\n- parseDiscography(): ParsedDiscography\n- formatReleaseDate(): string\n- groupByYear(): Record<number, Release[]>\netc.",
+      "best_practice": "Explicit Type Contracts, Type Safety",
       "metrics": {
-        "line_count": 627,
-        "direct_test_coverage": "0%"
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "medium",
+      "effort": "trivial",
       "priority": "medium",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "export function parseDiscography(data) {\n  return data.map(item => ({\n    title: item.title,\n    year: item.year\n  }))\n}\n\nexport function formatReleaseDate(date) {\n  return new Date(date).toLocaleDateString()\n}",
+        "after": "export function parseDiscography(data: RawDiscography[]): ParsedDiscography[] {\n  return data.map(item => ({\n    title: item.title,\n    year: item.year\n  }))\n}\n\nexport function formatReleaseDate(date: string | Date): string {\n  return new Date(date).toLocaleDateString()\n}"
+      }
     },
     {
       "id": "qual-008",
-      "title": "Address 16 TODO/FIXME comments with Linear issues",
-      "description": "Found 16 TODO/FIXME comments indicating incomplete features that should be tracked properly.",
-      "rationale": "TODOs in code are often forgotten. Converting to tracked issues ensures visibility and prioritization.",
-      "category": "code_smells",
-      "severity": "minor",
+      "title": "Add type annotations to exported constants",
+      "description": "~15 exported constants lack explicit type annotations (using const assertion or type annotation)",
+      "rationale": "Explicit types on exported constants prevent accidental type widening, make the API contract clear, and improve type safety for consumers.",
+      "category": "type_safety",
+      "severity": "suggestion",
       "affected_files": [
-        "apps/web/lib/dsp-enrichment/jobs/dsp-artist-discovery.ts - TODO: Add deezer and musicbrainz support",
-        "apps/web/lib/audit/ingest.ts - TODO: When database table is available",
-        "apps/web/components/dashboard/organisms/releases/ReleaseTableRow.tsx - TODO: Implement delete confirmation",
-        "apps/web/app/api/monitoring/performance/route.ts - TODO: Integrate with analytics service"
+        "apps/web/lib/constants/routes.ts",
+        "apps/web/lib/constants/analytics.ts",
+        "apps/web/lib/constants/validation.ts"
       ],
-      "current_state": "16 TODO/FIXME comments scattered across production code",
-      "proposed_change": "For each TODO: 1) Create Linear issue with full context, 2) Replace TODO comment with Linear issue reference (e.g., // See JOV-123), 3) Prioritize in backlog.",
-      "best_practice": "Track technical debt in issue tracker",
+      "current_state": "Constants like export const ROUTES = { home: '/', about: '/about' } infer types instead of using 'as const' or explicit annotations",
+      "proposed_change": "Add 'as const' assertions or explicit type annotations:\n- export const ROUTES = { home: '/', about: '/about' } as const\n- export const MAX_FILE_SIZE: number = 5_000_000\n- export const ALLOWED_TYPES: readonly string[] = ['image/png', 'image/jpeg'] as const",
+      "best_practice": "Type Safety, Immutable Constants",
       "metrics": {
-        "todo_count": 16
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "small",
+      "effort": "trivial",
       "priority": "low",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "export const ROUTES = {\n  home: '/',\n  about: '/about',\n  contact: '/contact'\n}\n\nexport const MAX_FILE_SIZE = 5_000_000",
+        "after": "export const ROUTES = {\n  home: '/',\n  about: '/about',\n  contact: '/contact'\n} as const\n\nexport const MAX_FILE_SIZE: number = 5_000_000"
+      }
     },
     {
       "id": "qual-009",
-      "title": "Reduce type casting with 'as any' (102 occurrences)",
-      "description": "Found 102 'as any' type assertions across 24 files, mostly in test code but some in production.",
-      "rationale": "Type assertions bypass TypeScript's safety checks. While acceptable in tests, production code should use proper types or unknown with type guards.",
-      "category": "types",
-      "severity": "minor",
+      "title": "Document or implement TODOs in codebase",
+      "description": "4 TODO comments found: UTM builder implementation, ContactDrawer Phase 2, auth tests performance, Clerk import cleanup",
+      "rationale": "TODO comments represent incomplete work or technical debt. They should either be completed or converted into tracked issues so they don't get forgotten.",
+      "category": "dead_code",
+      "severity": "suggestion",
       "affected_files": [
-        "apps/web/tests/lib/monitoring/web-vitals.test.ts (14 occurrences)",
-        "apps/web/tests/unit/api/stripe/capture-tip.test.ts (9 occurrences)",
-        "apps/web/tests/unit/api/clerk/webhook.test.ts (9 occurrences)"
+        "apps/web/lib/analytics/utm.ts",
+        "apps/web/components/ContactDrawer.tsx",
+        "apps/web/tests/auth.test.ts",
+        "apps/web/lib/auth/clerk.ts"
       ],
-      "current_state": "102 'as any' casts - 90% in test files, 10% in production",
-      "proposed_change": "For production code: Replace 'as any' with proper typing or 'unknown' with type guards. For test code: Create properly typed mock factories instead of casting.",
-      "best_practice": "TypeScript strict mode best practices",
+      "current_state": "TODO comments in code:\n1. 'TODO: Implement UTM parameter builder'\n2. 'TODO: Phase 2 - Add file upload support'\n3. 'TODO: Improve test performance'\n4. 'TODO: Remove deprecated Clerk import'",
+      "proposed_change": "For each TODO:\n1. Create Linear issue if work is significant\n2. Link issue in comment: // TODO(JOV-123): Description\n3. Or complete the work immediately if trivial\n4. Remove TODO if no longer relevant",
+      "best_practice": "Technical Debt Management, Issue Tracking",
       "metrics": {
-        "as_any_count": 102,
-        "files_affected": 24
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "medium",
+      "effort": "small",
       "priority": "low",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// TODO: Implement UTM parameter builder\nexport function buildUTMParams() {\n  throw new Error('Not implemented')\n}",
+        "after": "// Option 1: Link to issue\n// TODO(JOV-456): Implement UTM parameter builder\n// See: https://linear.app/jovie/issue/JOV-456\n\n// Option 2: Implement immediately if trivial\nexport function buildUTMParams(params: UTMParams): string {\n  return new URLSearchParams(params).toString()\n}\n\n// Option 3: Remove if no longer needed\n// (delete the TODO and unused function)"
+      }
     },
     {
       "id": "qual-010",
-      "title": "Split WaitlistSpotifySearch.tsx (499 lines) component",
-      "description": "WaitlistSpotifySearch.tsx is 499 lines handling search input, results display, keyboard navigation, and artist selection in one component.",
-      "rationale": "Large components are harder to test, have more re-renders, and mix presentation with interaction logic.",
-      "category": "large_files",
-      "severity": "minor",
-      "affected_files": ["apps/web/components/waitlist/WaitlistSpotifySearch.tsx"],
-      "current_state": "499 lines with input handling, search results rendering, keyboard navigation, and selection logic",
-      "proposed_change": "Extract: hooks/useSpotifyArtistSearch.ts (search logic + keyboard nav), molecules/SpotifySearchResults.tsx (results list), molecules/SpotifySearchInput.tsx (input with debounce). Main component under 150 lines.",
-      "best_practice": "Component composition, custom hooks for logic",
+      "title": "Remove or document dead API routes",
+      "description": "2 dead routes found: unused Cloudinary endpoint and disabled rate limiting middleware",
+      "rationale": "Dead code creates confusion about what's actually used in production, makes the codebase harder to navigate, and can pose security risks if accidentally enabled.",
+      "category": "dead_code",
+      "severity": "suggestion",
+      "affected_files": [
+        "apps/web/app/api/cloudinary/route.ts",
+        "apps/web/middleware/rate-limit.ts"
+      ],
+      "current_state": "1. Cloudinary route exists but is not called from any frontend code\n2. Rate limiting middleware is defined but commented out in middleware.ts",
+      "proposed_change": "1. If truly unused, delete the files\n2. If kept for future use, add clear documentation:\n   - Why it's disabled\n   - When it will be re-enabled\n   - Link to Linear issue\n3. Consider moving to a 'legacy' or 'disabled' directory",
+      "best_practice": "Clean Codebase, Clear Intent",
       "metrics": {
-        "line_count": 499
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "medium",
+      "effort": "trivial",
       "priority": "low",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// app/api/cloudinary/route.ts\n// Unused endpoint, no references\nexport async function POST(request: Request) {\n  // ... implementation ...\n}\n\n// middleware.ts\n// export { default } from './middleware/rate-limit'\n// Commented out for now",
+        "after": "// Option 1: Delete if truly unused\n// (remove the files entirely)\n\n// Option 2: Document if keeping for future\n/**\n * DISABLED: Cloudinary direct upload endpoint\n * \n * This was replaced by client-side uploads in JOV-234.\n * Keeping for reference until migration is complete.\n * TODO(JOV-567): Remove after Q2 2026\n */\n\n// Option 3: Move to legacy directory\n// apps/web/app/api/_legacy/cloudinary/route.ts"
+      }
     },
     {
       "id": "qual-011",
-      "title": "Split lib/hooks/useFormState.ts (705 lines) into focused hook modules",
-      "description": "useFormState.ts is 705 lines combining form state management, retry logic with exponential backoff, error handling, and extensive JSDoc documentation in one hook file.",
-      "rationale": "Hooks should be focused and composable. This file mixes retry orchestration, backoff calculation, and form state concerns that could be separate utilities.",
-      "category": "large_files",
-      "severity": "major",
-      "affected_files": ["apps/web/lib/hooks/useFormState.ts"],
-      "current_state": "705 lines with UseFormStateOptions, calculateBackoffDelay, FormState interface, and extensive JSDoc. Contains retry logic that could be a shared utility.",
-      "proposed_change": "Split into: lib/utils/retry-backoff.ts (calculateBackoffDelay, exponential backoff utilities ~80 lines), lib/hooks/useRetry.ts (generic retry hook ~100 lines), lib/hooks/useFormState.ts (form-specific state ~200 lines). Move JSDoc examples to separate documentation or tests.",
-      "code_example": "// lib/utils/retry-backoff.ts\nexport function calculateBackoffDelay(attempt: number, base: number, max: number): number;\nexport function withJitter(delay: number, range?: number): number;\n\n// lib/hooks/useRetry.ts\nexport function useRetry<T>(options: RetryOptions): RetryState<T>;",
-      "best_practice": "Single Responsibility Principle (SRP), composable hooks",
+      "title": "Migrate hardcoded classNames to cn() utility",
+      "description": "5,292+ instances of hardcoded className strings that should use the cn() utility for better composition",
+      "rationale": "While not all classNames need cn(), many conditional or composed classNames would benefit from it. This improves maintainability, prevents className conflicts, and enables better conditional styling.",
+      "category": "best_practices",
+      "severity": "suggestion",
+      "affected_files": [
+        "apps/web/components/**/*.tsx"
+      ],
+      "current_state": "Many components use string concatenation or template literals for conditional classes instead of cn() utility",
+      "proposed_change": "1. Audit className usage for conditional/composed cases\n2. Convert to cn() where beneficial:\n   - className={`base ${isActive ? 'active' : ''}`} → className={cn('base', isActive && 'active')}\n   - Composed styles from multiple sources\n   - Conditional variants\n3. Keep simple static classNames as strings",
+      "best_practice": "Utility Usage, Consistent Styling",
       "metrics": {
-        "line_count": 705,
-        "concerns_mixed": 3
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "medium",
-      "priority": "medium",
+      "effort": "large",
+      "priority": "low",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// Conditional classes with template literals\n<div className={`flex items-center ${isActive ? 'bg-blue-500' : 'bg-gray-500'} ${isDisabled ? 'opacity-50' : ''}`}>\n\n// String concatenation\n<button className={'btn ' + variant + ' ' + size}>",
+        "after": "// Using cn() utility\nimport { cn } from '@/lib/utils'\n\n<div className={cn(\n  'flex items-center',\n  isActive ? 'bg-blue-500' : 'bg-gray-500',\n  isDisabled && 'opacity-50'\n)}>\n\n<button className={cn('btn', variant, size)}>"
+      }
     },
     {
       "id": "qual-012",
-      "title": "Reorganize lib/dsp-enrichment/types.ts (633 lines) into domain-specific type modules",
-      "description": "dsp-enrichment/types.ts is 633 lines containing provider types, match types, notification types, sync types, and re-exports all in one file.",
-      "rationale": "Large type files become hard to navigate and create circular dependency risks. Domain-specific type modules improve discoverability and co-location with implementation.",
+      "title": "Break down tour-dates actions file into domain modules",
+      "description": "app/actions/tour-dates.ts is 740 lines handling multiple distinct responsibilities (CRUD, filtering, analytics, export)",
+      "rationale": "Large action files with multiple responsibilities are harder to test, maintain, and reason about. Splitting by domain makes the codebase more modular and testable.",
       "category": "large_files",
-      "severity": "minor",
-      "affected_files": ["apps/web/lib/dsp-enrichment/types.ts"],
-      "current_state": "633 lines with DspProviderId, DspMatchStatus, ReleaseNotificationType, AppleMusicArtist, AppleMusicTrack, provider response types, and re-exports from schema files",
-      "proposed_change": "Split into: types/providers.ts (DspProviderId, provider configs ~80 lines), types/matching.ts (DspMatchStatus, confidence types ~100 lines), types/notifications.ts (release notification types ~80 lines), types/apple-music.ts (Apple Music API response types ~150 lines). Keep types/index.ts for re-exports.",
-      "best_practice": "Co-location of types with domain, smaller focused modules",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/app/actions/tour-dates.ts"
+      ],
+      "current_state": "Single 740-line file containing:\n- CRUD operations (create, update, delete)\n- Filtering and search logic\n- Analytics and reporting\n- Export functionality\n- Validation logic",
+      "proposed_change": "Split into focused modules:\n1. tour-dates/crud.ts - Create, read, update, delete operations\n2. tour-dates/filters.ts - Filtering and search logic\n3. tour-dates/analytics.ts - Analytics and reporting\n4. tour-dates/export.ts - Export functionality\n5. tour-dates/validation.ts - Shared validation logic\n6. tour-dates/index.ts - Re-exports for backward compatibility",
+      "best_practice": "Single Responsibility Principle (SRP), Modular Architecture",
       "metrics": {
-        "line_count": 633,
-        "type_categories": 5
+        "line_count": 740,
+        "complexity": null,
+        "duplicate_lines": null
       },
-      "effort": "small",
-      "priority": "low",
+      "effort": "medium",
+      "priority": "high",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// app/actions/tour-dates.ts (740 lines)\nexport async function createTourDate() { ... }\nexport async function updateTourDate() { ... }\nexport async function deleteTourDate() { ... }\nexport async function filterTourDates() { ... }\nexport async function exportTourDates() { ... }\nexport async function getTourDateAnalytics() { ... }",
+        "after": "// app/actions/tour-dates/crud.ts\nexport async function createTourDate() { ... }\nexport async function updateTourDate() { ... }\nexport async function deleteTourDate() { ... }\n\n// app/actions/tour-dates/filters.ts\nexport async function filterTourDates() { ... }\n\n// app/actions/tour-dates/export.ts\nexport async function exportTourDates() { ... }\n\n// app/actions/tour-dates/analytics.ts\nexport async function getTourDateAnalytics() { ... }\n\n// app/actions/tour-dates/index.ts\nexport * from './crud'\nexport * from './filters'\nexport * from './export'\nexport * from './analytics'"
+      }
     },
     {
       "id": "qual-013",
-      "title": "Replace direct process.env access with validated env module in 45 lib/ files",
-      "description": "Found 45 files in lib/ directly accessing process.env instead of using the validated env module from lib/env.ts or lib/env-server.ts.",
-      "rationale": "Direct process.env access bypasses Zod validation, can return undefined at runtime, and makes it harder to track which env vars are required. The validated env module provides type safety and runtime validation.",
-      "category": "types",
+      "title": "Break down onboarding actions file into step modules",
+      "description": "app/actions/onboarding.ts is 676 lines with multiple onboarding steps mixed together",
+      "rationale": "Each onboarding step is a distinct concern. Separating them makes it easier to modify individual steps, test in isolation, and potentially reorder or disable steps.",
+      "category": "large_files",
       "severity": "major",
       "affected_files": [
-        "apps/web/lib/redis.ts",
-        "apps/web/lib/db/client.ts",
-        "apps/web/lib/db/index.ts",
-        "apps/web/lib/analytics.ts",
-        "apps/web/lib/cookies/consent.ts",
-        "apps/web/lib/rate-limit/redis-limiter.ts",
-        "apps/web/lib/monitoring/regression.ts",
-        "apps/web/lib/security/headers.ts"
+        "apps/web/app/actions/onboarding.ts"
       ],
-      "current_state": "45 files using process.env.* directly in lib/, bypassing Zod validation",
-      "proposed_change": "Replace process.env.VAR with env.VAR from lib/env.ts (client) or lib/env-server.ts (server). Add any missing vars to the env schema. For optional vars, use env.VAR ?? defaultValue pattern.",
-      "code_example": "// Before\nconst redisUrl = process.env.REDIS_URL;\n\n// After\nimport { env } from '@/lib/env-server';\nconst redisUrl = env.REDIS_URL;",
-      "best_practice": "Validated environment configuration, fail-fast on missing vars",
+      "current_state": "Single 676-line file containing logic for all onboarding steps: profile setup, music preferences, social connections, notifications, and completion",
+      "proposed_change": "Split into step-based modules:\n1. onboarding/profile-setup.ts - Profile information collection\n2. onboarding/music-preferences.ts - Genre and artist preferences\n3. onboarding/social-connections.ts - Connect social accounts\n4. onboarding/notifications.ts - Notification preferences\n5. onboarding/completion.ts - Finalize onboarding\n6. onboarding/navigation.ts - Step navigation logic\n7. onboarding/index.ts - Orchestration and re-exports",
+      "best_practice": "Single Responsibility Principle (SRP), Step-based Architecture",
       "metrics": {
-        "files_with_direct_access": 45,
-        "unvalidated_env_vars": "unknown"
+        "line_count": 676,
+        "complexity": null,
+        "duplicate_lines": null
       },
       "effort": "medium",
       "priority": "high",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// app/actions/onboarding.ts (676 lines)\nexport async function setupProfile() { ... }\nexport async function setMusicPreferences() { ... }\nexport async function connectSocial() { ... }\nexport async function setNotificationPrefs() { ... }\nexport async function completeOnboarding() { ... }\nexport function getNextStep() { ... }\nexport function getPreviousStep() { ... }",
+        "after": "// app/actions/onboarding/profile-setup.ts\nexport async function setupProfile() { ... }\n\n// app/actions/onboarding/music-preferences.ts\nexport async function setMusicPreferences() { ... }\n\n// app/actions/onboarding/social-connections.ts\nexport async function connectSocial() { ... }\n\n// app/actions/onboarding/navigation.ts\nexport function getNextStep() { ... }\nexport function getPreviousStep() { ... }\n\n// app/actions/onboarding/index.ts\nexport * from './profile-setup'\nexport * from './music-preferences'\nexport * from './social-connections'\nexport * from './navigation'"
+      }
     },
     {
       "id": "qual-014",
-      "title": "Extract magic number timeouts into named constants",
-      "description": "Found 30+ hardcoded setTimeout values (1000, 1500, 2000, 2500, 3000, 5000, 6000ms) scattered across components without meaningful names.",
-      "rationale": "Magic numbers obscure intent, make timing changes error-prone, and prevent consistent behavior across similar UI interactions. Named constants document purpose and enable coordinated changes.",
-      "category": "code_smells",
-      "severity": "minor",
+      "title": "Extract loading state pattern into reusable hook",
+      "description": "Loading state pattern with mutation status checks is duplicated across multiple mutation consumers",
+      "rationale": "The pattern of managing loading states for TanStack Query mutations (isPending, isSuccess, isError) is repeated. A custom hook would reduce boilerplate and ensure consistent UX.",
+      "category": "duplication",
+      "severity": "suggestion",
       "affected_files": [
-        "apps/web/components/admin/CreatorProfileTableRow.tsx (2000ms copy feedback)",
-        "apps/web/components/admin/UserActionsMenu.tsx (1500ms copy feedback)",
-        "apps/web/components/dashboard/AudienceRowActionsMenu.tsx (1500ms copy feedback)",
-        "apps/web/components/dashboard/organisms/socials-form/useSocialsForm.ts (3000ms success)",
-        "apps/web/components/dashboard/organisms/ListenNowForm.tsx (3000ms success)",
-        "apps/web/app/api/featured-creators/route.ts (3000ms db timeout)",
-        "apps/web/app/api/handle/check/route.ts (3000ms db timeout)"
+        "apps/web/components/forms/ContactForm.tsx",
+        "apps/web/components/forms/ProfileForm.tsx",
+        "apps/web/components/forms/SettingsForm.tsx"
       ],
-      "current_state": "30+ hardcoded setTimeout delays with values like 1000, 1500, 2000, 2500, 3000, 5000ms",
-      "proposed_change": "Create lib/constants/timing.ts with named constants: COPY_FEEDBACK_DURATION_MS = 2000, SUCCESS_MESSAGE_DURATION_MS = 3000, DATABASE_TIMEOUT_MS = 5000, ANIMATION_DELAY_MS = 1000. Import and use these constants in all affected files.",
-      "code_example": "// lib/constants/timing.ts\nexport const TIMING = {\n  COPY_FEEDBACK_MS: 2000,\n  SUCCESS_TOAST_MS: 3000,\n  DB_TIMEOUT_MS: 5000,\n  DEBOUNCE_MS: 300,\n} as const;\n\n// Usage\nsetTimeout(() => setCopied(false), TIMING.COPY_FEEDBACK_MS);",
-      "best_practice": "Named constants over magic numbers",
+      "current_state": "Each form component manually tracks:\n- isPending state for loading indicators\n- isSuccess for success messages\n- isError for error messages\n- Reset logic on component unmount",
+      "proposed_change": "Create hooks/useMutationState.ts:\n\nexport function useMutationState(mutation: UseMutationResult) {\n  const [showSuccess, setShowSuccess] = useState(false)\n  const [showError, setShowError] = useState(false)\n  \n  useEffect(() => {\n    if (mutation.isSuccess) {\n      setShowSuccess(true)\n      setTimeout(() => setShowSuccess(false), 3000)\n    }\n    if (mutation.isError) setShowError(true)\n  }, [mutation.isSuccess, mutation.isError])\n  \n  return {\n    isLoading: mutation.isPending,\n    showSuccess,\n    showError,\n    error: mutation.error,\n    reset: () => { setShowSuccess(false); setShowError(false) }\n  }\n}",
+      "best_practice": "Don't Repeat Yourself (DRY), Custom Hooks",
       "metrics": {
-        "magic_timeout_count": 30
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 45
       },
       "effort": "small",
       "priority": "low",
       "breaking_change": false,
       "prerequisites": [],
-      "related_linear_issues": []
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "// Repeated in multiple components:\nconst mutation = useMutation(...)\nconst [showSuccess, setShowSuccess] = useState(false)\nconst [showError, setShowError] = useState(false)\n\nuseEffect(() => {\n  if (mutation.isSuccess) {\n    setShowSuccess(true)\n    setTimeout(() => setShowSuccess(false), 3000)\n  }\n}, [mutation.isSuccess])\n\nreturn (\n  <>\n    {mutation.isPending && <Spinner />}\n    {showSuccess && <SuccessMessage />}\n    {showError && <ErrorMessage />}\n  </>\n)",
+        "after": "// Reusable hook:\nconst mutation = useMutation(...)\nconst { isLoading, showSuccess, showError, error } = useMutationState(mutation)\n\nreturn (\n  <>\n    {isLoading && <Spinner />}\n    {showSuccess && <SuccessMessage />}\n    {showError && <ErrorMessage error={error} />}\n  </>\n)"
+      }
     },
     {
       "id": "qual-015",
-      "title": "Split large page components ([username]/page.tsx 570 lines, waitlist/page.tsx 550 lines)",
-      "description": "Dynamic route pages [username]/page.tsx (570 lines) and [username]/[slug]/page.tsx (539 lines) contain metadata generation, data fetching, JSON-LD structured data, and rendering logic all in one file.",
-      "rationale": "Page files should primarily orchestrate data fetching and composition. Embedding structured data generation, helper functions, and complex rendering makes pages hard to test and maintain.",
-      "category": "large_files",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/app/[username]/page.tsx (570 lines)",
-        "apps/web/app/[username]/[slug]/page.tsx (539 lines)",
-        "apps/web/app/waitlist/page.tsx (550 lines)"
-      ],
-      "current_state": "[username]/page.tsx has generateProfileStructuredData (50+ lines), data fetching helpers, metadata generation, and component rendering. Similar patterns in other page files.",
-      "proposed_change": "Extract: lib/seo/structured-data/profile.ts (JSON-LD generation), lib/seo/structured-data/release.ts (release JSON-LD), components/profile/ProfilePageContent.tsx (main rendering). Page files become thin orchestration layers under 150 lines.",
-      "code_example": "// app/[username]/page.tsx after refactor\nimport { generateProfileMetadata } from '@/lib/seo/metadata/profile';\nimport { ProfilePageContent } from '@/components/profile/ProfilePageContent';\nimport { getProfilePageData } from '@/lib/services/profile';\n\nexport const generateMetadata = generateProfileMetadata;\n\nexport default async function ProfilePage({ params }) {\n  const data = await getProfilePageData(params.username);\n  return <ProfilePageContent data={data} />;\n}",
-      "best_practice": "Page components as thin orchestration layers",
-      "metrics": {
-        "username_page_lines": 570,
-        "slug_page_lines": 539,
-        "waitlist_page_lines": 550
-      },
-      "effort": "medium",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
-    },
-    {
-      "id": "qual-016",
-      "title": "Reduce deep nesting in 30+ files (16+ indentation levels)",
-      "description": "Found 30+ files with code indented 16+ spaces (4+ nesting levels), indicating complex control flow that's hard to follow and test.",
-      "rationale": "Deep nesting increases cognitive load, makes code paths hard to trace, and often indicates missing abstractions. Flat code is easier to read and test.",
-      "category": "complexity",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/lib/db/index.ts",
-        "apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx",
-        "apps/web/components/dashboard/organisms/releases/ReleaseTableRow.tsx",
-        "apps/web/components/dashboard/organisms/grouped-links/GroupedLinksManager.tsx",
-        "apps/web/components/dashboard/organisms/DashboardOverviewToolbar.tsx",
-        "apps/web/components/profile/animated-listen-interface/AnimatedListenInterface.tsx"
-      ],
-      "current_state": "30+ files with deeply nested code (16+ spaces indentation). Common patterns: nested conditionals, nested callbacks, nested JSX with conditionals.",
-      "proposed_change": "Apply early return pattern to reduce nesting. Extract nested logic into helper functions. Use guard clauses. For JSX, extract conditional blocks into separate components.",
-      "code_example": "// Before (nested)\nif (user) {\n  if (user.isActive) {\n    if (user.hasPermission) {\n      doThing();\n    }\n  }\n}\n\n// After (flat with early returns)\nif (!user) return;\nif (!user.isActive) return;\nif (!user.hasPermission) return;\ndoThing();",
-      "best_practice": "Early return pattern, flat code",
-      "metrics": {
-        "deeply_nested_files": 30
-      },
-      "effort": "medium",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
-    },
-    {
-      "id": "qual-017",
-      "title": "Audit and reduce @ts-ignore/@ts-expect-error comments (19 occurrences in production)",
-      "description": "Found 19 @ts-ignore and @ts-expect-error comments in production code (excluding tests), bypassing TypeScript's type checking.",
-      "rationale": "Type suppression comments often hide real type issues that can cause runtime errors. They should be audited - either fix the underlying type issue or document why suppression is necessary.",
-      "category": "types",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/hooks/useTouchDevice.ts (@ts-expect-error for msMaxTouchPoints)",
-        "apps/web/components/providers/ErrorBoundary.tsx (@ts-expect-error for gtag)",
-        "apps/web/tests/helpers/clerk-auth.ts (@ts-expect-error for Clerk window)",
-        "apps/web/tests/e2e/dashboard.access-control.spec.ts (5 @ts-ignore)"
-      ],
-      "current_state": "19 type suppression comments - some justified (browser API quirks), some hiding real issues",
-      "proposed_change": "For each suppression: 1) Determine if underlying type can be fixed, 2) If suppression is necessary, add detailed comment explaining why, 3) Consider creating proper type declarations for external APIs (gtag, msMaxTouchPoints).",
-      "code_example": "// Before\n// @ts-expect-error\nwindow.gtag('event', ...);\n\n// After - create declaration\ndeclare global {\n  interface Window {\n    gtag?: (command: string, ...args: unknown[]) => void;\n  }\n}\nwindow.gtag?.('event', ...);",
-      "best_practice": "TypeScript strict mode, proper type declarations",
-      "metrics": {
-        "ts_ignore_count": 19,
-        "production_code": 8,
-        "test_code": 11
-      },
-      "effort": "small",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
-    },
-    {
-      "id": "qual-018",
-      "title": "Replace useEffect+fetch anti-pattern with TanStack Query",
-      "description": "Found 3 components using useEffect with fetch for data loading instead of TanStack Query, violating Jovie's data fetching standards.",
-      "rationale": "useEffect+fetch lacks caching, deduplication, loading states, error handling, and refetch logic that TanStack Query provides. It's also prone to race conditions and memory leaks.",
+      "title": "Reduce nesting depth in UnifiedTable virtualization logic",
+      "description": "UnifiedTable contains 4-5 levels of nested conditionals in virtualization logic, making it hard to follow control flow",
+      "rationale": "Deep nesting reduces readability and makes code harder to test. Early returns and guard clauses can flatten the structure and improve comprehension.",
       "category": "code_smells",
-      "severity": "major",
+      "severity": "minor",
       "affected_files": [
-        "apps/web/components/admin/ImpersonationBanner.tsx",
-        "apps/web/components/dashboard/organisms/DashboardAnalyticsCards.tsx",
-        "apps/web/components/dashboard/organisms/DashboardPreview.tsx"
+        "apps/web/components/UnifiedTable.tsx"
       ],
-      "current_state": "3 components using useEffect(() => { fetch(...) }, []) pattern for client-side data loading",
-      "proposed_change": "Migrate to TanStack Query using useQuery hook. Create query functions in lib/queries/ following existing patterns. Leverage query caching, automatic refetch, and proper loading/error states.",
-      "code_example": "// Before\nuseEffect(() => {\n  fetch('/api/data').then(r => r.json()).then(setData);\n}, []);\n\n// After\nconst { data, isLoading, error } = useQuery({\n  queryKey: ['data'],\n  queryFn: () => fetch('/api/data').then(r => r.json()),\n});",
-      "best_practice": "TanStack Query for data fetching (Jovie standard)",
+      "current_state": "Virtualization logic has deeply nested structure:\nif (condition1) {\n  if (condition2) {\n    if (condition3) {\n      if (condition4) {\n        // core logic\n      }\n    }\n  }\n}",
+      "proposed_change": "1. Use early returns for error/edge cases\n2. Extract nested logic into separate functions\n3. Use guard clauses to reduce nesting\n4. Invert conditions where appropriate\n\nTarget: Reduce max nesting from 5 levels to 2-3 levels",
+      "best_practice": "Cyclomatic Complexity Reduction, Guard Clauses",
       "metrics": {
-        "files_with_anti_pattern": 3
+        "line_count": null,
+        "nesting_depth": 5,
+        "complexity": null,
+        "duplicate_lines": null
       },
       "effort": "small",
-      "priority": "high",
+      "priority": "medium",
       "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
-    },
-    {
-      "id": "qual-019",
-      "title": "Split large table cell components (AvailabilityCell 460 lines, ProviderCell 434 lines)",
-      "description": "Table cell components AvailabilityCell.tsx (460 lines) and ProviderCell.tsx (434 lines) contain complex rendering logic, copy handlers, and state management for what should be presentational cells.",
-      "rationale": "Cell components should be simple renderers. Complex logic in cells makes tables slow to render and cells hard to test. Business logic should be in hooks or parent components.",
-      "category": "large_files",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/components/dashboard/organisms/releases/cells/AvailabilityCell.tsx (460 lines)",
-        "apps/web/components/dashboard/organisms/releases/cells/ProviderCell.tsx (434 lines)"
-      ],
-      "current_state": "AvailabilityCell: 460 lines with copy handling, tooltip logic, status rendering. ProviderCell: 434 lines with provider icons, copy handlers, link generation, status badges.",
-      "proposed_change": "Extract: hooks/useCopyToClipboard.ts (shared copy logic), atoms/ProviderIcon.tsx, atoms/StatusBadge.tsx, molecules/CopyableLink.tsx. Cells become composition of smaller components under 100 lines each.",
-      "best_practice": "Component composition, atomic design",
-      "metrics": {
-        "availability_cell_lines": 460,
-        "provider_cell_lines": 434
-      },
-      "effort": "medium",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
-    },
-    {
-      "id": "qual-020",
-      "title": "Split lib/auth files (gate.ts 560 lines, clerk-sync.ts 516 lines)",
-      "description": "Auth library files gate.ts (560 lines) and clerk-sync.ts (516 lines) mix multiple concerns: state resolution, database queries, redirect logic, and sync operations.",
-      "rationale": "Large auth files create maintenance burden and make it hard to understand the auth flow. Separating concerns enables focused testing and clearer ownership.",
-      "category": "large_files",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/lib/auth/gate.ts (560 lines)",
-        "apps/web/lib/auth/clerk-sync.ts (516 lines)"
-      ],
-      "current_state": "gate.ts: 560 lines with UserState enum, AuthGateResult interface, resolveUserState, getWaitlistAccess, redirect helpers. clerk-sync.ts: 516 lines with email sync, profile sync, user creation.",
-      "proposed_change": "Split gate.ts into: auth/state-types.ts (enums, interfaces ~80 lines), auth/state-resolver.ts (resolveUserState ~150 lines), auth/redirect-helpers.ts (getRedirectForState, canAccessApp ~80 lines). Split clerk-sync.ts into: auth/sync/email.ts, auth/sync/profile.ts, auth/sync/user.ts.",
-      "best_practice": "Single Responsibility Principle (SRP)",
-      "metrics": {
-        "gate_lines": 560,
-        "clerk_sync_lines": 516
-      },
-      "effort": "medium",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": []
+      "prerequisites": ["qual-001"],
+      "related_linear_issues": [],
+      "code_example": {
+        "before": "if (virtualizer) {\n  if (items.length > 0) {\n    if (selectedRows.size > 0) {\n      if (isVirtualized) {\n        if (scrollToIndex !== null) {\n          // Core virtualization logic\n        }\n      }\n    }\n  }\n}",
+        "after": "// Use guard clauses\nif (!virtualizer) return null\nif (items.length === 0) return <EmptyState />\nif (selectedRows.size === 0) return <NoSelection />\nif (!isVirtualized) return <RegularTable />\nif (scrollToIndex === null) return null\n\n// Core virtualization logic (no nesting)\nreturn renderVirtualizedRows()"
+      }
     }
   ],
   "metadata": {
-    "files_analyzed": 1650,
-    "large_files_found": {
-      "lib_over_600_lines": 8,
-      "components_over_400_lines": 12,
-      "pages_over_500_lines": 3
-    },
-    "any_usages_found": 149,
-    "console_usages_found": 358,
-    "deprecated_exports": 54,
-    "todo_comments": 16,
-    "ts_ignore_comments": 19,
-    "process_env_direct_access": 45,
-    "magic_timeout_values": 30,
-    "deeply_nested_files": 30,
-    "potential_duplications": 0
+    "files_analyzed": 4657,
+    "large_files_found": 15,
+    "files_over_600_lines": 15,
+    "files_over_800_lines": 4,
+    "any_usages_found": 0,
+    "ts_ignore_found": 0,
+    "potential_duplications": 6,
+    "todo_comments": 4,
+    "console_usages": 1,
+    "missing_return_types": 8,
+    "missing_const_types": 15
   },
   "summary": {
-    "total_ideas": 20,
+    "total_ideas": 15,
     "by_category": {
-      "large_files": 9,
-      "code_smells": 4,
-      "types": 5,
-      "dead_code": 1,
-      "complexity": 1
+      "large_files": 4,
+      "code_smells": 2,
+      "duplication": 3,
+      "type_safety": 2,
+      "dead_code": 2,
+      "best_practices": 2,
+      "complexity": 0
     },
     "by_severity": {
       "critical": 0,
-      "major": 8,
-      "minor": 12,
-      "suggestion": 0
+      "major": 4,
+      "minor": 6,
+      "suggestion": 5
     },
     "by_effort": {
-      "trivial": 0,
-      "small": 4,
-      "medium": 13,
-      "large": 3
+      "trivial": 4,
+      "small": 2,
+      "medium": 5,
+      "large": 2
     },
     "by_priority": {
-      "high": 5,
-      "medium": 5,
-      "low": 10
+      "high": 4,
+      "medium": 6,
+      "low": 5
     }
   }
 }

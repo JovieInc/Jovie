@@ -23,6 +23,7 @@ import {
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
+import { extractErrorMessage } from '@/lib/utils/errors';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -313,7 +314,7 @@ function logOnboardingError(
     email: context.email,
     timestamp: new Date().toISOString(),
     errorName: error instanceof Error ? error.name : 'Unknown',
-    errorMessage: error instanceof Error ? error.message : String(error),
+    errorMessage: extractErrorMessage(error),
   });
 
   Sentry.captureException(error, {
