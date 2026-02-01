@@ -7,7 +7,6 @@
 import {
   type DetailedValidationResult,
   isUsernameFormatValid,
-  normalizeUsername as normalize,
   validateUsernameCore,
 } from './username-core';
 
@@ -50,7 +49,7 @@ export function validateUsername(username: string): UsernameValidationResult {
  * @param username - The username to normalize
  * @returns Normalized username (lowercase, trimmed)
  */
-export const normalizeUsername = normalize;
+export { normalizeUsername } from './username-core';
 
 /**
  * Check if a username is available (client-side pre-check).

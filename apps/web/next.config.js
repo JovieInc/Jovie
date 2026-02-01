@@ -120,6 +120,23 @@ const nextConfig = {
       key: 'Permissions-Policy',
       value: 'camera=(), microphone=(), geolocation=()',
     });
+
+    // Cache control header helpers
+    const cacheHeaders = {
+      immutable: {
+        key: 'Cache-Control',
+        value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+      },
+      noStore: {
+        key: 'Cache-Control',
+        value: 'private, no-cache, no-store, must-revalidate',
+      },
+      revalidate: {
+        key: 'Cache-Control',
+        value: 'public, max-age=0, must-revalidate',
+      },
+    };
+
     return [
       {
         source: '/api/health/build-info',
@@ -143,58 +160,36 @@ const nextConfig = {
       // Marketing pages (pre-rendered at build) - long-lived cache
       {
         source: '/',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
-          },
-        ],
+        headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
         source:
-          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog|legal/:path*)',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
-          },
-        ],
+          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog)',
+        headers: [...securityHeaders, cacheHeaders.immutable],
+      },
+      {
+        source: '/legal/:path*',
+        headers: [...securityHeaders, cacheHeaders.immutable],
       },
       // App routes and dynamic pages - no cache
       {
+        source: '/app/:path*',
+        headers: [...securityHeaders, cacheHeaders.noStore],
+      },
+      {
         source:
-          '/(app|go|r|onboarding|account|billing|hud|signin|signup|sso-callback)/:path*',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'private, no-cache, no-store, must-revalidate',
-          },
-        ],
+          '/(go|r|onboarding|account|billing|hud|signin|signup|sso-callback)(.*)',
+        headers: [...securityHeaders, cacheHeaders.noStore],
       },
       // Dynamic profile pages - no cache
       {
         source: '/:username/:path*',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-        ],
+        headers: [...securityHeaders, cacheHeaders.revalidate],
       },
       // Catch-all for other routes - revalidate on each request
       {
         source: '/(.*)',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
-          },
-        ],
+        headers: [...securityHeaders, cacheHeaders.revalidate],
       },
     ];
   },
@@ -223,6 +218,43 @@ const nextConfig = {
       },
       // VIP username redirects
       ...vipUsernameRedirects,
+    ];
+  },
+  async rewrites() {
+    return [
+      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
+      {
+        source: '/app/profile',
+        destination: '/app/dashboard/profile',
+      },
+      {
+        source: '/app/contacts',
+        destination: '/app/dashboard/contacts',
+      },
+      {
+        source: '/app/releases',
+        destination: '/app/dashboard/releases',
+      },
+      {
+        source: '/app/tour-dates',
+        destination: '/app/dashboard/tour-dates',
+      },
+      {
+        source: '/app/audience',
+        destination: '/app/dashboard/audience',
+      },
+      {
+        source: '/app/earnings',
+        destination: '/app/dashboard/earnings',
+      },
+      {
+        source: '/app/chat',
+        destination: '/app/dashboard/chat',
+      },
+      {
+        source: '/app/analytics',
+        destination: '/app/dashboard/analytics',
+      },
     ];
   },
   experimental: {

@@ -74,3 +74,4 @@ doppler.yaml
 
 # Local git worktrees (should never be committed)
 .worktrees/
+/.issues/

@@ -9,7 +9,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';
 
 // Redis key prefix for view count batching
@@ -97,6 +97,7 @@ export async function updateProfileByClerkId(
 export async function incrementProfileViews(username: string): Promise<void> {
   const normalizedUsername = username.toLowerCase();
   const redisKey = `${VIEW_COUNT_KEY_PREFIX}${normalizedUsername}`;
+  const redis = getRedis();
 
   // If Redis is available, use batched counting
   if (redis) {
@@ -212,6 +213,7 @@ async function incrementViewsDirectly(
  * Call this from a scheduled job (e.g., cron) to ensure eventual consistency.
  */
 export async function flushAllPendingViews(): Promise<number> {
+  const redis = getRedis();
   if (!redis) {
     captureWarning('Redis not available for view flush');
     return 0;

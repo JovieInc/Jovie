@@ -5,7 +5,7 @@ import {
   SidebarMenuAction,
   SidebarMenuActions,
 } from '@/components/organisms/Sidebar';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { copyToClipboard } from './utils';
@@ -18,7 +18,7 @@ export function ProfileMenuActions({
   publicProfileHref,
 }: ProfileMenuActionsProps) {
   const notifications = useNotifications();
-  const profileUrl = `${PROFILE_URL}${publicProfileHref}`;
+  const profileUrl = `${BASE_URL}${publicProfileHref}`;
 
   async function handleCopyProfileUrl() {
     const success = await copyToClipboard(profileUrl);

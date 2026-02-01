@@ -21,7 +21,7 @@ import {
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
 
 export interface ContextMenuDependencies {
@@ -164,7 +164,7 @@ export function useContextMenuItems({
           label: 'View profile',
           icon: <ExternalLink className='h-3.5 w-3.5' />,
           onClick: () => {
-            globalThis.open(`${PROFILE_URL}/${profile.username}`, '_blank');
+            globalThis.open(`${BASE_URL}/${profile.username}`, '_blank');
           },
         }
       );
@@ -180,7 +180,7 @@ export function useContextMenuItems({
             icon: <Copy className='h-3.5 w-3.5' />,
             onClick: () => {
               void (async () => {
-                const claimUrl = `${PROFILE_URL}/claim/${claimToken}`;
+                const claimUrl = `${BASE_URL}/claim/${claimToken}`;
                 try {
                   await navigator.clipboard.writeText(claimUrl);
                   toast.success('Claim link copied to clipboard');

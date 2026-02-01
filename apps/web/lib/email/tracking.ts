@@ -7,7 +7,7 @@
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
-import { APP_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { db } from '@/lib/db';
 import {
   type EmailEngagementEventType,
@@ -134,7 +134,7 @@ export function buildOpenTrackingUrl(
 ): string | null {
   const token = generateTrackingToken(payload);
   if (!token) return null;
-  return `${APP_URL}/api/email/track/open?t=${encodeURIComponent(token)}`;
+  return `${BASE_URL}/api/email/track/open?t=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -157,7 +157,7 @@ export function buildClickTrackingUrl(
     params.set('l', linkId);
   }
 
-  return `${APP_URL}/api/email/track/click?${params.toString()}`;
+  return `${BASE_URL}/api/email/track/click?${params.toString()}`;
 }
 
 /**

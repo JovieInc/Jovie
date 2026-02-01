@@ -9,7 +9,7 @@ import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -336,8 +336,8 @@ export function DashboardTipping() {
     const displayHandle = tipHandle || 'your-handle';
     const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
     const tipRelativePathLink = `${tipRelativePath}?source=link`;
-    const tipShareUrlQr = `${PROFILE_URL}${tipRelativePath}?source=qr`;
-    const tipUrl = `${PROFILE_URL}${tipRelativePathLink}`;
+    const tipShareUrlQr = `${BASE_URL}${tipRelativePath}?source=qr`;
+    const tipUrl = `${BASE_URL}${tipRelativePathLink}`;
     const qrDownloadUrl = getQrCodeUrl(tipShareUrlQr, QR_DOWNLOAD_SIZE);
 
     return {

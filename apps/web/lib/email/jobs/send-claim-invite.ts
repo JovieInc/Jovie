@@ -25,9 +25,7 @@ import { logger } from '@/lib/utils/logger';
 let emailProviderInstance: ResendEmailProvider | null = null;
 
 function getEmailProvider(): ResendEmailProvider {
-  if (!emailProviderInstance) {
-    emailProviderInstance = new ResendEmailProvider();
-  }
+  emailProviderInstance ??= new ResendEmailProvider();
   return emailProviderInstance;
 }
 

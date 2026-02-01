@@ -11,7 +11,6 @@ import type { RateLimitResult } from '@/lib/rate-limit';
 import {
   checkTrackingRateLimit,
   createRateLimitHeaders,
-  isRateLimitingEnabled,
   RATE_LIMITERS,
   trackingClicksLimiter,
   trackingIpClicksLimiter,
@@ -20,7 +19,7 @@ import {
 } from '@/lib/rate-limit';
 
 // Re-export the result type for backward compatibility
-export type { RateLimitResult };
+export type { RateLimitResult } from '@/lib/rate-limit';
 
 // Re-export individual limiters for direct access
 export {
@@ -61,7 +60,7 @@ export async function checkVisitRateLimit(
 /**
  * Check if rate limiting is enabled
  */
-export { isRateLimitingEnabled };
+export { isRateLimitingEnabled } from '@/lib/rate-limit';
 
 /**
  * Get rate limit headers for HTTP responses

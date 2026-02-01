@@ -104,9 +104,7 @@ export function detectPlatform(
   }
 
   // Fallback to custom/website
-  if (!detectedPlatform) {
-    detectedPlatform = PLATFORMS.website;
-  }
+  detectedPlatform ??= PLATFORMS.website;
 
   // Generate suggested title
   const suggestedTitle = generateSuggestedTitle(

@@ -15,17 +15,17 @@ import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { DrawerHeader } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 
 const PREVIEW_PANEL_WIDTH = 360;
 
 export function PreviewPanel() {
   const { isOpen, close, previewData } = usePreviewPanel();
 
-  // Use PROFILE_URL to ensure profile links always point to the profile domain
+  // Use BASE_URL to ensure profile links always point to the profile domain
   const profileUrl = useMemo(() => {
     if (!previewData) return '';
-    return `${PROFILE_URL}${previewData.profilePath}`;
+    return `${BASE_URL}${previewData.profilePath}`;
   }, [previewData]);
 
   const handleCopyUrl = useCallback(async () => {

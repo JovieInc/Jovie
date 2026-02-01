@@ -13,7 +13,7 @@ import Link from 'next/link';
 import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
@@ -43,7 +43,7 @@ export function ProfileNavButton({
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
 
-  const profileUrl = `${PROFILE_URL}/${artistHandle}`;
+  const profileUrl = `${BASE_URL}/${artistHandle}`;
 
   // Main profile: Jovie icon linking to homepage
   if (!showBackButton) {

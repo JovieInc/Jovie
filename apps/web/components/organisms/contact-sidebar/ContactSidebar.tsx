@@ -93,14 +93,15 @@ export const ContactSidebar = memo(function ContactSidebar({
       onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
     });
 
-    items.push({ type: 'separator' });
-
-    items.push({
-      id: 'delete',
-      label: 'Delete contact',
-      icon: <Trash2 className='h-4 w-4' />,
-      onClick: () => toast.info('Delete not implemented'),
-    });
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'delete',
+        label: 'Delete contact',
+        icon: <Trash2 className='h-4 w-4' />,
+        onClick: () => toast.info('Delete not implemented'),
+      }
+    );
 
     return convertToCommonDropdownItems(items);
   }, [hasContact, username, handleCopyProfileUrl, onRefresh]);

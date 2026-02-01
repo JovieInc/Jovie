@@ -4,7 +4,7 @@ import { cache } from 'react';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 
 /**
  * Redis-based distributed cache for admin role checks
@@ -87,6 +87,7 @@ export const isAdmin = cache(async function isAdmin(
   if (!userId) return false;
 
   const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
+  const redis = getRedis();
 
   // 1. Try Redis first (distributed cache)
   if (redis) {
@@ -152,6 +153,7 @@ export function invalidateAdminCache(userId: string): void {
   fallbackCache.delete(userId);
 
   // Clear Redis cache (best-effort, async)
+  const redis = getRedis();
   if (redis) {
     const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;
     redis.del(cacheKey).catch(error => {

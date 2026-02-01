@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 
 export interface CopyToClipboardButtonProps
@@ -61,8 +61,8 @@ export function CopyToClipboardButton({
   });
 
   const handleCopy = () => {
-    // Profile URLs should always use PROFILE_URL to ensure correct domain
-    const url = `${PROFILE_URL}${relativePath}`;
+    // Profile URLs should always use BASE_URL to ensure correct domain
+    const url = `${BASE_URL}${relativePath}`;
     copy(url);
   };
 

@@ -5,7 +5,7 @@
  */
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { APP_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { env } from '@/lib/env-server';
 
 /**
@@ -86,5 +86,5 @@ export function buildClaimInviteUnsubscribeUrl(email: string): string | null {
   if (!token) {
     return null;
   }
-  return `${APP_URL}/api/unsubscribe/claim-invites?token=${encodeURIComponent(token)}`;
+  return `${BASE_URL}/api/unsubscribe/claim-invites?token=${encodeURIComponent(token)}`;
 }
