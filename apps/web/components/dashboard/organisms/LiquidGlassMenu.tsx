@@ -1,10 +1,9 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import { ChevronUp, Search, Settings } from 'lucide-react';
+import { MoreHorizontal, Search, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +24,6 @@ export interface LiquidGlassMenuProps {
   readonly expandedItems: LiquidGlassMenuItem[];
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
-  readonly workspaceSelector?: ReactNode;
   readonly onSettingsClick?: () => void;
   readonly onSearchClick?: () => void;
   readonly className?: string;
@@ -129,13 +127,13 @@ function Badge({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' }) {
 
   const sizeClasses =
     size === 'sm'
-      ? 'min-w-[16px] h-[16px] px-1 text-[10px]'
-      : 'min-w-[22px] h-[22px] px-1.5 text-xs';
+      ? 'min-w-[18px] h-[18px] px-1.5 text-[10px]'
+      : 'min-w-[24px] h-[20px] px-2 text-xs';
 
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-semibold rounded-full bg-color-accent text-color-accent-foreground',
+        'flex items-center justify-center font-semibold rounded-full bg-[#0ea5e9] text-white',
         sizeClasses
       )}
     >
@@ -152,7 +150,6 @@ export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
   adminItems,
-  workspaceSelector,
   onSettingsClick,
   onSearchClick,
   className,
@@ -217,16 +214,25 @@ export function LiquidGlassMenu({
           <GlassBlur intense />
 
           <nav
-            className='relative z-10 py-2'
+            className='relative z-10 py-3'
             aria-label='Expanded navigation menu'
           >
-            {workspaceSelector && (
-              <div className='px-3 pb-2 mb-1 border-b border-default/50'>
-                {workspaceSelector}
+            {/* Header with settings - workspace selector disabled until multi-workspace support */}
+            {onSettingsClick && (
+              <div className='flex items-center justify-end px-3 pb-2'>
+                <button
+                  type='button'
+                  onClick={onSettingsClick}
+                  aria-label='Settings'
+                  className='flex items-center justify-center size-10 rounded-full bg-bg-surface-2/80 hover:bg-bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
+                >
+                  <Settings className='size-5' aria-hidden='true' />
+                </button>
               </div>
             )}
 
-            <div className='space-y-0.5 px-2'>
+            {/* Menu items - Linear compact style */}
+            <div className='px-2'>
               {allMenuItems.map(item => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -237,36 +243,19 @@ export function LiquidGlassMenu({
                     href={item.href}
                     className={cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-                      'active:scale-[0.98] active:translate-y-px',
+                      'active:scale-[0.98]',
                       active
-                        ? 'text-primary-token'
-                        : 'text-secondary-token hover:text-primary-token'
+                        ? 'bg-bg-surface-2 text-primary-token'
+                        : 'text-secondary-token hover:text-primary-token hover:bg-bg-surface-2/50'
                     )}
-                    style={{
-                      background: active
-                        ? 'var(--liquid-glass-item-selected)'
-                        : undefined,
-                    }}
-                    onMouseEnter={e => {
-                      if (!active)
-                        e.currentTarget.style.background =
-                          'var(--liquid-glass-item-hover)';
-                    }}
-                    onMouseLeave={e => {
-                      if (!active)
-                        e.currentTarget.style.background = 'transparent';
-                    }}
                   >
-                    <span
+                    <Icon
                       className={cn(
-                        'flex items-center justify-center size-8 rounded-lg transition-colors',
-                        active
-                          ? 'bg-color-accent/15 text-color-accent'
-                          : 'bg-sidebar-accent/50 text-tertiary-token'
+                        'size-5 shrink-0',
+                        active ? 'text-primary-token' : 'text-tertiary-token'
                       )}
-                    >
-                      <Icon className='size-[18px]' aria-hidden='true' />
-                    </span>
+                      aria-hidden='true'
+                    />
                     <span className='flex-1'>{item.label}</span>
                     {item.badge !== undefined && <Badge count={item.badge} />}
                   </Link>
@@ -277,8 +266,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div
-                    className='my-2 mx-3 border-t'
-                    style={{ borderColor: 'var(--liquid-glass-border)' }}
+                    className='my-2 mx-1 border-t border-default/30'
                   />
                   <p className='px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
                     Admin
@@ -293,36 +281,19 @@ export function LiquidGlassMenu({
                         href={item.href}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-                          'active:scale-[0.98] active:translate-y-px',
+                          'active:scale-[0.98]',
                           active
-                            ? 'text-primary-token'
-                            : 'text-secondary-token hover:text-primary-token'
+                            ? 'bg-bg-surface-2 text-primary-token'
+                            : 'text-secondary-token hover:text-primary-token hover:bg-bg-surface-2/50'
                         )}
-                        style={{
-                          background: active
-                            ? 'var(--liquid-glass-item-selected)'
-                            : undefined,
-                        }}
-                        onMouseEnter={e => {
-                          if (!active)
-                            e.currentTarget.style.background =
-                              'var(--liquid-glass-item-hover)';
-                        }}
-                        onMouseLeave={e => {
-                          if (!active)
-                            e.currentTarget.style.background = 'transparent';
-                        }}
                       >
-                        <span
+                        <Icon
                           className={cn(
-                            'flex items-center justify-center size-8 rounded-lg transition-colors',
-                            active
-                              ? 'bg-color-accent/15 text-color-accent'
-                              : 'bg-sidebar-accent/50 text-tertiary-token'
+                            'size-5 shrink-0',
+                            active ? 'text-primary-token' : 'text-tertiary-token'
                           )}
-                        >
-                          <Icon className='size-[18px]' aria-hidden='true' />
-                        </span>
+                          aria-hidden='true'
+                        />
                         <span className='flex-1'>{item.label}</span>
                         {item.badge !== undefined && (
                           <Badge count={item.badge} />
@@ -350,94 +321,61 @@ export function LiquidGlassMenu({
         <GlassHighlight subtle />
         <GlassBlur />
 
-        <div className='relative z-10 flex items-center justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2'>
-          {primaryItems.slice(0, 4).map(item => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
+        <div className='relative z-10 flex items-center justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2'>
+          {/* Primary nav items */}
+          <div className='flex items-center gap-1'>
+            {primaryItems.slice(0, 4).map(item => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
 
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative flex flex-col items-center justify-center p-2 rounded-xl min-w-[56px] transition-all duration-150',
-                  'active:scale-95 active:translate-y-px',
-                  active ? 'text-primary-token' : 'text-tertiary-token'
-                )}
-                style={{
-                  background: active
-                    ? 'var(--liquid-glass-item-selected)'
-                    : undefined,
-                }}
-              >
-                <span
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex items-center justify-center size-7 rounded-lg transition-colors',
-                    active && 'text-color-accent'
+                    'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
+                    'active:scale-95',
+                    active
+                      ? 'bg-bg-surface-2 text-primary-token'
+                      : 'text-tertiary-token hover:text-secondary-token'
                   )}
                 >
                   <Icon className='size-5' aria-hidden='true' />
-                </span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className='absolute top-1 right-1'>
-                    <Badge count={item.badge} size='sm' />
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className='absolute -top-0.5 -right-0.5'>
+                      <Badge count={item.badge} size='sm' />
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
 
-          {/* Expand/collapse toggle */}
-          <button
-            type='button'
-            onClick={toggleMenu}
-            aria-label={isExpanded ? 'Collapse menu' : 'Expand menu'}
-            aria-expanded={isExpanded}
-            className={cn(
-              'relative flex flex-col items-center justify-center p-2 rounded-xl min-w-[56px] transition-all duration-150',
-              'active:scale-95 active:translate-y-px',
-              isExpanded
-                ? 'text-primary-token'
-                : 'text-tertiary-token hover:text-secondary-token'
-            )}
-            style={{
-              background: isExpanded
-                ? 'var(--liquid-glass-item-selected)'
-                : undefined,
-            }}
-          >
-            <span className='flex items-center justify-center size-7 rounded-lg'>
-              <ChevronUp
-                className={cn(
-                  'size-5 transition-transform duration-300',
-                  isExpanded && 'rotate-180'
-                )}
-                aria-hidden='true'
-              />
-            </span>
-          </button>
-
-          {onSettingsClick && (
+            {/* More menu toggle - Linear style */}
             <button
               type='button'
-              onClick={onSettingsClick}
-              aria-label='Settings'
-              className='flex flex-col items-center justify-center p-2 rounded-xl min-w-[48px] text-tertiary-token hover:text-secondary-token transition-all duration-150 active:scale-95 active:translate-y-px'
+              onClick={toggleMenu}
+              aria-label={isExpanded ? 'Close menu' : 'More options'}
+              aria-expanded={isExpanded}
+              className={cn(
+                'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
+                'active:scale-95',
+                isExpanded
+                  ? 'bg-bg-surface-2 text-primary-token'
+                  : 'text-tertiary-token hover:text-secondary-token'
+              )}
             >
-              <span className='flex items-center justify-center size-7 rounded-lg'>
-                <Settings className='size-5' aria-hidden='true' />
-              </span>
+              <MoreHorizontal className='size-5' aria-hidden='true' />
             </button>
-          )}
+          </div>
 
+          {/* Search button - Linear floating style */}
           {onSearchClick && (
             <button
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='flex flex-col items-center justify-center p-3 rounded-full min-w-[48px] text-primary-token transition-all duration-150 active:scale-95 active:translate-y-px'
-              style={{ background: 'var(--liquid-glass-item-selected)' }}
+              className='flex items-center justify-center size-12 rounded-full bg-bg-surface-2 text-primary-token transition-all duration-150 active:scale-95 shadow-sm'
             >
               <Search className='size-5' aria-hidden='true' />
             </button>
