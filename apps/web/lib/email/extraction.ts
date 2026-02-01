@@ -14,7 +14,7 @@ import { logger } from '@/lib/utils/logger';
  * Matches most valid email addresses while avoiding false positives
  * Note: Hyphen placed at end of character class to avoid escaping
  */
-const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
+const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 /**
  * Obfuscation patterns used by creators to prevent scraping
@@ -25,7 +25,7 @@ const EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi;
  */
 const OBFUSCATION_PATTERNS = [
   // "email at domain dot com" variants
-  /\b([A-Za-z0-9._%+-]+)\s*(?:\(at\)|\[at\]|@|at)\s*([A-Za-z0-9.-]+)\s*(?:\(dot\)|\[dot\]|\.|\s+dot\s+)\s*([A-Za-z]{2,})\b/gi,
+  /\b([A-Z0-9._%+-]+)\s*(?:\(at\)|\[at\]|@|at)\s*([A-Z0-9.-]+)\s*(?:\(dot\)|\[dot\]|\.|\s+dot\s+)\s*([A-Z]{2,})\b/gi,
 ] as const;
 
 /**

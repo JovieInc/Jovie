@@ -25,6 +25,11 @@ export interface AudienceServerData {
   direction: 'asc' | 'desc';
 }
 
+/**
+ * Database session transaction type from withDbSessionTx
+ */
+export type DbSessionTx = Parameters<Parameters<typeof withDbSessionTx>[0]>[0];
+
 const DEFAULT_MEMBER_SORT = 'lastSeen' as const;
 const DEFAULT_SUBSCRIBER_SORT = 'createdAt' as const;
 
@@ -123,7 +128,7 @@ function normalizeReferrerHistory(value: unknown): AudienceReferrer[] {
  * Fetch audience members data
  */
 async function fetchMembersData(
-  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  tx: DbSessionTx,
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: Record<string, string | string[] | undefined>,
@@ -251,7 +256,7 @@ async function fetchMembersData(
  * Fetch subscribers data
  */
 async function fetchSubscribersData(
-  tx: Parameters<Parameters<typeof withDbSessionTx>[0]>[0],
+  tx: DbSessionTx,
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: Record<string, string | string[] | undefined>

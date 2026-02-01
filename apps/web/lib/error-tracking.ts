@@ -117,7 +117,13 @@ function sendToSentry(params: {
     if (context?.route) {
       tags.route =
         typeof context.route === 'object'
-          ? JSON.stringify(context.route)
+          ? (() => {
+              try {
+                return JSON.stringify(context.route);
+              } catch {
+                return '[unserializable route]';
+              }
+            })()
           : String(context.route);
     }
 
