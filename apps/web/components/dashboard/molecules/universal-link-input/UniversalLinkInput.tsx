@@ -101,22 +101,26 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
-        active ? 'bg-surface-2' : 'hover:bg-surface-2'
+        'flex w-full min-h-[44px] items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
+        active ? 'bg-surface-2' : 'hover:bg-surface-2',
+        'active:scale-[0.99]'
       )}
       onMouseEnter={onMouseEnter}
       onClick={onClick}
     >
       <span className='flex items-center gap-2.5'>
-        {/* Platform icon */}
+        {/* Platform icon - larger on mobile */}
         <span
-          className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md'
+          className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-md'
           style={{
             backgroundColor: iconHex,
             color: isDark ? '#ffffff' : '#0f172a',
           }}
         >
-          <SocialIcon platform={option.icon} className='h-3.5 w-3.5' />
+          <SocialIcon
+            platform={option.icon}
+            className='h-4 w-4 sm:h-3.5 sm:w-3.5'
+          />
         </span>
         {/* Platform name with match highlighting */}
         <HighlightedName
@@ -127,7 +131,11 @@ function PlatformSuggestionItem({
         <span className='text-xs text-tertiary-token'>{option.hint}</span>
       </span>
       {/* Only show Enter hint on active item */}
-      {active && <span className='text-xs text-tertiary-token'>Enter</span>}
+      {active && (
+        <span className='hidden text-xs text-tertiary-token sm:inline'>
+          Enter
+        </span>
+      )}
     </button>
   );
 }

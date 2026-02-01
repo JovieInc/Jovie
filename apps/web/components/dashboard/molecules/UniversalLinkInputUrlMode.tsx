@@ -131,10 +131,10 @@ export function UniversalLinkInputUrlMode({
         />
 
         {url && (
-          <div className='absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2'>
+          <div className='absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1'>
             {detectedLink && (
               <div
-                className='flex items-center justify-center w-6 h-6 rounded-full'
+                className='flex items-center justify-center h-8 w-8 rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
                 style={{
                   backgroundColor: iconBg,
                   color: iconColor,
@@ -143,17 +143,17 @@ export function UniversalLinkInputUrlMode({
               >
                 <SocialIcon
                   platform={detectedLink.platform.icon}
-                  className='w-3 h-3'
+                  className='h-4 w-4 sm:h-3 sm:w-3'
                 />
               </div>
             )}
             <button
               type='button'
               onClick={onClear}
-              className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+              className='flex items-center justify-center h-11 w-11 rounded-xl text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95 sm:h-8 sm:w-8 sm:rounded-full'
               aria-label='Clear input'
             >
-              <X className='w-4 h-4' />
+              <X className='h-5 w-5 sm:h-4 sm:w-4' />
             </button>
           </div>
         )}

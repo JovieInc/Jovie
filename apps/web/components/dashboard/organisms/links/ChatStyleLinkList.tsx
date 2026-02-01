@@ -99,7 +99,9 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
     estimateSize: index => {
       const row = virtualRows[index];
       if (!row) return 72;
-      return row.type === 'header' ? 28 : 84;
+      // header: 8 (pt-2) + 16 (text) + 8 (pb-2) = 32px
+      // link: larger on mobile for 44px tap targets
+      return row.type === 'header' ? 32 : 88;
     },
     overscan: 6,
   });
@@ -122,12 +124,12 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                     key={`${row.section}-header`}
                     ref={rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
-                    className='absolute left-0 top-0 w-full pb-2'
+                    className='absolute left-0 top-0 w-full pb-2 pt-2'
                     style={{
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    <h3 className='px-2 text-xs font-semibold tracking-wider text-tertiary-token'>
+                    <h3 className='px-1 text-xs font-medium uppercase tracking-wide text-tertiary-token'>
                       {labelFor(row.section)}
                     </h3>
                   </div>
