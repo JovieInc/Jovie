@@ -14,9 +14,7 @@ declare global {
 }
 
 function getWebVitalsHandlers(): Set<MetricHandler> {
-  if (!globalThis.jovieWebVitalsHandlers) {
-    globalThis.jovieWebVitalsHandlers = new Set<MetricHandler>();
-  }
+  globalThis.jovieWebVitalsHandlers ??= new Set<MetricHandler>();
   return globalThis.jovieWebVitalsHandlers;
 }
 

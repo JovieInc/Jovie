@@ -172,9 +172,7 @@ let _spotifyConfig: SpotifyConfig | null = null;
  * Validates on first access, then caches result.
  */
 export function getSpotifyEnv(): SpotifyConfig {
-  if (_spotifyConfig === null) {
-    _spotifyConfig = getSpotifyConfig();
-  }
+  _spotifyConfig ??= getSpotifyConfig();
   return _spotifyConfig;
 }
 
