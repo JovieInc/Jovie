@@ -19,7 +19,7 @@
  * ```
  */
 
-import { redis } from '@/lib/redis';
+import { getRedis } from '@/lib/redis';
 
 // ============================================================================
 // Types
@@ -79,6 +79,7 @@ if (typeof setInterval !== 'undefined') {
  */
 async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
   const lockKey = `idempotency:${key}`;
+  const redis = getRedis();
 
   if (redis) {
     // Use Redis NX (set if not exists) with expiry
@@ -108,6 +109,7 @@ async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
  */
 async function releaseLock(key: string): Promise<void> {
   const lockKey = `idempotency:${key}`;
+  const redis = getRedis();
 
   if (redis) {
     await redis.del(lockKey);
@@ -124,6 +126,7 @@ async function releaseLock(key: string): Promise<void> {
  */
 export async function isLocked(key: string): Promise<boolean> {
   const lockKey = `idempotency:${key}`;
+  const redis = getRedis();
 
   if (redis) {
     const result = await redis.exists(lockKey);
