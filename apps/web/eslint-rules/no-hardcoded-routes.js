@@ -47,10 +47,10 @@ module.exports = {
     schema: [],
   },
   create(context) {
-    const filename = context.getFilename();
+    const filename = context.filename;
 
     // Skip allowed files
-    if (ALLOWED_FILES.some((pattern) => filename.includes(pattern))) {
+    if (ALLOWED_FILES.some(pattern => filename.includes(pattern))) {
       return {};
     }
 
@@ -62,7 +62,7 @@ module.exports = {
         const value = node.value;
 
         // Check if it matches any hardcoded route pattern
-        const isHardcodedRoute = HARDCODED_ROUTE_PATTERNS.some((pattern) =>
+        const isHardcodedRoute = HARDCODED_ROUTE_PATTERNS.some(pattern =>
           pattern.test(value)
         );
 
@@ -79,7 +79,7 @@ module.exports = {
         // Check template literals that start with route patterns
         if (node.quasis.length > 0) {
           const firstQuasi = node.quasis[0].value.raw;
-          const isHardcodedRoute = HARDCODED_ROUTE_PATTERNS.some((pattern) =>
+          const isHardcodedRoute = HARDCODED_ROUTE_PATTERNS.some(pattern =>
             pattern.test(firstQuasi)
           );
 

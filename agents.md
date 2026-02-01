@@ -218,12 +218,13 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 ```
 
 **Cross-Environment Globals:**
-- Use `globalThis` instead of `window` or `global`
+- Use `globalThis` instead of `window` or `global` where applicable
 - `window` fails in SSR/Node, `global` fails in browser
+- Note: `globalThis.location` is still `undefined` in Node.js SSR - SSR guards are required
 
 | Wrong | Correct |
 |-------|---------|
-| `window.location` | `globalThis.location` (keep `typeof window !== 'undefined'` guards for SSR) |
+| `window.location` (no guard) | `typeof window !== 'undefined' ? window.location : undefined` |
 | `global.fetch` | `globalThis.fetch` |
 
 ### React/Next.js

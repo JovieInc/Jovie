@@ -18,7 +18,7 @@ Scan the codebase for non-standard database access patterns that violate our sin
 
 ```bash
 echo "=== Checking for db.transaction() usage ==="
-grep -rn "\.transaction(" apps/web/lib apps/web/app --include="*.ts" --include="*.tsx" || echo "✅ None found"
+grep -rn -E "\b(db|tx)\.transaction\(" apps/web/lib apps/web/app --include="*.ts" --include="*.tsx" || echo "✅ None found"
 
 echo ""
 echo "=== Checking for manual pooling imports ==="

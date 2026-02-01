@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # db-patterns-check.sh - Check for forbidden database patterns after file edits
 #
 # This hook runs after Edit/Write operations to catch database anti-patterns
@@ -28,8 +29,8 @@ fi
 
 ERRORS=()
 
-# Check for db.transaction() usage
-if grep -q "\.transaction(" "$FILE" 2>/dev/null; then
+# Check for db.transaction() usage (specific to db/tx objects)
+if grep -qE "\b(db|tx)\.transaction\(" "$FILE" 2>/dev/null; then
   ERRORS+=("db.transaction() detected - Neon HTTP driver doesn't support transactions. Use batch operations: db.insert().values([...items])")
 fi
 

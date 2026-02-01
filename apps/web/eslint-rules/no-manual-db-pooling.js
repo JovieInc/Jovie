@@ -16,8 +16,7 @@ module.exports = {
   meta: {
     type: 'problem',
     docs: {
-      description:
-        'Disallow manual database pooling - use @/lib/db instead',
+      description: 'Disallow manual database pooling - use @/lib/db instead',
       recommended: true,
     },
     messages: {
@@ -66,10 +65,7 @@ module.exports = {
 
       // Check for new Pool()
       NewExpression(node) {
-        if (
-          node.callee.type === 'Identifier' &&
-          node.callee.name === 'Pool'
-        ) {
+        if (node.callee.type === 'Identifier' && node.callee.name === 'Pool') {
           context.report({
             node,
             messageId: 'forbiddenPoolConstructor',

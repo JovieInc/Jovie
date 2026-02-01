@@ -24,11 +24,7 @@ const CACHE_CONFIG_PROPERTIES = new Set([
 ]);
 
 // Spread patterns that likely contain cache config
-const CACHE_PRESET_PATTERNS = [
-  /CACHE/i,
-  /cacheConfig/i,
-  /queryOptions/i,
-];
+const CACHE_PRESET_PATTERNS = [/CACHE/i, /cacheConfig/i, /queryOptions/i];
 
 module.exports = {
   meta: {
@@ -77,7 +73,25 @@ module.exports = {
             // If spreading a variable that looks like a cache preset, assume it has config
             if (spreadArg.type === 'Identifier') {
               const name = spreadArg.name;
-              if (CACHE_PRESET_PATTERNS.some((pattern) => pattern.test(name))) {
+              if (CACHE_PRESET_PATTERNS.some(pattern => pattern.test(name))) {
+                hasCacheConfig = true;
+                break;
+              }
+            }
+            // Handle MemberExpression like CACHE_PRESETS.STABLE
+            if (spreadArg.type === 'MemberExpression') {
+              const objectName =
+                spreadArg.object?.type === 'Identifier'
+                  ? spreadArg.object.name
+                  : null;
+              const propName =
+                spreadArg.property?.type === 'Identifier'
+                  ? spreadArg.property.name
+                  : null;
+              const fullName = [objectName, propName].filter(Boolean).join('.');
+              if (
+                CACHE_PRESET_PATTERNS.some(pattern => pattern.test(fullName))
+              ) {
                 hasCacheConfig = true;
                 break;
               }

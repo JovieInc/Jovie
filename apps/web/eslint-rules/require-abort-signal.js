@@ -45,7 +45,7 @@ module.exports = {
 
         // Find the queryFn property
         const queryFnProp = optionsArg.properties.find(
-          (prop) =>
+          prop =>
             prop.type === 'Property' &&
             prop.key.type === 'Identifier' &&
             prop.key.name === 'queryFn'
@@ -82,7 +82,7 @@ module.exports = {
         // If the first param is a destructuring pattern, check for 'signal'
         if (firstParam.type === 'ObjectPattern') {
           const hasSignal = firstParam.properties.some(
-            (prop) =>
+            prop =>
               prop.type === 'Property' &&
               prop.key.type === 'Identifier' &&
               prop.key.name === 'signal'

@@ -216,4 +216,12 @@ module.exports = [
       '@jovie/server-only-imports': 'off',
     },
   },
+  // lib/db internal files are allowed to use database patterns
+  {
+    files: ['**/lib/db/**'],
+    rules: {
+      '@jovie/no-db-transaction': 'off',
+      '@jovie/no-manual-db-pooling': 'off',
+    },
+  },
 ];
