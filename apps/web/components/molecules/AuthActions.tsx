@@ -13,9 +13,10 @@ export function AuthActions() {
       {/* Waitlist CTA - Linear style: 8px radius, 1px border */}
       <Link
         href='/waitlist'
-        className='inline-flex items-center justify-center h-8 px-4 text-sm font-medium rounded-lg bg-btn-primary text-btn-primary-foreground border border-white/10 hover:opacity-90 transition-opacity duration-150 focus-ring-themed'
+        className='inline-flex items-center justify-center h-8 px-3 sm:px-4 text-sm font-medium rounded-lg bg-btn-primary text-btn-primary-foreground border border-white/10 hover:opacity-90 transition-opacity duration-150 focus-ring-themed whitespace-nowrap'
       >
-        Request early access
+        <span className='hidden sm:inline'>Request early access</span>
+        <span className='sm:hidden'>Get access</span>
       </Link>
     </div>
   );
