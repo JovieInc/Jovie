@@ -117,13 +117,12 @@ function generateCacheKey(url: string, options?: DedupedFetchOptions): string {
   }
 
   // For other methods, include method and body hash in key
-  const bodyHash = options?.body
-    ? hashCode(
-        typeof options.body === 'object'
-          ? JSON.stringify(options.body)
-          : String(options.body)
-      )
-    : '';
+  const getBodyString = (): string => {
+    if (!options?.body) return '';
+    if (typeof options.body === 'object') return JSON.stringify(options.body);
+    return String(options.body);
+  };
+  const bodyHash = options?.body ? hashCode(getBodyString()) : '';
   return `${method}:${url}:${bodyHash}`;
 }
 

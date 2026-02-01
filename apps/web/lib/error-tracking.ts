@@ -39,14 +39,6 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
 
-interface ErrorMetadata {
-  severity: ErrorSeverity;
-  context?: ErrorContext;
-  timestamp: string;
-  environment: string;
-  sentryMode: SentryMode;
-}
-
 /**
  * Get current environment tag
  */
@@ -59,6 +51,94 @@ function getEnvironment(): string {
     return 'production';
   }
   return nodeEnv || 'production';
+}
+
+/**
+ * Log error to console based on severity
+ */
+function logToConsole(
+  severity: ErrorSeverity,
+  message: string,
+  data: Record<string, unknown>
+): void {
+  const consoleMessage = `[${severity.toUpperCase()}] ${message}`;
+
+  if (severity === 'warning') {
+    console.warn(consoleMessage, data);
+  } else {
+    console.error(consoleMessage, data);
+  }
+}
+
+/**
+ * Send error to Sentry if initialized
+ */
+function sendToSentry(params: {
+  error: unknown;
+  errorMessage: string;
+  message: string;
+  severity: ErrorSeverity;
+  sentryMode: SentryMode;
+  environment: string;
+  context?: ErrorContext;
+}): void {
+  const {
+    error,
+    errorMessage,
+    message,
+    severity,
+    sentryMode,
+    environment,
+    context,
+  } = params;
+
+  if (!isSentryInitialized()) {
+    console.warn(
+      '[Error Tracking] Sentry not initialized, error will only be logged to console and PostHog:',
+      {
+        message,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+        sentryMode,
+      }
+    );
+    return;
+  }
+
+  try {
+    const errorInstance =
+      error instanceof Error ? error : new Error(errorMessage);
+
+    const tags: Record<string, string> = {
+      severity,
+      environment,
+      sentryMode,
+    };
+
+    if (context?.route) {
+      tags.route =
+        typeof context.route === 'object'
+          ? (() => {
+              try {
+                return JSON.stringify(context.route);
+              } catch {
+                return '[unserializable route]';
+              }
+            })()
+          : String(context.route);
+    }
+
+    Sentry.captureException(errorInstance, {
+      extra: {
+        message,
+        sentryMode,
+        ...context,
+      },
+      level: severity === 'critical' ? 'fatal' : severity,
+      tags,
+    });
+  } catch (sentryError) {
+    console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
+  }
 }
 
 /**
@@ -118,76 +198,27 @@ export async function captureError(
 ): Promise<void> {
   const errorData = formatError(error);
   const sentryMode = getSentryMode();
-  const isInitialized = isSentryInitialized();
-
-  const metadata: ErrorMetadata = {
-    severity,
-    context: context || {},
-    timestamp: new Date().toISOString(),
-    environment: getEnvironment(),
-    sentryMode,
-  };
+  const environment = getEnvironment();
 
   // Always log to console for debugging
-  const consoleMessage = `[${severity.toUpperCase()}] ${message}`;
-  const consoleData = {
+  logToConsole(severity, message, {
     ...errorData,
-    ...metadata.context,
-    sentryMode, // Include SDK mode in console logs for debugging
-  };
-
-  if (severity === 'critical') {
-    console.error(consoleMessage, consoleData);
-  } else if (severity === 'warning') {
-    console.warn(consoleMessage, consoleData);
-  } else {
-    console.error(consoleMessage, consoleData);
-  }
+    ...context,
+    sentryMode,
+  });
 
   // Send to Sentry for error tracking (primary)
-  // Check if SDK is initialized before attempting capture
-  if (isInitialized) {
-    try {
-      const errorInstance =
-        error instanceof Error ? error : new Error(errorData.message);
-
-      Sentry.captureException(errorInstance, {
-        extra: {
-          message,
-          sentryMode, // Include SDK mode in extra for debugging
-          ...metadata.context,
-        },
-        level: severity === 'critical' ? 'fatal' : severity,
-        tags: {
-          severity,
-          environment: metadata.environment,
-          sentryMode, // Tag to filter by SDK variant in Sentry dashboard
-          ...(context?.route
-            ? {
-                route:
-                  typeof context.route === 'object'
-                    ? JSON.stringify(context.route)
-                    : String(context.route),
-              }
-            : {}),
-        },
-      });
-    } catch (sentryError) {
-      // Sentry capture failed - this should be rare but provides resilience
-      console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
-    }
-  } else {
-    // Sentry not initialized - log for debugging
-    // This can happen during initial load before SDK is ready, or on pages
-    // where Sentry hasn't been loaded yet
-    console.warn(
-      '[Error Tracking] Sentry not initialized, error will only be logged to console and PostHog:',
-      { message, errorType: errorData.type, sentryMode }
-    );
-  }
+  sendToSentry({
+    error,
+    errorMessage: errorData.message,
+    message,
+    severity,
+    sentryMode,
+    environment,
+    context,
+  });
 
   // Send to PostHog for monitoring (secondary, fire-and-forget)
-  // PostHog serves as a backup when Sentry is not initialized
   const eventName =
     severity === 'critical' ? '$exception_critical' : '$exception';
 
@@ -199,13 +230,12 @@ export async function captureError(
       error_stack: errorData.stack,
       error_severity: severity,
       error_raw_message: errorData.message,
-      sentry_mode: sentryMode, // Include SDK mode in PostHog events
-      sentry_initialized: isInitialized,
-      ...metadata.context,
+      sentry_mode: sentryMode,
+      sentry_initialized: isSentryInitialized(),
+      ...context,
     },
     context?.userId as string | undefined
   ).catch(trackingError => {
-    // Never let error tracking break the app
     console.warn('[Error Tracking] Failed to send to PostHog:', trackingError);
   });
 }

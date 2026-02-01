@@ -45,8 +45,6 @@ export function OptimizedAvatar({
 
 // Responsive avatar that adapts to screen size (thin wrapper for compatibility)
 interface ResponsiveAvatarProps extends Omit<OptimizedAvatarProps, 'size'> {
-  readonly sizes?: string;
-  readonly mobileSize?: number;
   readonly desktopSize?: number;
 }
 

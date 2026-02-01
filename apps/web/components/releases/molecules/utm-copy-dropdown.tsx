@@ -80,6 +80,78 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 };
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Map preset to submenu item format
+ */
+function presetToSubmenuItem(preset: UTMPreset) {
+  return {
+    id: preset.id,
+    label: preset.label,
+    description: preset.description,
+  };
+}
+
+/**
+ * Build sections for a category submenu
+ */
+function buildSectionsFromPresets(params: {
+  category: (typeof UTM_PRESET_CATEGORIES)[number];
+  recent: UTMPreset[];
+  popular: UTMPreset[];
+}): SearchableSubmenuSection[] {
+  const { category, recent, popular } = params;
+  const categoryPresetIds = new Set(category.presets.map(p => p.id));
+  const sections: SearchableSubmenuSection[] = [];
+
+  // Filter recent presets for this category
+  const categoryRecent = recent.filter(p => categoryPresetIds.has(p.id));
+  const recentIds = new Set(categoryRecent.map(p => p.id));
+
+  // Filter popular presets (excluding recent)
+  const categoryPopular = popular.filter(
+    p => categoryPresetIds.has(p.id) && !recentIds.has(p.id)
+  );
+
+  // Add recent section if we have any
+  if (categoryRecent.length > 0) {
+    sections.push({
+      id: 'recent',
+      label: 'Recent',
+      items: categoryRecent.map(presetToSubmenuItem),
+    });
+  }
+
+  // Add popular section if we have any
+  if (categoryPopular.length > 0) {
+    sections.push({
+      id: 'popular',
+      label: 'Popular',
+      items: categoryPopular.map(presetToSubmenuItem),
+    });
+  }
+
+  // Build set of used IDs for remaining items
+  const usedIds = new Set([...recentIds, ...categoryPopular.map(p => p.id)]);
+  const remaining = category.presets.filter(p => !usedIds.has(p.id));
+
+  // Add all items section
+  if (remaining.length > 0 || sections.length === 0) {
+    sections.push({
+      id: 'all',
+      label: sections.length > 0 ? 'All' : category.label,
+      items: (sections.length > 0 ? remaining : category.presets).map(
+        presetToSubmenuItem
+      ),
+    });
+  }
+
+  return sections;
+}
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -198,79 +270,7 @@ export function UTMCopyDropdown({
       const category = UTM_PRESET_CATEGORIES.find(c => c.id === categoryId);
       if (!category) return [];
 
-      // Single-pass filtering for recent and popular items
-      const categoryPresetIds = new Set(category.presets.map(p => p.id));
-      const categoryRecent: typeof recent = [];
-      const categoryPopularCandidates: typeof popular = [];
-
-      // First pass: collect recent matches
-      for (const preset of recent) {
-        if (categoryPresetIds.has(preset.id)) {
-          categoryRecent.push(preset);
-        }
-      }
-
-      // Create set of recent IDs for deduplication
-      const recentIds = new Set(categoryRecent.map(p => p.id));
-
-      // Second pass: collect popular matches (excluding recent)
-      for (const preset of popular) {
-        if (categoryPresetIds.has(preset.id) && !recentIds.has(preset.id)) {
-          categoryPopularCandidates.push(preset);
-        }
-      }
-
-      const sections: SearchableSubmenuSection[] = [];
-
-      // Add recent section if we have any
-      if (categoryRecent.length > 0) {
-        sections.push({
-          id: 'recent',
-          label: 'Recent',
-          items: categoryRecent.map(preset => ({
-            id: preset.id,
-            label: preset.label,
-            description: preset.description,
-          })),
-        });
-      }
-
-      // Add popular section if we have any
-      if (categoryPopularCandidates.length > 0) {
-        sections.push({
-          id: 'popular',
-          label: 'Popular',
-          items: categoryPopularCandidates.map(preset => ({
-            id: preset.id,
-            label: preset.label,
-            description: preset.description,
-          })),
-        });
-      }
-
-      // Add all items section
-      // Reuse recentIds and build used set efficiently
-      const usedIds = new Set(recentIds);
-      for (const preset of categoryPopularCandidates) {
-        usedIds.add(preset.id);
-      }
-      const remaining = category.presets.filter(p => !usedIds.has(p.id));
-
-      if (remaining.length > 0 || sections.length === 0) {
-        sections.push({
-          id: 'all',
-          label: sections.length > 0 ? 'All' : category.label,
-          items: (sections.length > 0 ? remaining : category.presets).map(
-            preset => ({
-              id: preset.id,
-              label: preset.label,
-              description: preset.description,
-            })
-          ),
-        });
-      }
-
-      return sections;
+      return buildSectionsFromPresets({ category, recent, popular });
     },
     [recent, popular]
   );

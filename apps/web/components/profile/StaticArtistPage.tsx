@@ -75,7 +75,6 @@ interface StaticArtistPageProps {
   readonly showFooter?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly primaryAction?: PrimaryAction;
-  readonly spotifyPreferred?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
 }

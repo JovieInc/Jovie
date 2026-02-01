@@ -13,4 +13,7 @@ export interface ArtistSearchModeProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-export type { ArtistSearchProvider, DetectedLink, CursorPosition };
+export type { DetectedLink } from '@/lib/utils/platform-detection';
+// Re-export types using export...from syntax
+export type { ArtistSearchProvider } from '../universalLinkInput.constants';
+export type { CursorPosition } from '../useInputFocusController';

@@ -44,6 +44,83 @@ function parseVersionFromBody(
 }
 
 /**
+ * Normalize a link item's category
+ */
+function normalizeCategory(category: string | undefined): PlatformType {
+  const validCategories: PlatformType[] = [
+    'dsp',
+    'social',
+    'earnings',
+    'websites',
+    'custom',
+  ];
+  return validCategories.includes(category as PlatformType)
+    ? (category as PlatformType)
+    : 'custom';
+}
+
+/**
+ * Normalize link items for persistence
+ */
+function normalizeLinkItems(input: LinkItem[]): LinkItem[] {
+  return input.map((item, index) => ({
+    ...item,
+    platform: {
+      ...item.platform,
+      category: normalizeCategory(item.platform.category as string | undefined),
+    },
+    category: normalizeCategory(item.platform.category as string | undefined),
+    order: typeof item.order === 'number' ? item.order : index,
+  }));
+}
+
+/**
+ * Build API payload from normalized links
+ */
+function buildSavePayload(normalized: LinkItem[]) {
+  return normalized.map((l, index) => ({
+    platform: l.platform.id,
+    platformType: l.platform.icon,
+    url: l.normalizedUrl,
+    sortOrder: index,
+    isActive: l.isVisible !== false,
+    displayText: l.title,
+    state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
+    confidence:
+      typeof l.confidence === 'number'
+        ? Number(l.confidence.toFixed(2))
+        : undefined,
+    sourcePlatform: l.sourcePlatform ?? undefined,
+    sourceType: l.sourceType ?? undefined,
+    evidence: l.evidence ?? undefined,
+  }));
+}
+
+/**
+ * Extract user-friendly error message from error
+ */
+function extractErrorMessage(error: unknown): string {
+  const defaultMessage = 'Failed to save links. Please try again.';
+
+  if (!(error instanceof FetchError)) {
+    return error instanceof Error && error.message
+      ? error.message
+      : defaultMessage;
+  }
+
+  if (error.status === 408) {
+    return 'Request timed out. Please try again.';
+  }
+
+  if (error.status >= 500) {
+    return 'Server error. Please try again later.';
+  }
+
+  // For 4xx errors (except 408), preserve the error message
+  return error.message || defaultMessage;
+}
+
+/**
  * Options for the useLinksPersistence hook
  */
 export interface UseLinksPersistenceOptions {
@@ -177,54 +254,78 @@ export function useLinksPersistence({
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);
 
+  // Handle successful save response
+  const handleSaveSuccess = useCallback(
+    (successData: SaveLinksResponse, normalized: LinkItem[]) => {
+      // Update version from success response
+      const newVersion = parseVersionFromBody(successData);
+      if (newVersion !== null) {
+        setLinksVersion(newVersion);
+      }
+
+      // Keep normalized links locally
+      setLinks(prev =>
+        areLinkItemsEqual(prev, normalized) ? prev : normalized
+      );
+
+      // Check for ingestable URLs and trigger suggestion sync
+      const hasIngestableLink =
+        suggestionsEnabled &&
+        normalized.some(item => isIngestableUrl(item.normalizedUrl));
+      if (hasIngestableLink) {
+        setAutoRefreshUntilMs(Date.now() + 20000);
+        onSyncSuggestions?.();
+      }
+
+      // Invalidate TanStack Query cache for consistency
+      if (profileId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.dashboard.socialLinks(profileId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.suggestions.list(profileId),
+        });
+      }
+
+      // Track analytics
+      track('dashboard_social_links_saved', { profileId });
+
+      const now = new Date();
+      toast.success(
+        `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
+      );
+    },
+    [profileId, suggestionsEnabled, onSyncSuggestions, queryClient]
+  );
+
+  // Handle 409 conflict error
+  const handleConflictError = useCallback(async () => {
+    toast.error(
+      'Your links were updated in another tab. Syncing suggestions and refreshing.',
+      { duration: 5000 }
+    );
+    try {
+      await onSyncSuggestions?.();
+      await queryClient.invalidateQueries({ queryKey: ['links'] });
+    } catch (syncError) {
+      void captureError('Failed to sync suggestions after 409', syncError, {
+        profileId,
+      });
+    }
+  }, [onSyncSuggestions, queryClient, profileId]);
+
   // Persist links to server
   const persistLinks = useCallback(
     async (input: LinkItem[]): Promise<void> => {
-      // Normalize the input
-      const normalized: LinkItem[] = input.map((item, index) => {
-        const rawCategory = item.platform.category as PlatformType | undefined;
-        const category: PlatformType =
-          rawCategory === 'dsp' ||
-          rawCategory === 'social' ||
-          rawCategory === 'earnings' ||
-          rawCategory === 'websites' ||
-          rawCategory === 'custom'
-            ? rawCategory
-            : 'custom';
+      const normalized = normalizeLinkItems(input);
 
-        return {
-          ...item,
-          platform: {
-            ...item.platform,
-            category,
-          },
-          category,
-          order: typeof item.order === 'number' ? item.order : index,
-        };
-      });
+      if (!profileId) {
+        toast.error('Unable to save links. Please refresh and try again.');
+        return;
+      }
 
       try {
-        const payload = normalized.map((l, index) => ({
-          platform: l.platform.id,
-          platformType: l.platform.icon,
-          url: l.normalizedUrl,
-          sortOrder: index,
-          isActive: l.isVisible !== false,
-          displayText: l.title,
-          state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
-          confidence:
-            typeof l.confidence === 'number'
-              ? Number(l.confidence.toFixed(2))
-              : undefined,
-          sourcePlatform: l.sourcePlatform ?? undefined,
-          sourceType: l.sourceType ?? undefined,
-          evidence: l.evidence ?? undefined,
-        }));
-
-        if (!profileId) {
-          toast.error('Unable to save links. Please refresh and try again.');
-          return;
-        }
+        const payload = buildSavePayload(normalized);
 
         const successData = await fetchWithTimeout<SaveLinksResponse>(
           '/api/dashboard/social-links',
@@ -236,67 +337,15 @@ export function useLinksPersistence({
               links: payload,
               expectedVersion: linksVersion,
             }),
-            timeout: 15000, // 15s timeout for save operations
+            timeout: 15000,
           }
         );
 
-        // Update version from success response
-        const newVersion = parseVersionFromBody(successData);
-        if (newVersion !== null) {
-          setLinksVersion(newVersion);
-        }
-
-        // Keep normalized links locally; server IDs will be applied on next load
-        setLinks(prev =>
-          areLinkItemsEqual(prev, normalized) ? prev : normalized
-        );
-
-        // Check for ingestable URLs and trigger suggestion sync
-        const hasIngestableLink =
-          suggestionsEnabled &&
-          normalized.some(item => isIngestableUrl(item.normalizedUrl));
-        if (hasIngestableLink) {
-          setAutoRefreshUntilMs(Date.now() + 20000);
-          onSyncSuggestions?.();
-        }
-
-        // Invalidate TanStack Query cache for consistency
-        if (profileId) {
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.dashboard.socialLinks(profileId),
-          });
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.suggestions.list(profileId),
-          });
-        }
-
-        // Track analytics
-        track('dashboard_social_links_saved', { profileId });
-
-        const now = new Date();
-        toast.success(
-          `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
-        );
+        handleSaveSuccess(successData, normalized);
       } catch (error) {
         // Handle 409 Conflict - links were modified elsewhere
         if (error instanceof FetchError && error.status === 409) {
-          toast.error(
-            'Your links were updated in another tab. Syncing suggestions and refreshing.',
-            { duration: 5000 }
-          );
-          try {
-            await onSyncSuggestions?.();
-            // Force refresh links to show latest
-            await queryClient.invalidateQueries({ queryKey: ['links'] });
-          } catch (syncError) {
-            void captureError(
-              'Failed to sync suggestions after 409',
-              syncError,
-              {
-                profileId,
-              }
-            );
-          }
+          await handleConflictError();
           return;
         }
 
@@ -306,30 +355,10 @@ export function useLinksPersistence({
           route: '/app/dashboard/links',
         });
 
-        // Extract user-friendly message
-        let message = 'Failed to save links. Please try again.';
-        if (error instanceof FetchError) {
-          if (error.status === 408) {
-            message = 'Request timed out. Please try again.';
-          } else if (error.status >= 500) {
-            message = 'Server error. Please try again later.';
-          } else {
-            // For 4xx errors (except 408), preserve the error message
-            message = error.message || message;
-          }
-        } else if (error instanceof Error && error.message) {
-          message = error.message;
-        }
-        toast.error(message);
+        toast.error(extractErrorMessage(error));
       }
     },
-    [
-      profileId,
-      suggestionsEnabled,
-      onSyncSuggestions,
-      linksVersion,
-      queryClient,
-    ]
+    [profileId, linksVersion, handleSaveSuccess, handleConflictError]
   );
 
   // Enqueue a save, ensuring we never write older state after newer state

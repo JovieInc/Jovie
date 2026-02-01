@@ -27,7 +27,7 @@ const PREVIEW_HOSTNAMES = new Set(['main.jov.ie', 'main.meetjovie.com']);
  */
 export function getBaseUrl(): string {
   // If we have NEXT_PUBLIC_APP_URL from env, use that first
-  if (typeof window !== 'undefined' && globalThis.location) {
+  if (globalThis.window && globalThis.location) {
     // Client-side: use current origin for local/preview environments
     const { protocol, hostname, port } = globalThis.location;
 

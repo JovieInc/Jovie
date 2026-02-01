@@ -1,0 +1,401 @@
+{
+  "generated_at": "2026-02-01T12:50:00Z",
+  "scope": "apps/web",
+  "linear_issues_checked": 0,
+  "ideas": [
+    {
+      "id": "qual-001",
+      "title": "Split UnifiedTable component (943 lines) into focused sub-components",
+      "description": "UnifiedTable.tsx is 943 lines with virtualization, grouping, keyboard navigation, and expansion logic all mixed together. Main component function spans 540 lines.",
+      "rationale": "Violates Single Responsibility Principle. Difficult to test, maintain, and reason about. Mixing virtualization logic with rendering logic increases cognitive load.",
+      "category": "large_files",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/components/organisms/table/organisms/UnifiedTable.tsx"
+      ],
+      "current_state": "Single 943-line component handling table virtualization, row rendering, grouping, keyboard navigation, context menus, and expansion in one file",
+      "proposed_change": "Extract: 1) VirtualizedTableBody (virtualization logic), 2) TableRowRenderer (row rendering), 3) GroupedTableSection (grouping logic), 4) ExpandableRow (expansion logic)",
+      "best_practice": "Single Responsibility Principle (SRP), Component Composition",
+      "metrics": {
+        "line_count": 943,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "large",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-002",
+      "title": "Refactor ReleaseFilterDropdown (844 lines) - extract submenu component",
+      "description": "ReleaseFilterDropdown.tsx repeats the same submenu pattern 3 times for different filter categories (release types, territories, labels). 844 lines total.",
+      "rationale": "Violates DRY principle. Repeated code increases maintenance burden - any change to the submenu pattern must be made in 3 places.",
+      "category": "duplication",
+      "severity": "major",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx"
+      ],
+      "current_state": "Three nearly identical submenu structures with search inputs, checkboxes, and selection logic",
+      "proposed_change": "Create reusable <FilterSubmenu> component accepting: items[], selectedItems, onSelectionChange, searchPlaceholder. Replace all 3 instances.",
+      "code_example": "// Before: 3x repeated pattern\n// After: <FilterSubmenu items={releaseTypes} selected={selectedTypes} onChange={setSelectedTypes} />",
+      "best_practice": "Don't Repeat Yourself (DRY), Component Reusability",
+      "metrics": {
+        "line_count": 844,
+        "complexity": null,
+        "duplicate_lines": 200
+      },
+      "effort": "medium",
+      "priority": "high",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-003",
+      "title": "Extract retry logic from useFormState hook (707 lines)",
+      "description": "useFormState.ts is 707 lines with complex exponential backoff and retry logic mixed with form state management.",
+      "rationale": "Retry logic with exponential backoff is reusable across the codebase. Currently tightly coupled to form state, making it hard to reuse.",
+      "category": "complexity",
+      "severity": "medium",
+      "affected_files": ["apps/web/lib/hooks/useFormState.ts"],
+      "current_state": "Retry logic embedded in 289-line hook with abort handling, state management, and callbacks",
+      "proposed_change": "Create lib/utils/retry.ts with: retryWithBackoff(), calculateBackoff(), isRetryableError(). Import in useFormState.",
+      "best_practice": "Separation of Concerns, Single Responsibility Principle",
+      "metrics": {
+        "line_count": 707,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-004",
+      "title": "Consolidate size mapping utility for Button components",
+      "description": "Size mapping logic (size === 'md' ? 'default' : size) is duplicated in 3 components: PrimaryCTA, BillingPortalLink, UpgradeButton",
+      "rationale": "Same logic repeated 3 times. Any change to size mapping must be made in 3 places.",
+      "category": "duplication",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/components/molecules/PrimaryCTA.tsx",
+        "apps/web/components/molecules/BillingPortalLink.tsx",
+        "apps/web/components/molecules/UpgradeButton.tsx"
+      ],
+      "current_state": "Each component has: const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : size;",
+      "proposed_change": "Create lib/utils/button-utils.ts with mapButtonSize() function. Import in all 3 components.",
+      "code_example": "// lib/utils/button-utils.ts\nexport const mapButtonSize = (size: 'sm' | 'md' | 'lg'): ButtonProps['size'] => size === 'md' ? 'default' : size;",
+      "best_practice": "Don't Repeat Yourself (DRY)",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 3
+      },
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-005",
+      "title": "Standardize error message extraction pattern",
+      "description": "Error message extraction (error instanceof Error ? error.message : 'fallback') appears 3+ times across the codebase",
+      "rationale": "Repeated error handling pattern. Inconsistent fallback messages. Should be standardized utility.",
+      "category": "duplication",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/components/molecules/BillingPortalLink.tsx",
+        "apps/web/components/molecules/UpgradeButton.tsx",
+        "apps/web/lib/ingestion/scheduler.ts"
+      ],
+      "current_state": "Each location extracts error message differently with custom fallback text",
+      "proposed_change": "Create lib/utils/error-utils.ts with getErrorMessage(error, fallback) utility. Use consistently.",
+      "code_example": "// lib/utils/error-utils.ts\nexport const getErrorMessage = (error: unknown, fallback: string): string => \n  error instanceof Error ? error.message : fallback;",
+      "best_practice": "Don't Repeat Yourself (DRY), Consistent Error Handling",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 3
+      },
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-006",
+      "title": "Replace console.warn with logger.warn in useSignUpFlow hook",
+      "description": "Direct console.warn usage in hooks/useSignUpFlow.ts:189-191 violates Jovie logging standards",
+      "rationale": "Jovie standard is to use lib/utils/logger for all logging. Console logs aren't captured in production monitoring.",
+      "category": "best_practices",
+      "severity": "minor",
+      "affected_files": ["apps/web/hooks/useSignUpFlow.ts"],
+      "current_state": "console.warn('[useSignUpFlow] Session polling timed out, proceeding with redirect')",
+      "proposed_change": "Import logger from '@/lib/utils/logger'. Replace with: logger.warn('Session polling timed out', { context: 'useSignUpFlow' })",
+      "code_example": "// Before:\nconsole.warn('[useSignUpFlow] ...');\n\n// After:\nimport { logger } from '@/lib/utils/logger';\nlogger.warn('Session polling timed out', { context: 'useSignUpFlow' });",
+      "best_practice": "Jovie Logging Standard - use logger utility instead of console.*",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-007",
+      "title": "Add explicit return types to exported functions in lib/music/discography.ts",
+      "description": "Multiple exported functions missing explicit return type annotations: pickSmartListenLink, buildSmartListenUrl, mapSpotifyAlbumToDiscographyRelease",
+      "rationale": "Jovie standard requires explicit return types on all exported functions. Improves type safety and API documentation.",
+      "category": "types",
+      "severity": "minor",
+      "affected_files": ["apps/web/lib/music/discography.ts"],
+      "current_state": "Functions exported without return type annotations, relying on type inference",
+      "proposed_change": "Add explicit return types to all exported functions. Example: export function pickSmartListenLink(...): DSPLink | null",
+      "best_practice": "Explicit over Implicit - Jovie TypeScript Standard",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-008",
+      "title": "Add type annotations to exported constants in ingestion modules",
+      "description": "Multiple exported constants lack type annotations: SKIP_HOSTS, LINKTREE_HANDLE_REGEX, HREF_REGEX, DEFAULT_TIMEOUT_MS, TRACKING_PARAMS",
+      "rationale": "Explicit types improve code documentation and catch potential type mismatches at compile time",
+      "category": "types",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/lib/ingestion/strategies/linktree/config.ts",
+        "apps/web/lib/ingestion/strategies/base/constants.ts"
+      ],
+      "current_state": "Constants exported without type annotations, relying on inference",
+      "proposed_change": "Add explicit types: export const SKIP_HOSTS: Set<string> = new Set([...]); export const DEFAULT_TIMEOUT_MS: number = 10000;",
+      "best_practice": "Explicit over Implicit - TypeScript Best Practices",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "trivial",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-009",
+      "title": "Standardize className usage with cn() utility (5,292+ instances)",
+      "description": "Widespread use of hardcoded className strings instead of cn() utility for conditional/merged class names",
+      "rationale": "cn() utility provides consistent class merging, prevents duplicate classes, and follows Jovie component standards. Currently 5,292+ instances of hardcoded classNames.",
+      "category": "best_practices",
+      "severity": "suggestion",
+      "affected_files": ["apps/web/components/**/*.tsx (widespread)"],
+      "current_state": "Components use hardcoded className strings: className='py-20 border-t border-gray-200'",
+      "proposed_change": "Gradually migrate to cn() for all dynamic/conditional classNames. Create ESLint rule to enforce for new code.",
+      "code_example": "// Before:\nclassName='py-20 border-t border-gray-200 dark:border-white/5'\n\n// After:\nimport { cn } from '@/lib/utils';\nclassName={cn('py-20 border-t border-gray-200', isDark && 'dark:border-white/5')}",
+      "best_practice": "Jovie Component Standard - use cn() for class composition",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": 5292
+      },
+      "effort": "large",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": ["Create ESLint rule first"],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-010",
+      "title": "Remove disabled Cloudinary endpoint (backward compatibility cleanup)",
+      "description": "API route /api/images/sign-upload returns 404 for Cloudinary uploads. Kept only for backward compatibility.",
+      "rationale": "Route is dead code but maintained to prevent 404s from cached clients. Should be removed after verification.",
+      "category": "dead_code",
+      "severity": "suggestion",
+      "affected_files": ["apps/web/app/api/images/sign-upload/route.ts"],
+      "current_state": "Route exists and returns { error: 'Cloudinary not enabled', status: 404 }",
+      "proposed_change": "1) Audit client code for usage, 2) Verify no active clients depend on endpoint, 3) Delete route file",
+      "best_practice": "Remove Dead Code - YAGNI Principle",
+      "metrics": {
+        "line_count": 10,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": true,
+      "prerequisites": ["Audit client usage"],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-011",
+      "title": "Clarify rate limiting status (globally disabled)",
+      "description": "Rate limiting implemented in wrap-link endpoint but globally disabled in lib/utils/bot-detection.ts. Status unclear.",
+      "rationale": "Implemented-but-disabled code creates confusion. Either enable it or remove it to reduce maintenance burden.",
+      "category": "dead_code",
+      "severity": "suggestion",
+      "affected_files": [
+        "apps/web/app/api/wrap-link/route.ts",
+        "apps/web/lib/utils/bot-detection.ts"
+      ],
+      "current_state": "checkRateLimit() exists but returns early (disabled globally)",
+      "proposed_change": "Document why disabled. Either: 1) Re-enable with justification, or 2) Remove rate limiting code entirely",
+      "best_practice": "Avoid Half-Implemented Features",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "small",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": ["Decision on rate limiting strategy"],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-012",
+      "title": "Break down tour-dates server actions (740 lines)",
+      "description": "tour-dates/actions.ts contains 740 lines handling multiple tour date operations in a single file",
+      "rationale": "Large server action files are harder to test and maintain. Breaking into focused functions improves modularity.",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": [
+        "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts"
+      ],
+      "current_state": "Single file with all tour date CRUD operations: fetch, create, update, delete, sync",
+      "proposed_change": "Split into focused files: tour-dates-read.ts, tour-dates-write.ts, tour-dates-sync.ts",
+      "best_practice": "Single Responsibility Principle (SRP)",
+      "metrics": {
+        "line_count": 740,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-013",
+      "title": "Break down onboarding server actions (676 lines)",
+      "description": "onboarding/actions.ts contains 676 lines with multi-step onboarding flow logic",
+      "rationale": "Large action files mixing validation, business logic, and database operations are hard to test and maintain",
+      "category": "large_files",
+      "severity": "minor",
+      "affected_files": ["apps/web/app/onboarding/actions.ts"],
+      "current_state": "Single file with all onboarding steps: profile creation, verification, linking, completion",
+      "proposed_change": "Split into step-focused modules: onboarding-profile.ts, onboarding-verification.ts, onboarding-linking.ts",
+      "best_practice": "Single Responsibility Principle (SRP)",
+      "metrics": {
+        "line_count": 676,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "medium",
+      "priority": "medium",
+      "breaking_change": false,
+      "prerequisites": [],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-014",
+      "title": "Implement custom UTM builder modal (placeholder feature)",
+      "description": "UTM copy dropdown shows toast 'Custom UTM builder coming soon!' instead of opening modal (Line 364)",
+      "rationale": "TODO comment indicates planned feature. Currently users click button that does nothing useful.",
+      "category": "dead_code",
+      "severity": "suggestion",
+      "affected_files": [
+        "apps/web/components/releases/molecules/utm-copy-dropdown.tsx"
+      ],
+      "current_state": "Button exists but shows placeholder toast message",
+      "proposed_change": "Either: 1) Implement custom UTM builder modal, or 2) Remove button until ready to implement",
+      "best_practice": "Avoid Half-Implemented Features",
+      "metrics": {
+        "line_count": null,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "large",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": ["Design custom UTM builder UI/UX"],
+      "related_linear_issues": []
+    },
+    {
+      "id": "qual-015",
+      "title": "Complete Phase 2 ContactDrawerContent unification",
+      "description": "ContactDrawerContent.tsx is a placeholder awaiting Phase 2 work to unify ContactSidebar and AudienceMemberSidebar",
+      "rationale": "Placeholder component does nothing - just renders children. Phase 2 work planned but not yet implemented.",
+      "category": "dead_code",
+      "severity": "suggestion",
+      "affected_files": [
+        "apps/web/components/organisms/drawer-content/ContactDrawerContent.tsx"
+      ],
+      "current_state": "Component is placeholder with TODO comment explaining Phase 2 extraction work needed",
+      "proposed_change": "Create task to extract and unify content from ContactSidebar and AudienceMemberSidebar into this component",
+      "best_practice": "Complete Planned Refactoring",
+      "metrics": {
+        "line_count": 20,
+        "complexity": null,
+        "duplicate_lines": null
+      },
+      "effort": "medium",
+      "priority": "low",
+      "breaking_change": false,
+      "prerequisites": [
+        "Analyze ContactSidebar and AudienceMemberSidebar patterns"
+      ],
+      "related_linear_issues": []
+    }
+  ],
+  "metadata": {
+    "files_analyzed": 4657,
+    "large_files_found": 15,
+    "any_usages_found": 0,
+    "potential_duplications": 10,
+    "console_usages": 1,
+    "hardcoded_classnames": 5292,
+    "missing_return_types": 8,
+    "todo_comments": 4
+  },
+  "summary": {
+    "total_ideas": 15,
+    "by_category": {
+      "large_files": 4,
+      "duplication": 3,
+      "complexity": 1,
+      "types": 2,
+      "best_practices": 2,
+      "dead_code": 3
+    },
+    "by_severity": {
+      "critical": 0,
+      "major": 3,
+      "minor": 7,
+      "suggestion": 5
+    },
+    "by_effort": {
+      "trivial": 4,
+      "small": 2,
+      "medium": 6,
+      "large": 3
+    }
+  }
+}

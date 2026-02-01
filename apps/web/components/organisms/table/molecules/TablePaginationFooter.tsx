@@ -12,7 +12,6 @@ export interface TablePaginationFooterProps {
   readonly totalItems: number;
   readonly onPageChange: (page: number) => void;
   readonly onPageSizeChange: (size: number) => void;
-  readonly pageSizeOptions?: number[];
   readonly className?: string;
 }
 
