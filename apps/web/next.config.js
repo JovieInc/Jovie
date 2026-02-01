@@ -220,6 +220,43 @@ const nextConfig = {
       ...vipUsernameRedirects,
     ];
   },
+  async rewrites() {
+    return [
+      // Rewrite /app/* to /app/dashboard/* for cleaner URLs
+      {
+        source: '/app/profile',
+        destination: '/app/dashboard/profile',
+      },
+      {
+        source: '/app/contacts',
+        destination: '/app/dashboard/contacts',
+      },
+      {
+        source: '/app/releases',
+        destination: '/app/dashboard/releases',
+      },
+      {
+        source: '/app/tour-dates',
+        destination: '/app/dashboard/tour-dates',
+      },
+      {
+        source: '/app/audience',
+        destination: '/app/dashboard/audience',
+      },
+      {
+        source: '/app/earnings',
+        destination: '/app/dashboard/earnings',
+      },
+      {
+        source: '/app/chat',
+        destination: '/app/dashboard/chat',
+      },
+      {
+        source: '/app/analytics',
+        destination: '/app/dashboard/analytics',
+      },
+    ];
+  },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now

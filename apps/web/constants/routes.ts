@@ -12,30 +12,30 @@
 // App routes - dashboard paths within /app/*
 export const APP_ROUTES = {
   // Dashboard
-  DASHBOARD: '/',
-  PROFILE: '/profile',
-  CONTACTS: '/contacts',
-  RELEASES: '/releases',
-  TOUR_DATES: '/tour-dates',
-  AUDIENCE: '/audience',
-  EARNINGS: '/earnings',
-  CHAT: '/chat',
-  ANALYTICS: '/analytics',
+  DASHBOARD: '/app',
+  PROFILE: '/app/profile',
+  CONTACTS: '/app/contacts',
+  RELEASES: '/app/releases',
+  TOUR_DATES: '/app/tour-dates',
+  AUDIENCE: '/app/audience',
+  EARNINGS: '/app/earnings',
+  CHAT: '/app/chat',
+  ANALYTICS: '/app/analytics',
 
   // Settings
-  SETTINGS: '/settings',
-  SETTINGS_APPEARANCE: '/settings/appearance',
-  SETTINGS_NOTIFICATIONS: '/settings/notifications',
-  SETTINGS_BRANDING: '/settings/branding',
-  SETTINGS_AD_PIXELS: '/settings/ad-pixels',
-  SETTINGS_BILLING: '/settings/billing',
+  SETTINGS: '/app/settings',
+  SETTINGS_APPEARANCE: '/app/settings/appearance',
+  SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
+  SETTINGS_BRANDING: '/app/settings/branding',
+  SETTINGS_AD_PIXELS: '/app/settings/ad-pixels',
+  SETTINGS_BILLING: '/app/settings/billing',
 
   // Admin
-  ADMIN: '/admin',
-  ADMIN_WAITLIST: '/admin/waitlist',
-  ADMIN_CREATORS: '/admin/creators',
-  ADMIN_USERS: '/admin/users',
-  ADMIN_ACTIVITY: '/admin/activity',
+  ADMIN: '/app/admin',
+  ADMIN_WAITLIST: '/app/admin/waitlist',
+  ADMIN_CREATORS: '/app/admin/creators',
+  ADMIN_USERS: '/app/admin/users',
+  ADMIN_ACTIVITY: '/app/admin/activity',
 
   // Auth & Onboarding
   SIGNIN: '/signin',
