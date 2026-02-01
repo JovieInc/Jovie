@@ -22,8 +22,8 @@ grep -rn -E "\b(db|tx)\.transaction\(" apps/web/lib apps/web/app --include="*.ts
 
 echo ""
 echo "=== Checking for manual pooling imports ==="
-grep -rn "from ['\"]pg['\"]" apps/web --include="*.ts" --include="*.tsx" || echo "✅ None found"
-grep -rn "from ['\"]pg-pool['\"]" apps/web --include="*.ts" --include="*.tsx" || echo "✅ None found"
+grep -rn -E "from ['\"]pg['\"]|require\(['\"]pg['\"]\)" apps/web --include="*.ts" --include="*.tsx" || echo "✅ None found"
+grep -rn -E "from ['\"]pg-pool['\"]|require\(['\"]pg-pool['\"]\)" apps/web --include="*.ts" --include="*.tsx" || echo "✅ None found"
 
 echo ""
 echo "=== Checking for new Pool() instantiation ==="
@@ -35,7 +35,7 @@ grep -rn "from ['\"]@/lib/db/client['\"]" apps/web --include="*.ts" --include="*
 
 echo ""
 echo "=== Checking for direct @neondatabase imports outside lib/db ==="
-grep -rn "from ['\"]@neondatabase" apps/web --include="*.ts" --include="*.tsx" | grep -v "lib/db/" || echo "✅ None found"
+grep -rn -E "from ['\"]@neondatabase|require\(['\"]@neondatabase" apps/web --include="*.ts" --include="*.tsx" | grep -v "lib/db/" || echo "✅ None found"
 ```
 
 ## Expected Results
