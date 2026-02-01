@@ -27,9 +27,7 @@ function isDevNodeRuntime(): boolean {
 }
 
 function ensureRegistry(): Map<string, DevCleanupFn> {
-  if (!globalThis.jovieDevCleanupFns) {
-    globalThis.jovieDevCleanupFns = new Map<string, DevCleanupFn>();
-  }
+  globalThis.jovieDevCleanupFns ??= new Map<string, DevCleanupFn>();
   return globalThis.jovieDevCleanupFns;
 }
 

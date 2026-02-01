@@ -61,9 +61,7 @@ export class PerformanceTracker {
       });
     }
 
-    if (!globalThis.joviePerformanceObservers) {
-      globalThis.joviePerformanceObservers = {};
-    }
+    globalThis.joviePerformanceObservers ??= {};
     globalThis.joviePerformanceObservers.navigation = observer;
 
     return () => {
@@ -117,9 +115,7 @@ export class PerformanceTracker {
       });
     }
 
-    if (!globalThis.joviePerformanceObservers) {
-      globalThis.joviePerformanceObservers = {};
-    }
+    globalThis.joviePerformanceObservers ??= {};
     globalThis.joviePerformanceObservers.resource = observer;
 
     return () => {
