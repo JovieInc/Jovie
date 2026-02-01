@@ -71,19 +71,20 @@ export const ContactSidebar = memo(function ContactSidebar({
     const items: ContextMenuItemType[] = [];
 
     if (username) {
-      items.push({
-        id: 'copy-url',
-        label: 'Copy profile URL',
-        icon: <Copy className='h-4 w-4' />,
-        onClick: () => void handleCopyProfileUrl(),
-      });
-
-      items.push({
-        id: 'open-profile',
-        label: 'Open profile',
-        icon: <ExternalLink className='h-4 w-4' />,
-        onClick: () => globalThis.open(`/${username}`, '_blank'),
-      });
+      items.push(
+        {
+          id: 'copy-url',
+          label: 'Copy profile URL',
+          icon: <Copy className='h-4 w-4' />,
+          onClick: () => void handleCopyProfileUrl(),
+        },
+        {
+          id: 'open-profile',
+          label: 'Open profile',
+          icon: <ExternalLink className='h-4 w-4' />,
+          onClick: () => globalThis.open(`/${username}`, '_blank'),
+        }
+      );
     }
 
     items.push({
