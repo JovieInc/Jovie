@@ -760,6 +760,22 @@ body {
   color: var(--color-accent);
 }
 
+@utility text-color-accent {
+  color: var(--color-accent);
+}
+
+@utility bg-color-accent {
+  background-color: var(--color-accent);
+}
+
+@utility bg-bg-base {
+  background-color: var(--color-bg-base);
+}
+
+@utility bg-bg-surface-1 {
+  background-color: var(--color-bg-surface-1);
+}
+
 @utility border-accent {
   border-color: color-mix(in oklch, var(--color-accent) 30%, transparent);
 }
