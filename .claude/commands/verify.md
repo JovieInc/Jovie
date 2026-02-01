@@ -115,7 +115,26 @@ grep -rn "from '@/lib/db/client'" apps/web --include="*.ts" --include="*.tsx" | 
 grep -rn "from '@neondatabase" apps/web --include="*.ts" --include="*.tsx" | grep -v "lib/db/"
 ```
 
-## 5. React Hook Best Practices
+## 5. TanStack Query Patterns
+
+**Verify proper cache configuration and AbortSignal usage:**
+
+- [ ] All `useQuery` calls have `staleTime` configured (or use a cache preset)
+- [ ] All `queryFn` destructure and pass `signal` parameter
+- [ ] No aggressive refetch settings for stable data (`refetchOnMount: false`, `refetchOnWindowFocus: false`)
+- [ ] Cache presets from `lib/queries/cache.ts` used consistently
+
+**Quick grep checks:**
+
+```bash
+# Find useQuery without staleTime (review these)
+grep -rn "useQuery({" apps/web --include="*.tsx" --include="*.ts" | grep -v staleTime | grep -v CACHE
+
+# Find queryFn without signal (review these)
+grep -rn "queryFn:" apps/web --include="*.tsx" --include="*.ts" | grep -v signal
+```
+
+## 6. React Hook Best Practices
 
 **Prevent render loops and memory leaks:**
 
@@ -144,7 +163,7 @@ const [x, setX] = useState(0);
 if (condition) setX(1); // This causes loop!
 ```
 
-## 6. Run Affected Tests
+## 7. Run Affected Tests
 
 ```bash
 pnpm vitest --run --changed
@@ -155,7 +174,7 @@ All tests must pass. If tests fail:
 2. Fix the root cause (not the test)
 3. Re-run until green
 
-## 7. Visual Verification (for UI changes)
+## 8. Visual Verification (for UI changes)
 
 If you modified UI components:
 
@@ -166,7 +185,7 @@ If you modified UI components:
 - [ ] Test in both light and dark modes
 - [ ] Test responsive breakpoints (mobile, tablet, desktop)
 
-## 8. Security Check
+## 9. Security Check
 
 If you touched auth/payments/admin code:
 
@@ -177,14 +196,14 @@ If you touched auth/payments/admin code:
 - [ ] Secrets are not hardcoded or logged
 - [ ] CORS headers are appropriate for endpoint type
 
-## 9. Documentation Check
+## 10. Documentation Check
 
 - [ ] API changes documented in relevant files
 - [ ] Breaking changes noted in PR description
 - [ ] Complex logic has inline comments explaining "why"
 - [ ] Types are accurate and exported where needed
 
-## 10. Performance Check (for data-heavy changes)
+## 11. Performance Check (for data-heavy changes)
 
 If you modified queries or data fetching:
 
@@ -193,7 +212,7 @@ If you modified queries or data fetching:
 - [ ] Caching strategy considered (Redis or TanStack Query)
 - [ ] Loading states handle slow networks
 
-## 11. Report Results
+## 12. Report Results
 
 Create a verification summary in your response:
 

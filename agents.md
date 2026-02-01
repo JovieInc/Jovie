@@ -134,6 +134,16 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
 
+### 7. Global UI Components Render Once
+
+Global UI elements must only render in root `app/layout.tsx`:
+- Cookie banners
+- Toast providers
+- Modal providers
+- Analytics scripts
+
+**NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)
@@ -195,11 +205,48 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 - Use proper interfaces for all data structures
 - Prefer `unknown` over `any` for truly unknown types
 
+**Null Safety for String Methods:**
+- Always guard against null/undefined before calling string methods
+- Common offenders: `.replaceAll()`, `.toLowerCase()`, `.split()`, `.trim()`
+
+```typescript
+// WRONG: Will throw TypeError if title is undefined
+const slug = title.replaceAll(' ', '-');
+
+// CORRECT: Guard with optional chaining or nullish coalescing
+const slug = title?.replaceAll(' ', '-') ?? '';
+```
+
+**Cross-Environment Globals:**
+- Use `globalThis` instead of `window` or `global` where applicable
+- `window` fails in SSR/Node, `global` fails in browser
+- Note: `globalThis.location` is still `undefined` in Node.js SSR - SSR guards are required
+
+| Wrong                        | Correct                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
+| `window.location` (no guard) | `typeof window !== 'undefined' ? window.location : undefined` |
+| `global.fetch`               | `globalThis.fetch`                                            |
+
 ### React/Next.js
 
 - Functional components with hooks only
 - Server Components by default, Client Components when needed
 - Use `'use client'` directive sparingly and intentionally
+
+**Component Definition Rules:**
+- **NEVER** define components inline (inside other components or render functions)
+- Inline components are recreated every render, breaking React reconciliation and causing performance issues
+- Extract all components to module scope or separate files
+
+| Wrong                                          | Correct                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `const columns = [{ cell: () => <Button /> }]` | Extract: `const ActionCell = () => <Button />` then use `cell: ActionCell` |
+| `{items.map(i => { const Item = () => ... })}`  | Define `Item` outside the parent component                                 |
+
+**Route Constants:**
+- **NEVER** hardcode route paths like `/app/dashboard/audience`
+- **ALWAYS** import from `constants/routes.ts`: `APP_ROUTES.AUDIENCE`
+- This prevents broken URLs from path typos and enables safe refactoring
 
 ### Server/Client Boundaries (Enforced by ESLint)
 
@@ -234,10 +281,44 @@ Remove the import or remove "use client" if this should be a server component.
 | Correct | Wrong |
 |---------|-------|
 | `import { db } from '@/lib/db'` | `import { db } from '@/lib/db/client'` |
-| `import { withTransaction } from '@/lib/db'` | `import { neon } from '@neondatabase/serverless'` |
 | Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
+| `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-The project uses `@neondatabase/serverless` with connection pooling (WebSocket-based). The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
+
+**Transaction Restrictions (Neon HTTP Driver):**
+- **NEVER** use `db.transaction()` - Neon HTTP driver does not support interactive transactions
+- For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`
+- If you need true ACID transactions, document the requirement and discuss alternatives
+
+**Forbidden Database Patterns:**
+| Forbidden                          | Why                               | Alternative                            |
+| ---------------------------------- | --------------------------------- | -------------------------------------- |
+| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
+| `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
+| `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
+| Loop with individual `db.insert()` | O(N) database operations          | `db.insert().values([...items])` batch |
+
+### Data Serialization (Server → Client Boundaries)
+
+**Date objects MUST be serialized** before:
+- Caching in Redis (`JSON.stringify` cannot serialize Date)
+- Returning from Server Actions / API routes
+- Passing from RSC to Client Components
+
+| Wrong                                                   | Correct                                                |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| `return { createdAt: user.createdAt }`                  | `return { createdAt: user.createdAt?.toISOString() }`  |
+| `redis.set(key, JSON.stringify(data))` with Date fields | Convert dates first with `toISOStringOrNull()` helper  |
+| Drizzle query result directly to client                 | Map dates: `{ ...row, date: row.date?.toISOString() }` |
+
+**Helper pattern:**
+
+```typescript
+const toISOStringOrNull = (date: Date | null | undefined) =>
+  date?.toISOString() ?? null;
+```
 
 ### React Hook Guidelines
 
@@ -264,6 +345,48 @@ if (condition) setState(x);  // Causes infinite loop!
 useEffect(() => {
   if (condition) setState(x);
 }, [condition]);
+```
+
+### TanStack Query Patterns
+
+**Required Configuration:**
+All `useQuery` calls MUST specify cache configuration:
+```typescript
+// CORRECT: Explicit cache config with AbortSignal
+useQuery({
+  queryKey: keys.user(id),
+  queryFn: ({ signal }) => fetchUser(id, { signal }), // AbortSignal required!
+  staleTime: 5 * 60 * 1000, // Required: when data becomes stale
+  gcTime: 10 * 60 * 1000,   // Required: when to garbage collect
+})
+
+// WRONG: Missing cache config (causes aggressive refetching and API spam)
+useQuery({
+  queryKey: keys.user(id),
+  queryFn: () => fetchUser(id), // Missing signal = memory leaks, missing cache = API spam
+})
+```
+
+**AbortSignal Requirement:**
+- All `queryFn` must destructure and pass `signal` to fetch operations
+- This prevents memory leaks and race conditions on component unmount
+- Without signal, requests continue after navigation, wasting resources
+
+**Cache Presets:**
+Use presets from `lib/queries/cache.ts` for consistency:
+- `STABLE_CACHE` - for data that rarely changes (user profile, billing status)
+- `DYNAMIC_CACHE` - for frequently updated data (notifications, real-time feeds)
+
+**Disable Aggressive Refetch:**
+
+For stable data, disable automatic refetching:
+
+```typescript
+useQuery({
+  ...options,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
+})
 ```
 
 ### Styling
