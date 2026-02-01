@@ -130,7 +130,9 @@ export const DEFAULT_SMART_LISTEN_PREFERENCE: DSPProviderKey[] = [
   'bandcamp',
 ];
 
-export function mergeDSPLinks(...linkSets: DSPLink[][]): DSPLink[] {
+export function mergeDSPLinks(
+  ...linkSets: readonly (readonly DSPLink[])[]
+): DSPLink[] {
   const bestByProvider = new Map<DSPProviderKey, DSPLink>();
 
   linkSets.flat().forEach(link => {

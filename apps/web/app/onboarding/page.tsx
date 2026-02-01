@@ -8,6 +8,7 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
   readonly searchParams?: Promise<{
@@ -71,8 +72,7 @@ export default async function OnboardingPage({
     existingProfile = dashboardData.selectedProfile;
   } catch (error) {
     // Log the error for debugging - distinguish between expected "no profile" and actual errors
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = extractErrorMessage(error, 'Unknown error');
     console.warn('[onboarding] Failed to load existing profile:', {
       error: errorMessage,
       clerkUserId: authResult.clerkUserId,
