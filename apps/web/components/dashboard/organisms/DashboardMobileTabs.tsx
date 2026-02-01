@@ -115,11 +115,11 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
       <nav
         aria-label='Dashboard tabs'
         className={cn(
-          'sticky bottom-0 z-30 border-t border-subtle bg-bg-base/95 backdrop-blur supports-backdrop-filter:bg-bg-base/80 lg:hidden',
+          'sticky bottom-0 z-30 border-t border-default bg-bg-base/95 backdrop-blur-lg supports-backdrop-filter:bg-bg-base/80 lg:hidden',
           className
         )}
       >
-        <div className='mx-auto flex w-full max-w-md items-center justify-between gap-1 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2'>
+        <div className='mx-auto flex w-full max-w-md items-center justify-between gap-0.5 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-1.5'>
           {DASHBOARD_TABS.map(tab => {
             const isActive =
               pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -130,13 +130,23 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
                 href={tab.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-2 min-h-[52px] text-[11px] font-medium transition-colors',
+                  'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 min-h-[56px] text-[10px] font-medium transition-all duration-150',
                   isActive
                     ? 'bg-sidebar-accent text-primary-token'
-                    : 'text-secondary-token/80 hover:text-primary-token active:bg-sidebar-accent/50'
+                    : 'text-tertiary-token hover:text-secondary-token active:bg-sidebar-accent/50 active:scale-95'
                 )}
               >
-                <Icon className='h-5 w-5' aria-hidden='true' />
+                <span
+                  className={cn(
+                    'flex items-center justify-center rounded-lg p-1.5 transition-colors duration-150',
+                    isActive && 'bg-color-accent/10 text-color-accent'
+                  )}
+                >
+                  <Icon
+                    className={cn('size-5', isActive && 'text-color-accent')}
+                    aria-hidden='true'
+                  />
+                </span>
                 <span className='truncate'>{tab.label}</span>
               </Link>
             );
@@ -147,13 +157,27 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
             aria-label='More options'
             aria-expanded={moreOpen}
             className={cn(
-              'flex flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-2 min-h-[52px] text-[11px] font-medium transition-colors',
+              'flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 min-h-[56px] text-[10px] font-medium transition-all duration-150',
               isMoreActive || moreOpen
                 ? 'bg-sidebar-accent text-primary-token'
-                : 'text-secondary-token/80 hover:text-primary-token active:bg-sidebar-accent/50'
+                : 'text-tertiary-token hover:text-secondary-token active:bg-sidebar-accent/50 active:scale-95'
             )}
           >
-            <MoreHorizontal className='h-5 w-5' aria-hidden='true' />
+            <span
+              className={cn(
+                'flex items-center justify-center rounded-lg p-1.5 transition-colors duration-150',
+                (isMoreActive || moreOpen) &&
+                  'bg-color-accent/10 text-color-accent'
+              )}
+            >
+              <MoreHorizontal
+                className={cn(
+                  'size-5',
+                  (isMoreActive || moreOpen) && 'text-color-accent'
+                )}
+                aria-hidden='true'
+              />
+            </span>
             <span className='truncate'>More</span>
           </button>
         </div>
@@ -162,9 +186,9 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
         <SheetContent side='bottom' className='rounded-t-2xl pb-safe'>
           <SheetHeader className='text-left'>
-            <SheetTitle>More</SheetTitle>
+            <SheetTitle className='text-primary-token'>More</SheetTitle>
           </SheetHeader>
-          <nav className='grid gap-1 py-4' aria-label='Additional navigation'>
+          <nav className='grid gap-0.5 py-4' aria-label='Additional navigation'>
             {MORE_MENU_ITEMS.map(item => {
               const isActive =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -175,13 +199,22 @@ export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
                   href={item.href}
                   onClick={() => setMoreOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                    'flex items-center gap-3 rounded-xl px-3 py-3.5 text-sm font-medium transition-all duration-150',
                     isActive
                       ? 'bg-sidebar-accent text-primary-token'
-                      : 'text-secondary-token hover:bg-sidebar-accent/50 hover:text-primary-token'
+                      : 'text-secondary-token hover:bg-sidebar-accent hover:text-primary-token active:scale-[0.98]'
                   )}
                 >
-                  <Icon className='h-5 w-5' aria-hidden='true' />
+                  <span
+                    className={cn(
+                      'flex items-center justify-center rounded-lg p-2 transition-colors',
+                      isActive
+                        ? 'bg-color-accent/10 text-color-accent'
+                        : 'bg-sidebar-accent text-tertiary-token'
+                    )}
+                  >
+                    <Icon className='size-5' aria-hidden='true' />
+                  </span>
                   {item.label}
                 </Link>
               );
