@@ -326,7 +326,7 @@ export function ReleaseTable({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
       header: MetaHeaderCell,
-      cell: createRightMetaCellRenderer(onCopy),
+      cell: createRightMetaCellRenderer(),
       size: 260,
       minSize: 260,
       maxSize: 260,

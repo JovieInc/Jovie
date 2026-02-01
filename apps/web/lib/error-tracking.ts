@@ -39,14 +39,6 @@ const nodeEnv = process.env.NODE_ENV ?? 'development';
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
 
-interface ErrorMetadata {
-  severity: ErrorSeverity;
-  context?: ErrorContext;
-  timestamp: string;
-  environment: string;
-  sentryMode: SentryMode;
-}
-
 /**
  * Get current environment tag
  */
@@ -90,12 +82,24 @@ function sendToSentry(params: {
   environment: string;
   context?: ErrorContext;
 }): void {
-  const { error, errorMessage, message, severity, sentryMode, environment, context } = params;
+  const {
+    error,
+    errorMessage,
+    message,
+    severity,
+    sentryMode,
+    environment,
+    context,
+  } = params;
 
   if (!isSentryInitialized()) {
     console.warn(
       '[Error Tracking] Sentry not initialized, error will only be logged to console and PostHog:',
-      { message, errorType: error instanceof Error ? error.name : 'UnknownError', sentryMode }
+      {
+        message,
+        errorType: error instanceof Error ? error.name : 'UnknownError',
+        sentryMode,
+      }
     );
     return;
   }

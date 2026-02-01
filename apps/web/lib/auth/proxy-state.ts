@@ -64,7 +64,9 @@ async function tryGetCachedState(
       },
     });
   } catch (cacheError) {
-    captureWarning('[proxy-state] Redis cache read failed', { error: cacheError });
+    captureWarning('[proxy-state] Redis cache read failed', {
+      error: cacheError,
+    });
   }
 
   return null;
@@ -74,12 +76,14 @@ async function tryGetCachedState(
  * Determine user state from database query result
  */
 function determineUserState(
-  result: {
-    dbUserId: string;
-    userStatus: string | null;
-    profileId: string | null;
-    profileComplete: Date | null;
-  } | undefined
+  result:
+    | {
+        dbUserId: string;
+        userStatus: string | null;
+        profileId: string | null;
+        profileComplete: Date | null;
+      }
+    | undefined
 ): ProxyUserState {
   // No DB user → needs waitlist/signup
   if (!result?.dbUserId) {

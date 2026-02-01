@@ -413,7 +413,12 @@ export async function getAudienceServerData(params: {
       );
     }
 
-    return fetchSubscribersData(tx, clerkUserId, selectedProfileId, searchParams);
+    return fetchSubscribersData(
+      tx,
+      clerkUserId,
+      selectedProfileId,
+      searchParams
+    );
   });
 }
 

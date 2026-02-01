@@ -218,9 +218,9 @@ async function handleExistingEntry(params: {
   fullName: string;
   primaryGoal: string | null | undefined;
   primarySocialUrl: string;
-  platform: string | null;
-  normalizedUrl: string | null;
-  spotifyUrl: string | null;
+  platform: string;
+  normalizedUrl: string;
+  spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
@@ -290,9 +290,9 @@ async function createNewWaitlistEntry(params: {
   fullName: string;
   primaryGoal: string | null | undefined;
   primarySocialUrl: string;
-  platform: string | null;
-  normalizedUrl: string | null;
-  spotifyUrl: string | null;
+  platform: string;
+  normalizedUrl: string;
+  spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
