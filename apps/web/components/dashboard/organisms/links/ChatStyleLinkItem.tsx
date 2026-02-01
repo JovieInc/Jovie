@@ -142,38 +142,46 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       {...attributes}
       style={cardStyle}
       className={cn(
-        'flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3',
+        'flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
         'transition-all duration-200',
         !visible && 'opacity-50',
         isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
       )}
     >
-      {/* Drag handle */}
+      {/* Drag handle - 44px tap target on mobile */}
       {draggable && (
         <button
           type='button'
-          className='cursor-grab text-tertiary-token hover:text-secondary-token active:cursor-grabbing'
+          className={cn(
+            'flex h-11 w-11 cursor-grab items-center justify-center rounded-lg sm:h-8 sm:w-8',
+            'text-tertiary-token transition-colors',
+            'hover:text-secondary-token active:cursor-grabbing active:scale-95',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          )}
           aria-label='Drag to reorder'
           {...listeners}
         >
-          <GripVertical className='h-4 w-4' />
+          <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />
         </button>
       )}
 
-      {/* Platform icon */}
+      {/* Platform icon - larger on mobile */}
       <div
-        className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
+        className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-lg'
         style={{
           backgroundColor: brandColor,
           color: isDark ? '#ffffff' : '#0f172a',
         }}
       >
-        <SocialIcon platform={link.platform.icon} className='h-5 w-5' />
+        <SocialIcon
+          platform={link.platform.icon}
+          className='h-6 w-6 sm:h-5 sm:w-5'
+        />
       </div>
 
       {/* Content */}
       <div className='min-w-0 flex-1'>
-        <div className='truncate font-medium text-primary-token'>
+        <div className='truncate text-[15px] font-medium text-primary-token sm:text-sm'>
           {link.platform.name || link.platform.id}
         </div>
         {handle && (
@@ -181,20 +189,21 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         )}
       </div>
 
-      {/* Menu button */}
+      {/* Menu button - 44px tap target on mobile */}
       <button
         type='button'
         aria-label={`Open actions for ${link.platform.name}`}
         ref={floatingRefs.setReference}
         className={cn(
-          'inline-flex h-8 w-8 items-center justify-center rounded-full',
+          'inline-flex h-11 w-11 items-center justify-center rounded-xl sm:h-9 sm:w-9 sm:rounded-full',
           'text-secondary-token transition-colors',
           'hover:bg-surface-1 hover:text-primary-token',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+          'active:scale-95'
         )}
         {...getReferenceProps()}
       >
-        <MoreHorizontal className='h-4 w-4' />
+        <MoreHorizontal className='h-5 w-5 sm:h-4 sm:w-4' />
       </button>
 
       {/* Dropdown menu */}
@@ -223,7 +232,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                   }}
                   className={cn(
                     MENU_ITEM_BASE,
-                    'w-full text-left active:scale-[0.98]',
+                    'min-h-[44px] w-full text-left active:scale-[0.98]',
                     item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                   )}
                   {...getItemProps()}
@@ -231,7 +240,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                   {item.iconName && (
                     <Icon
                       name={item.iconName}
-                      className='h-4 w-4 shrink-0 opacity-80'
+                      className='h-5 w-5 shrink-0 opacity-80 sm:h-4 sm:w-4'
                     />
                   )}
                   <span className='min-w-0 flex-1 truncate'>{item.label}</span>
