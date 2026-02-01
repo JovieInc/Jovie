@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import { DashboardCard } from '../atoms/DashboardCard';
 
 interface ProfileLinkCardProps {
@@ -10,7 +10,7 @@ interface ProfileLinkCardProps {
 }
 
 export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
-  const profileUrl = `${PROFILE_URL}/${handle}`;
+  const profileUrl = `${BASE_URL}/${handle}`;
 
   return (
     <DashboardCard variant='default' data-testid='profile-link-card'>
