@@ -24,14 +24,14 @@ export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
   base: `bg-surface-1 border border-subtle rounded-xl transition-all ${timing.slow} ${timing.easing}`,
 
-  // Padding variations (8px grid system)
+  // Padding variations (8px grid system) - mobile-first responsive
   padding: {
     none: 'p-0',
-    micro: 'p-3', // 12px
-    compact: 'p-4', // 16px
-    default: 'p-6', // 24px
-    large: 'p-8', // 32px
-    spacious: 'p-10', // 40px
+    micro: 'p-2 sm:p-3', // 8px -> 12px
+    compact: 'p-3 sm:p-4', // 12px -> 16px
+    default: 'p-4 sm:p-6', // 16px -> 24px
+    large: 'p-5 sm:p-8', // 20px -> 32px
+    spacious: 'p-6 sm:p-10', // 24px -> 40px
   },
 
   // Border radius variations - Linear-style precision
@@ -112,24 +112,24 @@ export const cardTokens = {
 
   // Enhanced variant compositions with Linear-level sophistication
   variants: {
-    // Default static card
+    // Default static card - responsive padding
     default: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
     `
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Interactive clickable card - full hover effects
+    // Interactive clickable card - full hover effects, responsive padding
     interactive: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       cursor-pointer
       transition-all ${timing.normal} ${timing.easing}
@@ -147,12 +147,12 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Settings card - subtle hover
+    // Settings card - subtle hover, responsive padding
     settings: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
@@ -172,24 +172,24 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Empty state card - centered content
+    // Empty state card - centered content, responsive padding
     'empty-state': `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
-      p-8
+      p-6 sm:p-8
       text-center
       shadow-[var(--shadow-sm)]
     `
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Elevated card - stands out with stronger border instead of higher surface
+    // Elevated card - stands out with stronger border, responsive padding
     elevated: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-default)]
       rounded-xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
@@ -197,12 +197,12 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Floating card - modal-like presence
+    // Floating card - modal-like presence, responsive padding
     floating: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-default)]
       rounded-xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-xl)]
       backdrop-blur-lg
       transition-all ${timing.slow} ${timing.easing}
@@ -210,12 +210,12 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Onboarding card - gradient border effect
+    // Onboarding card - gradient border effect, responsive padding
     onboarding: `
       relative
       bg-[var(--color-bg-surface-1)]
       rounded-2xl
-      p-6
+      p-4 sm:p-6
       shadow-[var(--shadow-lg)]
       ring-1
       ring-[var(--color-border-subtle)]
@@ -224,12 +224,12 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Feature card - for showcasing features
+    // Feature card - for showcasing features, responsive padding
     feature: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-2xl
-      p-8
+      p-6 sm:p-8
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]

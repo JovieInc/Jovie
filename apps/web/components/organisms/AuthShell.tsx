@@ -75,9 +75,9 @@ function AuthShellInner({
       <UnifiedSidebar section={section} navigation={navigation} />
 
       <SidebarInset>
-        <div className='mt-2 mb-2 mr-2 ml-0 h-full'>
-          <main className='flex-1 min-h-0 min-w-0 overflow-hidden border border-subtle rounded-md bg-base h-full'>
-            <div className='rounded-lg bg-surface-1 h-full overflow-hidden flex flex-col'>
+        <div className='mt-0 mb-0 mr-0 ml-0 lg:mt-2 lg:mb-2 lg:mr-2 h-full'>
+          <main className='flex-1 min-h-0 min-w-0 overflow-hidden lg:border lg:border-subtle lg:rounded-md bg-base h-full'>
+            <div className='lg:rounded-lg bg-surface-1 h-full overflow-hidden overflow-x-hidden flex flex-col'>
               <DashboardHeader
                 breadcrumbs={breadcrumbs}
                 leading={MobileMenuButton}
@@ -92,12 +92,12 @@ function AuthShellInner({
                 }
               />
               {isTableRoute ? (
-                <div className='flex-1 min-h-0 min-w-0 overflow-hidden'>
+                <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
                   {children}
                 </div>
               ) : (
                 <div className='flex-1 min-h-0 overflow-hidden flex'>
-                  <div className='flex-1 min-h-0 overflow-y-auto p-4 sm:p-6'>
+                  <div className='flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6'>
                     {children}
                   </div>
                   {previewPanel}

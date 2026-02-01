@@ -11,21 +11,10 @@ import {
   User,
   WifiOff,
 } from 'lucide-react';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useThrottledCallback } from '@/lib/pacer';
 import { cn } from '@/lib/utils';
-
-// Use useLayoutEffect on client, useEffect on server
-const useIsomorphicLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 interface ArtistContext {
   readonly displayName: string;
@@ -139,7 +128,6 @@ export function JovieChat({ artistContext }: JovieChatProps) {
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // Create transport with artist context in body
   const transport = useMemo(
@@ -209,39 +197,6 @@ export function JovieChat({ artistContext }: JovieChatProps) {
       setIsSubmitting(false);
     }
   }, [status]);
-
-  // Handle visual viewport changes (mobile keyboard)
-  useIsomorphicLayoutEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-
-    const viewport = window.visualViewport;
-
-    const handleViewportResize = () => {
-      // When keyboard opens, scroll messages to keep context visible
-      if (isInputFocused && messagesEndRef.current) {
-        // Small delay to let the viewport settle
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        });
-      }
-    };
-
-    viewport.addEventListener('resize', handleViewportResize);
-    return () => viewport.removeEventListener('resize', handleViewportResize);
-  }, [isInputFocused]);
-
-  // Scroll to bottom when input is focused (mobile context guarantee)
-  const handleInputFocus = useCallback(() => {
-    setIsInputFocused(true);
-    // Delay scroll to allow keyboard to appear
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, []);
-
-  const handleInputBlur = useCallback(() => {
-    setIsInputFocused(false);
-  }, []);
 
   // Core submit logic
   const doSubmit = useCallback(
@@ -326,11 +281,11 @@ export function JovieChat({ artistContext }: JovieChatProps) {
   return (
     <div className='flex h-full flex-col'>
       {hasMessages ? (
-        // Chat view - messages + sticky input at bottom
+        // Chat view - messages + input at bottom
         <>
-          {/* Messages area - with bottom padding for sticky composer */}
-          <div className='flex-1 overflow-y-auto px-4 py-4 sm:py-6'>
-            <div className='mx-auto max-w-2xl space-y-4 sm:space-y-6'>
+          {/* Messages area */}
+          <div className='flex-1 overflow-y-auto px-4 py-6'>
+            <div className='mx-auto max-w-2xl space-y-6'>
               {messages.map(message => (
                 <div
                   key={message.id}
@@ -340,44 +295,36 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                   )}
                 >
                   {message.role === 'assistant' && (
-                    <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 sm:h-8 sm:w-8 sm:rounded-lg'>
-                      <BrandLogo
-                        size={16}
-                        tone='auto'
-                        className='h-[18px] w-[18px] sm:h-4 sm:w-4'
-                      />
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                      <BrandLogo size={16} tone='auto' />
                     </div>
                   )}
                   <div
                     className={cn(
-                      'max-w-[85%] rounded-2xl px-4 py-3 sm:max-w-[80%]',
+                      'max-w-[80%] rounded-2xl px-4 py-3',
                       message.role === 'user'
                         ? 'bg-accent text-accent-foreground'
                         : 'bg-surface-2 text-primary-token'
                     )}
                   >
-                    <div className='whitespace-pre-wrap text-[15px] leading-relaxed sm:text-sm'>
+                    <div className='whitespace-pre-wrap text-sm leading-relaxed'>
                       {getMessageText(message.parts)}
                     </div>
                   </div>
                   {message.role === 'user' && (
-                    <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 sm:h-8 sm:w-8 sm:rounded-lg'>
-                      <User className='h-5 w-5 text-secondary-token sm:h-4 sm:w-4' />
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                      <User className='h-4 w-4 text-secondary-token' />
                     </div>
                   )}
                 </div>
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className='flex gap-3'>
-                  <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 sm:h-8 sm:w-8 sm:rounded-lg'>
-                    <BrandLogo
-                      size={16}
-                      tone='auto'
-                      className='h-[18px] w-[18px] sm:h-4 sm:w-4'
-                    />
+                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                    <BrandLogo size={16} tone='auto' />
                   </div>
                   <div className='rounded-2xl bg-surface-2 px-4 py-3'>
-                    <Loader2 className='h-5 w-5 animate-spin text-secondary-token sm:h-4 sm:w-4' />
+                    <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
                   </div>
                 </div>
               )}
@@ -385,55 +332,49 @@ export function JovieChat({ artistContext }: JovieChatProps) {
             </div>
           </div>
 
-          {/* Sticky composer at bottom with safe area */}
-          <div
-            className={cn(
-              'sticky bottom-0 z-10 border-t border-subtle bg-bg-base/95 backdrop-blur-lg',
-              'px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3',
-              'supports-[backdrop-filter]:bg-bg-base/80'
-            )}
-          >
-            {/* Error display above composer */}
-            {chatError && (
-              <div className='mx-auto mb-3 max-w-2xl'>
-                <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3 sm:p-4'>
-                  {chatError.type === 'network' ? (
-                    <WifiOff className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-                  ) : (
-                    <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-                  )}
-                  <div className='flex-1 space-y-2'>
-                    <div>
-                      <p className='text-sm font-medium text-primary-token'>
-                        {chatError.message}
-                      </p>
-                      <p className='mt-1 text-xs text-secondary-token'>
-                        {getNextStepMessage(chatError.type)}
-                        {chatError.errorCode && (
-                          <span className='ml-2 font-mono text-tertiary-token'>
-                            ({chatError.errorCode})
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    {chatError.failedMessage && !chatError.retryAfter && (
-                      <Button
-                        type='button'
-                        variant='secondary'
-                        size='sm'
-                        onClick={handleRetry}
-                        disabled={isLoading || isSubmitting}
-                        className='h-8 gap-2'
-                      >
-                        <RefreshCw className='h-3.5 w-3.5' />
-                        Try again
-                      </Button>
-                    )}
+          {/* Error display in chat view */}
+          {chatError && (
+            <div className='px-4 pb-3'>
+              <div className='mx-auto flex max-w-2xl items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
+                {chatError.type === 'network' ? (
+                  <WifiOff className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                ) : (
+                  <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                )}
+                <div className='flex-1 space-y-2'>
+                  <div>
+                    <p className='text-sm font-medium text-primary-token'>
+                      {chatError.message}
+                    </p>
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      {getNextStepMessage(chatError.type)}
+                      {chatError.errorCode && (
+                        <span className='ml-2 font-mono text-tertiary-token'>
+                          ({chatError.errorCode})
+                        </span>
+                      )}
+                    </p>
                   </div>
+                  {chatError.failedMessage && !chatError.retryAfter && (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      onClick={handleRetry}
+                      disabled={isLoading || isSubmitting}
+                      className='h-8 gap-2'
+                    >
+                      <RefreshCw className='h-3.5 w-3.5' />
+                      Try again
+                    </Button>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
+          {/* Input at bottom */}
+          <div className='border-t border-subtle px-4 py-4'>
             <form onSubmit={handleSubmit} className='mx-auto max-w-2xl'>
               <div className='relative'>
                 <textarea
@@ -443,19 +384,17 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                   placeholder='Ask a follow-up...'
                   rows={1}
                   className={cn(
-                    'w-full resize-none rounded-xl border bg-surface-1 py-3 pl-4 pr-14',
-                    'text-[16px] text-primary-token placeholder:text-tertiary-token sm:text-sm',
+                    'w-full resize-none rounded-xl border bg-surface-1 px-4 py-3 pr-14',
+                    'text-primary-token placeholder:text-tertiary-token',
                     'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
                     'transition-colors duration-fast',
-                    'max-h-32 min-h-[48px]',
+                    'max-h-32',
                     isOverLimit
                       ? 'border-error focus:border-error focus:ring-error/20'
                       : 'border-subtle focus:border-accent focus:ring-accent/20'
                   )}
                   onKeyDown={handleKeyDown}
                   onInput={handleInput}
-                  onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
                   maxLength={MAX_MESSAGE_LENGTH + 100}
                   aria-label='Chat message input'
                 />
@@ -465,13 +404,13 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                   disabled={
                     !input.trim() || isLoading || isSubmitting || isOverLimit
                   }
-                  className='absolute bottom-1.5 right-1.5 h-11 w-11 rounded-lg sm:h-9 sm:w-9'
+                  className='absolute bottom-2 right-2 h-8 w-8 rounded-lg'
                   aria-label='Send message'
                 >
                   {isLoading || isSubmitting ? (
-                    <Loader2 className='h-5 w-5 animate-spin sm:h-4 sm:w-4' />
+                    <Loader2 className='h-4 w-4 animate-spin' />
                   ) : (
-                    <ArrowUp className='h-5 w-5 sm:h-4 sm:w-4' />
+                    <ArrowUp className='h-4 w-4' />
                   )}
                 </Button>
 
@@ -479,7 +418,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                 {isNearLimit && (
                   <div
                     className={cn(
-                      'absolute bottom-3 left-3 text-xs',
+                      'absolute bottom-2 left-3 text-xs',
                       isOverLimit ? 'text-error' : 'text-tertiary-token'
                     )}
                   >
@@ -491,12 +430,12 @@ export function JovieChat({ artistContext }: JovieChatProps) {
           </div>
         </>
       ) : (
-        // Empty state - centered content with safe area padding
-        <div className='flex flex-1 flex-col items-center justify-center px-4 pb-[env(safe-area-inset-bottom)]'>
-          <div className='w-full max-w-2xl space-y-6 sm:space-y-8'>
+        // Empty state - centered content
+        <div className='flex flex-1 flex-col items-center justify-center px-4'>
+          <div className='w-full max-w-2xl space-y-8'>
             {/* Error display */}
             {chatError && (
-              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3 sm:p-4'>
+              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
                 {chatError.type === 'network' ? (
                   <WifiOff className='mt-0.5 h-5 w-5 shrink-0 text-error' />
                 ) : (
@@ -541,8 +480,8 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                 onChange={e => setInput(e.target.value)}
                 placeholder='What do you wanna ask Jovie?'
                 className={cn(
-                  'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-16',
-                  'text-[16px] text-primary-token placeholder:text-tertiary-token sm:text-sm',
+                  'w-full resize-none rounded-xl border bg-surface-1 px-4 py-4 pr-14',
+                  'text-primary-token placeholder:text-tertiary-token',
                   'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
                   'transition-colors duration-fast',
                   'min-h-[120px]',
@@ -551,9 +490,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                     : 'border-subtle focus:border-accent focus:ring-accent/20'
                 )}
                 onKeyDown={handleKeyDown}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-                maxLength={MAX_MESSAGE_LENGTH + 100}
+                maxLength={MAX_MESSAGE_LENGTH + 100} // Allow slight overflow for UX
                 aria-label='Chat message input'
                 aria-describedby={isOverLimit ? 'char-limit-error' : undefined}
               />
@@ -563,13 +500,13 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                 disabled={
                   !input.trim() || isLoading || isSubmitting || isOverLimit
                 }
-                className='absolute bottom-3 right-3 h-11 w-11 rounded-lg'
+                className='absolute bottom-3 right-3 h-10 w-10 rounded-lg'
                 aria-label='Send message'
               >
                 {isLoading || isSubmitting ? (
-                  <Loader2 className='h-5 w-5 animate-spin sm:h-4 sm:w-4' />
+                  <Loader2 className='h-4 w-4 animate-spin' />
                 ) : (
-                  <ArrowUp className='h-5 w-5 sm:h-4 sm:w-4' />
+                  <ArrowUp className='h-4 w-4' />
                 )}
               </Button>
 
@@ -587,7 +524,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
               )}
             </form>
 
-            {/* Suggested prompts - larger tap targets on mobile */}
+            {/* Suggested prompts */}
             <div className='space-y-3'>
               <p className='text-center text-sm text-tertiary-token'>
                 Try asking about:
@@ -599,11 +536,10 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                     type='button'
                     onClick={() => handleSuggestedPrompt(prompt)}
                     className={cn(
-                      'rounded-full border border-subtle bg-surface-1 px-4 py-2.5 text-sm',
-                      'min-h-[44px] text-secondary-token transition-colors duration-fast',
+                      'rounded-full border border-subtle bg-surface-1 px-4 py-2 text-sm',
+                      'text-secondary-token transition-colors duration-fast',
                       'hover:border-default hover:bg-surface-2 hover:text-primary-token',
-                      'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2',
-                      'active:scale-[0.98]'
+                      'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2'
                     )}
                   >
                     {prompt}

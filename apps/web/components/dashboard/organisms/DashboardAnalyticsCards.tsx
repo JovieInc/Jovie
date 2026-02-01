@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { BarChart3, Users } from 'lucide-react';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { BarChart3, HelpCircle, Users } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -64,7 +64,9 @@ function ErrorCards() {
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-xs font-medium text-secondary-token'>Audience</p>
+          <p className='text-xs font-medium text-secondary-token'>
+            Unique visitors
+          </p>
         </div>
         <p className='text-sm text-tertiary-token'>Temporarily unavailable</p>
       </div>
@@ -256,17 +258,55 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             icon={BarChart3}
             iconClassName='text-sky-600 dark:text-sky-400'
             iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
+            headerRight={
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type='button'
+                    className='text-tertiary-token hover:text-secondary-token transition-colors'
+                    aria-label='Learn more about profile views'
+                  >
+                    <HelpCircle className='h-3.5 w-3.5' />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side='top' className='max-w-[200px]'>
+                  <p className='text-xs'>
+                    Total page views, including repeat visits from the same
+                    person
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            }
           />
           <AnalyticsCard
-            title='Audience'
+            title='Unique visitors'
             value={uniqueUsersLabel}
             metadata={rangeLabel}
             icon={Users}
             iconClassName='text-emerald-600 dark:text-emerald-400'
             iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
+            headerRight={
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type='button'
+                    className='text-tertiary-token hover:text-secondary-token transition-colors'
+                    aria-label='Learn more about unique visitors'
+                  >
+                    <HelpCircle className='h-3.5 w-3.5' />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side='top' className='max-w-[200px]'>
+                  <p className='text-xs'>
+                    Individual people who visited your profile, counted once per
+                    person
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            }
           >
             <div className='flex items-center justify-between'>
-              <p className='text-xs text-tertiary-token'>Unique users</p>
+              <p className='text-xs text-tertiary-token'>Identified audience</p>
               <Link
                 href={APP_ROUTES.AUDIENCE}
                 className='text-xs font-medium text-accent-token hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary'
@@ -320,7 +360,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
       {renderContent()}
       <div className='sr-only' aria-live='polite' aria-atomic='true'>
         {displayProfileViews > 0 &&
-          `Profile views: ${profileViewsLabel}, Unique users: ${uniqueUsersLabel}`}
+          `Profile views: ${profileViewsLabel}, Unique visitors: ${uniqueUsersLabel}`}
       </div>
     </div>
   );

@@ -313,18 +313,21 @@ function DashboardLayoutWrapper({
 }>) {
   const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
 
-  const MobileMenuButton = isMobile ? (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={toggleSidebar}
-      aria-label={openMobile ? 'Close menu' : 'Open menu'}
-      aria-expanded={openMobile}
-      className='h-11 w-11'
-    >
-      {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
-    </Button>
-  ) : null;
+  // Only show hamburger menu button on mobile when NOT using the bottom tabs navigation
+  // When showMobileTabs is true, the LiquidGlassMenu is the primary navigation
+  const MobileMenuButton =
+    isMobile && !showMobileTabs ? (
+      <Button
+        variant='ghost'
+        size='icon'
+        onClick={toggleSidebar}
+        aria-label={openMobile ? 'Close menu' : 'Open menu'}
+        aria-expanded={openMobile}
+        className='h-11 w-11'
+      >
+        {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
+      </Button>
+    ) : null;
 
   const SidebarExpandButton =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
@@ -360,7 +363,7 @@ function DashboardLayoutWrapper({
                     'flex-1 min-h-0',
                     contentPadding,
                     showMobileTabs
-                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                      ? 'pb-[calc(env(safe-area-inset-bottom)+4.5rem)] lg:pb-0'
                       : undefined
                   )}
                 >
