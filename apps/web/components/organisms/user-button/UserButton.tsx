@@ -1,14 +1,14 @@
 'use client';
 
-import type { CommonDropdownItem } from '@jovie/ui';
+import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { Avatar } from '@/components/atoms/Avatar';
-import { Icon } from '@/components/atoms/Icon';
-import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { cn } from '@/lib/utils';
+import { Avatar } from '../../atoms/Avatar/Avatar';
+import { Icon } from '../../atoms/Icon';
+import { FeedbackModal } from '../../dashboard/molecules/FeedbackModal';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
 
@@ -146,7 +146,8 @@ function buildDropdownItems({
           className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
-      onClick: () => window.open('/legal/privacy', '_blank'),
+      onClick: () =>
+        window.open('/legal/privacy', '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
@@ -158,7 +159,8 @@ function buildDropdownItems({
           className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
-      onClick: () => window.open('/legal/terms', '_blank'),
+      onClick: () =>
+        window.open('/legal/terms', '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
@@ -170,11 +172,12 @@ function buildDropdownItems({
           className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
         />
       ),
-      onClick: () => window.open('/legal/cookies', '_blank'),
+      onClick: () =>
+        window.open('/legal/cookies', '_blank', 'noopener,noreferrer'),
     }
   );
 
-  items.push({
+  const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',
     id: 'learn-more',
     label: 'Learn more',
@@ -183,9 +186,10 @@ function buildDropdownItems({
         name='HelpCircle'
         className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
       />
-    ),
+    ) as unknown as CommonDropdownSubmenu['icon'],
     items: learnMoreItems,
-  } as CommonDropdownItem);
+  };
+  items.push(learnMoreSubmenu);
 
   // Add billing item based on status
   if (billingStatus.loading) {
