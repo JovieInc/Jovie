@@ -2,8 +2,13 @@ import { env } from '@/lib/env-server';
 
 export type DevCleanupFn = () => void | Promise<void>;
 
+/**
+ * Process event types that trigger cleanup
+ */
+export type ProcessCleanupEvent = 'beforeExit' | 'SIGINT' | 'SIGTERM';
+
 interface ProcessWithOnce {
-  once(event: 'beforeExit' | 'SIGINT' | 'SIGTERM', listener: () => void): void;
+  once(event: ProcessCleanupEvent, listener: () => void): void;
 }
 
 declare global {
