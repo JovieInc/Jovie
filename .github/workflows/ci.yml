@@ -609,8 +609,8 @@ jobs:
         run: |
           cd apps/web
 
-          # Start Next.js server in background
-          pnpm start &
+          # Start Next.js standalone server in background
+          node .next/standalone/server.js &
           SERVER_PID=$!
 
           # Wait for server to be ready
@@ -634,6 +634,9 @@ jobs:
           kill $SERVER_PID 2>/dev/null || true
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
 
   ci-unit-tests:
     name: Unit Tests
@@ -1501,6 +1504,8 @@ jobs:
           CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
