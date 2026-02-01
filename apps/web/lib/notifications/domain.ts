@@ -544,11 +544,15 @@ export const unsubscribeFromNotificationsDomain = async (
     ];
 
     if (targetChannel === 'email' && normalizedEmail) {
-      whereClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
-      whereClauses.push(eq(notificationSubscriptions.channel, 'email'));
+      whereClauses.push(
+        eq(notificationSubscriptions.email, normalizedEmail),
+        eq(notificationSubscriptions.channel, 'email')
+      );
     } else if (targetChannel === 'sms' && normalizedPhone) {
-      whereClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
-      whereClauses.push(eq(notificationSubscriptions.channel, 'sms'));
+      whereClauses.push(
+        eq(notificationSubscriptions.phone, normalizedPhone),
+        eq(notificationSubscriptions.channel, 'sms')
+      );
     }
 
     const deleted = await db
