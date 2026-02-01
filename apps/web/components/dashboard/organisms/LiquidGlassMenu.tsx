@@ -4,19 +4,14 @@ import type { LucideIcon } from 'lucide-react';
 import { ChevronUp, Search, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  type CSSProperties,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
-/**
- * Menu item configuration
- */
+// ============================================================================
+// Types
+// ============================================================================
+
 export type LiquidGlassMenuItem = {
   id: string;
   label: string;
@@ -25,33 +20,132 @@ export type LiquidGlassMenuItem = {
   badge?: number;
 };
 
-/**
- * Props for the LiquidGlassMenu component
- */
 export interface LiquidGlassMenuProps {
-  /** Menu items to display in the tab bar */
   readonly primaryItems: LiquidGlassMenuItem[];
-  /** Additional items shown in the expanded menu */
   readonly expandedItems: LiquidGlassMenuItem[];
-  /** Optional workspace/profile selector content */
   readonly workspaceSelector?: ReactNode;
-  /** Optional settings button handler */
   readonly onSettingsClick?: () => void;
-  /** Optional search button handler */
   readonly onSearchClick?: () => void;
-  /** Additional CSS classes */
   readonly className?: string;
 }
 
-/**
- * LiquidGlassMenu - An expandable mobile navigation with frosted glass effect
- *
- * Inspired by Linear's liquid glass design:
- * - Frosted glass aesthetic with backdrop blur
- * - Smooth expand/collapse animations
- * - Touch feedback with subtle lift effect
- * - Specular highlights for depth
- */
+// ============================================================================
+// Styles
+// ============================================================================
+
+const GLASS_LAYER_STYLES = {
+  highlight: {
+    background: 'var(--liquid-glass-highlight)',
+    mixBlendMode: 'plus-lighter' as const,
+    opacity: 0.5,
+  },
+  highlightSubtle: {
+    background: 'var(--liquid-glass-highlight)',
+    mixBlendMode: 'plus-lighter' as const,
+    opacity: 0.3,
+  },
+  blur: {
+    backdropFilter: 'blur(var(--liquid-glass-blur-intense))',
+    WebkitBackdropFilter: 'blur(var(--liquid-glass-blur-intense))',
+  },
+  blurLight: {
+    backdropFilter: 'blur(var(--liquid-glass-blur))',
+    WebkitBackdropFilter: 'blur(var(--liquid-glass-blur))',
+  },
+} as const;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function formatBadge(count: number): string {
+  return count > 99 ? '99+' : String(count);
+}
+
+function useCloseOnEscapeOrOutside(
+  ref: React.RefObject<HTMLElement | null>,
+  isOpen: boolean,
+  onClose: () => void
+): void {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    // Small delay prevents immediate close when opening via click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 10);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [ref, isOpen, onClose]);
+}
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+function GlassHighlight({ subtle = false }: { subtle?: boolean }) {
+  return (
+    <div
+      className='absolute inset-0 pointer-events-none rounded-2xl'
+      style={
+        subtle
+          ? GLASS_LAYER_STYLES.highlightSubtle
+          : GLASS_LAYER_STYLES.highlight
+      }
+      aria-hidden='true'
+    />
+  );
+}
+
+function GlassBlur({ intense = false }: { intense?: boolean }) {
+  return (
+    <div
+      className='absolute inset-0 rounded-2xl'
+      style={intense ? GLASS_LAYER_STYLES.blur : GLASS_LAYER_STYLES.blurLight}
+      aria-hidden='true'
+    />
+  );
+}
+
+function Badge({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' }) {
+  if (count <= 0) return null;
+
+  const sizeClasses =
+    size === 'sm'
+      ? 'min-w-[16px] h-[16px] px-1 text-[10px]'
+      : 'min-w-[22px] h-[22px] px-1.5 text-xs';
+
+  return (
+    <span
+      className={cn(
+        'flex items-center justify-center font-semibold rounded-full bg-color-accent text-color-accent-foreground',
+        sizeClasses
+      )}
+    >
+      {formatBadge(count)}
+    </span>
+  );
+}
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
 export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
@@ -59,60 +153,24 @@ export function LiquidGlassMenu({
   onSettingsClick,
   onSearchClick,
   className,
-}: LiquidGlassMenuProps) {
+}: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const expandedMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    if (!isExpanded) return;
+  const closeMenu = useCallback(() => setIsExpanded(false), []);
+  const toggleMenu = useCallback(() => setIsExpanded(prev => !prev), []);
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsExpanded(false);
-      }
-    };
+  useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenu);
 
-    // Add listener with a small delay to prevent immediate close on open
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 10);
-
-    return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isExpanded]);
-
-  // Close menu on route change
+  // Close on route change
   useEffect(() => {
     setIsExpanded(false);
   }, [pathname]);
 
-  // Handle escape key
-  useEffect(() => {
-    if (!isExpanded) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsExpanded(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isExpanded]);
-
-  const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
-
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
 
-  // All items for the expanded menu
   const allMenuItems = [...primaryItems, ...expandedItems];
 
   return (
@@ -128,27 +186,21 @@ export function LiquidGlassMenu({
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'
         )}
-        style={
-          {
-            '--menu-height': isExpanded ? 'auto' : '0px',
-          } as CSSProperties
-        }
       >
-        {/* Backdrop blur overlay for content behind */}
+        {/* Backdrop */}
         <div
           className={cn(
             'fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300',
             isExpanded ? 'opacity-100' : 'opacity-0'
           )}
-          onClick={() => setIsExpanded(false)}
+          onClick={closeMenu}
           aria-hidden='true'
         />
 
-        {/* Expanded menu container */}
+        {/* Expanded menu */}
         <div
-          ref={expandedMenuRef}
           className={cn(
-            'relative mx-4 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out transform',
+            'relative mx-4 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
             isExpanded ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
           )}
           style={{
@@ -157,40 +209,19 @@ export function LiquidGlassMenu({
             border: '1px solid var(--liquid-glass-border)',
           }}
         >
-          {/* Specular highlight overlay */}
-          <div
-            className='absolute inset-0 pointer-events-none rounded-2xl'
-            style={{
-              background: 'var(--liquid-glass-highlight)',
-              mixBlendMode: 'plus-lighter',
-              opacity: 0.5,
-            }}
-            aria-hidden='true'
-          />
+          <GlassHighlight />
+          <GlassBlur intense />
 
-          {/* Backdrop blur layer */}
-          <div
-            className='absolute inset-0 backdrop-blur-xl rounded-2xl'
-            style={{
-              backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-              WebkitBackdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            }}
-            aria-hidden='true'
-          />
-
-          {/* Menu content */}
           <nav
             className='relative z-10 py-2'
             aria-label='Expanded navigation menu'
           >
-            {/* Workspace selector if provided */}
             {workspaceSelector && (
               <div className='px-3 pb-2 mb-1 border-b border-default/50'>
                 {workspaceSelector}
               </div>
             )}
 
-            {/* Menu items */}
             <div className='space-y-0.5 px-2'>
               {allMenuItems.map(item => {
                 const Icon = item.icon;
@@ -213,15 +244,13 @@ export function LiquidGlassMenu({
                         : undefined,
                     }}
                     onMouseEnter={e => {
-                      if (!active) {
+                      if (!active)
                         e.currentTarget.style.background =
                           'var(--liquid-glass-item-hover)';
-                      }
                     }}
                     onMouseLeave={e => {
-                      if (!active) {
+                      if (!active)
                         e.currentTarget.style.background = 'transparent';
-                      }
                     }}
                   >
                     <span
@@ -235,11 +264,7 @@ export function LiquidGlassMenu({
                       <Icon className='size-[18px]' aria-hidden='true' />
                     </span>
                     <span className='flex-1'>{item.label}</span>
-                    {item.badge !== undefined && item.badge > 0 && (
-                      <span className='flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-xs font-semibold rounded-full bg-color-accent text-color-accent-foreground'>
-                        {item.badge > 99 ? '99+' : item.badge}
-                      </span>
-                    )}
+                    {item.badge !== undefined && <Badge count={item.badge} />}
                   </Link>
                 );
               })}
@@ -258,29 +283,10 @@ export function LiquidGlassMenu({
           borderTop: '1px solid var(--liquid-glass-border)',
         }}
       >
-        {/* Specular highlight for tab bar */}
-        <div
-          className='absolute inset-0 pointer-events-none'
-          style={{
-            background: 'var(--liquid-glass-highlight)',
-            mixBlendMode: 'plus-lighter',
-            opacity: 0.3,
-          }}
-          aria-hidden='true'
-        />
-
-        {/* Backdrop blur for tab bar */}
-        <div
-          className='absolute inset-0'
-          style={{
-            backdropFilter: `blur(var(--liquid-glass-blur))`,
-            WebkitBackdropFilter: `blur(var(--liquid-glass-blur))`,
-          }}
-          aria-hidden='true'
-        />
+        <GlassHighlight subtle />
+        <GlassBlur />
 
         <div className='relative z-10 flex items-center justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2'>
-          {/* Primary tab items */}
           {primaryItems.slice(0, 4).map(item => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -310,18 +316,18 @@ export function LiquidGlassMenu({
                   <Icon className='size-5' aria-hidden='true' />
                 </span>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className='absolute top-1 right-1 flex items-center justify-center min-w-[16px] h-[16px] px-1 text-[10px] font-bold rounded-full bg-color-accent text-color-accent-foreground'>
-                    {item.badge > 99 ? '99+' : item.badge}
+                  <span className='absolute top-1 right-1'>
+                    <Badge count={item.badge} size='sm' />
                   </span>
                 )}
               </Link>
             );
           })}
 
-          {/* Expand/collapse button */}
+          {/* Expand/collapse toggle */}
           <button
             type='button'
-            onClick={toggleExpanded}
+            onClick={toggleMenu}
             aria-label={isExpanded ? 'Collapse menu' : 'Expand menu'}
             aria-expanded={isExpanded}
             className={cn(
@@ -348,7 +354,6 @@ export function LiquidGlassMenu({
             </span>
           </button>
 
-          {/* Optional action buttons */}
           {onSettingsClick && (
             <button
               type='button'
@@ -368,9 +373,7 @@ export function LiquidGlassMenu({
               onClick={onSearchClick}
               aria-label='Search'
               className='flex flex-col items-center justify-center p-3 rounded-full min-w-[48px] text-primary-token transition-all duration-150 active:scale-95 active:translate-y-px'
-              style={{
-                background: 'var(--liquid-glass-item-selected)',
-              }}
+              style={{ background: 'var(--liquid-glass-item-selected)' }}
             >
               <Search className='size-5' aria-hidden='true' />
             </button>

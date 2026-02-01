@@ -12,22 +12,12 @@ import {
   UserCircle,
   Users,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
 
-/**
- * Primary navigation items shown in the tab bar
- */
 const PRIMARY_ITEMS: LiquidGlassMenuItem[] = [
-  {
-    id: 'overview',
-    label: 'Dashboard',
-    href: '/app/dashboard',
-    icon: Home,
-  },
+  { id: 'overview', label: 'Dashboard', href: '/app/dashboard', icon: Home },
   {
     id: 'profile',
     label: 'Profile',
@@ -48,9 +38,6 @@ const PRIMARY_ITEMS: LiquidGlassMenuItem[] = [
   },
 ];
 
-/**
- * Additional items shown in the expanded menu
- */
 const EXPANDED_ITEMS: LiquidGlassMenuItem[] = [
   {
     id: 'releases',
@@ -82,39 +69,20 @@ const EXPANDED_ITEMS: LiquidGlassMenuItem[] = [
     href: '/app/dashboard/chat',
     icon: MessageCircle,
   },
-  {
-    id: 'settings',
-    label: 'Settings',
-    href: '/app/settings',
-    icon: Settings,
-  },
+  { id: 'settings', label: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
 export interface DashboardMobileTabsProps {
   readonly className?: string;
 }
 
-/**
- * DashboardMobileTabs - Mobile navigation with liquid glass expandable menu
- *
- * Features:
- * - Fixed bottom tab bar with primary navigation
- * - Expandable menu with all navigation options
- * - Liquid glass visual effect (frosted glass with blur)
- * - Smooth animations and touch feedback
- */
-export function DashboardMobileTabs({ className }: DashboardMobileTabsProps) {
-  const router = useRouter();
-
-  const handleSettingsClick = useCallback(() => {
-    router.push('/app/settings');
-  }, [router]);
-
+export function DashboardMobileTabs({
+  className,
+}: DashboardMobileTabsProps): React.JSX.Element {
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
       expandedItems={EXPANDED_ITEMS}
-      onSettingsClick={handleSettingsClick}
       className={cn('lg:hidden', className)}
     />
   );
