@@ -94,26 +94,27 @@ export function ContactSidebarHeader({
     });
 
     // Refresh - overflow action
-    overflowActions.push({
-      id: 'refresh',
-      label: 'Refresh profile',
-      icon: RefreshCw,
-      onClick: () => {
-        if (onRefresh) {
-          onRefresh();
-          return;
-        }
-        globalThis.location.reload();
-      },
-    });
-
     // Open profile - overflow action
-    overflowActions.push({
-      id: 'open',
-      label: 'Open profile',
-      icon: ExternalLink,
-      href: `/${contact.username}`,
-    });
+    overflowActions.push(
+      {
+        id: 'refresh',
+        label: 'Refresh profile',
+        icon: RefreshCw,
+        onClick: () => {
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          globalThis.location.reload();
+        },
+      },
+      {
+        id: 'open',
+        label: 'Open profile',
+        icon: ExternalLink,
+        href: `/${contact.username}`,
+      }
+    );
   }
 
   return (
