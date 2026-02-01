@@ -569,3 +569,69 @@
   --menu-item-hover: 30 30 39;
   --menu-separator: 255 255 255 / 0.08;
 }
+
+/* ============================================
+   LIQUID GLASS SYSTEM
+   ============================================
+
+   Linear-inspired frosted glass effect with:
+   - Gaussian blur for depth
+   - Subtle gradients for structure
+   - Specular highlights
+   - Dynamic shadows
+*/
+:root {
+  /* Liquid glass base */
+  --liquid-glass-bg: oklch(100% 0 0 / 70%);
+  --liquid-glass-bg-solid: oklch(98% 0.005 var(--theme-base-hue));
+  --liquid-glass-border: oklch(0% 0 0 / 8%);
+  --liquid-glass-shadow:
+    0 8px 32px oklch(0% 0 0 / 8%), 0 4px 16px oklch(0% 0 0 / 5%),
+    inset 0 1px 0 oklch(100% 0 0 / 50%);
+  --liquid-glass-shadow-elevated:
+    0 16px 48px oklch(0% 0 0 / 12%), 0 8px 24px oklch(0% 0 0 / 8%),
+    inset 0 1px 0 oklch(100% 0 0 / 60%);
+
+  /* Highlight/specular */
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 40%) 0%,
+    oklch(100% 0 0 / 10%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
+
+  /* Item states */
+  --liquid-glass-item-hover: oklch(0% 0 0 / 5%);
+  --liquid-glass-item-active: oklch(0% 0 0 / 8%);
+  --liquid-glass-item-selected: oklch(0% 0 0 / 10%);
+
+  /* Blur values */
+  --liquid-glass-blur: 24px;
+  --liquid-glass-blur-intense: 40px;
+}
+
+:root.dark {
+  /* Dark mode liquid glass */
+  --liquid-glass-bg: oklch(15% 0.01 var(--theme-base-hue) / 75%);
+  --liquid-glass-bg-solid: oklch(18% 0.01 var(--theme-base-hue));
+  --liquid-glass-border: oklch(100% 0 0 / 10%);
+  --liquid-glass-shadow:
+    0 8px 32px oklch(0% 0 0 / 40%), 0 4px 16px oklch(0% 0 0 / 30%),
+    inset 0 1px 0 oklch(100% 0 0 / 8%);
+  --liquid-glass-shadow-elevated:
+    0 16px 48px oklch(0% 0 0 / 50%), 0 8px 24px oklch(0% 0 0 / 40%),
+    inset 0 1px 0 oklch(100% 0 0 / 12%);
+
+  /* Highlight/specular - subtler in dark mode */
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 12%) 0%,
+    oklch(100% 0 0 / 4%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
+
+  /* Item states */
+  --liquid-glass-item-hover: oklch(100% 0 0 / 6%);
+  --liquid-glass-item-active: oklch(100% 0 0 / 10%);
+  --liquid-glass-item-selected: oklch(100% 0 0 / 12%);
+}
