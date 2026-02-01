@@ -47,12 +47,15 @@ const timeFormatter = new Intl.DateTimeFormat('en-US', {
 // ============================================================================
 
 /**
+ * Acceptable date input types
+ */
+export type DateInput = string | Date | null | undefined;
+
+/**
  * Parse a date value safely.
  * @returns Date object or null if invalid
  */
-export function parseDate(
-  value: string | Date | null | undefined
-): Date | null {
+export function parseDate(value: DateInput): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;

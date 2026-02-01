@@ -79,15 +79,20 @@ export async function getAnalyticsData(
   // Consolidated analytics into one SQL round trip (previously nine queries).
   // Local dev timing (5-run avg, seeded DB): ~120ms ➝ ~48ms.
   // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
+  /**
+   * Aggregate value from database (can be string, number, or null)
+   */
+  type AggregateValue = string | number | null;
+
   const analyticsAggregates = await apiQuery(
     () =>
       db
         .execute<{
-          total_clicks: string | number | null;
-          spotify_clicks: string | number | null;
-          social_clicks: string | number | null;
-          recent_clicks: string | number | null;
-          profile_views_in_range: string | number | null;
+          total_clicks: AggregateValue;
+          spotify_clicks: AggregateValue;
+          social_clicks: AggregateValue;
+          recent_clicks: AggregateValue;
+          profile_views_in_range: AggregateValue;
           clicks_by_day: JsonArray<{ date: string; count: number }>;
           top_links: JsonArray<{
             id: string | null;

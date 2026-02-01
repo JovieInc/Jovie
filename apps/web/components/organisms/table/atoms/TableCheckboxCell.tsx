@@ -5,6 +5,11 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
+/**
+ * Checkbox state types
+ */
+export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
+
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES =
   'h-4 w-4 border-2 border-subtle rounded-[4px] data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white';
@@ -27,11 +32,7 @@ export interface TableCheckboxCellTanStackProps<TData = unknown> {
   readonly rowNumber?: number;
   readonly isChecked?: boolean;
   readonly onToggleSelect?: () => void;
-  readonly headerCheckboxState?:
-    | 'checked'
-    | 'unchecked'
-    | 'indeterminate'
-    | boolean;
+  readonly headerCheckboxState?: CheckboxState;
   readonly onToggleSelectAll?: () => void;
 }
 
