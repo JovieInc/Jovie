@@ -15,7 +15,7 @@ import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 
 /**
  * PreviewPanelContent - Profile preview drawer content
@@ -33,8 +33,8 @@ export function PreviewPanelContent() {
   const links = previewData?.links ?? [];
   const profilePath = previewData?.profilePath ?? '';
 
-  // Use PROFILE_URL to ensure profile links always point to the profile domain
-  const profileUrl = profilePath ? `${PROFILE_URL}${profilePath}` : '';
+  // Use BASE_URL to ensure profile links always point to the profile domain
+  const profileUrl = profilePath ? `${BASE_URL}${profilePath}` : '';
 
   // Action handlers - defined inline, no useCallback needed for simple handlers
   const handleCopyUrl = async () => {

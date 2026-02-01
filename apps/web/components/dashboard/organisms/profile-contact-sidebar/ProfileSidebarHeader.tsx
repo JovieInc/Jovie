@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 
 interface ProfileSidebarHeaderProps {
   readonly username: string;
@@ -51,8 +51,8 @@ export function ProfileSidebarHeader({
     };
   }, []);
 
-  // Use PROFILE_URL to ensure profile links always point to the profile domain
-  const profileUrl = `${PROFILE_URL}${profilePath}`;
+  // Use BASE_URL to ensure profile links always point to the profile domain
+  const profileUrl = `${BASE_URL}${profilePath}`;
 
   const handleCopyUrl = async () => {
     try {

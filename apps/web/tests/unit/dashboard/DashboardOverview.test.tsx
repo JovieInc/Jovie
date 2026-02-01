@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
-import { PROFILE_URL } from '@/constants/domains';
+import { BASE_URL } from '@/constants/domains';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -146,9 +146,9 @@ describe('DashboardOverview', () => {
     });
     fireEvent.click(copyBtn);
 
-    // Clipboard called with computed profile URL using PROFILE_URL
+    // Clipboard called with computed profile URL using BASE_URL
     expect(writeText).toHaveBeenCalledTimes(1);
-    expect(writeText.mock.calls[0][0]).toBe(`${PROFILE_URL}/artist1`);
+    expect(writeText.mock.calls[0][0]).toBe(`${BASE_URL}/artist1`);
 
     // Wait for the copy success state to appear
     await waitFor(() => {
