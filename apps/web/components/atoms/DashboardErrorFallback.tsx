@@ -26,8 +26,8 @@ export function DashboardErrorFallback({
       `Error ID: ${errorDigest || 'unknown'}`,
       `Time: ${timestamp.toISOString()}`,
       `Context: Dashboard`,
-      `URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`,
-      `User Agent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'}`,
+      `URL: ${globalThis.location?.href ?? 'N/A'}`,
+      `User Agent: ${globalThis.navigator?.userAgent ?? 'N/A'}`,
     ].join('\n');
 
     navigator.clipboard

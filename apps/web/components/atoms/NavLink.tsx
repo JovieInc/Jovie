@@ -43,15 +43,10 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
     let isExternal = external;
     if (isExternal === undefined) {
       try {
-        const url = new URL(
-          href,
-          typeof window !== 'undefined'
-            ? globalThis.location.href
-            : 'http://localhost'
-        );
-        isExternal =
-          typeof window !== 'undefined' &&
-          url.origin !== globalThis.location.origin;
+        const currentHref = globalThis.location?.href ?? 'http://localhost';
+        const url = new URL(href, currentHref);
+        const currentOrigin = globalThis.location?.origin;
+        isExternal = currentOrigin !== undefined && url.origin !== currentOrigin;
       } catch {
         // If URL parsing fails (e.g., relative path), it's not external
         isExternal = false;

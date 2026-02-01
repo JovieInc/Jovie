@@ -41,7 +41,7 @@ export function CookieBannerSection({
   }, [showBanner]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !globalThis.JVConsent) {
+    if (globalThis.window && !globalThis.JVConsent) {
       const listeners = new Set<(v: unknown) => void>();
       globalThis.JVConsent = {
         onChange(cb: (v: unknown) => void) {

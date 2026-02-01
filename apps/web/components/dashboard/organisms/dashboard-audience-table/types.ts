@@ -1,7 +1,6 @@
-import type { AudienceMode } from '@/components/dashboard/audience/table/types';
 import type { AudienceMember } from '@/types';
 
-export type { AudienceMode };
+export type { AudienceMode } from '@/components/dashboard/audience/table/types';
 
 export type AudienceRow = AudienceMember;
 
