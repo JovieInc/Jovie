@@ -233,9 +233,6 @@ export default function PricingPage() {
                   <span className='text-xs font-medium uppercase tracking-wide text-primary-token'>
                     Pro
                   </span>
-                  <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900'>
-                    Most Popular
-                  </span>
                 </div>
                 <p className='text-sm text-secondary-token mb-4'>
                   Your identity. Your data.

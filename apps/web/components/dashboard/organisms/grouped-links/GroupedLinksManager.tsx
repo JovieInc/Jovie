@@ -267,7 +267,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       {/* Scrollable links area */}
       <section
         ref={scrollContainerRef}
-        className='flex-1 overflow-y-auto px-4 py-6'
+        className='flex-1 overflow-y-auto px-4 py-4 sm:py-6'
         aria-label='Links list'
       >
         <div className='mx-auto max-w-2xl'>
@@ -294,8 +294,14 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         </div>
       </section>
 
-      {/* Input at bottom */}
-      <div className='border-t border-subtle bg-base px-4 py-4'>
+      {/* Sticky input at bottom with safe area */}
+      <div
+        className={cn(
+          'sticky bottom-0 z-10 border-t border-subtle',
+          'bg-bg-base/95 backdrop-blur-lg supports-backdrop-filter:bg-bg-base/80',
+          'px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3'
+        )}
+      >
         <div className='mx-auto max-w-2xl space-y-3'>{inputSection}</div>
       </div>
     </section>

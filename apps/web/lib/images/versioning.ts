@@ -109,13 +109,18 @@ export function generateVersionedSrcSet(
 /**
  * Transform image URLs with optimization parameters
  */
+/**
+ * Supported image formats for transformation
+ */
+export type ImageFormat = 'webp' | 'avif' | 'auto';
+
 export function transformImageUrl(
   url: string,
   options: {
     width?: number;
     height?: number;
     quality?: number;
-    format?: 'webp' | 'avif' | 'auto';
+    format?: ImageFormat;
     crop?: 'fill' | 'fit' | 'thumb';
     gravity?: 'auto' | 'face' | 'center';
   } = {}

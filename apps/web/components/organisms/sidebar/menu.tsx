@@ -35,18 +35,44 @@ export const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-1.5 py-[5px] text-left text-[13px] font-medium leading-[19px] tracking-tight outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-white data-[active=true]:text-white hover:bg-white/5 data-[active=true]:bg-white/10 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-white/6 active:duration-50 active:ease-out group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden [&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:h-4 [&>[data-sidebar-icon]]:w-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 data-[active=true]:[&>svg]:text-white',
+  [
+    // Base layout and typography
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-lg px-2.5 py-2 text-left text-[13px] font-medium leading-tight tracking-tight outline-none',
+    // Transitions
+    'transition-all duration-150 ease-out active:duration-50',
+    // Default text color - uses semantic tokens for light/dark mode
+    'text-secondary-token',
+    // Hover state - theme-aware
+    'hover:text-primary-token hover:bg-sidebar-accent',
+    // Active state - theme-aware with accent
+    'data-[active=true]:text-primary-token data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold',
+    // Focus state
+    'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar-background',
+    // Disabled state
+    'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
+    // Menu action spacing
+    'group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14',
+    // Collapsed icon mode
+    'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center',
+    // Text truncation in collapsed mode
+    '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150',
+    'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
+    // Icon styling
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-tertiary-token [&>svg]:transition-colors [&>svg]:duration-150',
+    'hover:[&>svg]:text-secondary-token data-[active=true]:[&>svg]:text-primary-token',
+  ].join(' '),
   {
     variants: {
       variant: {
-        default: 'hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent',
+        default: '',
         outline:
-          'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
+          'bg-sidebar-background shadow-[0_0_0_1px_rgb(var(--sidebar-border))] hover:shadow-[0_0_0_1px_rgb(var(--sidebar-accent))]',
       },
       size: {
-        default: 'h-8',
-        sm: 'h-7 text-xs',
-        lg: 'h-9 group-data-[collapsible=icon]:!size-9',
+        default: 'min-h-[40px]',
+        sm: 'min-h-[32px] text-xs',
+        lg: 'min-h-[44px] group-data-[collapsible=icon]:!size-9',
       },
     },
     defaultVariants: {
@@ -158,10 +184,13 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar='menu-action'
       className={cn(
-        'relative flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-muted/60 outline-none ring-sidebar-ring transition-colors duration-150 ease-out hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:text-sidebar-foreground [&>svg]:size-3.5 [&>svg]:shrink-0',
+        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-tertiary-token outline-none transition-colors duration-150 ease-out',
+        'hover:text-primary-token hover:bg-sidebar-accent',
+        'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:text-primary-token',
+        '[&>svg]:size-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
-        'peer-data-[active=true]/menu-button:text-sidebar-accent-foreground',
+        'peer-data-[active=true]/menu-button:text-secondary-token',
         className
       )}
       {...props}
@@ -178,11 +207,11 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-[11px] font-medium tabular-nums text-sidebar-muted select-none pointer-events-none',
-      'peer-hover/menu-button:text-white peer-data-[active=true]/menu-button:text-white',
-      'peer-data-[size=sm]/menu-button:text-xs',
-      'peer-data-[size=default]/menu-button:text-xs',
-      'peer-data-[size=lg]/menu-button:text-sm',
+      'absolute right-2 flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-[11px] font-medium tabular-nums text-tertiary-token select-none pointer-events-none',
+      'peer-hover/menu-button:text-secondary-token peer-data-[active=true]/menu-button:text-secondary-token',
+      'peer-data-[size=sm]/menu-button:text-[10px]',
+      'peer-data-[size=default]/menu-button:text-[11px]',
+      'peer-data-[size=lg]/menu-button:text-xs',
       'group-data-[collapsible=icon]:hidden',
       className
     )}
@@ -273,9 +302,15 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-[13px] text-sidebar-muted outline-none ring-sidebar-ring transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors',
-        'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground hover:[&>svg]:text-sidebar-foreground',
-        size === 'sm' && 'text-xs h-6',
+        'flex min-h-[32px] min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-2.5 text-[13px] text-secondary-token outline-none transition-colors duration-150',
+        'hover:bg-sidebar-accent hover:text-primary-token',
+        'focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+        'active:bg-sidebar-accent active:text-primary-token',
+        'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
+        '[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-tertiary-token [&>svg]:transition-colors',
+        'data-[active=true]:bg-sidebar-accent data-[active=true]:text-primary-token data-[active=true]:font-medium',
+        'data-[active=true]:[&>svg]:text-secondary-token hover:[&>svg]:text-secondary-token',
+        size === 'sm' && 'text-xs min-h-[28px]',
         'group-data-[collapsible=icon]:hidden',
         className
       )}
