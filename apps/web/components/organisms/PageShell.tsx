@@ -51,7 +51,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        'bg-surface-1 shadow-sm h-full overflow-hidden flex flex-col',
+        'bg-surface-1 shadow-sm h-full overflow-hidden overflow-x-hidden flex flex-col',
         className
       )}
     >
@@ -107,20 +107,20 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'h-14 shrink-0 border-b border-subtle px-4 sm:px-6',
-        'flex items-center justify-between gap-4',
+        'min-h-[56px] shrink-0 border-b border-subtle px-4 sm:px-6',
+        'flex items-center justify-between gap-3 sm:gap-4',
         className
       )}
     >
-      <div className='flex items-center gap-3 min-w-0'>
+      <div className='flex items-center gap-2 sm:gap-3 min-w-0'>
         {mobileSidebarTrigger}
         {breadcrumbs}
-        <div className='min-w-0'>
-          <h1 className='text-sm font-semibold text-primary-token truncate'>
+        <div className='min-w-0 flex-1'>
+          <h1 className='text-[15px] sm:text-sm font-semibold text-primary-token truncate'>
             {title}
           </h1>
           {description && (
-            <p className='text-xs text-secondary-token truncate'>
+            <p className='text-xs text-secondary-token truncate hidden sm:block'>
               {description}
             </p>
           )}
@@ -169,8 +169,8 @@ export function PageContent({
   return (
     <div
       className={cn(
-        'flex-1 min-h-0 overflow-auto',
-        !noPadding && 'p-6',
+        'flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden',
+        !noPadding && 'p-4 sm:p-6',
         className
       )}
     >
