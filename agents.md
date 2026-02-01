@@ -222,10 +222,10 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - `window` fails in SSR/Node, `global` fails in browser
 - Note: `globalThis.location` is still `undefined` in Node.js SSR - SSR guards are required
 
-| Wrong | Correct |
-|-------|---------|
+| Wrong                        | Correct                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
 | `window.location` (no guard) | `typeof window !== 'undefined' ? window.location : undefined` |
-| `global.fetch` | `globalThis.fetch` |
+| `global.fetch`               | `globalThis.fetch`                                            |
 
 ### React/Next.js
 
@@ -238,10 +238,10 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - Inline components are recreated every render, breaking React reconciliation and causing performance issues
 - Extract all components to module scope or separate files
 
-| Wrong | Correct |
-|-------|---------|
+| Wrong                                          | Correct                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------- |
 | `const columns = [{ cell: () => <Button /> }]` | Extract: `const ActionCell = () => <Button />` then use `cell: ActionCell` |
-| `{items.map(i => { const Item = () => ... })}` | Define `Item` outside the parent component |
+| `{items.map(i => { const Item = () => ... })}`  | Define `Item` outside the parent component                                 |
 
 **Route Constants:**
 - **NEVER** hardcode route paths like `/app/dashboard/audience`
@@ -292,13 +292,13 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 - If you need true ACID transactions, document the requirement and discuss alternatives
 
 **Forbidden Database Patterns:**
-| Forbidden | Why | Alternative |
-|-----------|-----|-------------|
-| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible | Sequential operations or batch insert |
-| `import { Pool } from 'pg'` | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'` |
-| `import pg from 'pg'` | Direct postgres driver | Use `import { db } from '@/lib/db'` |
-| `new Pool()` or `pool.connect()` | Manual connection management | Use `import { db } from '@/lib/db'` |
-| Loop with individual `db.insert()` | O(N) database operations | `db.insert().values([...items])` batch |
+| Forbidden                          | Why                               | Alternative                            |
+| ---------------------------------- | --------------------------------- | -------------------------------------- |
+| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
+| `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
+| `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
+| Loop with individual `db.insert()` | O(N) database operations          | `db.insert().values([...items])` batch |
 
 ### Data Serialization (Server → Client Boundaries)
 
@@ -307,13 +307,14 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 - Returning from Server Actions / API routes
 - Passing from RSC to Client Components
 
-| Wrong | Correct |
-|-------|---------|
-| `return { createdAt: user.createdAt }` | `return { createdAt: user.createdAt?.toISOString() }` |
-| `redis.set(key, JSON.stringify(data))` with Date fields | Convert dates first with `toISOStringOrNull()` helper |
-| Drizzle query result directly to client | Map dates: `{ ...row, date: row.date?.toISOString() }` |
+| Wrong                                                   | Correct                                                |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| `return { createdAt: user.createdAt }`                  | `return { createdAt: user.createdAt?.toISOString() }`  |
+| `redis.set(key, JSON.stringify(data))` with Date fields | Convert dates first with `toISOStringOrNull()` helper  |
+| Drizzle query result directly to client                 | Map dates: `{ ...row, date: row.date?.toISOString() }` |
 
 **Helper pattern:**
+
 ```typescript
 const toISOStringOrNull = (date: Date | null | undefined) =>
   date?.toISOString() ?? null;
@@ -377,7 +378,9 @@ Use presets from `lib/queries/cache.ts` for consistency:
 - `DYNAMIC_CACHE` - for frequently updated data (notifications, real-time feeds)
 
 **Disable Aggressive Refetch:**
+
 For stable data, disable automatic refetching:
+
 ```typescript
 useQuery({
   ...options,

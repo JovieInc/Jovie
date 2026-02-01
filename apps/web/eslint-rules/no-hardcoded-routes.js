@@ -11,13 +11,14 @@
  */
 
 // Patterns that indicate hardcoded app routes
+// Uses (?:\/|$) to match both base routes and nested routes
 const HARDCODED_ROUTE_PATTERNS = [
-  /^\/app\/dashboard\//,
-  /^\/app\/settings\//,
-  /^\/app\/admin\//,
-  /^\/dashboard\//,
-  /^\/settings\//,
-  /^\/admin\//,
+  /^\/app\/dashboard(?:\/|$)/,
+  /^\/app\/settings(?:\/|$)/,
+  /^\/app\/admin(?:\/|$)/,
+  /^\/dashboard(?:\/|$)/,
+  /^\/settings(?:\/|$)/,
+  /^\/admin(?:\/|$)/,
 ];
 
 // Files where hardcoded routes are allowed (route definitions, tests, middleware)

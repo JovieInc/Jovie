@@ -57,14 +57,19 @@ module.exports = {
         let hasCacheConfig = false;
 
         for (const prop of optionsArg.properties) {
-          // Check for direct cache properties
-          if (
-            prop.type === 'Property' &&
-            prop.key.type === 'Identifier' &&
-            CACHE_CONFIG_PROPERTIES.has(prop.key.name)
-          ) {
-            hasCacheConfig = true;
-            break;
+          // Check for direct cache properties (supports both Identifier and Literal keys)
+          if (prop.type === 'Property') {
+            const keyName =
+              prop.key.type === 'Identifier'
+                ? prop.key.name
+                : prop.key.type === 'Literal' &&
+                    typeof prop.key.value === 'string'
+                  ? prop.key.value
+                  : null;
+            if (keyName && CACHE_CONFIG_PROPERTIES.has(keyName)) {
+              hasCacheConfig = true;
+              break;
+            }
           }
 
           // Check for spread operators that might contain cache config

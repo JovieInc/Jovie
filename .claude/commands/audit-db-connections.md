@@ -43,7 +43,9 @@ grep -rn "from ['\"]@neondatabase" apps/web --include="*.ts" --include="*.tsx" |
 All checks should return "✅ None found". If violations are found:
 
 ### For db.transaction()
+
 Replace with sequential operations or batch inserts:
+
 ```typescript
 // ❌ Wrong
 await db.transaction(async (tx) => {
@@ -60,7 +62,9 @@ await db.insert(profiles).values(profile);
 ```
 
 ### For manual pooling
+
 Replace with the canonical db import:
+
 ```typescript
 // ❌ Wrong
 import { Pool } from 'pg';
@@ -71,7 +75,9 @@ import { db } from '@/lib/db';
 ```
 
 ### For legacy client
+
 Update to use the main db export:
+
 ```typescript
 // ❌ Wrong
 import { db } from '@/lib/db/client';

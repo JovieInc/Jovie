@@ -34,8 +34,8 @@ if grep -qE "\b(db|tx)\.transaction\(" "$FILE" 2>/dev/null; then
   ERRORS+=("db.transaction() detected - Neon HTTP driver doesn't support transactions. Use batch operations: db.insert().values([...items])")
 fi
 
-# Check for manual pooling imports
-if grep -qE "from ['\"]pg['\"]|from ['\"]pg-pool['\"]" "$FILE" 2>/dev/null; then
+# Check for manual pooling imports (ESM and CommonJS)
+if grep -qE "from ['\"]pg['\"]|from ['\"]pg-pool['\"]|require\(['\"]pg['\"]\)|require\(['\"]pg-pool['\"]\)" "$FILE" 2>/dev/null; then
   ERRORS+=("Manual database pooling import detected (pg/pg-pool). Use: import { db } from '@/lib/db'")
 fi
 
