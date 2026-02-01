@@ -38,35 +38,18 @@ module.exports = plugin(function ({ addUtilities, matchUtilities, theme }) {
   });
 
   // Spacing variants (pt-4-safe, etc.) using matchUtilities
-  matchUtilities(
-    {
-      'pt-safe': value => ({
-        paddingTop: `calc(env(safe-area-inset-top) + ${value})`,
-      }),
-      'pr-safe': value => ({
-        paddingRight: `calc(env(safe-area-inset-right) + ${value})`,
-      }),
-      'pb-safe': value => ({
-        paddingBottom: `calc(env(safe-area-inset-bottom) + ${value})`,
-      }),
-      'pl-safe': value => ({
-        paddingLeft: `calc(env(safe-area-inset-left) + ${value})`,
-      }),
-      'top-safe': value => ({
-        top: `calc(env(safe-area-inset-top) + ${value})`,
-      }),
-      'right-safe': value => ({
-        right: `calc(env(safe-area-inset-right) + ${value})`,
-      }),
-      'bottom-safe': value => ({
-        bottom: `calc(env(safe-area-inset-bottom) + ${value})`,
-      }),
-      'left-safe': value => ({
-        left: `calc(env(safe-area-inset-left) + ${value})`,
-      }),
+  // Generate from safeAreaMappings to reduce duplication
+  const spacingVariants = Object.entries(safeAreaMappings).reduce(
+    (acc, [key, { property, inset }]) => {
+      acc[`${key}-safe`] = value => ({
+        [property]: `calc(env(safe-area-inset-${inset}) + ${value})`,
+      });
+      return acc;
     },
-    { values: theme('spacing') }
+    {}
   );
+
+  matchUtilities(spacingVariants, { values: theme('spacing') });
 
   // ============================================
   // SCROLLBAR HIDING (cross-browser)
