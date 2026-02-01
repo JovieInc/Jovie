@@ -360,7 +360,7 @@ function DashboardLayoutWrapper({
                     'flex-1 min-h-0',
                     contentPadding,
                     showMobileTabs
-                      ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                      ? 'pb-[calc(env(safe-area-inset-bottom)+4.5rem)] lg:pb-0'
                       : undefined
                   )}
                 >
