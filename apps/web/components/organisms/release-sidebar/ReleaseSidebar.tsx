@@ -107,17 +107,18 @@ export function ReleaseSidebar({
       className: CONTEXT_MENU_ITEM_CLASS,
     });
 
-    items.push({ type: 'separator', id: 'sep-1', className: '-mx-0.5 my-1' });
-
-    items.push({
-      type: 'action',
-      id: 'delete',
-      label: 'Delete release',
-      icon: <Trash2 className='h-4 w-4' />,
-      onClick: () => toast.info('Delete not implemented'),
-      variant: 'destructive',
-      className: CONTEXT_MENU_ITEM_CLASS,
-    });
+    items.push(
+      { type: 'separator', id: 'sep-1', className: '-mx-0.5 my-1' },
+      {
+        type: 'action',
+        id: 'delete',
+        label: 'Delete release',
+        icon: <Trash2 className='h-4 w-4' />,
+        onClick: () => toast.info('Delete not implemented'),
+        variant: 'destructive',
+        className: CONTEXT_MENU_ITEM_CLASS,
+      }
+    );
 
     return items;
   }, [release, handleCopySmartLink, onRefresh]);
