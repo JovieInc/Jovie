@@ -1,7 +1,9 @@
 'use client';
 
-import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, Copy, RefreshCcw } from 'lucide-react';
+import { useState } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
+import { toast } from 'sonner';
 
 /**
  * Error fallback UI specifically for table components.
@@ -13,6 +15,29 @@ export function TableErrorFallback({
   error,
   resetErrorBoundary,
 }: FallbackProps) {
+  const [timestamp] = useState(() => new Date());
+
+  const errorDigest = (error as Error & { digest?: string })?.digest;
+
+  const handleCopyErrorDetails = () => {
+    const details = [
+      `Error ID: ${errorDigest || 'unknown'}`,
+      `Time: ${timestamp.toISOString()}`,
+      `Context: Table`,
+      `URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`,
+      `User Agent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'}`,
+    ].join('\n');
+
+    navigator.clipboard
+      .writeText(details)
+      .then(() => {
+        toast.success('Error details copied to clipboard');
+      })
+      .catch(() => {
+        toast.error('Failed to copy error details');
+      });
+  };
+
   return (
     <div
       role='alert'
@@ -46,6 +71,36 @@ export function TableErrorFallback({
           <RefreshCcw className='h-4 w-4' aria-hidden='true' />
           Reload table
         </button>
+
+        <div className='mt-4 w-full space-y-1.5'>
+          {errorDigest && (
+            <p className='text-xs text-muted-foreground text-center'>
+              Error ID: {errorDigest}
+            </p>
+          )}
+
+          <button
+            type='button'
+            onClick={handleCopyErrorDetails}
+            className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors'
+            aria-label='Copy error details to clipboard'
+          >
+            <Copy className='h-3 w-3' aria-hidden='true' />
+            Copy Details
+          </button>
+        </div>
+
+        {process.env.NODE_ENV === 'development' && error?.message && (
+          <details className='mt-4 rounded-md bg-secondary/30 p-3 w-full max-w-md'>
+            <summary className='cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground'>
+              Developer Info (dev only)
+            </summary>
+            <pre className='mt-2 overflow-auto text-xs text-muted-foreground whitespace-pre-wrap break-words'>
+              {error.message}
+              {error.stack && `\n\n${error.stack}`}
+            </pre>
+          </details>
+        )}
       </div>
     </div>
   );

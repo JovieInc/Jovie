@@ -1,5 +1,9 @@
-import { AlertTriangle, X } from 'lucide-react';
+'use client';
+
+import { AlertTriangle, Copy, X } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export interface ErrorBannerAction {
@@ -16,6 +20,8 @@ export interface ErrorBannerProps {
   readonly testId?: string;
   /** Optional callback to dismiss the banner. When provided, renders a close button. */
   readonly onDismiss?: () => void;
+  /** Optional error object with digest */
+  readonly error?: Error & { digest?: string };
 }
 
 export function ErrorBanner({
@@ -25,7 +31,30 @@ export function ErrorBanner({
   className,
   testId,
   onDismiss,
+  error,
 }: ErrorBannerProps) {
+  const [timestamp] = useState(() => new Date());
+  const [showDetails, setShowDetails] = useState(false);
+
+  const handleCopyErrorDetails = () => {
+    const details = [
+      `Error ID: ${error?.digest || 'unknown'}`,
+      `Time: ${timestamp.toISOString()}`,
+      `Title: ${title}`,
+      ...(description ? [`Description: ${description}`] : []),
+      `URL: ${typeof window !== 'undefined' ? window.location.href : 'N/A'}`,
+      `User Agent: ${typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A'}`,
+    ].join('\n');
+
+    navigator.clipboard
+      .writeText(details)
+      .then(() => {
+        toast.success('Error details copied to clipboard');
+      })
+      .catch(() => {
+        toast.error('Failed to copy error details');
+      });
+  };
   const actionClass =
     'inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150b0b] dark:focus-visible:ring-offset-[#0d0a0a]';
 
@@ -109,6 +138,51 @@ export function ErrorBanner({
               {actions.map((action, index) => renderAction(action, index))}
             </div>
           ) : null}
+
+          <div className='mt-3'>
+            <button
+              type='button'
+              onClick={() => setShowDetails(!showDetails)}
+              className='text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
+            >
+              {showDetails ? 'Hide' : 'Show'} error details
+            </button>
+
+            {showDetails && (
+              <div className='mt-2 pt-2 border-t border-red-500/20 dark:border-red-900/40 space-y-1.5'>
+                {error?.digest && (
+                  <p className='text-xs text-red-100/80 dark:text-red-200/70'>
+                    Error ID: {error.digest}
+                  </p>
+                )}
+                <p className='text-xs text-red-100/80 dark:text-red-200/70'>
+                  Time: {timestamp.toLocaleString()}
+                </p>
+
+                <button
+                  type='button'
+                  onClick={handleCopyErrorDetails}
+                  className='inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-red-100 hover:text-white hover:bg-red-500/20 transition-colors dark:text-red-200 dark:hover:text-red-50'
+                  aria-label='Copy error details to clipboard'
+                >
+                  <Copy className='h-3 w-3' aria-hidden='true' />
+                  Copy Error Details
+                </button>
+
+                {process.env.NODE_ENV === 'development' && error?.message && (
+                  <details className='mt-2 rounded-md bg-red-900/30 dark:bg-red-950/50 p-2'>
+                    <summary className='cursor-pointer text-xs font-medium text-red-100/90 dark:text-red-200/80 hover:text-red-50'>
+                      Developer Info (dev only)
+                    </summary>
+                    <pre className='mt-2 overflow-auto text-xs text-red-100/80 dark:text-red-200/70 whitespace-pre-wrap break-words'>
+                      {error.message}
+                      {error.stack && `\n\n${error.stack}`}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {onDismiss ? (
