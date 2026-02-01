@@ -86,6 +86,7 @@
         "noDangerouslySetInnerHtml": "warn"
       },
       "style": {
+        "useConst": "error",
         "noRestrictedGlobals": {
           "level": "warn",
           "options": {

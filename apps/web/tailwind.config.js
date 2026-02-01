@@ -25,7 +25,92 @@ module.exports = {
   ],
   darkMode: 'class',
   theme: {
-    extend: {},
+    extend: {
+      // Tier 1: Design token colors - auto-generates text-*, bg-*, border-* utilities
+      colors: {
+        // Primary text tokens
+        'primary-token': 'var(--color-text-primary-token)',
+        'secondary-token': 'var(--color-text-secondary-token)',
+        'tertiary-token': 'var(--color-text-tertiary-token)',
+        'quaternary-token': 'var(--color-text-quaternary-token)',
+
+        // Accent colors
+        accent: 'var(--color-accent)',
+        'accent-hover': 'var(--color-accent-hover)',
+        'accent-active': 'var(--color-accent-active)',
+        'accent-subtle': 'var(--color-accent-subtle)',
+
+        // Semantic status colors
+        destructive: 'var(--color-error)',
+        error: 'var(--color-error)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        info: 'var(--color-info)',
+
+        // Surface backgrounds (generates bg-surface-0, bg-surface-1, etc.)
+        surface: {
+          0: 'var(--color-bg-surface-0)',
+          1: 'var(--color-bg-surface-1)',
+          2: 'var(--color-bg-surface-2)',
+          3: 'var(--color-bg-surface-3)',
+        },
+
+        // Base colors
+        base: 'var(--color-bg-base)',
+
+        // Button colors
+        'btn-primary': 'var(--color-btn-primary-bg)',
+        'btn-primary-foreground': 'var(--color-btn-primary-fg)',
+        'btn-secondary': 'var(--color-btn-secondary-bg)',
+        'btn-secondary-foreground': 'var(--color-btn-secondary-fg)',
+
+        // Brand colors
+        'brand-spotify': 'var(--color-brand-spotify)',
+        'brand-spotify-hover': 'var(--color-brand-spotify-hover)',
+        'brand-spotify-subtle': 'var(--color-brand-spotify-subtle)',
+        'brand-apple': 'var(--color-brand-apple)',
+        'brand-apple-hover': 'var(--color-brand-apple-hover)',
+        'brand-apple-subtle': 'var(--color-brand-apple-subtle)',
+        'brand-youtube': 'var(--color-brand-youtube)',
+        'brand-youtube-hover': 'var(--color-brand-youtube-hover)',
+        'brand-youtube-subtle': 'var(--color-brand-youtube-subtle)',
+
+        // Additional text utilities
+        'muted-secondary': 'var(--color-text-muted-secondary)',
+      },
+
+      // Border colors with better naming (avoids border-border-subtle)
+      borderColor: {
+        subtle: 'var(--color-border-subtle)',
+        default: 'var(--color-border-default)',
+        strong: 'var(--color-border-strong)',
+        accent: 'var(--color-accent)',
+        success: 'var(--color-success)',
+        error: 'var(--color-error)',
+        warning: 'var(--color-warning)',
+        info: 'var(--color-info)',
+      },
+
+      // Background colors for semantic states
+      backgroundColor: {
+        'success-subtle': 'var(--color-success-subtle)',
+        'error-subtle': 'var(--color-error-subtle)',
+        'warning-subtle': 'var(--color-warning-subtle)',
+        'info-subtle': 'var(--color-info-subtle)',
+        'interactive-hover': 'var(--color-interactive-hover)',
+        'interactive-active': 'var(--color-interactive-active)',
+        'cell-hover': 'var(--color-cell-hover)',
+      },
+
+      // Ring colors (for focus rings)
+      ringColor: {
+        accent: 'var(--color-accent)',
+        success: 'var(--color-success)',
+        error: 'var(--color-error)',
+        warning: 'var(--color-warning)',
+        info: 'var(--color-info)',
+      },
+    },
   },
-  plugins: [],
+  plugins: [require('./lib/tailwind/utilities-plugin.js')],
 };

@@ -116,115 +116,52 @@ body {
   --color-muted-secondary: var(--color-text-muted-secondary);
 }
 
-/* Safe area inset utilities for iOS device support */
-/* Padding utilities that add safe area insets */
-@utility pt-safe {
-  padding-top: var(--safe-area-inset-top);
+/* ============================================
+   SAFE AREA UTILITIES - MIGRATED TO PLUGIN
+   ============================================
+   These utilities are now in lib/tailwind/utilities-plugin.js
+   Commented out to prevent conflicts with Tailwind v4
+
+@utility pt-safe, pr-safe, pb-safe, pl-safe - Base safe area padding
+@utility top-safe, right-safe, bottom-safe, left-safe - Safe area positioning
+@utility pt-4-safe, pb-4-safe, etc. - Safe area + spacing variants
+*/
+
+/* ============================================
+   TYPOGRAPHY & PATTERN UTILITIES
+   ============================================ */
+
+/* Typography utilities - component-like, moved to @layer components */
+@layer components {
+  .dashboard-heading {
+    font-weight: 590;
+    letter-spacing: -0.025em;
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  .dashboard-label {
+    font-size: 0.6875rem; /* 11px */
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .dashboard-body {
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    letter-spacing: -0.011em;
+  }
 }
 
-@utility pr-safe {
-  padding-right: var(--safe-area-inset-right);
-}
-
-@utility pb-safe {
-  padding-bottom: var(--safe-area-inset-bottom);
-}
-
-@utility pl-safe {
-  padding-left: var(--safe-area-inset-left);
-}
-
-/* Position utilities that add safe area insets to positioning */
-@utility top-safe {
-  top: var(--safe-area-inset-top);
-}
-
-@utility right-safe {
-  right: var(--safe-area-inset-right);
-}
-
-@utility bottom-safe {
-  bottom: var(--safe-area-inset-bottom);
-}
-
-@utility left-safe {
-  left: var(--safe-area-inset-left);
-}
-
-/* Combined safe area utilities with minimum spacing (base spacing + safe area inset) */
-/* These ensure minimum spacing on devices without safe areas while adding safe area insets on iOS */
-@utility pb-4-safe {
-  padding-bottom: calc(1rem + var(--safe-area-inset-bottom));
-}
-
-@utility pr-4-safe {
-  padding-right: calc(1rem + var(--safe-area-inset-right));
-}
-
-@utility pt-4-safe {
-  padding-top: calc(1rem + var(--safe-area-inset-top));
-}
-
-@utility pl-4-safe {
-  padding-left: calc(1rem + var(--safe-area-inset-left));
-}
-
-@utility bottom-4-safe {
-  bottom: calc(1rem + var(--safe-area-inset-bottom));
-}
-
-@utility right-4-safe {
-  right: calc(1rem + var(--safe-area-inset-right));
-}
-
-@utility top-4-safe {
-  top: calc(1rem + var(--safe-area-inset-top));
-}
-
-@utility left-4-safe {
-  left: calc(1rem + var(--safe-area-inset-left));
-}
-
-/* Linear Typography Utilities - for dashboard-specific typography needs */
-@utility dashboard-heading {
-  font-weight: 590;
-  letter-spacing: -0.025em;
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-}
-
-@utility dashboard-label {
-  font-size: 0.6875rem; /* 11px */
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-@utility dashboard-body {
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  letter-spacing: -0.011em;
-}
-
-@utility grid-bg {
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-  background-size: 50px 50px;
-}
-
-@utility grid-bg-dark {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 50px 50px;
-}
+/* Grid backgrounds - MIGRATED TO PLUGIN
+   Now in lib/tailwind/utilities-plugin.js */
 
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
@@ -244,221 +181,217 @@ body {
   }
 }
 
-/* Standard focus ring utility for all interactive elements */
-@utility focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
-}
+/* ============================================
+   BUTTON & FOCUS UTILITIES - MOVED TO COMPONENTS
+   ============================================ */
 
-/* Standard focus ring utility with transparent offset (for elements with white backgrounds) */
-@utility focus-ring-transparent-offset {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
-}
+@layer components {
+  /* Focus ring utilities */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+  }
 
-@utility btn {
-  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none;
-}
+  .focus-ring-transparent-offset {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
+  }
 
-@utility btn-primary {
-  background-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-fg);
-}
+  /* Button component styles */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+  }
 
-@utility bg-btn-primary {
-  background-color: var(--color-btn-primary-bg);
-}
+  .btn-primary {
+    background-color: var(--color-btn-primary-bg);
+    color: var(--color-btn-primary-fg);
+  }
 
-@utility text-btn-primary-foreground {
-  color: var(--color-btn-primary-fg);
-}
+  .btn-secondary {
+    background-color: var(--color-bg-surface-2);
+    color: var(--color-text-primary-token);
+  }
 
-@utility btn-secondary {
-  @apply bg-surface-2 text-primary-token hover:bg-surface-3;
-}
+  .btn-secondary:hover {
+    background-color: var(--color-bg-surface-3);
+  }
 
-@utility btn-ghost {
-  @apply hover:bg-surface-2;
-}
+  .btn-ghost:hover {
+    background-color: var(--color-bg-surface-2);
+  }
 
-@utility btn-sm {
-  @apply h-8 px-3 text-xs;
-}
+  .btn-sm {
+    @apply h-8 px-3 text-xs;
+  }
 
-@utility btn-md {
-  @apply h-10 px-4 py-2;
-}
+  .btn-md {
+    @apply h-10 px-4 py-2;
+  }
 
-@utility btn-lg {
-  @apply h-12 px-8 text-base;
-}
-
-@utility text-accent {
-  color: var(--color-accent);
-}
-
-/* Menu/Dropdown utilities */
-@utility menu-background {
-  background-color: rgb(var(--menu-background));
-}
-
-@utility menu-border {
-  border-color: rgb(var(--menu-border));
-}
-
-@utility menu-shadow {
-  box-shadow:
-    0 10px 15px -3px rgb(var(--menu-shadow)),
-    0 4px 6px -2px rgb(var(--menu-shadow));
-}
-
-@utility menu-item-hover {
-  background-color: rgb(var(--menu-item-hover));
-}
-
-@utility menu-separator {
-  border-color: rgb(var(--menu-separator));
-}
-
-/* Enhanced surface utilities */
-@utility bg-surface-0 {
-  background-color: var(--color-bg-surface-0);
-}
-
-@utility bg-surface-1 {
-  background-color: var(--color-bg-surface-1);
-}
-
-@utility bg-surface-2 {
-  background-color: var(--color-bg-surface-2);
-}
-
-@utility bg-surface-3 {
-  background-color: var(--color-bg-surface-3);
-}
-
-/* Legacy surface utilities (map to new system) */
-@utility surface {
-  background-color: var(--color-bg-surface-1);
-}
-
-@utility surface-hover {
-  background-color: var(--color-bg-surface-2);
-}
-
-@utility surface-pressed {
-  background-color: var(--color-bg-surface-3);
-}
-
-/* Text utilities */
-@utility text-primary {
-  color: var(--color-text-primary-token);
-}
-
-@utility text-secondary {
-  color: var(--color-text-secondary-token);
-}
-
-@utility text-tertiary {
-  color: var(--color-text-tertiary-token);
-}
-
-/* Dashboard token utilities for consistency */
-@utility text-primary-token {
-  color: var(--color-text-primary-token);
-}
-
-@utility text-secondary-token {
-  color: var(--color-text-secondary-token);
-}
-
-@utility text-tertiary-token {
-  color: var(--color-text-tertiary-token);
-}
-
-@utility heading-linear {
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  font-variation-settings: "opsz" 28;
-  letter-spacing: -0.0325em;
-  font-weight: 538;
-  line-height: 1.1;
-  text-wrap: balance;
-}
-
-@utility text-linear {
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  font-variation-settings: "opsz" 28;
-  letter-spacing: -0.011em;
-  line-height: 1.6;
-}
-
-@utility marketing-h1-linear {
-  font-size: clamp(2.5rem, 5vw + 1rem, 5rem); /* 40px → 80px */
-  font-weight: 538; /* Linear's exact weight */
-  letter-spacing: -0.0325em;
-  line-height: 1.1;
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  font-variation-settings: "opsz" 28; /* Optical sizing */
-  text-wrap: balance;
-}
-
-@utility marketing-h2-linear {
-  font-size: clamp(2rem, 3vw + 1rem, 3.5rem); /* 32px → 56px */
-  font-weight: 538;
-  letter-spacing: -0.028em;
-  line-height: 1.2;
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  font-variation-settings: "opsz" 28;
-  text-wrap: balance;
-}
-
-@utility marketing-lead-linear {
-  font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem); /* 16px → 20px */
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  font-variation-settings: "opsz" 28;
-  letter-spacing: -0.011em;
-  line-height: 1.6;
-}
-
-@utility marketing-body {
-  @apply text-linear text-base sm:text-lg;
-}
-
-@utility marketing-card {
-  @apply relative p-6 rounded-2xl border border-subtle transition-colors;
-}
-
-@utility marketing-cta {
-  @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
-}
-
-/* Hide scrollbar utility - for premium horizontal scroll sections */
-@utility scrollbar-hide {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-
-  &::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+  .btn-lg {
+    @apply h-12 px-8 text-base;
   }
 }
+
+/* bg-btn-primary and text-btn-primary-foreground now available via theme.extend.colors
+   text-accent now available via theme.extend.colors */
+
+/* ============================================
+   MENU/DROPDOWN UTILITIES - MOVED TO COMPONENTS
+   ============================================ */
+
+@layer components {
+  .menu-background {
+    background-color: rgb(var(--menu-background));
+  }
+
+  .menu-border {
+    border-color: rgb(var(--menu-border));
+  }
+
+  .menu-shadow {
+    box-shadow:
+      0 10px 15px -3px rgb(var(--menu-shadow)),
+      0 4px 6px -2px rgb(var(--menu-shadow));
+  }
+
+  .menu-item-hover {
+    background-color: rgb(var(--menu-item-hover));
+  }
+
+  .menu-separator {
+    border-color: rgb(var(--menu-separator));
+  }
+}
+
+/* ============================================
+   SURFACE & TEXT UTILITIES - MIGRATED TO THEME
+   ============================================
+   These are now available via theme.extend.colors:
+   - bg-surface-0, bg-surface-1, bg-surface-2, bg-surface-3
+   - text-primary-token, text-secondary-token, text-tertiary-token
+*/
+
+/* Legacy surface utilities (map to new system) */
+@layer components {
+  .surface {
+    background-color: var(--color-bg-surface-1);
+  }
+
+  .surface-hover {
+    background-color: var(--color-bg-surface-2);
+  }
+
+  .surface-pressed {
+    background-color: var(--color-bg-surface-3);
+  }
+
+  /* Backwards compatibility aliases */
+  .text-primary {
+    color: var(--color-text-primary-token);
+  }
+
+  .text-secondary {
+    color: var(--color-text-secondary-token);
+  }
+
+  .text-tertiary {
+    color: var(--color-text-tertiary-token);
+  }
+}
+
+/* ============================================
+   MARKETING & TYPOGRAPHY COMPONENTS
+   ============================================ */
+
+@layer components {
+  .heading-linear {
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28;
+    letter-spacing: -0.0325em;
+    font-weight: 538;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  .text-linear {
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
+  }
+
+  .marketing-h1-linear {
+    font-size: clamp(2.5rem, 5vw + 1rem, 5rem); /* 40px → 80px */
+    font-weight: 538; /* Linear's exact weight */
+    letter-spacing: -0.0325em;
+    line-height: 1.1;
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28; /* Optical sizing */
+    text-wrap: balance;
+  }
+
+  .marketing-h2-linear {
+    font-size: clamp(2rem, 3vw + 1rem, 3.5rem); /* 32px → 56px */
+    font-weight: 538;
+    letter-spacing: -0.028em;
+    line-height: 1.2;
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28;
+    text-wrap: balance;
+  }
+
+  .marketing-lead-linear {
+    font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem); /* 16px → 20px */
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
+  }
+
+  .marketing-body {
+    font-feature-settings:
+      "cv01",
+      "ss03",
+      "rlig" 1,
+      "calt" 1;
+    font-variation-settings: "opsz" 28;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
+    @apply text-base sm:text-lg;
+  }
+
+  .marketing-card {
+    @apply relative p-6 rounded-2xl border transition-colors;
+    border-color: var(--color-border-subtle);
+  }
+
+  .marketing-cta {
+    @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
+  }
+}
+
+/* scrollbar-hide - MIGRATED TO PLUGIN
+   Now in lib/tailwind/utilities-plugin.js */
 
 @layer base {
   .marketing-mono {
@@ -512,144 +445,90 @@ body {
   }
 }
 
-/* Linear Button Utilities */
-@utility btn-linear-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  height: 2.5rem; /* 40px */
-  padding: 0 1.5rem;
-  border-radius: 8px; /* Linear uses 8px */
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.011em;
-  background-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-fg);
-  border: 1px solid rgba(255, 255, 255, 0.1); /* subtle white border */
-  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+/* ============================================
+   LINEAR-STYLE COMPONENTS
+   ============================================ */
 
-  &:hover {
-    opacity: 0.9;
+@layer components {
+  /* Linear Button */
+  .btn-linear-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.5rem; /* 40px */
+    padding: 0 1.5rem;
+    border-radius: 8px; /* Linear uses 8px */
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.011em;
+    background-color: var(--color-btn-primary-bg);
+    color: var(--color-btn-primary-fg);
+    border: 1px solid rgba(255, 255, 255, 0.1); /* subtle white border */
+    transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  /* Linear Spacing System */
+  .section-spacing-linear {
+    padding-top: 4rem; /* 64px */
+    padding-bottom: 4rem;
+
+    @media (min-width: 640px) {
+      padding-top: 5rem; /* 80px */
+      padding-bottom: 5rem;
+    }
+
+    @media (min-width: 1024px) {
+      padding-top: 6rem; /* 96px */
+      padding-bottom: 6rem;
+    }
+  }
+
+  .section-gap-linear {
+    gap: 2rem; /* 32px Linear rhythm */
+  }
+
+  .text-destructive {
+    color: #dc2626;
+    /* red-600 */
+
+    &:is(.dark *) {
+      color: #f87171;
+      /* red-400 */
+    }
   }
 }
 
-/* Linear Spacing System */
-@utility section-spacing-linear {
-  padding-top: 4rem; /* 64px */
-  padding-bottom: 4rem;
+/* text-quaternary-token now available via theme.extend.colors */
 
-  @media (min-width: 640px) {
-    padding-top: 5rem; /* 80px */
-    padding-bottom: 5rem;
+/* ============================================
+   SEMANTIC STATUS UTILITIES - MIGRATED TO THEME
+   ============================================
+   Core utilities now available via theme.extend:
+   - text-success, text-error, text-warning, text-info
+   - bg-success, bg-error, bg-warning, bg-info
+   - bg-success-subtle, bg-error-subtle, bg-warning-subtle, bg-info-subtle
+   - border-success, border-error, border-warning, border-info
+*/
+
+/* Interactive state utilities - moved to components */
+@layer components {
+  .interactive-hover {
+    background-color: var(--color-interactive-hover);
   }
 
-  @media (min-width: 1024px) {
-    padding-top: 6rem; /* 96px */
-    padding-bottom: 6rem;
+  .interactive-pressed {
+    background-color: var(--color-interactive-active);
   }
-}
 
-@utility section-gap-linear {
-  gap: 2rem; /* 32px Linear rhythm */
-}
-
-@utility text-quaternary-token {
-  color: var(--color-text-quaternary-token);
-}
-
-@utility text-destructive {
-  color: #dc2626;
-  /* red-600 */
-
-  &:is(.dark *) {
-    color: #f87171;
-    /* red-400 */
+  .focus-ring-themed {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    --tw-ring-color: var(--color-focus-ring);
   }
-}
-
-/* Semantic status color utilities - mapped to design tokens */
-
-/* Success */
-@utility border-success {
-  border-color: color-mix(in oklch, var(--color-success) 30%, transparent);
-}
-
-@utility bg-success {
-  background-color: var(--color-success);
-}
-
-@utility bg-success-subtle {
-  background-color: var(--color-success-subtle);
-}
-
-@utility text-success {
-  color: var(--color-success);
-}
-
-/* Error */
-@utility border-error {
-  border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
-}
-
-@utility bg-error {
-  background-color: var(--color-error);
-}
-
-@utility bg-error-subtle {
-  background-color: var(--color-error-subtle);
-}
-
-@utility text-error {
-  color: var(--color-error);
-}
-
-/* Warning */
-@utility border-warning {
-  border-color: color-mix(in oklch, var(--color-warning) 30%, transparent);
-}
-
-@utility bg-warning {
-  background-color: var(--color-warning);
-}
-
-@utility bg-warning-subtle {
-  background-color: var(--color-warning-subtle);
-}
-
-@utility text-warning {
-  color: var(--color-warning);
-}
-
-/* Info */
-@utility border-info {
-  border-color: color-mix(in oklch, var(--color-info) 30%, transparent);
-}
-
-@utility bg-info {
-  background-color: var(--color-info);
-}
-
-@utility bg-info-subtle {
-  background-color: var(--color-info-subtle);
-}
-
-@utility text-info {
-  color: var(--color-info);
-}
-
-/* Interactive state utilities */
-@utility interactive-hover {
-  background-color: rgb(var(--interactive-hover));
-}
-
-@utility interactive-pressed {
-  background-color: rgb(var(--interactive-pressed));
-}
-
-@utility focus-ring-themed {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-  --tw-ring-color: rgb(var(--color-focus-ring));
 }
 
 /* Menu animations */
@@ -717,89 +596,83 @@ body {
   }
 }
 
-/* Utility bridges for Linear-style tokens */
-@utility bg-base {
-  background-color: var(--color-bg-base);
+/* ============================================
+   COLOR UTILITY BRIDGES - MIGRATED TO THEME
+   ============================================
+   These utilities are now available via theme.extend.colors:
+   - bg-base (via colors.base)
+   - text-accent (via colors.accent)
+   - bg-accent (via colors.accent)
+   - border-subtle, border-default, border-strong (via borderColor)
+   - border-accent (via borderColor.accent)
+   - ring-accent (Tailwind auto-generates from colors.accent)
+*/
+
+/* Safe utilities with hardcoded fallbacks for critical above-the-fold content */
+@layer components {
+  .bg-base-safe {
+    background-color: #f6f6f6;
+    background-color: var(--color-bg-base, #f6f6f6);
+  }
+
+  .text-primary-safe {
+    color: #0c0c0c;
+    color: var(--color-text-primary-token, #0c0c0c);
+  }
+
+  :root.dark .bg-base-safe {
+    background-color: #090909;
+    background-color: var(--color-bg-base, #090909);
+  }
+
+  :root.dark .text-primary-safe {
+    color: #f4f4f5;
+    color: var(--color-text-primary-token, #f4f4f5);
+  }
+
+  /* Legacy aliases for backwards compatibility */
+  .text-accent-token {
+    color: var(--color-accent);
+  }
+
+  .text-color-accent {
+    color: var(--color-accent);
+  }
+
+  .bg-color-accent {
+    background-color: var(--color-accent);
+  }
+
+  .bg-bg-base {
+    background-color: var(--color-bg-base);
+  }
+
+  .bg-bg-surface-1 {
+    background-color: var(--color-bg-surface-1);
+  }
 }
 
-/* Safe utilities with hardcoded fallbacks for critical above-the-fold content (ENG-001) */
-@utility bg-base-safe {
-  background-color: #f6f6f6;
-  background-color: var(--color-bg-base, #f6f6f6);
-}
+/* ============================================
+   SKELETON LOADING COMPONENT
+   ============================================ */
 
-@utility text-primary-safe {
-  color: #0c0c0c;
-  color: var(--color-text-primary-token, #0c0c0c);
-}
+@layer components {
+  .skeleton {
+    background-color: var(--color-skeleton-base);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-skeleton-shimmer),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
 
-:root.dark .bg-base-safe {
-  background-color: #090909;
-  background-color: var(--color-bg-base, #090909);
-}
-
-:root.dark .text-primary-safe {
-  color: #f4f4f5;
-  color: var(--color-text-primary-token, #f4f4f5);
-}
-
-/* Enhanced border utilities */
-@utility border-subtle {
-  border-color: var(--color-border-subtle);
-}
-
-@utility border-default {
-  border-color: var(--color-border-default);
-}
-
-@utility border-strong {
-  border-color: var(--color-border-strong);
-}
-
-@utility text-accent-token {
-  color: var(--color-accent);
-}
-
-@utility text-color-accent {
-  color: var(--color-accent);
-}
-
-@utility bg-color-accent {
-  background-color: var(--color-accent);
-}
-
-@utility bg-bg-base {
-  background-color: var(--color-bg-base);
-}
-
-@utility bg-bg-surface-1 {
-  background-color: var(--color-bg-surface-1);
-}
-
-@utility border-accent {
-  border-color: color-mix(in oklch, var(--color-accent) 30%, transparent);
-}
-
-@utility ring-accent {
-  --tw-ring-color: var(--color-accent);
-}
-
-/* Skeleton loading utilities */
-@utility skeleton {
-  background-color: var(--color-skeleton-base);
-  background-image: linear-gradient(
-    90deg,
-    transparent,
-    var(--color-skeleton-shimmer),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-
-  /* Reduced motion: show static background instead of shimmer animation */
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    background-image: none;
+    /* Reduced motion: show static background instead of shimmer animation */
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+      background-image: none;
+    }
   }
 }
 
@@ -813,16 +686,53 @@ body {
   }
 }
 
-/* Preview update animation */
-@utility animate-shimmer {
-  animation: shimmer 1.5s ease-in-out infinite;
+/* ============================================
+   ANIMATION COMPONENTS
+   ============================================ */
 
-  /* Reduced motion: disable shimmer animation */
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
+@layer components {
+  /* Preview update animation */
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+
+    /* Reduced motion: disable shimmer animation */
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-scroll-infinite {
+    animation: scroll-infinite 30s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  /* Micro-animations */
+  .card-hover {
+    @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+  }
+
+  .input-focus-glow {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
+    --tw-ring-color: var(--color-accent);
+  }
+
+  .btn-press {
+    @apply transform transition-transform duration-100 ease-out active:scale-95;
   }
 }
 
+/* Keyframes */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -835,11 +745,6 @@ body {
   }
 }
 
-@utility animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out;
-}
-
-/* Slow pulse animation for decorative elements */
 @keyframes pulse-slow {
   0%,
   100% {
@@ -850,11 +755,6 @@ body {
   }
 }
 
-@utility animate-pulse-slow {
-  animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Infinite scroll carousel animation */
 @keyframes scroll-infinite {
   0% {
     transform: translateX(0);
@@ -862,27 +762,6 @@ body {
   100% {
     transform: translateX(-50%);
   }
-}
-
-@utility animate-scroll-infinite {
-  animation: scroll-infinite 30s linear infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-/* Micro-animations */
-@utility card-hover {
-  @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
-}
-
-@utility input-focus-glow {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
-}
-
-@utility btn-press {
-  @apply transform transition-transform duration-100 ease-out active:scale-95;
 }
 
 /* Motion preference utility for accessibility */
@@ -942,23 +821,28 @@ body {
   }
 }
 
-/* Auth logo spin animation */
+/* ============================================
+   AUTH LOGO ANIMATION
+   ============================================ */
+
+@layer components {
+  .animate-logo-spin {
+    animation: logo-spin 1.2s ease-in-out 0s 1 forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-logo-spin {
+      animation: none !important;
+    }
+  }
+}
+
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
   }
   to {
     transform: rotate(360deg);
-  }
-}
-
-@utility animate-logo-spin {
-  animation: logo-spin 1.2s ease-in-out 0s 1 forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-logo-spin {
-    animation: none !important;
   }
 }
 
