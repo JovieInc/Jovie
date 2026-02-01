@@ -115,9 +115,11 @@ function buildDropdownItems({
     },
   ];
 
-  // Add keyboard shortcuts item if handler is provided
+  // Add "Learn More" submenu with keyboard shortcuts and legal links
+  const learnMoreItems: CommonDropdownItem[] = [];
+
   if (handleOpenShortcuts) {
-    items.push({
+    learnMoreItems.push({
       type: 'action',
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
@@ -131,6 +133,59 @@ function buildDropdownItems({
       shortcut: '⌘ /',
     });
   }
+
+  // Add legal page links
+  learnMoreItems.push(
+    {
+      type: 'action',
+      id: 'privacy-policy',
+      label: 'Privacy Policy',
+      icon: (
+        <Icon
+          name='Shield'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () => window.open('/legal/privacy', '_blank'),
+    },
+    {
+      type: 'action',
+      id: 'terms-of-service',
+      label: 'Terms of Service',
+      icon: (
+        <Icon
+          name='FileText'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () => window.open('/legal/terms', '_blank'),
+    },
+    {
+      type: 'action',
+      id: 'cookie-policy',
+      label: 'Cookie Policy',
+      icon: (
+        <Icon
+          name='Cookie'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () => window.open('/legal/cookies', '_blank'),
+    }
+  );
+
+  items.push({
+    type: 'submenu',
+    id: 'learn-more',
+    label: 'Learn more',
+    icon: (
+      <Icon
+        name='HelpCircle'
+        className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+      />
+    ),
+    items: learnMoreItems,
+  } as CommonDropdownItem);
 
   // Add billing item based on status
   if (billingStatus.loading) {
