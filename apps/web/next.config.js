@@ -14,6 +14,8 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   output: 'standalone',
+  // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Disable static generation to prevent Clerk context issues during build
   trailingSlash: false,
   // Build optimizations
