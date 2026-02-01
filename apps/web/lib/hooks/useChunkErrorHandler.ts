@@ -36,7 +36,12 @@ const DEPLOYMENT_REFERENCE_ERRORS = [
 function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object'
+        ? JSON.stringify(error)
+        : String(error);
   const lowerMessage = message.toLowerCase();
 
   return CHUNK_ERROR_PATTERNS.some(pattern => lowerMessage.includes(pattern));

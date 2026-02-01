@@ -63,17 +63,17 @@ export function DashboardSidebar({
       {...props}
     >
       <SidebarHeader className='relative pb-0'>
-        <div className='group/toggle flex items-center gap-2 px-2 py-1'>
+        <div className='group/toggle flex items-center gap-2 px-3 py-2'>
           {isInSettings ? (
             <Link
               href='/app'
               aria-label='Back'
               className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                'inline-flex h-9 items-center gap-2 rounded-lg px-2.5 py-1 text-[13px] font-medium text-secondary-token transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
-              <ArrowLeft className='h-4 w-4' aria-hidden='true' />
+              <ArrowLeft className='size-4' aria-hidden='true' />
               <span className='truncate group-data-[collapsible=icon]:hidden'>
                 Back
               </span>
@@ -83,10 +83,10 @@ export function DashboardSidebar({
               href='/app'
               aria-label='Go to dashboard'
               className={cn(
-                'flex h-9 w-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+                'flex size-9 items-center justify-center rounded-lg transition-all duration-150 ease-out hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
               )}
             >
-              <BrandLogo size={16} tone='auto' className='h-5 w-5' />
+              <BrandLogo size={16} tone='auto' className='size-5' />
               <span className='sr-only'>Dashboard</span>
             </Link>
           )}
@@ -95,27 +95,27 @@ export function DashboardSidebar({
             <SidebarTrigger
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className={cn(
-                'h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                'size-8 shrink-0 rounded-lg border border-default bg-bg-surface-1 text-tertiary-token hover:bg-sidebar-accent hover:text-primary-token focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-all duration-150',
                 'group-data-[state=closed]:hidden'
               )}
             />
           </div>
         </div>
         {!isInSettings && (
-          <div className='px-2 pb-3 pt-2 lg:hidden'>
-            <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
+          <div className='px-3 pb-4 pt-3 lg:hidden'>
+            <div className='flex items-center gap-3 rounded-xl border border-default bg-bg-surface-1 p-3.5 shadow-sm'>
               <OptimizedAvatar
                 src={avatarUrl}
                 alt={displayName}
                 size={64}
-                className='h-10 w-10'
+                className='size-12 ring-2 ring-sidebar-accent'
               />
-              <div className='min-w-0'>
-                <p className='truncate text-sm font-semibold text-sidebar-foreground'>
+              <div className='min-w-0 flex-1'>
+                <p className='truncate text-sm font-semibold text-primary-token'>
                   {displayName}
                 </p>
                 {username ? (
-                  <p className='truncate text-xs text-sidebar-muted'>
+                  <p className='truncate text-xs text-tertiary-token'>
                     @{username}
                   </p>
                 ) : null}
@@ -127,7 +127,7 @@ export function DashboardSidebar({
                   asChild
                   size='sm'
                   variant='secondary'
-                  className='flex-1 min-h-[44px]'
+                  className='flex-1 min-h-[44px] rounded-xl'
                 >
                   <Link
                     href={profileHref}
@@ -142,7 +142,7 @@ export function DashboardSidebar({
                   idleLabel='Copy link'
                   successLabel='Copied'
                   errorLabel='Copy failed'
-                  className='flex-1 min-h-[44px]'
+                  className='flex-1 min-h-[44px] rounded-xl'
                 />
               </div>
             ) : null}
@@ -161,7 +161,7 @@ export function DashboardSidebar({
       {!isInSettings && (
         <SidebarFooter className='mt-auto'>
           <SidebarSeparator className='mx-0' />
-          <div className='px-2 py-3'>
+          <div className='px-3 py-3'>
             <div
               className={cn(
                 isCollapsed

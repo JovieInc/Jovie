@@ -45,8 +45,9 @@ export function escapeCSVValue(value: unknown): string {
     return '';
   }
 
-  // Convert to string
-  const stringValue = String(value);
+  // Convert to string (JSON.stringify objects to avoid [object Object])
+  const stringValue =
+    typeof value === 'object' ? JSON.stringify(value) : String(value);
 
   // Check if escaping is needed
   const needsQuoting =
@@ -112,7 +113,8 @@ export function formatYesNo(value: unknown): string {
  * formatOptionalString(123) // '123'
  */
 export function formatOptionalString(value: unknown): string {
-  return value ? String(value) : '';
+  if (!value) return '';
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }
 
 /**
@@ -173,8 +175,8 @@ function getColumnValue<T>(
     return '';
   }
 
-  // Convert to string
-  return String(value);
+  // Convert to string (JSON.stringify objects to avoid [object Object])
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }
 
 /**

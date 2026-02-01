@@ -928,6 +928,196 @@
     "projectName": "Jovie"
   },
   {
+    "key": "AZwXxHrxtYDXugYtCwah",
+    "rule": "typescript:S3776",
+    "severity": "CRITICAL",
+    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+    "project": "JovieInc_Jovie",
+    "line": 113,
+    "hash": "80d67d1c41feb87c83130080185deea9",
+    "textRange": {
+      "startLine": 113,
+      "endLine": 113,
+      "startOffset": 22,
+      "endOffset": 34
+    },
+    "flows": [
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 139,
+              "endLine": 139,
+              "startOffset": 2,
+              "endOffset": 4
+            },
+            "msg": "+1"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 141,
+              "endLine": 141,
+              "startOffset": 9,
+              "endOffset": 11
+            },
+            "msg": "+1"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 143,
+              "endLine": 143,
+              "startOffset": 4,
+              "endOffset": 8
+            },
+            "msg": "+1"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 149,
+              "endLine": 149,
+              "startOffset": 2,
+              "endOffset": 4
+            },
+            "msg": "+1"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 179,
+              "endLine": 179,
+              "startOffset": 4,
+              "endOffset": 8
+            },
+            "msg": "+1"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 152,
+              "endLine": 152,
+              "startOffset": 31,
+              "endOffset": 32
+            },
+            "msg": "+2 (incl. 1 for nesting)"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 160,
+              "endLine": 160,
+              "startOffset": 39,
+              "endOffset": 40
+            },
+            "msg": "+2 (incl. 1 for nesting)"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 166,
+              "endLine": 166,
+              "startOffset": 12,
+              "endOffset": 13
+            },
+            "msg": "+2 (incl. 1 for nesting)"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 169,
+              "endLine": 169,
+              "startOffset": 20,
+              "endOffset": 21
+            },
+            "msg": "+3 (incl. 2 for nesting)"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 175,
+              "endLine": 175,
+              "startOffset": 6,
+              "endOffset": 11
+            },
+            "msg": "+2 (incl. 1 for nesting)"
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+            "textRange": {
+              "startLine": 192,
+              "endLine": 192,
+              "startOffset": 28,
+              "endOffset": 29
+            },
+            "msg": "+1"
+          }
+        ]
+      }
+    ],
+    "status": "OPEN",
+    "message": "Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed.",
+    "effort": "7min",
+    "debt": "7min",
+    "tags": ["brain-overload"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "FOCUSED",
+    "cleanCodeAttributeCategory": "ADAPTABLE",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "HIGH"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
     "key": "AZwWc4Xk7H-Pi57bYHBY",
     "rule": "typescript:S3776",
     "severity": "CRITICAL",
@@ -1950,6 +2140,111 @@
     "projectName": "Jovie"
   },
   {
+    "key": "AZwXxGpwtYDXugYtCwaZ",
+    "rule": "typescript:S3358",
+    "severity": "MAJOR",
+    "component": "JovieInc_Jovie:apps/web/components/dashboard/organisms/release-provider-matrix/utils/exportReleases.ts",
+    "project": "JovieInc_Jovie",
+    "line": 72,
+    "hash": "c316ce03cc20a7ccf3b49a0f4f67f0f8",
+    "textRange": {
+      "startLine": 72,
+      "endLine": 72,
+      "startOffset": 23,
+      "endOffset": 76
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Extract this nested ternary operation into an independent statement.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["confusing"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHf8tYDXugYtCwae",
+    "rule": "typescript:S3358",
+    "severity": "MAJOR",
+    "component": "JovieInc_Jovie:apps/web/lib/hooks/useChunkErrorHandler.ts",
+    "project": "JovieInc_Jovie",
+    "line": 42,
+    "hash": "5aa7c25adc9bcbcc4c34d3d445fcb77f",
+    "textRange": {
+      "startLine": 42,
+      "endLine": 44,
+      "startOffset": 8,
+      "endOffset": 23
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Extract this nested ternary operation into an independent statement.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["confusing"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHjbtYDXugYtCwag",
+    "rule": "typescript:S3358",
+    "severity": "MAJOR",
+    "component": "JovieInc_Jovie:apps/web/lib/fetch/deduped-fetch.ts",
+    "project": "JovieInc_Jovie",
+    "line": 122,
+    "hash": "a2a9e72f35f3af31726c3e52119bb5f8",
+    "textRange": {
+      "startLine": 122,
+      "endLine": 124,
+      "startOffset": 8,
+      "endOffset": 32
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Extract this nested ternary operation into an independent statement.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["confusing"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "MEDIUM"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
     "key": "AZwWc4Xk7H-Pi57bYHBZ",
     "rule": "typescript:S3358",
     "severity": "MAJOR",
@@ -2819,41 +3114,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZuAB9uQQkvcf9fLSXQd",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/spotify/env.ts",
-    "project": "JovieInc_Jovie",
-    "line": 175,
-    "hash": "671a8ae0c7622c1ce5e0c3671b221353",
-    "textRange": {
-      "startLine": 175,
-      "endLine": 177,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2026-01-02T18:43:46+0000",
-    "updateDate": "2026-01-02T18:43:55+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZuADM7k10mB7ve_Xgft",
     "rule": "typescript:S7763",
     "severity": "MINOR",
@@ -3099,41 +3359,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZuROKhd4eb3Vj86p0H2",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/admin/route-factory.ts",
-    "project": "JovieInc_Jovie",
-    "line": 146,
-    "hash": "92f9cbdc7dce6af5dd3d932d6023565b",
-    "textRange": {
-      "startLine": 146,
-      "endLine": 146,
-      "startOffset": 31,
-      "endOffset": 36
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2026-01-06T02:50:38+0000",
-    "updateDate": "2026-01-06T02:50:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZuWzQZrnLRkr7wbsb9D",
     "rule": "typescript:S2737",
     "severity": "MINOR",
@@ -3204,41 +3429,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdSsj9TSCcME8MSTh",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
-    "project": "JovieInc_Jovie",
-    "line": 49,
-    "hash": "daafdf4f0ce93c5324d63c90bf1dfe21",
-    "textRange": {
-      "startLine": 49,
-      "endLine": 49,
-      "startOffset": 29,
-      "endOffset": 34
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2025-12-29T02:12:54+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZttdSss9TSCcME8MSTl",
     "rule": "typescript:S1874",
     "severity": "MINOR",
@@ -3294,41 +3484,6 @@
     "debt": "15min",
     "tags": ["cwe", "obsolete", "type-dependent"],
     "creationDate": "2025-12-25T05:31:30+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdSxL9TSCcME8MSVd",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/monitoring/web-vitals.ts",
-    "project": "JovieInc_Jovie",
-    "line": 17,
-    "hash": "0580516f51cabd73e21cbe2a38b99d65",
-    "textRange": {
-      "startLine": 17,
-      "endLine": 19,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2025-12-25T19:45:26+0000",
     "updateDate": "2025-12-30T04:10:47+0000",
     "type": "CODE_SMELL",
     "organization": "jovieinc",
@@ -3856,76 +4011,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdSsj9TSCcME8MSTk",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
-    "project": "JovieInc_Jovie",
-    "line": 177,
-    "hash": "2ac34fb449334e90674e5f1d6961d1c7",
-    "textRange": {
-      "startLine": 177,
-      "endLine": 177,
-      "startOffset": 16,
-      "endOffset": 21
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2025-12-29T02:12:54+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZu5VNzjcrOH2p5Q8tQS",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
-    "project": "JovieInc_Jovie",
-    "line": 115,
-    "hash": "7fac421dc378e4c1240a5810d1d79746",
-    "textRange": {
-      "startLine": 115,
-      "endLine": 115,
-      "startOffset": 24,
-      "endOffset": 29
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2026-01-13T21:43:31+0000",
-    "updateDate": "2026-01-13T21:44:09+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZttdSye9TSCcME8MSWM",
     "rule": "typescript:S7763",
     "severity": "MINOR",
@@ -4031,41 +4116,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdSyx9TSCcME8MSWU",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/fetch/deduped-fetch.ts",
-    "project": "JovieInc_Jovie",
-    "line": 120,
-    "hash": "0972d0a706169221f4ad266a136ab0cb",
-    "textRange": {
-      "startLine": 120,
-      "endLine": 120,
-      "startOffset": 51,
-      "endOffset": 63
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'options.body' may use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2025-12-29T04:12:17+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZttdS_t9TSCcME8MSYQ",
     "rule": "typescript:S4323",
     "severity": "MINOR",
@@ -4155,41 +4205,6 @@
     "organization": "jovieinc",
     "cleanCodeAttribute": "CONVENTIONAL",
     "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZvnElvQDOlpB-IPASQs",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/hooks/useChunkErrorHandler.ts",
-    "project": "JovieInc_Jovie",
-    "line": 39,
-    "hash": "33e043ca4feeda1f1d01c37f05b29358",
-    "textRange": {
-      "startLine": 39,
-      "endLine": 39,
-      "startOffset": 66,
-      "endOffset": 71
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'error' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2026-01-22T18:55:35+0000",
-    "updateDate": "2026-01-22T18:55:45+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
     "impacts": [
       {
         "softwareQuality": "MAINTAINABILITY",
@@ -5110,41 +5125,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZvyUNgQUb4ztR0-lRWX",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/dashboard/organisms/release-provider-matrix/utils/exportReleases.ts",
-    "project": "JovieInc_Jovie",
-    "line": 71,
-    "hash": "7d86b21a193897817027cf54632425f6",
-    "textRange": {
-      "startLine": 71,
-      "endLine": 71,
-      "startOffset": 45,
-      "endOffset": 46
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'v' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2026-01-24T23:20:38+0000",
-    "updateDate": "2026-01-24T23:20:45+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZttdSRK9TSCcME8MSKv",
     "rule": "typescript:S6767",
     "severity": "MINOR",
@@ -5804,146 +5784,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdS-F9TSCcME8MSXi",
-    "rule": "typescript:S6551",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
-    "project": "JovieInc_Jovie",
-    "line": 165,
-    "hash": "5dca5344909cc223b1bdfa2889ecede4",
-    "textRange": {
-      "startLine": 165,
-      "endLine": 165,
-      "startOffset": 47,
-      "endOffset": 60
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "'context.route' will use Object's default stringification format ('[object Object]') when stringified.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["object", "string", "type-dependent"],
-    "creationDate": "2025-12-21T17:28:17+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "LOGICAL",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdS-F9TSCcME8MSXj",
-    "rule": "typescript:S7763",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
-    "project": "JovieInc_Jovie",
-    "line": 371,
-    "hash": "d3349094a0b53c707b320d91fcf10d58",
-    "textRange": {
-      "startLine": 371,
-      "endLine": 371,
-      "startOffset": 9,
-      "endOffset": 22
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Use `export…from` to re-export `getSentryMode`.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["convention"],
-    "creationDate": "2025-12-29T04:26:39+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdS-F9TSCcME8MSXk",
-    "rule": "typescript:S7763",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
-    "project": "JovieInc_Jovie",
-    "line": 371,
-    "hash": "d3349094a0b53c707b320d91fcf10d58",
-    "textRange": {
-      "startLine": 371,
-      "endLine": 371,
-      "startOffset": 24,
-      "endOffset": 43
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Use `export…from` to re-export `isSentryInitialized`.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["convention"],
-    "creationDate": "2025-12-29T04:26:39+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdS-F9TSCcME8MSXl",
-    "rule": "typescript:S7763",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
-    "project": "JovieInc_Jovie",
-    "line": 371,
-    "hash": "d3349094a0b53c707b320d91fcf10d58",
-    "textRange": {
-      "startLine": 371,
-      "endLine": 371,
-      "startOffset": 45,
-      "endOffset": 60
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Use `export…from` to re-export `SentryMode`.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["convention"],
-    "creationDate": "2025-12-29T04:26:39+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZttdS_S9TSCcME8MSYI",
     "rule": "typescript:S6594",
     "severity": "MINOR",
@@ -6069,76 +5909,6 @@
     "debt": "5min",
     "tags": ["convention"],
     "creationDate": "2025-12-29T19:02:34+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdSw59TSCcME8MSVV",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/monitoring/performance.ts",
-    "project": "JovieInc_Jovie",
-    "line": 64,
-    "hash": "44abe85f00fb3dd778e09c348fef1ccd",
-    "textRange": {
-      "startLine": 64,
-      "endLine": 66,
-      "startOffset": 4,
-      "endOffset": 5
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2025-12-25T19:45:26+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdSw59TSCcME8MSVY",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/monitoring/performance.ts",
-    "project": "JovieInc_Jovie",
-    "line": 120,
-    "hash": "44abe85f00fb3dd778e09c348fef1ccd",
-    "textRange": {
-      "startLine": 120,
-      "endLine": 122,
-      "startOffset": 4,
-      "endOffset": 5
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2025-12-25T19:45:26+0000",
     "updateDate": "2025-12-30T04:10:47+0000",
     "type": "CODE_SMELL",
     "organization": "jovieinc",
@@ -6358,105 +6128,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdSsR9TSCcME8MSTe",
-    "rule": "typescript:S4323",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
-    "project": "JovieInc_Jovie",
-    "line": 6,
-    "hash": "3b7121a2a5a09cfeb6961286a877e95d",
-    "textRange": {
-      "startLine": 6,
-      "endLine": 6,
-      "startOffset": 14,
-      "endOffset": 49
-    },
-    "flows": [
-      {
-        "locations": [
-          {
-            "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
-            "textRange": {
-              "startLine": 48,
-              "endLine": 48,
-              "startOffset": 25,
-              "endOffset": 60
-            },
-            "msg": "Following occurrence."
-          }
-        ]
-      },
-      {
-        "locations": [
-          {
-            "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
-            "textRange": {
-              "startLine": 97,
-              "endLine": 97,
-              "startOffset": 10,
-              "endOffset": 45
-            },
-            "msg": "Following occurrence."
-          }
-        ]
-      }
-    ],
-    "status": "OPEN",
-    "message": "Replace this union type with a type alias.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["proficiency"],
-    "creationDate": "2025-12-25T19:45:26+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "DISTINCT",
-    "cleanCodeAttributeCategory": "ADAPTABLE",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZttdSsR9TSCcME8MSTf",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
-    "project": "JovieInc_Jovie",
-    "line": 30,
-    "hash": "8d663459d3fa6eba571f9a808155839d",
-    "textRange": {
-      "startLine": 30,
-      "endLine": 32,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2025-12-25T19:45:26+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZvckJAlcXu3BUPZUxZE",
     "rule": "typescript:S7780",
     "severity": "MINOR",
@@ -6632,41 +6303,6 @@
     "projectName": "Jovie"
   },
   {
-    "key": "AZttdSrH9TSCcME8MSS_",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/utils/platform-detection/detector.ts",
-    "project": "JovieInc_Jovie",
-    "line": 107,
-    "hash": "74a3d2dce5a17cb4bb6e4e003a4fdb1c",
-    "textRange": {
-      "startLine": 107,
-      "endLine": 109,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2025-12-27T05:13:31+0000",
-    "updateDate": "2025-12-30T04:10:47+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
     "key": "AZwCQweqqrVczB8GXda1",
     "rule": "typescript:S7770",
     "severity": "MINOR",
@@ -6692,41 +6328,6 @@
     "organization": "jovieinc",
     "cleanCodeAttribute": "CLEAR",
     "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZuu8Guk4_0IOEs4yPie",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/email/jobs/send-claim-invite.ts",
-    "project": "JovieInc_Jovie",
-    "line": 28,
-    "hash": "63552d462d85d6283dded1955f677680",
-    "textRange": {
-      "startLine": 28,
-      "endLine": 30,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2026-01-11T21:20:18+0000",
-    "updateDate": "2026-01-11T21:20:27+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
     "impacts": [
       {
         "softwareQuality": "MAINTAINABILITY",
@@ -6793,76 +6394,6 @@
     "tags": ["es6", "readability"],
     "creationDate": "2026-01-28T07:15:19+0000",
     "updateDate": "2026-01-28T07:15:29+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZwDd6jP3spFjQyNhBVM",
-    "rule": "typescript:S6606",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/lib/stripe/dunning.ts",
-    "project": "JovieInc_Jovie",
-    "line": 44,
-    "hash": "63552d462d85d6283dded1955f677680",
-    "textRange": {
-      "startLine": 44,
-      "endLine": 46,
-      "startOffset": 2,
-      "endOffset": 3
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["es2020", "nullish-coalescing", "type-dependent"],
-    "creationDate": "2026-01-28T07:15:19+0000",
-    "updateDate": "2026-01-28T07:15:29+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CONVENTIONAL",
-    "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZv292QA7e-UCdS0JByx",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/releases/molecules/utm-copy-dropdown.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 357,
-    "hash": "ca5e125d2ed2a5ff07c2eccac9459675",
-    "textRange": {
-      "startLine": 357,
-      "endLine": 357,
-      "startOffset": 10,
-      "endOffset": 14
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-25T21:00:00+0000",
-    "updateDate": "2026-01-25T21:00:10+0000",
     "type": "CODE_SMELL",
     "organization": "jovieinc",
     "cleanCodeAttribute": "CLEAR",
@@ -7036,251 +6567,6 @@
     "organization": "jovieinc",
     "cleanCodeAttribute": "CONVENTIONAL",
     "cleanCodeAttributeCategory": "CONSISTENT",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZuongX7tnRoQq97yj53",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/contact-sidebar/ContactSidebarHeader.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 111,
-    "hash": "fed3138d2d322fe6c3b7f68494bed43b",
-    "textRange": {
-      "startLine": 111,
-      "endLine": 111,
-      "startOffset": 20,
-      "endOffset": 24
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-10T07:00:26+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZurCytbfVloj49XSTvF",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/release-sidebar/ReleaseSidebarHeader.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 90,
-    "hash": "fed3138d2d322fe6c3b7f68494bed43b",
-    "textRange": {
-      "startLine": 90,
-      "endLine": 90,
-      "startOffset": 20,
-      "endOffset": 24
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-11T03:07:50+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZve4RRUcDw8EJPV6N5A",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 86,
-    "hash": "ca5e125d2ed2a5ff07c2eccac9459675",
-    "textRange": {
-      "startLine": 86,
-      "endLine": 86,
-      "startOffset": 10,
-      "endOffset": 14
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-21T04:42:12+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZve4RRUcDw8EJPV6N5B",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 95,
-    "hash": "ca5e125d2ed2a5ff07c2eccac9459675",
-    "textRange": {
-      "startLine": 95,
-      "endLine": 95,
-      "startOffset": 10,
-      "endOffset": 14
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-21T04:42:12+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZve4RRUcDw8EJPV6N5D",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 110,
-    "hash": "319cb388d88fd951f0d70e5741a82e31",
-    "textRange": {
-      "startLine": 110,
-      "endLine": 110,
-      "startOffset": 10,
-      "endOffset": 14
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-21T04:42:12+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZve4RU5cDw8EJPV6N5G",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/contact-sidebar/ContactSidebar.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 81,
-    "hash": "ca5e125d2ed2a5ff07c2eccac9459675",
-    "textRange": {
-      "startLine": 81,
-      "endLine": 81,
-      "startOffset": 12,
-      "endOffset": 16
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-21T04:42:12+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
-    "impacts": [
-      {
-        "softwareQuality": "MAINTAINABILITY",
-        "severity": "LOW"
-      }
-    ],
-    "issueStatus": "OPEN",
-    "projectName": "Jovie"
-  },
-  {
-    "key": "AZwH1XtfKwhuqDRSXWAH",
-    "rule": "typescript:S7778",
-    "severity": "MINOR",
-    "component": "JovieInc_Jovie:apps/web/components/organisms/contact-sidebar/ContactSidebar.tsx",
-    "project": "JovieInc_Jovie",
-    "line": 96,
-    "hash": "db28ac1f3bb1629ea86e9bf29334e8a3",
-    "textRange": {
-      "startLine": 96,
-      "endLine": 96,
-      "startOffset": 10,
-      "endOffset": 14
-    },
-    "flows": [],
-    "status": "OPEN",
-    "message": "Do not call `Array#push()` multiple times.",
-    "effort": "5min",
-    "debt": "5min",
-    "tags": ["performance", "readability"],
-    "creationDate": "2026-01-28T23:48:21+0000",
-    "updateDate": "2026-01-31T03:32:49+0000",
-    "type": "CODE_SMELL",
-    "organization": "jovieinc",
-    "cleanCodeAttribute": "CLEAR",
-    "cleanCodeAttributeCategory": "INTENTIONAL",
     "impacts": [
       {
         "softwareQuality": "MAINTAINABILITY",
@@ -7740,6 +7026,356 @@
     "projectName": "Jovie"
   },
   {
+    "key": "AZttdS-F9TSCcME8MSXj",
+    "rule": "typescript:S7763",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+    "project": "JovieInc_Jovie",
+    "line": 378,
+    "hash": "d3349094a0b53c707b320d91fcf10d58",
+    "textRange": {
+      "startLine": 378,
+      "endLine": 378,
+      "startOffset": 9,
+      "endOffset": 22
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Use `export…from` to re-export `getSentryMode`.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["convention"],
+    "creationDate": "2025-12-29T04:26:39+0000",
+    "updateDate": "2025-12-30T04:10:47+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZttdS-F9TSCcME8MSXk",
+    "rule": "typescript:S7763",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+    "project": "JovieInc_Jovie",
+    "line": 378,
+    "hash": "d3349094a0b53c707b320d91fcf10d58",
+    "textRange": {
+      "startLine": 378,
+      "endLine": 378,
+      "startOffset": 24,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Use `export…from` to re-export `isSentryInitialized`.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["convention"],
+    "creationDate": "2025-12-29T04:26:39+0000",
+    "updateDate": "2025-12-30T04:10:47+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZttdS-F9TSCcME8MSXl",
+    "rule": "typescript:S7763",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+    "project": "JovieInc_Jovie",
+    "line": 378,
+    "hash": "d3349094a0b53c707b320d91fcf10d58",
+    "textRange": {
+      "startLine": 378,
+      "endLine": 378,
+      "startOffset": 45,
+      "endOffset": 60
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Use `export…from` to re-export `SentryMode`.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["convention"],
+    "creationDate": "2025-12-29T04:26:39+0000",
+    "updateDate": "2025-12-30T04:10:47+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZuROKhd4eb3Vj86p0H2",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/admin/route-factory.ts",
+    "project": "JovieInc_Jovie",
+    "line": 149,
+    "hash": "92f9cbdc7dce6af5dd3d932d6023565b",
+    "textRange": {
+      "startLine": 149,
+      "endLine": 149,
+      "startOffset": 31,
+      "endOffset": 36
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-01-06T02:50:38+0000",
+    "updateDate": "2026-01-06T02:50:47+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxGpwtYDXugYtCwaa",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/dashboard/organisms/release-provider-matrix/utils/exportReleases.ts",
+    "project": "JovieInc_Jovie",
+    "line": 72,
+    "hash": "c316ce03cc20a7ccf3b49a0f4f67f0f8",
+    "textRange": {
+      "startLine": 72,
+      "endLine": 72,
+      "startOffset": 74,
+      "endOffset": 75
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'v' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHf8tYDXugYtCwaf",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/hooks/useChunkErrorHandler.ts",
+    "project": "JovieInc_Jovie",
+    "line": 44,
+    "hash": "5353cd329c9958b6700321fb0ccb3763",
+    "textRange": {
+      "startLine": 44,
+      "endLine": 44,
+      "startOffset": 17,
+      "endOffset": 22
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'error' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHrxtYDXugYtCwai",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/error-tracking.ts",
+    "project": "JovieInc_Jovie",
+    "line": 170,
+    "hash": "ec6feeb685d38b7a46f36fcba1ef24d9",
+    "textRange": {
+      "startLine": 170,
+      "endLine": 170,
+      "startOffset": 29,
+      "endOffset": 42
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'context.route' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHWJtYDXugYtCwab",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
+    "project": "JovieInc_Jovie",
+    "line": 50,
+    "hash": "3b2c825bfad8fb4d6fa948d20ae1a50a",
+    "textRange": {
+      "startLine": 50,
+      "endLine": 50,
+      "startOffset": 63,
+      "endOffset": 68
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHWJtYDXugYtCwac",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
+    "project": "JovieInc_Jovie",
+    "line": 117,
+    "hash": "e19e8a95086f6c4ccfdbc6f1228896cd",
+    "textRange": {
+      "startLine": 117,
+      "endLine": 117,
+      "startOffset": 68,
+      "endOffset": 73
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXxHWJtYDXugYtCwad",
+    "rule": "typescript:S6551",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/utils/csv.ts",
+    "project": "JovieInc_Jovie",
+    "line": 179,
+    "hash": "e19e8a95086f6c4ccfdbc6f1228896cd",
+    "textRange": {
+      "startLine": 179,
+      "endLine": 179,
+      "startOffset": 68,
+      "endOffset": 73
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "'value' will use Object's default stringification format ('[object Object]') when stringified.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["object", "string", "type-dependent"],
+    "creationDate": "2026-02-01T05:50:07+0000",
+    "updateDate": "2026-02-01T05:50:44+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "LOGICAL",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
     "key": "AZttdSq99TSCcME8MSS0",
     "rule": "typescript:S7764",
     "severity": "MINOR",
@@ -7915,6 +7551,986 @@
     "projectName": "Jovie"
   },
   {
+    "key": "AZwXv0UPqpGt-0oZjwF2",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/queries/QueryErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 38,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 38,
+      "endLine": 38,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXv0UPqpGt-0oZjwF3",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/queries/QueryErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 38,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 38,
+      "endLine": 38,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXv0UPqpGt-0oZjwF4",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/queries/QueryErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 38,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 38,
+      "endLine": 38,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXv0UPqpGt-0oZjwF5",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/queries/QueryErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 39,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 39,
+      "endLine": 39,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz07qpGt-0oZjwFq",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/PageErrorState.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 32,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 32,
+      "endLine": 32,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz07qpGt-0oZjwFr",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/PageErrorState.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 32,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 32,
+      "endLine": 32,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz07qpGt-0oZjwFs",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/PageErrorState.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 32,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 32,
+      "endLine": 32,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz07qpGt-0oZjwFt",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/PageErrorState.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 33,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 33,
+      "endLine": 33,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz11qpGt-0oZjwF0",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorDialog.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 46,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 46,
+      "endLine": 46,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz11qpGt-0oZjwF1",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorDialog.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 47,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 47,
+      "endLine": 47,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz11qpGt-0oZjwFy",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorDialog.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 46,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 46,
+      "endLine": 46,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz11qpGt-0oZjwFz",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorDialog.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 46,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 46,
+      "endLine": 46,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz1WqpGt-0oZjwFu",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorBanner.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 45,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 45,
+      "endLine": 45,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz1WqpGt-0oZjwFv",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorBanner.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 45,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 45,
+      "endLine": 45,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz1WqpGt-0oZjwFw",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorBanner.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 45,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 45,
+      "endLine": 45,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvz1WqpGt-0oZjwFx",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/feedback/ErrorBanner.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 46,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 46,
+      "endLine": 46,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzrXqpGt-0oZjwFe",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/TableErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 27,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 27,
+      "endLine": 27,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzrXqpGt-0oZjwFf",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/TableErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 27,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 27,
+      "endLine": 27,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzrXqpGt-0oZjwFg",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/TableErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 27,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 27,
+      "endLine": 27,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzrXqpGt-0oZjwFh",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/TableErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 28,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 28,
+      "endLine": 28,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvztdqpGt-0oZjwFi",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/ErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 44,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 44,
+      "endLine": 44,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvztdqpGt-0oZjwFj",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/ErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 44,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 44,
+      "endLine": 44,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvztdqpGt-0oZjwFk",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/ErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 44,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 44,
+      "endLine": 44,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvztdqpGt-0oZjwFl",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/ErrorBoundary.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 45,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 45,
+      "endLine": 45,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzwHqpGt-0oZjwFm",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/DashboardErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 29,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 29,
+      "endLine": 29,
+      "startOffset": 14,
+      "endOffset": 43
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzwHqpGt-0oZjwFn",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/DashboardErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 29,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 29,
+      "endLine": 29,
+      "startOffset": 21,
+      "endOffset": 27
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis.window` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzwHqpGt-0oZjwFo",
+    "rule": "typescript:S7764",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/DashboardErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 29,
+    "hash": "c98bd759c202395d0d78bc279468bcb5",
+    "textRange": {
+      "startLine": 29,
+      "endLine": 29,
+      "startOffset": 46,
+      "endOffset": 52
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Prefer `globalThis` over `window`.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["es2020", "portability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CONVENTIONAL",
+    "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwXvzwHqpGt-0oZjwFp",
+    "rule": "typescript:S7735",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/atoms/DashboardErrorFallback.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 30,
+    "hash": "7cea84f4e563f91ca0568406f8d65e65",
+    "textRange": {
+      "startLine": 30,
+      "endLine": 30,
+      "startOffset": 21,
+      "endOffset": 53
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Unexpected negated condition.",
+    "effort": "2min",
+    "debt": "2min",
+    "tags": ["readability"],
+    "creationDate": "2026-02-01T05:44:24+0000",
+    "updateDate": "2026-02-01T05:45:16+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
     "key": "AZttdSx19TSCcME8MSV_",
     "rule": "typescript:S7763",
     "severity": "MINOR",
@@ -7940,6 +8556,105 @@
     "organization": "jovieinc",
     "cleanCodeAttribute": "CONVENTIONAL",
     "cleanCodeAttributeCategory": "CONSISTENT",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZttdSsR9TSCcME8MSTe",
+    "rule": "typescript:S4323",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
+    "project": "JovieInc_Jovie",
+    "line": 6,
+    "hash": "3b7121a2a5a09cfeb6961286a877e95d",
+    "textRange": {
+      "startLine": 6,
+      "endLine": 6,
+      "startOffset": 14,
+      "endOffset": 49
+    },
+    "flows": [
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
+            "textRange": {
+              "startLine": 46,
+              "endLine": 46,
+              "startOffset": 25,
+              "endOffset": 60
+            },
+            "msg": "Following occurrence."
+          }
+        ]
+      },
+      {
+        "locations": [
+          {
+            "component": "JovieInc_Jovie:apps/web/lib/utils/dev-cleanup.ts",
+            "textRange": {
+              "startLine": 95,
+              "endLine": 95,
+              "startOffset": 10,
+              "endOffset": 45
+            },
+            "msg": "Following occurrence."
+          }
+        ]
+      }
+    ],
+    "status": "OPEN",
+    "message": "Replace this union type with a type alias.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["proficiency"],
+    "creationDate": "2025-12-25T19:45:26+0000",
+    "updateDate": "2025-12-30T04:10:47+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "DISTINCT",
+    "cleanCodeAttributeCategory": "ADAPTABLE",
+    "impacts": [
+      {
+        "softwareQuality": "MAINTAINABILITY",
+        "severity": "LOW"
+      }
+    ],
+    "issueStatus": "OPEN",
+    "projectName": "Jovie"
+  },
+  {
+    "key": "AZwH1XtfKwhuqDRSXWAH",
+    "rule": "typescript:S7778",
+    "severity": "MINOR",
+    "component": "JovieInc_Jovie:apps/web/components/organisms/contact-sidebar/ContactSidebar.tsx",
+    "project": "JovieInc_Jovie",
+    "line": 97,
+    "hash": "99c1e28cac5b34653400dd38d1d322df",
+    "textRange": {
+      "startLine": 97,
+      "endLine": 97,
+      "startOffset": 10,
+      "endOffset": 14
+    },
+    "flows": [],
+    "status": "OPEN",
+    "message": "Do not call `Array#push()` multiple times.",
+    "effort": "5min",
+    "debt": "5min",
+    "tags": ["performance", "readability"],
+    "creationDate": "2026-01-28T23:48:21+0000",
+    "updateDate": "2026-01-31T03:32:49+0000",
+    "type": "CODE_SMELL",
+    "organization": "jovieinc",
+    "cleanCodeAttribute": "CLEAR",
+    "cleanCodeAttributeCategory": "INTENTIONAL",
     "impacts": [
       {
         "softwareQuality": "MAINTAINABILITY",
@@ -7995,8 +8710,8 @@
     "textRange": {
       "startLine": 364,
       "endLine": 364,
-      "startOffset": 11,
-      "endOffset": 15
+      "startOffset": 13,
+      "endOffset": 17
     },
     "flows": [],
     "status": "OPEN",

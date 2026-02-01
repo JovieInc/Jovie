@@ -3,7 +3,14 @@
 import { useChat } from '@ai-sdk/react';
 import { Button } from '@jovie/ui';
 import { DefaultChatTransport } from 'ai';
-import { AlertCircle, ArrowUp, Loader2, User } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUp,
+  Loader2,
+  RefreshCw,
+  User,
+  WifiOff,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useThrottledCallback } from '@/lib/pacer';
@@ -55,14 +62,69 @@ function getMessageText(parts: Array<{ type: string; text?: string }>): string {
     .join('');
 }
 
+type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
+
 interface ChatError {
+  readonly type: ChatErrorType;
   readonly message: string;
   readonly retryAfter?: number;
+  readonly errorCode?: string;
+  readonly failedMessage?: string;
+}
+
+function getErrorType(error: Error): ChatErrorType {
+  const msg = error.message.toLowerCase();
+  if (
+    msg.includes('network') ||
+    msg.includes('fetch') ||
+    msg.includes('offline')
+  ) {
+    return 'network';
+  }
+  if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
+    return 'rate_limit';
+  }
+  if (msg.includes('500') || msg.includes('server')) {
+    return 'server';
+  }
+  return 'unknown';
+}
+
+function getUserFriendlyMessage(
+  type: ChatErrorType,
+  retryAfter?: number
+): string {
+  switch (type) {
+    case 'network':
+      return 'Unable to connect. Please check your internet connection.';
+    case 'rate_limit':
+      return retryAfter
+        ? `Too many requests. Please wait ${retryAfter} seconds.`
+        : 'Too many requests. Please wait a moment.';
+    case 'server':
+      return 'We encountered a temporary issue. Please try again.';
+    default:
+      return 'Something went wrong. Please try again.';
+  }
+}
+
+function getNextStepMessage(type: ChatErrorType): string {
+  switch (type) {
+    case 'network':
+      return 'Check your connection and try again';
+    case 'rate_limit':
+      return 'Wait a moment, then try again';
+    case 'server':
+      return 'Try again or contact support if this persists';
+    default:
+      return 'Try again or contact support';
+  }
 }
 
 export function JovieChat({ artistContext }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const lastAttemptedMessageRef = useRef<string>('');
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,18 +142,34 @@ export function JovieChat({ artistContext }: JovieChatProps) {
   const { messages, sendMessage, status } = useChat({
     transport,
     onError: error => {
+      const errorType = getErrorType(error);
+      let retryAfter: number | undefined;
+      let errorCode: string | undefined;
+
       // Parse error response for rate limiting info
       try {
         const errorData = JSON.parse(error.message);
-        setChatError({
-          message: errorData.message || 'An error occurred. Please try again.',
-          retryAfter: errorData.retryAfter,
-        });
+        retryAfter = errorData.retryAfter;
+        errorCode = errorData.code || errorData.errorCode;
       } catch {
-        setChatError({
-          message: error.message || 'An error occurred. Please try again.',
-        });
+        // Not JSON, extract error code from message if present
+        const codeMatch = error.message.match(/\[([A-Z_]+)\]/);
+        errorCode = codeMatch?.[1];
       }
+
+      setChatError({
+        type: errorType,
+        message: getUserFriendlyMessage(errorType, retryAfter),
+        retryAfter,
+        errorCode,
+        failedMessage: lastAttemptedMessageRef.current,
+      });
+
+      // Restore the user's message so they don't lose it
+      if (lastAttemptedMessageRef.current) {
+        setInput(lastAttemptedMessageRef.current);
+      }
+
       setIsSubmitting(false);
     },
   });
@@ -128,10 +206,14 @@ export function JovieChat({ artistContext }: JovieChatProps) {
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
         setChatError({
+          type: 'unknown',
           message: `Message is too long. Maximum is ${MAX_MESSAGE_LENGTH} characters.`,
         });
         return;
       }
+
+      // Store the message before sending (in case of error)
+      lastAttemptedMessageRef.current = text.trim();
 
       setChatError(null);
       setIsSubmitting(true);
@@ -145,6 +227,14 @@ export function JovieChat({ artistContext }: JovieChatProps) {
     },
     [isLoading, isSubmitting, sendMessage]
   );
+
+  // Retry the last failed message
+  const handleRetry = useCallback(() => {
+    if (chatError?.failedMessage) {
+      setChatError(null);
+      doSubmit(chatError.failedMessage);
+    }
+  }, [chatError?.failedMessage, doSubmit]);
 
   // Throttled submit to prevent rapid submissions
   const throttledSubmit = useThrottledCallback(doSubmit, {
@@ -246,15 +336,37 @@ export function JovieChat({ artistContext }: JovieChatProps) {
           {chatError && (
             <div className='px-4 pb-3'>
               <div className='mx-auto flex max-w-2xl items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
-                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-                <div className='flex-1'>
-                  <p className='text-sm font-medium text-primary-token'>
-                    {chatError.message}
-                  </p>
-                  {chatError.retryAfter && (
-                    <p className='mt-1 text-xs text-secondary-token'>
-                      Try again in {chatError.retryAfter} seconds
+                {chatError.type === 'network' ? (
+                  <WifiOff className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                ) : (
+                  <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                )}
+                <div className='flex-1 space-y-2'>
+                  <div>
+                    <p className='text-sm font-medium text-primary-token'>
+                      {chatError.message}
                     </p>
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      {getNextStepMessage(chatError.type)}
+                      {chatError.errorCode && (
+                        <span className='ml-2 font-mono text-tertiary-token'>
+                          ({chatError.errorCode})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {chatError.failedMessage && !chatError.retryAfter && (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      onClick={handleRetry}
+                      disabled={isLoading || isSubmitting}
+                      className='h-8 gap-2'
+                    >
+                      <RefreshCw className='h-3.5 w-3.5' />
+                      Try again
+                    </Button>
                   )}
                 </div>
               </div>
@@ -324,15 +436,37 @@ export function JovieChat({ artistContext }: JovieChatProps) {
             {/* Error display */}
             {chatError && (
               <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
-                <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-                <div className='flex-1'>
-                  <p className='text-sm font-medium text-primary-token'>
-                    {chatError.message}
-                  </p>
-                  {chatError.retryAfter && (
-                    <p className='mt-1 text-xs text-secondary-token'>
-                      Try again in {chatError.retryAfter} seconds
+                {chatError.type === 'network' ? (
+                  <WifiOff className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                ) : (
+                  <AlertCircle className='mt-0.5 h-5 w-5 shrink-0 text-error' />
+                )}
+                <div className='flex-1 space-y-2'>
+                  <div>
+                    <p className='text-sm font-medium text-primary-token'>
+                      {chatError.message}
                     </p>
+                    <p className='mt-1 text-xs text-secondary-token'>
+                      {getNextStepMessage(chatError.type)}
+                      {chatError.errorCode && (
+                        <span className='ml-2 font-mono text-tertiary-token'>
+                          ({chatError.errorCode})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {chatError.failedMessage && !chatError.retryAfter && (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      onClick={handleRetry}
+                      disabled={isLoading || isSubmitting}
+                      className='h-8 gap-2'
+                    >
+                      <RefreshCw className='h-3.5 w-3.5' />
+                      Try again
+                    </Button>
                   )}
                 </div>
               </div>

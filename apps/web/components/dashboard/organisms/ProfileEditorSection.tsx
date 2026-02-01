@@ -104,8 +104,8 @@ export function ProfileEditorSection({
   onInputBlur,
 }: ProfileEditorSectionProps) {
   return (
-    <div className='mx-auto w-full max-w-2xl'>
-      <div className='flex flex-col items-center gap-3'>
+    <div className='mx-auto w-full max-w-2xl px-4 sm:px-0'>
+      <div className='flex flex-col items-center gap-4'>
         <AvatarUploadable
           src={avatarUrl}
           alt={`Avatar for @${username}`}
@@ -123,8 +123,8 @@ export function ProfileEditorSection({
           showHoverOverlay
         />
 
-        <div className='w-full max-w-md space-y-1.5'>
-          {/* Display Name Field */}
+        <div className='w-full max-w-md space-y-2'>
+          {/* Display Name Field - Primary hierarchy */}
           <div className='grid gap-1'>
             {editingField === 'displayName' ? (
               <Input
@@ -136,11 +136,12 @@ export function ProfileEditorSection({
                 onChange={e => onDisplayNameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'displayName')}
                 onBlur={onInputBlur}
+                className='min-h-[48px] text-center text-base sm:min-h-[44px]'
               />
             ) : (
               <button
                 type='button'
-                className='w-full rounded-md py-1.5 text-center text-base font-medium text-primary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
+                className='min-h-[48px] w-full rounded-xl py-3 text-center text-lg font-semibold text-primary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:min-h-[44px] sm:rounded-lg sm:py-2 sm:text-base sm:font-medium'
                 onClick={() => setEditingField('displayName')}
                 aria-label='Edit display name'
               >
@@ -149,7 +150,7 @@ export function ProfileEditorSection({
             )}
           </div>
 
-          {/* Username Field */}
+          {/* Username Field - Secondary hierarchy */}
           <div className='grid gap-1'>
             {editingField === 'username' ? (
               <Input
@@ -163,11 +164,12 @@ export function ProfileEditorSection({
                 onChange={e => onUsernameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'username')}
                 onBlur={onInputBlur}
+                className='min-h-[44px] text-center text-sm'
               />
             ) : (
               <button
                 type='button'
-                className='w-full rounded-md py-1 text-center text-sm font-medium text-secondary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
+                className='min-h-[44px] w-full rounded-xl py-2.5 text-center text-sm font-medium text-secondary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:rounded-lg sm:py-2'
                 onClick={() => setEditingField('username')}
                 aria-label='Edit username'
               >

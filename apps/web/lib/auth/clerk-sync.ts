@@ -18,11 +18,16 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
  * NOTE: App must never trust Clerk metadata for authorization.
  * Authorization is always enforced server-side from the database.
  */
+/**
+ * User status types
+ */
+export type JovieUserStatus = 'active' | 'pending' | 'banned';
+
 export interface JovieClerkMetadata {
   /** User role: 'user' | 'admin' */
   jovie_role: 'user' | 'admin';
-  /** User status: 'active' | 'pending' | 'banned' */
-  jovie_status: 'active' | 'pending' | 'banned';
+  /** User status */
+  jovie_status: JovieUserStatus;
   /** Whether user has a complete creator profile */
   jovie_has_profile: boolean;
 }

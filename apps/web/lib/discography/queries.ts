@@ -13,6 +13,11 @@ import {
   providerLinks,
 } from '@/lib/db/schema';
 
+/**
+ * Release data source types
+ */
+export type ReleaseSourceType = 'manual' | 'admin' | 'ingested';
+
 /** Track summary data aggregated per release */
 export interface TrackSummary {
   totalDurationMs: number | null;
@@ -56,7 +61,7 @@ export interface UpsertReleaseInput {
   isExplicit?: boolean;
   artworkUrl?: string | null;
   spotifyPopularity?: number | null;
-  sourceType?: 'manual' | 'admin' | 'ingested';
+  sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
 }
 
@@ -65,7 +70,7 @@ interface UpsertProviderLinkBase {
   providerId: string;
   url: string;
   externalId?: string | null;
-  sourceType?: 'manual' | 'admin' | 'ingested';
+  sourceType?: ReleaseSourceType;
   isPrimary?: boolean;
   metadata?: Record<string, unknown>;
 }
@@ -520,7 +525,7 @@ export async function upsertTrack(input: {
   isExplicit?: boolean;
   isrc?: string | null;
   previewUrl?: string | null;
-  sourceType?: 'manual' | 'admin' | 'ingested';
+  sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
   const now = new Date();

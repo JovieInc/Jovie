@@ -74,40 +74,37 @@ export function ReleaseSidebar({
     const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
     const items: CommonDropdownItem[] = [];
 
-    items.push({
-      type: 'action',
-      id: 'copy-url',
-      label: 'Copy smart link',
-      icon: <Copy className='h-4 w-4' />,
-      onClick: () => void handleCopySmartLink(),
-      className: CONTEXT_MENU_ITEM_CLASS,
-    });
-
-    items.push({
-      type: 'action',
-      id: 'open-release',
-      label: 'Open release',
-      icon: <ExternalLink className='h-4 w-4' />,
-      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
-      className: CONTEXT_MENU_ITEM_CLASS,
-    });
-
-    items.push({
-      type: 'action',
-      id: 'refresh',
-      label: 'Refresh',
-      icon: <RefreshCw className='h-4 w-4' />,
-      onClick: () => {
-        if (onRefresh) {
-          onRefresh();
-        } else {
-          globalThis.location.reload();
-        }
-      },
-      className: CONTEXT_MENU_ITEM_CLASS,
-    });
-
     items.push(
+      {
+        type: 'action',
+        id: 'copy-url',
+        label: 'Copy smart link',
+        icon: <Copy className='h-4 w-4' />,
+        onClick: () => void handleCopySmartLink(),
+        className: CONTEXT_MENU_ITEM_CLASS,
+      },
+      {
+        type: 'action',
+        id: 'open-release',
+        label: 'Open release',
+        icon: <ExternalLink className='h-4 w-4' />,
+        onClick: () => globalThis.open(smartLinkUrl, '_blank'),
+        className: CONTEXT_MENU_ITEM_CLASS,
+      },
+      {
+        type: 'action',
+        id: 'refresh',
+        label: 'Refresh',
+        icon: <RefreshCw className='h-4 w-4' />,
+        onClick: () => {
+          if (onRefresh) {
+            onRefresh();
+          } else {
+            globalThis.location.reload();
+          }
+        },
+        className: CONTEXT_MENU_ITEM_CLASS,
+      },
       { type: 'separator', id: 'sep-1', className: '-mx-0.5 my-1' },
       {
         type: 'action',

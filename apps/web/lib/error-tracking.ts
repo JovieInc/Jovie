@@ -162,7 +162,14 @@ export async function captureError(
           severity,
           environment: metadata.environment,
           sentryMode, // Tag to filter by SDK variant in Sentry dashboard
-          ...(context?.route ? { route: String(context.route) } : {}),
+          ...(context?.route
+            ? {
+                route:
+                  typeof context.route === 'object'
+                    ? JSON.stringify(context.route)
+                    : String(context.route),
+              }
+            : {}),
         },
       });
     } catch (sentryError) {

@@ -348,23 +348,24 @@ export function UTMCopyDropdown({
       });
     }
 
-    items.push({
-      type: 'separator',
-      id: 'sep-3',
-    });
-
-    // Custom UTM option
-    items.push({
-      type: 'action',
-      id: 'custom-utm',
-      label: 'Custom UTM...',
-      icon: Settings,
-      onClick: () => {
-        track('utm_custom_open', {});
-        // TODO: Open custom UTM builder modal
-        toast.info('Custom UTM builder coming soon!');
+    items.push(
+      {
+        type: 'separator',
+        id: 'sep-3',
       },
-    });
+      // Custom UTM option
+      {
+        type: 'action',
+        id: 'custom-utm',
+        label: 'Custom UTM...',
+        icon: Settings,
+        onClick: () => {
+          track('utm_custom_open', {});
+          // TODO: Open custom UTM builder modal
+          toast.info('Custom UTM builder coming soon!');
+        },
+      }
+    );
 
     return items;
   }, [

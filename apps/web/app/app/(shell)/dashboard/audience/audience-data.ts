@@ -9,6 +9,7 @@ import {
   users,
 } from '@/lib/db/schema';
 import { formatCountryLabel } from '@/lib/utils/audience';
+import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
 import type { AudienceAction, AudienceMember, AudienceReferrer } from '@/types';
 
 export type AudienceMode = 'members' | 'subscribers';
@@ -70,7 +71,10 @@ function normalizeLocationLabel(
   geoCity: string | null,
   geoCountry: string | null
 ) {
-  const parts = [geoCity, geoCountry].filter(Boolean) as string[];
+  // Decode URL-encoded location parts (e.g., %20 -> space, + -> space)
+  const parts = [geoCity, geoCountry]
+    .filter(Boolean)
+    .map(part => safeDecodeURIComponent(part as string));
   return parts.length ? parts.join(', ') : 'Unknown';
 }
 
