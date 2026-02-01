@@ -178,7 +178,7 @@ const nextConfig = {
       },
       {
         source:
-          '/(go|r|onboarding|account|billing|hud|signin|signup|sso-callback)/:path*',
+          '/(go|r|onboarding|account|billing|hud|signin|signup|sso-callback)(.*)',
         headers: [...securityHeaders, cacheHeaders.noStore],
       },
       // Dynamic profile pages - no cache
