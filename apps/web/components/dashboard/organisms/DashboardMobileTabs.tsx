@@ -14,7 +14,8 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { cn } from '@/lib/utils';
 
@@ -117,6 +118,7 @@ export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
+  const router = useRouter();
 
   // Include admin items in expanded menu when user is admin
   const adminItems = useMemo(
@@ -124,11 +126,16 @@ export function DashboardMobileTabs({
     [isAdmin]
   );
 
+  const handleSettingsClick = useCallback(() => {
+    router.push('/app/settings');
+  }, [router]);
+
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
       expandedItems={EXPANDED_ITEMS}
       adminItems={adminItems}
+      onSettingsClick={handleSettingsClick}
       className={cn('lg:hidden', className)}
     />
   );
