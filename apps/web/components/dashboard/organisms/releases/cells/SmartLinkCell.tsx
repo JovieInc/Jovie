@@ -8,12 +8,6 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface SmartLinkCellProps {
   readonly release: ReleaseViewModel;
-  /** @deprecated Not used - clipboard write happens in CopyLinkInput */
-  readonly onCopy?: (
-    path: string,
-    label: string,
-    testId: string
-  ) => Promise<string>;
 }
 
 /**
