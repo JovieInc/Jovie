@@ -73,9 +73,7 @@ interface ChatError {
 
 export function JovieChat({ artistContext }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -241,10 +239,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
         // Chat view - messages + sticky input at bottom
         <>
           {/* Messages area - with bottom padding for sticky composer */}
-          <div
-            ref={messagesContainerRef}
-            className='flex-1 overflow-y-auto px-4 py-4 sm:py-6'
-          >
+          <div className='flex-1 overflow-y-auto px-4 py-4 sm:py-6'>
             <div className='mx-auto max-w-2xl space-y-4 sm:space-y-6'>
               {messages.map(message => (
                 <div
@@ -257,9 +252,9 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                   {message.role === 'assistant' && (
                     <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 sm:h-8 sm:w-8 sm:rounded-lg'>
                       <BrandLogo
-                        size={18}
+                        size={16}
                         tone='auto'
-                        className='sm:h-4 sm:w-4'
+                        className='h-[18px] w-[18px] sm:h-4 sm:w-4'
                       />
                     </div>
                   )}
@@ -286,9 +281,9 @@ export function JovieChat({ artistContext }: JovieChatProps) {
                 <div className='flex gap-3'>
                   <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 sm:h-8 sm:w-8 sm:rounded-lg'>
                     <BrandLogo
-                      size={18}
+                      size={16}
                       tone='auto'
-                      className='sm:h-4 sm:w-4'
+                      className='h-[18px] w-[18px] sm:h-4 sm:w-4'
                     />
                   </div>
                   <div className='rounded-2xl bg-surface-2 px-4 py-3'>
@@ -302,11 +297,10 @@ export function JovieChat({ artistContext }: JovieChatProps) {
 
           {/* Sticky composer at bottom with safe area */}
           <div
-            ref={composerRef}
             className={cn(
               'sticky bottom-0 z-10 border-t border-subtle bg-bg-base/95 backdrop-blur-lg',
               'px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3',
-              'supports-backdrop-filter:bg-bg-base/80'
+              'supports-[backdrop-filter]:bg-bg-base/80'
             )}
           >
             {/* Error display above composer */}

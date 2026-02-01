@@ -155,7 +155,8 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
           className={cn(
             'flex h-11 w-11 cursor-grab items-center justify-center rounded-lg sm:h-8 sm:w-8',
             'text-tertiary-token transition-colors',
-            'hover:text-secondary-token active:cursor-grabbing active:scale-95'
+            'hover:text-secondary-token active:cursor-grabbing active:scale-95',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
           )}
           aria-label='Drag to reorder'
           {...listeners}
