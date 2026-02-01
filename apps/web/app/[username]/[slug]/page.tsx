@@ -304,7 +304,7 @@ export default async function ContentSmartLinkPage({
   }
 
   // Get content
-  let content = await getContentBySlug(creator.id, slug);
+  const content = await getContentBySlug(creator.id, slug);
 
   // If content not found, check for redirect
   if (!content) {

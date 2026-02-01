@@ -42,7 +42,7 @@ const baseConfig = {
   },
   rules: {
     ...nextBase.rules,
-    'prefer-const': 'error',
+    // NOTE: prefer-const moved to Biome as style/useConst for efficiency
     'no-restricted-imports': [
       'error',
       {
@@ -105,7 +105,7 @@ const baseConfig = {
       },
     ],
 
-    'no-duplicate-imports': 'error',
+    // NOTE: Using import/no-duplicates only (has auto-fix), removed redundant no-duplicate-imports
     'import/no-duplicates': 'error',
     'import/no-cycle': 'error',
     'no-restricted-syntax': [
@@ -173,13 +173,10 @@ module.exports = [
   baseConfig,
   nextTypescript,
   nextIgnores,
-  {
-    files: ['**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'error',
-      '@typescript-eslint/no-explicit-any': 'warn',
-    },
-  },
+  // NOTE: @typescript-eslint/no-unused-vars and @typescript-eslint/no-explicit-any
+  // are intentionally NOT included here - Biome handles these via:
+  // - correctness/noUnusedImports + correctness/noUnusedVariables
+  // - suspicious/noExplicitAny
   ...nextCoreWebVitals,
   {
     rules: {
@@ -194,12 +191,8 @@ module.exports = [
       'import/no-cycle': 'off',
     },
   },
-  {
-    files: ['**/*.test.ts', '**/*.test.tsx'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-    },
-  },
+  // NOTE: Test file overrides for @typescript-eslint/no-explicit-any removed
+  // - Biome already disables suspicious/noExplicitAny for test files
   // Disable server/client boundary rules for server-only contexts
   {
     files: ['**/app/api/**', '**/actions.ts', '**/actions/*.ts'],

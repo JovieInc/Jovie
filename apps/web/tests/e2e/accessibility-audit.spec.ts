@@ -139,7 +139,7 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
             g1 = fgC[1],
             b1 = fgC[2],
             a1 = fgC[3];
-          let r2 = bgC[0],
+          const r2 = bgC[0],
             g2 = bgC[1],
             b2 = bgC[2];
 
