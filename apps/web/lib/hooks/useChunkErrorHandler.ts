@@ -33,15 +33,23 @@ const DEPLOYMENT_REFERENCE_ERRORS = [
  * Checks if an error is a chunk load error (common when app is updated
  * while user has old version open)
  */
+/**
+ * Extract error message from unknown error type
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object') return JSON.stringify(error);
+  return String(error);
+}
+
+/**
+ * Checks if an error is a chunk load error (common when app is updated
+ * while user has old version open)
+ */
 function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === 'object'
-        ? JSON.stringify(error)
-        : String(error);
+  const message = getErrorMessage(error);
   const lowerMessage = message.toLowerCase();
 
   return CHUNK_ERROR_PATTERNS.some(pattern => lowerMessage.includes(pattern));

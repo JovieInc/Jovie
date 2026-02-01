@@ -179,25 +179,25 @@ async function buildEngagementStats(
     whereConditions.push(eq(emailEngagement.referenceId, campaignId));
   }
 
-  const engagementQuery =
+  // Pre-build the where clause separator to avoid nested template literals
+  const andSeparator = sql` AND `;
+  const whereClause =
     whereConditions.length > 0
-      ? db
-          .select({
-            eventType: emailEngagement.eventType,
-            count: count(),
-            uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
-          })
-          .from(emailEngagement)
-          .where(sql`${sql.join(whereConditions, sql` AND `)}`)
-          .groupBy(emailEngagement.eventType)
-      : db
-          .select({
-            eventType: emailEngagement.eventType,
-            count: count(),
-            uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
-          })
-          .from(emailEngagement)
-          .groupBy(emailEngagement.eventType);
+      ? sql`${sql.join(whereConditions, andSeparator)}`
+      : undefined;
+
+  const baseQuery = db
+    .select({
+      eventType: emailEngagement.eventType,
+      count: count(),
+      uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
+    })
+    .from(emailEngagement)
+    .groupBy(emailEngagement.eventType);
+
+  const engagementQuery = whereClause
+    ? baseQuery.where(whereClause)
+    : baseQuery;
 
   const engagementResult = await engagementQuery;
 

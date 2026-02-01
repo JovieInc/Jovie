@@ -139,11 +139,13 @@ export const PlatformPill = React.forwardRef<
     className,
   });
 
-  const ariaLabel = !isInteractive
-    ? undefined
-    : collapsed
-      ? `${platformName}: ${primaryText}`
-      : `Select ${platformName}`;
+  // Extract aria label logic to avoid nested ternary
+  const getAriaLabel = (): string | undefined => {
+    if (!isInteractive) return undefined;
+    if (collapsed) return `${platformName}: ${primaryText}`;
+    return `Select ${platformName}`;
+  };
+  const ariaLabel = getAriaLabel();
 
   return (
     <button
