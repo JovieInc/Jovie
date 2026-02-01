@@ -23,6 +23,8 @@ export type LiquidGlassMenuItem = {
 export interface LiquidGlassMenuProps {
   readonly primaryItems: LiquidGlassMenuItem[];
   readonly expandedItems: LiquidGlassMenuItem[];
+  /** Optional admin items - shown in a separate section with header */
+  readonly adminItems?: LiquidGlassMenuItem[];
   readonly workspaceSelector?: ReactNode;
   readonly onSettingsClick?: () => void;
   readonly onSearchClick?: () => void;
@@ -149,6 +151,7 @@ function Badge({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' }) {
 export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
+  adminItems,
   workspaceSelector,
   onSettingsClick,
   onSearchClick,
@@ -172,6 +175,7 @@ export function LiquidGlassMenu({
     pathname === href || pathname.startsWith(`${href}/`);
 
   const allMenuItems = [...primaryItems, ...expandedItems];
+  const hasAdminItems = adminItems && adminItems.length > 0;
 
   return (
     <div
@@ -268,6 +272,66 @@ export function LiquidGlassMenu({
                   </Link>
                 );
               })}
+
+              {/* Admin section - only visible when adminItems provided */}
+              {hasAdminItems && (
+                <>
+                  <div
+                    className='my-2 mx-3 border-t'
+                    style={{ borderColor: 'var(--liquid-glass-border)' }}
+                  />
+                  <p className='px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                    Admin
+                  </p>
+                  {adminItems.map(item => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+
+                    return (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                          'active:scale-[0.98] active:translate-y-px',
+                          active
+                            ? 'text-primary-token'
+                            : 'text-secondary-token hover:text-primary-token'
+                        )}
+                        style={{
+                          background: active
+                            ? 'var(--liquid-glass-item-selected)'
+                            : undefined,
+                        }}
+                        onMouseEnter={e => {
+                          if (!active)
+                            e.currentTarget.style.background =
+                              'var(--liquid-glass-item-hover)';
+                        }}
+                        onMouseLeave={e => {
+                          if (!active)
+                            e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <span
+                          className={cn(
+                            'flex items-center justify-center size-8 rounded-lg transition-colors',
+                            active
+                              ? 'bg-color-accent/15 text-color-accent'
+                              : 'bg-sidebar-accent/50 text-tertiary-token'
+                          )}
+                        >
+                          <Icon className='size-[18px]' aria-hidden='true' />
+                        </span>
+                        <span className='flex-1'>{item.label}</span>
+                        {item.badge !== undefined && (
+                          <Badge count={item.badge} />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </nav>
         </div>
