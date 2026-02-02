@@ -1,5 +1,15 @@
 import { expect, test } from './setup';
 
+/**
+ * Artist Profile Pages Tests
+ *
+ * NOTE: Tests public artist profiles for unauthenticated visitors.
+ * Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const runArtistProfileTests =
   process.env.E2E_ARTIST_PROFILE === '1' ||
   !!(process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy'));

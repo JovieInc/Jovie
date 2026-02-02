@@ -7,8 +7,14 @@ import { expect, test } from '@playwright/test';
  * These tests use axe-core to scan critical routes for accessibility violations.
  * Tests run against WCAG 2.0 Level A and AA, plus WCAG 2.1 Level A and AA standards.
  *
+ * NOTE: Tests public routes for unauthenticated visitors.
+ * Must run without saved authentication.
+ *
  * @see https://www.deque.com/axe/core-documentation/api-documentation/
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
   const publicRoutes = [

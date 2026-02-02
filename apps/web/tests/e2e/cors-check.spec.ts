@@ -1,6 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
+/**
+ * CORS Check Tests
+ *
+ * NOTE: Tests public homepage for unauthenticated visitors.
+ * Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('No CORS errors on homepage', async ({ page }) => {
   const corsErrors: string[] = [];
 
