@@ -1,0 +1,44 @@
+name: Neon Scheduled Branch Cleanup
+
+on:
+  schedule:
+    # Run every 4 hours to catch orphaned branches
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      cleanup_threshold:
+        description: 'Cleanup threshold (number of branches to trigger cleanup)'
+        required: false
+        default: '5'
+
+permissions:
+  contents: read
+
+jobs:
+  scheduled-cleanup:
+    name: Cleanup Orphaned Neon Branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Run Neon branch cleanup
+        uses: ./.github/actions/neon-branch-cleanup
+        with:
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
+          neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_limit: '10'
+          protected_branches: 'main,development,preview,br-main,br-production'
+          # Lower threshold for scheduled runs - be more aggressive
+          cleanup_threshold: ${{ github.event.inputs.cleanup_threshold || '5' }}
+
+      - name: Report cleanup summary
+        if: always()
+        run: |
+          echo "## Neon Branch Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Scheduled cleanup completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Threshold: ${{ github.event.inputs.cleanup_threshold || '5' }} branches" >> $GITHUB_STEP_SUMMARY
+          echo "- Run at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
