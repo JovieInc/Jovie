@@ -98,7 +98,7 @@
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.23",
+    "@ai-sdk/anthropic": "^3.0.35",
     "@ai-sdk/react": "^3.0.51",
     "@clerk/elements": "0.24.3",
     "@clerk/nextjs": "6.36.7",
