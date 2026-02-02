@@ -5,7 +5,7 @@ import {
 } from '@clerk/testing/playwright';
 import { chromium } from '@playwright/test';
 import { config } from 'dotenv';
-import { APP_ROUTES, AUTH_ROUTES } from '@/constants/routes';
+import { APP_ROUTES } from '@/constants/routes';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables from .env.development.local
@@ -38,7 +38,7 @@ async function authenticateAndSaveSession(
   await setupClerkTestingToken({ page });
 
   // Navigate to sign-in page (has ClerkProvider)
-  await page.goto(`${baseURL}${AUTH_ROUTES.SIGN_IN}`, {
+  await page.goto(`${baseURL}${APP_ROUTES.SIGNIN}`, {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForTimeout(1000);
