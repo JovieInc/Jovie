@@ -21,7 +21,7 @@ function toUpstashWindow(
   const normalized = window.replaceAll(/\s+/g, '');
 
   // Map our format to Upstash format
-  const match = normalized.match(/^(\d+)([smhd])$/);
+  const match = /^(\d+)([smhd])$/.exec(normalized);
   if (!match) {
     throw new SyntaxError(`Invalid window format: ${window}`);
   }
