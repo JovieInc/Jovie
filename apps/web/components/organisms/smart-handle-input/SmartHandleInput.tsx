@@ -1,7 +1,7 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import { useCallback, useEffect, useId, useMemo } from 'react';
-import { Input } from '@/components/atoms/Input';
 import {
   generateUsernameSuggestions,
   validateUsernameFormat,
@@ -97,7 +97,6 @@ export function SmartHandleInput({
           placeholder={placeholder}
           disabled={disabled}
           className='font-sans pl-20'
-          inputClassName='font-sans'
           id={inputId}
           validationState={getValidationState()}
           statusIcon={

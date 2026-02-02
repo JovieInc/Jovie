@@ -1,5 +1,4 @@
-import { Button } from '@jovie/ui';
-import { Input } from '@/components/atoms/Input';
+import { Button, Input } from '@jovie/ui';
 
 export default function SandboxPage() {
   return (

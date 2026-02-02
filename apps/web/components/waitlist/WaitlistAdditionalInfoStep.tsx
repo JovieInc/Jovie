@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@/components/atoms/Input';
+import { Input } from '@jovie/ui';
 import type { FormErrors } from './types';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 

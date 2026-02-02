@@ -1,6 +1,6 @@
+import { Input } from '@jovie/ui';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Input } from '@/components/atoms/Input';
 
 describe('Input', () => {
   describe('basic rendering', () => {
@@ -11,18 +11,13 @@ describe('Input', () => {
     });
 
     it('renders with custom className', () => {
-      const { container } = render(
-        <Input placeholder='Custom' className='custom-wrapper' />
-      );
-      expect(container.querySelector('[data-slot="control"]')).toHaveClass(
-        'custom-wrapper'
-      );
+      render(<Input placeholder='Custom' className='custom-wrapper' />);
+      const input = screen.getByPlaceholderText('Custom');
+      expect(input).toHaveClass('custom-wrapper');
     });
 
-    it('renders with inputClassName', () => {
-      render(
-        <Input placeholder='Custom input' inputClassName='custom-input' />
-      );
+    it('renders with className on input element', () => {
+      render(<Input placeholder='Custom input' className='custom-input' />);
       const input = screen.getByPlaceholderText('Custom input');
       expect(input).toHaveClass('custom-input');
     });
@@ -61,7 +56,7 @@ describe('Input', () => {
       render(<Input error='This field is required' placeholder='Enter text' />);
       const errorMessage = screen.getByText('This field is required');
       expect(errorMessage).toBeInTheDocument();
-      expect(errorMessage).toHaveClass('text-red-600');
+      expect(errorMessage).toHaveClass('text-destructive');
     });
 
     it('error message has proper ARIA attributes', () => {
@@ -71,12 +66,10 @@ describe('Input', () => {
       expect(errorMessage).toHaveAttribute('aria-live', 'polite');
     });
 
-    it('marks control as invalid when error is present', () => {
-      const { container } = render(
-        <Input error='Error message' placeholder='Input' />
-      );
-      const control = container.querySelector('[data-slot="control"]');
-      expect(control).toHaveAttribute('data-invalid');
+    it('marks input as invalid when error is present', () => {
+      render(<Input error='Error message' placeholder='Input' />);
+      const input = screen.getByPlaceholderText('Input');
+      expect(input).toHaveAttribute('aria-invalid', 'true');
     });
 
     it('displays error alongside label and input', () => {
@@ -134,20 +127,17 @@ describe('Input', () => {
   });
 
   describe('validation states', () => {
-    it('shows valid state', () => {
-      const { container } = render(
-        <Input validationState='valid' placeholder='Valid' />
-      );
-      const control = container.querySelector('[data-slot="control"]');
-      expect(control).toHaveAttribute('data-valid');
+    it('shows valid state with success variant styling', () => {
+      render(<Input validationState='valid' placeholder='Valid' />);
+      const input = screen.getByPlaceholderText('Valid');
+      // Valid state applies success border styling
+      expect(input).toHaveClass('border-green-500');
     });
 
-    it('shows invalid state', () => {
-      const { container } = render(
-        <Input validationState='invalid' placeholder='Invalid' />
-      );
-      const control = container.querySelector('[data-slot="control"]');
-      expect(control).toHaveAttribute('data-invalid');
+    it('shows invalid state with aria-invalid', () => {
+      render(<Input validationState='invalid' placeholder='Invalid' />);
+      const input = screen.getByPlaceholderText('Invalid');
+      expect(input).toHaveAttribute('aria-invalid', 'true');
     });
 
     it('shows pending state with aria-busy', () => {
@@ -160,7 +150,8 @@ describe('Input', () => {
   describe('loading state', () => {
     it('renders loading spinner when loading prop is true', () => {
       render(<Input loading placeholder='Loading' />);
-      const spinner = screen.getByRole('status');
+      // The loading spinner uses an output element with aria-label="Loading"
+      const spinner = screen.getByLabelText('Loading');
       expect(spinner).toBeInTheDocument();
     });
 
@@ -176,7 +167,7 @@ describe('Input', () => {
       );
 
       // Should show spinner, not status icon
-      expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByLabelText('Loading')).toBeInTheDocument();
       expect(screen.queryByText('✓')).not.toBeInTheDocument();
     });
   });
@@ -316,10 +307,10 @@ describe('Input', () => {
       expect(input).toBeDisabled();
     });
 
-    it('applies disabled data attribute to control', () => {
-      const { container } = render(<Input disabled placeholder='Disabled' />);
-      const control = container.querySelector('[data-slot="control"]');
-      expect(control).toHaveAttribute('data-disabled');
+    it('applies disabled attribute to input', () => {
+      render(<Input disabled placeholder='Disabled' />);
+      const input = screen.getByPlaceholderText('Disabled');
+      expect(input).toBeDisabled();
     });
 
     it('is disabled and cannot be changed', () => {

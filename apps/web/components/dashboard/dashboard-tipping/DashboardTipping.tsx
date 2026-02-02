@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { Check, Wallet, X } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { Input } from '@/components/atoms/Input';
 import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';

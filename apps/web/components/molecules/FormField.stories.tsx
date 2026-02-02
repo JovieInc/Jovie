@@ -1,5 +1,5 @@
+import { Input } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from './FormField';
 
 const meta: Meta<typeof FormField> = {

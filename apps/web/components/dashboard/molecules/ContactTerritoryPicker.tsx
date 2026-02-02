@@ -1,8 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { memo, useCallback } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { CONTACT_TERRITORY_PRESETS } from '@/lib/contacts/constants';
 
 interface TerritoryButtonProps {

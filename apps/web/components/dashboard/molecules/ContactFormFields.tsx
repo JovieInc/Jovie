@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@/components/atoms/Input';
+import { Input } from '@jovie/ui';
 
 export interface ContactFormFieldsProps {
   readonly personName: string | null | undefined;

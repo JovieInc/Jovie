@@ -1,8 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { memo, useCallback } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { CONTACT_ROLE_OPTIONS } from '@/lib/contacts/constants';
 import type { ContactRole } from '@/types/contacts';
 

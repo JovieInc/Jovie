@@ -1,5 +1,5 @@
+import { Input } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Input } from './Input';
 
 const meta: Meta<typeof Input> = {
   title: 'Atoms/Input',

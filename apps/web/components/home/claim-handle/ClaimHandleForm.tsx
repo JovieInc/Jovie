@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,7 +12,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { BASE_URL } from '@/constants/app';
@@ -302,8 +301,10 @@ export function ClaimHandleForm({
               available,
               checkingAvail,
             })}
-            className={getInputClassName({ isShaking, available })}
-            inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
+            className={cn(
+              getInputClassName({ isShaking, available }),
+              'text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
+            )}
             statusIcon={
               <HandleStatusIcon
                 showChecking={showChecking}
