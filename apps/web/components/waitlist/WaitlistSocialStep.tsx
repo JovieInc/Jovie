@@ -1,7 +1,7 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import { useEffect, useRef } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type FormErrors,
@@ -50,9 +50,8 @@ export function WaitlistSocialStep({
   useEffect(() => {
     if (isHydrating) return;
     const button =
-      platformButtonRefs.current[
-        selectedPlatformIndex >= 0 ? selectedPlatformIndex : 0
-      ] ?? platformButtonRefs.current[0];
+      platformButtonRefs.current[Math.max(0, selectedPlatformIndex)] ??
+      platformButtonRefs.current[0];
     button?.focus();
   }, [isHydrating, selectedPlatformIndex]);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import Image from 'next/image';
 import {
   type KeyboardEvent,
@@ -9,7 +10,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {

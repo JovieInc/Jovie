@@ -41,7 +41,7 @@ export function sanitizeHttpsUrl(
 export function deriveFilenameFromUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    const last = parsed.pathname.split('/').filter(Boolean).slice(-1)[0];
+    const last = parsed.pathname.split('/').filter(Boolean).at(-1);
     if (last && last.length <= 128) return last;
     return 'remote-avatar';
   } catch {

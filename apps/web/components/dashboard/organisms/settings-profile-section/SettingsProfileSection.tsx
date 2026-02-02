@@ -1,7 +1,7 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
-import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -132,8 +132,7 @@ export function SettingsProfileSection({
                     }
                     onBlur={() => flushSave()}
                     placeholder='yourname'
-                    className='flex-1 min-w-0'
-                    inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
+                    className='flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
                   />
                 </div>
               </div>
@@ -154,7 +153,7 @@ export function SettingsProfileSection({
                 onChange={e => handleFieldChange('displayName', e.target.value)}
                 onBlur={() => flushSave()}
                 placeholder='The name your fans will see'
-                inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />
             </div>
           </div>

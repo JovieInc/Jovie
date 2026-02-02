@@ -64,7 +64,7 @@ module.exports = {
         'btn-secondary': 'var(--color-btn-secondary-bg)',
         'btn-secondary-foreground': 'var(--color-btn-secondary-fg)',
 
-        // Brand colors
+        // Brand/DSP colors
         'brand-spotify': 'var(--color-brand-spotify)',
         'brand-spotify-hover': 'var(--color-brand-spotify-hover)',
         'brand-spotify-subtle': 'var(--color-brand-spotify-subtle)',
@@ -74,6 +74,24 @@ module.exports = {
         'brand-youtube': 'var(--color-brand-youtube)',
         'brand-youtube-hover': 'var(--color-brand-youtube-hover)',
         'brand-youtube-subtle': 'var(--color-brand-youtube-subtle)',
+        'brand-soundcloud': 'var(--color-brand-soundcloud)',
+        'brand-soundcloud-hover': 'var(--color-brand-soundcloud-hover)',
+        'brand-soundcloud-subtle': 'var(--color-brand-soundcloud-subtle)',
+        'brand-tidal': 'var(--color-brand-tidal)',
+        'brand-tidal-hover': 'var(--color-brand-tidal-hover)',
+        'brand-tidal-subtle': 'var(--color-brand-tidal-subtle)',
+        'brand-amazon': 'var(--color-brand-amazon)',
+        'brand-amazon-hover': 'var(--color-brand-amazon-hover)',
+        'brand-amazon-subtle': 'var(--color-brand-amazon-subtle)',
+        'brand-deezer': 'var(--color-brand-deezer)',
+        'brand-deezer-hover': 'var(--color-brand-deezer-hover)',
+        'brand-deezer-subtle': 'var(--color-brand-deezer-subtle)',
+        'brand-pandora': 'var(--color-brand-pandora)',
+        'brand-pandora-hover': 'var(--color-brand-pandora-hover)',
+        'brand-pandora-subtle': 'var(--color-brand-pandora-subtle)',
+        'brand-audiomack': 'var(--color-brand-audiomack)',
+        'brand-audiomack-hover': 'var(--color-brand-audiomack-hover)',
+        'brand-audiomack-subtle': 'var(--color-brand-audiomack-subtle)',
 
         // Additional text utilities
         'muted-secondary': 'var(--color-text-muted-secondary)',

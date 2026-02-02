@@ -10,7 +10,6 @@ export * from './CookieActions';
 export * from './DSPButtonGroup';
 export * from './FeatureCard';
 export * from './FrostedContainer';
-export * from './LoadingButton';
 export * from './PrimaryCTA';
 export * from './QRCodeCard';
 export * from './SocialLink';

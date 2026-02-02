@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * TODO: Migrate away from Headless UI
+ *
+ * This component currently uses Headless UI. Consider migrating to:
+ * 1. shadcn/ui Combobox pattern (Radix Popover + Base UI Combobox)
+ *    See: https://ui.shadcn.com/docs/components/radix/combobox
+ * 2. cmdk library for command palette style (used by Vercel/Linear)
+ *    See: https://cmdk.paco.me/
+ *
+ * This will maintain consistency with the rest of the Radix-based design system.
+ */
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';

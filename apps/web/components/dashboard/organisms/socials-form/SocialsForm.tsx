@@ -2,6 +2,7 @@
 
 import {
   Button,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -9,7 +10,6 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import type { SocialsFormProps } from './types';

@@ -1,9 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { Textarea } from '@/components/atoms/Textarea';
 import { FormField } from '@/components/molecules/FormField';
 import {
   Dialog,
