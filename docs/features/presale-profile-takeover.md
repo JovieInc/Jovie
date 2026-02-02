@@ -415,7 +415,7 @@ export async function sendPendingAnnouncementEmails() {
 'use client';
 
 import { useState } from 'react';
-import { Input } from '@/components/atoms/Input';
+import { Input } from '@jovie/ui';
 import { Label } from '@/components/atoms/Label';
 import { Button } from '@/components/atoms/Button';
 import { Calendar, Mail, Megaphone } from 'lucide-react';

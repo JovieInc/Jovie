@@ -7,10 +7,9 @@
  * Allows adding, verifying, and removing email addresses.
  */
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { CheckCircle, Mail, ShieldAlert } from 'lucide-react';
 
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 
 import { DashboardCard } from '../../atoms/DashboardCard';

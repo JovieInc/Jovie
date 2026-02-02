@@ -368,7 +368,7 @@ export function extractSpotifyImageUrls(
     small: findClosest(150).url,
     medium: findClosest(300).url,
     large: findClosest(600).url,
-    original: sorted[0]?.url ?? sorted[sorted.length - 1]?.url,
+    original: sorted[0]?.url ?? sorted.at(-1)?.url,
   };
 }
 

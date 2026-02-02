@@ -131,6 +131,9 @@ export {
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
+// InputGroup
+export type { InputGroupProps } from './atoms/input-group';
+export { InputGroup } from './atoms/input-group';
 // Keyboard (Kbd)
 export type { KbdProps } from './atoms/kbd';
 export { Kbd } from './atoms/kbd';
@@ -154,6 +157,17 @@ export type {
   SearchableSubmenuSection,
 } from './atoms/searchable-submenu';
 export { SearchableList, SearchableSubmenu } from './atoms/searchable-submenu';
+// Segment Control
+export type {
+  SegmentControlOption,
+  SegmentControlProps,
+} from './atoms/segment-control';
+export {
+  SegmentControl,
+  Tabs,
+  TabsPrimitive,
+  TabsRoot,
+} from './atoms/segment-control';
 // Select
 export {
   Select,
@@ -186,8 +200,14 @@ export {
 // Simple Tooltip (convenience wrapper for common use cases)
 export type { SimpleTooltipProps } from './atoms/simple-tooltip';
 export { SimpleTooltip } from './atoms/simple-tooltip';
+// Skeleton
+export type { LoadingSkeletonProps, SkeletonProps } from './atoms/skeleton';
+export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
 // Switch
 export { Switch } from './atoms/switch';
+// Textarea
+export type { TextareaProps } from './atoms/textarea';
+export { Textarea, textareaVariants } from './atoms/textarea';
 // Tooltip
 export type { TooltipContentProps } from './atoms/tooltip';
 export {

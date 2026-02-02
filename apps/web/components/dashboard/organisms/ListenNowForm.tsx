@@ -1,8 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { useProfileMutation } from '@/lib/queries';
 import { normalizeUrl } from '@/lib/utils/platform-detection';

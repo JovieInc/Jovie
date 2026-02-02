@@ -128,6 +128,49 @@
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* ============================================
+     DSP/BRAND COLORS - External platform colors
+     ============================================
+     Static brand colors (don't change with theme).
+     Used for platform identification.
+  */
+  /* Spotify */
+  --color-brand-spotify: #1db954;
+  --color-brand-spotify-hover: #1aa34a;
+  --color-brand-spotify-subtle: oklch(95% 0.05 145);
+  /* Apple Music */
+  --color-brand-apple: #fa243c;
+  --color-brand-apple-hover: #e01f35;
+  --color-brand-apple-subtle: oklch(95% 0.05 20);
+  /* YouTube */
+  --color-brand-youtube: #ff0000;
+  --color-brand-youtube-hover: #e60000;
+  --color-brand-youtube-subtle: oklch(95% 0.05 25);
+  /* SoundCloud */
+  --color-brand-soundcloud: #ff5500;
+  --color-brand-soundcloud-hover: #e64d00;
+  --color-brand-soundcloud-subtle: oklch(95% 0.05 45);
+  /* Tidal */
+  --color-brand-tidal: #000000;
+  --color-brand-tidal-hover: #1a1a1a;
+  --color-brand-tidal-subtle: oklch(95% 0 0);
+  /* Amazon Music */
+  --color-brand-amazon: #ff9900;
+  --color-brand-amazon-hover: #e68a00;
+  --color-brand-amazon-subtle: oklch(95% 0.05 70);
+  /* Deezer */
+  --color-brand-deezer: #feaa2d;
+  --color-brand-deezer-hover: #e59928;
+  --color-brand-deezer-subtle: oklch(95% 0.05 75);
+  /* Pandora */
+  --color-brand-pandora: #3668ff;
+  --color-brand-pandora-hover: #2d5ce6;
+  --color-brand-pandora-subtle: oklch(95% 0.05 250);
+  /* Audiomack */
+  --color-brand-audiomack: #ffa200;
+  --color-brand-audiomack-hover: #e69200;
+  --color-brand-audiomack-subtle: oklch(95% 0.05 70);
 }
 
 /* Dark mode - same generation logic, inverted lightness */

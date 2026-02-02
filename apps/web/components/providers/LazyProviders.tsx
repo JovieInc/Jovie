@@ -6,7 +6,7 @@ import React from 'react';
 const ToastProvider = dynamic(
   () => import('./ToastProvider').then(mod => ({ default: mod.ToastProvider })),
   {
-    ssr: false,
+    ssr: true,
     loading: () => null,
   }
 );

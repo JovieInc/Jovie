@@ -1,10 +1,9 @@
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Badge } from '@/components/atoms/Badge';
 import { DotBadge } from '@/components/atoms/DotBadge';
 import { Icon } from '@/components/atoms/Icon';
-import { Input } from '@/components/atoms/Input';
 import { Label } from '@/components/atoms/Label';
 import { NavLink } from '@/components/atoms/NavLink';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
@@ -80,7 +79,7 @@ describe('Atoms Integration Tests', () => {
       render(
         <div>
           <Label htmlFor='password'>Password</Label>
-          <Input id='password' type='password' invalid />
+          <Input id='password' type='password' aria-invalid='true' />
           <span role='alert'>Password is required</span>
         </div>
       );

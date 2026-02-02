@@ -34,7 +34,7 @@ export * from './HeaderIconButton';
 export * from './HeaderText';
 export * from './Icon';
 export * from './IconBadge';
-export * from './Input';
+// Input migrated to @jovie/ui - import { Input } from '@jovie/ui'
 export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './Label';
@@ -63,7 +63,7 @@ export * from './SkipToContent';
 export * from './Spacer';
 export * from './StatusBadge';
 export * from './TableErrorFallback';
-export * from './Textarea';
+// Textarea migrated to @jovie/ui - import { Textarea } from '@jovie/ui'
 export * from './Tooltip';
 export * from './TruncatedText';
 export * from './VerifiedBadge';

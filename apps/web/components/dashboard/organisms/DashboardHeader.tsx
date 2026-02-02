@@ -26,8 +26,7 @@ export function DashboardHeader({
   className,
   mobileTabs,
 }: DashboardHeaderProps) {
-  const currentLabel =
-    breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : '';
+  const currentLabel = breadcrumbs.at(-1)?.label ?? '';
 
   return (
     <header
