@@ -17,7 +17,7 @@ test.describe('Onboarding Flow', () => {
       });
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible({ timeout: 5000 });
 
     await handleInput.fill(handle);

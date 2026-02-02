@@ -57,7 +57,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test simulates rapid typing across different handles
     // to ensure the final availability state matches the last input
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible();
 
     // Simulate rapid typing sequence: taken1 -> available1 -> taken2 -> available2
@@ -113,7 +113,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test specifically checks that a taken handle doesn't show as available
     // even if there are race conditions with previous requests
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible();
 
     // Type sequence: available1 -> taken1 rapidly
@@ -140,7 +140,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test rapid sequence of different handles to stress test the race condition protection
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible();
 
     const rapidSequence = [
@@ -203,7 +203,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible();
 
     // Type rapidly to trigger request cancellation
@@ -231,7 +231,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test that the UI doesn't flicker or show inconsistent states
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     const submitButton = page.getByRole('button', {
       name: 'Request Early Access',
     });
@@ -285,7 +285,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible();
 
     // Type handle that will cause network error
