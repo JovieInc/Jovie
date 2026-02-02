@@ -1,0 +1,63 @@
+/**
+ * Validation functions for onboarding data
+ */
+
+'use server';
+
+import { eq } from 'drizzle-orm';
+import type { withDbSessionTx } from '@/lib/auth/session';
+import { creatorProfiles, users } from '@/lib/db/schema';
+import {
+  createOnboardingError,
+  OnboardingErrorCode,
+  onboardingErrorToError,
+} from '@/lib/errors/onboarding';
+
+type DbTransaction = Parameters<Parameters<typeof withDbSessionTx>[0]>[0];
+
+/**
+ * Validates that the provided email is not already in use by another user.
+ */
+export async function ensureEmailAvailable(
+  tx: DbTransaction,
+  clerkUserId: string,
+  userEmail: string
+): Promise<void> {
+  const [emailOwner] = await tx
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(users.email, userEmail))
+    .limit(1);
+
+  if (emailOwner && emailOwner.clerkId !== clerkUserId) {
+    throw onboardingErrorToError(
+      createOnboardingError(
+        OnboardingErrorCode.EMAIL_IN_USE,
+        'Email is already in use'
+      )
+    );
+  }
+}
+
+/**
+ * Validates that the provided handle is not already in use by another profile.
+ */
+export async function ensureHandleAvailable(
+  tx: DbTransaction,
+  normalizedUsername: string,
+  profileId?: string | null
+): Promise<void> {
+  const [conflict] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+    .limit(1);
+
+  if (conflict && (!profileId || conflict.id !== profileId)) {
+    const error = createOnboardingError(
+      OnboardingErrorCode.USERNAME_TAKEN,
+      'Handle already taken'
+    );
+    throw onboardingErrorToError(error);
+  }
+}
