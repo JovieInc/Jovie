@@ -1,9 +1,20 @@
+import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
+
+// Helper function to locate and wait for ProfileLinkCard
+async function getProfileLinkCard(page: Page): Promise<Locator> {
+  const profileLinkCard = page
+    .locator('[data-testid="profile-link-card"]')
+    .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
+  await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+  return profileLinkCard;
+}
 
 test.describe('ProfileLinkCard E2E Tests', () => {
   test.beforeEach(async ({ page, context }) => {
     // Grant clipboard permissions to avoid permission prompts
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // Note: clipboard-write is not supported in WebKit, only clipboard-read
+    await context.grantPermissions(['clipboard-read']);
 
     // Navigate to dashboard where ProfileLinkCard should be visible
     // Note: This test assumes authentication is handled or mocked appropriately
@@ -17,11 +28,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     page,
     context,
   }) => {
-    // Wait for ProfileLinkCard to be visible - use multiple selectors for robustness
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Listen for new page/tab creation
     const pagePromise = context.waitForEvent('page');
@@ -50,11 +57,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
   });
 
   test('Copy button places correct URL on clipboard', async ({ page }) => {
-    // Wait for ProfileLinkCard to be visible - use multiple selectors for robustness
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Spy on clipboard writeText method
     await page.evaluate(() => {
@@ -92,11 +95,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     // Revoke clipboard permissions to simulate permission denied
     await context.clearPermissions();
 
-    // Wait for ProfileLinkCard to be visible - use multiple selectors for robustness
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Mock clipboard.writeText to throw permission error
     await page.evaluate(() => {
@@ -130,11 +129,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
   test('ProfileLinkCard displays correct profile URL in text', async ({
     page,
   }) => {
-    // Wait for ProfileLinkCard to be visible - use multiple selectors for robustness
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Find the URL text display
     const urlText = profileLinkCard
@@ -152,10 +147,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     page,
   }) => {
     // This test ensures the getBaseUrl() function works correctly
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Get the displayed URL
     const urlText = profileLinkCard
@@ -175,10 +167,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     context,
   }) => {
     // This test specifically ensures we avoid flaky window.open assertions
-    const profileLinkCard = page
-      .locator('[data-testid="profile-link-card"]')
-      .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
-    await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
+    const profileLinkCard = await getProfileLinkCard(page);
 
     // Count initial pages
     const initialPageCount = context.pages().length;
