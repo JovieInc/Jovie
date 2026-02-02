@@ -30,7 +30,7 @@ export function IconBadge({
         style={{
           color: `var(${colorVar})`,
         }}
-        aria-hidden={ariaLabel ? false : true}
+        aria-hidden={!ariaLabel}
         role={ariaLabel ? 'img' : undefined}
         aria-label={ariaLabel}
       />

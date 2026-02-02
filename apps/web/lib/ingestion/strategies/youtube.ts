@@ -200,8 +200,7 @@ function extractAvatar(data: unknown): string | null {
       (Array.isArray(microThumbnails) && microThumbnails) ||
       [];
 
-    const best =
-      thumbnails.length > 0 ? thumbnails[thumbnails.length - 1] : null;
+    const best = thumbnails.at(-1) ?? null;
     const url = best ? getPath(best, ['url']) : null;
     return typeof url === 'string' ? url : null;
   } catch {

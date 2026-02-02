@@ -170,7 +170,7 @@ export function useUniversalLinkInput({
           );
           const pathParts = parsed.pathname.split('/').filter(Boolean);
           if (pathParts.length > 0) {
-            handle = pathParts[pathParts.length - 1] ?? '';
+            handle = pathParts.at(-1) ?? '';
           }
         }
       } catch {
