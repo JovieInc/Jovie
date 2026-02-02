@@ -214,7 +214,7 @@
     "@typescript-eslint/parser": "^8.53.1",
     "@vercel/toolbar": "^0.1.41",
     "@vitejs/plugin-react": "^5.0.2",
-    "@vitest/coverage-v8": "^4.0.16",
+    "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.23",
     "axe-core": "^4.11.1",
     "axe-playwright": "^2.2.2",
