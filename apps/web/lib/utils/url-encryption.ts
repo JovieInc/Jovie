@@ -14,8 +14,14 @@ function base64EncodeUtf8(input: string): string {
     return Buffer.from(input, 'utf8').toString('base64');
   }
 
-  // Browser fallback
-  return btoa(unescape(encodeURIComponent(input)));
+  // Browser fallback using TextEncoder (modern API)
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(input);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 function base64DecodeUtf8(input: string): string {
@@ -23,8 +29,13 @@ function base64DecodeUtf8(input: string): string {
     return Buffer.from(input, 'base64').toString('utf8');
   }
 
-  // Browser fallback
-  return decodeURIComponent(escape(atob(input)));
+  // Browser fallback using TextDecoder (modern API)
+  const binary = atob(input);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export interface EncryptionResult {

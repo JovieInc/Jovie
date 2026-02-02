@@ -68,41 +68,37 @@ export const ContactSidebar = memo(function ContactSidebar({
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!hasContact) return [];
 
-    const items: ContextMenuItemType[] = [];
-
-    if (username) {
-      items.push(
-        {
-          id: 'copy-url',
-          label: 'Copy profile URL',
-          icon: <Copy className='h-4 w-4' />,
-          onClick: () => void handleCopyProfileUrl(),
-        },
-        {
-          id: 'open-profile',
-          label: 'Open profile',
-          icon: <ExternalLink className='h-4 w-4' />,
-          onClick: () => globalThis.open(`/${username}`, '_blank'),
-        }
-      );
-    }
-
-    items.push({
-      id: 'refresh',
-      label: 'Refresh',
-      icon: <RefreshCw className='h-4 w-4' />,
-      onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
-    });
-
-    items.push(
+    const items: ContextMenuItemType[] = [
+      ...(username
+        ? [
+            {
+              id: 'copy-url',
+              label: 'Copy profile URL',
+              icon: <Copy className='h-4 w-4' />,
+              onClick: () => void handleCopyProfileUrl(),
+            },
+            {
+              id: 'open-profile',
+              label: 'Open profile',
+              icon: <ExternalLink className='h-4 w-4' />,
+              onClick: () => globalThis.open(`/${username}`, '_blank'),
+            },
+          ]
+        : []),
+      {
+        id: 'refresh',
+        label: 'Refresh',
+        icon: <RefreshCw className='h-4 w-4' />,
+        onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
+      },
       { type: 'separator' },
       {
         id: 'delete',
         label: 'Delete contact',
         icon: <Trash2 className='h-4 w-4' />,
         onClick: () => toast.info('Delete not implemented'),
-      }
-    );
+      },
+    ];
 
     return convertToCommonDropdownItems(items);
   }, [hasContact, username, handleCopyProfileUrl, onRefresh]);

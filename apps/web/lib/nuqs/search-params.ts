@@ -18,6 +18,8 @@ import {
   parseAsStringLiteral,
 } from 'nuqs/server';
 
+export { parseAsString as sortFieldParser } from 'nuqs/server';
+
 // ============================================================================
 // Pagination Parsers
 // ============================================================================
@@ -52,11 +54,7 @@ export const sortDirectionParser = parseAsStringLiteral([
   'desc',
 ] as const).withDefault('desc');
 
-/**
- * Generic sort field parser.
- * Use this when you need a simple string sort field.
- */
-export const sortFieldParser = parseAsString;
+// sortFieldParser is re-exported from nuqs/server at the top of this file
 
 // ============================================================================
 // Search Parsers

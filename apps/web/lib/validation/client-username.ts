@@ -7,12 +7,12 @@
 
 import {
   type DetailedValidationResult,
-  generateUsernameSuggestions as generateSuggestions,
   validateUsernameCore,
 } from './username-core';
 
-// Re-export core constants for backwards compatibility
+// Re-export core constants and utilities for backwards compatibility
 export {
+  generateUsernameSuggestions,
   RESERVED_USERNAMES,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -52,9 +52,3 @@ export function validateUsernameFormat(
     suggestion: result.suggestion,
   };
 }
-
-/**
- * Generate username suggestions based on input.
- * Re-exported from core for client-side use.
- */
-export const generateUsernameSuggestions = generateSuggestions;

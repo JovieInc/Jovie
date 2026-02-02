@@ -1,9 +1,10 @@
 import {
   Dialog as UiDialog,
   DialogContent as UiDialogContent,
-  DialogDescription as UiDialogDescription,
-  DialogTitle as UiDialogTitle,
 } from '@jovie/ui';
+
+export { DialogDescription, DialogTitle } from '@jovie/ui';
+
 import type React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -60,10 +61,6 @@ export function Dialog({
     </UiDialog>
   );
 }
-
-export const DialogTitle = UiDialogTitle;
-
-export const DialogDescription = UiDialogDescription;
 
 export function DialogBody({
   className,
