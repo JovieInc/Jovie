@@ -127,6 +127,7 @@ async function globalSetup() {
   }
 
   // Start browser to warm up (non-smoke only)
+  // Note: Auth state is created by auth.setup.ts, not here
   console.log('🌐 Warming up browser...');
   const browser = await chromium.launch();
   const page = await browser.newPage();

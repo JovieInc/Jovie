@@ -1,14 +1,11 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Locator, Page } from '@playwright/test';
-import { expect, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { expect, test } from '../fixtures/performance'; // Use performance-optimized fixture
 import { hasClerkCredentials } from '../helpers/clerk-credentials';
 
-// Helper function to locate and wait for ProfileLinkCard
-async function getProfileLinkCard(page: Page): Promise<Locator> {
-  const profileLinkCard = page
-    .locator('[data-testid="profile-link-card"]')
-    .or(page.locator('text=Your Profile Link').locator('..').locator('..'));
+// Helper function to locate and wait for dashboard overview (where profile link is now integrated)
+async function getDashboardOverview(page: Page): Promise<Locator> {
+  const profileLinkCard = page.locator('[data-testid="dashboard-overview"]');
   await expect(profileLinkCard).toBeVisible({ timeout: 10000 });
   return profileLinkCard;
 }
@@ -27,30 +24,35 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     // Note: clipboard-write is not supported in WebKit, only clipboard-read
     await context.grantPermissions(['clipboard-read']);
 
-    // Set up Clerk testing token and sign in
+    // Set up Clerk testing token (required even with storageState)
     await setupClerkTestingToken({ page });
 
-    try {
-      await signInUser(page);
-    } catch (error) {
-      console.error('Failed to sign in test user:', error);
-      test.skip();
-    }
+    // Navigate to dashboard - authentication is already set up via storageState
+    // (created in auth.setup.ts and loaded automatically for all tests)
+    await page.goto('/app/dashboard', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+
+    // Wait for dashboard to be ready
+    const profileLinkCard = page.locator('[data-testid="dashboard-overview"]');
+    await profileLinkCard.waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test('View Profile button opens correct URL in new tab', async ({
     page,
     context,
   }) => {
-    const profileLinkCard = await getProfileLinkCard(page);
+    const profileLinkCard = await getDashboardOverview(page);
 
     // Listen for new page/tab creation
     const pagePromise = context.waitForEvent('page');
 
-    // Click the "View Profile" link
-    const viewProfileLink = profileLinkCard.locator('a', {
-      hasText: 'View Profile',
-    });
+    // Click the "View profile" link in the header (icon button with aria-label)
+    // Note: aria-label is lowercase "View profile"
+    const viewProfileLink = profileLinkCard.locator(
+      'a[aria-label="View profile"]'
+    );
     await expect(viewProfileLink).toBeVisible();
     await viewProfileLink.click();
 
@@ -71,7 +73,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
   });
 
   test('Copy button places correct URL on clipboard', async ({ page }) => {
-    const profileLinkCard = await getProfileLinkCard(page);
+    const profileLinkCard = await getDashboardOverview(page);
 
     // Spy on clipboard writeText method
     await page.evaluate(() => {
@@ -83,13 +85,18 @@ test.describe('ProfileLinkCard E2E Tests', () => {
       };
     });
 
-    // Click the "Copy" button
-    const copyButton = profileLinkCard.locator('button', { hasText: 'Copy' });
+    // Click the "Copy URL" button in the header (icon button with sr-only label)
+    const copyButton = profileLinkCard
+      .locator('button')
+      .filter({ has: page.locator('.sr-only', { hasText: 'Copy URL' }) })
+      .first();
     await expect(copyButton).toBeVisible();
     await copyButton.click();
 
-    // Verify the button text changes to "Copied!"
-    await expect(copyButton).toHaveText('Copied!', { timeout: 3000 });
+    // Verify the sr-only label changes to "Copied!"
+    await expect(
+      copyButton.locator('.sr-only', { hasText: 'Copied!' })
+    ).toBeVisible({ timeout: 3000 });
 
     // Verify clipboard was called with correct URL
     const clipboardData = await page.evaluate(
@@ -98,8 +105,10 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     expect(clipboardData).toBeTruthy();
     expect(clipboardData).toMatch(/^https?:\/\/.+\/[a-zA-Z0-9._-]+$/); // Should be full URL with handle
 
-    // Wait for button text to revert back to "Copy"
-    await expect(copyButton).toHaveText('Copy', { timeout: 3000 });
+    // Wait for button text to revert back to "Copy URL"
+    await expect(
+      copyButton.locator('.sr-only', { hasText: 'Copy URL' })
+    ).toBeVisible({ timeout: 3000 });
   });
 
   test('Copy button handles clipboard permission errors gracefully', async ({
@@ -109,7 +118,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     // Revoke clipboard permissions to simulate permission denied
     await context.clearPermissions();
 
-    const profileLinkCard = await getProfileLinkCard(page);
+    const profileLinkCard = await getDashboardOverview(page);
 
     // Mock clipboard.writeText to throw permission error
     await page.evaluate(() => {
@@ -140,40 +149,20 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     ).toBeTruthy();
   });
 
-  test('ProfileLinkCard displays correct profile URL in text', async ({
+  test.skip('ProfileLinkCard displays correct profile URL in text', async ({
     page,
   }) => {
-    const profileLinkCard = await getProfileLinkCard(page);
-
-    // Find the URL text display
-    const urlText = profileLinkCard
-      .locator('p')
-      .filter({ hasText: /https?:\/\/.+/ });
-    await expect(urlText).toBeVisible();
-
-    // Verify URL format
-    const displayedUrl = await urlText.textContent();
-    expect(displayedUrl).toBeTruthy();
-    expect(displayedUrl).toMatch(/^https?:\/\/.+\/[a-zA-Z0-9._-]+$/);
+    // SKIP: Profile URL is no longer displayed as text in the dashboard header.
+    // The URL is now only available via the copy button and view profile link.
+    // This test is kept for reference but skipped as the feature design changed.
   });
 
-  test('ProfileLinkCard works across different environments', async ({
+  test.skip('ProfileLinkCard works across different environments', async ({
     page,
   }) => {
-    // This test ensures the getBaseUrl() function works correctly
-    const profileLinkCard = await getProfileLinkCard(page);
-
-    // Get the displayed URL
-    const urlText = profileLinkCard
-      .locator('p')
-      .filter({ hasText: /https?:\/\/.+/ });
-    const displayedUrl = await urlText.textContent();
-
-    expect(displayedUrl).toBeTruthy();
-
-    // Verify the URL follows a valid profile URL format
-    // Profile URLs use PROFILE_URL constant to ensure correct domain (jov.ie)
-    expect(displayedUrl).toMatch(/^https?:\/\/.+\/.+$/);
+    // SKIP: Profile URL is no longer displayed as text in the dashboard header.
+    // The URL verification is now covered by the copy button and view profile tests.
+    // This test is kept for reference but skipped as the feature design changed.
   });
 
   test('No flaky window/tab handling - uses context.pages', async ({
@@ -181,7 +170,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     context,
   }) => {
     // This test specifically ensures we avoid flaky window.open assertions
-    const profileLinkCard = await getProfileLinkCard(page);
+    const profileLinkCard = await getDashboardOverview(page);
 
     // Count initial pages
     const initialPageCount = context.pages().length;

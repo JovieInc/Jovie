@@ -459,6 +459,30 @@ const apiKey = process.env.STRIPE_SECRET_KEY; // No validation!
 
 Required variables are defined in `lib/env.ts` with Zod validation.
 
+### Doppler for Secrets Management
+
+**All secrets and environment variables are stored in Doppler.**
+
+To access secrets when running commands locally:
+
+```bash
+# Run any command with Doppler secrets injected
+doppler run -- <command>
+
+# Examples
+doppler run -- pnpm dev
+doppler run -- pnpm playwright test
+doppler run -- node scripts/migrate.js
+```
+
+**Key points:**
+- Clerk credentials (test & production)
+- Database URLs
+- API keys (Stripe, Resend, etc.)
+- E2E test credentials (E2E_CLERK_USER_USERNAME, E2E_CLERK_USER_PASSWORD)
+
+**NEVER** commit `.env` files with real secrets. Use Doppler or local `.env.local` for development.
+
 ---
 
 ## Branch Strategy
