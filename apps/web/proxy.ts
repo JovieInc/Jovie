@@ -533,11 +533,41 @@ const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
 });
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
-  const shouldBypassClerk =
-    process.env.NODE_ENV === 'test' && isMockOrMissingClerkConfig();
+  // Check if Clerk config is missing or mocked
+  const clerkConfigMissing = isMockOrMissingClerkConfig();
 
-  if (shouldBypassClerk) {
+  // In test mode, always bypass Clerk if config is missing
+  if (process.env.NODE_ENV === 'test' && clerkConfigMissing) {
     return handleRequest(req, null);
+  }
+
+  // In production/dev, if Clerk config is missing, handle gracefully
+  // This can happen during Vercel cold starts when env vars are temporarily unavailable
+  if (clerkConfigMissing) {
+    const pathname = req.nextUrl.pathname;
+    const pathInfo = categorizePath(pathname);
+
+    // For public routes (non-protected), proceed without auth
+    // This allows the homepage, marketing pages, and public profiles to load
+    if (!pathInfo.isProtectedPath) {
+      return handleRequest(req, null);
+    }
+
+    // For protected routes, return a service unavailable error
+    // This is better than crashing with an unhandled exception
+    return new NextResponse(
+      JSON.stringify({
+        error: 'Service temporarily unavailable',
+        message: 'Authentication service is initializing. Please try again.',
+      }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '5',
+        },
+      }
+    );
   }
 
   return clerkWrappedMiddleware(req, event);

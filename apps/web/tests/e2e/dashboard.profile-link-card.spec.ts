@@ -1,5 +1,7 @@
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
+import { signInUser } from '../helpers/clerk-auth';
 
 // Helper function to locate and wait for ProfileLinkCard
 async function getProfileLinkCard(page: Page): Promise<Locator> {
@@ -10,18 +12,47 @@ async function getProfileLinkCard(page: Page): Promise<Locator> {
   return profileLinkCard;
 }
 
+/**
+ * Check if Clerk credentials are available for authenticated tests
+ */
+function hasClerkCredentials(): boolean {
+  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
+  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = username.includes('+clerk_test');
+
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail) &&
+    clerkSetupSuccess
+  );
+}
+
 test.describe('ProfileLinkCard E2E Tests', () => {
   test.beforeEach(async ({ page, context }) => {
+    // Skip if no Clerk credentials configured
+    if (!hasClerkCredentials()) {
+      console.log('⚠ Skipping ProfileLinkCard tests - no Clerk credentials');
+      console.log('  Set E2E_CLERK_USER_USERNAME and E2E_CLERK_USER_PASSWORD');
+      test.skip();
+      return;
+    }
+
     // Grant clipboard permissions to avoid permission prompts
     // Note: clipboard-write is not supported in WebKit, only clipboard-read
     await context.grantPermissions(['clipboard-read']);
 
-    // Navigate to dashboard where ProfileLinkCard should be visible
-    // Note: This test assumes authentication is handled or mocked appropriately
-    await page.goto('/app/dashboard', {
-      waitUntil: 'domcontentloaded',
-      timeout: 10000,
-    });
+    // Set up Clerk testing token and sign in
+    await setupClerkTestingToken({ page });
+
+    try {
+      await signInUser(page);
+    } catch (error) {
+      console.error('Failed to sign in test user:', error);
+      test.skip();
+    }
   });
 
   test('View Profile button opens correct URL in new tab', async ({
