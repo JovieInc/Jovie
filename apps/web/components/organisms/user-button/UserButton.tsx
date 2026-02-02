@@ -186,7 +186,7 @@ function buildDropdownItems({
         name='HelpCircle'
         className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
       />
-    ) as unknown as CommonDropdownSubmenu['icon'],
+    ),
     items: learnMoreItems,
   };
   items.push(learnMoreSubmenu);
