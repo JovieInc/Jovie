@@ -1,5 +1,15 @@
 import { expect, test } from './setup';
 
+/**
+ * Legal Pages Tests
+ *
+ * NOTE: Legal pages (privacy policy, terms of service) are public
+ * and must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Legal Pages', () => {
   test.describe('Privacy Policy', () => {
     test.beforeEach(async ({ page }) => {

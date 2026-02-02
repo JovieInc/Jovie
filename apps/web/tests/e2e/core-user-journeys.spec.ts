@@ -10,7 +10,15 @@ import {
  *
  * These tests verify the most critical user paths work correctly.
  * They use deterministic waits instead of flaky timeouts.
+ *
+ * NOTE: These tests run WITHOUT the saved authentication session,
+ * as they test unauthenticated user journeys (anonymous homepage,
+ * public profiles, and redirect to sign-in).
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Core User Journeys', () => {
   test('Homepage loads correctly for anonymous users', async ({ page }) => {
     await smokeNavigate(page, '/');
