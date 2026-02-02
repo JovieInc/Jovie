@@ -31,7 +31,7 @@ const OBFUSCATION_PATTERNS = [
 /**
  * Email domains that are likely personal/contact emails (prioritize these)
  */
-const PERSONAL_EMAIL_DOMAINS = [
+const PERSONAL_EMAIL_DOMAINS = new Set([
   'gmail.com',
   'yahoo.com',
   'hotmail.com',
@@ -41,7 +41,7 @@ const PERSONAL_EMAIL_DOMAINS = [
   'aol.com',
   'protonmail.com',
   'proton.me',
-];
+]);
 
 /**
  * Domains that are likely not personal contact emails (deprioritize)
@@ -100,13 +100,13 @@ function scoreEmail(email: string, context?: string): number {
   const local = email.split('@')[0]?.toLowerCase() ?? '';
 
   // Personal domain bonus
-  if (PERSONAL_EMAIL_DOMAINS.includes(domain)) {
+  if (PERSONAL_EMAIL_DOMAINS.has(domain)) {
     score += 10;
   }
 
   // Custom domain (likely business email)
   if (
-    !PERSONAL_EMAIL_DOMAINS.includes(domain) &&
+    !PERSONAL_EMAIL_DOMAINS.has(domain) &&
     !domain.includes('gmail') &&
     !domain.includes('yahoo')
   ) {

@@ -23,7 +23,6 @@ import { createClerkClient } from '@clerk/backend';
 interface TestUser {
   username: string;
   email: string;
-  password: string;
   firstName: string;
   lastName: string;
   metadata: {
@@ -36,8 +35,7 @@ interface TestUser {
 const TEST_USERS: TestUser[] = [
   {
     username: 'e2e-test-user',
-    email: 'e2e@jov.ie',
-    password: generateSecurePassword(),
+    email: 'e2e+clerk_test@jov.ie',
     firstName: 'E2E',
     lastName: 'Test',
     metadata: {
@@ -48,8 +46,7 @@ const TEST_USERS: TestUser[] = [
   },
   {
     username: 'e2e-test-user-2',
-    email: 'e2e-2@jov.ie',
-    password: generateSecurePassword(),
+    email: 'e2e-2+clerk_test@jov.ie',
     firstName: 'E2E',
     lastName: 'Test 2',
     metadata: {
@@ -59,19 +56,6 @@ const TEST_USERS: TestUser[] = [
     },
   },
 ];
-
-function generateSecurePassword(): string {
-  // Generate a strong password: 16 chars, alphanumeric + symbols
-  const chars =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let password = '';
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  for (let i = 0; i < 16; i++) {
-    password += chars[array[i] % chars.length];
-  }
-  return password;
-}
 
 async function setupE2EUsers() {
   console.log('🔧 Setting up E2E test users in Clerk...\n');
@@ -103,7 +87,6 @@ async function setupE2EUsers() {
   const createdUsers: Array<{
     username: string;
     email: string;
-    password: string;
     clerkId: string;
   }> = [];
 
@@ -124,22 +107,19 @@ async function setupE2EUsers() {
         createdUsers.push({
           username: testUser.username,
           email: testUser.email,
-          password: testUser.password,
           clerkId: existing.id,
         });
         continue;
       }
 
-      // Create user with password authentication
+      // Create user with OTP email authentication (no password needed)
       const user = await clerk.users.createUser({
         username: testUser.username,
         emailAddress: [testUser.email],
-        password: testUser.password,
         firstName: testUser.firstName,
         lastName: testUser.lastName,
         publicMetadata: testUser.metadata,
-        skipPasswordChecks: false, // Enforce password requirements
-        skipPasswordRequirement: false,
+        skipPasswordRequirement: true, // App uses OTP, not passwords
       });
 
       console.log(`  ✓ Created user (ID: ${user.id})`);
@@ -150,7 +130,6 @@ async function setupE2EUsers() {
       createdUsers.push({
         username: testUser.username,
         email: testUser.email,
-        password: testUser.password,
         clerkId: user.id,
       });
     } catch (error) {
@@ -172,14 +151,16 @@ async function setupE2EUsers() {
   console.log('# Primary E2E User');
   console.log(`E2E_CLERK_USER_ID=${createdUsers[0].clerkId}`);
   console.log(`E2E_CLERK_USER_USERNAME=${createdUsers[0].email}`);
-  console.log(`E2E_CLERK_USER_PASSWORD=${createdUsers[0].password}`);
 
   if (createdUsers.length > 1) {
     console.log('\n# Secondary E2E User (for multi-user tests)');
     console.log(`E2E_CLERK_USER_2_ID=${createdUsers[1].clerkId}`);
     console.log(`E2E_CLERK_USER_2_USERNAME=${createdUsers[1].email}`);
-    console.log(`E2E_CLERK_USER_2_PASSWORD=${createdUsers[1].password}`);
   }
+
+  console.log(
+    '\n💡 Note: Uses OTP email authentication (code: 424242 for test emails)'
+  );
 
   console.log('\n' + '='.repeat(80));
   console.log('📝 Next Steps:');

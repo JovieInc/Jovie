@@ -54,7 +54,7 @@ export function cloudinaryUrl(
   if (opts.height) parts.push(`h_${opts.height}`);
   if (opts.crop) parts.push(`c_${opts.crop}`);
   if (opts.gravity) parts.push(`g_${opts.gravity}`);
-  if (typeof opts.radius !== 'undefined') parts.push(`r_${opts.radius}`);
+  if (opts.radius !== undefined) parts.push(`r_${opts.radius}`);
 
   const transformation = parts.join(',');
 

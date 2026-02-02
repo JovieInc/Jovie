@@ -63,7 +63,7 @@ export function computeLinkConfidence(input: ConfidenceInput): {
 } {
   const signals = new Set<ConfidenceSignal>(
     (input.signals ?? []).filter((s): s is ConfidenceSignal =>
-      Object.prototype.hasOwnProperty.call(SIGNAL_WEIGHTS, s)
+      Object.hasOwn(SIGNAL_WEIGHTS, s)
     )
   );
   const sources = new Set<string>(input.sources ?? []);
