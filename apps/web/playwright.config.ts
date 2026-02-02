@@ -29,7 +29,9 @@ function getRetries(): number {
 
 function getWorkers(): number | undefined {
   if (!isCI) return undefined;
-  return isSmokeOnly ? 8 : 4;
+  // GitHub Actions runners have 2 vCPUs - match that to avoid context switching
+  // Using 4-8 workers causes thrashing and makes tests slower/flakier
+  return 2;
 }
 
 export default defineConfig({
@@ -84,16 +86,34 @@ export default defineConfig({
   },
 
   projects: [
+    // Setup project: authenticate once and save storageState
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+      // Setup runs without storageState to create fresh auth
+    },
+
+    // Authenticated tests use storageState from setup
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Use saved auth state for faster tests (created in global-setup.ts)
+        // Tests will fall back to individual sign-ins if storageState doesn't exist
+        storageState: '.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
     // Only run Firefox in full-matrix workflow (weekly comprehensive testing)
     ...(isFullMatrix
       ? [
           {
             name: 'firefox',
-            use: { ...devices['Desktop Firefox'] },
+            use: {
+              ...devices['Desktop Firefox'],
+              storageState: '.auth/user.json',
+            },
+            dependencies: ['setup'],
           },
         ]
       : []),
@@ -102,7 +122,11 @@ export default defineConfig({
       ? [
           {
             name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
+            use: {
+              ...devices['Desktop Safari'],
+              storageState: '.auth/user.json',
+            },
+            dependencies: ['setup'],
           },
         ]
       : []),
@@ -124,7 +148,7 @@ export default defineConfig({
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,
-          timeout: 60000,
+          timeout: 120000, // Increased to 2min for slow Turbopack compilations
           stdout: 'pipe',
           stderr: 'pipe',
         },
