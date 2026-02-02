@@ -54,7 +54,6 @@ export function SsoCallbackHandler({
       // Use signInFallbackRedirectUrl as the default destination
       // since password prompts typically happen for existing users
       router.replace(signInFallbackRedirectUrl);
-      return;
     }
   }, [router, signInFallbackRedirectUrl]);
 

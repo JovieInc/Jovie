@@ -348,7 +348,7 @@ export type RateLimiterName = keyof typeof RATE_LIMITERS;
  * Supports: '1 m' (minutes), '1 h' (hours), '1 d' (days), '1 s' (seconds)
  */
 export function parseWindowToMs(window: string): number {
-  const match = window.match(/^(\d+)\s*([smhd])$/);
+  const match = /^(\d+)\s*([smhd])$/.exec(window);
   if (!match) {
     throw new SyntaxError(`Invalid window format: ${window}`);
   }

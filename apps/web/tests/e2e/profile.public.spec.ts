@@ -1,10 +1,16 @@
 /**
  * E2E tests for public profile rendering performance
  * Tests loading speed, avatar visibility, social links, and performance metrics
+ *
+ * NOTE: These tests verify the public unauthenticated profile viewing
+ * experience and must run without saved authentication.
  */
 
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, smokeNavigate } from './utils/smoke-test-utils';
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Public Profile Performance', () => {
   test.describe('Tim Profile Rendering', () => {

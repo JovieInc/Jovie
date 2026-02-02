@@ -84,7 +84,7 @@ export function extractSpotifyId(url: string): string | null {
   ];
 
   for (const pattern of patterns) {
-    const match = url.match(pattern);
+    const match = pattern.exec(url);
     if (match) {
       return match[1];
     }

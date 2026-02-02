@@ -32,8 +32,15 @@ function hasRealClerkConfig(): boolean {
  * Previous tests merged for efficiency (was 6, now 2).
  * Billing routes moved to billing.spec.ts (full suite only).
  *
+ * NOTE: These tests must run WITHOUT the saved authentication session,
+ * otherwise auth pages would redirect to /app.
+ *
  * @smoke
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Auth Smoke Tests @smoke', () => {
   // =========================================================================
   // AUTH PAGES - Consolidated test (was 2 separate tests)

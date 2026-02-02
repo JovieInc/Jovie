@@ -45,7 +45,7 @@ function createMultiPatternExtractor(
 ): (url: string) => string | null {
   return (url: string) => {
     for (const pattern of patterns) {
-      const match = url.match(pattern);
+      const match = pattern.exec(url);
       if (match) return match[1];
     }
     return null;

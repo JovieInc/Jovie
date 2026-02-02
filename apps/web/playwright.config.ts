@@ -81,6 +81,9 @@ export default defineConfig({
     actionTimeout: isSmokeOnly ? 10_000 : 15_000,
     // Add Vercel bypass header when secret is available (for staging/canary)
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
+    // Reuse authenticated session from global setup
+    // Tests can override this by not using the storage state fixture
+    storageState: 'tests/.auth/user.json',
   },
 
   projects: [

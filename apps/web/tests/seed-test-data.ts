@@ -63,54 +63,62 @@ export async function seedTestData() {
 
   try {
     // Create E2E test user (for authenticated dashboard tests)
-    const E2E_CLERK_USER_ID = 'user_31mqVTy5GIyFXxvfyRArBu7Xt4v';
-    const E2E_EMAIL = 'e2e@jov.ie';
+    // These values come from the setup script: scripts/setup-e2e-users.ts
+    const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
+    const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
     const E2E_USERNAME = 'e2e-test-user';
 
-    console.log('  Creating E2E test user...');
-    const [existingUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, E2E_CLERK_USER_ID))
-      .limit(1);
-
-    if (!existingUser) {
-      // Create the user record
-      const [createdUser] = await db
-        .insert(users)
-        .values({
-          clerkId: E2E_CLERK_USER_ID,
-          email: E2E_EMAIL,
-          name: 'E2E Test User',
-          userStatus: 'active', // Active user with completed onboarding
-        })
-        .returning({ id: users.id });
-
-      console.log(`    ✓ Created E2E user (ID: ${createdUser.id})`);
-
-      // Create a creator profile for the E2E user
-      const [createdProfile] = await db
-        .insert(creatorProfiles)
-        .values({
-          userId: createdUser.id,
-          username: E2E_USERNAME,
-          usernameNormalized: E2E_USERNAME.toLowerCase(),
-          displayName: 'E2E Test User',
-          bio: 'Automated test user',
-          creatorType: 'artist',
-          isPublic: true,
-          isVerified: false,
-          isClaimed: true,
-          ingestionStatus: 'idle',
-          onboardingCompletedAt: new Date(), // Mark onboarding as complete
-        })
-        .returning({ id: creatorProfiles.id });
-
+    if (!E2E_CLERK_USER_ID) {
+      console.log('  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation');
       console.log(
-        `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+        '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
       );
     } else {
-      console.log('    ✓ E2E test user already exists (skipping)');
+      console.log('  Creating E2E test user...');
+      const [existingUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, E2E_CLERK_USER_ID))
+        .limit(1);
+
+      if (!existingUser) {
+        // Create the user record
+        const [createdUser] = await db
+          .insert(users)
+          .values({
+            clerkId: E2E_CLERK_USER_ID,
+            email: E2E_EMAIL,
+            name: 'E2E Test User',
+            userStatus: 'active', // Active user with completed onboarding
+          })
+          .returning({ id: users.id });
+
+        console.log(`    ✓ Created E2E user (ID: ${createdUser.id})`);
+
+        // Create a creator profile for the E2E user
+        const [createdProfile] = await db
+          .insert(creatorProfiles)
+          .values({
+            userId: createdUser.id,
+            username: E2E_USERNAME,
+            usernameNormalized: E2E_USERNAME.toLowerCase(),
+            displayName: 'E2E Test User',
+            bio: 'Automated test user',
+            creatorType: 'artist',
+            isPublic: true,
+            isVerified: false,
+            isClaimed: true,
+            ingestionStatus: 'idle',
+            onboardingCompletedAt: new Date(), // Mark onboarding as complete
+          })
+          .returning({ id: creatorProfiles.id });
+
+        console.log(
+          `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+        );
+      } else {
+        console.log('    ✓ E2E test user already exists (skipping)');
+      }
     }
 
     // Create test profiles

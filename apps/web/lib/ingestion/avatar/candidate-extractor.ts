@@ -62,7 +62,7 @@ function extractSpotifyArtistId(url: string): string | null {
       parsed.hostname === 'open.spotify.com' ||
       parsed.hostname === 'spotify.com'
     ) {
-      const match = parsed.pathname.match(/\/artist\/([a-zA-Z0-9]+)/);
+      const match = /\/artist\/([a-zA-Z0-9]+)/.exec(parsed.pathname);
       return match?.[1] ?? null;
     }
   } catch {
@@ -83,7 +83,7 @@ function extractAppleMusicArtistId(url: string): string | null {
       parsed.hostname === 'itunes.apple.com'
     ) {
       // Format: /us/artist/artist-name/123456789
-      const match = parsed.pathname.match(/\/artist\/[^/]+\/(\d+)/);
+      const match = /\/artist\/[^/]+\/(\d+)/.exec(parsed.pathname);
       return match?.[1] ?? null;
     }
   } catch {
@@ -104,7 +104,7 @@ function extractDeezerArtistId(url: string): string | null {
       parsed.hostname === 'deezer.com'
     ) {
       // Format: /artist/123 or /en/artist/123
-      const match = parsed.pathname.match(/\/artist\/(\d+)/);
+      const match = /\/artist\/(\d+)/.exec(parsed.pathname);
       return match?.[1] ?? null;
     }
   } catch {
