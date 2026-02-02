@@ -104,17 +104,17 @@ export function LoadingSkeleton({
   width = 'w-full',
   rounded = 'sm',
 }: LoadingSkeletonProps) {
+  // Generate stable keys for multi-line skeletons (always called to satisfy hook rules)
+  const lineKeys = React.useMemo(
+    () => Array.from({ length: lines }, (_, i) => `skeleton-line-${i}`),
+    [lines]
+  );
+
   if (lines === 1) {
     return (
       <Skeleton className={cn(height, width, className)} rounded={rounded} />
     );
   }
-
-  // Generate stable keys for multi-line skeletons
-  const lineKeys = React.useMemo(
-    () => Array.from({ length: lines }, (_, i) => `skeleton-line-${i}`),
-    [lines]
-  );
 
   return (
     <div className='space-y-2' aria-hidden='true'>

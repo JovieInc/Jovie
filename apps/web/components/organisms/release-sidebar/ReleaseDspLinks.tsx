@@ -82,7 +82,7 @@ export function ReleaseDspLinks({
 }: ReleaseDspLinksProps) {
   // Get list of providers that don't have links yet (for the add dropdown)
   const availableProviders = Object.entries(providerConfig).filter(
-    ([key]) => !release.providers.find(p => p.key === key)
+    ([key]) => !release.providers.some(p => p.key === key)
   ) as [ProviderKey, { label: string; accent: string }][];
 
   return (

@@ -100,13 +100,13 @@ function scoreEmail(email: string, context?: string): number {
   const local = email.split('@')[0]?.toLowerCase() ?? '';
 
   // Personal domain bonus
-  if (PERSONAL_EMAIL_DOMAINS.some(d => domain === d)) {
+  if (PERSONAL_EMAIL_DOMAINS.includes(domain)) {
     score += 10;
   }
 
   // Custom domain (likely business email)
   if (
-    !PERSONAL_EMAIL_DOMAINS.some(d => domain === d) &&
+    !PERSONAL_EMAIL_DOMAINS.includes(domain) &&
     !domain.includes('gmail') &&
     !domain.includes('yahoo')
   ) {

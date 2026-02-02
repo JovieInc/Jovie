@@ -79,8 +79,7 @@ export function WaitlistPrimaryGoalStep({
   useEffect(() => {
     if (isHydrating) return;
     const button =
-      buttonRefs.current[selectedIndex >= 0 ? selectedIndex : 0] ??
-      buttonRefs.current[0];
+      buttonRefs.current[Math.max(0, selectedIndex)] ?? buttonRefs.current[0];
     button?.focus();
   }, [isHydrating, selectedIndex]);
 

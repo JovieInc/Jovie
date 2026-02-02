@@ -117,8 +117,7 @@ export function fuzzyMatch(
     matchIndices: [],
   };
 
-  for (let qIdx = 0; qIdx < query.length; qIdx += 1) {
-    const qChar = query[qIdx];
+  for (const qChar of query) {
     if (qChar === ' ') continue;
 
     const nextState = findNextMatch(qChar, target, state);
