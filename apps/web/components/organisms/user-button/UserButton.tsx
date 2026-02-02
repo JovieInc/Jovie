@@ -1,14 +1,14 @@
 'use client';
 
-import type { CommonDropdownItem } from '@jovie/ui';
+import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { Avatar } from '@/components/atoms/Avatar';
-import { Icon } from '@/components/atoms/Icon';
-import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { cn } from '@/lib/utils';
+import { Avatar } from '../../atoms/Avatar/Avatar';
+import { Icon } from '../../atoms/Icon';
+import { FeedbackModal } from '../../dashboard/molecules/FeedbackModal';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
 
@@ -115,9 +115,11 @@ function buildDropdownItems({
     },
   ];
 
-  // Add keyboard shortcuts item if handler is provided
+  // Add "Learn More" submenu with keyboard shortcuts and legal links
+  const learnMoreItems: CommonDropdownItem[] = [];
+
   if (handleOpenShortcuts) {
-    items.push({
+    learnMoreItems.push({
       type: 'action',
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
@@ -131,6 +133,63 @@ function buildDropdownItems({
       shortcut: '⌘ /',
     });
   }
+
+  // Add legal page links
+  learnMoreItems.push(
+    {
+      type: 'action',
+      id: 'privacy-policy',
+      label: 'Privacy Policy',
+      icon: (
+        <Icon
+          name='Shield'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () =>
+        window.open('/legal/privacy', '_blank', 'noopener,noreferrer'),
+    },
+    {
+      type: 'action',
+      id: 'terms-of-service',
+      label: 'Terms of Service',
+      icon: (
+        <Icon
+          name='FileText'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () =>
+        window.open('/legal/terms', '_blank', 'noopener,noreferrer'),
+    },
+    {
+      type: 'action',
+      id: 'cookie-policy',
+      label: 'Cookie Policy',
+      icon: (
+        <Icon
+          name='Cookie'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
+      onClick: () =>
+        window.open('/legal/cookies', '_blank', 'noopener,noreferrer'),
+    }
+  );
+
+  const learnMoreSubmenu: CommonDropdownSubmenu = {
+    type: 'submenu',
+    id: 'learn-more',
+    label: 'Learn more',
+    icon: (
+      <Icon
+        name='HelpCircle'
+        className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+      />
+    ),
+    items: learnMoreItems,
+  };
+  items.push(learnMoreSubmenu);
 
   // Add billing item based on status
   if (billingStatus.loading) {

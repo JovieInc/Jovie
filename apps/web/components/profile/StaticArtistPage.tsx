@@ -221,6 +221,12 @@ export function StaticArtistPage({
         <div>
           {mode === 'profile' ? (
             <div className='space-y-4'>
+              {latestRelease && (
+                <LatestReleaseCard
+                  release={latestRelease}
+                  artistHandle={artist.handle}
+                />
+              )}
               <div data-testid='primary-cta'>
                 <ProfilePrimaryCTA
                   artist={artist}
@@ -229,12 +235,6 @@ export function StaticArtistPage({
                   showCapture
                 />
               </div>
-              {latestRelease && (
-                <LatestReleaseCard
-                  release={latestRelease}
-                  artistHandle={artist.handle}
-                />
-              )}
             </div>
           ) : (
             renderContent(

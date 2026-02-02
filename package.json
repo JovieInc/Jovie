@@ -73,7 +73,7 @@
       "biome check --write --no-errors-on-unmatched"
     ],
     "apps/web/**/*.{ts,tsx}": [
-      "pnpm --filter=@jovie/web run lint:eslint --max-warnings 0"
+      "eslint --config apps/web/eslint.config.js --max-warnings=0 --cache --cache-location apps/web/.cache/eslint --cache-strategy content"
     ],
     "apps/web/components/**/*.{tsx,ts}": [
       "pnpm --filter=@jovie/web run a11y:check:staged"
