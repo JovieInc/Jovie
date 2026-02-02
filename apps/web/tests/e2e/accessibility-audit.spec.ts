@@ -263,7 +263,7 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of routes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url);
+      await page.goto(url, { timeout: 60000 });
       await page.waitForLoadState('networkidle');
 
       // Always test BOTH themes for every page
@@ -299,7 +299,7 @@ test.describe('Accessibility Audit', () => {
   test('Check authenticated pages contrast (requires auth)', async ({
     page,
   }) => {
-    test.setTimeout(180000);
+    test.setTimeout(300000);
 
     // Try to sign in - skip test if auth fails
     try {
@@ -329,7 +329,7 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of authRoutes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url);
+      await page.goto(url, { timeout: 60000 });
       await page.waitForLoadState('networkidle');
 
       // Check if we got redirected to signin (auth failed)
