@@ -1,8 +1,8 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { fetchBandsintownEvents } from '@/lib/bandsintown';
-import { db } from '@/lib/db';
-import { type TourDate, tourDates } from '@/lib/db/schema';
+import { db, type TourDate, tourDates } from '@/lib/db';
 import { getDashboardData } from '../../actions';
 import type { ProfileInfo, TourDateViewModel } from './types';
 
@@ -14,7 +14,7 @@ export async function requireProfile(): Promise<ProfileInfo> {
   const data = await getDashboardData();
 
   if (data.needsOnboarding) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   if (!data.selectedProfile) {
@@ -109,19 +109,19 @@ export async function upsertBandsintownEvents(
     .onConflictDoUpdate({
       target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
       set: {
-        title: sql`excluded.title`,
-        startDate: sql`excluded.start_date`,
-        startTime: sql`excluded.start_time`,
-        venueName: sql`excluded.venue_name`,
-        city: sql`excluded.city`,
-        region: sql`excluded.region`,
-        country: sql`excluded.country`,
-        latitude: sql`excluded.latitude`,
-        longitude: sql`excluded.longitude`,
-        ticketUrl: sql`excluded.ticket_url`,
-        ticketStatus: sql`excluded.ticket_status`,
-        lastSyncedAt: sql`excluded.last_synced_at`,
-        rawData: sql`excluded.raw_data`,
+        title: drizzleSql`excluded.title`,
+        startDate: drizzleSql`excluded.start_date`,
+        startTime: drizzleSql`excluded.start_time`,
+        venueName: drizzleSql`excluded.venue_name`,
+        city: drizzleSql`excluded.city`,
+        region: drizzleSql`excluded.region`,
+        country: drizzleSql`excluded.country`,
+        latitude: drizzleSql`excluded.latitude`,
+        longitude: drizzleSql`excluded.longitude`,
+        ticketUrl: drizzleSql`excluded.ticket_url`,
+        ticketStatus: drizzleSql`excluded.ticket_status`,
+        lastSyncedAt: drizzleSql`excluded.last_synced_at`,
+        rawData: drizzleSql`excluded.raw_data`,
         updatedAt: now,
       },
     });

@@ -6,9 +6,9 @@ import {
   revalidatePath,
   revalidateTag,
 } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { db } from '@/lib/db';
-import { type TourDate, tourDates } from '@/lib/db/schema';
+import { db, type TourDate, tourDates } from '@/lib/db';
 import { trackServerEvent } from '@/lib/server-analytics';
 import {
   mapTourDateToViewModel,
@@ -49,34 +49,38 @@ export async function createTourDate(params: {
   // Validate ticketUrl if provided
   validateTicketUrl(params.ticketUrl);
 
-  const [created] = await db
-    .insert(tourDates)
-    .values({
+  try {
+    const [created] = await db
+      .insert(tourDates)
+      .values({
+        profileId: profile.id,
+        provider: 'manual',
+        title: params.title ?? null,
+        startDate: parsedStartDate,
+        startTime: params.startTime ?? null,
+        venueName: params.venueName,
+        city: params.city,
+        region: params.region ?? null,
+        country: params.country,
+        ticketUrl: params.ticketUrl ?? null,
+        ticketStatus: params.ticketStatus ?? 'available',
+      })
+      .returning();
+
+    void trackServerEvent('tour_date_created', {
       profileId: profile.id,
-      provider: 'manual',
-      title: params.title ?? null,
-      startDate: parsedStartDate,
-      startTime: params.startTime ?? null,
-      venueName: params.venueName,
-      city: params.city,
-      region: params.region ?? null,
-      country: params.country,
-      ticketUrl: params.ticketUrl ?? null,
-      ticketStatus: params.ticketStatus ?? 'available',
-    })
-    .returning();
+      tourDateId: created.id,
+      source: 'manual',
+    });
 
-  void trackServerEvent('tour_date_created', {
-    profileId: profile.id,
-    tourDateId: created.id,
-    source: 'manual',
-  });
+    // Invalidate cache and revalidate path
+    revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
-  // Invalidate cache and revalidate path
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
-
-  return mapTourDateToViewModel(created);
+    return mapTourDateToViewModel(created);
+  } catch {
+    throw new Error('Unable to create tour date right now. Please try again.');
+  }
 }
 
 /**
@@ -103,19 +107,6 @@ export async function updateTourDate(params: {
 
   const profile = await requireProfile();
 
-  // Verify ownership
-  const [existing] = await db
-    .select()
-    .from(tourDates)
-    .where(
-      and(eq(tourDates.id, params.id), eq(tourDates.profileId, profile.id))
-    )
-    .limit(1);
-
-  if (!existing) {
-    throw new TypeError('Tour date not found');
-  }
-
   const updateData: Partial<TourDate> = {
     updatedAt: new Date(),
   };
@@ -140,21 +131,37 @@ export async function updateTourDate(params: {
   if (params.ticketStatus !== undefined)
     updateData.ticketStatus = params.ticketStatus;
 
-  const [updated] = await db
-    .update(tourDates)
-    .set(updateData)
-    .where(eq(tourDates.id, params.id))
-    .returning();
+  try {
+    // Atomic ownership check and update in a single query
+    const [updated] = await db
+      .update(tourDates)
+      .set(updateData)
+      .where(
+        and(eq(tourDates.id, params.id), eq(tourDates.profileId, profile.id))
+      )
+      .returning();
 
-  if (!updated) {
-    throw new TypeError('Tour date not found');
+    if (!updated) {
+      throw new TypeError('Tour date not found');
+    }
+
+    void trackServerEvent('tour_date_updated', {
+      profileId: profile.id,
+      tourDateId: params.id,
+    });
+
+    // Invalidate cache and revalidate path
+    revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
+
+    return mapTourDateToViewModel(updated);
+  } catch (error) {
+    // Re-throw known errors (TypeError for not found, SyntaxError for validation)
+    if (error instanceof TypeError || error instanceof SyntaxError) {
+      throw error;
+    }
+    throw new Error('Unable to update tour date right now. Please try again.');
   }
-
-  // Invalidate cache and revalidate path
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
-
-  return mapTourDateToViewModel(updated);
 }
 
 /**
@@ -172,23 +179,31 @@ export async function deleteTourDate(
 
   const profile = await requireProfile();
 
-  // Verify ownership and delete
-  const result = await db
-    .delete(tourDates)
-    .where(and(eq(tourDates.id, id), eq(tourDates.profileId, profile.id)));
+  try {
+    // Verify ownership and delete atomically
+    const result = await db
+      .delete(tourDates)
+      .where(and(eq(tourDates.id, id), eq(tourDates.profileId, profile.id)));
 
-  if (result.rowCount === 0) {
-    throw new TypeError('Tour date not found');
+    if (result.rowCount === 0) {
+      throw new TypeError('Tour date not found');
+    }
+
+    void trackServerEvent('tour_date_deleted', {
+      profileId: profile.id,
+      tourDateId: id,
+    });
+
+    // Invalidate cache and revalidate path
+    revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
+
+    return { success: true };
+  } catch (error) {
+    // Re-throw known errors (TypeError for not found)
+    if (error instanceof TypeError) {
+      throw error;
+    }
+    throw new Error('Unable to delete tour date right now. Please try again.');
   }
-
-  void trackServerEvent('tour_date_deleted', {
-    profileId: profile.id,
-    tourDateId: id,
-  });
-
-  // Invalidate cache and revalidate path
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
-
-  return { success: true };
 }

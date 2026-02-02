@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   CONTACTS: '/app/contacts',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
+  DASHBOARD_TOUR_DATES: '/app/dashboard/tour-dates',
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',

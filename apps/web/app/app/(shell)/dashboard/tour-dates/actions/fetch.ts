@@ -3,10 +3,10 @@
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { unstable_noStore as noStore, unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { isBandsintownConfigured } from '@/lib/bandsintown';
-import { db } from '@/lib/db';
-import { tourDates } from '@/lib/db/schema';
+import { creatorProfiles, db, tourDates } from '@/lib/db';
 import { mapTourDateToViewModel, requireProfile } from './helpers';
 import type { BandsintownConnectionStatus, TourDateViewModel } from './types';
 
@@ -33,7 +33,9 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/tour-dates');
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_TOUR_DATES}`
+    );
   }
 
   const profile = await requireProfile();
@@ -51,11 +53,23 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
 
 /**
  * Load upcoming tour dates only (for public display)
+ * Only returns data for public profiles as defense-in-depth
  */
 export async function loadUpcomingTourDates(
   profileId: string
 ): Promise<TourDateViewModel[]> {
   noStore();
+
+  // Defense-in-depth: verify profile is public before returning tour dates
+  const [profile] = await db
+    .select({ isPublic: creatorProfiles.isPublic })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!profile?.isPublic) {
+    return [];
+  }
 
   const now = new Date();
   const dates = await db

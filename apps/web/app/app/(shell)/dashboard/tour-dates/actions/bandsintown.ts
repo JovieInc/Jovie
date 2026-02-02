@@ -6,13 +6,13 @@ import {
   revalidatePath,
   revalidateTag,
 } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   fetchBandsintownEvents,
   verifyBandsintownArtist,
 } from '@/lib/bandsintown';
-import { db } from '@/lib/db';
-import { creatorProfiles, tourDates } from '@/lib/db/schema';
+import { creatorProfiles, db, tourDates } from '@/lib/db';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
@@ -63,7 +63,7 @@ export async function saveBandsintownApiKey(params: {
       profileId: profile.id,
     });
 
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
     return {
       success: true,
@@ -109,7 +109,7 @@ export async function removeBandsintownApiKey(): Promise<{
       profileId: profile.id,
     });
 
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
     return { success: true };
   } catch {
@@ -155,43 +155,80 @@ export async function connectBandsintownArtist(params: {
     };
   }
 
-  // Update profile with Bandsintown artist name
-  await db
-    .update(creatorProfiles)
-    .set({
-      bandsintownArtistName: params.artistName,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  // Fetch events from Bandsintown before making any DB changes
+  // This prevents partial state if the external API call fails
+  let events: Awaited<ReturnType<typeof fetchBandsintownEvents>>;
+  try {
+    events = await fetchBandsintownEvents(params.artistName, apiKey);
+  } catch {
+    return {
+      success: false,
+      message:
+        'Unable to fetch events from Bandsintown. Please try again later.',
+      synced: 0,
+      tourDates: [],
+    };
+  }
 
-  // Fetch and sync events
-  const events = await fetchBandsintownEvents(params.artistName, apiKey);
-  const synced = await upsertBandsintownEvents(profile.id, events);
+  try {
+    // Update profile with Bandsintown artist name
+    await db
+      .update(creatorProfiles)
+      .set({
+        bandsintownArtistName: params.artistName,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
 
-  void trackServerEvent('tour_dates_synced', {
-    profileId: profile.id,
-    synced,
-    source: 'bandsintown',
-    isInitialConnect: true,
-  });
+    // Sync events to database
+    const synced = await upsertBandsintownEvents(profile.id, events);
 
-  // Invalidate cache and revalidate path
-  revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+    void trackServerEvent('tour_dates_synced', {
+      profileId: profile.id,
+      synced,
+      source: 'bandsintown',
+      isInitialConnect: true,
+    });
 
-  // Load updated tour dates
-  const dates = await db
-    .select()
-    .from(tourDates)
-    .where(eq(tourDates.profileId, profile.id))
-    .orderBy(tourDates.startDate);
+    // Invalidate cache and revalidate path
+    revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
-  return {
-    success: true,
-    message: `Connected and synced ${synced} tour dates from Bandsintown.`,
-    synced,
-    tourDates: dates.map(mapTourDateToViewModel),
-  };
+    // Load updated tour dates
+    const dates = await db
+      .select()
+      .from(tourDates)
+      .where(eq(tourDates.profileId, profile.id))
+      .orderBy(tourDates.startDate);
+
+    return {
+      success: true,
+      message: `Connected and synced ${synced} tour dates from Bandsintown.`,
+      synced,
+      tourDates: dates.map(mapTourDateToViewModel),
+    };
+  } catch {
+    // If DB operations fail, attempt to rollback the artist name update
+    // Note: This is best-effort cleanup since we can't use transactions with Neon HTTP
+    try {
+      await db
+        .update(creatorProfiles)
+        .set({
+          bandsintownArtistName: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+    } catch {
+      // Cleanup failed, but we still want to report the original error
+    }
+
+    return {
+      success: false,
+      message: 'Unable to connect artist right now. Please try again.',
+      synced: 0,
+      tourDates: [],
+    };
+  }
 }
 
 /**
@@ -247,7 +284,7 @@ export async function syncFromBandsintown(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
   return {
     success: true,
@@ -291,7 +328,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
 
     // Invalidate cache and revalidate path
     revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.DASHBOARD_TOUR_DATES);
 
     return { success: true };
   } catch {
