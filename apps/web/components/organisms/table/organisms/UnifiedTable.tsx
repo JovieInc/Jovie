@@ -853,29 +853,27 @@ export function UnifiedTable<TData>({
 
           {/* Rows */}
           {(shouldVirtualize ? virtualRows : rows).map((item, listIndex) => {
-            // When virtualized, item is VirtualItem and we need to get the actual row
-            // When not virtualized, item IS the row
-            let row: Row<TData>;
-            let virtualItem: VirtualItem | undefined;
-            let rowIndex: number;
-
-            if (shouldVirtualize) {
-              virtualItem = item as VirtualItem;
-              row = rows[virtualItem.index]!;
-              rowIndex = virtualItem.index;
-            } else {
-              row = item as Row<TData>;
-              rowIndex = listIndex;
-            }
+            // Extract row data based on virtualization mode
+            const { row, virtualItem, rowIndex } = shouldVirtualize
+              ? {
+                  virtualItem: item as VirtualItem,
+                  row: rows[(item as VirtualItem).index]!,
+                  rowIndex: (item as VirtualItem).index,
+                }
+              : {
+                  virtualItem: undefined,
+                  row: item as Row<TData>,
+                  rowIndex: listIndex,
+                };
 
             const rowData = row.original as TData;
 
-            // Custom row renderer
+            // Early return for custom row renderer
             if (renderRow) {
               return renderRow(rowData, rowIndex);
             }
 
-            // Default row renderer using memoized TableRow
+            // Build base row element
             const rowElement = (
               <TableRow
                 key={row.id}
@@ -895,18 +893,8 @@ export function UnifiedTable<TData>({
               />
             );
 
-            // Check if row is expanded and has expanded content
-            const rowId = getExpandableRowId
-              ? getExpandableRowId(rowData)
-              : (getRowId?.(rowData) ?? row.id);
-            const isExpanded = expandedRowIds?.has(rowId);
-            const expandedContent =
-              isExpanded && renderExpandedContent
-                ? renderExpandedContent(rowData, columnCount)
-                : null;
-
-            // Wrap with context menu if provided
-            const wrappedRowElement = getContextMenuItems ? (
+            // Apply context menu wrapper if needed
+            const wrappedRow = getContextMenuItems ? (
               <TableContextMenu
                 key={row.id}
                 items={getContextMenuItems(rowData)}
@@ -917,17 +905,25 @@ export function UnifiedTable<TData>({
               rowElement
             );
 
-            // If expanded, render both row and expanded content
-            if (expandedContent) {
-              return (
-                <React.Fragment key={row.id}>
-                  {wrappedRowElement}
-                  {expandedContent}
-                </React.Fragment>
-              );
+            // Check for expanded content
+            const rowId = getExpandableRowId
+              ? getExpandableRowId(rowData)
+              : (getRowId?.(rowData) ?? row.id);
+            const isExpanded = expandedRowIds?.has(rowId);
+
+            // Early return if no expanded content
+            if (!isExpanded || !renderExpandedContent) {
+              return wrappedRow;
             }
 
-            return wrappedRowElement;
+            // Render row with expanded content
+            const expandedContent = renderExpandedContent(rowData, columnCount);
+            return (
+              <React.Fragment key={row.id}>
+                {wrappedRow}
+                {expandedContent}
+              </React.Fragment>
+            );
           })}
 
           {/* Bottom padding for virtualization */}
