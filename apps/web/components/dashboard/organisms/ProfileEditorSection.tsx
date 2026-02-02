@@ -7,8 +7,8 @@
 
 'use client';
 
+import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
-import { Input } from '@/components/atoms/Input';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,

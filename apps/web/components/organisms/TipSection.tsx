@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { LoadingButton } from '@/components/molecules/LoadingButton';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { captureError } from '@/lib/error-tracking';
@@ -119,16 +118,15 @@ export function TipSection({
           </button>
         )}
         {amounts.map(amount => (
-          <LoadingButton
+          <Button
             key={amount}
             onClick={() => handleStripePayment(amount)}
             className='w-full'
             size='lg'
-            isLoading={loading === amount}
-            loadingText='Processing…'
+            loading={loading === amount}
           >
             ${amount} Tip
-          </LoadingButton>
+          </Button>
         ))}
         <p className='mt-2 text-center text-xs text-gray-500'>
           Tips are non-refundable

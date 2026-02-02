@@ -1,10 +1,9 @@
 'use client';
 
-import { Button, Switch } from '@jovie/ui';
+import { Button, Input, Switch } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { usePixelSettingsMutation } from '@/lib/queries';
 
@@ -76,7 +75,7 @@ function PlatformSection({
             value={pixelIdValue}
             onChange={e => onPixelIdChange(e.target.value)}
             placeholder={pixelIdPlaceholder}
-            inputClassName={INPUT_CLASS}
+            className={INPUT_CLASS}
           />
         </div>
 
@@ -95,7 +94,7 @@ function PlatformSection({
               value={tokenValue}
               onChange={e => onTokenChange(e.target.value)}
               placeholder={tokenPlaceholder}
-              inputClassName={`${INPUT_CLASS} pr-10`}
+              className={`${INPUT_CLASS} pr-10`}
             />
             <button
               type='button'

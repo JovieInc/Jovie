@@ -1,6 +1,6 @@
+import { Input } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 
 describe('FormField', () => {

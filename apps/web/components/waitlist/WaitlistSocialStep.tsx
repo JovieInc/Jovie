@@ -1,7 +1,7 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import { useEffect, useRef } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
   type FormErrors,

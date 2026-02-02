@@ -21,10 +21,15 @@ export type {
   UseAsyncValidationReturn,
 } from './useAsyncValidation';
 export { useAsyncValidation } from './useAsyncValidation';
-
 // Auto-save hook
 export type { UseAutoSaveOptions, UseAutoSaveReturn } from './useAutoSave';
 export { useAutoSave } from './useAutoSave';
+// Debounced Input hook
+export type {
+  UseDebouncedInputOptions,
+  UseDebouncedInputReturn,
+} from './useDebouncedInput';
+export { useDebouncedInput } from './useDebouncedInput';
 // Rate-limited validation hook
 export type {
   UseRateLimitedValidationOptions,
