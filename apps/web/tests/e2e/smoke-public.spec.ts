@@ -27,8 +27,15 @@ const MIN_CONTENT_LENGTH = {
  * Optimized for speed: 4 consolidated tests covering critical paths.
  * Previous tests merged for efficiency (was 10, now 4).
  *
+ * NOTE: These tests must run WITHOUT the saved authentication session
+ * to verify the public unauthenticated experience.
+ *
  * @smoke @critical
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   // HOMEPAGE - Consolidated test (was 3 separate tests)

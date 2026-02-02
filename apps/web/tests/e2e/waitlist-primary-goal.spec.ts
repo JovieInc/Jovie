@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * Waitlist Primary Goal Tests
+ *
+ * NOTE: This test verifies that unauthenticated users are redirected
+ * to signin before accessing the waitlist. Must run without saved auth.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Waitlist primary goal', () => {
   test('requires authentication before showing the waitlist form', async ({
     page,

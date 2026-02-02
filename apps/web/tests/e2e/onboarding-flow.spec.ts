@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * Onboarding Flow Tests
+ *
+ * NOTE: Most tests in this file expect unauthenticated behavior
+ * (redirects to /signin, anonymous handle claiming). We override
+ * the global storageState to run as unauthenticated.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Onboarding Flow', () => {
   test.beforeEach(async ({ page }) => {
     // Start each test at the homepage
