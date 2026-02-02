@@ -16,9 +16,18 @@ import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
  * - Shows critical/error issues prominently
  * - Dismissible (state persists in session storage)
  * - Styled consistently with the app's design system
+ *
+ * Note: This component requires QueryClientProvider to be in the React tree.
+ * If QueryClient is not available, the query will be disabled and component won't show.
  */
 export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Wait for client-side mount (avoids SSR/hydration issues)
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Check dismissal state from session storage
   useEffect(() => {
@@ -30,6 +39,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
 
   // Determine if we should show the banner
   const showBanner =
+    isMounted &&
     isAdmin &&
     (process.env.NODE_ENV !== 'production' ||
       publicEnv.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
