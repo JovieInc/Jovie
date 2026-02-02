@@ -1,5 +1,6 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 
 /**
  * Custom error types for better test debugging
@@ -29,7 +30,6 @@ export async function createOrReuseTestUserSession(page: Page, email: string) {
 
   await page.evaluate(
     async ({ email: targetEmail }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const clerk = (window as any).Clerk;
       if (!clerk) throw new Error('Clerk not initialized');
 
@@ -98,6 +98,33 @@ export async function signInUser(
     );
   }
 
+  // Check if already authenticated (from storageState)
+  // Look for Clerk session cookies which indicate we loaded with a saved session
+  const cookies = await page.context().cookies();
+  const hasClerkSession = cookies.some(
+    cookie =>
+      cookie.name.startsWith('__session') || cookie.name.startsWith('__client')
+  );
+
+  if (hasClerkSession) {
+    // Already signed in via storageState, just navigate to dashboard
+    await page.goto(APP_ROUTES.DASHBOARD, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+
+    // Wait for dashboard to be ready
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const userMenu = page.locator('[data-testid="user-menu"]');
+    const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
+
+    await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
+      timeout: 15000,
+    });
+
+    return page;
+  }
+
   // Set up Clerk testing token BEFORE navigation
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
@@ -111,22 +138,19 @@ export async function signInUser(
 
   try {
     // Use the official Clerk testing helper
-    // For testing with a real test user that has a password, use password strategy
-    if (password) {
-      // Password authentication works with any identifier (email or username)
+    // The @clerk/testing library has built-in support for email_code strategy
+    // with +clerk_test emails (automatically uses code 424242)
+    if (username.includes('+clerk_test')) {
+      // For test emails with +clerk_test suffix, use email_code strategy
+      await clerk.signIn({
+        page,
+        signInParams: { strategy: 'email_code', identifier: username },
+      });
+    } else if (password) {
+      // For real test users with passwords, use password strategy
       await clerk.signIn({
         page,
         signInParams: { strategy: 'password', identifier: username, password },
-      });
-    } else if (username.includes('+clerk_test')) {
-      // For test emails with +clerk_test suffix, use email_code strategy
-      // The testing token bypasses the actual email verification
-      await clerk.signIn({
-        page,
-        signInParams: {
-          strategy: 'email_code',
-          identifier: username,
-        },
       });
     } else {
       throw new ClerkTestError(
@@ -156,7 +180,7 @@ export async function signInUser(
 
   // After sign-in, navigate to the dashboard to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
+  await page.goto(APP_ROUTES.DASHBOARD, { waitUntil: 'domcontentloaded' });
 
   // Wait for page to stabilize after React 19 transient hooks error
   // There's a known React 19 bug (facebook/react#33580) that causes a transient
@@ -199,7 +223,7 @@ export async function signOutUser(page: Page) {
   }
 
   // Wait for sign out to complete
-  await page.waitForURL(url => !url.pathname.includes('/app/dashboard'), {
+  await page.waitForURL(url => !url.pathname.includes(APP_ROUTES.DASHBOARD), {
     timeout: 10000,
   });
 }
@@ -224,8 +248,13 @@ export async function isAuthenticated(page: Page): Promise<boolean> {
  * Use this in beforeEach hooks for tests that require authentication
  */
 export async function setupAuthenticatedTest(page: Page) {
+  const username = process.env.E2E_CLERK_USER_USERNAME;
+  const password = process.env.E2E_CLERK_USER_PASSWORD;
+
+  // For +clerk_test emails, password is not required
+  // For regular emails, password is required
   const hasTestCredentials =
-    process.env.E2E_CLERK_USER_USERNAME && process.env.E2E_CLERK_USER_PASSWORD;
+    username && (username.includes('+clerk_test') || password);
 
   if (!hasTestCredentials) {
     console.warn(

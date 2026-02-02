@@ -1,7 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
+import { users } from '@/lib/db/schema/auth';
+// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type {
   NotificationDeliveryChannel,
   NotificationPreferences,
@@ -75,10 +78,7 @@ const normalizePreferences = (
     dismissedNotificationIds: normalizeDismissed(notifications),
     preferredChannel:
       notifications.preferredChannel &&
-      Object.prototype.hasOwnProperty.call(
-        DEFAULT_CHANNELS,
-        notifications.preferredChannel
-      )
+      Object.hasOwn(DEFAULT_CHANNELS, notifications.preferredChannel)
         ? notifications.preferredChannel
         : undefined,
     email: fallbackEmail ?? null,

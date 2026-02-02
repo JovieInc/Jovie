@@ -1,6 +1,11 @@
-import { clerkSetup } from '@clerk/testing/playwright';
+import {
+  clerk,
+  clerkSetup,
+  setupClerkTestingToken,
+} from '@clerk/testing/playwright';
 import { chromium } from '@playwright/test';
 import { config } from 'dotenv';
+import { APP_ROUTES } from '@/constants/routes';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables from .env.development.local
@@ -21,6 +26,55 @@ function isRealKey(key: string | undefined): key is string {
   if (!key) return false;
   const lowerKey = key.toLowerCase();
   return !SENSITIVE_PATTERNS.some(pattern => lowerKey.includes(pattern));
+}
+
+async function authenticateAndSaveSession(
+  page: import('@playwright/test').Page,
+  baseURL: string
+): Promise<void> {
+  const username = process.env.E2E_CLERK_USER_USERNAME!;
+
+  // Set up Clerk testing token BEFORE navigation
+  await setupClerkTestingToken({ page });
+
+  // Navigate to sign-in page (has ClerkProvider)
+  await page.goto(`${baseURL}${APP_ROUTES.SIGNIN}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForTimeout(1000);
+
+  // Authenticate using email_code strategy for +clerk_test emails
+  if (username.includes('+clerk_test')) {
+    await clerk.signIn({
+      page,
+      signInParams: { strategy: 'email_code', identifier: username },
+    });
+  } else {
+    // Fallback to password for non-test emails
+    const password = process.env.E2E_CLERK_USER_PASSWORD;
+    if (!password) {
+      throw new Error('Password required for non-test emails');
+    }
+    await clerk.signIn({
+      page,
+      signInParams: {
+        strategy: 'password',
+        identifier: username,
+        password,
+      },
+    });
+  }
+
+  // Navigate to dashboard to verify authentication
+  await page.goto(`${baseURL}${APP_ROUTES.DASHBOARD}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  // Save the authenticated session to a file
+  const storageStatePath = 'tests/.auth/user.json';
+  await page.context().storageState({ path: storageStatePath });
+  console.log(`✓ Session saved to ${storageStatePath}`);
+  console.log('  All tests will reuse this authenticated session');
 }
 
 async function globalSetup() {
@@ -141,11 +195,22 @@ async function globalSetup() {
 
     // Also warm up the dashboard route (takes ~20s on cold start)
     console.log('🔥 Pre-warming dashboard route...');
-    await page.goto(`${baseURL}/app/dashboard`, {
+    await page.goto(`${baseURL}${APP_ROUTES.DASHBOARD}`, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
     console.log('✓ Dashboard warmup complete');
+
+    // Authenticate once and save session (if test user is configured)
+    if (hasTestUser && hasRealClerkKeys) {
+      console.log('🔐 Authenticating E2E user and saving session...');
+      try {
+        await authenticateAndSaveSession(page, baseURL);
+      } catch (error) {
+        console.warn('⚠ Failed to authenticate and save session:', error);
+        console.log('  Tests will authenticate individually (slower)');
+      }
+    }
   } catch (error) {
     console.warn('⚠ Browser warmup failed (non-fatal):', error);
   } finally {
