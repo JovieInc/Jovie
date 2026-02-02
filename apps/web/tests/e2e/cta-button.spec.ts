@@ -10,6 +10,9 @@ const STORYBOOK_NAV_OPTIONS = {
   timeout: STORYBOOK_TIMEOUT,
 };
 
+// Run Storybook tests serially to prevent server overload
+test.describe.configure({ mode: 'serial' });
+
 test.describe('CTAButton Component', () => {
   test('should render correctly and handle state changes', async ({ page }) => {
     // Navigate to the Storybook page for CTAButton
