@@ -13,28 +13,25 @@
  * All exports remain the same, so existing imports will continue to work.
  */
 
-export type {
-	BandsintownConnectionStatus,
-	TicketStatus,
-	TourDateViewModel,
-} from './actions/types';
-
 export {
-	checkBandsintownConnection,
-	loadTourDates,
-	loadUpcomingTourDates,
-} from './actions/fetch';
-
-export {
-	createTourDate,
-	deleteTourDate,
-	updateTourDate,
-} from './actions/crud';
-
-export {
-	connectBandsintownArtist,
-	disconnectBandsintown,
-	removeBandsintownApiKey,
-	saveBandsintownApiKey,
-	syncFromBandsintown,
+  connectBandsintownArtist,
+  disconnectBandsintown,
+  removeBandsintownApiKey,
+  saveBandsintownApiKey,
+  syncFromBandsintown,
 } from './actions/bandsintown';
+export {
+  createTourDate,
+  deleteTourDate,
+  updateTourDate,
+} from './actions/crud';
+export {
+  checkBandsintownConnection,
+  loadTourDates,
+  loadUpcomingTourDates,
+} from './actions/fetch';
+export type {
+  BandsintownConnectionStatus,
+  TicketStatus,
+  TourDateViewModel,
+} from './actions/types';

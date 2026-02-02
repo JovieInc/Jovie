@@ -10,29 +10,26 @@
  * - bandsintown.ts: Bandsintown integration
  */
 
-// Types
-export type {
-	BandsintownConnectionStatus,
-	ProfileInfo,
-	TicketStatus,
-	TourDateViewModel,
-} from './types';
-
-// Fetch operations
-export {
-	checkBandsintownConnection,
-	loadTourDates,
-	loadUpcomingTourDates,
-} from './fetch';
-
-// CRUD operations
-export { createTourDate, deleteTourDate, updateTourDate } from './crud';
-
 // Bandsintown integration
 export {
-	connectBandsintownArtist,
-	disconnectBandsintown,
-	removeBandsintownApiKey,
-	saveBandsintownApiKey,
-	syncFromBandsintown,
+  connectBandsintownArtist,
+  disconnectBandsintown,
+  removeBandsintownApiKey,
+  saveBandsintownApiKey,
+  syncFromBandsintown,
 } from './bandsintown';
+// CRUD operations
+export { createTourDate, deleteTourDate, updateTourDate } from './crud';
+// Fetch operations
+export {
+  checkBandsintownConnection,
+  loadTourDates,
+  loadUpcomingTourDates,
+} from './fetch';
+// Types
+export type {
+  BandsintownConnectionStatus,
+  ProfileInfo,
+  TicketStatus,
+  TourDateViewModel,
+} from './types';
