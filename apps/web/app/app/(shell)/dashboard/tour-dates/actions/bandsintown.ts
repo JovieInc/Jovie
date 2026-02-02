@@ -269,12 +269,29 @@ export async function syncFromBandsintown(): Promise<{
   // Decrypt user's API key if available
   const apiKey = decryptPII(profile.bandsintownApiKey);
 
-  // Fetch events from Bandsintown and upsert
-  const events = await fetchBandsintownEvents(
-    profile.bandsintownArtistName,
-    apiKey
-  );
-  const synced = await upsertBandsintownEvents(profile.id, events);
+  let synced: number;
+  try {
+    // Fetch events from Bandsintown and upsert
+    const events = await fetchBandsintownEvents(
+      profile.bandsintownArtistName,
+      apiKey
+    );
+    synced = await upsertBandsintownEvents(profile.id, events);
+  } catch (error) {
+    // Track the sync failure with context for debugging
+    void trackServerEvent('tour_dates_sync_failed', {
+      profileId: profile.id,
+      userId,
+      source: 'bandsintown',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return {
+      success: false,
+      message: 'Unable to sync from Bandsintown right now. Please try again.',
+      synced: 0,
+    };
+  }
 
   void trackServerEvent('tour_dates_synced', {
     profileId: profile.id,

@@ -103,28 +103,36 @@ export async function upsertBandsintownEvents(
     rawData: event.rawData,
   }));
 
-  await db
-    .insert(tourDates)
-    .values(insertValues)
-    .onConflictDoUpdate({
-      target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
-      set: {
-        title: drizzleSql`excluded.title`,
-        startDate: drizzleSql`excluded.start_date`,
-        startTime: drizzleSql`excluded.start_time`,
-        venueName: drizzleSql`excluded.venue_name`,
-        city: drizzleSql`excluded.city`,
-        region: drizzleSql`excluded.region`,
-        country: drizzleSql`excluded.country`,
-        latitude: drizzleSql`excluded.latitude`,
-        longitude: drizzleSql`excluded.longitude`,
-        ticketUrl: drizzleSql`excluded.ticket_url`,
-        ticketStatus: drizzleSql`excluded.ticket_status`,
-        lastSyncedAt: drizzleSql`excluded.last_synced_at`,
-        rawData: drizzleSql`excluded.raw_data`,
-        updatedAt: now,
-      },
-    });
+  try {
+    await db
+      .insert(tourDates)
+      .values(insertValues)
+      .onConflictDoUpdate({
+        target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
+        set: {
+          title: drizzleSql`excluded.title`,
+          startDate: drizzleSql`excluded.start_date`,
+          startTime: drizzleSql`excluded.start_time`,
+          venueName: drizzleSql`excluded.venue_name`,
+          city: drizzleSql`excluded.city`,
+          region: drizzleSql`excluded.region`,
+          country: drizzleSql`excluded.country`,
+          latitude: drizzleSql`excluded.latitude`,
+          longitude: drizzleSql`excluded.longitude`,
+          ticketUrl: drizzleSql`excluded.ticket_url`,
+          ticketStatus: drizzleSql`excluded.ticket_status`,
+          lastSyncedAt: drizzleSql`excluded.last_synced_at`,
+          rawData: drizzleSql`excluded.raw_data`,
+          updatedAt: now,
+        },
+      });
+  } catch (error) {
+    // Re-throw with context for better traceability in callers
+    throw new Error(
+      `Failed to upsert Bandsintown events for profile ${profileId} (${events.length} events)`,
+      { cause: error }
+    );
+  }
 
   return events.length;
 }
