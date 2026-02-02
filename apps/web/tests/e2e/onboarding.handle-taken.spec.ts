@@ -94,7 +94,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     }
 
     const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
+      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
     );
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
@@ -140,7 +140,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Get the handle input field
     const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
+      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
     );
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
@@ -189,7 +189,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Get the handle input field
     const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
+      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
     );
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 

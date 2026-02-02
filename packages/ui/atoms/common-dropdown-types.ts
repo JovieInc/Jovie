@@ -86,7 +86,7 @@ export interface CommonDropdownRadioGroup extends CommonDropdownBaseItem {
 export interface CommonDropdownSubmenu extends CommonDropdownBaseItem {
   type: 'submenu';
   label: string;
-  icon?: LucideIcon;
+  icon?: LucideIcon | ReactNode;
   items: CommonDropdownItem[];
 }
 
