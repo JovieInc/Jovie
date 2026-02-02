@@ -26,11 +26,13 @@ function ThemeKeyboardShortcut() {
   const { resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
+    function handleKeyDown(event: KeyboardEvent) {
+      // Ignore if event already handled or modifier keys pressed
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.toLowerCase() !== 't') return;
 
+      // Ignore if user is typing in a text input
       const target = event.target;
       if (target instanceof HTMLElement) {
         const tagName = target.tagName.toLowerCase();
@@ -41,11 +43,11 @@ function ThemeKeyboardShortcut() {
 
       event.preventDefault();
       setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-    };
+    }
 
-    globalThis.addEventListener('keydown', onKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
     return () => {
-      globalThis.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', handleKeyDown);
     };
   }, [resolvedTheme, setTheme]);
 
@@ -53,10 +55,12 @@ function ThemeKeyboardShortcut() {
 }
 
 // Lazy load non-critical providers to reduce initial bundle size
+// SSR enabled to allow page content to render server-side for SEO
+// Analytics components inside LazyProviders remain client-only
 const LazyProviders = dynamic<LazyProvidersProps>(
   () => import('./LazyProviders').then(mod => ({ default: mod.LazyProviders })),
   {
-    ssr: false,
+    ssr: true,
     loading: LazyProvidersSkeleton,
   }
 );
@@ -83,20 +87,20 @@ function CoreProvidersInner({
   useChunkErrorHandler();
 
   useEffect(() => {
-    // Environment-gated startup log
-    try {
-      logger.group('Jovie App');
-      logger.info('Booting client providers', {
-        vercelEnv: process.env.VERCEL_ENV || 'local',
-        nodeEnv: process.env.NODE_ENV,
-      });
-      // Feature flags removed - pre-launch
-      logger.groupEnd();
+    // Log startup info
+    logger.group('Jovie App');
+    logger.info('Booting client providers', {
+      vercelEnv: process.env.VERCEL_ENV || 'local',
+      nodeEnv: process.env.NODE_ENV,
+    });
+    logger.groupEnd();
 
-      // Initialize Web Vitals tracking for performance monitoring
-      let cleanupWebVitals: (() => void) | undefined;
-      let isUnmounted = false;
-      import('@/lib/monitoring/web-vitals').then(({ initWebVitals }) => {
+    // Initialize Web Vitals tracking for performance monitoring
+    let cleanupWebVitals: (() => void) | undefined;
+    let isUnmounted = false;
+
+    import('@/lib/monitoring/web-vitals')
+      .then(({ initWebVitals }) => {
         const cleanup = initWebVitals(metric => {
           // Create a custom event for the performance dashboard
           if (typeof window !== 'undefined') {
@@ -111,25 +115,26 @@ function CoreProvidersInner({
         }
 
         cleanupWebVitals = cleanup;
+      })
+      .catch(error => {
+        logger.error('Failed to initialize Web Vitals:', error);
       });
 
-      // Initialize other performance monitoring in production
-      if (process.env.NODE_ENV === 'production') {
-        import('@/lib/monitoring/client').then(({ initAllMonitoring }) => {
+    // Initialize other performance monitoring in production
+    if (process.env.NODE_ENV === 'production') {
+      import('@/lib/monitoring/client')
+        .then(({ initAllMonitoring }) => {
           initAllMonitoring();
+        })
+        .catch(error => {
+          logger.error('Failed to initialize monitoring:', error);
         });
-      }
-
-      return () => {
-        isUnmounted = true;
-        if (cleanupWebVitals) {
-          cleanupWebVitals();
-        }
-      };
-    } catch (error) {
-      console.error('Error initializing monitoring:', error);
-      return undefined;
     }
+
+    return () => {
+      isUnmounted = true;
+      cleanupWebVitals?.();
+    };
   }, []);
 
   return (
