@@ -1,9 +1,15 @@
 /**
  * E2E Tests for Anti-Cloaking Link Wrapping
  * Tests user flows and security measures for link wrapping system
+ *
+ * NOTE: Tests public link wrapping functionality for unauthenticated visitors.
+ * Must run without saved authentication.
  */
 
 import { expect, test } from '@playwright/test';
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 // Test data
 const TEST_URLS = {
@@ -387,7 +393,6 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
       // Test interstitial page without JavaScript
       await page.context().addInitScript(() => {
         // Disable fetch to simulate network error
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).fetch = () =>
           Promise.reject(new Error('Network error'));
       });

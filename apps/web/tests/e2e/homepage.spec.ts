@@ -1,6 +1,16 @@
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
+/**
+ * Homepage Tests
+ *
+ * NOTE: Tests public homepage for unauthenticated visitors.
+ * Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });

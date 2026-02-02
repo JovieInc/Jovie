@@ -12,9 +12,15 @@ import { expect, test } from './setup';
  *
  * Run with: pnpm test:e2e --grep "Homepage Visual"
  *
+ * NOTE: Tests public homepage for unauthenticated visitors.
+ * Must run without saved authentication.
+ *
  * @visual-regression
  * @a11y
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 const HOMEPAGE_SECTIONS = [
   {
