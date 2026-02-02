@@ -274,6 +274,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
     email: 'Email',
     phone: 'Phone',
   };
+  if (!platform) return '';
   return (
     labels[platform] ||
     platform

@@ -62,6 +62,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 }
 
 export function slugify(text: string): string {
+  if (!text) return '';
   const safeText = text.slice(0, 200);
   return safeText
     .toLowerCase()

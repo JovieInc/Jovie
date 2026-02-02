@@ -165,6 +165,7 @@ export function jaroWinklerSimilarity(
  * @returns Normalized name
  */
 export function normalizeArtistName(name: string): string {
+  if (!name) return '';
   let normalized = name
     // Convert to lowercase
     .toLowerCase()

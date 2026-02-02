@@ -116,6 +116,7 @@ function extractFilename(src: string): string | null {
  * Clean and humanize filename for alt text
  */
 function cleanFilename(filename: string): string {
+  if (!filename) return '';
   return (
     filename
       // Remove file extension

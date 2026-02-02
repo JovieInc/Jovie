@@ -31,6 +31,7 @@ export function normalizeString(value: string | undefined | null): string {
  * Trim leading slashes from a path-like string.
  */
 export function trimLeadingSlashes(value: string): string {
+  if (!value) return '';
   let start = 0;
   while (start < value.length && value[start] === '/') {
     start += 1;
@@ -42,6 +43,7 @@ export function trimLeadingSlashes(value: string): string {
  * Trim trailing slashes from a path-like string.
  */
 export function trimTrailingSlashes(value: string): string {
+  if (!value) return '';
   let end = value.length;
   while (end > 0 && value[end - 1] === '/') {
     end -= 1;

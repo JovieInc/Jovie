@@ -109,8 +109,8 @@ export function useSettingsProfile({
     error: saveError,
   } = useAutoSave<ProfileUpdateData>({
     saveFn: async data => {
-      const displayName = data.displayName.trim();
-      const username = data.username.trim();
+      const displayName = data.displayName?.trim() ?? '';
+      const username = data.username?.trim() ?? '';
 
       if (!displayName || !username) {
         return;
