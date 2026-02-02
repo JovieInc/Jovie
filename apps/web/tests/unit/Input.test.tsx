@@ -149,10 +149,11 @@ describe('Input', () => {
 
   describe('loading state', () => {
     it('renders loading spinner when loading prop is true', () => {
-      render(<Input loading placeholder='Loading' />);
-      // The loading spinner uses an output element with aria-label="Loading"
-      const spinner = screen.getByLabelText('Loading');
+      const { container } = render(<Input loading placeholder='Loading' />);
+      // The spinner is decorative (aria-hidden) since input has aria-busy
+      const spinner = container.querySelector('.animate-spin');
       expect(spinner).toBeInTheDocument();
+      expect(spinner).toHaveAttribute('aria-hidden', 'true');
     });
 
     it('sets aria-busy when loading', () => {
@@ -162,12 +163,12 @@ describe('Input', () => {
     });
 
     it('does not show statusIcon when loading', () => {
-      render(
+      const { container } = render(
         <Input loading statusIcon={<span>✓</span>} placeholder='Loading' />
       );
 
       // Should show spinner, not status icon
-      expect(screen.getByLabelText('Loading')).toBeInTheDocument();
+      expect(container.querySelector('.animate-spin')).toBeInTheDocument();
       expect(screen.queryByText('✓')).not.toBeInTheDocument();
     });
   });
