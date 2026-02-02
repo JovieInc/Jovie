@@ -1,25 +1,8 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
+import { hasClerkCredentials } from '../helpers/clerk-credentials';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
-
-/**
- * Check if Clerk credentials are available for authenticated tests
- */
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = username.includes('+clerk_test');
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail) &&
-    clerkSetupSuccess
-  );
-}
 
 test.describe('Dashboard Routing', () => {
   test.beforeEach(async ({ page }) => {

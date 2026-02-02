@@ -155,6 +155,13 @@
       "when": 1738282000000,
       "tag": "0021_optimize_provider_links_query",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1770005578587,
+      "tag": "0022_add_users_clerk_lookup_index",
+      "breakpoints": true
     }
   ]
 }

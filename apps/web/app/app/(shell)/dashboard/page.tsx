@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 /**
- * Legacy dashboard route (/dashboard)
- * Redirects to app root (/) for clean URLs
+ * Legacy dashboard route (/app/dashboard)
+ * Redirects to app root (/app) for clean URLs
  */
 export default async function LegacyDashboardPage() {
-  redirect('/');
+  redirect('/app');
 }

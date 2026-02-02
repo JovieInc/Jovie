@@ -6,15 +6,14 @@
  */
 
 import { neonConfig, Pool } from '@neondatabase/serverless';
-import { eq, sql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
-import * as schema from '@/lib/db/schema';
+// eslint-disable-next-line no-restricted-imports -- Seed script needs direct schema access
+import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 
 // Configure WebSocket for transaction support in tests
 neonConfig.webSocketConstructor = ws;
-
-const { creatorProfiles, socialLinks } = schema;
 
 interface TestProfile {
   username: string;
@@ -52,10 +51,62 @@ export async function seedTestData() {
     return { success: false, reason: 'no_database_url' };
   }
 
+  // eslint-disable-next-line @jovie/no-manual-db-pooling -- Seed script runs outside app, requires manual pool
   const pool = new Pool({ connectionString: databaseUrl });
-  const db = drizzle(pool, { schema });
+  const db = drizzle(pool);
 
   try {
+    // Create E2E test user (for authenticated dashboard tests)
+    const E2E_CLERK_USER_ID = 'user_31mqVTy5GIyFXxvfyRArBu7Xt4v';
+    const E2E_EMAIL = 'e2e@jov.ie';
+    const E2E_USERNAME = 'e2e-test-user';
+
+    console.log('  Creating E2E test user...');
+    const [existingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, E2E_CLERK_USER_ID))
+      .limit(1);
+
+    if (!existingUser) {
+      // Create the user record
+      const [createdUser] = await db
+        .insert(users)
+        .values({
+          clerkId: E2E_CLERK_USER_ID,
+          email: E2E_EMAIL,
+          name: 'E2E Test User',
+          userStatus: 'active', // Active user with completed onboarding
+        })
+        .returning({ id: users.id });
+
+      console.log(`    ✓ Created E2E user (ID: ${createdUser.id})`);
+
+      // Create a creator profile for the E2E user
+      const [createdProfile] = await db
+        .insert(creatorProfiles)
+        .values({
+          userId: createdUser.id,
+          username: E2E_USERNAME,
+          usernameNormalized: E2E_USERNAME.toLowerCase(),
+          displayName: 'E2E Test User',
+          bio: 'Automated test user',
+          creatorType: 'artist',
+          isPublic: true,
+          isVerified: false,
+          isClaimed: true,
+          ingestionStatus: 'idle',
+          onboardingCompletedAt: new Date(), // Mark onboarding as complete
+        })
+        .returning({ id: creatorProfiles.id });
+
+      console.log(
+        `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+      );
+    } else {
+      console.log('    ✓ E2E test user already exists (skipping)');
+    }
+
     // Create test profiles
     for (const profile of TEST_PROFILES) {
       console.log(`  Creating profile: ${profile.username}`);
@@ -80,7 +131,7 @@ export async function seedTestData() {
       // NOTE: Uses explicit column list to be resilient to schema changes (e.g., waitlist_entry_id migration)
       // This avoids Drizzle trying to insert columns that may not exist in all environments
       const result = await db.execute<{ id: string }>(
-        sql`INSERT INTO creator_profiles (
+        drizzleSql`INSERT INTO creator_profiles (
           username, username_normalized, display_name, bio,
           spotify_url, avatar_url, creator_type,
           is_public, is_verified, is_claimed, ingestion_status
