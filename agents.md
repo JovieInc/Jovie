@@ -401,6 +401,47 @@ useQuery({
 - E2E tests: Playwright
 - Focus on user behavior, not implementation details
 
+#### Test Performance (CI Runtime Is a First-Class Constraint)
+
+Tests are part of the deploy path. Slow tests slow shipping. Test runtime performance is a functional requirement of the testing system itself.
+
+**Core Rule:** Any test that materially slows CI without proportional risk reduction is considered harmful, even if it is "correct."
+
+**Why This Matters (Pre-PMF Context):**
+- We're pre product-market fit—iteration speed is critical
+- Gated CI tests must run fast enough to support 2–3 deploys per day
+- Test runtime must not grow unbounded over time
+- Added tests must justify their runtime cost with real risk coverage
+
+**Gated CI (Deploy-Blocking):**
+| Allowed | Not Allowed |
+|---------|-------------|
+| Fast, deterministic tests | Long-running E2E |
+| Focused unit/integration tests | Exhaustive fuzzing |
+| Minimal fixture setup | Large fixture setup |
+| Mocked external calls | Real network, sleep, or polling loops |
+
+**Nightly / Async Jobs:**
+- May be slow and exhaustive
+- May trade speed for coverage
+- Must never block deploys
+
+**Agent Rules:**
+
+| Do | Don't |
+|----|-------|
+| Prefer fewer, stronger assertions over more tests | Add slow tests to gated CI by default |
+| Collapse redundant tests | Increase CI runtime without explaining why |
+| Move slow or high-cardinality tests to nightly | Justify slow tests with "better coverage" alone |
+| Call out expected runtime impact in PRs when adding tests | |
+
+**Signs of a Broken Test Suite:**
+- CI time increases noticeably without corresponding risk reduction
+- Engineers avoid deploys due to slow feedback
+- Tests are skipped locally to save time
+
+**Default Bias:** When there's a tradeoff between test thoroughness and iteration speed in gated CI, bias toward speed and move thoroughness to nightly runs.
+
 ---
 
 ## Environment Variables
