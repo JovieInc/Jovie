@@ -9,7 +9,7 @@ const DEFAULT_CONFIDENCE = '0.700';
 
 function normalizeText(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 export async function storeAvatarCandidate(params: {

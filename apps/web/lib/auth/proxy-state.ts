@@ -21,6 +21,13 @@ const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decis
 // Timeout for DB query to prevent proxy hanging on Neon cold starts
 const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
 
+/** Get a human-readable label for user state (for logging) */
+function getUserStateLabel(state: ProxyUserState): string {
+  if (state.isActive) return 'active';
+  if (state.needsOnboarding) return 'onboarding';
+  return 'waitlist';
+}
+
 /**
  * Try to get user state from Redis cache
  */
@@ -44,11 +51,7 @@ async function tryGetCachedState(
         data: {
           cacheKey: cacheKey.replace(clerkUserId, '[REDACTED]'),
           durationMs: cacheDuration,
-          userState: cached.isActive
-            ? 'active'
-            : cached.needsOnboarding
-              ? 'onboarding'
-              : 'waitlist',
+          userState: getUserStateLabel(cached),
         },
       });
       return cached;

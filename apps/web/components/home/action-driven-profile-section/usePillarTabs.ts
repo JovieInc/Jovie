@@ -23,7 +23,7 @@ export function usePillarTabs({
 
   const activePillarIndex = useMemo<number>(() => {
     const index = pillars.findIndex(pillar => pillar.id === activePillarId);
-    return index >= 0 ? index : 0;
+    return Math.max(0, index);
   }, [activePillarId, pillars]);
 
   const getTabId = (pillarId: PillarId): string =>

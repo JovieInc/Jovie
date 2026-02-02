@@ -60,7 +60,7 @@ function addDSP(
   key: string,
   url: string | null | undefined
 ): void {
-  if (!url || dsps.find(d => d.key === key)) {
+  if (!url || dsps.some(d => d.key === key)) {
     return;
   }
 

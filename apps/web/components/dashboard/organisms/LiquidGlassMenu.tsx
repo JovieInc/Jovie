@@ -98,7 +98,7 @@ function useCloseOnEscapeOrOutside(
 // Sub-components
 // ============================================================================
 
-function GlassHighlight({ subtle = false }: { subtle?: boolean }) {
+function GlassHighlight({ subtle = false }: { readonly subtle?: boolean }) {
   return (
     <div
       className='absolute inset-0 pointer-events-none rounded-2xl'
@@ -112,7 +112,7 @@ function GlassHighlight({ subtle = false }: { subtle?: boolean }) {
   );
 }
 
-function GlassBlur({ intense = false }: { intense?: boolean }) {
+function GlassBlur({ intense = false }: { readonly intense?: boolean }) {
   return (
     <div
       className='absolute inset-0 rounded-2xl'
@@ -122,7 +122,13 @@ function GlassBlur({ intense = false }: { intense?: boolean }) {
   );
 }
 
-function Badge({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' }) {
+function Badge({
+  count,
+  size = 'md',
+}: {
+  readonly count: number;
+  readonly size?: 'sm' | 'md';
+}) {
   if (count <= 0) return null;
 
   const sizeClasses =
