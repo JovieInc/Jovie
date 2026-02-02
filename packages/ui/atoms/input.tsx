@@ -244,15 +244,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               getRightPosition(effectiveSize)
             )}
           >
-            {/* Loading spinner */}
+            {/* Loading spinner - decorative since input has aria-busy */}
             {isPending && (
-              <output
+              <span
                 className={cn(
                   'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',
                   'text-muted-foreground',
                   getSpinnerSize(effectiveSize)
                 )}
-                aria-label='Loading'
+                aria-hidden='true'
               />
             )}
 
@@ -287,7 +287,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             </label>
           )}
 
-          {helpText && !error && (
+          {helpText && (
             <p id={helpTextId} className='text-xs text-tertiary-token'>
               {helpText}
             </p>
