@@ -127,7 +127,7 @@ export default defineConfig({
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,
-          timeout: 120000, // Increased from 60s to 120s for Turbopack compilation
+          timeout: 300000, // Increased to 300s (5min) for Turbopack cold start
           stdout: 'pipe',
           stderr: 'pipe',
         },
