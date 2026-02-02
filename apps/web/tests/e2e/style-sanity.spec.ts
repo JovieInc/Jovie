@@ -1,7 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-// Simple sanity check that Tailwind classes resolve to expected computed styles in the browser
-// We do not rely on specific pages to include elements; instead we inject a transient node.
+/**
+ * Style Sanity Tests
+ *
+ * Simple sanity check that Tailwind classes resolve to expected computed styles in the browser.
+ * We do not rely on specific pages to include elements; instead we inject a transient node.
+ *
+ * NOTE: Tests run on public pages. Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Style sanity', () => {
   test('bg-black text-white computes correctly', async ({ page }) => {

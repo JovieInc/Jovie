@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * Featured Creators Tests
+ *
+ * NOTE: Tests public homepage for unauthenticated visitors.
+ * Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Featured Creators on Homepage', () => {
   test('featured creators section loads and displays creators', async ({
     page,
