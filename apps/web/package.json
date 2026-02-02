@@ -212,7 +212,7 @@
     "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.53.1",
     "@typescript-eslint/parser": "^8.54.0",
-    "@vercel/toolbar": "^0.1.41",
+    "@vercel/toolbar": "^0.2.1",
     "@vitejs/plugin-react": "^5.0.2",
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.23",
