@@ -14,15 +14,8 @@ import {
   useReactTable,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type VirtualItem } from '@tanstack/react-virtual';
+import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -33,6 +26,8 @@ import {
 import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import { cn, presets } from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
+import { useTableKeyboardNav } from './useTableKeyboardNav';
+import { useTableVirtualization } from './useTableVirtualization';
 
 export interface UnifiedTableProps<TData> {
   /**
@@ -528,67 +523,30 @@ export function UnifiedTable<TData>({
       enabled: groupingEnabled,
     });
 
-  // Initialize virtualizer
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: useCallback(() => rowHeight, [rowHeight]),
+  // Initialize virtualization
+  const {
+    virtualizer: rowVirtualizer,
+    virtualRows,
+    totalSize,
+    paddingTop,
+    paddingBottom,
+  } = useTableVirtualization({
+    rowCount: rows.length,
+    scrollElementRef: tableContainerRef,
+    estimatedRowHeight: rowHeight,
     overscan,
     enabled: shouldVirtualize,
   });
 
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const totalSize = rowVirtualizer.getTotalSize();
-
-  // Padding for virtualized rows
-  const paddingTop =
-    shouldVirtualize && virtualRows.length > 0
-      ? (virtualRows[0]?.start ?? 0)
-      : 0;
-  const paddingBottom =
-    shouldVirtualize && virtualRows.length > 0
-      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-      : 0;
-
-  // Keyboard navigation handler
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent, rowIndex: number, rowData: TData) => {
-      if (!shouldEnableKeyboardNav) return;
-
-      switch (event.key) {
-        case 'ArrowDown':
-          event.preventDefault();
-          if (rowIndex < rows.length - 1) {
-            const nextIndex = rowIndex + 1;
-            setFocusedIndex(nextIndex);
-            rowRefs.current.get(nextIndex)?.focus();
-          }
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          if (rowIndex > 0) {
-            const prevIndex = rowIndex - 1;
-            setFocusedIndex(prevIndex);
-            rowRefs.current.get(prevIndex)?.focus();
-          }
-          break;
-        case 'Enter':
-        case ' ':
-          event.preventDefault();
-          onRowClick?.(rowData);
-          break;
-      }
-    },
-    [shouldEnableKeyboardNav, rows.length, setFocusedIndex, onRowClick]
-  );
-
-  // Scroll focused row into view when it changes
-  useEffect(() => {
-    if (focusedIndex >= 0 && shouldEnableKeyboardNav) {
-      const rowElement = rowRefs.current.get(focusedIndex);
-      rowElement?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
-  }, [focusedIndex, shouldEnableKeyboardNav]);
+  // Initialize keyboard navigation
+  const { handleKeyDown } = useTableKeyboardNav({
+    enabled: shouldEnableKeyboardNav,
+    focusedIndex,
+    rowCount: rows.length,
+    rowRefsMap: rowRefs.current,
+    setFocusedIndex,
+    onRowClick,
+  });
 
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
@@ -853,29 +811,27 @@ export function UnifiedTable<TData>({
 
           {/* Rows */}
           {(shouldVirtualize ? virtualRows : rows).map((item, listIndex) => {
-            // When virtualized, item is VirtualItem and we need to get the actual row
-            // When not virtualized, item IS the row
-            let row: Row<TData>;
-            let virtualItem: VirtualItem | undefined;
-            let rowIndex: number;
-
-            if (shouldVirtualize) {
-              virtualItem = item as VirtualItem;
-              row = rows[virtualItem.index]!;
-              rowIndex = virtualItem.index;
-            } else {
-              row = item as Row<TData>;
-              rowIndex = listIndex;
-            }
+            // Extract row data based on virtualization mode
+            const { row, virtualItem, rowIndex } = shouldVirtualize
+              ? {
+                  virtualItem: item as VirtualItem,
+                  row: rows[(item as VirtualItem).index]!,
+                  rowIndex: (item as VirtualItem).index,
+                }
+              : {
+                  virtualItem: undefined,
+                  row: item as Row<TData>,
+                  rowIndex: listIndex,
+                };
 
             const rowData = row.original as TData;
 
-            // Custom row renderer
+            // Early return for custom row renderer
             if (renderRow) {
               return renderRow(rowData, rowIndex);
             }
 
-            // Default row renderer using memoized TableRow
+            // Build base row element
             const rowElement = (
               <TableRow
                 key={row.id}
@@ -895,18 +851,8 @@ export function UnifiedTable<TData>({
               />
             );
 
-            // Check if row is expanded and has expanded content
-            const rowId = getExpandableRowId
-              ? getExpandableRowId(rowData)
-              : (getRowId?.(rowData) ?? row.id);
-            const isExpanded = expandedRowIds?.has(rowId);
-            const expandedContent =
-              isExpanded && renderExpandedContent
-                ? renderExpandedContent(rowData, columnCount)
-                : null;
-
-            // Wrap with context menu if provided
-            const wrappedRowElement = getContextMenuItems ? (
+            // Apply context menu wrapper if needed
+            const wrappedRow = getContextMenuItems ? (
               <TableContextMenu
                 key={row.id}
                 items={getContextMenuItems(rowData)}
@@ -917,17 +863,25 @@ export function UnifiedTable<TData>({
               rowElement
             );
 
-            // If expanded, render both row and expanded content
-            if (expandedContent) {
-              return (
-                <React.Fragment key={row.id}>
-                  {wrappedRowElement}
-                  {expandedContent}
-                </React.Fragment>
-              );
+            // Check for expanded content
+            const rowId = getExpandableRowId
+              ? getExpandableRowId(rowData)
+              : (getRowId?.(rowData) ?? row.id);
+            const isExpanded = expandedRowIds?.has(rowId);
+
+            // Early return if no expanded content
+            if (!isExpanded || !renderExpandedContent) {
+              return wrappedRow;
             }
 
-            return wrappedRowElement;
+            // Render row with expanded content
+            const expandedContent = renderExpandedContent(rowData, columnCount);
+            return (
+              <React.Fragment key={row.id}>
+                {wrappedRow}
+                {expandedContent}
+              </React.Fragment>
+            );
           })}
 
           {/* Bottom padding for virtualization */}
