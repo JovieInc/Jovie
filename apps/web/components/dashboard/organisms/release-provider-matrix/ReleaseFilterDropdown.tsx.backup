@@ -16,7 +16,6 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
-import { FilterSubmenu } from './FilterSubmenu';
 import type { ReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
 import type { PopularityLevel, ReleaseFilters } from './ReleaseTableSubheader';
 
@@ -383,8 +382,12 @@ export function ReleaseFilterDropdown({
 }: ReleaseFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mainSearch, setMainSearch] = useState('');
+  const [typeSearch, setTypeSearch] = useState('');
+  const [popularitySearch, setPopularitySearch] = useState('');
   const [labelSearch, setLabelSearch] = useState('');
   const mainSearchRef = useRef<HTMLInputElement>(null);
+  const typeSearchRef = useRef<HTMLInputElement>(null);
+  const popularitySearchRef = useRef<HTMLInputElement>(null);
   const labelSearchRef = useRef<HTMLInputElement>(null);
 
   // Toggle type selection
@@ -448,6 +451,24 @@ export function ReleaseFilterDropdown({
     );
   }, [mainSearch]);
 
+  // Filter type options by search
+  const filteredTypeOptions = useMemo(() => {
+    if (!typeSearch.trim()) return RELEASE_TYPE_OPTIONS;
+    const query = typeSearch.toLowerCase();
+    return RELEASE_TYPE_OPTIONS.filter(opt =>
+      opt.label.toLowerCase().includes(query)
+    );
+  }, [typeSearch]);
+
+  // Filter popularity options by search
+  const filteredPopularityOptions = useMemo(() => {
+    if (!popularitySearch.trim()) return POPULARITY_OPTIONS;
+    const query = popularitySearch.toLowerCase();
+    return POPULARITY_OPTIONS.filter(opt =>
+      opt.label.toLowerCase().includes(query)
+    );
+  }, [popularitySearch]);
+
   // Filter label options by search
   const filteredLabelOptions = useMemo(() => {
     if (!labelSearch.trim()) return counts.byLabel;
@@ -477,9 +498,21 @@ export function ReleaseFilterDropdown({
     setIsOpen(open);
     if (!open) {
       setMainSearch('');
+      setTypeSearch('');
+      setPopularitySearch('');
       setLabelSearch('');
     }
   }, []);
+
+  // Submenu content styles
+  const submenuContentClass = cn(
+    DROPDOWN_CONTENT_BASE,
+    DROPDOWN_SHADOW,
+    DROPDOWN_TRANSITIONS,
+    DROPDOWN_SLIDE_ANIMATIONS,
+    'min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+  );
+
   return (
     <div className='flex items-center gap-2'>
       <DropdownMenuPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
@@ -533,38 +566,168 @@ export function ReleaseFilterDropdown({
               ) : (
                 <>
                   {/* Release Type Submenu */}
-                  <FilterSubmenu
-                    label='Release Type'
-                    iconName='Disc3'
-                    options={RELEASE_TYPE_OPTIONS}
-                    selectedIds={filters.releaseTypes}
-                    onToggle={handleTypeToggle}
-                    counts={counts.byType}
-                    searchPlaceholder='Search types...'
-                    isVisible={filteredCategories.some(
-                      c => c.id === 'releaseType'
-                    )}
-                  />
+                  {filteredCategories.some(c => c.id === 'releaseType') && (
+                    <DropdownMenuPrimitive.Sub
+                      onOpenChange={open => {
+                        if (open) {
+                          // Delay focus to ensure submenu is rendered
+                          setTimeout(() => typeSearchRef.current?.focus(), 50);
+                        } else {
+                          setTypeSearch('');
+                        }
+                      }}
+                    >
+                      <DropdownMenuPrimitive.SubTrigger
+                        className={cn(MENU_ITEM_BASE, 'gap-2 justify-between')}
+                      >
+                        <div className='flex items-center gap-2'>
+                          <Icon
+                            name='Disc3'
+                            className='h-3.5 w-3.5 text-tertiary-token'
+                          />
+                          <span>Release Type</span>
+                          {typeFilterCount > 0 && (
+                            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
+                              {typeFilterCount}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
+                      </DropdownMenuPrimitive.SubTrigger>
+                      <DropdownMenuPrimitive.Portal>
+                        <DropdownMenuPrimitive.SubContent
+                          sideOffset={4}
+                          alignOffset={-4}
+                          className={submenuContentClass}
+                        >
+                          <SearchInput
+                            value={typeSearch}
+                            onChange={setTypeSearch}
+                            onClear={() => {
+                              setTypeSearch('');
+                              typeSearchRef.current?.focus();
+                            }}
+                            placeholder='Search types...'
+                            inputRef={typeSearchRef}
+                          />
+                          <div className='flex-1 overflow-y-auto p-1'>
+                            {filteredTypeOptions.length === 0 ? (
+                              <div className='py-6 text-center text-xs text-tertiary-token'>
+                                No types found
+                              </div>
+                            ) : (
+                              filteredTypeOptions.map(opt => (
+                                <SubmenuCheckboxItem
+                                  key={opt.id}
+                                  label={opt.label}
+                                  icon={
+                                    <Icon
+                                      name={opt.iconName as 'Disc3'}
+                                      className='h-3.5 w-3.5'
+                                    />
+                                  }
+                                  count={counts.byType[opt.id] || 0}
+                                  checked={filters.releaseTypes.includes(
+                                    opt.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    handleTypeToggle(opt.id)
+                                  }
+                                  searchInputRef={typeSearchRef}
+                                />
+                              ))
+                            )}
+                          </div>
+                        </DropdownMenuPrimitive.SubContent>
+                      </DropdownMenuPrimitive.Portal>
+                    </DropdownMenuPrimitive.Sub>
+                  )}
 
                   {/* Popularity Submenu */}
-                  <FilterSubmenu
-                    label='Popularity'
-                    iconName='Signal'
-                    options={POPULARITY_OPTIONS}
-                    selectedIds={filters.popularity}
-                    onToggle={handlePopularityToggle}
-                    counts={counts.byPopularity}
-                    searchPlaceholder='Search popularity...'
-                    isVisible={filteredCategories.some(
-                      c => c.id === 'popularity'
-                    )}
-                  />
+                  {filteredCategories.some(c => c.id === 'popularity') && (
+                    <DropdownMenuPrimitive.Sub
+                      onOpenChange={open => {
+                        if (open) {
+                          // Delay focus to ensure submenu is rendered
+                          setTimeout(
+                            () => popularitySearchRef.current?.focus(),
+                            50
+                          );
+                        } else {
+                          setPopularitySearch('');
+                        }
+                      }}
+                    >
+                      <DropdownMenuPrimitive.SubTrigger
+                        className={cn(MENU_ITEM_BASE, 'gap-2 justify-between')}
+                      >
+                        <div className='flex items-center gap-2'>
+                          <Icon
+                            name='Signal'
+                            className='h-3.5 w-3.5 text-tertiary-token'
+                          />
+                          <span>Popularity</span>
+                          {popularityFilterCount > 0 && (
+                            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
+                              {popularityFilterCount}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
+                      </DropdownMenuPrimitive.SubTrigger>
+                      <DropdownMenuPrimitive.Portal>
+                        <DropdownMenuPrimitive.SubContent
+                          sideOffset={4}
+                          alignOffset={-4}
+                          className={submenuContentClass}
+                        >
+                          <SearchInput
+                            value={popularitySearch}
+                            onChange={setPopularitySearch}
+                            onClear={() => {
+                              setPopularitySearch('');
+                              popularitySearchRef.current?.focus();
+                            }}
+                            placeholder='Search popularity...'
+                            inputRef={popularitySearchRef}
+                          />
+                          <div className='flex-1 overflow-y-auto p-1'>
+                            {filteredPopularityOptions.length === 0 ? (
+                              <div className='py-6 text-center text-xs text-tertiary-token'>
+                                No options found
+                              </div>
+                            ) : (
+                              filteredPopularityOptions.map(opt => (
+                                <SubmenuCheckboxItem
+                                  key={opt.id}
+                                  label={opt.label}
+                                  icon={
+                                    <Icon
+                                      name={opt.iconName as 'Signal'}
+                                      className='h-3.5 w-3.5'
+                                    />
+                                  }
+                                  count={counts.byPopularity[opt.id] || 0}
+                                  checked={filters.popularity.includes(opt.id)}
+                                  onCheckedChange={() =>
+                                    handlePopularityToggle(opt.id)
+                                  }
+                                  searchInputRef={popularitySearchRef}
+                                />
+                              ))
+                            )}
+                          </div>
+                        </DropdownMenuPrimitive.SubContent>
+                      </DropdownMenuPrimitive.Portal>
+                    </DropdownMenuPrimitive.Sub>
+                  )}
 
-                  {/* Label Submenu - Note: Uses VirtualizedLabelList internally */}
+                  {/* Label Submenu */}
                   {filteredCategories.some(c => c.id === 'label') && (
                     <DropdownMenuPrimitive.Sub
                       onOpenChange={open => {
                         if (open) {
+                          // Delay focus to ensure submenu is rendered
                           setTimeout(() => labelSearchRef.current?.focus(), 50);
                         } else {
                           setLabelSearch('');
@@ -592,13 +755,7 @@ export function ReleaseFilterDropdown({
                         <DropdownMenuPrimitive.SubContent
                           sideOffset={4}
                           alignOffset={-4}
-                          className={cn(
-                            DROPDOWN_CONTENT_BASE,
-                            DROPDOWN_SHADOW,
-                            DROPDOWN_TRANSITIONS,
-                            DROPDOWN_SLIDE_ANIMATIONS,
-                            'min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
-                          )}
+                          className={submenuContentClass}
                         >
                           <SearchInput
                             value={labelSearch}
