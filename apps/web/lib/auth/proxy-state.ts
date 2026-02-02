@@ -3,6 +3,7 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- pre-existing barrel import, will be fixed in schema refactor
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
@@ -14,9 +15,10 @@ export interface ProxyUserState {
 }
 
 // Redis cache settings for user state
-// Short TTL to balance freshness vs cold DB latency
+// Short TTL for transitional users, longer TTL for stable active users
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
-const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decisions
+const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for transitional users
+const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - longer for stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts
 const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
@@ -26,6 +28,17 @@ function getUserStateLabel(state: ProxyUserState): string {
   if (state.isActive) return 'active';
   if (state.needsOnboarding) return 'onboarding';
   return 'waitlist';
+}
+
+/**
+ * Determine the appropriate cache TTL based on user state.
+ * - Active users (stable state): 5 minutes - state rarely changes
+ * - Transitional users (waitlist/onboarding): 30 seconds - need fresher state
+ */
+function getTtlForUserState(state: ProxyUserState): number {
+  return state.isActive
+    ? USER_STATE_CACHE_TTL_ACTIVE_SECONDS
+    : USER_STATE_CACHE_TTL_SECONDS;
 }
 
 /**
@@ -118,17 +131,19 @@ function determineUserState(
 /**
  * Cache user state in Redis (fire-and-forget)
  */
-function cacheUserState(cacheKey: string, userState: ProxyUserState): void {
+function cacheUserState(
+  cacheKey: string,
+  userState: ProxyUserState,
+  ttlSeconds: number
+): void {
   const redis = getRedis();
   if (!redis) return;
 
-  redis
-    .set(cacheKey, userState, { ex: USER_STATE_CACHE_TTL_SECONDS })
-    .catch(cacheError => {
-      captureWarning('[proxy-state] Redis cache write failed', {
-        error: cacheError,
-      });
+  redis.set(cacheKey, userState, { ex: ttlSeconds }).catch(cacheError => {
+    captureWarning('[proxy-state] Redis cache write failed', {
+      error: cacheError,
     });
+  });
 }
 
 /**
@@ -218,7 +233,8 @@ export async function getUserState(
     const userState = determineUserState(result);
 
     // Cache the result in Redis (fire-and-forget)
-    cacheUserState(cacheKey, userState);
+    const ttl = getTtlForUserState(userState);
+    cacheUserState(cacheKey, userState, ttl);
 
     return userState;
   } catch (error) {
