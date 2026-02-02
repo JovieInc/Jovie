@@ -76,9 +76,9 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:3100',
     trace: 'on-first-retry',
     video: videoMode,
-    // Faster navigation timeouts for smoke tests
-    navigationTimeout: isSmokeOnly ? 15_000 : 30_000,
-    actionTimeout: isSmokeOnly ? 10_000 : 15_000,
+    // Faster navigation timeouts for smoke tests, longer for full suite (Turbopack compilation)
+    navigationTimeout: isSmokeOnly ? 15_000 : 60_000, // Increased from 30s to 60s
+    actionTimeout: isSmokeOnly ? 10_000 : 20_000, // Increased from 15s to 20s
     // Add Vercel bypass header when secret is available (for staging/canary)
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
     // Reuse authenticated session from global setup
@@ -127,7 +127,7 @@ export default defineConfig({
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,
-          timeout: 60000,
+          timeout: 120000, // Increased from 60s to 120s for Turbopack compilation
           stdout: 'pipe',
           stderr: 'pipe',
         },

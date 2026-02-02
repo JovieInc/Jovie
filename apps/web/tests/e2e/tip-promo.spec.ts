@@ -1,5 +1,8 @@
 import { expect, test } from './setup';
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('TipPromo Feature Flag', () => {
   test.describe('when NEXT_PUBLIC_FEATURE_TIPS is enabled', () => {
     test.beforeEach(async ({ page }) => {

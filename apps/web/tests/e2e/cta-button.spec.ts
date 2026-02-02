@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('CTAButton Component', () => {
   test('should render correctly and handle state changes', async ({ page }) => {
     // Navigate to the Storybook page for CTAButton

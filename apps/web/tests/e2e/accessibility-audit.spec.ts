@@ -214,6 +214,9 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
   });
 }
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Accessibility Audit', () => {
   // Use a signed-in session if available
   // test.beforeEach(async ({ page }) => {
