@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 import {
+  measureWebVitals,
+  PERFORMANCE_BUDGETS,
+} from './utils/performance-test-utils';
+import {
   assertNoCriticalErrors,
   assertPageHealthy,
   assertPageRendered,
@@ -117,6 +121,28 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
 
       const context = getContext();
       await assertPageHealthy(page, context, testInfo);
+
+      // Measure homepage Web Vitals (non-blocking)
+      const vitals = await measureWebVitals(page);
+      await testInfo.attach('homepage-vitals', {
+        body: JSON.stringify(vitals, null, 2),
+        contentType: 'application/json',
+      });
+
+      // Log for visibility (don't fail test, just warn)
+      console.log('📊 Homepage Web Vitals:');
+      console.log(
+        `   LCP: ${vitals.lcp?.toFixed(0)}ms (budget: ${PERFORMANCE_BUDGETS.homepage.lcp}ms)`
+      );
+      console.log(
+        `   FCP: ${vitals.fcp?.toFixed(0)}ms (budget: ${PERFORMANCE_BUDGETS.homepage.fcp}ms)`
+      );
+
+      if (vitals.lcp && vitals.lcp > PERFORMANCE_BUDGETS.homepage.lcp) {
+        console.warn(
+          `⚠️  Homepage LCP exceeded budget: ${vitals.lcp.toFixed(0)}ms > ${PERFORMANCE_BUDGETS.homepage.lcp}ms`
+        );
+      }
     } finally {
       cleanup();
     }
