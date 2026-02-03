@@ -42,7 +42,7 @@ test.describe('Releases dashboard', () => {
   test('copies a smart link and follows the redirect @smoke', async ({
     page,
   }, testInfo) => {
-    await page.goto('/app/releases', {
+    await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
@@ -88,7 +88,7 @@ test.describe('Releases dashboard', () => {
   test('shows releases matrix with basic columns @smoke', async ({
     page,
   }, testInfo) => {
-    await page.goto('/app/releases', {
+    await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });

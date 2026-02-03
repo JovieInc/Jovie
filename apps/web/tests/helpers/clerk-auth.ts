@@ -107,8 +107,9 @@ export async function signInUser(
   );
 
   if (hasClerkSession) {
-    // Already signed in via storageState, just navigate to dashboard
-    await page.goto(APP_ROUTES.DASHBOARD, {
+    // Already signed in via storageState, just navigate to dashboard profile page
+    // Note: /app redirects to /app/dashboard/profile, but direct navigation is more reliable
+    await page.goto('/app/dashboard/profile', {
       waitUntil: 'domcontentloaded',
       timeout: 90000, // Increased for Turbopack cold compilation (can take 60+ seconds)
     });
@@ -178,9 +179,10 @@ export async function signInUser(
     throw error;
   }
 
-  // After sign-in, navigate to the dashboard to verify authentication
+  // After sign-in, navigate to the dashboard profile to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  await page.goto(APP_ROUTES.DASHBOARD, {
+  // Use direct path instead of APP_ROUTES.DASHBOARD which redirects
+  await page.goto('/app/dashboard/profile', {
     waitUntil: 'domcontentloaded',
     timeout: 90000, // Turbopack cold compilation can take 60+ seconds
   });
