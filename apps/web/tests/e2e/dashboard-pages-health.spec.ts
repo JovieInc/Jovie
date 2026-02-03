@@ -234,7 +234,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test('All dashboard pages load without errors', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes for 7 content pages
+    test.setTimeout(300_000); // 5 minutes for 7 pages (accounts for Turbopack compilation)
 
     const results: PageHealthResult[] = [];
 
@@ -422,7 +422,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         return;
       }
 
-      test.setTimeout(60_000);
+      test.setTimeout(90_000); // 90s to account for Turbopack compilation
 
       // Navigate to the page (already signed in from beforeEach)
       const currentUrl = page.url();
