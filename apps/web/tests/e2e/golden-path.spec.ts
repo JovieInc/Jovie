@@ -1,6 +1,11 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
+import { assertFastPageLoad } from './utils/performance-assertions';
+import {
+  measurePageLoad,
+  PERFORMANCE_BUDGETS,
+} from './utils/performance-test-utils';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -56,7 +61,7 @@ test.describe('Golden Path - Complete User Journey', () => {
 
   test('Authenticated user can access dashboard and view profile', async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.setTimeout(60_000); // 60 seconds for auth operations
 
     // STEP 1: Sign in with test user
@@ -67,14 +72,30 @@ test.describe('Golden Path - Complete User Journey', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    // STEP 3: Verify dashboard elements are visible (use more reliable selectors)
+    // STEP 3: Measure dashboard load performance
+    const dashboardPerf = await measurePageLoad(page);
+    await testInfo.attach('dashboard-load-time', {
+      body: `${dashboardPerf.loadTime.toFixed(0)}ms (DOM: ${dashboardPerf.domContentLoaded.toFixed(0)}ms)`,
+      contentType: 'text/plain',
+    });
+    await assertFastPageLoad(
+      dashboardPerf.domContentLoaded,
+      PERFORMANCE_BUDGETS.dashboard.domContentLoaded,
+      testInfo
+    );
+
+    console.log(
+      `📊 Dashboard Performance: DOM Content Loaded in ${dashboardPerf.domContentLoaded.toFixed(0)}ms`
+    );
+
+    // STEP 4: Verify dashboard elements are visible (use more reliable selectors)
     await expect(
       page.locator('h1, h2, [data-testid="dashboard-heading"]').filter({
         hasText: /dashboard|overview|welcome/i,
       })
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    // STEP 4: Navigate to profile (if user has one)
+    // STEP 5: Navigate to profile (if user has one)
     const profileLink = page
       .getByRole('link', { name: /view profile|public profile/i })
       .or(page.locator('[data-testid="profile-link"]'));

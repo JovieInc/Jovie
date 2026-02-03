@@ -30,6 +30,10 @@ inputs:
     description: 'Aggressive cleanup threshold (default: 3)'
     required: false
     default: '3'
+  expires_in_hours:
+    description: 'Hours until branch auto-expires (0 = no expiration). Acts as safety net if cleanup fails.'
+    required: false
+    default: '4'
 
 outputs:
   branch_id:
@@ -45,6 +49,17 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Compute expiration timestamp
+      id: compute-expiry
+      if: inputs.expires_in_hours != '0'
+      shell: bash
+      run: |
+        HOURS="${{ inputs.expires_in_hours }}"
+        # Compute expiration time in RFC 3339 format
+        EXPIRES_AT=$(date -u -d "+${HOURS} hours" +"%Y-%m-%dT%H:%M:%SZ")
+        echo "expires_at=$EXPIRES_AT" >> $GITHUB_OUTPUT
+        echo "Branch will auto-expire at: $EXPIRES_AT (${HOURS}h from now)"
+
     - name: Create Neon branch (attempt 1)
       id: create-branch-attempt-1
       continue-on-error: true
@@ -55,6 +70,7 @@ runs:
         parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
         api_key: ${{ inputs.api_key }}
+        expires_at: ${{ steps.compute-expiry.outputs.expires_at }}
 
     - name: Aggressive cleanup on limit error
       if: steps.create-branch-attempt-1.outcome == 'failure'
@@ -76,6 +92,7 @@ runs:
         parent_branch: ${{ inputs.parent_branch }}
         role: ${{ inputs.role }}
         api_key: ${{ inputs.api_key }}
+        expires_at: ${{ steps.compute-expiry.outputs.expires_at }}
 
     - name: Set outputs from successful attempt
       id: set-outputs

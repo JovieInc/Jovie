@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Error states for API failures', () => {
   test('Notifications page surfaces an error when subscribe API fails', async ({
     page,

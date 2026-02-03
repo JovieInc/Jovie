@@ -234,7 +234,7 @@ export function Footer({
                 }
               />
               {variant === 'minimal' && (
-                <p className='text-[10px] leading-4 font-normal tracking-tight text-[#6b6f76] dark:text-[#505257]'>
+                <p className='text-[10px] leading-4 font-normal tracking-tight text-[#6b6f76] dark:text-[#9ca3af]'>
                   Made for musicians, by musicians
                 </p>
               )}
