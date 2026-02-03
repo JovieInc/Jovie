@@ -125,7 +125,7 @@ export async function seedTestData() {
     for (const profile of TEST_PROFILES) {
       console.log(`  Creating profile: ${profile.username}`);
 
-      // Check if profile already exists
+      // Check if profile already exists and delete it to ensure clean state
       const [existing] = await db
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
@@ -136,9 +136,12 @@ export async function seedTestData() {
 
       if (existing) {
         console.log(
-          `    ✓ Profile ${profile.username} already exists (skipping)`
+          `    → Profile ${profile.username} exists, recreating with correct values...`
         );
-        continue;
+        // Delete existing profile (social links will cascade delete)
+        await db
+          .delete(creatorProfiles)
+          .where(eq(creatorProfiles.id, existing.id));
       }
 
       // Create the creator profile (no user association needed for public profiles)
