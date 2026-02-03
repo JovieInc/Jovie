@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { creatorClaimInvites } from '@/lib/db/schema';
+import { creatorClaimInvites } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';

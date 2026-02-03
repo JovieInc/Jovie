@@ -28,7 +28,7 @@ export type LinktreePageProps = {
       readonly dehydratedState?: { queries?: unknown };
     };
   };
-  query?: { handle?: string };
+  readonly query?: { handle?: string };
 };
 
 export type StructuredLink = { url?: string | null; title?: string | null };

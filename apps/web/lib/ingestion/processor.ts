@@ -13,7 +13,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import type { DbOrTransaction } from '@/lib/db';
-import type { ingestionJobs } from '@/lib/db/schema';
+import type { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';

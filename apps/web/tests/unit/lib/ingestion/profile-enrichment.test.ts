@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DbType } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 
 describe('applyProfileEnrichment', () => {

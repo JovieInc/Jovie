@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   check,
@@ -72,14 +72,16 @@ export const audienceMembers = pgTable(
     ).on(table.creatorProfileId, table.updatedAt),
     retentionIdx: index('audience_members_retention_idx')
       .on(table.lastSeenAt)
-      .where(sql`type = 'anonymous' AND email IS NULL AND phone IS NULL`),
+      .where(
+        drizzleSql`type = 'anonymous' AND email IS NULL AND phone IS NULL`
+      ),
     // Performance indexes for dashboard analytics subquery optimization (JOV-520)
     fingerprintLookupIdx: index('idx_audience_members_fingerprint')
       .on(table.creatorProfileId, table.fingerprint)
-      .where(sql`fingerprint IS NOT NULL`),
+      .where(drizzleSql`fingerprint IS NOT NULL`),
     emailLookupIdx: index('idx_audience_members_email')
       .on(table.creatorProfileId, table.email)
-      .where(sql`email IS NOT NULL`),
+      .where(drizzleSql`email IS NOT NULL`),
   })
 );
 
@@ -131,7 +133,7 @@ export const clickEvents = pgTable(
     // Partial index avoids full table scans when filtering is_bot = false OR is_bot IS NULL
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
-      .where(sql`is_bot = false OR is_bot IS NULL`),
+      .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
   })
 );
 
@@ -177,7 +179,7 @@ export const notificationSubscriptions = pgTable(
     ).on(table.creatorProfileId, table.phone),
     contactRequired: check(
       'notification_subscriptions_contact_required',
-      sql`${table.email} IS NOT NULL OR ${table.phone} IS NOT NULL`
+      drizzleSql`${table.email} IS NOT NULL OR ${table.phone} IS NOT NULL`
     ),
     creatorProfileCreatedAtIdx: index(
       'notification_subscriptions_creator_profile_id_created_at_idx'

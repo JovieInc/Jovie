@@ -4,7 +4,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { OptimizedImage } from '@/components/atoms/OptimizedImage';
 import { Container } from '@/components/site/Container';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 // Root layout handles dynamic rendering
 export const revalidate = 3600; // Revalidate every hour

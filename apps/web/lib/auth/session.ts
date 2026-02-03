@@ -3,7 +3,8 @@ import 'server-only';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Validates that a userId is a safe Clerk ID format

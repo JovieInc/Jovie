@@ -7,7 +7,8 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 

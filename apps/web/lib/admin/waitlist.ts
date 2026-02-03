@@ -1,6 +1,6 @@
 import { desc, sql as drizzleSql } from 'drizzle-orm';
 import { db, doesTableExist, waitlistEntries } from '@/lib/db';
-import type { WaitlistEntry } from '@/lib/db/schema';
+import type { WaitlistEntry } from '@/lib/db/schema/waitlist';
 
 export interface WaitlistEntryRow {
   id: string;

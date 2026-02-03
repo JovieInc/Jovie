@@ -2,7 +2,7 @@ import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { notificationSubscriptions } from '@/lib/db/schema';
+import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
 

@@ -3,8 +3,8 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- pre-existing barrel import, will be fixed in schema refactor
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 

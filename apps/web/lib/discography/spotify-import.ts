@@ -1,7 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks, providerLinks } from '@/lib/db/schema';
+import {
+  discogReleases,
+  discogTracks,
+  providerLinks,
+} from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,

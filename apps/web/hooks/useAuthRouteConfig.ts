@@ -9,6 +9,7 @@ import {
   settingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
+import { APP_ROUTES } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -42,8 +43,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
 
   // Detect section based on pathname
   const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
-    if (pathname.startsWith('/app/admin')) return 'admin';
-    if (pathname.startsWith('/app/settings')) return 'settings';
+    if (pathname.startsWith(APP_ROUTES.ADMIN)) return 'admin';
+    if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
     return 'dashboard';
   }, [pathname]);
 

@@ -16,7 +16,6 @@ import {
 } from 'vitest';
 
 declare global {
-  // eslint-disable-next-line no-var
   var jovieDevCleanupRegistered: boolean | undefined;
 }
 

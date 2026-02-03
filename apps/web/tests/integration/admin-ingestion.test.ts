@@ -1,10 +1,13 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+/* eslint-disable no-restricted-imports -- Test requires full schema access */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { POST } from '@/app/api/admin/creator-ingest/route';
 import * as schema from '@/lib/db/schema';
-import { creatorProfiles, ingestionJobs, socialLinks } from '@/lib/db/schema';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { setupDatabaseBeforeAll } from '../setup-db';
 
 type TestDb = NeonDatabase<typeof schema>;

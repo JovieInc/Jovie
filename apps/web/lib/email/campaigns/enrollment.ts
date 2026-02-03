@@ -7,7 +7,7 @@
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { campaignEnrollments } from '@/lib/db/schema';
+import { campaignEnrollments } from '@/lib/db/schema/email-engagement';
 import { hashEmail } from '@/lib/email/tracking';
 import { logger } from '@/lib/utils/logger';
 

@@ -124,7 +124,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
     });
 
   // Reserved for future drag handle pointer down handler
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const _handleDragHandlePointerDown = React.useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {
       if (listeners?.onPointerDown) {

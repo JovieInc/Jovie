@@ -4,9 +4,6 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-import './IngestedSuggestions.test-utils';
-
 import { IngestedSuggestions } from '@/components/dashboard/organisms/links/IngestedSuggestions';
 import { track } from '@/lib/analytics';
 import {

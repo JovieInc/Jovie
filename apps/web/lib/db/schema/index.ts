@@ -5,7 +5,9 @@
  * Import from here for backwards compatibility with existing code.
  *
  * @example
- * import { users, creatorProfiles, socialLinks } from '@/lib/db/schema';
+ * import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
  */
 
 // Admin

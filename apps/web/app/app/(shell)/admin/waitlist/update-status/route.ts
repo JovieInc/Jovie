@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { waitlistEntries } from '@/lib/db/schema';
+import { APP_ROUTES } from '@/constants/routes';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const parsedBody = await parseJsonBody<unknown>(request, {
-      route: 'POST /app/admin/waitlist/update-status',
+      route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/update-status`,
       headers: NO_STORE_HEADERS,
     });
     if (!parsedBody.ok) {
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
       'Admin action failed: update waitlist status',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/app/admin/waitlist/update-status',
+        route: `${APP_ROUTES.ADMIN_WAITLIST}/update-status`,
         action: 'update_waitlist_status',
         adminEmail: entitlements?.email ?? 'unknown',
         timestamp: new Date().toISOString(),

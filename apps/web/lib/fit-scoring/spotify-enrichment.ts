@@ -5,10 +5,10 @@
  * with enrichment data needed for fit scoring.
  */
 
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getSpotifyArtist, isSpotifyAvailable } from '@/lib/spotify/index';
 
 import { calculateAndStoreFitScore } from './service';
@@ -177,7 +177,7 @@ export async function getEnrichmentQueue(
 }> {
   // Count total
   const [countResult] = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: drizzleSql<number>`count(*)::int` })
     .from(creatorProfiles)
     .where(
       and(

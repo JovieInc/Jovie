@@ -28,7 +28,7 @@ function getLinkDetectionStatus(
 }
 
 interface UniversalLinkInputUrlModeProps {
-  url: string;
+  readonly url: string;
   readonly placeholder: string;
   readonly disabled?: boolean;
   readonly detectedLink: DetectedLink | null;

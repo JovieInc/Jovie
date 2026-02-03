@@ -5,7 +5,7 @@ import { BASE_URL } from '@/constants/app';
 import { HOSTNAME } from '@/constants/domains';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
 /**

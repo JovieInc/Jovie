@@ -150,7 +150,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     verified = false,
     priority = false,
     quality = 85,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
     className,
     style,

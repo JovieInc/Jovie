@@ -3,7 +3,7 @@ export const runtime = 'nodejs';
 import { count, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {

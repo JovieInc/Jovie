@@ -12,13 +12,13 @@
  * - Complaint rate > 0.1% = Suspension
  */
 
-import { eq, lt, sql } from 'drizzle-orm';
+import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type CreatorSendingReputation,
   creatorSendingReputation,
   emailSendAttribution,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/sender';
 import { logger } from '@/lib/utils/logger';
 import { hashEmail } from './suppression';
 
@@ -151,7 +151,7 @@ export async function checkReputation(
           status: 'probation',
           suspendedAt: null,
           suspendedUntil: null,
-          metadata: sql`${creatorSendingReputation.metadata} || ${JSON.stringify(
+          metadata: drizzleSql`${creatorSendingReputation.metadata} || ${JSON.stringify(
             {
               lastStatusChange: now.toISOString(),
               statusReason: 'Suspension expired, moved to probation',
@@ -232,8 +232,8 @@ export async function recordSend(
   await db
     .update(creatorSendingReputation)
     .set({
-      totalSent: sql`${creatorSendingReputation.totalSent} + 1`,
-      recentSent: sql`${creatorSendingReputation.recentSent} + 1`,
+      totalSent: drizzleSql`${creatorSendingReputation.totalSent} + 1`,
+      recentSent: drizzleSql`${creatorSendingReputation.recentSent} + 1`,
       updatedAt: now,
     })
     .where(eq(creatorSendingReputation.creatorProfileId, creatorProfileId));
@@ -262,7 +262,7 @@ export async function recordDelivery(creatorProfileId: string): Promise<void> {
   await db
     .update(creatorSendingReputation)
     .set({
-      totalDelivered: sql`${creatorSendingReputation.totalDelivered} + 1`,
+      totalDelivered: drizzleSql`${creatorSendingReputation.totalDelivered} + 1`,
       updatedAt: now,
     })
     .where(eq(creatorSendingReputation.creatorProfileId, creatorProfileId));
@@ -345,7 +345,7 @@ export async function recordBounce(
       now.getTime() + 7 * 24 * 60 * 60 * 1000
     ); // 7 days
     updateData.suspensionReason = `Bounce rate ${(newBounceRate * 100).toFixed(2)}% exceeds threshold`;
-    updateData.metadata = sql`${creatorSendingReputation.metadata} || ${JSON.stringify(
+    updateData.metadata = drizzleSql`${creatorSendingReputation.metadata} || ${JSON.stringify(
       {
         lastStatusChange: now.toISOString(),
         statusReason: `Auto-suspended: bounce rate ${(newBounceRate * 100).toFixed(2)}%`,
@@ -361,7 +361,7 @@ export async function recordBounce(
 
   // Add warning tracking if moved to warning
   if (newStatus === 'warning' && statusChanged) {
-    updateData.warningCount = sql`${creatorSendingReputation.warningCount} + 1`;
+    updateData.warningCount = drizzleSql`${creatorSendingReputation.warningCount} + 1`;
     updateData.lastWarningAt = now;
   }
 
@@ -424,7 +424,7 @@ export async function recordComplaint(
       now.getTime() + 14 * 24 * 60 * 60 * 1000
     ); // 14 days for complaints
     updateData.suspensionReason = `Complaint rate ${(newComplaintRate * 100).toFixed(3)}% exceeds threshold`;
-    updateData.metadata = sql`${creatorSendingReputation.metadata} || ${JSON.stringify(
+    updateData.metadata = drizzleSql`${creatorSendingReputation.metadata} || ${JSON.stringify(
       {
         lastStatusChange: now.toISOString(),
         statusReason: `Auto-suspended: complaint rate ${(newComplaintRate * 100).toFixed(3)}%`,
@@ -440,7 +440,7 @@ export async function recordComplaint(
 
   // Add warning tracking if moved to warning
   if (newStatus === 'warning' && statusChanged) {
-    updateData.warningCount = sql`${creatorSendingReputation.warningCount} + 1`;
+    updateData.warningCount = drizzleSql`${creatorSendingReputation.warningCount} + 1`;
     updateData.lastWarningAt = now;
   }
 

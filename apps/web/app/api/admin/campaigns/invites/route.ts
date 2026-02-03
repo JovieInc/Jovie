@@ -5,15 +5,20 @@
  */
 
 import type { SQLWrapper } from 'drizzle-orm';
-import { and, count, desc, eq, gte, ilike, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gte,
+  ilike,
+} from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
-import {
-  creatorClaimInvites,
-  creatorProfiles,
-  emailEngagement,
-} from '@/lib/db/schema';
+import { emailEngagement } from '@/lib/db/schema/email-engagement';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
 
@@ -143,7 +148,7 @@ async function fetchEngagementData(inviteIds: string[]) {
     })
     .from(emailEngagement)
     .where(
-      sql`${emailEngagement.referenceId} = ANY(ARRAY[${sql.raw(
+      drizzleSql`${emailEngagement.referenceId} = ANY(ARRAY[${drizzleSql.raw(
         inviteIds.map(id => `'${id}'::uuid`).join(',')
       )}])`
     )

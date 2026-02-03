@@ -5,12 +5,12 @@ export interface FooterProps {
   readonly artistSettings?: {
     readonly hide_branding?: boolean;
   };
-  showThemeToggle?: boolean;
-  className?: string;
-  themeShortcutKey?: string;
-  brandingMark?: 'wordmark' | 'icon';
-  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-  links?: Array<{
+  readonly showThemeToggle?: boolean;
+  readonly className?: string;
+  readonly themeShortcutKey?: string;
+  readonly brandingMark?: 'wordmark' | 'icon';
+  readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
+  readonly links?: Array<{
     href: string;
     label: string;
   }>;

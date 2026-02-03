@@ -7,7 +7,8 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import type { ProfileData, ProfileUpdateData } from './types';

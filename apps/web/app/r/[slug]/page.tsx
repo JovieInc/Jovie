@@ -16,11 +16,8 @@ import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { UNKNOWN_ARTIST } from '@/constants/app';
 import { db } from '@/lib/db';
-import {
-  creatorProfiles,
-  discogReleases,
-  providerLinks,
-} from '@/lib/db/schema';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -34,8 +31,8 @@ import { ReleaseLandingPage } from './ReleaseLandingPage';
 export const revalidate = 300;
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ dsp?: string }>;
+  readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ dsp?: string }>;
 }
 
 /**

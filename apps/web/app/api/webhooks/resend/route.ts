@@ -24,7 +24,7 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
-import { webhookEvents } from '@/lib/db/schema';
+import { webhookEvents } from '@/lib/db/schema/suppression';
 import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';

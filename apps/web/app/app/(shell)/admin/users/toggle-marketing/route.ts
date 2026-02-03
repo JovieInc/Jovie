@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseToggleMarketingPayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { toggleCreatorMarketingAction } from '../../actions';
@@ -13,7 +14,7 @@ export const POST = createAdminRouteHandler({
     marketingOptOut: payload.nextMarketingOptOut,
   }),
   errorContext: {
-    route: '/app/admin/users/toggle-marketing',
+    route: `${APP_ROUTES.ADMIN_USERS}/toggle-marketing`,
     action: 'toggle_marketing_user',
   },
   errorMessage: 'Failed to update marketing preferences',

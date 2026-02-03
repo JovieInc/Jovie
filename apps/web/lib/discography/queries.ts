@@ -1,9 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
 import {
-  creatorProfiles,
-  type ProviderLink as DbProviderLink,
   type DiscogRelease,
   discogReleases,
   discogTracks,
@@ -11,7 +9,8 @@ import {
   type NewDiscogTrack,
   type NewProviderLink,
   providerLinks,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Release data source types
@@ -106,11 +105,11 @@ async function getTrackSummariesForReleases(
   const summaries = await db
     .select({
       releaseId: discogTracks.releaseId,
-      totalDurationMs: sql<number>`sum(${discogTracks.durationMs})`.as(
+      totalDurationMs: drizzleSql<number>`sum(${discogTracks.durationMs})`.as(
         'total_duration_ms'
       ),
       primaryIsrc:
-        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
+        drizzleSql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
     })
@@ -142,7 +141,7 @@ export async function getLatestReleaseForProfile(
     .select()
     .from(discogReleases)
     .where(eq(discogReleases.creatorProfileId, creatorProfileId))
-    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
   return release ?? null;
@@ -185,7 +184,7 @@ export async function getLatestReleaseByUsername(
       eq(discogReleases.creatorProfileId, creatorProfiles.id)
     )
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
   return release ?? null;
@@ -633,7 +632,7 @@ export async function getTracksForReleaseWithProviders(
 
   // Get total count for pagination
   const [countResult] = await db
-    .select({ count: sql<number>`COUNT(*)` })
+    .select({ count: drizzleSql<number>`COUNT(*)` })
     .from(discogTracks)
     .where(eq(discogTracks.releaseId, releaseId));
 

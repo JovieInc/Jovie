@@ -6,7 +6,9 @@ import { eq } from 'drizzle-orm';
 
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { db } from '@/lib/db';
-import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
+import { adminAuditLog } from '@/lib/db/schema/admin';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 
 /**

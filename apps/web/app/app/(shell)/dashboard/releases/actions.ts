@@ -8,9 +8,10 @@ import {
   unstable_cache,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -174,7 +175,7 @@ export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/releases');
+    redirect(`/sign-in?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
   const profile = await requireProfile();
@@ -248,7 +249,7 @@ export async function saveProviderOverride(params: {
 
     // Invalidate cache and revalidate path
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath('/app/dashboard/releases');
+    revalidatePath(APP_ROUTES.RELEASES);
 
     return mapReleaseToViewModel(
       release,
@@ -310,7 +311,7 @@ export async function resetProviderOverride(params: {
 
     // Invalidate cache and revalidate path
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath('/app/dashboard/releases');
+    revalidatePath(APP_ROUTES.RELEASES);
 
     return mapReleaseToViewModel(
       release,
@@ -357,7 +358,7 @@ export async function syncFromSpotify(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/releases');
+  revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
     void trackServerEvent('releases_synced', {
@@ -471,7 +472,7 @@ export async function connectSpotifyArtist(params: {
   // Sync releases from the connected artist
   const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
 
-  revalidatePath('/app/dashboard/releases');
+  revalidatePath(APP_ROUTES.RELEASES);
 
   // Map releases to view models
   const releases = result.releases.map(release =>

@@ -22,7 +22,8 @@ import {
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
-import { billingAuditLog, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';

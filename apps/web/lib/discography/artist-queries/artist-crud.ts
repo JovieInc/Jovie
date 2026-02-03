@@ -6,7 +6,7 @@
 
 import { eq, or } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
-import { type Artist, artists, type NewArtist } from '@/lib/db/schema';
+import { type Artist, artists, type NewArtist } from '@/lib/db/schema/content';
 import { normalizeArtistName } from '../artist-parser';
 import type { FindOrCreateArtistInput } from './types';
 

@@ -70,12 +70,20 @@ export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {
         so there's no need to delay page interactivity for these scripts.
       */}
       {/* Music Group Structured Data */}
-      <Script type='application/ld+json' strategy='afterInteractive'>
+      <Script
+        id='artist-music-group-jsonld'
+        type='application/ld+json'
+        strategy='afterInteractive'
+      >
         {JSON.stringify(musicStructuredData)}
       </Script>
 
       {/* Breadcrumb Structured Data */}
-      <Script type='application/ld+json' strategy='afterInteractive'>
+      <Script
+        id='artist-breadcrumb-jsonld'
+        type='application/ld+json'
+        strategy='afterInteractive'
+      >
         {JSON.stringify(breadcrumbStructuredData)}
       </Script>
 

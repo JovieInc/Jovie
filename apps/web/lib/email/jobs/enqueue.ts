@@ -5,7 +5,7 @@
  */
 
 import type { DbOrTransaction } from '@/lib/db';
-import { ingestionJobs } from '@/lib/db/schema';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { logger } from '@/lib/utils/logger';
 import type { SendClaimInvitePayload } from './send-claim-invite';
 

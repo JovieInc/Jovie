@@ -1,7 +1,7 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   type ContextMenuItemType,
@@ -33,10 +33,14 @@ interface ProviderConfig {
 }
 
 interface ReleaseTableProps {
-  releases: ReleaseViewModel[];
+  readonly releases: ReleaseViewModel[];
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly artistName?: string | null;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
   readonly onEdit: (release: ReleaseViewModel) => void;
   readonly onAddUrl?: (
     releaseId: string,
@@ -156,9 +160,13 @@ export function ReleaseTable({
 
   // Refs for bulk actions header
   const selectedCountRef = useRef(selectedIds.size);
-  selectedCountRef.current = selectedIds.size;
   const bulkActionsRef = useRef(bulkActions);
-  bulkActionsRef.current = bulkActions;
+
+  // Update refs in effect rather than during render
+  useEffect(() => {
+    selectedCountRef.current = selectedIds.size;
+    bulkActionsRef.current = bulkActions;
+  }, [selectedIds.size, bulkActions]);
 
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
@@ -291,6 +299,7 @@ export function ReleaseTable({
   );
 
   // Build column definitions (dynamic columns only)
+  // eslint-disable-next-line react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
