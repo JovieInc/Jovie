@@ -53,9 +53,9 @@ export default defineConfig({
     : 'html',
 
   // Global timeout settings
-  timeout: isSmokeOnly ? 30_000 : 60_000, // 30s for smoke, 60s for full
+  timeout: isSmokeOnly ? 30_000 : 120_000, // 30s for smoke, 120s for full (Turbopack compilation)
   expect: {
-    timeout: isSmokeOnly ? 10_000 : 15_000, // 10s for smoke, 15s for full
+    timeout: isSmokeOnly ? 10_000 : 20_000, // 10s for smoke, 20s for full
     // Visual regression snapshot settings
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
@@ -77,8 +77,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     video: videoMode,
     // Faster navigation timeouts for smoke tests, longer for full suite (Turbopack compilation)
-    navigationTimeout: isSmokeOnly ? 15_000 : 60_000, // Increased from 30s to 60s
-    actionTimeout: isSmokeOnly ? 10_000 : 20_000, // Increased from 15s to 20s
+    navigationTimeout: isSmokeOnly ? 15_000 : 120_000, // 120s for Turbopack cold compilation
+    actionTimeout: isSmokeOnly ? 10_000 : 30_000, // Increased to 30s for slow page loads
     // Add Vercel bypass header when secret is available (for staging/canary)
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
     // Reuse authenticated session from global setup
