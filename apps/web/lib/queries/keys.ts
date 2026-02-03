@@ -218,6 +218,14 @@ export const queryKeys = {
       [...queryKeys.campaign.all, 'preview', { threshold, limit }] as const,
     stats: () => [...queryKeys.campaign.all, 'stats'] as const,
   },
+
+  // Chat conversations
+  chat: {
+    all: ['chat'] as const,
+    conversations: () => [...queryKeys.chat.all, 'conversations'] as const,
+    conversation: (id: string) =>
+      [...queryKeys.chat.all, 'conversation', id] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

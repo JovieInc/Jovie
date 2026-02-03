@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/refs -- refs.setReference and refs.setFloating from useFloating are callback refs, not ref value accesses */
+
 /**
  * UniversalLinkInput Component
  *
@@ -17,6 +19,7 @@ import {
 } from '@floating-ui/react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import {
   getPlatformIconMetadata,
   SocialIcon,
@@ -147,7 +150,7 @@ export const UniversalLinkInput = forwardRef<
   (
     {
       onAdd,
-      placeholder = 'Paste any link (Spotify, Instagram, TikTok, etc.)',
+      placeholder = 'Paste any link or ask Jovie anything...',
       disabled = false,
       existingPlatforms = [],
       prefillUrl,
@@ -156,6 +159,8 @@ export const UniversalLinkInput = forwardRef<
       onQueryChange,
       onPreviewChange,
       clearSignal = 0,
+      chatEnabled = true,
+      onChatSubmit,
     },
     forwardedRef
   ) => {
@@ -188,6 +193,8 @@ export const UniversalLinkInput = forwardRef<
       prefillUrl,
       onPrefillConsumed,
       clearSignal,
+      chatEnabled,
+      onChatSubmit,
     });
 
     // Batch add handler for multi-link paste

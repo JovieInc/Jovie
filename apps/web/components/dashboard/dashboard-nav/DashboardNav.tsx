@@ -3,11 +3,13 @@
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -64,7 +66,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const secondaryItems = secondaryNavigation;
 
-  const isInSettings = pathname.startsWith('/app/settings');
+  const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
@@ -126,6 +128,7 @@ export function DashboardNav(_: DashboardNavProps) {
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
+
       {isAdmin && !isInSettings && (
         <div
           className='mt-2 pt-2 mx-1 border-t border-default'

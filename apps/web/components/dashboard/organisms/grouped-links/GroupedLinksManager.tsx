@@ -2,13 +2,16 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
+// eslint-disable-next-line no-restricted-imports -- Module re-export, not barrel
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/universal-link-input';
+// eslint-disable-next-line no-restricted-imports -- Direct file import
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { InlineChatArea, type InlineChatAreaRef } from '../InlineChatArea';
 import { ChatStyleLinkList } from '../links/ChatStyleLinkList';
 import {
   type SuggestedLink,
@@ -36,6 +39,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   suggestionsEnabled = false,
   profileId,
   sidebarOpen = false,
+  artistContext,
 }: GroupedLinksManagerProps<T>) {
   // Link state management
   const {
@@ -89,6 +93,16 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const chatAreaRef = useRef<InlineChatAreaRef | null>(null);
+
+  // Chat state
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const chatEnabled = !!artistContext;
+
+  // Chat submit handler
+  const handleChatSubmit = useCallback((message: string) => {
+    chatAreaRef.current?.submitMessage(message);
+  }, []);
 
   // Pending preview management
   const {
@@ -185,7 +199,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         </p>
       )}
 
-      {/* Combined search + add input */}
+      {/* Combined search + add + chat input */}
       <UniversalLinkInput
         ref={linkInputRef}
         onAdd={handleAdd}
@@ -196,6 +210,8 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         onQueryChange={() => {}}
         onPreviewChange={handlePreviewChange}
         clearSignal={clearSignal}
+        chatEnabled={chatEnabled}
+        onChatSubmit={handleChatSubmit}
       />
 
       {/* Ingested AI-discovered suggestions */}
@@ -271,6 +287,17 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
         aria-label='Links list'
       >
         <div className='mx-auto max-w-2xl'>
+          {/* Inline chat area */}
+          {artistContext && profileId && (
+            <InlineChatArea
+              ref={chatAreaRef}
+              artistContext={artistContext}
+              profileId={profileId}
+              expanded={chatExpanded}
+              onExpandedChange={setChatExpanded}
+            />
+          )}
+
           <ChatStyleLinkList
             links={links}
             onLinksChange={next => {

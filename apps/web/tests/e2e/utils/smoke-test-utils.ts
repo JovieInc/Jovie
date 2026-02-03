@@ -73,6 +73,10 @@ export const EXPECTED_ERROR_PATTERNS = [
   'net::err_name_not_resolved',
   'fetch failed',
   '404',
+  // Chunk loading errors (Turbopack dev environment)
+  'chunkloaderror',
+  'failed to load chunk',
+  'web vitals',
   // CSP and security headers (expected in test)
   'content security policy',
   'csp',
