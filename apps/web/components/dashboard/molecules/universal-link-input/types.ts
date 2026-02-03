@@ -4,6 +4,7 @@ import type {
   PLATFORM_OPTIONS,
 } from '../universalLinkInput.constants';
 import type { CursorPosition } from '../useInputFocusController';
+import type { InputMode } from './useChatMode';
 import type { RankedPlatformOption } from './utils';
 
 export type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
@@ -22,6 +23,10 @@ export interface UniversalLinkInputProps {
     isDuplicate: boolean
   ) => void;
   readonly clearSignal?: number;
+  /** Enable chat mode detection (default: true) */
+  readonly chatEnabled?: boolean;
+  /** Callback when user submits a chat message */
+  readonly onChatSubmit?: (message: string) => void;
 }
 
 export interface UniversalLinkInputRef {
@@ -40,6 +45,8 @@ export interface UseUniversalLinkInputReturn {
   platformSuggestions: RankedPlatformOption[];
   shouldShowAutosuggest: boolean;
   isShortQuery: boolean;
+  /** Current input mode (url, platform, or chat) */
+  inputMode: InputMode;
   focusInput: (cursor?: CursorPosition) => void;
   handleUrlChange: (value: string) => void;
   handleAdd: () => void;

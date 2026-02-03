@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { ArtistContext } from './grouped-links/types';
 import { useLinksPersistence } from './links/hooks/useLinksPersistence';
 import { useProfileEditor } from './links/hooks/useProfileEditor';
 import { useSuggestionSync } from './links/hooks/useSuggestionSync';
@@ -68,6 +70,27 @@ export function EnhancedDashboardLinks({
     handleInputKeyDown,
     handleInputBlur,
   } = useProfileEditor();
+
+  // Get dashboard data for chat context
+  const { selectedProfile, hasSocialLinks, hasMusicLinks, tippingStats } =
+    useDashboardData();
+
+  // Build artist context for chat
+  const artistContext = useMemo((): ArtistContext | undefined => {
+    if (!selectedProfile) return undefined;
+    return {
+      displayName: selectedProfile.displayName ?? selectedProfile.username,
+      username: selectedProfile.username,
+      bio: selectedProfile.bio,
+      genres: selectedProfile.genres ?? [],
+      spotifyFollowers: selectedProfile.spotifyFollowers,
+      spotifyPopularity: selectedProfile.spotifyPopularity,
+      profileViews: selectedProfile.profileViews ?? 0,
+      hasSocialLinks,
+      hasMusicLinks,
+      tippingStats,
+    };
+  }, [selectedProfile, hasSocialLinks, hasMusicLinks, tippingStats]);
 
   // Get sidebar state early to gate polling
   const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
@@ -242,6 +265,7 @@ export function EnhancedDashboardLinks({
           profileId={profileId}
           sidebarOpen={sidebarOpen}
           className={useChatLayout ? 'flex-1' : undefined}
+          artistContext={artistContext}
         />
       </div>
     </div>

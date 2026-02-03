@@ -1,9 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { MessageCircle, Plus } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 // eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
@@ -11,14 +8,11 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 // eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
   adminNavigation,
   primaryNavigation,
@@ -45,10 +39,6 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
-  const router = useRouter();
-
-  // Fetch chat history for sidebar
-  const { data: conversations } = useChatConversationsQuery({ limit: 5 });
 
   // Debug: track isAdmin changes in development
   useEffect(() => {
@@ -120,32 +110,11 @@ export function DashboardNav(_: DashboardNavProps) {
     [renderNavItem]
   );
 
-  // Handle new chat button click
-  const handleNewChat = useCallback(() => {
-    // Navigate to chat page without a conversation ID (starts new chat)
-    router.push(APP_ROUTES.CHAT);
-  }, [router]);
-
   return (
     <nav
       className='flex flex-1 flex-col px-2'
       aria-label='Dashboard navigation'
     >
-      {/* New Chat Button */}
-      {!isInSettings && (
-        <div className='mb-2 px-1'>
-          <Button
-            variant='secondary'
-            size='sm'
-            className='w-full justify-start gap-2'
-            onClick={handleNewChat}
-          >
-            <Plus className='h-4 w-4' />
-            New Chat
-          </Button>
-        </div>
-      )}
-
       <SidebarGroup className='mb-1'>
         <SidebarGroupContent className='space-y-1'>
           {navSections.map((section, index) => (
@@ -159,39 +128,6 @@ export function DashboardNav(_: DashboardNavProps) {
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
-
-      {/* Chat History Section */}
-      {!isInSettings && conversations && conversations.length > 0 && (
-        <div
-          className='mt-2 pt-2 mx-1 border-t border-default'
-          data-testid='chat-history-section'
-        >
-          <SidebarCollapsibleGroup label='Recent Chats' defaultOpen>
-            <SidebarMenu>
-              {conversations.map(conversation => {
-                const isActive =
-                  pathname === `${APP_ROUTES.CHAT}/${conversation.id}`;
-                return (
-                  <SidebarMenuItem key={conversation.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      className='h-auto py-2'
-                    >
-                      <Link href={`${APP_ROUTES.CHAT}/${conversation.id}`}>
-                        <MessageCircle className='h-4 w-4 shrink-0' />
-                        <span className='truncate text-sm'>
-                          {conversation.title || 'Untitled chat'}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarCollapsibleGroup>
-        </div>
-      )}
 
       {isAdmin && !isInSettings && (
         <div
