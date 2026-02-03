@@ -9,8 +9,8 @@ export default function AppNotFound() {
       <PageContent>
         <EmptyState
           icon={<FileQuestion className='h-10 w-10' />}
-          heading='Oops, this page took a detour'
-          description="We can't find what you're looking for, but don't worry—your dashboard is just a click away!"
+          heading="This page missed its cue"
+          description="We can't find this track in the setlist. But don't worry, your dashboard is ready to play!"
           action={{
             label: 'Back to Dashboard',
             href: APP_ROUTES.DASHBOARD,

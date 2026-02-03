@@ -13,7 +13,7 @@ export default function LegalError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='Legal'
-      message="This document took an unexpected break. Try again, or reach out to support@meetjovie.com if it keeps playing hide and seek!"
+      message="This document took an intermission. Try again, or reach out to support@meetjovie.com if it's still offstage!"
     />
   );
 }

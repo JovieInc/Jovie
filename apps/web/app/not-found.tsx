@@ -24,16 +24,16 @@ export default function NotFound() {
             </div>
 
             <h1 className='text-2xl md:text-3xl font-medium text-primary-token tracking-tight mb-3'>
-              Oops, wrong turn!
+              This page left the stage
             </h1>
             <p className='text-base text-secondary-token leading-relaxed mb-8'>
-              This page seems to have wandered off. Don&apos;t worry, Jovie&apos;s
-              still here to help you find your way back.
+              Looks like this track isn&apos;t in the setlist. But don&apos;t
+              worry, Jovie&apos;s got plenty more to play!
             </p>
 
             <div className='flex items-center justify-center gap-3'>
               <CTAButton href='/' size='lg'>
-                Take me home
+                Back to the main stage
               </CTAButton>
             </div>
           </div>

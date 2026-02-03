@@ -36,7 +36,7 @@ export default function ProfileError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='Profile'
-      message="This profile is being a bit shy right now. Don't worry, try again in a sec!"
+      message="This profile is backstage right now. Don't worry, try again in a sec!"
     />
   );
 }

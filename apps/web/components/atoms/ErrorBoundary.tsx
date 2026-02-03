@@ -18,7 +18,7 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = "Something hiccuped on our end. Don't worry, give it another go!",
+  message = "We hit a wrong note. Don't worry, give it another go!",
 }: ErrorBoundaryProps) {
   const router = useRouter();
   const [timestamp] = useState(() => new Date());
@@ -74,7 +74,7 @@ export default function ErrorBoundary({
 
           <div className='space-y-2'>
             <h3 className='heading-linear text-lg text-primary-token'>
-              Oops, hit a bump!
+              Oops, slight remix needed
             </h3>
             <p className='text-linear text-sm text-secondary-token'>
               {message}
