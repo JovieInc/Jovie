@@ -218,7 +218,7 @@
     "autoprefixer": "^10.4.23",
     "axe-core": "^4.11.1",
     "axe-playwright": "^2.2.2",
-    "babel-plugin-react-compiler": "^19.1.0-rc.1",
+    "babel-plugin-react-compiler": "^19.1.0-rc.3",
     "danger": "^13.0.4",
     "drizzle-kit": "^0.31.8",
     "drizzle-zod": "^0.8.3",
