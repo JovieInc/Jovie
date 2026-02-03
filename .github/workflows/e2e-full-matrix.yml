@@ -33,12 +33,13 @@ jobs:
 
       - name: Create ephemeral Neon database branch
         id: neon-branch
-        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '3'
 
       - name: Run database migrations
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -89,6 +90,23 @@ jobs:
           name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
           path: apps/web/test-results/
           retention-days: 7
+
+      - name: Cleanup Neon branch
+        if: always()
+        continue-on-error: true
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: e2e-full-${{ github.run_id }}-${{ matrix.browser }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "Neon credentials missing; skipping branch cleanup."
+            exit 0
+          fi
+          echo "Deleting Neon branch '$BRANCH_NAME'..."
+          npx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+            echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring."
+          }
 
   notify:
     name: Notify Results
