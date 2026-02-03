@@ -1,22 +1,21 @@
 import { redirect } from 'next/navigation';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from './dashboard/actions';
+import { getDashboardData } from '../dashboard/actions';
 
 export const metadata = {
   title: 'Chat with Jovie',
   description: 'Ask Jovie about your music career',
 };
 
-// User-specific page - always render fresh
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export default async function AppRootPage() {
+export default async function ChatPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app');
+    redirect('/sign-in?redirect_url=/app/chat');
   }
 
   const dashboardData = await getDashboardData();
