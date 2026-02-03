@@ -17,6 +17,7 @@ import {
 import { cache } from 'react';
 import { setupDbSession } from '@/lib/auth/session';
 import { db, sqlAny } from '@/lib/db';
+import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -124,11 +125,15 @@ async function fetchChromeDataWithSession(
   await setupDbSession(clerkUserId);
   try {
     // First check if user exists in users table
-    const [userData] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
+    const [userData] = await dashboardQuery(
+      () =>
+        db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, clerkUserId))
+          .limit(1),
+      'User lookup query'
+    );
 
     if (!userData?.id) {
       // No user row yet — send to onboarding to create user/artist
@@ -144,26 +149,29 @@ async function fetchChromeDataWithSession(
     }
 
     // Now that we know user exists, get creator profiles
-    const creatorData = await db
-      .select()
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, userData.id))
-      .orderBy(asc(creatorProfiles.createdAt))
-      .catch((error: unknown) => {
-        const migrationResult = handleMigrationErrors(error, {
-          userId: userData.id,
-          operation: 'creator_profiles',
-        });
-
-        if (!migrationResult.shouldRetry) {
-          return migrationResult.fallbackData as CreatorProfile[];
-        }
-
-        Sentry.captureException(error, {
-          tags: { query: 'creator_profiles', context: 'dashboard_data' },
-        });
-        throw error;
+    const creatorData = await dashboardQuery(
+      () =>
+        db
+          .select()
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, userData.id))
+          .orderBy(asc(creatorProfiles.createdAt)),
+      'Creator profiles query'
+    ).catch((error: unknown) => {
+      const migrationResult = handleMigrationErrors(error, {
+        userId: userData.id,
+        operation: 'creator_profiles',
       });
+
+      if (!migrationResult.shouldRetry) {
+        return migrationResult.fallbackData as CreatorProfile[];
+      }
+
+      Sentry.captureException(error, {
+        tags: { query: 'creator_profiles', context: 'dashboard_data' },
+      });
+      throw error;
+    });
 
     if (!creatorData || creatorData.length === 0) {
       // No creator profiles yet — onboarding
@@ -183,11 +191,15 @@ async function fetchChromeDataWithSession(
     // Performance optimization: Single query for both link counts using conditional aggregation
     // This reduces database round trips from 3 to 2 (33% reduction)
     const [settings, linkCounts] = await Promise.all([
-      db
-        .select()
-        .from(userSettings)
-        .where(eq(userSettings.userId, userData.id))
-        .limit(1)
+      dashboardQuery(
+        () =>
+          db
+            .select()
+            .from(userSettings)
+            .where(eq(userSettings.userId, userData.id))
+            .limit(1),
+        'User settings query'
+      )
         .then(
           result => result?.[0] as { sidebarCollapsed: boolean } | undefined
         )
@@ -208,18 +220,22 @@ async function fetchChromeDataWithSession(
           throw error;
         }),
       // Consolidated link count query - counts all active links and music links in one query
-      db
-        .select({
-          totalActive: count(),
-          musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-        })
-        .from(socialLinks)
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, selected.id),
-            eq(socialLinks.state, 'active')
-          )
-        )
+      dashboardQuery(
+        () =>
+          db
+            .select({
+              totalActive: count(),
+              musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+            })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.state, 'active')
+              )
+            ),
+        'Social links count query'
+      )
         .then(result => ({
           hasLinks: Number(result?.[0]?.totalActive ?? 0) > 0,
           hasMusicLinks: Number(result?.[0]?.musicActive ?? 0) > 0,
@@ -310,12 +326,14 @@ async function fetchTippingStatsWithSession(
     const startOfMonthISO = startOfMonth.toISOString();
 
     const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      db
-        .select({
-          totalReceived: drizzleSql`
+      dashboardQuery(
+        () =>
+          db
+            .select({
+              totalReceived: drizzleSql`
             COALESCE(SUM(${tips.amountCents}), 0)
           `,
-          monthReceived: drizzleSql`
+              monthReceived: drizzleSql`
             COALESCE(
               SUM(
                 CASE
@@ -327,25 +345,31 @@ async function fetchTippingStatsWithSession(
               0
             )
           `,
-          tipsSubmitted: drizzleSql`
+              tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
-        })
-        .from(tips)
-        .where(eq(tips.creatorProfileId, profileId)),
-      db
-        .select({
-          total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
-          qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
-          link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
-        })
-        .from(clickEvents)
-        .where(
-          and(
-            eq(clickEvents.creatorProfileId, profileId),
-            eq(clickEvents.linkType, 'tip')
-          )
-        ),
+            })
+            .from(tips)
+            .where(eq(tips.creatorProfileId, profileId)),
+        'Tipping stats query'
+      ),
+      dashboardQuery(
+        () =>
+          db
+            .select({
+              total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+              qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
+              link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
+            })
+            .from(clickEvents)
+            .where(
+              and(
+                eq(clickEvents.creatorProfileId, profileId),
+                eq(clickEvents.linkType, 'tip')
+              )
+            ),
+        'Click events query'
+      ),
     ]);
 
     const tipTotalsRaw = tipTotalsRawResult?.[0];
