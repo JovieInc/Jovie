@@ -7,6 +7,7 @@
 import { and, eq } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
 import {
+  type ArtistRole,
   artists,
   type NewTrackArtist,
   trackArtists,

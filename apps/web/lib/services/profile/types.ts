@@ -6,11 +6,8 @@
  */
 
 import type { DiscogRelease } from '@/lib/db/schema/content';
-import type {
-  CreatorContact,
-  CreatorProfile,
-  creatorTypeEnum,
-} from '@/lib/db/schema/profiles';
+import type { creatorTypeEnum } from '@/lib/db/schema/enums';
+import type { CreatorContact, CreatorProfile } from '@/lib/db/schema/profiles';
 
 /** Creator type enum values */
 export type CreatorType = (typeof creatorTypeEnum.enumValues)[number];
