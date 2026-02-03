@@ -16,6 +16,7 @@ import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import * as schema from '@/lib/db/schema';
+import { getRedis } from '@/lib/redis';
 
 // Configure WebSocket for transaction support in tests
 neonConfig.webSocketConstructor = ws;
@@ -185,6 +186,21 @@ export async function seedTestData() {
           state: 'active',
         });
         console.log(`    ✓ Added Spotify link for ${profile.username}`);
+      }
+
+      // Invalidate Redis cache for this profile to ensure fresh data
+      const redis = getRedis();
+      if (redis) {
+        const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
+        try {
+          await redis.del(cacheKey);
+          console.log(`    ✓ Invalidated Redis cache for ${profile.username}`);
+        } catch (error) {
+          console.warn(
+            `    ⚠ Failed to invalidate Redis cache for ${profile.username}:`,
+            error
+          );
+        }
       }
     }
 
