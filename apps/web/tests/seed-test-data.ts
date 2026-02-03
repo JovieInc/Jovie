@@ -190,7 +190,10 @@ export async function seedTestData() {
 
       // Invalidate Redis cache for this profile to ensure fresh data
       // Only attempt if Redis credentials are available
-      if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      if (
+        process.env.UPSTASH_REDIS_REST_URL &&
+        process.env.UPSTASH_REDIS_REST_TOKEN
+      ) {
         try {
           const redis = new Redis({
             url: process.env.UPSTASH_REDIS_REST_URL,
