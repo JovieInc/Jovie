@@ -1,22 +1,25 @@
 import type { Metadata } from 'next';
+import { BrandPromiseSection } from '@/components/home/BrandPromiseSection';
 import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksSection } from '@/components/home/HowItWorksSection';
+import { JovieAISection } from '@/components/home/JovieAISection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
+import { UseCasesSection } from '@/components/home/UseCasesSection';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, APP_URL, BRAND } from '@/constants/app';
 
 // Fully static - no database dependency, instant cold starts
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
+  const title = `${APP_NAME} — ${BRAND.tagline}`;
   const description =
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube. Free to start.';
+    'Meet Jovie, the AI that turns your music into a career. One profile that captures fans, routes them to their preferred platform, and updates itself. Free to start.';
   const keywords = [
     'link in bio',
     'linktree alternative',
@@ -244,10 +247,13 @@ export default function HomePage() {
       {/* 1. Hero Section */}
       <RedesignedHero />
 
-      {/* 2. Problem Section */}
+      {/* 2. Brand Promise Section - Introduces the brand hierarchy */}
+      <BrandPromiseSection />
+
+      {/* 3. Problem Section */}
       <ProblemSection />
 
-      {/* 3. Comparison Section */}
+      {/* 4. Comparison Section */}
       <ComparisonSection />
 
       <DeferredSection
@@ -255,8 +261,17 @@ export default function HomePage() {
         className='section-spacing-linear'
         placeholderClassName='bg-surface-0/30'
       >
-        {/* 4. What You Get Section */}
+        {/* 5. What You Get Section */}
         <WhatYouGetSection />
+      </DeferredSection>
+
+      <DeferredSection
+        placeholderHeight={480}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 6. Jovie AI Section */}
+        <JovieAISection />
       </DeferredSection>
 
       <DeferredSection
@@ -264,7 +279,7 @@ export default function HomePage() {
         className='section-spacing-linear'
         placeholderClassName='bg-surface-0/30'
       >
-        {/* 5. How It Works Section */}
+        {/* 7. How It Works Section */}
         <HowItWorksSection />
       </DeferredSection>
 
@@ -273,8 +288,17 @@ export default function HomePage() {
         className='section-spacing-linear'
         placeholderClassName='bg-surface-0/30'
       >
-        {/* 6. See It In Action Section */}
+        {/* 8. See It In Action Section */}
         <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+      </DeferredSection>
+
+      <DeferredSection
+        placeholderHeight={400}
+        className='section-spacing-linear'
+        placeholderClassName='bg-surface-0/30'
+      >
+        {/* 9. Use Cases Section */}
+        <UseCasesSection />
       </DeferredSection>
 
       <DeferredSection
@@ -282,7 +306,7 @@ export default function HomePage() {
         className='section-spacing-linear'
         placeholderClassName='bg-surface-0/30'
       >
-        {/* 7. Final CTA Section */}
+        {/* 10. Final CTA Section */}
         <FinalCTASection />
       </DeferredSection>
     </div>
