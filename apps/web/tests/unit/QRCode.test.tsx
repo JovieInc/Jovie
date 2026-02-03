@@ -7,7 +7,6 @@ vi.mock('next/image', () => ({
   __esModule: true,
   default: ({ src, alt, width, height, onError, ...props }: any) => {
     return (
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Test mock component
       // eslint-disable-next-line @next/next/no-img-element -- Mock for next/image
       <img
         src={src}
