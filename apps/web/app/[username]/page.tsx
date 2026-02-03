@@ -225,7 +225,16 @@ const fetchProfileAndLinks = async (
 // Cache public profile reads across requests; tags keep updates fast and precise.
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
+// IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
 const getCachedProfileAndLinks = async (username: string) => {
+  // Skip Next.js cache in test/development environments
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
+    return fetchProfileAndLinks(username);
+  }
+
   try {
     return await unstable_cache(
       async () => fetchProfileAndLinks(username),

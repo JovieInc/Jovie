@@ -312,8 +312,8 @@ export async function saveBandsintownApiKey(params: {
 
   const profile = await requireProfile();
 
-  // Basic validation
-  const trimmedKey = params.apiKey.trim();
+  // Basic validation - guard against undefined/null
+  const trimmedKey = params.apiKey?.trim() ?? '';
   if (trimmedKey.length < 10) {
     return {
       success: false,
