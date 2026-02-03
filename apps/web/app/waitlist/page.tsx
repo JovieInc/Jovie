@@ -4,7 +4,6 @@ import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   ALLOWED_PLANS,
   clearWaitlistStorage,
@@ -23,6 +22,7 @@ import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGo
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
+import { APP_ROUTES } from '@/constants/routes';
 import { captureWarning } from '@/lib/error-tracking';
 import { FetchError } from '@/lib/queries/fetch';
 import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';

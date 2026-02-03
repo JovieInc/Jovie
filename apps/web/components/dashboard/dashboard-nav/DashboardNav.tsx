@@ -9,8 +9,8 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
-import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { APP_ROUTES } from '@/constants/routes';
+import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
   primaryNavigation,

@@ -14,6 +14,7 @@ import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -22,7 +23,6 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
-import { APP_ROUTES } from '@/constants/routes';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -86,8 +86,7 @@ function AuthShellWrapperInner({
   });
 
   // Determine if preview panel should be enabled (profile route only)
-  const isProfileRoute =
-    pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
+  const isProfileRoute = pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
   const previewEnabled = config.section === 'dashboard' && isProfileRoute;
 
   // Determine header action: use custom actions from context if available,

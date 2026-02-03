@@ -23,7 +23,12 @@ import { cn } from '@/lib/utils';
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
 
 const PRIMARY_ITEMS: LiquidGlassMenuItem[] = [
-  { id: 'overview', label: 'Dashboard', href: APP_ROUTES.DASHBOARD, icon: Home },
+  {
+    id: 'overview',
+    label: 'Dashboard',
+    href: APP_ROUTES.DASHBOARD,
+    icon: Home,
+  },
   {
     id: 'profile',
     label: 'Profile',
@@ -75,7 +80,12 @@ const EXPANDED_ITEMS: LiquidGlassMenuItem[] = [
     href: APP_ROUTES.CHAT,
     icon: MessageCircle,
   },
-  { id: 'settings', label: 'Settings', href: APP_ROUTES.SETTINGS, icon: Settings },
+  {
+    id: 'settings',
+    label: 'Settings',
+    href: APP_ROUTES.SETTINGS,
+    icon: Settings,
+  },
 ];
 
 const ADMIN_ITEMS: LiquidGlassMenuItem[] = [

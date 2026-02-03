@@ -101,8 +101,14 @@ export function DashboardOverview({
       <StarterEmptyState
         title='We could not load your profile'
         description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
-        primaryAction={{ label: 'Refresh dashboard', href: '/app' }}
-        secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
+        primaryAction={{
+          label: 'Refresh dashboard',
+          href: APP_ROUTES.DASHBOARD,
+        }}
+        secondaryAction={{
+          label: 'Restart onboarding',
+          href: APP_ROUTES.ONBOARDING,
+        }}
         testId='dashboard-missing-profile'
       />
     );
@@ -200,7 +206,7 @@ export function DashboardOverview({
                 isComplete={isHandleClaimed}
                 stepNumber={1}
                 label='Claim your handle'
-                actionHref='/app/settings'
+                actionHref={APP_ROUTES.SETTINGS}
                 actionLabel='Claim'
               />
               <SetupTaskItem
