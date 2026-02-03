@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
-import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';

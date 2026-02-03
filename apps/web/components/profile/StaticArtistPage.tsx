@@ -4,7 +4,7 @@ import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
-import type { DiscogRelease } from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';

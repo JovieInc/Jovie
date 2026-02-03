@@ -10,7 +10,7 @@ import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/service
 import { TourDatesList } from './TourDatesList';
 
 interface Props {
-  params: Promise<{ username: string }>;
+  readonly params: Promise<{ username: string }>;
 }
 
 // Cache profile lookup for 5 minutes

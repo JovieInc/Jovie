@@ -10,7 +10,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles, profilePhotos } from '@/lib/db/schema';
+import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { buildSeoFilename } from '@/lib/images/config';
 import { logger } from '@/lib/utils/logger';
 import { normalizeString } from '@/lib/utils/string-utils';

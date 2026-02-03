@@ -2,7 +2,7 @@
  * Type definitions for onboarding operations
  */
 
-import type { creatorProfiles } from '@/lib/db/schema';
+import type { creatorProfiles } from '@/lib/db/schema/profiles';
 
 export type CompletionStatus = 'created' | 'updated' | 'complete';
 

@@ -4,7 +4,7 @@
  * Shared types, interfaces, and field selection constants for billing operations.
  */
 
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 
 /**
  * All billing-related fields that can be queried from the users table.

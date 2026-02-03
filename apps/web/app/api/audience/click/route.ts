@@ -9,7 +9,8 @@ import {
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
 import { type DbOrTransaction, db } from '@/lib/db';
-import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';

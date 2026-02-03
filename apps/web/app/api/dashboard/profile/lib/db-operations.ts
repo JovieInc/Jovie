@@ -7,7 +7,8 @@
 import { NextResponse } from 'next/server';
 import { db, eq } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_STORE_HEADERS } from './constants';
 
 export interface UpdateProfileRecordsParams {

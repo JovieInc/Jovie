@@ -3,7 +3,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 interface AuthBrandingProps {
   readonly title: string;
   readonly description: string;
-  gradientVariant?:
+  readonly gradientVariant?:
     | 'blue-purple-cyan'
     | 'purple-cyan-blue'
     | 'purple-pink-orange'

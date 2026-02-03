@@ -1,7 +1,7 @@
 import { Music } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { DiscogRelease } from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema/content';
 
 type LatestReleaseCardProps = {
   readonly release: DiscogRelease;

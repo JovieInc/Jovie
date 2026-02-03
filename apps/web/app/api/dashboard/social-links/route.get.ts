@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
-import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 

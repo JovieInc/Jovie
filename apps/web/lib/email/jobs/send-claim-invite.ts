@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enrollInCampaign } from '@/lib/email/campaigns/enrollment';
 import {
   type ClaimInviteTemplateData,

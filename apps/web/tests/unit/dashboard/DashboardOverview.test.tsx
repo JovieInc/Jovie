@@ -9,7 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import { BASE_URL } from '@/constants/domains';
-import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
+import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema/profiles';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 function makeProfile(

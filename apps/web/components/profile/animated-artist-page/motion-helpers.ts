@@ -9,9 +9,9 @@ import type { Variants } from 'motion/react';
  * Motion animation values for fade-up transitions.
  */
 export interface FadeUpMotionProps {
-  initial: { opacity: number; y?: number };
-  animate: { opacity: number; y?: number };
-  transition: { duration: number };
+  readonly initial: { opacity: number; y?: number };
+  readonly animate: { opacity: number; y?: number };
+  readonly transition: { duration: number };
 }
 
 /**

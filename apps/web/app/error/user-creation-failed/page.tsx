@@ -18,7 +18,7 @@ export default async function UserCreationFailedPage() {
         <div className='space-y-2'>
           <h1 className='text-2xl font-bold'>Account Setup Error</h1>
           <p className='text-muted-foreground'>
-            We're having trouble setting up your account. This is usually
+            We&apos;re having trouble setting up your account. This is usually
             temporary.
           </p>
         </div>

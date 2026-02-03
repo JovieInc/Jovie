@@ -21,7 +21,7 @@ import {
 import { type CursorPosition } from './useInputFocusController';
 
 interface PlatformSelectorProps {
-  currentPlatformIcon: string;
+  readonly currentPlatformIcon: string;
   readonly onPlatformSelect: (
     platform: (typeof PLATFORM_OPTIONS)[number]
   ) => void;

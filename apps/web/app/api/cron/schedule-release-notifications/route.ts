@@ -1,4 +1,4 @@
-import { and, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   db,
@@ -92,8 +92,8 @@ export async function GET(request: Request) {
             notificationSubscriptions.creatorProfileId,
             creatorProfileIds
           ),
-          sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-          sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+          drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+          drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
         )
       );
 
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
         .onConflictDoUpdate({
           target: fanReleaseNotifications.dedupKey,
           set: {
-            scheduledFor: sql`EXCLUDED.scheduled_for`,
+            scheduledFor: drizzleSql`EXCLUDED.scheduled_for`,
             status: 'pending',
             error: null,
             updatedAt: now,

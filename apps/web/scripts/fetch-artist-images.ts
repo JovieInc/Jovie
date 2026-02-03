@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+/* eslint-disable no-restricted-imports -- Script requires full schema access */
 
 /**
  * Fetch Artist Images from Spotify

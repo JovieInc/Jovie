@@ -11,10 +11,8 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import type {
-  CreatorContact as DbCreatorContact,
-  DiscogRelease,
-} from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   getProfileWithLinks as getCreatorProfileWithLinks,
@@ -265,7 +263,7 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  searchParams?: Promise<{
+  readonly searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
     claim_token?: string;
   }>;

@@ -5,16 +5,20 @@
  * Provides methods for both individual and batch score calculations.
  */
 
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  sql as drizzleSql,
+  eq,
+  isNotNull,
+  isNull,
+} from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
-import {
-  creatorContacts,
-  creatorProfiles,
-  discogReleases,
-  socialLinks,
-} from '@/lib/db/schema';
+import { discogReleases } from '@/lib/db/schema/content';
+import { socialLinks } from '@/lib/db/schema/links';
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
+import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 
 import {
   calculateFitScore,
@@ -158,14 +162,14 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
-      socialLinkPlatforms: sql<string[]>`
+      socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
             filter (where ${socialLinks.platform} is not null),
           '{}'
         )
       `,
-      latestReleaseDate: sql<Date | null>`
+      latestReleaseDate: drizzleSql<Date | null>`
         max(${discogReleases.releaseDate})
       `,
     })
@@ -306,7 +310,7 @@ export async function getTopFitProfiles(
       and(
         eq(creatorProfiles.isClaimed, false),
         isNotNull(creatorProfiles.fitScore),
-        sql`${creatorProfiles.fitScore} >= ${minScore}`
+        drizzleSql`${creatorProfiles.fitScore} >= ${minScore}`
       )
     )
     .orderBy(desc(creatorProfiles.fitScore))

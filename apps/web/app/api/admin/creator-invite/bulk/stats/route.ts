@@ -1,11 +1,8 @@
-import { count, eq, sql } from 'drizzle-orm';
+import { count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import {
-  creatorClaimInvites,
-  creatorProfiles,
-  ingestionJobs,
-} from '@/lib/db/schema';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
 import { NO_STORE_HEADERS } from '../lib';
@@ -110,7 +107,7 @@ export async function GET() {
     // Count claimed profiles that were invited (distinct to avoid counting duplicates)
     const [claimedResult] = await db
       .select({
-        count: sql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
+        count: drizzleSql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
       })
       .from(creatorClaimInvites)
       .innerJoin(
@@ -166,7 +163,7 @@ export async function GET() {
       })
       .from(ingestionJobs)
       .where(
-        sql`${ingestionJobs.jobType} = 'send_claim_invite' AND ${ingestionJobs.status} = 'pending'`
+        drizzleSql`${ingestionJobs.jobType} = 'send_claim_invite' AND ${ingestionJobs.status} = 'pending'`
       )
       .orderBy(ingestionJobs.runAt)
       .limit(1);

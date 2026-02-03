@@ -6,7 +6,7 @@
 import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { wrappedLinks } from '@/lib/db/schema';
+import { wrappedLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
 import {
   categorizeDomain,

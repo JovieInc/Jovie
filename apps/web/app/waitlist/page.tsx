@@ -22,6 +22,7 @@ import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGo
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
+import { APP_ROUTES } from '@/constants/routes';
 import { captureWarning } from '@/lib/error-tracking';
 import { FetchError } from '@/lib/queries/fetch';
 import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';
@@ -217,7 +218,7 @@ export default function WaitlistPage() {
 
       if (waitlistStatus.status === 'claimed') {
         clearWaitlistStorage();
-        router.replace('/app/dashboard');
+        router.replace(APP_ROUTES.DASHBOARD);
         return;
       }
 

@@ -6,7 +6,7 @@ import type { SuggestedLink } from '../links/hooks';
 import { sectionOf } from '../links/utils';
 
 interface UseSuggestionHandlersProps<T extends DetectedLink> {
-  existingNormalizedUrlPlatforms: Map<string, Set<string>>;
+  readonly existingNormalizedUrlPlatforms: Map<string, Set<string>>;
   readonly setLinks: React.Dispatch<React.SetStateAction<T[]>>;
   readonly insertLinkWithSectionOrdering: (prev: T[], link: T) => T[];
   readonly onLinkAdded?: (links: T[]) => void;

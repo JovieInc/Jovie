@@ -31,7 +31,7 @@ interface ProviderConfig {
 }
 
 interface AvailabilityCellProps {
-  release: ReleaseViewModel;
+  readonly release: ReleaseViewModel;
   readonly allProviders: ProviderKey[];
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly onCopy: (

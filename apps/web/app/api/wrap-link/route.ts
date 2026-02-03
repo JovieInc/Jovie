@@ -48,7 +48,7 @@ interface RequestBody {
 export async function POST(request: NextRequest) {
   try {
     // Basic bot detection (less aggressive for this endpoint)
-    const _botResult = detectBot(request, '/api/wrap-link'); // eslint-disable-line @typescript-eslint/no-unused-vars
+    const _botResult = detectBot(request, '/api/wrap-link');
     const ip =
       request.headers.get('x-forwarded-for') ||
       request.headers.get('x-real-ip') ||
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { url, customAlias, expiresInHours } = body;
-    const _platform = body.platform || 'external'; // eslint-disable-line @typescript-eslint/no-unused-vars
+    const _platform = body.platform || 'external';
 
     // Validate URL
     if (!url || !isValidUrl(url)) {

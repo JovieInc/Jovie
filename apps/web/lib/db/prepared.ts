@@ -10,7 +10,7 @@
  * - Improves connection pool efficiency
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from './index';
 import { creatorProfiles, users } from './schema';
 
@@ -42,7 +42,7 @@ const profileCoreFields = {
 export const getUserByClerkIdPrepared = db
   .select(userCoreFields)
   .from(users)
-  .where(eq(users.clerkId, sql.placeholder('clerkId')))
+  .where(eq(users.clerkId, drizzleSql.placeholder('clerkId')))
   .limit(1)
   .prepare('get_user_by_clerk_id');
 
@@ -58,7 +58,7 @@ export const getProfileByUserIdPrepared = db
   .from(creatorProfiles)
   .where(
     and(
-      eq(creatorProfiles.userId, sql.placeholder('userId')),
+      eq(creatorProfiles.userId, drizzleSql.placeholder('userId')),
       eq(creatorProfiles.isClaimed, true)
     )
   )
@@ -96,7 +96,7 @@ export const getSessionContextPrepared = db
       eq(creatorProfiles.isClaimed, true)
     )
   )
-  .where(eq(users.clerkId, sql.placeholder('clerkId')))
+  .where(eq(users.clerkId, drizzleSql.placeholder('clerkId')))
   .limit(1)
   .prepare('get_session_context');
 
@@ -115,6 +115,8 @@ export const getProfileByUsernamePrepared = db
     settings: creatorProfiles.settings,
   })
   .from(creatorProfiles)
-  .where(eq(creatorProfiles.usernameNormalized, sql.placeholder('username')))
+  .where(
+    eq(creatorProfiles.usernameNormalized, drizzleSql.placeholder('username'))
+  )
   .limit(1)
   .prepare('get_profile_by_username');

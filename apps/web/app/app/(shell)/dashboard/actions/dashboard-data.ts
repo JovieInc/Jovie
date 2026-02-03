@@ -17,15 +17,10 @@ import {
 import { cache } from 'react';
 import { setupDbSession } from '@/lib/auth/session';
 import { db, sqlAny } from '@/lib/db';
-import {
-  type CreatorProfile,
-  clickEvents,
-  creatorProfiles,
-  socialLinks,
-  tips,
-  userSettings,
-  users,
-} from '@/lib/db/schema';
+import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { userSettings, users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   createEmptyTippingStats,
   profileIsPublishable,

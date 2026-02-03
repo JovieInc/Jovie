@@ -11,12 +11,13 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db, ingestionJobs } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
 
@@ -145,7 +146,7 @@ export async function GET(request: Request) {
       .where(
         and(
           eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-          sql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+          drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
         )
       )
       .orderBy(desc(ingestionJobs.createdAt))

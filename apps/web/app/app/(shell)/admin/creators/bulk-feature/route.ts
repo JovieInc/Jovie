@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseBulkFeaturePayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { bulkSetCreatorsFeaturedAction } from '../../actions';
@@ -9,7 +10,7 @@ export const POST = createAdminRouteHandler({
   actionFn: bulkSetCreatorsFeaturedAction,
   parsePayload: parseBulkFeaturePayload,
   errorContext: {
-    route: '/app/admin/creators/bulk-feature',
+    route: `${APP_ROUTES.ADMIN_CREATORS}/bulk-feature`,
     action: 'bulk_feature_creators',
   },
   errorMessage: 'Failed to update featured status',

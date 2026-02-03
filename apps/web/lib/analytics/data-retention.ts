@@ -15,7 +15,7 @@ import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
 import { env } from '@/lib/env-server';
 
 // Default retention period in days

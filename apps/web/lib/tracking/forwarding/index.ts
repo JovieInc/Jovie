@@ -6,14 +6,14 @@
  * 2. Creator's configured pixels (when configured)
  */
 
-import { and, eq, lte, or, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   creatorPixels,
   type PixelEvent,
   type PixelForwardingStatus,
   pixelEvents,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/pixels';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
@@ -283,12 +283,12 @@ export async function processPendingEvents(limit = 100): Promise<{
           lte(pixelEvents.forwardAt, new Date()),
           or(
             eq(pixelEvents.forwardingStatus, {}),
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_facebook":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_google":{"status":"failed"}}'::jsonb`,
-            sql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_tiktok":{"status":"failed"}}'::jsonb`
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"failed"}}'::jsonb`,
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"failed"}}'::jsonb`,
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"failed"}}'::jsonb`,
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_facebook":{"status":"failed"}}'::jsonb`,
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_google":{"status":"failed"}}'::jsonb`,
+            drizzleSql`${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_tiktok":{"status":"failed"}}'::jsonb`
           )
         )
       )

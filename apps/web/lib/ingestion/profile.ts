@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 interface EnrichmentInput {
   profileId: string;

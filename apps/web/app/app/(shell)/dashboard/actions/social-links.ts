@@ -12,7 +12,9 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Minimal link shape for initializing DashboardLinks client from the server.

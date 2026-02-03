@@ -1,7 +1,10 @@
 import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
 
 export interface IngestProfileDropdownProps {
-  onIngestPending?: (profile: { id: string; username: string }) => void;
+  readonly onIngestPending?: (profile: {
+    id: string;
+    username: string;
+  }) => void;
 }
 
 export interface UseIngestProfileReturn {

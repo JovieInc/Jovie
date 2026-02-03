@@ -8,7 +8,7 @@
 import { sql as drizzleSql, isNotNull } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { DbOrTransaction } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { logger } from '@/lib/utils/logger';
 import { handleOrphanedSubscription } from './orphaned-subscription-handler';
 import { fixStatusMismatch } from './status-mismatch-fixer';

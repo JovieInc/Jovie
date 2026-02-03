@@ -4,10 +4,10 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   audienceMembers,
-  creatorProfiles,
   notificationSubscriptions,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
 import type { AudienceAction, AudienceMember, AudienceReferrer } from '@/types';

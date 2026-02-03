@@ -16,8 +16,9 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import { captureError } from '@/lib/error-tracking';
 

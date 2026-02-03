@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db, eq } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';

@@ -5,12 +5,12 @@
  * Types are inferred from Drizzle schema for consistency.
  */
 
+import type { DiscogRelease } from '@/lib/db/schema/content';
 import type {
   CreatorContact,
   CreatorProfile,
   creatorTypeEnum,
-  DiscogRelease,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/profiles';
 
 /** Creator type enum values */
 export type CreatorType = (typeof creatorTypeEnum.enumValues)[number];

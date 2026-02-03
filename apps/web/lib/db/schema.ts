@@ -7,10 +7,10 @@
  *
  * @example
  * // Preferred (new code):
- * import { users } from '@/lib/db/schema';
+ * import { users } from '@/lib/db/schema/auth';
  *
  * // Also works (backwards compatible):
- * import { users } from '@/lib/db/schema';
+ * import { users } from '@/lib/db/schema/auth';
  */
 
 export * from './schema/index';

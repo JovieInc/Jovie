@@ -7,7 +7,7 @@ let hasInitialized = false;
 
 declare global {
   // Holds the current web-vitals listener for cleanup across HMR.
-  // eslint-disable-next-line no-var
+
   var jovieWebVitalsListener: ((event: Event) => void) | undefined;
 }
 

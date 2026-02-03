@@ -10,7 +10,7 @@
 import { eq } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorContacts } from '@/lib/db/schema';
+import { creatorContacts } from '@/lib/db/schema/profiles';
 import {
   calculateAndStoreFitScore,
   updatePaidTierScore,

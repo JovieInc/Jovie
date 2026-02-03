@@ -17,28 +17,34 @@ import {
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
 
 const PRIMARY_ITEMS: LiquidGlassMenuItem[] = [
-  { id: 'overview', label: 'Dashboard', href: '/app/dashboard', icon: Home },
+  {
+    id: 'overview',
+    label: 'Dashboard',
+    href: APP_ROUTES.DASHBOARD,
+    icon: Home,
+  },
   {
     id: 'profile',
     label: 'Profile',
-    href: '/app/dashboard/profile',
+    href: APP_ROUTES.PROFILE,
     icon: UserCircle,
   },
   {
     id: 'contacts',
     label: 'Contacts',
-    href: '/app/dashboard/contacts',
+    href: APP_ROUTES.CONTACTS,
     icon: IdCard,
   },
   {
     id: 'audience',
     label: 'Audience',
-    href: '/app/dashboard/audience',
+    href: APP_ROUTES.AUDIENCE,
     icon: Users,
   },
 ];
@@ -47,65 +53,70 @@ const EXPANDED_ITEMS: LiquidGlassMenuItem[] = [
   {
     id: 'releases',
     label: 'Releases',
-    href: '/app/dashboard/releases',
+    href: APP_ROUTES.RELEASES,
     icon: Music,
   },
   {
     id: 'tour-dates',
     label: 'Tour Dates',
-    href: '/app/dashboard/tour-dates',
+    href: APP_ROUTES.TOUR_DATES,
     icon: CalendarDays,
   },
   {
     id: 'analytics',
     label: 'Analytics',
-    href: '/app/dashboard/analytics',
+    href: APP_ROUTES.ANALYTICS,
     icon: PieChart,
   },
   {
     id: 'earnings',
     label: 'Earnings',
-    href: '/app/dashboard/earnings',
+    href: APP_ROUTES.EARNINGS,
     icon: Banknote,
   },
   {
     id: 'chat',
     label: 'Chat',
-    href: '/app/dashboard/chat',
+    href: APP_ROUTES.CHAT,
     icon: MessageCircle,
   },
-  { id: 'settings', label: 'Settings', href: '/app/settings', icon: Settings },
+  {
+    id: 'settings',
+    label: 'Settings',
+    href: APP_ROUTES.SETTINGS,
+    icon: Settings,
+  },
 ];
 
 const ADMIN_ITEMS: LiquidGlassMenuItem[] = [
   {
     id: 'admin_overview',
     label: 'Admin Dashboard',
-    href: '/app/admin',
+    href: APP_ROUTES.ADMIN,
     icon: ShieldCheck,
   },
   {
     id: 'admin_waitlist',
     label: 'Waitlist',
-    href: '/app/admin/waitlist',
+    href: APP_ROUTES.ADMIN_WAITLIST,
     icon: UserPlus,
   },
   {
     id: 'admin_creators',
     label: 'Creators',
-    href: '/app/admin/creators',
+    href: APP_ROUTES.ADMIN_CREATORS,
     icon: Users,
   },
   {
     id: 'admin_users',
     label: 'Users',
-    href: '/app/admin/users',
+    href: APP_ROUTES.ADMIN_USERS,
     icon: UserCircle,
   },
   {
     id: 'admin_activity',
     label: 'Activity',
-    href: '/app/admin/activity',
+    href: APP_ROUTES.ADMIN_ACTIVITY,
     icon: PieChart,
   },
 ];
@@ -127,7 +138,7 @@ export function DashboardMobileTabs({
   );
 
   const handleSettingsClick = useCallback(() => {
-    router.push('/app/settings');
+    router.push(APP_ROUTES.SETTINGS);
   }, [router]);
 
   return (

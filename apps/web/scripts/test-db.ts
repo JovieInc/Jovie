@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { db, withDb } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 async function testDbConnection() {
   // Test connection

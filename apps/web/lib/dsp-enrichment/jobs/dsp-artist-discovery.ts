@@ -10,12 +10,13 @@
 
 import 'server-only';
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
-import { creatorProfiles, discogTracks } from '@/lib/db/schema';
+import { discogTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 import {
   convertAppleMusicToIsrcMatches,
@@ -86,7 +87,7 @@ async function fetchLocalTracks(
     .where(
       and(
         eq(discogTracks.creatorProfileId, creatorProfileId),
-        sql`${discogTracks.isrc} IS NOT NULL`
+        drizzleSql`${discogTracks.isrc} IS NOT NULL`
       )
     )
     .orderBy(discogTracks.createdAt)

@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseBulkRefreshPayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { bulkRerunCreatorIngestionAction } from '../../actions';
@@ -13,7 +14,7 @@ export const POST = createAdminRouteHandler({
     queuedCount: result.queuedCount,
   }),
   errorContext: {
-    route: '/app/admin/creators/bulk-refresh',
+    route: `${APP_ROUTES.ADMIN_CREATORS}/bulk-refresh`,
     action: 'bulk_refresh_creators',
   },
   errorMessage: 'Failed to queue ingestion jobs',

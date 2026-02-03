@@ -15,7 +15,8 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles, discogTracks } from '@/lib/db/schema';
+import { discogTracks } from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 

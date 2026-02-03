@@ -4,13 +4,21 @@
  * Database queries for fetching eligible profiles.
  */
 
-import { and, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+} from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   creatorClaimInvites,
   creatorContacts,
   creatorProfiles,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/profiles';
 
 export interface EligibleProfile {
   id: string;
@@ -89,7 +97,7 @@ export async function fetchProfilesByFitScore(
         isNull(creatorClaimInvites.id) // No existing invites
       )
     )
-    .orderBy(sql`${creatorProfiles.fitScore} DESC`)
+    .orderBy(drizzleSql`${creatorProfiles.fitScore} DESC`)
     .limit(limit);
 }
 
@@ -106,7 +114,7 @@ export async function getEligibleProfileCount(
   fitScoreThreshold: number
 ): Promise<number> {
   const [countResult] = await db
-    .select({ count: sql<number>`count(*)` })
+    .select({ count: drizzleSql<number>`count(*)` })
     .from(creatorProfiles)
     .leftJoin(
       creatorClaimInvites,

@@ -3,7 +3,7 @@ import 'server-only';
 import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 

@@ -1,7 +1,10 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
-import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const parsedBody = await parseJsonBody<unknown>(request, {
-      route: 'POST /app/admin/waitlist/approve',
+      route: `POST ${APP_ROUTES.ADMIN_WAITLIST}/approve`,
       headers: NO_STORE_HEADERS,
     });
     if (!parsedBody.ok) {
@@ -201,7 +204,7 @@ export async function POST(request: Request) {
       'Admin action failed: approve waitlist entry',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/app/admin/waitlist/approve',
+        route: `${APP_ROUTES.ADMIN_WAITLIST}/approve`,
         action: 'approve_waitlist',
         adminEmail: entitlements?.email ?? 'unknown',
         timestamp: new Date().toISOString(),

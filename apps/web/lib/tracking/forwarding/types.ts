@@ -4,7 +4,7 @@
  * Shared types for server-side pixel forwarding to ad platforms.
  */
 
-import type { CreatorPixel, PixelEvent } from '@/lib/db/schema';
+import type { CreatorPixel, PixelEvent } from '@/lib/db/schema/pixels';
 
 /**
  * Result of a forwarding attempt to a single platform.
