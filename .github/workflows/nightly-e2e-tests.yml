@@ -39,6 +39,7 @@ jobs:
           branch_name: nightly-e2e-${{ github.run_id }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '3'
 
       - name: Run database migrations
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
