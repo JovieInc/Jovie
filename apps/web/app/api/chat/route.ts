@@ -223,37 +223,13 @@ function createProfileEditTool(context: ArtistContext) {
       'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name, bio, or genres.',
     inputSchema: profileEditSchema,
     execute: async ({ field, newValue, reason }) => {
-      // Get the current value for comparison
-      let currentValue: string | string[] | null;
-      switch (field) {
-        case 'displayName':
-          currentValue = context.displayName;
-          break;
-        case 'bio':
-          currentValue = context.bio;
-          break;
-        case 'genres':
-          currentValue = context.genres;
-          break;
-        default:
-          return {
-            success: false,
-            error: 'Invalid field',
-          };
+      // Validate the new value type matches the field
+      const isGenres = field === 'genres';
+      if (isGenres && !Array.isArray(newValue)) {
+        return { success: false, error: 'Genres must be an array of strings' };
       }
-
-      // Validate the new value
-      if (field === 'genres' && !Array.isArray(newValue)) {
-        return {
-          success: false,
-          error: 'Genres must be an array of strings',
-        };
-      }
-      if (field !== 'genres' && typeof newValue !== 'string') {
-        return {
-          success: false,
-          error: `${field} must be a string`,
-        };
+      if (!isGenres && typeof newValue !== 'string') {
+        return { success: false, error: `${field} must be a string` };
       }
 
       // Return preview data for the UI to render
@@ -261,8 +237,8 @@ function createProfileEditTool(context: ArtistContext) {
         success: true,
         preview: {
           field,
-          fieldLabel: FIELD_DESCRIPTIONS[field as EditableField],
-          currentValue,
+          fieldLabel: FIELD_DESCRIPTIONS[field],
+          currentValue: context[field],
           newValue,
           reason,
         },

@@ -97,44 +97,15 @@ export async function POST(req: Request) {
     }
 
     // Get the old value for audit logging
-    let oldValue: string | string[] | null;
-    switch (field) {
-      case 'displayName':
-        oldValue = profile.displayName;
-        break;
-      case 'bio':
-        oldValue = profile.bio;
-        break;
-      case 'genres':
-        oldValue = profile.genres;
-        break;
-    }
+    const oldValue = profile[field];
 
     // Apply the update
-    const updateData: Partial<{
-      displayName: string;
-      bio: string;
-      genres: string[];
-      updatedAt: Date;
-    }> = {
-      updatedAt: new Date(),
-    };
-
-    switch (field) {
-      case 'displayName':
-        updateData.displayName = newValue as string;
-        break;
-      case 'bio':
-        updateData.bio = newValue as string;
-        break;
-      case 'genres':
-        updateData.genres = newValue as string[];
-        break;
-    }
-
     await db
       .update(creatorProfiles)
-      .set(updateData)
+      .set({
+        [field]: newValue,
+        updatedAt: new Date(),
+      })
       .where(eq(creatorProfiles.id, profileId));
 
     // Log to audit table
