@@ -42,9 +42,10 @@ test.describe('Releases dashboard', () => {
   test('copies a smart link and follows the redirect @smoke', async ({
     page,
   }, testInfo) => {
+    test.setTimeout(120_000); // 2 minutes (dev mode is slow)
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
-      timeout: 60000,
+      timeout: 90000, // Increased for Turbopack cold compilation
     });
 
     // Wait for page to stabilize
@@ -90,9 +91,10 @@ test.describe('Releases dashboard', () => {
   test('shows releases matrix with basic columns @smoke', async ({
     page,
   }, testInfo) => {
+    test.setTimeout(120_000); // 2 minutes (dev mode is slow)
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
-      timeout: 60000,
+      timeout: 90000, // Increased for Turbopack cold compilation
     });
 
     // Wait for page to stabilize
