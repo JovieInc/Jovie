@@ -11,6 +11,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
+// eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -227,7 +228,16 @@ const fetchProfileAndLinks = async (
 // Cache public profile reads across requests; tags keep updates fast and precise.
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
+// IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
 const getCachedProfileAndLinks = async (username: string) => {
+  // Skip Next.js cache in test/development environments
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
+    return fetchProfileAndLinks(username);
+  }
+
   try {
     return await unstable_cache(
       async () => fetchProfileAndLinks(username),
@@ -265,7 +275,7 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  searchParams?: Promise<{
+  readonly searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
     claim_token?: string;
   }>;

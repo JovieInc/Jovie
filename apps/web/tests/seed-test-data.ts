@@ -5,21 +5,17 @@
  * Run this before E2E tests to ensure test profiles exist.
  *
  * ESLint exceptions:
- * - no-restricted-syntax: Seed scripts need direct drizzle-orm sql access
  * - no-restricted-imports: Seed scripts import full schema for flexibility
- * - no-manual-db-pooling: Seed scripts run outside app context, need manual pools
  */
 
-/* eslint-disable no-restricted-syntax, no-restricted-imports, @jovie/no-manual-db-pooling */
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import { eq, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
+/* eslint-disable no-restricted-imports */
+import { neon } from '@neondatabase/serverless';
+import { Redis } from '@upstash/redis';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
-// Configure WebSocket for transaction support in tests
-neonConfig.webSocketConstructor = ws;
-
+// Use the same HTTP driver as the app for consistency
 const { users, creatorProfiles, socialLinks } = schema;
 
 interface TestProfile {
@@ -58,8 +54,10 @@ export async function seedTestData() {
     return { success: false, reason: 'no_database_url' };
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
-  const db = drizzle(pool, { schema });
+  // Use Neon HTTP driver (same as the app) instead of WebSocket driver
+  // This ensures we write to the same connection pool the app reads from
+  const sql = neon(databaseUrl);
+  const db = drizzle(sql, { schema });
 
   try {
     // Create E2E test user (for authenticated dashboard tests)
@@ -125,7 +123,7 @@ export async function seedTestData() {
     for (const profile of TEST_PROFILES) {
       console.log(`  Creating profile: ${profile.username}`);
 
-      // Check if profile already exists
+      // Check if profile already exists and delete it to ensure clean state
       const [existing] = await db
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
@@ -136,34 +134,31 @@ export async function seedTestData() {
 
       if (existing) {
         console.log(
-          `    ✓ Profile ${profile.username} already exists (skipping)`
+          `    → Profile ${profile.username} exists, recreating with correct values...`
         );
-        continue;
+        // Delete existing profile (social links will cascade delete)
+        await db
+          .delete(creatorProfiles)
+          .where(eq(creatorProfiles.id, existing.id));
       }
 
-      // Create the creator profile (no user association needed for public profiles)
-      // NOTE: Uses explicit column list to be resilient to schema changes (e.g., waitlist_entry_id migration)
-      // This avoids Drizzle trying to insert columns that may not exist in all environments
-      const result = await db.execute<{ id: string }>(
-        sql`INSERT INTO creator_profiles (
-          username, username_normalized, display_name, bio,
-          spotify_url, avatar_url, creator_type,
-          is_public, is_verified, is_claimed, ingestion_status
-        ) VALUES (
-          ${profile.username},
-          ${profile.username.toLowerCase()},
-          ${profile.displayName},
-          ${profile.bio},
-          ${profile.spotifyUrl || null},
-          ${profile.avatarUrl || null},
-          ${'artist'},
-          ${true},
-          ${false},
-          ${false},
-          ${'idle'}
-        ) RETURNING id`
-      );
-      const createdProfile = result.rows[0];
+      // Create the creator profile using Drizzle ORM insert to ensure proper boolean handling
+      const [createdProfile] = await db
+        .insert(creatorProfiles)
+        .values({
+          username: profile.username,
+          usernameNormalized: profile.username.toLowerCase(),
+          displayName: profile.displayName,
+          bio: profile.bio,
+          spotifyUrl: profile.spotifyUrl || null,
+          avatarUrl: profile.avatarUrl || null,
+          creatorType: 'artist',
+          isPublic: true,
+          isVerified: false,
+          isClaimed: false,
+          ingestionStatus: 'idle',
+        })
+        .returning({ id: creatorProfiles.id });
 
       console.log(
         `    ✓ Created profile ${profile.username} (ID: ${createdProfile.id})`
@@ -183,13 +178,42 @@ export async function seedTestData() {
         });
         console.log(`    ✓ Added Spotify link for ${profile.username}`);
       }
+
+      // Invalidate Redis cache for this profile to ensure fresh data
+      // Only attempt if Redis credentials are available
+      if (
+        process.env.UPSTASH_REDIS_REST_URL &&
+        process.env.UPSTASH_REDIS_REST_TOKEN
+      ) {
+        try {
+          const redis = new Redis({
+            url: process.env.UPSTASH_REDIS_REST_URL,
+            token: process.env.UPSTASH_REDIS_REST_TOKEN,
+          });
+          const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
+
+          // Verify cache exists before deletion
+          const beforeCache = await redis.get(cacheKey);
+          const deletedCount = await redis.del(cacheKey);
+
+          // Verify cache was actually deleted
+          const afterCache = await redis.get(cacheKey);
+
+          console.log(
+            `    ✓ Invalidated Redis cache for ${profile.username} (deleted ${deletedCount} key(s), before: ${beforeCache ? 'EXISTS' : 'NULL'}, after: ${afterCache ? 'EXISTS' : 'NULL'})`
+          );
+        } catch (error) {
+          console.warn(
+            `    ⚠ Failed to invalidate Redis cache for ${profile.username}:`,
+            error
+          );
+        }
+      }
     }
 
-    await pool.end();
     console.log('✅ Test data seeding complete');
     return { success: true };
   } catch (error) {
-    await pool.end();
     console.error('❌ Failed to seed test data:', error);
     throw error;
   }
