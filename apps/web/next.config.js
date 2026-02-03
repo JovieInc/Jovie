@@ -268,6 +268,7 @@ const nextConfig = {
       '@headlessui/react',
       'lucide-react',
       'simple-icons',
+      'web-vitals', // Prevent ChunkLoadError in E2E tests
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-popover',

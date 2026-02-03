@@ -110,7 +110,7 @@ export async function signInUser(
     // Already signed in via storageState, just navigate to dashboard
     await page.goto(APP_ROUTES.DASHBOARD, {
       waitUntil: 'domcontentloaded',
-      timeout: 30000,
+      timeout: 60000, // Increased from 30s to 60s for Turbopack compilation
     });
 
     // Wait for dashboard to be ready
@@ -119,7 +119,7 @@ export async function signInUser(
     const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
 
     await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-      timeout: 15000,
+      timeout: 30000, // Increased from 15s to 30s for hydration
     });
 
     return page;
