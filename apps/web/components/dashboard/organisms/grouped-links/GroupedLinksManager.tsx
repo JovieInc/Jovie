@@ -288,10 +288,11 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
       >
         <div className='mx-auto max-w-2xl'>
           {/* Inline chat area */}
-          {artistContext && (
+          {artistContext && profileId && (
             <InlineChatArea
               ref={chatAreaRef}
               artistContext={artistContext}
+              profileId={profileId}
               expanded={chatExpanded}
               onExpandedChange={setChatExpanded}
             />

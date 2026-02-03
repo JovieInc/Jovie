@@ -37,6 +37,10 @@ import {
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
 import { cn } from '@/lib/utils';
+import {
+  type ProfileEditPreview,
+  ProfileEditPreviewCard,
+} from './ProfileEditPreviewCard';
 
 interface ArtistContext {
   readonly displayName: string;
@@ -58,6 +62,8 @@ interface ArtistContext {
 
 interface InlineChatAreaProps {
   readonly artistContext: ArtistContext;
+  /** Profile ID for applying edits */
+  readonly profileId: string;
   /** Whether the chat area is expanded */
   readonly expanded?: boolean;
   /** Callback when expanded state changes */
@@ -127,10 +133,41 @@ function getMessageText(parts: Array<{ type: string; text?: string }>): string {
     .join('');
 }
 
+// Type for tool invocation parts
+interface ToolInvocationPart {
+  type: 'tool-invocation';
+  toolInvocationId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  state: 'call' | 'result' | 'partial-call';
+  result?: {
+    success: boolean;
+    preview?: ProfileEditPreview;
+    error?: string;
+  };
+}
+
+// Helper to check if a part is a tool invocation
+function isToolInvocationPart(part: unknown): part is ToolInvocationPart {
+  return (
+    typeof part === 'object' &&
+    part !== null &&
+    'type' in part &&
+    (part as { type: string }).type === 'tool-invocation'
+  );
+}
+
+// Helper to extract tool invocation parts from message
+function getToolInvocations(
+  parts: Array<{ type: string }>
+): ToolInvocationPart[] {
+  return parts.filter(isToolInvocationPart);
+}
+
 export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
   InlineChatAreaProps
->(({ artistContext, expanded = false, onExpandedChange }, ref) => {
+>(({ artistContext, profileId, expanded = false, onExpandedChange }, ref) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
@@ -359,38 +396,72 @@ export const InlineChatArea = forwardRef<
         <div className='border-t border-subtle'>
           <div className='max-h-80 overflow-y-auto px-4 py-4'>
             <div className='space-y-4'>
-              {messages.map(message => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex gap-3',
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  {message.role === 'assistant' && (
-                    <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                      <BrandLogo size={14} tone='auto' />
-                    </div>
-                  )}
-                  <div
-                    className={cn(
-                      'max-w-[85%] rounded-2xl px-3 py-2',
-                      message.role === 'user'
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-surface-2 text-primary-token'
+              {messages.map(message => {
+                const textContent = getMessageText(message.parts);
+                const toolInvocations = getToolInvocations(message.parts);
+
+                return (
+                  <div key={message.id} className='space-y-3'>
+                    {/* Text content */}
+                    {textContent && (
+                      <div
+                        className={cn(
+                          'flex gap-3',
+                          message.role === 'user'
+                            ? 'justify-end'
+                            : 'justify-start'
+                        )}
+                      >
+                        {message.role === 'assistant' && (
+                          <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                            <BrandLogo size={14} tone='auto' />
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            'max-w-[85%] rounded-2xl px-3 py-2',
+                            message.role === 'user'
+                              ? 'bg-accent text-accent-foreground'
+                              : 'bg-surface-2 text-primary-token'
+                          )}
+                        >
+                          <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+                            {textContent}
+                          </div>
+                        </div>
+                        {message.role === 'user' && (
+                          <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                            <User className='h-3.5 w-3.5 text-secondary-token' />
+                          </div>
+                        )}
+                      </div>
                     )}
-                  >
-                    <div className='whitespace-pre-wrap text-sm leading-relaxed'>
-                      {getMessageText(message.parts)}
-                    </div>
+
+                    {/* Tool invocation results */}
+                    {toolInvocations.map(toolInvocation => {
+                      if (
+                        toolInvocation.toolName === 'proposeProfileEdit' &&
+                        toolInvocation.state === 'result' &&
+                        toolInvocation.result?.success &&
+                        toolInvocation.result.preview
+                      ) {
+                        return (
+                          <div
+                            key={toolInvocation.toolInvocationId}
+                            className='ml-10'
+                          >
+                            <ProfileEditPreviewCard
+                              preview={toolInvocation.result.preview}
+                              profileId={profileId}
+                            />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
                   </div>
-                  {message.role === 'user' && (
-                    <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                      <User className='h-3.5 w-3.5 text-secondary-token' />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {/* Loading indicator */}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
