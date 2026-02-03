@@ -164,7 +164,7 @@ const nextConfig = {
       },
       {
         source:
-          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog)',
+          '/(pricing|support|investors|profiles|ai|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
@@ -214,6 +214,17 @@ const nextConfig = {
       {
         source: '/terms',
         destination: '/legal/terms',
+        permanent: true,
+      },
+      // Marketing page redirects (old URLs → new URLs)
+      {
+        source: '/link-in-bio',
+        destination: '/profiles',
+        permanent: true,
+      },
+      {
+        source: '/engagement-engine',
+        destination: '/ai',
         permanent: true,
       },
       // VIP username redirects

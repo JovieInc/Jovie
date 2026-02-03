@@ -50,9 +50,15 @@ export function HeaderNav({
               {/* Navigation - Center (hidden on mobile) */}
               <div className='hidden md:flex flex-1 justify-center ml-8'>
                 <nav
-                  className='flex items-center'
+                  className='flex items-center gap-1'
                   aria-label='Primary navigation'
                 >
+                  <Link href='/profiles' className={navLinkClass}>
+                    Profiles
+                  </Link>
+                  <Link href='/ai' className={navLinkClass}>
+                    AI
+                  </Link>
                   {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
@@ -64,9 +70,12 @@ export function HeaderNav({
               {/* Mobile Navigation */}
               <div className='md:hidden flex-1 justify-center flex ml-4'>
                 <nav
-                  className='flex items-center'
+                  className='flex items-center gap-1'
                   aria-label='Primary navigation'
                 >
+                  <Link href='/profiles' className={navLinkClass}>
+                    Profiles
+                  </Link>
                   {hidePricingLink ? null : (
                     <Link href='/pricing' className={navLinkClass}>
                       Pricing
