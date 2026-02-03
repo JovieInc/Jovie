@@ -110,7 +110,7 @@ export async function signInUser(
     // Already signed in via storageState, just navigate to dashboard
     await page.goto(APP_ROUTES.DASHBOARD, {
       waitUntil: 'domcontentloaded',
-      timeout: 60000, // Increased from 30s to 60s for Turbopack compilation
+      timeout: 90000, // Increased for Turbopack cold compilation (can take 60+ seconds)
     });
 
     // Wait for dashboard to be ready
@@ -119,7 +119,7 @@ export async function signInUser(
     const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
 
     await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-      timeout: 30000, // Increased from 15s to 30s for hydration
+      timeout: 45000, // Increased for hydration after slow compilation
     });
 
     return page;
@@ -180,7 +180,10 @@ export async function signInUser(
 
   // After sign-in, navigate to the dashboard to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  await page.goto(APP_ROUTES.DASHBOARD, { waitUntil: 'domcontentloaded' });
+  await page.goto(APP_ROUTES.DASHBOARD, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000, // Turbopack cold compilation can take 60+ seconds
+  });
 
   // Wait for page to stabilize after React 19 transient hooks error
   // There's a known React 19 bug (facebook/react#33580) that causes a transient
@@ -199,7 +202,7 @@ export async function signInUser(
   const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
 
   await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-    timeout: 15000,
+    timeout: 30000, // Increased for hydration after slow compilation
   });
 
   return page;
