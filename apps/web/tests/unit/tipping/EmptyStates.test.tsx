@@ -8,7 +8,6 @@ import {
 // Mock next/image
 vi.mock('next/image', () => ({
   default: (props: any) => {
-    // biome-ignore lint/a11y/useAltText: Test mock component
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text -- Mock for next/image
     return <img {...props} />;
   },
