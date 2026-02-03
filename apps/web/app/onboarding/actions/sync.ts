@@ -1,8 +1,8 @@
 /**
  * Background sync operations for onboarding
+ * Note: This is a helper module, not a Server Action file.
+ * It's called internally by server actions, not from the client.
  */
-
-'use server';
 
 import * as Sentry from '@sentry/nextjs';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
