@@ -8,14 +8,21 @@ export function RedesignedHero() {
       <Container size='homepage' className='relative z-10'>
         <div className='flex flex-col items-center text-center max-w-3xl mx-auto'>
           <div className='space-y-5'>
+            {/* Eyebrow */}
+            <p className='text-[13px] leading-5 font-[510] text-accent tracking-wide uppercase'>
+              Your AI for music
+            </p>
+
             {/* H1 - Linear Typography */}
             <h1 className='text-balance text-[40px] leading-[1.08] tracking-[-0.022em] font-[510] text-primary-token sm:text-[52px] sm:leading-[1.08] lg:text-[64px] lg:leading-[1.06]'>
-              The link in bio your music deserves
+              Meet Jovie
             </h1>
 
             {/* Lead - Secondary color hierarchy */}
             <p className='max-w-xl mx-auto text-[16px] leading-[27px] font-normal text-secondary-token sm:text-[17px]'>
-              Capture every fan with an AI-powered profile that updates itself.
+              The AI that turns your music into a career.
+              <br className='hidden sm:block' />
+              One profile. Every fan. No busywork.
             </p>
           </div>
 
@@ -31,7 +38,7 @@ export function RedesignedHero() {
             </LinearButton>
             <LinearButton
               variant='secondary'
-              href='#how-it-works'
+              href='#brand-promise'
               className='h-10 px-4 rounded-[10px] text-[15px] leading-[40px] font-[510] text-tertiary-token hover:text-primary-token hover:bg-[var(--color-interactive-hover)]'
             >
               See how it works ↓

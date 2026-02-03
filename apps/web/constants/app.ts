@@ -3,6 +3,25 @@ import { BASE_URL, APP_URL as DOMAINS_APP_URL } from './domains';
 export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 
+// Brand Hierarchy
+// Jovie = The AI brand name (like Claude, Grok)
+// Jovie Profiles = The product (link-in-bio pages artists create)
+// Jovie AI = The intelligence/superpower behind everything
+export const BRAND = {
+  name: 'Jovie',
+  tagline: 'Your AI for music',
+  product: {
+    name: 'Jovie Profiles',
+    tagline: 'Your fan funnel, on autopilot',
+    description: 'The profile that works while you create',
+  },
+  ai: {
+    name: 'Jovie AI',
+    tagline: 'The intelligence behind your music career',
+    description: 'Your page gets smarter every day',
+  },
+} as const;
+
 /**
  * APP_URL - The app/dashboard domain (meetjovie.com)
  * Use this for:
