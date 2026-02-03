@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
 export default function ContactPage() {
-  redirect('/app/dashboard/contacts');
+  redirect(APP_ROUTES.CONTACTS);
 }

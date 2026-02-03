@@ -352,7 +352,7 @@ export function useLinksPersistence({
         void captureError('Failed to save social links', error, {
           profileId,
           linkCount: normalized.length,
-          route: '/app/dashboard/links',
+          route: '/app/profile',
         });
 
         toast.error(extractErrorMessage(error));

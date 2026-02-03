@@ -14,6 +14,7 @@ import {
   convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import type { DashboardAudienceTableProps } from './types';
@@ -307,7 +308,7 @@ export const DashboardAudienceTableUnified = memo(
         }
       : {
           label: 'Open profile settings',
-          href: '/app/dashboard/profile',
+          href: APP_ROUTES.PROFILE,
         };
     const emptyStateSecondaryAction = {
       label:

@@ -3,6 +3,7 @@ import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { APP_ROUTES } from '@/constants/routes';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 
@@ -50,7 +51,7 @@ export default async function AppShellLayout({
             title='Dashboard failed to load'
             description='We could not load your workspace data. Refresh to try again or return to your profile.'
             actions={[
-              { label: 'Retry', href: '/app/dashboard' },
+              { label: 'Retry', href: APP_ROUTES.DASHBOARD },
               { label: 'Go to my profile', href: '/' },
             ]}
             testId='dashboard-error'

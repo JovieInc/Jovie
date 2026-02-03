@@ -93,7 +93,7 @@ function getEmptyStateAction(
   }
   return {
     label: 'Open profile settings',
-    href: '/app/dashboard/profile',
+    href: APP_ROUTES.PROFILE,
   };
 }
 
@@ -217,7 +217,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     } catch (e) {
       void captureError('Failed to copy profile URL to clipboard', e, {
         profileUrl,
-        route: '/app/dashboard',
+        route: APP_ROUTES.DASHBOARD,
       });
       notifications.error('Failed to copy');
     }

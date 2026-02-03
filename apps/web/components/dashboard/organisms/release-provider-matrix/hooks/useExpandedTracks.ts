@@ -123,7 +123,7 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         void captureError('Failed to load tracks for release', error, {
           releaseId,
           releaseSlug: release.slug,
-          route: '/app/dashboard/releases',
+          route: '/app/releases',
         });
         // Could show a toast here
       } finally {

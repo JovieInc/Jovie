@@ -35,7 +35,7 @@ export function useDashboardTheme({
     } catch (error) {
       void captureError('Failed to save theme preference', error, {
         theme: newTheme,
-        route: '/app/dashboard',
+        route: '/app',
       });
     } finally {
       setIsUpdating(false);

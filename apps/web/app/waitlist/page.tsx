@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ALLOWED_PLANS,
   clearWaitlistStorage,
@@ -217,7 +218,7 @@ export default function WaitlistPage() {
 
       if (waitlistStatus.status === 'claimed') {
         clearWaitlistStorage();
-        router.replace('/app/dashboard');
+        router.replace(APP_ROUTES.DASHBOARD);
         return;
       }
 

@@ -17,6 +17,7 @@ import {
 } from '@/components/dashboard/organisms/dashboard-overview-helpers';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   trimLeadingSlashes,
   trimTrailingSlashes,
@@ -206,14 +207,14 @@ export function DashboardOverview({
                 isComplete={hasMusicLink}
                 stepNumber={2}
                 label='Add a music link'
-                actionHref='/app/dashboard/profile'
+                actionHref={APP_ROUTES.PROFILE}
                 actionLabel='Add'
               />
               <SetupTaskItem
                 isComplete={hasSocialLinks}
                 stepNumber={3}
                 label='Add social links'
-                actionHref='/app/dashboard/profile'
+                actionHref={APP_ROUTES.PROFILE}
                 actionLabel='Add'
               />
             </ul>

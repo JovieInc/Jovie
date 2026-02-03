@@ -22,6 +22,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -86,7 +87,7 @@ function AuthShellWrapperInner({
 
   // Determine if preview panel should be enabled (profile route only)
   const isProfileRoute =
-    pathname?.startsWith('/app/dashboard/profile') ?? false;
+    pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
   const previewEnabled = config.section === 'dashboard' && isProfileRoute;
 
   // Determine header action: use custom actions from context if available,

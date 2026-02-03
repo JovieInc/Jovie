@@ -1,6 +1,7 @@
 import { FileQuestion } from 'lucide-react';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { APP_ROUTES } from '@/constants/routes';
 
 export default function AppNotFound() {
   return (
@@ -12,7 +13,7 @@ export default function AppNotFound() {
           description="The page you're looking for doesn't exist or has been moved."
           action={{
             label: 'Go to Dashboard',
-            href: '/app/dashboard',
+            href: APP_ROUTES.DASHBOARD,
           }}
           secondaryAction={{
             label: 'Contact Support',
