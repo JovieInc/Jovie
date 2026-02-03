@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ChatConversation } from './useChatConversationsQuery';
 import { createMutationFn } from './fetch';
 import { queryKeys } from './keys';
+import type { ChatConversation } from './useChatConversationsQuery';
 
 // Types
 export interface ChatMessage {
@@ -60,12 +60,14 @@ export function useCreateConversationMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: createMutationFn<CreateConversationInput, CreateConversationResponse>(
-      '/api/chat/conversations',
-      'POST'
-    ),
+    mutationFn: createMutationFn<
+      CreateConversationInput,
+      CreateConversationResponse
+    >('/api/chat/conversations', 'POST'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
     },
   });
 }
@@ -93,8 +95,12 @@ export function useAddMessagesMutation() {
       return response.json() as Promise<AddMessagesResponse>;
     },
     onSuccess: (_, { conversationId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversation(conversationId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversation(conversationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
     },
   });
 }
@@ -107,19 +113,26 @@ export function useUpdateConversationMutation() {
 
   return useMutation({
     mutationFn: async ({ conversationId, title }: UpdateConversationInput) => {
-      const response = await fetch(`/api/chat/conversations/${conversationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
+      const response = await fetch(
+        `/api/chat/conversations/${conversationId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        }
+      );
       if (!response.ok) {
         throw new Error('Failed to update conversation');
       }
       return response.json() as Promise<UpdateConversationResponse>;
     },
     onSuccess: (_, { conversationId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversation(conversationId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversation(conversationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
     },
   });
 }
@@ -132,16 +145,21 @@ export function useDeleteConversationMutation() {
 
   return useMutation({
     mutationFn: async ({ conversationId }: DeleteConversationInput) => {
-      const response = await fetch(`/api/chat/conversations/${conversationId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        `/api/chat/conversations/${conversationId}`,
+        {
+          method: 'DELETE',
+        }
+      );
       if (!response.ok) {
         throw new Error('Failed to delete conversation');
       }
       return response.json() as Promise<DeleteConversationResponse>;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations() });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
     },
   });
 }

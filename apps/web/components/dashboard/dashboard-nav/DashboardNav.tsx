@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -13,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -74,7 +76,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const secondaryItems = secondaryNavigation;
 
-  const isInSettings = pathname.startsWith('/app/settings');
+  const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
@@ -167,7 +169,8 @@ export function DashboardNav(_: DashboardNavProps) {
           <SidebarCollapsibleGroup label='Recent Chats' defaultOpen>
             <SidebarMenu>
               {conversations.map(conversation => {
-                const isActive = pathname === `${APP_ROUTES.CHAT}/${conversation.id}`;
+                const isActive =
+                  pathname === `${APP_ROUTES.CHAT}/${conversation.id}`;
                 return (
                   <SidebarMenuItem key={conversation.id}>
                     <SidebarMenuButton

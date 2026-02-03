@@ -1,8 +1,8 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import {
   AlertCircle,
@@ -13,6 +13,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useThrottledCallback } from '@/lib/pacer';
 import { queryKeys } from '@/lib/queries/keys';
@@ -63,9 +64,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 // Helper to extract text content from message parts
-function getMessageText(
-  parts: Array<{ type: string; text?: string }>
-): string {
+function getMessageText(parts: Array<{ type: string; text?: string }>): string {
   return parts
     .filter(
       (part): part is { type: 'text'; text: string } =>
@@ -235,7 +234,7 @@ export function JovieChat({
       parts: [{ type: 'text' as const, text: msg.content }],
       createdAt: new Date(msg.createdAt),
     }));
-  }, [existingConversation?.messages]);
+  }, [existingConversation]);
 
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
@@ -430,7 +429,7 @@ export function JovieChat({
       setChatError(null);
       doSubmit(chatError.failedMessage);
     }
-  }, [chatError?.failedMessage, doSubmit]);
+  }, [chatError, doSubmit]);
 
   // Throttled submit to prevent rapid submissions
   const throttledSubmit = useThrottledCallback(doSubmit, {
@@ -463,14 +462,11 @@ export function JovieChat({
     [handleSubmit]
   );
 
-  const handleInput = useCallback(
-    (e: React.FormEvent<HTMLTextAreaElement>) => {
-      const target = e.target as HTMLTextAreaElement;
-      target.style.height = 'auto';
-      target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-    },
-    []
-  );
+  const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    target.style.height = 'auto';
+    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+  }, []);
 
   // Character count display
   const characterCount = input.length;
