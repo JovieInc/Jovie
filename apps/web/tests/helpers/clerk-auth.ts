@@ -98,32 +98,19 @@ export async function signInUser(
     );
   }
 
-  // Check if already authenticated (from storageState)
-  // Look for Clerk session cookies which indicate we loaded with a saved session
+  // Clear any existing session cookies to avoid using stale JWTs
+  // Clerk JWTs expire after 60 seconds, so stored sessions are usually invalid
   const cookies = await page.context().cookies();
-  const hasClerkSession = cookies.some(
+  const clerkCookies = cookies.filter(
     cookie =>
-      cookie.name.startsWith('__session') || cookie.name.startsWith('__client')
+      cookie.name.startsWith('__session') ||
+      cookie.name.startsWith('__client') ||
+      cookie.name.startsWith('__clerk')
   );
-
-  if (hasClerkSession) {
-    // Already signed in via storageState, just navigate to dashboard profile page
-    // Note: /app redirects to /app/dashboard/profile, but direct navigation is more reliable
-    await page.goto('/app/dashboard/profile', {
-      waitUntil: 'domcontentloaded',
-      timeout: 90000, // Increased for Turbopack cold compilation (can take 60+ seconds)
-    });
-
-    // Wait for dashboard to be ready
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const userMenu = page.locator('[data-testid="user-menu"]');
-    const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
-
-    await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-      timeout: 45000, // Increased for hydration after slow compilation
-    });
-
-    return page;
+  if (clerkCookies.length > 0) {
+    await page
+      .context()
+      .clearCookies({ name: new RegExp('^__(session|client|clerk)') });
   }
 
   // Set up Clerk testing token BEFORE navigation
