@@ -2,6 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { Button } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import {
   AlertCircle,
@@ -12,8 +13,15 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useThrottledCallback } from '@/lib/pacer';
+import { queryKeys } from '@/lib/queries/keys';
+import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
+import {
+  useAddMessagesMutation,
+  useCreateConversationMutation,
+} from '@/lib/queries/useChatMutations';
 import { cn } from '@/lib/utils';
 
 interface ArtistContext {
@@ -36,6 +44,10 @@ interface ArtistContext {
 
 interface JovieChatProps {
   readonly artistContext: ArtistContext;
+  /** Conversation ID to load and continue */
+  readonly conversationId?: string | null;
+  /** Callback when a new conversation is created */
+  readonly onConversationCreate?: (conversationId: string) => void;
 }
 
 /** Maximum allowed message length */
@@ -171,13 +183,36 @@ function ErrorDisplay({
   );
 }
 
-export function JovieChat({ artistContext }: JovieChatProps) {
+export function JovieChat({
+  artistContext,
+  conversationId,
+  onConversationCreate,
+}: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(conversationId ?? null);
+  const pendingMessagesRef = useRef<{
+    userMessage: string;
+    assistantMessage: string;
+  } | null>(null);
+  const queryClient = useQueryClient();
+
+  // Mutations for persistence
+  const createConversationMutation = useCreateConversationMutation();
+  const addMessagesMutation = useAddMessagesMutation();
+
+  // Load existing conversation if conversationId is provided
+  const { data: existingConversation, isLoading: isLoadingConversation } =
+    useChatConversationQuery({
+      conversationId: activeConversationId,
+      enabled: !!activeConversationId,
+    });
 
   // Create transport with artist context in body
   const transport = useMemo(
@@ -189,7 +224,19 @@ export function JovieChat({ artistContext }: JovieChatProps) {
     [artistContext]
   );
 
-  const { messages, sendMessage, status } = useChat({
+  // Convert loaded messages to the format useChat expects
+  const initialMessages = useMemo(() => {
+    if (!existingConversation?.messages) return undefined;
+    return existingConversation.messages.map(msg => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      parts: [{ type: 'text' as const, text: msg.content }],
+      createdAt: new Date(msg.createdAt),
+    }));
+  }, [existingConversation]);
+
+  const { messages, sendMessage, status, setMessages } = useChat({
     transport,
     onError: error => {
       const errorType = getErrorType(error);
@@ -224,6 +271,13 @@ export function JovieChat({ artistContext }: JovieChatProps) {
     },
   });
 
+  // Sync initial messages when loaded
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages, setMessages]);
+
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
 
@@ -241,16 +295,66 @@ export function JovieChat({ artistContext }: JovieChatProps) {
     }
   }, [messages]);
 
-  // Reset submitting state when streaming completes
+  // Save messages to database when streaming completes
   useEffect(() => {
-    if (status === 'ready') {
+    if (
+      status === 'ready' &&
+      pendingMessagesRef.current &&
+      activeConversationId
+    ) {
+      const { userMessage, assistantMessage } = pendingMessagesRef.current;
+
+      // Only save if we have both messages
+      if (userMessage && assistantMessage) {
+        // Save both messages to database
+        addMessagesMutation.mutate(
+          {
+            conversationId: activeConversationId,
+            messages: [
+              { role: 'user', content: userMessage },
+              { role: 'assistant', content: assistantMessage },
+            ],
+          },
+          {
+            onSuccess: () => {
+              // Invalidate conversation query to refresh data
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.chat.conversation(activeConversationId),
+              });
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.chat.conversations(),
+              });
+            },
+          }
+        );
+      }
+
+      pendingMessagesRef.current = null;
+      setIsSubmitting(false);
+    } else if (status === 'ready') {
       setIsSubmitting(false);
     }
-  }, [status]);
+  }, [status, activeConversationId, addMessagesMutation, queryClient]);
+
+  // Track assistant response for persistence
+  useEffect(() => {
+    if (status === 'ready' && messages.length >= 2) {
+      // Find last assistant message (reverse to find from end)
+      const lastAssistantMessage = [...messages]
+        .reverse()
+        .find(m => m.role === 'assistant');
+
+      if (lastAssistantMessage && pendingMessagesRef.current) {
+        pendingMessagesRef.current.assistantMessage = getMessageText(
+          lastAssistantMessage.parts
+        );
+      }
+    }
+  }, [status, messages]);
 
   // Core submit logic
   const doSubmit = useCallback(
-    (text: string) => {
+    async (text: string) => {
       if (!text.trim() || isLoading || isSubmitting) return;
 
       // Validate message length
@@ -262,12 +366,46 @@ export function JovieChat({ artistContext }: JovieChatProps) {
         return;
       }
 
+      const trimmedText = text.trim();
+
       // Store the message before sending (in case of error)
-      lastAttemptedMessageRef.current = text.trim();
+      lastAttemptedMessageRef.current = trimmedText;
 
       setChatError(null);
       setIsSubmitting(true);
-      sendMessage({ text: text.trim() });
+
+      // If no active conversation, create one first
+      if (!activeConversationId) {
+        try {
+          const result = await createConversationMutation.mutateAsync({
+            initialMessage: trimmedText,
+          });
+          setActiveConversationId(result.conversation.id);
+          onConversationCreate?.(result.conversation.id);
+
+          // Store pending message for later persistence
+          pendingMessagesRef.current = {
+            userMessage: trimmedText,
+            assistantMessage: '', // Will be filled when response completes
+          };
+        } catch {
+          setChatError({
+            type: 'server',
+            message: 'Failed to create conversation',
+            failedMessage: trimmedText,
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        // Store pending message for persistence
+        pendingMessagesRef.current = {
+          userMessage: trimmedText,
+          assistantMessage: '', // Will be filled when response completes
+        };
+      }
+
+      sendMessage({ text: trimmedText });
       setInput('');
 
       // Reset textarea height
@@ -275,7 +413,14 @@ export function JovieChat({ artistContext }: JovieChatProps) {
         inputRef.current.style.height = 'auto';
       }
     },
-    [isLoading, isSubmitting, sendMessage]
+    [
+      isLoading,
+      isSubmitting,
+      sendMessage,
+      activeConversationId,
+      createConversationMutation,
+      onConversationCreate,
+    ]
   );
 
   // Retry the last failed message
@@ -284,7 +429,7 @@ export function JovieChat({ artistContext }: JovieChatProps) {
       setChatError(null);
       doSubmit(chatError.failedMessage);
     }
-  }, [chatError?.failedMessage, doSubmit]);
+  }, [chatError, doSubmit]);
 
   // Throttled submit to prevent rapid submissions
   const throttledSubmit = useThrottledCallback(doSubmit, {
@@ -327,6 +472,15 @@ export function JovieChat({ artistContext }: JovieChatProps) {
   const characterCount = input.length;
   const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
   const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
+
+  // Show loading state while fetching existing conversation
+  if (isLoadingConversation && activeConversationId) {
+    return (
+      <div className='flex h-full items-center justify-center'>
+        <Loader2 className='h-8 w-8 animate-spin text-secondary-token' />
+      </div>
+    );
+  }
 
   return (
     <div className='flex h-full flex-col'>

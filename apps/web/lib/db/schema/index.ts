@@ -18,6 +18,8 @@ export * from './analytics';
 export * from './auth';
 // Billing (Stripe, Audit)
 export * from './billing';
+// Chat (Conversations, Messages, Audit)
+export * from './chat';
 // Content (Providers, Releases, Tracks)
 export * from './content';
 // DSP Enrichment (Cross-platform matches, enrichment data)
