@@ -8,6 +8,7 @@
 import { and, eq, ne } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+// eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for DB operations
 import {
   type CreatorContact,
   creatorContacts,
@@ -36,7 +37,11 @@ const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
 
 // Query timeout for public profile pages (fail fast for user-facing pages)
-const PUBLIC_PROFILE_QUERY_TIMEOUT_MS = 5000; // 5 seconds
+// Increase timeout in test/development to account for Turbopack compilation overhead
+const PUBLIC_PROFILE_QUERY_TIMEOUT_MS =
+  process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+    ? 30000 // 30 seconds for dev/test
+    : 5000; // 5 seconds for production
 
 /**
  * Get a profile by its ID.
