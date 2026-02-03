@@ -27,8 +27,8 @@ export default function NotFound() {
               This page left the stage
             </h1>
             <p className='text-base text-secondary-token leading-relaxed mb-8'>
-              Looks like this track isn&apos;t in the setlist. But don&apos;t
-              worry, Jovie&apos;s got plenty more to play!
+              Looks like this one&apos;s not part of the show. But don&apos;t
+              worry, Jovie&apos;s got plenty more waiting in the wings!
             </p>
 
             <div className='flex items-center justify-center gap-3'>

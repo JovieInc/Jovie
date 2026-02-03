@@ -10,7 +10,7 @@ export default function AppNotFound() {
         <EmptyState
           icon={<FileQuestion className='h-10 w-10' />}
           heading="This page missed its cue"
-          description="We can't find this track in the setlist. But don't worry, your dashboard is ready to play!"
+          description="We can't find this one in the lineup. But don't worry, your dashboard is ready for an encore!"
           action={{
             label: 'Back to Dashboard',
             href: APP_ROUTES.DASHBOARD,
