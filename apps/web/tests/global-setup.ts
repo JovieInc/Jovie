@@ -158,6 +158,12 @@ async function globalSetup() {
       console.log('🌱 Seeding test data...');
       await seedTestData();
       console.log('✓ Test data seeded successfully');
+
+      // Wait for cache invalidation to propagate across all connections
+      // This prevents race conditions where tests start before Redis/DB caches are cleared
+      console.log('⏳ Waiting for cache invalidation to propagate...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second wait
+      console.log('✓ Cache propagation complete');
     } catch (error) {
       console.warn('⚠ Failed to seed test data:', error);
       console.log('  Tests may fail if required profiles are missing');

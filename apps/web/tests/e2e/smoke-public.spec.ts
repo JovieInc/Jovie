@@ -152,6 +152,9 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // PUBLIC PROFILE - Single essential test (listen mode moved to full suite)
   // =========================================================================
   test.describe('Public Profile', () => {
+    // Run serially to avoid race condition with database seeding in parallel execution
+    test.describe.configure({ mode: 'serial' });
+
     test('loads and displays creator name', async ({ page }, testInfo) => {
       const { getContext, cleanup } = setupPageMonitoring(page);
 
