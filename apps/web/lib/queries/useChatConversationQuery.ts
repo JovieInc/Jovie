@@ -1,10 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type { ChatConversation } from './useChatConversationsQuery';
-import type { ChatMessage } from './useChatMutations';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import type { ChatConversation } from './useChatConversationsQuery';
+import type { ChatMessage } from './useChatMutations';
 
 interface ConversationWithMessages {
   conversation: ChatConversation;

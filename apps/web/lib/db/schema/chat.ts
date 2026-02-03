@@ -8,8 +8,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
-import { creatorProfiles } from './profiles';
 import { chatMessageRoleEnum } from './enums';
+import { creatorProfiles } from './profiles';
 
 /**
  * Chat conversations table.
