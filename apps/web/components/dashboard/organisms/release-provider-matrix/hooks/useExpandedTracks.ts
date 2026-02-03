@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, useTransition } from 'react';
 import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
+import { APP_ROUTES } from '@/constants/routes';
 import type { ReleaseViewModel, TrackViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 
@@ -123,7 +124,7 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         void captureError('Failed to load tracks for release', error, {
           releaseId,
           releaseSlug: release.slug,
-          route: '/app/dashboard/releases',
+          route: APP_ROUTES.RELEASES,
         });
         // Could show a toast here
       } finally {

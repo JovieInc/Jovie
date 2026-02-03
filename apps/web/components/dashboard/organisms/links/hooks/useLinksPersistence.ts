@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
@@ -352,7 +353,7 @@ export function useLinksPersistence({
         void captureError('Failed to save social links', error, {
           profileId,
           linkCount: normalized.length,
-          route: '/app/dashboard/links',
+          route: APP_ROUTES.PROFILE,
         });
 
         toast.error(extractErrorMessage(error));

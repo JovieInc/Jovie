@@ -9,6 +9,7 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
@@ -20,16 +21,13 @@ import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
 
-const PROFILE_HREF = '/app/dashboard/profile';
-const ADMIN_BASE_HREF = '/app/admin';
-
 function isItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.href) {
     return true;
   }
 
   // Admin routes need exact match to avoid false positives
-  if (item.href === ADMIN_BASE_HREF) {
+  if (item.href === APP_ROUTES.ADMIN) {
     return false;
   }
 
@@ -85,7 +83,7 @@ export function DashboardNav(_: DashboardNavProps) {
     (item: NavItem, _index: number) => {
       const isActive = isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
-      const isProfileItem = item.href === PROFILE_HREF;
+      const isProfileItem = item.href === APP_ROUTES.PROFILE;
 
       return (
         <NavMenuItem

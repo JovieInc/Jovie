@@ -2,6 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
 import type { ThemeValue, UseDashboardThemeReturn } from './types';
 
@@ -35,7 +36,7 @@ export function useDashboardTheme({
     } catch (error) {
       void captureError('Failed to save theme preference', error, {
         theme: newTheme,
-        route: '/app/dashboard',
+        route: APP_ROUTES.DASHBOARD,
       });
     } finally {
       setIsUpdating(false);

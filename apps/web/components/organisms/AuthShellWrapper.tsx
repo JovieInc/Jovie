@@ -14,6 +14,7 @@ import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -85,8 +86,7 @@ function AuthShellWrapperInner({
   });
 
   // Determine if preview panel should be enabled (profile route only)
-  const isProfileRoute =
-    pathname?.startsWith('/app/dashboard/profile') ?? false;
+  const isProfileRoute = pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
   const previewEnabled = config.section === 'dashboard' && isProfileRoute;
 
   // Determine header action: use custom actions from context if available,

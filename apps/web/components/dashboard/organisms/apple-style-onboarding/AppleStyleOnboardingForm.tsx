@@ -9,6 +9,7 @@ import {
   OnboardingNameStep,
 } from '@/components/dashboard/organisms/onboarding';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
 import type { AppleStyleOnboardingFormProps } from './types';
@@ -141,7 +142,7 @@ export function AppleStyleOnboardingForm({
   ]);
 
   const goToDashboard = useCallback(() => {
-    globalThis.location.href = '/app/dashboard';
+    globalThis.location.href = APP_ROUTES.DASHBOARD;
   }, []);
 
   const renderStepContent = () => {

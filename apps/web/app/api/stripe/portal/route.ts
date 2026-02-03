@@ -5,6 +5,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
@@ -55,7 +56,7 @@ export async function POST() {
 
     // Create return URL
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const returnUrl = `${baseUrl}/app/dashboard`;
+    const returnUrl = `${baseUrl}${APP_ROUTES.DASHBOARD}`;
 
     // Create billing portal session
     const session = await createBillingPortalSession({
