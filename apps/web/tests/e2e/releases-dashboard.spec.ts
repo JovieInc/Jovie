@@ -65,7 +65,9 @@ test.describe('Releases dashboard', () => {
 
     // Now check for the releases matrix
     const matrix = page.getByTestId('releases-matrix');
-    const hasMatrix = await matrix.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasMatrix = await matrix
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (!hasMatrix) {
       console.log('⚠ Skipping: Releases matrix not visible');
@@ -109,7 +111,9 @@ test.describe('Releases dashboard', () => {
     }
 
     const matrix = page.getByTestId('releases-matrix');
-    const hasMatrix = await matrix.isVisible({ timeout: 5000 }).catch(() => false);
+    const hasMatrix = await matrix
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (!hasMatrix) {
       console.log('⚠ Skipping: Releases matrix not visible');
