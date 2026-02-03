@@ -45,7 +45,21 @@ async function hasPageContent(
  */
 
 test.describe('Dashboard Landing @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    // Set onboarding completion cookie to bypass redirect check in proxy.ts
+    // This simulates a user who has just completed onboarding
+    await context.addCookies([
+      {
+        name: 'jovie_onboarding_complete',
+        value: '1',
+        domain: 'localhost',
+        path: '/',
+        httpOnly: false,
+        secure: false,
+        sameSite: 'Lax',
+      },
+    ]);
+
     // Mock authentication for testing
     await page.route('**/api/auth/**', async route => {
       await route.fulfill({
