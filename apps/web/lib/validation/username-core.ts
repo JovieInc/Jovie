@@ -327,6 +327,7 @@ export function generateUsernameSuggestions(
   artistName?: string
 ): string[] {
   const suggestions: string[] = [];
+  if (!baseUsername) return suggestions;
   const base = baseUsername.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
 
   if (artistName) {

@@ -209,7 +209,7 @@ export async function saveProviderOverride(params: {
       throw new TypeError('Profile mismatch');
     }
 
-    const trimmedUrl = params.url.trim();
+    const trimmedUrl = params.url?.trim() ?? '';
     if (!trimmedUrl) {
       throw new TypeError('URL is required');
     }

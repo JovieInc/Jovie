@@ -172,8 +172,8 @@ export function useProfileEditor(
         return;
       }
 
-      const username = data.username.trim();
-      const displayName = data.displayName.trim();
+      const username = data.username?.trim() ?? '';
+      const displayName = data.displayName?.trim() ?? '';
 
       if (displayName.length === 0 || username.length === 0) {
         return;

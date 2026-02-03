@@ -9,6 +9,7 @@
  * @returns The escaped string safe for use in HTML templates
  */
 export function escapeHtml(unsafe: string): string {
+  if (!unsafe) return '';
   return unsafe
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

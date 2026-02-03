@@ -91,6 +91,7 @@ const BRACKET_BOUNDARY_PATTERN = /[()[\]]/;
  * - Remove special characters (keep basic punctuation)
  */
 export function normalizeArtistName(name: string): string {
+  if (!name) return '';
   return name
     .toLowerCase()
     .replaceAll(/\s+/g, ' ')
@@ -104,6 +105,7 @@ export function normalizeArtistName(name: string): string {
  * - Remove duplicate spaces
  */
 function cleanArtistName(name: string): string {
+  if (!name) return '';
   return name.replaceAll(/\s+/g, ' ').trim();
 }
 
