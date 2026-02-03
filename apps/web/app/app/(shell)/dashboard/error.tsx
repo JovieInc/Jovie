@@ -13,9 +13,7 @@ export default function DashboardError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='Dashboard'
-      message={
-        'We encountered an error loading your dashboard. Please try again.'
-      }
+      message="Your dashboard hit a snag, but don't worry—just give it another go!"
     />
   );
 }

@@ -24,15 +24,16 @@ export default function NotFound() {
             </div>
 
             <h1 className='text-2xl md:text-3xl font-medium text-primary-token tracking-tight mb-3'>
-              Page Not Found
+              Oops, wrong turn!
             </h1>
             <p className='text-base text-secondary-token leading-relaxed mb-8'>
-              The link you followed may be broken, or the page may have moved.
+              This page seems to have wandered off. Don&apos;t worry, Jovie&apos;s
+              still here to help you find your way back.
             </p>
 
             <div className='flex items-center justify-center gap-3'>
               <CTAButton href='/' size='lg'>
-                Return Home
+                Take me home
               </CTAButton>
             </div>
           </div>

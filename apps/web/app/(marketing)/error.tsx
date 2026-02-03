@@ -31,7 +31,7 @@ export default function MarketingError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='Marketing'
-      message={'We encountered an error loading this page. Please try again.'}
+      message="Whoops, this page isn't cooperating right now. Give it another try!"
     />
   );
 }

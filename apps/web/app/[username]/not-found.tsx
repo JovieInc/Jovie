@@ -19,11 +19,11 @@ export default function NotFound() {
           </div>
 
           <h1 className='text-2xl md:text-3xl font-medium text-gray-900 dark:text-white tracking-tight mb-3'>
-            Profile not found
+            Hmm, we can&apos;t find this one
           </h1>
           <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed mb-8'>
-            The profile you&apos;re looking for doesn&apos;t exist or isn&apos;t
-            public.
+            This profile doesn&apos;t exist or is keeping a low profile. But
+            don&apos;t worry, there&apos;s plenty more to explore on Jovie!
           </p>
 
           <div className='flex items-center justify-center gap-3'>
@@ -31,7 +31,7 @@ export default function NotFound() {
               href='/'
               className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
             >
-              Go home
+              Back to Jovie
             </Link>
           </div>
         </div>

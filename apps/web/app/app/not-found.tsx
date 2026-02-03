@@ -9,14 +9,14 @@ export default function AppNotFound() {
       <PageContent>
         <EmptyState
           icon={<FileQuestion className='h-10 w-10' />}
-          heading='Page not found'
-          description="The page you're looking for doesn't exist or has been moved."
+          heading='Oops, this page took a detour'
+          description="We can't find what you're looking for, but don't worry—your dashboard is just a click away!"
           action={{
-            label: 'Go to Dashboard',
+            label: 'Back to Dashboard',
             href: APP_ROUTES.DASHBOARD,
           }}
           secondaryAction={{
-            label: 'Contact Support',
+            label: 'Need help?',
             href: 'mailto:support@jovie.fm',
           }}
         />

@@ -14,7 +14,7 @@ export default function WaitlistError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='Waitlist'
-      message='We encountered an error. Please try again.'
+      message="Hang tight! Something went a bit sideways, but we're on it. Try again!"
     />
   );
 }

@@ -13,7 +13,7 @@ export default function AppError({ error, reset }: Readonly<ErrorProps>) {
       error={error}
       reset={reset}
       context='App'
-      message='We encountered an error loading this page. Please try again.'
+      message="Something hiccuped on our end. Don't worry, give it another go!"
     />
   );
 }
