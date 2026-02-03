@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseToggleFeaturedPayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { toggleCreatorFeaturedAction } from '../../actions';
@@ -13,7 +14,7 @@ export const POST = createAdminRouteHandler({
     isFeatured: payload.nextFeatured,
   }),
   errorContext: {
-    route: '/app/admin/creators/toggle-featured',
+    route: `${APP_ROUTES.ADMIN_CREATORS}/toggle-featured`,
     action: 'toggle_featured_creator',
   },
   errorMessage: 'Failed to update featured status',

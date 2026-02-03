@@ -6,7 +6,7 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { isValidHandle } from '@/lib/ingestion/strategies/linktree';

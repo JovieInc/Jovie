@@ -7,7 +7,8 @@
 import 'server-only';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { billingAuditLog, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { billingAuditLog } from '@/lib/db/schema/billing';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { fetchUserBillingData } from './queries';
 import {

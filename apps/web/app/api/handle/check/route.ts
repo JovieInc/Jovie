@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';

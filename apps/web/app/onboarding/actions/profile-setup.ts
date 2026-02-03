@@ -6,7 +6,8 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import type { withDbSessionTx } from '@/lib/auth/session';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { CompletionResult, CreatorProfile } from './types';
 
 type DbTransaction = Parameters<Parameters<typeof withDbSessionTx>[0]>[0];

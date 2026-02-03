@@ -7,7 +7,7 @@
 import 'server-only';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { billingAuditLog } from '@/lib/db/schema';
+import { billingAuditLog } from '@/lib/db/schema/billing';
 import { captureCriticalError } from '@/lib/error-tracking';
 
 /**

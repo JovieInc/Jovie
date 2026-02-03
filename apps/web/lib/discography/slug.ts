@@ -11,7 +11,7 @@ import {
   contentSlugRedirects,
   discogReleases,
   discogTracks,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
 
 export type ContentType = 'release' | 'track';
 

@@ -4,9 +4,9 @@
  * Handles subscriptions that exist in DB but not in Stripe (deleted subscriptions).
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
 /**
@@ -62,7 +62,7 @@ export async function handleOrphanedSubscription(
     .set({
       stripeSubscriptionId: null,
       billingUpdatedAt: new Date(),
-      billingVersion: sql`${users.billingVersion} + 1`,
+      billingVersion: drizzleSql`${users.billingVersion} + 1`,
     })
     .where(eq(users.id, user.id));
 

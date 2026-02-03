@@ -10,8 +10,9 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type Stripe from 'stripe';
 
+import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { captureWarning } from '@/lib/error-tracking';
 
 /**
@@ -196,7 +197,7 @@ export function isActiveSubscription(
  */
 export async function invalidateBillingCache(): Promise<void> {
   // Revalidate the dashboard and any pages that display billing info
-  revalidatePath('/app/dashboard');
-  revalidatePath('/billing');
-  revalidatePath('/app/settings');
+  revalidatePath(APP_ROUTES.DASHBOARD);
+  revalidatePath(APP_ROUTES.BILLING);
+  revalidatePath(APP_ROUTES.SETTINGS);
 }

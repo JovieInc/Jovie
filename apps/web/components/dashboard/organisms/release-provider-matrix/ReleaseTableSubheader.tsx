@@ -47,7 +47,10 @@ interface ReleaseTableSubheaderProps {
   /** Column visibility state */
   readonly columnVisibility: Record<string, boolean>;
   /** Callback when column visibility changes */
-  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  readonly onColumnVisibilityChange: (
+    columnId: string,
+    visible: boolean
+  ) => void;
   /** Available columns to toggle */
   readonly availableColumns: readonly { id: string; label: string }[];
   /** Callback to reset display settings to defaults */

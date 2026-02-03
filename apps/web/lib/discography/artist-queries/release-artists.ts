@@ -11,7 +11,7 @@ import {
   artists,
   type NewReleaseArtist,
   releaseArtists,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
 import type { ArtistWithRole } from './types';
 
 /**

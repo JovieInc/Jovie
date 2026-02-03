@@ -8,14 +8,13 @@
 import { and, eq, ne } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for DB operations
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorContact,
   creatorContacts,
   creatorProfiles,
-  socialLinks,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/profiles';
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';

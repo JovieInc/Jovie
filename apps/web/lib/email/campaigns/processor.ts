@@ -5,17 +5,16 @@
  * Should be called periodically (e.g., every 15 minutes via cron).
  */
 
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lte } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
   type CampaignStep,
   campaignEnrollments,
   campaignSequences,
-  creatorClaimInvites,
-  creatorProfiles,
   emailEngagement,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/email-engagement';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
@@ -218,7 +217,7 @@ async function getClaimInviteData(subjectId: string): Promise<{
         eq(creatorClaimInvites.status, 'sent')
       )
     )
-    .orderBy(sql`${creatorClaimInvites.sentAt} DESC`)
+    .orderBy(drizzleSql`${creatorClaimInvites.sentAt} DESC`)
     .limit(1);
 
   if (!invite?.claimToken) {

@@ -14,11 +14,14 @@ import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { formatUsername } from './utils';
 
 interface ContactFieldsProps {
-  firstName: string | null | undefined;
+  readonly firstName: string | null | undefined;
   readonly lastName: string | null | undefined;
   readonly username: string;
   readonly isEditable: boolean;
-  onNameChange: (field: 'firstName' | 'lastName', value: string) => void;
+  readonly onNameChange: (
+    field: 'firstName' | 'lastName',
+    value: string
+  ) => void;
   readonly onUsernameChange: (value: string) => void;
 }
 

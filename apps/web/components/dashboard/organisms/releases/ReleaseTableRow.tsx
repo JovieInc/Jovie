@@ -22,7 +22,7 @@ interface ProviderConfig {
 }
 
 interface ReleaseTableRowProps {
-  release: ReleaseViewModel;
+  readonly release: ReleaseViewModel;
   readonly index: number;
   readonly totalRows: number;
   readonly primaryProviders: ProviderKey[];

@@ -1,4 +1,4 @@
-import { and, eq, lt, lte, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
   creatorProfiles,
@@ -174,8 +174,8 @@ async function fetchActiveSubscriber(subscriptionId: string) {
     .where(
       and(
         eq(notificationSubscriptions.id, subscriptionId),
-        sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
       )
     )
     .limit(1);
@@ -214,7 +214,7 @@ async function batchFetchReleases(releaseIds: string[]) {
       releaseDate: discogReleases.releaseDate,
     })
     .from(discogReleases)
-    .where(sql`${discogReleases.id} = ANY(${releaseIds})`);
+    .where(drizzleSql`${discogReleases.id} = ANY(${releaseIds})`);
 
   return new Map(releases.map(r => [r.id, r]));
 }
@@ -230,7 +230,7 @@ async function batchFetchCreatorProfiles(creatorProfileIds: string[]) {
       usernameNormalized: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
-    .where(sql`${creatorProfiles.id} = ANY(${creatorProfileIds})`);
+    .where(drizzleSql`${creatorProfiles.id} = ANY(${creatorProfileIds})`);
 
   return new Map(creators.map(c => [c.id, c]));
 }
@@ -248,9 +248,9 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
     .from(notificationSubscriptions)
     .where(
       and(
-        sql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
-        sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+        drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
+        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
       )
     );
 
@@ -270,7 +270,7 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
     .where(
       and(
         eq(providerLinks.ownerType, 'release'),
-        sql`${providerLinks.releaseId} = ANY(${releaseIds})`
+        drizzleSql`${providerLinks.releaseId} = ANY(${releaseIds})`
       )
     );
 

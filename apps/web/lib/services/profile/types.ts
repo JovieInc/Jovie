@@ -5,12 +5,9 @@
  * Types are inferred from Drizzle schema for consistency.
  */
 
-import type {
-  CreatorContact,
-  CreatorProfile,
-  creatorTypeEnum,
-  DiscogRelease,
-} from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema/content';
+import type { creatorTypeEnum } from '@/lib/db/schema/enums';
+import type { CreatorContact, CreatorProfile } from '@/lib/db/schema/profiles';
 
 /** Creator type enum values */
 export type CreatorType = (typeof creatorTypeEnum.enumValues)[number];

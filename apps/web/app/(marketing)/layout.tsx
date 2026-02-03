@@ -1,4 +1,4 @@
-import { SkipToContent } from '@/components/atoms';
+import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 

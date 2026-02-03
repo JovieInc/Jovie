@@ -3,7 +3,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { dashboardIdempotencyKeys, socialLinks } from '@/lib/db/schema';
+import { dashboardIdempotencyKeys, socialLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, TTL } from '@/lib/http/headers';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';

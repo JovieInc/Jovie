@@ -11,8 +11,7 @@ vi.mock('next/image', () => ({
     onLoad,
     ...props
   }: React.ComponentProps<'img'>) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Test mock component
+    // eslint-disable-next-line @next/next/no-img-element -- Mock for next/image
     <img
       src={src}
       alt={alt}

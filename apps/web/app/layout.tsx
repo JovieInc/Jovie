@@ -149,7 +149,7 @@ export default function RootLayout({
 
   const headContent = (
     <head>
-      <script src='/theme-init.js' />
+      <Script src='/theme-init.js' strategy='beforeInteractive' />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}

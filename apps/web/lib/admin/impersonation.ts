@@ -19,7 +19,8 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import { adminAuditLog, users } from '@/lib/db/schema';
+import { adminAuditLog } from '@/lib/db/schema/admin';
+import { users } from '@/lib/db/schema/auth';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { isAdmin } from './roles';
 

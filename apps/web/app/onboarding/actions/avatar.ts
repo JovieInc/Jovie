@@ -7,7 +7,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { creatorProfiles, profilePhotos } from '@/lib/db/schema';
+import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
 

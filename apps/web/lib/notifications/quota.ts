@@ -11,9 +11,12 @@
  * - Enterprise: 25,000 daily / 250,000 monthly
  */
 
-import { eq, lt, sql } from 'drizzle-orm';
+import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { type CreatorEmailQuota, creatorEmailQuotas } from '@/lib/db/schema';
+import {
+  type CreatorEmailQuota,
+  creatorEmailQuotas,
+} from '@/lib/db/schema/sender';
 import { logger } from '@/lib/utils/logger';
 
 /** Quota limits by plan tier */
@@ -183,8 +186,8 @@ export async function incrementQuota(
     const [updated] = await db
       .update(creatorEmailQuotas)
       .set({
-        dailySent: sql`${creatorEmailQuotas.dailySent} + ${count}`,
-        monthlySent: sql`${creatorEmailQuotas.monthlySent} + ${count}`,
+        dailySent: drizzleSql`${creatorEmailQuotas.dailySent} + ${count}`,
+        monthlySent: drizzleSql`${creatorEmailQuotas.monthlySent} + ${count}`,
         updatedAt: now,
       })
       .where(eq(creatorEmailQuotas.creatorProfileId, creatorProfileId))
@@ -226,7 +229,7 @@ export async function updateQuotaLimits(
       ...(limits.daily !== undefined && { dailyLimit: limits.daily }),
       ...(limits.monthly !== undefined && { monthlyLimit: limits.monthly }),
       hasCustomLimits: true,
-      metadata: sql`${creatorEmailQuotas.metadata} || ${JSON.stringify({
+      metadata: drizzleSql`${creatorEmailQuotas.metadata} || ${JSON.stringify({
         overrideReason,
         overrideBy,
       })}::jsonb`,

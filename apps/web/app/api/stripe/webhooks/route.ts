@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
 import { withTransaction } from '@/lib/db';
-import { stripeWebhookEvents } from '@/lib/db/schema';
+import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';

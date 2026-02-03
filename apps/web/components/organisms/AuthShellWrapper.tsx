@@ -121,7 +121,7 @@ function AuthShellWrapperInner({
   // setTableMeta is a stable useState setter, so we exclude it from deps
   const tableMetaContextValue = useMemo(
     () => ({ tableMeta, setTableMeta }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is stable from useState
+
     [tableMeta]
   );
 

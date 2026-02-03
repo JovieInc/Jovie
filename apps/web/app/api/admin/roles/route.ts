@@ -6,7 +6,7 @@ import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
 import { syncAdminRoleChange } from '@/lib/auth/clerk-sync';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';

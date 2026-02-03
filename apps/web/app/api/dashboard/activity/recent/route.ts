@@ -1,5 +1,6 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -7,7 +8,7 @@ import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
 import {
   formatLocationString,
@@ -212,7 +213,7 @@ export async function GET(request: NextRequest) {
           description: `${actorLabel}${locationLabel} ${phrase}.`,
           icon,
           timestamp: row.createdAt.toISOString(),
-          href: '/app/dashboard/audience',
+          href: APP_ROUTES.AUDIENCE,
         };
       });
 
@@ -229,7 +230,7 @@ export async function GET(request: NextRequest) {
             description: `${actorLabel}${locationLabel} visited your Jovie profile.`,
             icon: '👀',
             timestamp,
-            href: '/app/dashboard/audience',
+            href: APP_ROUTES.AUDIENCE,
           };
         });
 
@@ -246,7 +247,7 @@ export async function GET(request: NextRequest) {
           description: `Someone${locationLabel} just subscribed.`,
           icon: row.channel === 'sms' ? '📱' : '📩',
           timestamp: row.createdAt.toISOString(),
-          href: '/app/dashboard/contacts',
+          href: APP_ROUTES.CONTACTS,
         };
       });
 

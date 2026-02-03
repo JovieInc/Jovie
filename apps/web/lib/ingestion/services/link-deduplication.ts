@@ -4,7 +4,7 @@
  * Handles canonical identity matching for social links.
  */
 
-import type { socialLinks } from '@/lib/db/schema';
+import type { socialLinks } from '@/lib/db/schema/links';
 import {
   canonicalIdentity,
   detectPlatform,

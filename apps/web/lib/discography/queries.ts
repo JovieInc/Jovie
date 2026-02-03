@@ -1,17 +1,17 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
 import {
-  creatorProfiles,
-  type ProviderLink as DbProviderLink,
   type DiscogRelease,
   discogReleases,
   discogTracks,
   type NewDiscogRelease,
   type NewDiscogTrack,
   type NewProviderLink,
+  type ProviderLink,
   providerLinks,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Release data source types
@@ -26,7 +26,7 @@ export interface TrackSummary {
 
 // Types for release data with provider links
 export interface ReleaseWithProviders extends DiscogRelease {
-  providerLinks: DbProviderLink[];
+  providerLinks: ProviderLink[];
   trackSummary?: TrackSummary;
 }
 
@@ -106,11 +106,11 @@ async function getTrackSummariesForReleases(
   const summaries = await db
     .select({
       releaseId: discogTracks.releaseId,
-      totalDurationMs: sql<number>`sum(${discogTracks.durationMs})`.as(
+      totalDurationMs: drizzleSql<number>`sum(${discogTracks.durationMs})`.as(
         'total_duration_ms'
       ),
       primaryIsrc:
-        sql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
+        drizzleSql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
     })
@@ -142,7 +142,7 @@ export async function getLatestReleaseForProfile(
     .select()
     .from(discogReleases)
     .where(eq(discogReleases.creatorProfileId, creatorProfileId))
-    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
   return release ?? null;
@@ -185,7 +185,7 @@ export async function getLatestReleaseByUsername(
       eq(discogReleases.creatorProfileId, creatorProfiles.id)
     )
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-    .orderBy(sql`${discogReleases.releaseDate} DESC NULLS LAST`)
+    .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
     .limit(1);
 
   return release ?? null;
@@ -234,7 +234,7 @@ export async function getReleasesForProfile(
   ]);
 
   // Group links by release ID
-  const linksByRelease = new Map<string, DbProviderLink[]>();
+  const linksByRelease = new Map<string, ProviderLink[]>();
   for (const link of providerLinksResult) {
     if (!link.releaseId) continue;
     const existing = linksByRelease.get(link.releaseId) ?? [];
@@ -401,7 +401,7 @@ export async function upsertRelease(
  */
 export async function upsertProviderLink(
   input: UpsertProviderLinkInput
-): Promise<DbProviderLink> {
+): Promise<ProviderLink> {
   const now = new Date();
 
   // Determine owner type based on which ID is provided
@@ -455,7 +455,7 @@ export async function upsertProviderLink(
 export async function getProviderLink(
   releaseId: string,
   providerId: string
-): Promise<DbProviderLink | null> {
+): Promise<ProviderLink | null> {
   const [link] = await db
     .select()
     .from(providerLinks)
@@ -478,7 +478,7 @@ export async function resetProviderLink(
   releaseId: string,
   providerId: string,
   ingestedUrl?: string
-): Promise<DbProviderLink | null> {
+): Promise<ProviderLink | null> {
   if (!ingestedUrl) {
     // Delete the link if no ingested URL exists
     await db
@@ -603,7 +603,7 @@ export interface TrackWithProviders {
   isExplicit: boolean;
   isrc: string | null;
   previewUrl: string | null;
-  providerLinks: DbProviderLink[];
+  providerLinks: ProviderLink[];
 }
 
 export interface TracksWithProvidersResult {
@@ -633,7 +633,7 @@ export async function getTracksForReleaseWithProviders(
 
   // Get total count for pagination
   const [countResult] = await db
-    .select({ count: sql<number>`COUNT(*)` })
+    .select({ count: drizzleSql<number>`COUNT(*)` })
     .from(discogTracks)
     .where(eq(discogTracks.releaseId, releaseId));
 
@@ -658,7 +658,7 @@ export async function getTracksForReleaseWithProviders(
 
   // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
-  let trackProviderLinks: DbProviderLink[] = [];
+  let trackProviderLinks: ProviderLink[] = [];
 
   if (await hasProviderLinksTable()) {
     trackProviderLinks = await db
@@ -673,7 +673,7 @@ export async function getTracksForReleaseWithProviders(
   }
 
   // Group links by track ID
-  const linksByTrack = new Map<string, DbProviderLink[]>();
+  const linksByTrack = new Map<string, ProviderLink[]>();
   for (const link of trackProviderLinks) {
     if (!link.trackId) continue;
     const existing = linksByTrack.get(link.trackId) ?? [];

@@ -17,7 +17,8 @@ import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';

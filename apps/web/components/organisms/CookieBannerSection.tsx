@@ -6,7 +6,6 @@ import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
 
 declare global {
-  // eslint-disable-next-line no-var
   var JVConsent:
     | {
         onChange: (cb: (v: unknown) => void) => () => void;

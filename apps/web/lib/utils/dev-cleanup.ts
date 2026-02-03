@@ -12,11 +12,10 @@ interface ProcessWithOnce {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var jovieDevCleanupRegistered: boolean | undefined;
-  // eslint-disable-next-line no-var
+
   var jovieDevCleanupFns: Map<string, DevCleanupFn> | undefined;
-  // eslint-disable-next-line no-var
+
   var jovieDevMemoryMonitorInterval: ReturnType<typeof setInterval> | undefined;
 }
 

@@ -7,12 +7,14 @@ import {
   revalidateTag,
   unstable_cache,
 } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbOrTransaction } from '@/lib/db';
-import { creatorContacts, creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 
 function mapContact(
@@ -180,7 +182,7 @@ export async function saveContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
-  revalidatePath('/app/dashboard/contacts');
+  revalidatePath(APP_ROUTES.CONTACTS);
 
   return result;
 }
@@ -221,5 +223,5 @@ export async function deleteContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${profileId}`, 'max');
-  revalidatePath('/app/dashboard/contacts');
+  revalidatePath(APP_ROUTES.CONTACTS);
 }

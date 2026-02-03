@@ -234,7 +234,7 @@ export interface UnifiedTableProps<TData> {
  * Internal memoized row component to prevent inline handler recreation
  */
 interface TableRowProps<TData> {
-  row: Row<TData>;
+  readonly row: Row<TData>;
   readonly rowIndex: number;
   readonly rowRefsMap: Map<number, HTMLTableRowElement>;
   readonly shouldEnableKeyboardNav: boolean;
@@ -243,7 +243,7 @@ interface TableRowProps<TData> {
   readonly focusedIndex: number;
   readonly onRowClick?: (row: TData) => void;
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
-  onKeyDown: (
+  readonly onKeyDown: (
     event: React.KeyboardEvent,
     rowIndex: number,
     rowData: TData

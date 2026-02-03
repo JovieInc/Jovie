@@ -3,7 +3,7 @@ import type { DetectedLink } from '@/lib/utils/platform-detection';
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
 > {
-  initialLinks: T[];
+  readonly initialLinks: T[];
   readonly className?: string;
   readonly onLinksChange?: (links: T[]) => void;
   readonly onLinkAdded?: (links: T[]) => void;

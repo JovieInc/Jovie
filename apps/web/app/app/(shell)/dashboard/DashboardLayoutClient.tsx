@@ -16,7 +16,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 
 export { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 
-import { SkipToContent } from '@/components/atoms';
+import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import { PreviewPanel } from '@/components/dashboard/layout/PreviewPanel';
@@ -76,16 +76,19 @@ function extractSubPaths(
 }
 
 function getBaseBreadcrumb(mode: BreadcrumbMode): DashboardBreadcrumbItem {
-  if (mode === 'admin') return { label: 'Admin', href: '/app/admin' };
-  if (mode === 'settings') return { label: 'Settings', href: '/app/settings' };
-  return { label: 'Dashboard', href: '/app' };
+  if (mode === 'admin') return { label: 'Admin', href: APP_ROUTES.ADMIN };
+  if (mode === 'settings')
+    return { label: 'Settings', href: APP_ROUTES.SETTINGS };
+  return { label: 'Dashboard', href: APP_ROUTES.DASHBOARD };
 }
 
 function getBasePath(mode: BreadcrumbMode): string {
-  if (mode === 'admin') return '/app/admin';
-  if (mode === 'settings') return '/app/settings';
-  return '/app/dashboard';
+  if (mode === 'admin') return APP_ROUTES.ADMIN;
+  if (mode === 'settings') return APP_ROUTES.SETTINGS;
+  return APP_ROUTES.DASHBOARD;
 }
+
+import { APP_ROUTES } from '@/constants/routes';
 
 import {
   PreviewPanelProvider,
@@ -131,24 +134,22 @@ export default function DashboardLayoutClient({
 
   // Memoize route checks to avoid recalculating on every render
   const routeFlags = useMemo(() => {
-    const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
-    const isSettingsRoute = pathname?.startsWith('/app/settings') ?? false;
-    const isAdminRoute = pathname?.startsWith('/app/admin') ?? false;
-    const isProfileRoute =
-      pathname?.startsWith('/app/dashboard/profile') ?? false;
-    const isAudienceRoute =
-      pathname?.startsWith('/app/dashboard/audience') ?? false;
-    const isContactsRoute =
-      pathname?.startsWith('/app/dashboard/contacts') ?? false;
+    const isAppDashboardRoute =
+      pathname?.startsWith(APP_ROUTES.DASHBOARD) ?? false;
+    const isSettingsRoute = pathname?.startsWith(APP_ROUTES.SETTINGS) ?? false;
+    const isAdminRoute = pathname?.startsWith(APP_ROUTES.ADMIN) ?? false;
+    const isProfileRoute = pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
+    const isAudienceRoute = pathname?.startsWith(APP_ROUTES.AUDIENCE) ?? false;
+    const isContactsRoute = pathname?.startsWith(APP_ROUTES.CONTACTS) ?? false;
     const isFullWidthRoute =
-      pathname?.startsWith('/app/admin/creators') ||
-      pathname?.startsWith('/app/admin/users') ||
-      pathname?.startsWith('/app/admin/waitlist') ||
+      pathname?.startsWith(APP_ROUTES.ADMIN_CREATORS) ||
+      pathname?.startsWith(APP_ROUTES.ADMIN_USERS) ||
+      pathname?.startsWith(APP_ROUTES.ADMIN_WAITLIST) ||
       isAudienceRoute ||
       isContactsRoute ||
-      pathname?.startsWith('/app/dashboard/releases');
+      pathname?.startsWith(APP_ROUTES.RELEASES);
     const isContactTableRoute =
-      pathname?.startsWith('/app/admin/creators') || isAudienceRoute;
+      pathname?.startsWith(APP_ROUTES.ADMIN_CREATORS) || isAudienceRoute;
 
     return {
       isAppDashboardRoute,

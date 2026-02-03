@@ -2,7 +2,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 

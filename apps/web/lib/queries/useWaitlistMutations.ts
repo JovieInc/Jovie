@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { APP_ROUTES } from '@/constants/routes';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -45,7 +46,7 @@ async function approveWaitlistEntry(
       success?: boolean;
       status?: string;
       error?: string;
-    }>('/app/admin/waitlist/approve', {
+    }>(`${APP_ROUTES.ADMIN_WAITLIST}/approve`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +82,7 @@ async function updateWaitlistStatus(
       success?: boolean;
       status?: string;
       error?: string;
-    }>('/app/admin/waitlist/update-status', {
+    }>(`${APP_ROUTES.ADMIN_WAITLIST}/update-status`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { transformImageUrl } from '@/lib/images/versioning';
 

@@ -6,11 +6,14 @@ import { CONTACT_ROLE_OPTIONS } from '@/lib/contacts/constants';
 import type { ContactRole } from '@/types/contacts';
 
 interface RoleButtonProps {
-  value: ContactRole;
+  readonly value: ContactRole;
   readonly label: string;
   readonly isSelected: boolean;
   readonly customLabel: string | null | undefined;
-  onRoleChange: (role: ContactRole, customLabel: string | null) => void;
+  readonly onRoleChange: (
+    role: ContactRole,
+    customLabel: string | null
+  ) => void;
 }
 
 const RoleButton = memo(function RoleButton({
@@ -38,9 +41,12 @@ const RoleButton = memo(function RoleButton({
 });
 
 export interface ContactRoleSelectorProps {
-  selectedRole: ContactRole;
+  readonly selectedRole: ContactRole;
   readonly customLabel: string | null | undefined;
-  onRoleChange: (role: ContactRole, customLabel: string | null) => void;
+  readonly onRoleChange: (
+    role: ContactRole,
+    customLabel: string | null
+  ) => void;
   readonly onCustomLabelChange: (label: string) => void;
 }
 

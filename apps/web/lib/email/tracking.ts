@@ -14,7 +14,7 @@ import {
   type EmailEngagementMetadata,
   emailEngagement,
   type TrackedEmailType,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/email-engagement';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 

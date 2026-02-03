@@ -3,11 +3,9 @@ import 'server-only';
 import { and, desc, sql as drizzleSql, inArray } from 'drizzle-orm';
 
 import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
-import {
-  creatorProfiles,
-  stripeWebhookEvents,
-  waitlistEntries,
-} from '@/lib/db/schema';
+import { stripeWebhookEvents } from '@/lib/db/schema/billing';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminMercuryMetrics } from './mercury-metrics';

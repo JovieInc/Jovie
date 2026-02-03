@@ -7,12 +7,12 @@
 import {
   and,
   count,
+  sql as drizzleSql,
   eq,
   ilike,
   inArray,
   notInArray,
   or,
-  sql,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
@@ -20,7 +20,7 @@ import {
   artists,
   releaseArtists,
   trackArtists,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
 import type { CollaboratorInfo } from './types';
 
 /**
@@ -96,7 +96,7 @@ export async function getFrequentCollaborators(
           .where(
             and(
               inArray(trackArtists.trackId, trackIds),
-              sql`${trackArtists.artistId} != ${artistId}`
+              drizzleSql`${trackArtists.artistId} != ${artistId}`
             )
           )
           .groupBy(trackArtists.artistId)
@@ -114,7 +114,7 @@ export async function getFrequentCollaborators(
           .where(
             and(
               inArray(releaseArtists.releaseId, releaseIds),
-              sql`${releaseArtists.artistId} != ${artistId}`
+              drizzleSql`${releaseArtists.artistId} != ${artistId}`
             )
           )
           .groupBy(releaseArtists.artistId)

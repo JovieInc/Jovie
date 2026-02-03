@@ -2,10 +2,13 @@ import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 export interface ReleaseProviderMatrixProps {
   readonly releases: ReleaseViewModel[];
-  providerConfig: Record<ProviderKey, { label: string; accent: string }>;
-  primaryProviders: ProviderKey[];
-  spotifyConnected?: boolean;
-  spotifyArtistName?: string | null;
+  readonly providerConfig: Record<
+    ProviderKey,
+    { label: string; accent: string }
+  >;
+  readonly primaryProviders: ProviderKey[];
+  readonly spotifyConnected?: boolean;
+  readonly spotifyArtistName?: string | null;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

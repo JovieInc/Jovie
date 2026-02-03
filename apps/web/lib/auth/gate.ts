@@ -3,12 +3,16 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 import { syncEmailFromClerk } from './clerk-sync';
+// eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { resolveProfileState } from './profile-state-resolver';
+// eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { checkUserStatus } from './status-checker';
 
 /**

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DiscogRelease } from '@/lib/db/schema';
+import type { DiscogRelease } from '@/lib/db/schema/content';
 
 const hoisted = vi.hoisted(() => {
   const selectMock = vi.fn();

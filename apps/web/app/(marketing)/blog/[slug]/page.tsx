@@ -4,7 +4,7 @@ import { APP_URL } from '@/constants/app';
 import { getBlogPost, getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 
 interface BlogPostPageProps {
-  params: Promise<{ slug: string }>;
+  readonly params: Promise<{ slug: string }>;
 }
 
 // Fully static - blog posts are pre-generated at build time
