@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
+    "tsBuildInfoFile": ".cache/tsbuildinfo",
     "composite": true,
     "baseUrl": ".",
     "paths": {
