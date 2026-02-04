@@ -212,8 +212,7 @@ export const MENU_LABEL_BASE =
  * Menu separator styles
  * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-1 h-px bg-border-subtle';
+export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-border-subtle';
 
 /**
  * Keyboard shortcut indicator styles
