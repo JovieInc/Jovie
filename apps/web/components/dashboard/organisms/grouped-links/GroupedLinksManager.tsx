@@ -45,16 +45,27 @@ function AnimatedHint({ hint }: { readonly hint: string | null }) {
   const [displayHint, setDisplayHint] = useState<string | null>(null);
 
   useEffect(() => {
+    let rafId: number | null = null;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
     if (hint) {
       setDisplayHint(hint);
       // Trigger animation after render
-      requestAnimationFrame(() => setVisible(true));
+      rafId = requestAnimationFrame(() => setVisible(true));
     } else {
       setVisible(false);
       // Clear hint after fade out animation completes
-      const timer = setTimeout(() => setDisplayHint(null), 200);
-      return () => clearTimeout(timer);
+      timerId = setTimeout(() => setDisplayHint(null), 200);
     }
+
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      if (timerId !== null) {
+        clearTimeout(timerId);
+      }
+    };
   }, [hint]);
 
   if (!displayHint) return null;
