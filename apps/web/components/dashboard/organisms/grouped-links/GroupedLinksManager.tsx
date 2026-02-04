@@ -1,18 +1,29 @@
 'use client';
 
-import { AnimatePresence, motion } from 'motion/react';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
-// eslint-disable-next-line no-restricted-imports -- Module re-export, not barrel
+import dynamic from 'next/dynamic';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/universal-link-input';
-// eslint-disable-next-line no-restricted-imports -- Direct file import
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { InlineChatArea, type InlineChatAreaRef } from '../InlineChatArea';
+import type { InlineChatAreaRef } from '../InlineChatArea';
 import { ChatStyleLinkList } from '../links/ChatStyleLinkList';
+
+// Lazy load InlineChatArea - it imports heavy AI SDK libraries (~25KB)
+const InlineChatArea = dynamic(
+  () =>
+    import('../InlineChatArea').then(mod => ({ default: mod.InlineChatArea })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className='mb-4 h-12 animate-pulse rounded-lg bg-surface-1' />
+    ),
+  }
+);
+
 import {
   type SuggestedLink,
   useLinksManager,
@@ -25,6 +36,44 @@ import { buildPillLabel } from './buildPillLabel';
 import type { GroupedLinksManagerProps } from './types';
 import { usePendingPreview } from './usePendingPreview';
 import { useSuggestionHandlers } from './useSuggestionHandlers';
+
+/**
+ * AnimatedHint - A hint message with CSS-based fade animation (no motion library)
+ */
+function AnimatedHint({ hint }: { readonly hint: string | null }) {
+  const [visible, setVisible] = useState(false);
+  const [displayHint, setDisplayHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hint) {
+      setDisplayHint(hint);
+      // Trigger animation after render
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
+      // Clear hint after fade out animation completes
+      const timer = setTimeout(() => setDisplayHint(null), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [hint]);
+
+  if (!displayHint) return null;
+
+  return (
+    <output
+      style={{
+        transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(-10px)',
+        display: 'block',
+      }}
+      className='rounded-lg border border-amber-300/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
+      aria-live='polite'
+    >
+      {displayHint}
+    </output>
+  );
+}
 
 function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   initialLinks,
@@ -164,22 +213,8 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   // Shared input section component
   const inputSection = (
     <>
-      {/* Hint message with animation */}
-      <AnimatePresence>
-        {hint && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
-            role='status'
-            aria-live='polite'
-          >
-            {hint}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Hint message with CSS animation (no motion library) */}
+      <AnimatedHint hint={hint} />
 
       {/* YouTube cross-category prompt */}
       {ytPrompt && (

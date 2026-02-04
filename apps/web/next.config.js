@@ -7,26 +7,21 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 
 const nextConfig = {
+  // Transpile workspace packages for proper module resolution
+  transpilePackages: ['@jovie/ui'],
   turbopack: {
     // Resolve aliases matching tsconfig paths for consistent module resolution
     resolveAlias: {
-      '@/*': ['./*'],
-      '@/components/*': ['./components/*'],
-      '@/atoms/*': ['./components/atoms/*'],
-      '@/molecules/*': ['./components/molecules/*'],
-      '@/organisms/*': ['./components/organisms/*'],
-      '@/app/*': ['./app/*', './app/app/*'],
-      '@/lib/*': ['./lib/*'],
-      '@/types/*': ['./types/*'],
-      '@jovie/ui': [path.resolve(__dirname, '../../packages/ui')],
-      '@jovie/ui/*': [path.resolve(__dirname, '../../packages/ui/*')],
+      '@/*': './*',
+      '@/components/*': './components/*',
+      '@/atoms/*': './components/atoms/*',
+      '@/molecules/*': './components/molecules/*',
+      '@/organisms/*': './components/organisms/*',
+      '@/lib/*': './lib/*',
+      '@/types/*': './types/*',
     },
     // Prioritize common extensions for faster resolution
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
-    // Memory limit for Turbopack (in bytes) - 4GB for large monorepos
-    memoryLimit: 4 * 1024 * 1024 * 1024,
-    // Use deterministic module IDs for better cache stability
-    moduleIdStrategy: 'deterministic',
   },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
@@ -405,10 +400,11 @@ const nextConfig = {
     }
 
     // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
+    // Note: tsconfig paths handle this for TypeScript, but webpack needs explicit alias
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      ['@jovie/ui']: path.resolve(__dirname, 'packages/ui'),
+      ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
     };
 
     return config;

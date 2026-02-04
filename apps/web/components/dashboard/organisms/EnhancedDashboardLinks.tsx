@@ -16,7 +16,6 @@ import {
   convertDetectedLinksToLinkItems,
   convertLinksToDashboardFormat,
 } from './links/utils/link-transformers';
-import { ProfileEditorSection } from './ProfileEditorSection';
 
 const GROUPED_LINKS_MANAGER_LOADING_KEYS = Array.from(
   { length: 4 },
@@ -39,6 +38,26 @@ const GroupedLinksManager = dynamic(
             className='h-16 animate-pulse rounded-lg bg-surface-1'
           />
         ))}
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+// Lazy load ProfileEditorSection - only needed when sidebar is closed
+const ProfileEditorSection = dynamic(
+  () =>
+    import('./ProfileEditorSection').then(mod => ({
+      default: mod.ProfileEditorSection,
+    })),
+  {
+    loading: () => (
+      <div className='mb-4 flex items-start gap-4'>
+        <div className='h-20 w-20 animate-pulse rounded-full bg-surface-1' />
+        <div className='flex-1 space-y-2'>
+          <div className='h-6 w-48 animate-pulse rounded bg-surface-1' />
+          <div className='h-4 w-32 animate-pulse rounded bg-surface-1' />
+        </div>
       </div>
     ),
     ssr: false,

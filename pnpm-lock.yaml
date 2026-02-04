@@ -125,6 +125,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.4))
+      '@jovie/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2
@@ -156,10 +159,10 @@ importers:
         specifier: ^2.2.6
         version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-separator':
-        specifier: ^1.1.7
+        specifier: ^1.1.8
         version: 1.1.8(@types/react-dom@19.2.3(@types/react@19.2.9))(@types/react@19.2.9)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-slot':
-        specifier: ^1.2.3
+        specifier: ^1.2.4
         version: 1.2.4(@types/react@19.2.9)(react@19.2.4)
       '@radix-ui/react-switch':
         specifier: ^1.2.6
@@ -225,7 +228,7 @@ importers:
         specifier: ^0.7.1
         version: 0.7.1
       clsx:
-        specifier: ^2.1.0
+        specifier: ^2.1.1
         version: 2.1.1
       critters:
         specifier: ^0.0.25
@@ -574,7 +577,7 @@ importers:
         specifier: ^7.71.1
         version: 7.71.1(react@19.2.4)
       tailwind-merge:
-        specifier: ^3.3.0
+        specifier: ^3.3.1
         version: 3.4.0
     devDependencies:
       '@types/react':
