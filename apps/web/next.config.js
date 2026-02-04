@@ -7,6 +7,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 
 const nextConfig = {
+  // Turbopack configuration (Next.js 16+ uses tsconfig paths automatically)
   turbopack: {},
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
@@ -385,10 +386,11 @@ const nextConfig = {
     }
 
     // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
+    // Note: tsconfig paths handle this for TypeScript, but webpack needs explicit alias
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      ['@jovie/ui']: path.resolve(__dirname, 'packages/ui'),
+      ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
     };
 
     return config;
