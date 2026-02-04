@@ -125,6 +125,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.4))
+      '@jovie/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2

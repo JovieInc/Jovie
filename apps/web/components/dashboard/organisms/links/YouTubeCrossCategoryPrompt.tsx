@@ -1,8 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AnimatePresence, motion } from 'motion/react';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { labelFor } from './utils';
 
@@ -61,7 +60,7 @@ export interface YouTubeCrossCategoryPromptProps {
  * this prompt asks if they want to add it to the other section as well.
  *
  * Features:
- * - Animated entry/exit using framer-motion
+ * - Animated entry/exit using CSS transitions (no motion library)
  * - Clear messaging about what adding will do
  * - Confirm and Cancel buttons
  * - Memoized for performance
@@ -89,6 +88,18 @@ export const YouTubeCrossCategoryPrompt = React.memo(
     className,
     animate = true,
   }: YouTubeCrossCategoryPromptProps) {
+    // Animation state for CSS transitions
+    const [isVisible, setIsVisible] = useState(!animate);
+
+    // Trigger animation on mount
+    useEffect(() => {
+      if (animate && candidate) {
+        // Small delay to allow initial render before animating
+        const timer = requestAnimationFrame(() => setIsVisible(true));
+        return () => cancelAnimationFrame(timer);
+      }
+    }, [animate, candidate]);
+
     // Don't render if no candidate
     if (!candidate) {
       return null;
@@ -121,46 +132,40 @@ export const YouTubeCrossCategoryPrompt = React.memo(
 
     const platformName = candidate.platform.name || candidate.platform.id;
 
-    const content = (
-      <dialog
-        open
-        className={`rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3 m-0 ${className ?? ''}`}
-        aria-labelledby='yt-cross-category-prompt-title'
-        data-testid='youtube-cross-category-prompt'
-      >
-        <div id='yt-cross-category-prompt-title' className='text-primary-token'>
-          You already added {platformName} in this section. Do you also want to
-          add it as {getTargetDisplayName()}?
-        </div>
-        <div className='shrink-0 flex items-center gap-2'>
-          <Button size='sm' variant='primary' onClick={handleConfirm}>
-            {getButtonLabel()}
-          </Button>
-          <Button size='sm' variant='outline' onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </dialog>
-    );
+    // CSS transition styles
+    const transitionStyle = animate
+      ? {
+          transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
+        }
+      : undefined;
 
-    // If animations are disabled, render directly
-    if (!animate) {
-      return content;
-    }
-
-    // Wrap in AnimatePresence for smooth enter/exit
     return (
-      <AnimatePresence mode='wait'>
-        <motion.div
-          key='yt-cross-category-prompt'
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
+      <div style={transitionStyle}>
+        <dialog
+          open
+          className={`m-0 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-3 text-sm ${className ?? ''}`}
+          aria-labelledby='yt-cross-category-prompt-title'
+          data-testid='youtube-cross-category-prompt'
         >
-          {content}
-        </motion.div>
-      </AnimatePresence>
+          <div
+            id='yt-cross-category-prompt-title'
+            className='text-primary-token'
+          >
+            You already added {platformName} in this section. Do you also want
+            to add it as {getTargetDisplayName()}?
+          </div>
+          <div className='flex shrink-0 items-center gap-2'>
+            <Button size='sm' variant='primary' onClick={handleConfirm}>
+              {getButtonLabel()}
+            </Button>
+            <Button size='sm' variant='outline' onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        </dialog>
+      </div>
     );
   }
 );

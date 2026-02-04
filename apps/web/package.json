@@ -98,6 +98,7 @@
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
   },
   "dependencies": {
+    "@jovie/ui": "workspace:*",
     "@ai-sdk/anthropic": "^3.0.35",
     "@ai-sdk/react": "^3.0.51",
     "@clerk/elements": "0.24.3",
