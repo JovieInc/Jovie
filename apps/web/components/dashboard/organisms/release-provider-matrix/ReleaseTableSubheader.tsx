@@ -185,7 +185,7 @@ function LinearStyleDisplayMenu({
             variant='ghost'
             size='sm'
             className={cn(
-              'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-[#c9c9cc] hover:bg-[#f2f2f2] hover:text-primary-token dark:border-transparent dark:bg-transparent dark:hover:border-white/20 dark:hover:bg-[#151618] dark:hover:text-white',
+              'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-interactive-hover hover:text-primary-token',
               triggerClassName
             )}
           >
@@ -292,7 +292,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   const pillButtonClass =
-    'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-[#c9c9cc] hover:bg-[#f2f2f2] hover:text-primary-token dark:border-transparent dark:bg-transparent dark:hover:border-white/20 dark:hover:bg-[#151618] dark:hover:text-white';
+    'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-interactive-hover hover:text-primary-token';
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-1.5'>
