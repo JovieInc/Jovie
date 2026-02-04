@@ -143,7 +143,7 @@ export const popoverContentClasses = [
 export const selectContentClasses = [
   'relative z-50',
   SELECT_MAX_HEIGHT,
-  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle bg-white dark:bg-surface-3 p-0.5 text-primary-token',
+  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle bg-surface-0 dark:bg-surface-1 p-0.5 text-primary-token',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -195,7 +195,7 @@ export const SELECT_ITEM_BASE =
   'relative flex w-full cursor-default select-none items-center rounded-md py-1 pl-8 pr-2 text-[12.5px] font-medium leading-[16px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
   'text-secondary-token ' +
-  'focus-visible:bg-white/5 focus-visible:text-primary-token ' +
+  'focus-visible:bg-interactive-hover focus-visible:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50';
 
 // ============================================================================
