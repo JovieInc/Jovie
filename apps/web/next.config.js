@@ -7,8 +7,27 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 
 const nextConfig = {
-  // Turbopack configuration (Next.js 16+ uses tsconfig paths automatically)
-  turbopack: {},
+  turbopack: {
+    // Resolve aliases matching tsconfig paths for consistent module resolution
+    resolveAlias: {
+      '@/*': ['./*'],
+      '@/components/*': ['./components/*'],
+      '@/atoms/*': ['./components/atoms/*'],
+      '@/molecules/*': ['./components/molecules/*'],
+      '@/organisms/*': ['./components/organisms/*'],
+      '@/app/*': ['./app/*', './app/app/*'],
+      '@/lib/*': ['./lib/*'],
+      '@/types/*': ['./types/*'],
+      '@jovie/ui': [path.resolve(__dirname, '../../packages/ui')],
+      '@jovie/ui/*': [path.resolve(__dirname, '../../packages/ui/*')],
+    },
+    // Prioritize common extensions for faster resolution
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
+    // Memory limit for Turbopack (in bytes) - 4GB for large monorepos
+    memoryLimit: 4 * 1024 * 1024 * 1024,
+    // Use deterministic module IDs for better cache stability
+    moduleIdStrategy: 'deterministic',
+  },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
   typescript: {
