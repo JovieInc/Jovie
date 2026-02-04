@@ -12,6 +12,11 @@ import {
   setupUrlMocks,
 } from './AvatarUploadable.test-utils';
 
+// Mock analytics - must be in test file for proper hoisting
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 describe('AvatarUploadable - Progress States', () => {
   const { mockOnUpload, mockOnSuccess, mockOnError } = createMockCallbacks();
   let restoreUrlMocks: (() => void) | undefined;
