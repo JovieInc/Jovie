@@ -20,11 +20,13 @@ export function runBackgroundSyncOperations(
     syncCanonicalUsernameFromApp(userId, username),
     syncAllClerkMetadata(userId),
   ]).then(results => {
+    const syncContexts = [
+      'onboarding_username_sync',
+      'onboarding_metadata_sync',
+    ];
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const context =
-          index === 0 ? 'onboarding_username_sync' : 'onboarding_metadata_sync';
-        console.error(`[ONBOARDING] ${context} failed:`, result.reason);
+        const context = syncContexts[index];
         Sentry.captureException(result.reason, {
           tags: { context, username },
           level: 'warning',
