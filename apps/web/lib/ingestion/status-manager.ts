@@ -1,5 +1,6 @@
 import { and, eq, inArray, lte } from 'drizzle-orm';
-import { creatorProfiles, type DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 /**

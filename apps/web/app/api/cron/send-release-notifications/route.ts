@@ -1,13 +1,10 @@
 import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import {
-  creatorProfiles,
-  db,
-  discogReleases,
-  fanReleaseNotifications,
-  notificationSubscriptions,
-  providerLinks,
-} from '@/lib/db';
+import { db } from '@/lib/db';
+import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { discogReleases, providerLinks } from '@/lib/db/schema/content';
+import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { env } from '@/lib/env-server';
 import { sendNotification } from '@/lib/notifications/service';

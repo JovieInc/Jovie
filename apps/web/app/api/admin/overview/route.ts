@@ -1,7 +1,8 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { db, waitlistEntries } from '@/lib/db';
+import { db } from '@/lib/db';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';

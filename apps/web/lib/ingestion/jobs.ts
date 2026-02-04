@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
-import { db, ingestionJobs } from '@/lib/db';
+import { db } from '@/lib/db';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
   canonicalIdentity,
   detectPlatform,

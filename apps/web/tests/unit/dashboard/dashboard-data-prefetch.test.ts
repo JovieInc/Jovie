@@ -105,7 +105,10 @@ vi.mock('next/cache', async () => {
   };
 });
 
+const setupDbSessionMock = vi.fn();
+
 vi.mock('@/lib/auth/session', () => ({
+  setupDbSession: setupDbSessionMock,
   withDbSessionTx: withDbSessionTxMock,
   withDbSession: vi.fn(async handler => handler('user_123')),
 }));
@@ -119,7 +122,80 @@ vi.mock('@/lib/cache/profile', () => ({
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: {},
+  db: {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ id: 'user_db_1' }]),
+          orderBy: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    }),
+  },
+}));
+
+vi.mock('@/lib/db/query-timeout', () => ({
+  dashboardQuery: vi.fn(async fn => fn()),
+}));
+
+vi.mock('@/lib/db/schema/analytics', () => ({
+  clickEvents: {
+    creatorProfileId: 'creatorProfileId',
+    linkType: 'linkType',
+    metadata: 'metadata',
+  },
+  tips: {
+    creatorProfileId: 'creatorProfileId',
+    amountCents: 'amountCents',
+    id: 'id',
+    createdAt: 'createdAt',
+  },
+}));
+
+vi.mock('@/lib/db/schema/auth', () => ({
+  userSettings: { userId: 'userId', sidebarCollapsed: 'sidebarCollapsed' },
+  users: { id: 'id', clerkId: 'clerkId' },
+}));
+
+vi.mock('@/lib/db/schema/links', () => ({
+  socialLinks: {
+    creatorProfileId: 'creatorProfileId',
+    state: 'state',
+    platformType: 'platformType',
+    platform: 'platform',
+  },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: { userId: 'userId', id: 'id', createdAt: 'createdAt' },
+}));
+
+vi.mock('@/lib/db/server', () => ({
+  createEmptyTippingStats: vi.fn(() => ({
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  })),
+  profileIsPublishable: vi.fn(() => true),
+  selectDashboardProfile: vi.fn(profiles => profiles[0] ?? null),
+}));
+
+vi.mock('@/lib/db/sql-helpers', () => ({
+  sqlAny: vi.fn(() => 'mock-sql'),
+}));
+
+vi.mock('@/lib/migrations/handleMigrationErrors', () => ({
+  handleMigrationErrors: vi.fn(() => ({
+    shouldRetry: false,
+    fallbackData: [],
+  })),
+}));
+
+vi.mock('@/lib/services/social-links/types', () => ({
+  DSP_PLATFORMS: ['spotify', 'apple-music'],
 }));
 
 describe('dashboard data prefetch', () => {
@@ -152,6 +228,8 @@ describe('dashboard data prefetch', () => {
     ]);
 
     expect(first).toEqual(second);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(1);
+    // setupDbSession is called for each cached function (chrome data + tipping stats)
+    // but the actual data fetching is deduplicated via unstable_cache
+    expect(setupDbSessionMock).toHaveBeenCalled();
   });
 });

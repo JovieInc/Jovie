@@ -16,7 +16,7 @@ import {
 } from 'next/cache';
 import { cache } from 'react';
 import { setupDbSession } from '@/lib/auth/session';
-import { db, sqlAny } from '@/lib/db';
+import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -28,6 +28,7 @@ import {
   selectDashboardProfile,
   type TippingStats,
 } from '@/lib/db/server';
+import { sqlAny } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
