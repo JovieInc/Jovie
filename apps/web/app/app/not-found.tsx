@@ -9,7 +9,7 @@ export default function AppNotFound() {
       <PageContent>
         <EmptyState
           icon={<FileQuestion className='h-10 w-10' />}
-          heading="This page missed its cue"
+          heading='This page missed its cue'
           description="We can't find this one in the lineup. But don't worry, your dashboard is ready for an encore!"
           action={{
             label: 'Back to Dashboard',
@@ -17,7 +17,7 @@ export default function AppNotFound() {
           }}
           secondaryAction={{
             label: 'Need help?',
-            href: 'mailto:support@jovie.fm',
+            href: 'mailto:support@meetjovie.com',
           }}
         />
       </PageContent>
