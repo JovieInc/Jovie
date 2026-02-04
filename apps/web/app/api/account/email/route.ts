@@ -1,7 +1,8 @@
 import { clerkClient } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
-import { db, eq } from '@/lib/db';
+import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { parseJsonBody } from '@/lib/http/parse-json';

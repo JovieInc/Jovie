@@ -1,6 +1,7 @@
 import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, profilePhotos } from '@/lib/db';
+import { db } from '@/lib/db';
+import { profilePhotos } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 import {
   buildCleanupDetails,

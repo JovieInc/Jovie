@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
-import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { logger } from '@/lib/utils/logger';
 import {

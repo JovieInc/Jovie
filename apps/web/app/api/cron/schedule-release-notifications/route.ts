@@ -1,11 +1,9 @@
 import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import {
-  db,
-  discogReleases,
-  fanReleaseNotifications,
-  notificationSubscriptions,
-} from '@/lib/db';
+import { db } from '@/lib/db';
+import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { discogReleases } from '@/lib/db/schema/content';
+import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 

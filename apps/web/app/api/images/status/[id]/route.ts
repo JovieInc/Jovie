@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { and, db, eq, profilePhotos } from '@/lib/db';
+import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { profilePhotos } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';

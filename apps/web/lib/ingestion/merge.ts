@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { type DbOrTransaction, socialLinks } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { socialLinks } from '@/lib/db/schema/links';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';

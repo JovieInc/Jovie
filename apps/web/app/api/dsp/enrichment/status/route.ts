@@ -14,9 +14,10 @@ import { auth } from '@clerk/nextjs/server';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { db, ingestionJobs } from '@/lib/db';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
