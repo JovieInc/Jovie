@@ -2,15 +2,23 @@
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { cn } from '@/lib/utils';
 import { Avatar } from '../../atoms/Avatar/Avatar';
 import { Icon } from '../../atoms/Icon';
-import { FeedbackModal } from '../../dashboard/molecules/FeedbackModal';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
+
+const FeedbackModal = dynamic(
+  () =>
+    import('../../dashboard/molecules/FeedbackModal').then(mod => ({
+      default: mod.FeedbackModal,
+    })),
+  { ssr: false }
+);
 
 interface BuildDropdownItemsParams {
   billingStatus: {
