@@ -46,7 +46,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle dark:border-[#1f2022] bg-white dark:bg-[#101011] p-0.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-white dark:bg-surface-1 p-0.5 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -162,12 +162,12 @@ export const selectContentClasses = [
 export const MENU_ITEM_BASE =
   'relative flex cursor-default select-none items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token dark:text-[#e3e5e9] hover:bg-[#f2f2f2] dark:hover:bg-[#151618] hover:text-primary-token dark:hover:text-white ' +
-  'data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white ' +
+  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-ring-themed focus-visible:ring-offset-0 ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-neutral-500 dark:[&_svg]:text-[#a6abb3] ' +
-  'hover:[&_svg]:text-neutral-600 data-highlighted:[&_svg]:text-neutral-600 dark:hover:[&_svg]:text-[#d0d3d8] dark:data-highlighted:[&_svg]:text-[#d0d3d8]';
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
+  'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
 
 /**
  * Destructive variant for menu items (delete, remove actions)
@@ -183,8 +183,8 @@ export const MENU_ITEM_DESTRUCTIVE =
 export const CHECKBOX_RADIO_ITEM_BASE =
   'relative flex cursor-default select-none items-center rounded-lg py-2 pl-9 pr-3 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token dark:text-[#e3e5e9] hover:bg-[#f2f2f2] dark:hover:bg-[#151618] hover:text-primary-token dark:hover:text-white ' +
-  'data-highlighted:bg-[#f2f2f2] dark:data-highlighted:bg-[#151618] data-highlighted:text-primary-token dark:data-highlighted:text-white ' +
+  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-ring-themed focus-visible:ring-offset-0';
 
@@ -213,7 +213,7 @@ export const MENU_LABEL_BASE =
  * Uses design token for border consistency
  */
 export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-1 h-px bg-[#e5e5e5] dark:bg-surface-3';
+  '-mx-0.5 my-1 h-px bg-border-subtle';
 
 /**
  * Keyboard shortcut indicator styles

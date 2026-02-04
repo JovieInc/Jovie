@@ -489,7 +489,7 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token dark:border-[#1f2022] dark:bg-transparent dark:hover:border-[#2a2b2d] dark:hover:bg-[#151618] dark:hover:text-white',
+                'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-interactive-hover hover:text-primary-token',
                 buttonClassName
               )}
             >
