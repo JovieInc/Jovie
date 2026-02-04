@@ -32,7 +32,10 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # ==============================================================================
 # Configuration
 # ==============================================================================
-REQUIRED_NODE_MAJOR=24
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REQUIRED_NODE_VERSION="$(cat "${REPO_ROOT}/.nvmrc" 2>/dev/null || echo "24")"
+REQUIRED_NODE_MAJOR="${REQUIRED_NODE_VERSION%%.*}"
 REQUIRED_PNPM_VERSION="9.15.4"
 DOPPLER_PROJECT="${DOPPLER_PROJECT:-jovie}"
 DOPPLER_CONFIG="${DOPPLER_CONFIG:-dev}"
@@ -58,40 +61,42 @@ get_os() {
 # ==============================================================================
 
 setup_node() {
-  log_info "Checking Node.js version..."
+  log_info "Checking Node.js version (required: ${REQUIRED_NODE_VERSION})..."
 
   # Check if Node is installed and correct version
   if check_command node; then
-    NODE_VERSION=$(node --version | sed 's/v//' | cut -d. -f1)
-    if [[ "$NODE_VERSION" -eq "$REQUIRED_NODE_MAJOR" ]]; then
-      log_success "Node.js v$(node --version | sed 's/v//') is installed"
+    NODE_VERSION=$(node --version | sed 's/v//')
+    NODE_MAJOR="${NODE_VERSION%%.*}"
+    if [[ "$NODE_VERSION" == "$REQUIRED_NODE_VERSION" || "$NODE_MAJOR" -eq "$REQUIRED_NODE_MAJOR" ]]; then
+      log_success "Node.js v${NODE_VERSION} is installed"
       return 0
     fi
   fi
 
-  log_warn "Node.js ${REQUIRED_NODE_MAJOR}.x required, installing..."
+  log_warn "Node.js ${REQUIRED_NODE_VERSION} required, installing..."
 
   # Try nvm first
   if [[ -f "$HOME/.nvm/nvm.sh" ]]; then
+    # shellcheck source=/dev/null
     source "$HOME/.nvm/nvm.sh"
-    nvm install ${REQUIRED_NODE_MAJOR}
-    nvm use ${REQUIRED_NODE_MAJOR}
-    log_success "Node.js ${REQUIRED_NODE_MAJOR} installed via nvm"
+    nvm install "${REQUIRED_NODE_VERSION}"
+    nvm use "${REQUIRED_NODE_VERSION}"
+    log_success "Node.js ${REQUIRED_NODE_VERSION} installed via nvm"
     return 0
   fi
 
   # Try fnm
   if check_command fnm; then
-    fnm install ${REQUIRED_NODE_MAJOR}
-    fnm use ${REQUIRED_NODE_MAJOR}
-    log_success "Node.js ${REQUIRED_NODE_MAJOR} installed via fnm"
+    fnm install "${REQUIRED_NODE_VERSION}"
+    fnm use "${REQUIRED_NODE_VERSION}"
+    log_success "Node.js ${REQUIRED_NODE_VERSION} installed via fnm"
     return 0
   fi
 
   # Try n
   if check_command n; then
-    n ${REQUIRED_NODE_MAJOR}
-    log_success "Node.js ${REQUIRED_NODE_MAJOR} installed via n"
+    n "${REQUIRED_NODE_VERSION}"
+    log_success "Node.js ${REQUIRED_NODE_VERSION} installed via n"
     return 0
   fi
 
@@ -107,10 +112,11 @@ setup_node() {
   log_info "Installing nvm..."
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
   export NVM_DIR="$HOME/.nvm"
+  # shellcheck source=/dev/null
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  nvm install ${REQUIRED_NODE_MAJOR}
-  nvm use ${REQUIRED_NODE_MAJOR}
-  log_success "Node.js ${REQUIRED_NODE_MAJOR} installed via nvm"
+  nvm install "${REQUIRED_NODE_VERSION}"
+  nvm use "${REQUIRED_NODE_VERSION}"
+  log_success "Node.js ${REQUIRED_NODE_VERSION} installed via nvm"
 }
 
 # ==============================================================================

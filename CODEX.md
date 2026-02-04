@@ -127,6 +127,7 @@ doppler run -- your-command
 ## Troubleshooting
 
 ### Wrong Node version
+
 ```bash
 nvm use 24
 # or
@@ -134,22 +135,26 @@ fnm use 24
 ```
 
 ### Wrong pnpm version
+
 ```bash
 corepack prepare pnpm@9.15.4 --activate
 ```
 
 ### Doppler not configured
+
 ```bash
 doppler login
 doppler setup --project jovie --config dev
 ```
 
 ### Dependencies out of sync
+
 ```bash
 pnpm install
 ```
 
 ### Turbo cache issues
+
 ```bash
 rm -rf .turbo
 pnpm turbo build

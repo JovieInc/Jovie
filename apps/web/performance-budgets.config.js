@@ -12,7 +12,7 @@
  * - Dynamic pages: ~80-150ms (with Redis cache), ~200-500ms (cache miss)
  *
  * Resource size budgets are set to current production values + 10% headroom.
- * Current baseline (2025-02-04):
+ * Current baseline (2026-02-04):
  * - Script: ~437KB (optimized with code splitting)
  * - Stylesheet: ~45KB (Tailwind + custom styles)
  * - Total: ~535KB
