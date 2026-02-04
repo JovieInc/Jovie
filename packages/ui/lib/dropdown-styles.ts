@@ -46,7 +46,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-white dark:bg-surface-1 p-0.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-0 dark:bg-surface-1 p-0.5 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -212,7 +212,7 @@ export const MENU_LABEL_BASE =
  * Menu separator styles
  * Uses design token for border consistency
  */
-export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-border-subtle';
+export const MENU_SEPARATOR_BASE = '-mx-0.5 my-1 h-px bg-surface-2';
 
 /**
  * Keyboard shortcut indicator styles

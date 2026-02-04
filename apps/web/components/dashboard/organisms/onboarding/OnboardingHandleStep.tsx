@@ -175,7 +175,7 @@ export function OnboardingHandleStep({
           <div>
             <div
               className={[
-                'w-full flex items-center gap-2 rounded-[6px] border bg-white dark:bg-surface-1 px-4 py-2.5',
+                'w-full flex items-center gap-2 rounded-[6px] border bg-surface-0 dark:bg-surface-1 px-4 py-2.5',
                 'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-surface-0',
                 stateError || handleValidation.error
                   ? 'border-error'
