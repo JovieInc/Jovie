@@ -115,7 +115,7 @@ export function AuthLayout({
       className={cn(
         // Fixed positioning prevents iOS Safari rubber-band overscroll completely
         // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
-        'fixed inset-0 flex flex-col items-center bg-[#f5f5f5] text-[#1f2023] dark:bg-[#090909] dark:text-[#e3e4e6] overflow-y-auto overflow-x-hidden overscroll-none max-w-[100dvw]',
+        'fixed inset-0 flex flex-col items-center bg-surface-0 text-primary-token overflow-y-auto overflow-x-hidden overscroll-none max-w-[100dvw]',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
@@ -133,7 +133,7 @@ export function AuthLayout({
       {showSkipLink && (
         <Link
           href='#auth-form'
-          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-white dark:focus:bg-[#0f1011] focus:text-[#1f2023] dark:focus:text-[#e3e4e6] focus:border focus:border-[#d7d9de] dark:focus:border-[#2c2e33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]'
+          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-surface-1 focus:text-primary-token focus:border focus:border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0'
         >
           Skip to form
         </Link>

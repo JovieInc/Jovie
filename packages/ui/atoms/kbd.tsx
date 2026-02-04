@@ -22,7 +22,7 @@ const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(
           ? // Tooltip variant: theme-aware for proper contrast
             'border border-black/15 bg-black/10 text-neutral-700 dark:border-white/20 dark:bg-white/15 dark:text-white'
           : // Default variant: for use outside tooltips
-            'border border-[var(--accents-3)] bg-surface-1 text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.08)] dark:bg-[var(--accents-1)] dark:border-[var(--accents-4)]',
+            'border border-subtle bg-surface-1 text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.08)]',
         className
       )}
       {...props}
