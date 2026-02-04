@@ -2,15 +2,21 @@
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
-import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
-import { cn } from '@/lib/utils';
 import { Avatar } from '../../atoms/Avatar/Avatar';
 import { Icon } from '../../atoms/Icon';
-import { FeedbackModal } from '../../dashboard/molecules/FeedbackModal';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
+
+const FeedbackModal = dynamic(
+  () =>
+    import('../../dashboard/molecules/FeedbackModal').then(mod => ({
+      default: mod.FeedbackModal,
+    })),
+  { ssr: false, loading: () => null }
+);
 
 interface BuildDropdownItemsParams {
   billingStatus: {
@@ -273,7 +279,6 @@ export function UserButton({
   settingsHref,
   showUserInfo = false,
 }: UserButtonProps) {
-  const router = useRouter();
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const {
     isLoaded,
@@ -299,7 +304,7 @@ export function UserButton({
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
 
-  // Handle loading state
+  // Handle loading state or no user
   if (!isLoaded || !user) {
     return showUserInfo ? (
       <div className='flex w-full items-center gap-2.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5'>
@@ -310,34 +315,6 @@ export function UserButton({
       </div>
     ) : (
       <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
-    );
-  }
-
-  // Fallback if user failed to load but Clerk is ready
-  if (!user) {
-    return (
-      <Button
-        variant='ghost'
-        size={showUserInfo ? 'sm' : 'icon'}
-        className={cn(
-          'w-full justify-start gap-2.5 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 px-2.5 py-1.5 h-auto',
-          !showUserInfo && 'h-10 w-10 justify-center'
-        )}
-        onClick={() => {
-          router.push('/signin');
-        }}
-      >
-        <Avatar name='User' alt='User avatar' size='xs' />
-        {showUserInfo && (
-          <div className='flex flex-1 items-center justify-between'>
-            <span className='text-xs font-medium'>Sign in</span>
-            <Icon
-              name='ChevronRight'
-              className='h-3.5 w-3.5 text-tertiary-token'
-            />
-          </div>
-        )}
-      </Button>
     );
   }
 

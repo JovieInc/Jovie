@@ -14,7 +14,15 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"],
+      "outputs": [
+        ".next/standalone/**",
+        ".next/static/**",
+        ".next/server/**",
+        ".next/*.json",
+        ".next/BUILD_ID",
+        "!.next/cache/**",
+        "dist/**"
+      ],
       "env": [
         "NODE_ENV",
         "NEXT_PUBLIC_*",
@@ -65,12 +73,12 @@
       "env": ["NODE_ENV", "CI"]
     },
     "test:e2e": {
-      "dependsOn": ["build"],
+      "dependsOn": ["^build"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*"]
     },
     "e2e:smoke": {
-      "dependsOn": ["build"],
+      "dependsOn": ["^build"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
     },

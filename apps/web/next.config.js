@@ -290,7 +290,6 @@ const nextConfig = {
       '@dnd-kit/core',
       '@dnd-kit/sortable',
       '@dnd-kit/utilities',
-      '@dnd-kit/modifiers',
       'framer-motion',
       'zod',
       '@tanstack/react-table',

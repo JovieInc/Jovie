@@ -1,8 +1,8 @@
 /**
  * Background sync operations for onboarding
+ * Note: This is a helper module, not a Server Action file.
+ * It's called internally by server actions, not from the client.
  */
-
-'use server';
 
 import * as Sentry from '@sentry/nextjs';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
@@ -20,11 +20,13 @@ export function runBackgroundSyncOperations(
     syncCanonicalUsernameFromApp(userId, username),
     syncAllClerkMetadata(userId),
   ]).then(results => {
+    const syncContexts = [
+      'onboarding_username_sync',
+      'onboarding_metadata_sync',
+    ];
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const context =
-          index === 0 ? 'onboarding_username_sync' : 'onboarding_metadata_sync';
-        console.error(`[ONBOARDING] ${context} failed:`, result.reason);
+        const context = syncContexts[index];
         Sentry.captureException(result.reason, {
           tags: { context, username },
           level: 'warning',

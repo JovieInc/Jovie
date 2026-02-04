@@ -98,31 +98,19 @@ export async function signInUser(
     );
   }
 
-  // Check if already authenticated (from storageState)
-  // Look for Clerk session cookies which indicate we loaded with a saved session
+  // Clear any existing session cookies to avoid using stale JWTs
+  // Clerk JWTs expire after 60 seconds, so stored sessions are usually invalid
   const cookies = await page.context().cookies();
-  const hasClerkSession = cookies.some(
+  const clerkCookies = cookies.filter(
     cookie =>
-      cookie.name.startsWith('__session') || cookie.name.startsWith('__client')
+      cookie.name.startsWith('__session') ||
+      cookie.name.startsWith('__client') ||
+      cookie.name.startsWith('__clerk')
   );
-
-  if (hasClerkSession) {
-    // Already signed in via storageState, just navigate to dashboard
-    await page.goto(APP_ROUTES.DASHBOARD, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000, // Increased from 30s to 60s for Turbopack compilation
-    });
-
-    // Wait for dashboard to be ready
-    const userButton = page.locator('[data-clerk-element="userButton"]');
-    const userMenu = page.locator('[data-testid="user-menu"]');
-    const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
-
-    await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-      timeout: 30000, // Increased from 15s to 30s for hydration
-    });
-
-    return page;
+  if (clerkCookies.length > 0) {
+    await page
+      .context()
+      .clearCookies({ name: new RegExp('^__(session|client|clerk)') });
   }
 
   // Set up Clerk testing token BEFORE navigation
@@ -178,9 +166,12 @@ export async function signInUser(
     throw error;
   }
 
-  // After sign-in, navigate to the dashboard to verify authentication
+  // After sign-in, navigate to the profile page to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  await page.goto(APP_ROUTES.DASHBOARD, { waitUntil: 'domcontentloaded' });
+  await page.goto(APP_ROUTES.PROFILE, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000, // Turbopack cold compilation can take 60+ seconds
+  });
 
   // Wait for page to stabilize after React 19 transient hooks error
   // There's a known React 19 bug (facebook/react#33580) that causes a transient
@@ -199,7 +190,7 @@ export async function signInUser(
   const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
 
   await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-    timeout: 15000,
+    timeout: 30000, // Increased for hydration after slow compilation
   });
 
   return page;

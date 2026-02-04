@@ -16,7 +16,8 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
 // Use the same HTTP driver as the app for consistency
-const { users, creatorProfiles, socialLinks } = schema;
+const { users, creatorProfiles, socialLinks, discogReleases, providerLinks } =
+  schema;
 
 interface TestProfile {
   username: string;
@@ -44,6 +45,93 @@ const TEST_PROFILES: TestProfile[] = [
       'https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0',
   },
 ];
+
+// Sample release data for E2E tests
+const TEST_RELEASES = [
+  {
+    title: 'Neon Skyline',
+    slug: 'neon-skyline',
+    releaseType: 'single' as const,
+    releaseDate: new Date('2024-01-15'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    spotifyUrl: 'https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv',
+  },
+  {
+    title: 'Midnight Drive',
+    slug: 'midnight-drive',
+    releaseType: 'album' as const,
+    releaseDate: new Date('2023-11-20'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    spotifyUrl: 'https://open.spotify.com/album/6JJh8nj3ZPYoEXZwLhRJ7U',
+  },
+];
+
+/**
+ * Seeds releases and provider links for a creator profile.
+ * Handles partial seed states by creating missing releases and provider links.
+ */
+async function seedReleasesForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  console.log('    Seeding releases for E2E user...');
+
+  // Get existing releases with their slugs to handle partial seed states
+  const existingReleases = await db
+    .select({ id: discogReleases.id, slug: discogReleases.slug })
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, profileId));
+
+  // Build a map of existing releases by slug
+  const existingBySlug = new Map(
+    existingReleases.map(release => [release.slug, release.id])
+  );
+
+  for (const release of TEST_RELEASES) {
+    let releaseId = existingBySlug.get(release.slug);
+
+    // Create release if it doesn't exist
+    if (!releaseId) {
+      const [createdRelease] = await db
+        .insert(discogReleases)
+        .values({
+          creatorProfileId: profileId,
+          title: release.title,
+          slug: release.slug,
+          releaseType: release.releaseType,
+          releaseDate: release.releaseDate,
+          artworkUrl: release.artworkUrl,
+          totalTracks: release.releaseType === 'album' ? 10 : 1,
+          sourceType: 'manual',
+        })
+        .returning({ id: discogReleases.id });
+
+      releaseId = createdRelease.id;
+      console.log(`    ✓ Created release: ${release.title}`);
+    } else {
+      console.log(`    ✓ Release exists: ${release.title}`);
+    }
+
+    // Add Spotify provider link with upsert behavior (onConflictDoNothing)
+    await db
+      .insert(providerLinks)
+      .values({
+        providerId: 'spotify',
+        ownerType: 'release',
+        releaseId,
+        url: release.spotifyUrl,
+        isPrimary: true,
+        sourceType: 'manual',
+      })
+      .onConflictDoNothing();
+
+    console.log(`    ✓ Ensured Spotify link for ${release.title}`);
+  }
+
+  console.log('    ✓ Releases seeding complete');
+}
 
 export async function seedTestData() {
   console.log('🌱 Seeding test data for E2E smoke tests...');
@@ -80,18 +168,21 @@ export async function seedTestData() {
         .limit(1);
 
       if (!existingUser) {
-        // Create the user record
+        // Create the user record with admin privileges for E2E tests
         const [createdUser] = await db
           .insert(users)
           .values({
             clerkId: E2E_CLERK_USER_ID,
             email: E2E_EMAIL,
-            name: 'E2E Test User',
+            name: 'E2E Test',
             userStatus: 'active', // Active user with completed onboarding
+            isAdmin: true, // Grant admin for E2E admin tests
           })
           .returning({ id: users.id });
 
-        console.log(`    ✓ Created E2E user (ID: ${createdUser.id})`);
+        console.log(
+          `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
+        );
 
         // Create a creator profile for the E2E user
         const [createdProfile] = await db
@@ -114,8 +205,29 @@ export async function seedTestData() {
         console.log(
           `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
         );
+
+        // Seed releases for E2E user
+        await seedReleasesForProfile(db, createdProfile.id);
       } else {
-        console.log('    ✓ E2E test user already exists (skipping)');
+        // Ensure existing user has admin privileges
+        await db
+          .update(users)
+          .set({ isAdmin: true, name: 'E2E Test' })
+          .where(eq(users.clerkId, E2E_CLERK_USER_ID));
+        console.log('    ✓ E2E test user exists, ensured admin privileges');
+
+        // Get the existing profile ID to seed releases
+        const [existingProfile] = await db
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(
+            eq(creatorProfiles.usernameNormalized, E2E_USERNAME.toLowerCase())
+          )
+          .limit(1);
+
+        if (existingProfile) {
+          await seedReleasesForProfile(db, existingProfile.id);
+        }
       }
     }
 

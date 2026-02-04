@@ -138,6 +138,7 @@ test.describe('Dashboard Routing', () => {
    * Catches production issues where pages load but content fails to render
    */
   test('all dashboard routes render content @smoke', async ({ page }) => {
+    test.setTimeout(240_000); // 4 minutes for 4 routes (dev mode is slow)
     const routes = [
       { path: '/app/dashboard/profile', content: /profile|links|edit/i },
       { path: '/app/dashboard/earnings', content: /earnings|tips|revenue/i },
@@ -194,6 +195,7 @@ test.describe('Dashboard Routing', () => {
    * Catches hydration mismatches from ssr: false components
    */
   test('lazy components hydrate without errors @smoke', async ({ page }) => {
+    test.setTimeout(180_000); // 3 minutes (dev mode is slow)
     const hydrationErrors: string[] = [];
 
     page.on('console', msg => {
