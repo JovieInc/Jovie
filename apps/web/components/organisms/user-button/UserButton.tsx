@@ -15,7 +15,7 @@ const FeedbackModal = dynamic(
     import('../../dashboard/molecules/FeedbackModal').then(mod => ({
       default: mod.FeedbackModal,
     })),
-  { ssr: false }
+  { ssr: false, loading: () => null }
 );
 
 interface BuildDropdownItemsParams {

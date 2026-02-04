@@ -18,6 +18,8 @@
         ".next/standalone/**",
         ".next/static/**",
         ".next/server/**",
+        ".next/*.json",
+        ".next/BUILD_ID",
         "!.next/cache/**",
         "dist/**"
       ],

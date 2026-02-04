@@ -69,7 +69,8 @@ const TEST_RELEASES = [
 ];
 
 /**
- * Seeds releases and provider links for a creator profile
+ * Seeds releases and provider links for a creator profile.
+ * Handles partial seed states by creating missing releases and provider links.
  */
 async function seedReleasesForProfile(
   db: ReturnType<typeof drizzle>,
@@ -77,47 +78,56 @@ async function seedReleasesForProfile(
 ) {
   console.log('    Seeding releases for E2E user...');
 
-  // Check if releases already exist for this profile
+  // Get existing releases with their slugs to handle partial seed states
   const existingReleases = await db
-    .select({ id: discogReleases.id })
+    .select({ id: discogReleases.id, slug: discogReleases.slug })
     .from(discogReleases)
-    .where(eq(discogReleases.creatorProfileId, profileId))
-    .limit(1);
+    .where(eq(discogReleases.creatorProfileId, profileId));
 
-  if (existingReleases.length > 0) {
-    console.log('    ✓ Releases already exist for E2E user (skipping)');
-    return;
-  }
+  // Build a map of existing releases by slug
+  const existingBySlug = new Map(
+    existingReleases.map(release => [release.slug, release.id])
+  );
 
   for (const release of TEST_RELEASES) {
-    // Create the release
-    const [createdRelease] = await db
-      .insert(discogReleases)
+    let releaseId = existingBySlug.get(release.slug);
+
+    // Create release if it doesn't exist
+    if (!releaseId) {
+      const [createdRelease] = await db
+        .insert(discogReleases)
+        .values({
+          creatorProfileId: profileId,
+          title: release.title,
+          slug: release.slug,
+          releaseType: release.releaseType,
+          releaseDate: release.releaseDate,
+          artworkUrl: release.artworkUrl,
+          totalTracks: release.releaseType === 'album' ? 10 : 1,
+          sourceType: 'manual',
+        })
+        .returning({ id: discogReleases.id });
+
+      releaseId = createdRelease.id;
+      console.log(`    ✓ Created release: ${release.title}`);
+    } else {
+      console.log(`    ✓ Release exists: ${release.title}`);
+    }
+
+    // Add Spotify provider link with upsert behavior (onConflictDoNothing)
+    await db
+      .insert(providerLinks)
       .values({
-        creatorProfileId: profileId,
-        title: release.title,
-        slug: release.slug,
-        releaseType: release.releaseType,
-        releaseDate: release.releaseDate,
-        artworkUrl: release.artworkUrl,
-        totalTracks: release.releaseType === 'album' ? 10 : 1,
+        providerId: 'spotify',
+        ownerType: 'release',
+        releaseId,
+        url: release.spotifyUrl,
+        isPrimary: true,
         sourceType: 'manual',
       })
-      .returning({ id: discogReleases.id });
+      .onConflictDoNothing();
 
-    console.log(`    ✓ Created release: ${release.title}`);
-
-    // Add Spotify provider link
-    await db.insert(providerLinks).values({
-      providerId: 'spotify',
-      ownerType: 'release',
-      releaseId: createdRelease.id,
-      url: release.spotifyUrl,
-      isPrimary: true,
-      sourceType: 'manual',
-    });
-
-    console.log(`    ✓ Added Spotify link for ${release.title}`);
+    console.log(`    ✓ Ensured Spotify link for ${release.title}`);
   }
 
   console.log('    ✓ Releases seeding complete');
