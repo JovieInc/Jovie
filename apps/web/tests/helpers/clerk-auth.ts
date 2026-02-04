@@ -166,10 +166,9 @@ export async function signInUser(
     throw error;
   }
 
-  // After sign-in, navigate to the dashboard profile to verify authentication
+  // After sign-in, navigate to the profile page to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  // Use direct path because APP_ROUTES.PROFILE doesn't include /dashboard prefix
-  await page.goto(`${APP_ROUTES.DASHBOARD}/profile`, {
+  await page.goto(APP_ROUTES.PROFILE, {
     waitUntil: 'domcontentloaded',
     timeout: 90000, // Turbopack cold compilation can take 60+ seconds
   });
