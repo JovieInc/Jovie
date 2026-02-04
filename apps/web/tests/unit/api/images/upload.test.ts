@@ -10,6 +10,7 @@ const {
   mockUpdate,
   mockSelect,
   mockEq,
+  mockGetUserByClerkId,
   sharpMock,
   sharpMetadataMock,
 } = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ const {
   mockUpdate: vi.fn(),
   mockSelect: vi.fn(),
   mockEq: vi.fn(() => 'eq-result'),
+  mockGetUserByClerkId: vi.fn(),
   sharpMock: vi.fn(),
   sharpMetadataMock: vi.fn(),
 }));
@@ -56,59 +58,48 @@ vi.mock('@/lib/auth/session', () => ({
   },
 }));
 
-vi.mock('@/lib/db', () => {
-  // Track call count to return different results for different queries
-  let selectCallCount = 0;
-  const select = mockSelect.mockImplementation(() => {
-    selectCallCount++;
-    return {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockImplementation(() => {
-            // First call: users table (returns user id)
-            // Second call: creatorProfiles table (returns usernameNormalized)
-            if (selectCallCount === 1) {
-              return Promise.resolve([
-                { id: 'internal-user-id', clerkId: 'test-user-id' },
-              ]);
-            }
-            // Second query for creatorProfiles
-            return Promise.resolve([{ usernameNormalized: 'testuser' }]);
-          }),
-        }),
-      }),
-    };
-  });
+vi.mock('drizzle-orm', () => ({
+  eq: mockEq,
+  and: vi.fn(),
+  sql: vi.fn(),
+}));
 
-  // Reset call count before each test
-  const originalMockClear = mockSelect.mockClear.bind(mockSelect);
-  mockSelect.mockClear = () => {
-    selectCallCount = 0;
-    return originalMockClear();
-  };
+vi.mock('@/lib/db/queries/shared', () => ({
+  getUserByClerkId: mockGetUserByClerkId,
+}));
 
-  return {
-    db: {
-      select,
-      insert: mockInsert,
-      update: mockUpdate,
-    },
-    eq: mockEq,
-    profilePhotos: {
-      id: 'id',
-      userId: 'user_id',
-    },
-    users: {
-      id: 'id',
-      clerkId: 'clerk_id',
-    },
-    creatorProfiles: {
-      id: 'id',
-      userId: 'user_id',
-      usernameNormalized: 'username_normalized',
-    },
-  };
-});
+vi.mock('@/lib/db/schema/profiles', () => ({
+  profilePhotos: {
+    id: 'id',
+    userId: 'user_id',
+    status: 'status',
+    blobUrl: 'blobUrl',
+    smallUrl: 'smallUrl',
+    mediumUrl: 'mediumUrl',
+    largeUrl: 'largeUrl',
+    mimeType: 'mimeType',
+    fileSize: 'fileSize',
+    width: 'width',
+    height: 'height',
+    processedAt: 'processedAt',
+    updatedAt: 'updatedAt',
+    originalFilename: 'originalFilename',
+  },
+  creatorProfiles: {
+    id: 'id',
+    userId: 'user_id',
+    usernameNormalized: 'username_normalized',
+  },
+}));
+
+// Keep db mock for dynamic import fallback in route
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: mockSelect,
+    insert: mockInsert,
+    update: mockUpdate,
+  },
+}));
 
 vi.mock('@/lib/cache', () => ({
   invalidateAvatarCache: vi.fn().mockResolvedValue(undefined),
@@ -130,6 +121,23 @@ vi.mock('@/lib/rate-limit', () => ({
 const mockValidateMagicBytes = vi.fn();
 vi.mock('@/lib/images/validate-magic-bytes', () => ({
   validateMagicBytes: (...args: unknown[]) => mockValidateMagicBytes(...args),
+}));
+
+vi.mock('@/lib/images/config', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/images/config')>();
+  return {
+    ...actual,
+    buildSeoFilename: vi.fn(() => 'test-photo.avif'),
+  };
+});
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 vi.mock('@vercel/blob', () => ({
@@ -242,6 +250,12 @@ describe('/api/images/upload', () => {
     // Default: magic bytes validation passes for valid image types
     mockValidateMagicBytes.mockReturnValue(true);
 
+    // Default: getUserByClerkId returns a valid user
+    mockGetUserByClerkId.mockResolvedValue({
+      id: 'internal-user-id',
+      clerkId: 'test-user-id',
+    });
+
     // Setup default mock implementations
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -261,6 +275,17 @@ describe('/api/images/upload', () => {
     mockUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    // Mock select for creatorProfiles query (to get usernameNormalized for cache invalidation)
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ usernameNormalized: 'testuser' }]),
+        }),
       }),
     });
   });
