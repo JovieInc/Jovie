@@ -13,7 +13,6 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useThrottledCallback } from '@/lib/pacer';
 import { queryKeys } from '@/lib/queries/keys';
@@ -138,6 +137,13 @@ interface ErrorDisplayProps {
   readonly onRetry: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
+}
+
+function SubmitIcon({ isActive }: { readonly isActive: boolean }) {
+  if (isActive) {
+    return <Loader2 className='h-4 w-4 animate-spin' />;
+  }
+  return <ArrowUp className='h-4 w-4' />;
 }
 
 function ErrorDisplay({
@@ -584,11 +590,7 @@ export function JovieChat({
                   className='absolute bottom-2 right-2 h-8 w-8 rounded-lg'
                   aria-label='Send message'
                 >
-                  {isLoading || isSubmitting ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <ArrowUp className='h-4 w-4' />
-                  )}
+                  <SubmitIcon isActive={isLoading || isSubmitting} />
                 </Button>
 
                 {/* Character count in chat view */}
@@ -651,11 +653,7 @@ export function JovieChat({
                 className='absolute bottom-3 right-3 h-10 w-10 rounded-lg'
                 aria-label='Send message'
               >
-                {isLoading || isSubmitting ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
-                  <ArrowUp className='h-4 w-4' />
-                )}
+                <SubmitIcon isActive={isLoading || isSubmitting} />
               </Button>
 
               {/* Character count */}
