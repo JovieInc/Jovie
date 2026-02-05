@@ -70,9 +70,10 @@ body {
 }
 
 @theme {
+  /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
-    var(--font-inter), "Inter Variable", -apple-system, BlinkMacSystemFont,
-    "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+    var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui",
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
@@ -395,6 +396,9 @@ body {
 
 @layer base {
   .marketing-mono {
+    /* Linear uses normal letter-spacing */
+    letter-spacing: normal;
+
     /* Light mode - Linear-inspired minimal aesthetic */
     --color-bg-base: #ffffff;
     --color-bg-surface-0: #fafbfc;
@@ -450,21 +454,30 @@ body {
    ============================================ */
 
 @layer components {
-  /* Linear Button */
+  /* Linear Button - Pixel-perfect Linear.app CTA styling (light gray) */
   .btn-linear-primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    height: 2.5rem; /* 40px */
-    padding: 0 1.5rem;
+    gap: 8px; /* Linear's exact gap */
+    height: 32px; /* Linear's exact height */
+    padding: 0 12px; /* Linear's exact padding */
     border-radius: 8px; /* Linear uses 8px */
-    font-size: 15px;
-    font-weight: 500;
-    letter-spacing: -0.011em;
-    background-color: var(--color-btn-primary-bg);
-    color: var(--color-btn-primary-fg);
-    border: 1px solid rgba(255, 255, 255, 0.1); /* subtle white border */
+    font-size: 13px; /* Linear's exact font-size */
+    font-weight: 510; /* Linear's exact weight */
+    line-height: 32px; /* Linear's line-height */
+    letter-spacing: normal; /* Linear uses normal */
+    background-color: rgb(230, 230, 230); /* Linear's exact light gray */
+    color: rgb(8, 9, 10); /* Linear's exact dark text */
+    border: 1px solid rgb(230, 230, 230); /* Linear's border */
+    max-width: 100%; /* Linear's max-width */
+    /* Linear's subtle depth shadow */
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+      rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+      rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+      rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+      rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {

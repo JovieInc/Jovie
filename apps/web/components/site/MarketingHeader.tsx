@@ -38,7 +38,8 @@ export function MarketingHeader({
     wait: PACER_TIMING.SCROLL_THROTTLE_MS,
   });
   const resolvedHideNav = hideNav ?? pathname === '/investors';
-  const hidePricingLink = pathname === '/';
+  // Show pricing link on all pages including homepage (was hidden as pseudo feature flag)
+  const hidePricingLink = false;
 
   return (
     <Header
@@ -48,7 +49,12 @@ export function MarketingHeader({
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
       containerSize='homepage'
-      className='bg-base border-b border-subtle'
+      className='border-b'
+      style={{
+        backgroundColor: 'rgba(11, 11, 11, 0.8)', // Linear's exact header bg
+        borderBottomColor: 'rgba(255, 255, 255, 0.08)', // Linear's border
+        color: 'rgb(247, 248, 248)', // Linear's text color
+      }}
     />
   );
 }
