@@ -127,8 +127,8 @@ export function ComparisonSection() {
             <div className='mt-8 text-center'>
               <h3
                 style={{
-                  fontSize: '18px',
-                  fontWeight: 'var(--linear-font-weight-semibold)',
+                  fontSize: 'var(--linear-h4-size)',
+                  fontWeight: 'var(--linear-h4-weight)',
                   color: 'var(--linear-text-primary)',
                   marginBottom: 'var(--linear-space-1)',
                 }}
@@ -191,8 +191,8 @@ export function ComparisonSection() {
               </div>
               <h3
                 style={{
-                  fontSize: '18px',
-                  fontWeight: 'var(--linear-font-weight-semibold)',
+                  fontSize: 'var(--linear-h4-size)',
+                  fontWeight: 'var(--linear-h4-weight)',
                   color: 'var(--linear-text-primary)',
                   marginBottom: 'var(--linear-space-1)',
                 }}

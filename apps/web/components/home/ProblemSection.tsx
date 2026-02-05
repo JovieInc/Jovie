@@ -64,7 +64,7 @@ export function ProblemSection() {
                 <div>
                   <h3
                     style={{
-                      fontSize: '18px',
+                      fontSize: 'var(--linear-h4-size)',
                       fontWeight: 'var(--linear-font-weight-medium)',
                       color: 'var(--linear-text-primary)',
                       marginBottom: 'var(--linear-space-1)',

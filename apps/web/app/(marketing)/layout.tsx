@@ -24,8 +24,6 @@ export default function MarketingLayout({
           display: 'flex',
           flexDirection: 'column',
           paddingTop: 'var(--linear-header-height)',
-          borderStyle: 'none',
-          borderColor: 'var(--linear-text-primary)',
         }}
       >
         {children}

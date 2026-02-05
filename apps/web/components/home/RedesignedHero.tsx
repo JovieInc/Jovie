@@ -1,86 +1,104 @@
 import { ArrowRight } from 'lucide-react';
-import { LinearButton } from '@/components/atoms/LinearButton';
+import Link from 'next/link';
 
 /**
  * RedesignedHero - Linear.app style hero section
+ * Matches Linear's homepage hero layout exactly
  */
 export function RedesignedHero() {
   return (
     <section
-      className='relative overflow-hidden mx-auto'
+      className='relative overflow-hidden'
       style={{
-        height: 'var(--linear-hero-height)',
-        maxWidth: 'var(--linear-hero-section-max)',
-        padding: '0 var(--linear-container-padding)',
+        minHeight: 'calc(100vh - 56px)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '80px 24px 120px',
       }}
     >
-      <div className='relative z-10'>
+      <div
+        className='relative z-10 mx-auto w-full'
+        style={{ maxWidth: '1200px' }}
+      >
         <div className='text-center'>
-          {/* H1 */}
+          {/* H1 - Large centered headline like Linear */}
           <h1
             className='text-balance mx-auto'
             style={{
-              maxWidth: 'var(--linear-hero-h1-width)',
-              fontSize: 'clamp(40px, 8vw, 64px)',
-              fontWeight: 'var(--linear-font-weight-medium)',
-              lineHeight: 1.06,
-              letterSpacing: 'var(--linear-tracking-headline)',
+              maxWidth: '900px',
+              fontSize: 'clamp(36px, 5.5vw, 56px)',
+              fontWeight: 500,
+              lineHeight: 1.1,
+              letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
             }}
           >
-            The link in bio your music deserves
+            Jovie is a purpose-built link in bio for artists and musicians
           </h1>
 
-          {/* Subheading */}
+          {/* Subheading - matches Linear's lead paragraph */}
           <p
-            className='mx-auto mt-4'
+            className='mx-auto'
             style={{
-              maxWidth: 'var(--linear-hero-lead-width)',
-              fontSize: 'var(--linear-body-lg-size)',
-              fontWeight: 'var(--linear-font-weight-normal)',
-              lineHeight: 'var(--linear-body-lg-leading)',
+              maxWidth: '560px',
+              marginTop: '24px',
+              fontSize: 'var(--linear-h4-size)',
+              fontWeight: 400,
+              lineHeight: 1.6,
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Capture every fan with an AI-powered profile that updates itself.
+            Capture every fan with AI-powered profiles. Turn casual listeners
+            into subscribers, then send them to Spotify, Apple Music, or
+            wherever they stream.
           </p>
 
-          {/* CTAs */}
+          {/* CTAs - Linear style with primary button and secondary link */}
           <div
             className='flex flex-col sm:flex-row items-center justify-center'
             style={{
-              marginTop: 'var(--linear-space-8)',
-              gap: 'var(--linear-space-3)',
+              marginTop: '40px',
+              gap: '16px',
             }}
           >
-            <LinearButton variant='primary' href='/waitlist'>
-              Request early access
-              <ArrowRight className='h-4 w-4 ml-1.5' />
-            </LinearButton>
-            <LinearButton variant='secondary' href='#how-it-works'>
-              See how it works ↓
-            </LinearButton>
-          </div>
+            {/* Primary CTA */}
+            <Link
+              href='/waitlist'
+              className='inline-flex items-center justify-center transition-opacity hover:opacity-90'
+              style={{
+                height: '40px',
+                padding: '0 20px',
+                backgroundColor: 'var(--linear-btn-primary-bg)',
+                color: 'var(--linear-btn-primary-fg)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 500,
+              }}
+            >
+              Get started
+            </Link>
 
-          {/* Supporting text */}
-          <p
-            style={{
-              marginTop: 'var(--linear-space-5)',
-              fontSize: 'var(--linear-caption-size)',
-              fontWeight: 'var(--linear-font-weight-medium)',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            Free to start. Zero setup.
-          </p>
+            {/* Secondary CTA - Link style like Linear's "New: Feature" link */}
+            <Link
+              href='#how-it-works'
+              className='inline-flex items-center transition-opacity hover:opacity-70'
+              style={{
+                fontSize: '14px',
+                fontWeight: 500,
+                color: 'var(--linear-text-secondary)',
+                gap: '6px',
+              }}
+            >
+              <span>See how it works</span>
+              <ArrowRight
+                className='transition-transform group-hover:translate-x-0.5'
+                style={{ width: '14px', height: '14px' }}
+              />
+            </Link>
+          </div>
         </div>
       </div>
-
-      {/* Bottom border */}
-      <div
-        className='absolute bottom-0 left-0 right-0 h-px'
-        style={{ backgroundColor: 'var(--linear-border-subtle)' }}
-      />
     </section>
   );
 }

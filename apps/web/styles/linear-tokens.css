@@ -176,6 +176,11 @@
   --linear-h3-leading: 31.92px;
   --linear-h3-tracking: -0.288px;
 
+  /* H4 Subheading - 18px */
+  --linear-h4-size: 18px;
+  --linear-h4-weight: var(--linear-font-weight-semibold);
+  --linear-h4-leading: 24px;
+
   /* Body large - 17px */
   --linear-body-lg-size: 17px;
   --linear-body-lg-weight: var(--linear-font-weight-normal);
