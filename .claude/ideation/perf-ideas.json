@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-01-24T17:15:00.000Z",
-  "updated_at": "2026-01-25T20:00:00.000Z",
+  "updated_at": "2026-02-05T12:00:00.000Z",
   "scope": "apps/web",
   "linear_issues_checked": 0,
   "ideas": [
@@ -317,9 +317,12 @@
       }
     ],
     "memoization_stats": {
-      "useMemo_useCallback_count": 412,
-      "React_memo_count": 28,
+      "useMemo_count": 227,
+      "useCallback_count": 316,
+      "React_memo_count": 23,
       "files_with_memoization": 115,
+      "inline_onClick_handlers": 109,
+      "inline_style_objects": 56,
       "note": "React Compiler enabled for auto-memoization. Strong memoization adoption throughout codebase."
     },
     "virtualization_stats": {
@@ -360,20 +363,24 @@
       "note": "Excellent Next.js Image adoption (85% of image elements)"
     },
     "large_component_files": [
-      { "file": "UnifiedTable.tsx", "lines": 865 },
-      { "file": "WaitlistSpotifySearch.tsx", "lines": 499 },
+      { "file": "UnifiedTable.tsx", "lines": 897 },
+      { "file": "JovieChat.tsx", "lines": 703 },
+      { "file": "ReleaseFilterDropdown.tsx", "lines": 687 },
+      { "file": "InviteCampaignManager.tsx", "lines": 592 },
+      { "file": "WaitlistSpotifySearch.tsx", "lines": 533 },
+      { "file": "InlineChatArea.tsx", "lines": 516 },
+      { "file": "column-renderers.tsx", "lines": 479 },
       { "file": "DashboardAudienceTable.stories.tsx", "lines": 478 },
-      { "file": "DashboardTipping.tsx", "lines": 456 },
-      { "file": "AvailabilityCell.tsx", "lines": 449 },
-      { "file": "AdminCreatorProfilesWithSidebar.tsx", "lines": 445 },
-      { "file": "AdminCreatorProfilesUnified.tsx", "lines": 445 },
-      { "file": "DashboardAudienceTableUnified.tsx", "lines": 430 },
-      { "file": "ProviderCell.tsx", "lines": 425 },
-      { "file": "JovieChat.tsx", "lines": 421 }
+      { "file": "ReleaseTable.tsx", "lines": 474 },
+      { "file": "DashboardTipping.tsx", "lines": 455 }
     ],
-    "inline_handlers_count": 176,
-    "inline_styles_count": 77,
-    "map_renders_count": 231
+    "inline_handlers_count": 109,
+    "inline_styles_count": 56,
+    "map_renders_count": 231,
+    "useEffect_hooks_count": 149,
+    "dynamic_imports_ssr_false": 18,
+    "sentry_imports_count": 76,
+    "motion_library_usage": 14
   },
   "summary": {
     "total_ideas": 14,
@@ -416,7 +423,26 @@
       "Unused @statsig/web-analytics removed"
     ],
     "areas_for_improvement": [
-      "Continue migrating remaining fetch() calls to React Query mutations (42 remaining)"
-    ]
+      "Continue migrating remaining fetch() calls to React Query mutations (42 remaining)",
+      "Consider splitting large components (6 files over 500 lines)",
+      "Audit 4 files with .map(async) pattern for potential N+1 queries"
+    ],
+    "february_2026_audit": {
+      "components_over_500_lines": 6,
+      "inline_onClick_handlers": 109,
+      "inline_style_objects": 56,
+      "useEffect_hooks_count": 149,
+      "react_memo_components": 23,
+      "useMemo_occurrences": 227,
+      "useCallback_occurrences": 316,
+      "virtualization_usage": 8,
+      "dynamic_imports_ssr_false": 18,
+      "sentry_imports": 76,
+      "motion_imports": 14,
+      "next_image_usage": 34,
+      "tanstack_query_cache_strategies": 15,
+      "promise_all_usage": 49,
+      "map_async_patterns": 4
+    }
   }
 }
