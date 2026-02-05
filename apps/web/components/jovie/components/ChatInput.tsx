@@ -58,8 +58,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const isCompact = variant === 'compact';
 
     return (
-      <form onSubmit={onSubmit} className={cn(!isCompact && 'relative')}>
-        <div className={cn(isCompact && 'relative')}>
+      <form onSubmit={onSubmit}>
+        <div className='relative'>
           <textarea
             ref={ref}
             value={value}
