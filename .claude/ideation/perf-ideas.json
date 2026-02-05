@@ -423,10 +423,18 @@
       "Unused @statsig/web-analytics removed"
     ],
     "areas_for_improvement": [
-      "Continue migrating remaining fetch() calls to React Query mutations (42 remaining)",
-      "Consider splitting large components (6 files over 500 lines)",
-      "Audit 4 files with .map(async) pattern for potential N+1 queries"
+      "Continue migrating remaining fetch() calls to React Query mutations (41 remaining)",
+      "Consider splitting large components (6 files over 500 lines)"
     ],
+    "february_2026_fixes": {
+      "n_plus_one_fixed": [
+        "fit-scoring/service.ts: calculateMissingFitScores (N UPDATEs → 1 batch)",
+        "fit-scoring/service.ts: recalculateAllFitScores (N calculations → batched)"
+      ],
+      "tanstack_query_migrations": [
+        "ProfileEditPreviewCard.tsx: useConfirmProfileEditMutation added"
+      ]
+    },
     "february_2026_audit": {
       "components_over_500_lines": 6,
       "inline_onClick_handlers": 109,
