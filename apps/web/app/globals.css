@@ -454,6 +454,35 @@ body {
    ============================================ */
 
 @layer components {
+  /* Linear Nav Link - exact specs from comparison (same as login button) */
+  .nav-link-linear {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 12px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 510;
+    line-height: 19.5px;
+    color: rgb(138, 143, 152); /* Linear's muted gray */
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    outline-color: transparent;
+    min-width: 0;
+    min-height: 0;
+    transition:
+      color 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      background 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: rgb(247, 248, 248);
+    }
+  }
+
   /* Linear Nav Login Button - exact specs from comparison */
   .btn-linear-login {
     position: relative;

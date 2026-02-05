@@ -2,12 +2,10 @@ import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
-import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
-// Linear nav link styles - exact specs from comparison
-const navLinkClass =
-  'inline-flex items-center justify-start h-8 px-2 -ml-2 text-[16px] font-normal text-[rgb(247,248,248)] hover:text-white transition-colors duration-150 rounded-[6px] focus-ring-themed';
+// Linear header structure: full-width nav with flex layout
+// See globals.css for .nav-link-linear styles
 
 export interface HeaderNavProps {
   readonly sticky?: boolean;
@@ -28,10 +26,12 @@ export function HeaderNav({
   logoVariant = 'word',
   hideNav = false,
   hidePricingLink = false,
-  containerSize = 'lg',
+  containerSize: _containerSize = 'lg',
 }: HeaderNavProps = {}) {
-  // Note: sticky prop reserved for future use
+  // Note: sticky and containerSize props reserved for future use
   void _sticky;
+  void _containerSize;
+
   return (
     <header
       data-testid='header-nav'
@@ -41,83 +41,61 @@ export function HeaderNav({
         borderStyle: 'none none solid',
         borderColor:
           'rgb(247, 248, 248) rgb(247, 248, 248) rgba(255, 255, 255, 0.08)',
-        zIndex: 100, // Linear's exact z-index
-        backdropFilter: 'blur(20px)', // Linear's backdrop blur
-        WebkitBackdropFilter: 'blur(20px)', // Safari support
+        zIndex: 100,
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         minWidth: 0,
         minHeight: 0,
         ...style,
       }}
     >
-      <Container size={containerSize}>
-        <div className='flex h-16 items-center'>
-          {/* Logo - Left side */}
-          <div className='flex items-center'>
-            <LogoLink logoSize={logoSize} variant={logoVariant} />
-          </div>
-
-          {hideNav ? (
-            <div className='flex-1' aria-hidden='true' />
-          ) : (
-            <>
-              {/* Navigation - Center (hidden on mobile) */}
-              <div className='hidden md:flex flex-1 justify-center ml-8'>
-                <nav
-                  className='flex items-center'
-                  aria-label='Primary navigation'
-                  style={{
-                    borderStyle: 'none',
-                    borderColor: 'rgb(247, 248, 248)',
-                  }}
-                >
-                  {hidePricingLink ? null : (
-                    <Link
-                      href='/pricing'
-                      className={navLinkClass}
-                      style={{
-                        borderStyle: 'none',
-                        borderColor: 'rgb(247, 248, 248)',
-                      }}
-                    >
-                      Pricing
-                    </Link>
-                  )}
-                </nav>
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className='md:hidden flex-1 justify-center flex ml-4'>
-                <nav
-                  className='flex items-center'
-                  aria-label='Primary navigation'
-                  style={{
-                    borderStyle: 'none',
-                    borderColor: 'rgb(247, 248, 248)',
-                  }}
-                >
-                  {hidePricingLink ? null : (
-                    <Link
-                      href='/pricing'
-                      className={navLinkClass}
-                      style={{
-                        borderStyle: 'none',
-                        borderColor: 'rgb(247, 248, 248)',
-                      }}
-                    >
-                      Pricing
-                    </Link>
-                  )}
-                </nav>
-              </div>
-            </>
-          )}
-
-          {/* Actions - Right side */}
-          <div className='flex items-center gap-2'>
-            <AuthActions />
-          </div>
+      {/* Linear-style full-width nav with flex layout */}
+      <nav
+        className='flex items-center w-full h-16'
+        aria-label='Primary navigation'
+        style={{
+          display: 'flex',
+          maxWidth: 'none',
+          padding: 0,
+          margin: 0,
+        }}
+      >
+        {/* Logo section - left aligned with padding */}
+        <div
+          className='flex items-center'
+          style={{ paddingLeft: '24px', minWidth: '200px' }}
+        >
+          <LogoLink logoSize={logoSize} variant={logoVariant} />
         </div>
-      </Container>
+
+        {/* Center nav links - flex-1 to take remaining space */}
+        {hideNav ? (
+          <div className='flex-1' aria-hidden='true' />
+        ) : (
+          <div className='flex-1 flex items-center justify-center'>
+            {hidePricingLink ? null : (
+              <Link
+                href='/pricing'
+                className='nav-link-linear focus-ring-themed'
+              >
+                Pricing
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Auth actions - right aligned with padding */}
+        <div
+          className='flex items-center gap-1'
+          style={{
+            paddingRight: '24px',
+            minWidth: '200px',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <AuthActions />
+        </div>
+      </nav>
     </header>
   );
 }
