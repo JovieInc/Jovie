@@ -127,18 +127,34 @@ export function useJovieChat({
     }
   }, [input, chatError]);
 
-  // Save messages to database when streaming completes
+  // Sync activeConversationId when parent prop changes
   useEffect(() => {
-    if (
-      status === 'ready' &&
-      pendingMessagesRef.current &&
-      activeConversationId
-    ) {
+    setActiveConversationId(conversationId ?? null);
+  }, [conversationId]);
+
+  // Save messages to database when streaming completes
+  // Consolidated: first extract assistant message, then persist
+  useEffect(() => {
+    if (status !== 'ready') return;
+
+    // Extract assistant message from completed stream
+    if (messages.length >= 2 && pendingMessagesRef.current) {
+      const lastAssistantMessage = [...messages]
+        .reverse()
+        .find(m => m.role === 'assistant');
+
+      if (lastAssistantMessage) {
+        pendingMessagesRef.current.assistantMessage = getMessageText(
+          lastAssistantMessage.parts
+        );
+      }
+    }
+
+    if (pendingMessagesRef.current && activeConversationId) {
       const { userMessage, assistantMessage } = pendingMessagesRef.current;
 
       // Only save if we have both messages
       if (userMessage && assistantMessage) {
-        // Save both messages to database
         addMessagesMutation.mutate(
           {
             conversationId: activeConversationId,
@@ -149,7 +165,6 @@ export function useJovieChat({
           },
           {
             onSuccess: () => {
-              // Invalidate conversation query to refresh data
               queryClient.invalidateQueries({
                 queryKey: queryKeys.chat.conversation(activeConversationId),
               });
@@ -157,13 +172,12 @@ export function useJovieChat({
                 queryKey: queryKeys.chat.conversations(),
               });
             },
-            onError: () => {
+            onError: err => {
+              console.error('[useJovieChat] Failed to save messages:', err);
               setChatError({
                 type: 'server',
                 message: 'Failed to save messages. Please try again.',
               });
-              pendingMessagesRef.current = null;
-              setIsSubmitting(false);
             },
           }
         );
@@ -171,26 +185,16 @@ export function useJovieChat({
 
       pendingMessagesRef.current = null;
       setIsSubmitting(false);
-    } else if (status === 'ready') {
+    } else {
       setIsSubmitting(false);
     }
-  }, [status, activeConversationId, addMessagesMutation, queryClient]);
-
-  // Track assistant response for persistence
-  useEffect(() => {
-    if (status === 'ready' && messages.length >= 2) {
-      // Find last assistant message (reverse to find from end)
-      const lastAssistantMessage = [...messages]
-        .reverse()
-        .find(m => m.role === 'assistant');
-
-      if (lastAssistantMessage && pendingMessagesRef.current) {
-        pendingMessagesRef.current.assistantMessage = getMessageText(
-          lastAssistantMessage.parts
-        );
-      }
-    }
-  }, [status, messages]);
+  }, [
+    status,
+    activeConversationId,
+    addMessagesMutation,
+    queryClient,
+    messages,
+  ]);
 
   // Core submit logic
   const doSubmit = useCallback(
@@ -228,7 +232,8 @@ export function useJovieChat({
             userMessage: trimmedText,
             assistantMessage: '', // Will be filled when response completes
           };
-        } catch {
+        } catch (err) {
+          console.error('[useJovieChat] Failed to create conversation:', err);
           setChatError({
             type: 'server',
             message: 'Failed to create conversation',

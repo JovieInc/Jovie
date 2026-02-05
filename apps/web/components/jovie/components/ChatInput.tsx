@@ -38,12 +38,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.nativeEvent.isComposing) return;
+        if (
+          e.key === 'Enter' &&
+          !e.shiftKey &&
+          value.trim() &&
+          !isLoading &&
+          !isSubmitting &&
+          !isOverLimit
+        ) {
           e.preventDefault();
           onSubmit();
         }
       },
-      [onSubmit]
+      [onSubmit, value, isLoading, isSubmitting, isOverLimit]
     );
 
     const handleInput = useCallback(
@@ -58,7 +66,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const isCompact = variant === 'compact';
 
     return (
-      <form onSubmit={onSubmit}>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSubmit(e);
+        }}
+      >
         <div className='relative'>
           <textarea
             ref={ref}

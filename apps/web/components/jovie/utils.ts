@@ -1,11 +1,9 @@
-import type { ChatErrorType } from './types';
+import type { ChatErrorType, MessagePart } from './types';
 
 /**
  * Extract text content from message parts
  */
-export function getMessageText(
-  parts: Array<{ type: string; text?: string }>
-): string {
+export function getMessageText(parts: readonly MessagePart[]): string {
   return parts
     .filter(
       (part): part is { type: 'text'; text: string } =>
@@ -16,21 +14,36 @@ export function getMessageText(
 }
 
 /**
- * Determine the error type from an Error object
+ * Determine the error type from an Error object.
+ * Prefers structured properties (status, code, name) before falling back to message matching.
  */
 export function getErrorType(error: Error): ChatErrorType {
-  const msg = error.message.toLowerCase();
-  if (
-    msg.includes('network') ||
-    msg.includes('fetch') ||
-    msg.includes('offline')
-  ) {
+  // Check structured properties first (e.g. { status, code } from API errors)
+  const errorObj = error as unknown as Record<string, unknown>;
+  const status = errorObj.status as number | undefined;
+  const code = errorObj.code as string | undefined;
+
+  if (error.name === 'TypeError' && error.message.includes('fetch')) {
     return 'network';
   }
-  if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
+
+  if (status === 429 || code === 'RATE_LIMITED') {
     return 'rate_limit';
   }
-  if (msg.includes('500') || msg.includes('server')) {
+
+  if (typeof status === 'number' && status >= 500) {
+    return 'server';
+  }
+
+  // Fall back to message pattern matching with word boundaries
+  const msg = error.message.toLowerCase();
+  if (/\b(network|fetch|offline)\b/.test(msg)) {
+    return 'network';
+  }
+  if (/\b(rate|limit|429)\b/.test(msg)) {
+    return 'rate_limit';
+  }
+  if (/\b(500|5\d{2}|server)\b/.test(msg)) {
     return 'server';
   }
   return 'unknown';

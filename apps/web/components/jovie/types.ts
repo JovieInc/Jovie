@@ -40,6 +40,11 @@ export const MAX_MESSAGE_LENGTH = 4000;
 /** Minimum time between message submissions (ms) */
 export const SUBMIT_THROTTLE_MS = 1000;
 
+export interface MessagePart {
+  readonly type: string;
+  readonly text?: string;
+}
+
 export const SUGGESTED_PROMPTS = [
   'What should I focus on this week?',
   'How can I grow my audience?',

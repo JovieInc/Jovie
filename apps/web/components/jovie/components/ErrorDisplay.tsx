@@ -22,7 +22,12 @@ export function ErrorDisplay({
   const ErrorIcon = chatError.type === 'network' ? WifiOff : AlertCircle;
 
   return (
-    <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'>
+    <div
+      role='alert'
+      aria-live='assertive'
+      aria-atomic='true'
+      className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'
+    >
       <ErrorIcon className='mt-0.5 h-5 w-5 shrink-0 text-error' />
       <div className='flex-1 space-y-2'>
         <div>

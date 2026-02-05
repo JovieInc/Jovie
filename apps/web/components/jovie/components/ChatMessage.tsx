@@ -5,12 +5,8 @@ import { User } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 
+import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-
-interface MessagePart {
-  type: string;
-  text?: string;
-}
 
 interface ChatMessageProps {
   readonly id: string;
@@ -18,11 +14,14 @@ interface ChatMessageProps {
   readonly parts: MessagePart[];
 }
 
-export function ChatMessage({ role, parts }: ChatMessageProps) {
+export function ChatMessage({ id, role, parts }: ChatMessageProps) {
   const isUser = role === 'user';
 
   return (
-    <div className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}>
+    <div
+      data-message-id={id}
+      className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}
+    >
       {!isUser && (
         <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
           <BrandLogo size={16} tone='auto' />
