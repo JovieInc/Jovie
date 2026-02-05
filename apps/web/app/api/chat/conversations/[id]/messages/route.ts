@@ -1,9 +1,9 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -25,6 +25,28 @@ const batchMessageSchema = z.object({
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+/**
+ * Auto-generate a title from the first user message if no title exists.
+ * Uses a single guarded UPDATE to eliminate round-trip and prevent race conditions.
+ */
+async function maybeGenerateTitle(
+  conversationId: string,
+  messageContent: string
+): Promise<void> {
+  const autoTitle = messageContent.slice(0, 50).trim();
+  if (!autoTitle) return;
+  const suffix = autoTitle.length >= 50 ? '...' : '';
+  await db
+    .update(chatConversations)
+    .set({ title: autoTitle + suffix })
+    .where(
+      and(
+        eq(chatConversations.id, conversationId),
+        isNull(chatConversations.title)
+      )
+    );
 }
 
 /**
@@ -112,20 +134,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     // Auto-generate title from first user message if no title exists
     const firstUserMessage = messagesToInsert.find(m => m.role === 'user');
     if (firstUserMessage) {
-      const [conv] = await db
-        .select({ title: chatConversations.title })
-        .from(chatConversations)
-        .where(eq(chatConversations.id, conversationId))
-        .limit(1);
-
-      if (!conv?.title) {
-        // Generate title from first ~50 chars of first user message
-        const autoTitle = firstUserMessage.content.slice(0, 50).trim();
-        await db
-          .update(chatConversations)
-          .set({ title: autoTitle + (autoTitle.length >= 50 ? '...' : '') })
-          .where(eq(chatConversations.id, conversationId));
-      }
+      await maybeGenerateTitle(conversationId, firstUserMessage.content);
     }
 
     return NextResponse.json(

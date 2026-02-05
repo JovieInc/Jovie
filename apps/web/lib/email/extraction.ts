@@ -12,8 +12,9 @@ import { logger } from '@/lib/utils/logger';
 /**
  * Common email regex pattern
  * Matches most valid email addresses while avoiding false positives
- * Note: Hyphen placed at end of character class to avoid escaping
+ * Note: Hyphen placed at end of character class (no escape needed)
  */
+// NOSONAR - S5869 false positive: all chars in class are unique, hyphen at end is intentional
 const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 /**
@@ -21,8 +22,9 @@ const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
  * - "email at domain dot com"
  * - "email (at) domain (dot) com"
  * - "email [at] domain [dot] com"
- * Note: Hyphen placed at end of character class to avoid escaping
+ * Note: Hyphen placed at end of character class (no escape needed)
  */
+// NOSONAR - S5869 false positive: all chars in class are unique, hyphen at end is intentional
 const OBFUSCATION_PATTERNS = [
   // "email at domain dot com" variants
   /\b([A-Z0-9._%+-]+)\s*(?:\(at\)|\[at\]|@|at)\s*([A-Z0-9.-]+)\s*(?:\(dot\)|\[dot\]|\.|\s+dot\s+)\s*([A-Z]{2,})\b/gi,
