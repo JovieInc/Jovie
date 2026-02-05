@@ -20,26 +20,65 @@ const benefits = [
 
 export function ProblemSection() {
   return (
-    <section className='section-spacing-linear bg-base border-t border-subtle'>
+    <section
+      className='section-spacing-linear'
+      style={{
+        backgroundColor: 'var(--linear-bg-page)',
+        borderTop: '1px solid var(--linear-border-subtle)',
+      }}
+    >
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto'>
-          <h2 className='marketing-h2-linear text-center mb-12'>
+          <h2
+            className='text-center heading-gap-linear'
+            style={{
+              fontSize: 'var(--linear-h2-size)',
+              fontWeight: 'var(--linear-font-weight-medium)',
+              lineHeight: 'var(--linear-h2-leading)',
+              letterSpacing: 'var(--linear-h2-tracking)',
+              color: 'var(--linear-text-primary)',
+            }}
+          >
             Everything you need.{' '}
-            <span className='text-tertiary-token'>Nothing you don&apos;t.</span>
+            <span style={{ color: 'var(--linear-text-tertiary)' }}>
+              Nothing you don&apos;t.
+            </span>
           </h2>
 
-          <div className='space-y-8'>
+          <div
+            className='flex flex-col'
+            style={{ gap: 'var(--linear-space-10)' }}
+          >
             {benefits.map(benefit => (
-              <div key={benefit.title} className='flex items-start gap-4'>
-                {/* Icon - Linear 24px treatment */}
+              <div
+                key={benefit.title}
+                className='flex items-start'
+                style={{ gap: 'var(--linear-space-4)' }}
+              >
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
-                  <CheckCircle2 className='w-5 h-5 text-success' />
+                  <CheckCircle2
+                    className='w-5 h-5'
+                    style={{ color: 'var(--linear-success)' }}
+                  />
                 </div>
-                <div className='space-y-1'>
-                  <h3 className='text-lg font-medium text-primary-token'>
+                <div>
+                  <h3
+                    style={{
+                      fontSize: 'var(--linear-h4-size)',
+                      fontWeight: 'var(--linear-font-weight-medium)',
+                      color: 'var(--linear-text-primary)',
+                      marginBottom: 'var(--linear-space-1)',
+                    }}
+                  >
                     {benefit.title}
                   </h3>
-                  <p className='marketing-lead-linear text-tertiary-token'>
+                  <p
+                    style={{
+                      fontSize: 'var(--linear-body-lg-size)',
+                      lineHeight: 'var(--linear-body-lg-leading)',
+                      color: 'var(--linear-text-tertiary)',
+                    }}
+                  >
                     {benefit.description}
                   </p>
                 </div>

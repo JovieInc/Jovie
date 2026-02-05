@@ -6,20 +6,20 @@ const steps = [
     icon: Link,
     title: 'Connect Spotify',
     description: 'Sign in with your Spotify for Artists account.',
-    iconColor: 'text-green-500',
+    iconColor: '#22c55e', // green
   },
   {
     icon: Globe,
     title: 'We find every link',
     description:
       'Your whole catalog, discovered across Apple Music, YouTube, Tidal, and more.',
-    iconColor: 'text-blue-500',
+    iconColor: '#3b82f6', // blue
   },
   {
     icon: Sparkles,
     title: 'SmartLinks created instantly',
     description: 'Every song gets a link. New releases added automatically.',
-    iconColor: 'text-amber-500',
+    iconColor: '#f59e0b', // amber
   },
 ];
 
@@ -27,29 +27,74 @@ export function HowItWorksSection() {
   return (
     <section
       id='how-it-works'
-      className='section-spacing-linear bg-base border-t border-subtle'
+      className='section-spacing-linear'
+      style={{
+        backgroundColor: 'var(--linear-bg-page)',
+        borderTop: '1px solid var(--linear-border-subtle)',
+      }}
     >
       <Container size='homepage'>
         <div className='max-w-4xl mx-auto'>
-          <h2 className='marketing-h2-linear text-center mb-12'>
+          <h2
+            className='text-center heading-gap-linear'
+            style={{
+              fontSize: 'var(--linear-h2-size)',
+              fontWeight: 'var(--linear-font-weight-medium)',
+              lineHeight: 'var(--linear-h2-leading)',
+              letterSpacing: 'var(--linear-h2-tracking)',
+              color: 'var(--linear-text-primary)',
+            }}
+          >
             How it works
           </h2>
 
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12'>
+          <div
+            className='grid grid-cols-1 md:grid-cols-3'
+            style={{ gap: 'var(--linear-space-16)' }}
+          >
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
                 <div key={step.title} className='text-center'>
-                  <div className='flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-subtle'>
-                    <Icon className={`w-6 h-6 ${step.iconColor}`} />
+                  <div
+                    className='flex items-center justify-center w-12 h-12 mx-auto rounded-full'
+                    style={{
+                      backgroundColor: 'var(--linear-bg-surface-1)',
+                      marginBottom: 'var(--linear-space-4)',
+                    }}
+                  >
+                    <Icon
+                      className='w-6 h-6'
+                      style={{ color: step.iconColor }}
+                    />
                   </div>
-                  <div className='text-xs font-medium text-tertiary-token mb-2'>
+                  <div
+                    style={{
+                      fontSize: 'var(--linear-label-size)',
+                      fontWeight: 'var(--linear-font-weight-medium)',
+                      color: 'var(--linear-text-tertiary)',
+                      marginBottom: 'var(--linear-space-2)',
+                    }}
+                  >
                     Step {index + 1}
                   </div>
-                  <h3 className='text-lg font-medium text-primary-token mb-2'>
+                  <h3
+                    style={{
+                      fontSize: 'var(--linear-h4-size)',
+                      fontWeight: 'var(--linear-font-weight-medium)',
+                      color: 'var(--linear-text-primary)',
+                      marginBottom: 'var(--linear-space-2)',
+                    }}
+                  >
                     {step.title}
                   </h3>
-                  <p className='text-sm leading-relaxed text-tertiary-token'>
+                  <p
+                    style={{
+                      fontSize: 'var(--linear-body-sm-size)',
+                      lineHeight: 1.6,
+                      color: 'var(--linear-text-tertiary)',
+                    }}
+                  >
                     {step.description}
                   </p>
                 </div>

@@ -87,24 +87,51 @@ export function SeeItInActionCarousel({ creators }: Props) {
   return (
     <section
       ref={sectionRef}
-      className='section-spacing-linear bg-base border-t border-subtle overflow-hidden'
+      className='section-spacing-linear overflow-hidden'
+      style={{
+        backgroundColor: 'var(--linear-bg-page)',
+        borderTop: '1px solid var(--linear-border-subtle)',
+      }}
     >
       <div className='max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8'>
-        <h2 className='marketing-h2-linear text-center mb-12'>
+        <h2
+          className='text-center'
+          style={{
+            fontSize: 'var(--linear-h2-size)',
+            fontWeight: 'var(--linear-font-weight-medium)',
+            lineHeight: 'var(--linear-h2-leading)',
+            letterSpacing: 'var(--linear-h2-tracking)',
+            color: 'var(--linear-text-primary)',
+            marginBottom: 'var(--linear-space-12)',
+          }}
+        >
           See it in action
         </h2>
       </div>
 
       <div className='relative'>
         {/* Fade edges for premium feel */}
-        <div className='absolute left-0 top-0 bottom-0 w-24 bg-linear-to-r from-base to-transparent z-10 pointer-events-none' />
-        <div className='absolute right-0 top-0 bottom-0 w-24 bg-linear-to-l from-base to-transparent z-10 pointer-events-none' />
+        <div
+          className='absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          style={{
+            background:
+              'linear-gradient(to right, var(--linear-bg-page), transparent)',
+          }}
+        />
+        <div
+          className='absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          style={{
+            background:
+              'linear-gradient(to left, var(--linear-bg-page), transparent)',
+          }}
+        />
 
         {/* Scrolling track - driven by page scroll */}
         <div
-          className='flex gap-6 will-change-transform motion-reduce:transform-none'
+          className='flex will-change-transform motion-reduce:transform-none'
           style={{
             width: 'max-content',
+            gap: 'var(--linear-space-6)',
             transform: `translateX(-${scrollOffset}px)`,
             transition: isVisible ? 'transform 0.1s linear' : 'none',
           }}
@@ -122,7 +149,10 @@ export function SeeItInActionCarousel({ creators }: Props) {
                 placeholder='blur'
                 blurDataURL={BLUR_DATA_URL}
                 loading={index < 12 ? 'eager' : 'lazy'}
-                className='rounded-full object-cover border border-subtle transition-colors duration-150 hover:border-default'
+                className='rounded-full object-cover transition-colors duration-150'
+                style={{
+                  border: '1px solid var(--linear-border-subtle)',
+                }}
               />
             </div>
           ))}

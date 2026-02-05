@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react';
 import { getCopyrightText } from '@/constants/app';
 import { cn } from '@/lib/utils';
 
 interface CopyrightProps {
   readonly className?: string;
+  readonly style?: CSSProperties;
   readonly variant?: 'light' | 'dark';
   readonly year?: number;
 }
@@ -16,11 +18,15 @@ const variantStyles = {
 
 export function Copyright({
   className,
+  style,
   variant = 'dark',
   year,
 }: CopyrightProps) {
   return (
-    <p className={cn(baseStyles, variantStyles[variant], className)}>
+    <p
+      className={cn(baseStyles, variantStyles[variant], className)}
+      style={style}
+    >
       {getCopyrightText(year)}
     </p>
   );

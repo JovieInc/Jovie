@@ -1,11 +1,12 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { Logo } from '@/components/atoms/Logo';
 import { cn } from '@/lib/utils';
 
 interface FooterBrandingProps {
   readonly artistHandle?: string;
-  readonly variant?: 'light' | 'dark';
+  readonly variant?: 'light' | 'dark' | 'linear';
   readonly className?: string;
   readonly showCTA?: boolean;
   readonly size?: 'sm' | 'md';
@@ -20,7 +21,6 @@ export function FooterBranding({
   size = 'md',
   mark = 'wordmark',
 }: FooterBrandingProps) {
-  void variant;
   const signUpLink = artistHandle
     ? `/waitlist?utm_source=profile&utm_artist=${artistHandle}`
     : '/waitlist';
@@ -28,6 +28,20 @@ export function FooterBranding({
   const logoHref = artistHandle
     ? `/?utm_source=profile&utm_artist=${artistHandle}`
     : '/';
+
+  // Linear variant: full opacity, no hover bg, cleaner look
+  const isLinear = variant === 'linear';
+  const logoLinkClass = isLinear
+    ? 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-150 ease-out hover:opacity-80'
+    : 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
+
+  const logoClass = isLinear
+    ? 'opacity-100'
+    : 'opacity-50 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100';
+
+  const ctaStyle: CSSProperties | undefined = isLinear
+    ? { color: 'var(--linear-text-tertiary)' }
+    : undefined;
 
   return (
     <div
@@ -37,23 +51,19 @@ export function FooterBranding({
       )}
     >
       {mark === 'icon' ? (
-        <Link
-          href={logoHref}
-          aria-label='Jovie home'
-          className='rounded-md p-1 -m-1 focus-ring-themed opacity-50 transition-all duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-1'
-        >
-          <BrandLogo size={size === 'sm' ? 20 : 28} tone='auto' />
+        <Link href={logoHref} aria-label='Jovie home' className={logoLinkClass}>
+          <BrandLogo
+            size={size === 'sm' ? 20 : 28}
+            tone={isLinear ? 'white' : 'auto'}
+            className={logoClass}
+          />
         </Link>
       ) : (
-        <Link
-          href={logoHref}
-          aria-label='Jovie home'
-          className='rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1'
-        >
+        <Link href={logoHref} aria-label='Jovie home' className={logoLinkClass}>
           <Logo
             size={size === 'sm' ? 'xs' : 'sm'}
             variant='wordAlt'
-            className='opacity-50 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100'
+            className={logoClass}
           />
         </Link>
       )}
@@ -63,11 +73,14 @@ export function FooterBranding({
           href={signUpLink}
           className={cn(
             'text-[10px] leading-snug uppercase font-semibold tracking-[0.04em]',
-            'text-tertiary-token hover:text-secondary-token',
+            !isLinear && 'text-tertiary-token hover:text-secondary-token',
             'transition-all duration-150 ease-out text-center',
-            'opacity-60 group-hover:opacity-100 group-focus-within:opacity-100',
-            'rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-surface-1'
+            !isLinear &&
+              'opacity-60 group-hover:opacity-100 group-focus-within:opacity-100',
+            'rounded-md px-2 py-1 -mx-2 -my-1',
+            !isLinear && 'hover:bg-surface-1'
           )}
+          style={ctaStyle}
         >
           Join the waitlist
         </Link>

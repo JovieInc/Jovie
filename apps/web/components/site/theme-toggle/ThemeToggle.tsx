@@ -25,6 +25,7 @@ export function ThemeToggle({
   appearance = 'icon',
   className = '',
   shortcutKey,
+  variant = 'default',
 }: ThemeToggleProps) {
   const {
     mounted,
@@ -79,6 +80,7 @@ export function ThemeToggle({
         shortcutDescriptionId={shortcutDescriptionId}
         shortcutDescription={shortcutDescription}
         className={className}
+        variant={variant}
         wrapButton={withShortcutTooltip}
       />
     );
@@ -90,13 +92,27 @@ export function ThemeToggle({
     );
   }
 
+  const isLinear = variant === 'linear';
+  const iconButtonClass = isLinear
+    ? `h-8 w-8 p-0 flex items-center justify-center rounded-full transition-colors hover:opacity-80 focus-ring-themed focus-visible:ring-offset-transparent ${className}`
+    : `h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token transition-colors hover:bg-surface-1 focus-ring-themed focus-visible:ring-offset-transparent ${className}`;
+
+  const iconButtonStyle = isLinear
+    ? {
+        backgroundColor: 'var(--linear-bg-button)',
+        border: '1px solid var(--linear-border-subtle)',
+        color: 'var(--linear-text-tertiary)',
+      }
+    : undefined;
+
   const toggleButton = (
     <Button
       variant='ghost'
       size='sm'
       onClick={cycleTheme}
       aria-describedby={shortcutDescription ? shortcutDescriptionId : undefined}
-      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token transition-colors hover:bg-surface-1 focus-ring-themed focus-visible:ring-offset-transparent ${className}`}
+      className={iconButtonClass}
+      style={iconButtonStyle}
       title={`Current: ${theme === 'system' ? 'auto (' + resolvedTheme + ')' : theme}. Click to switch to ${getNextTheme()}${shortcutDisplay ? ' (' + shortcutDisplay + ')' : ''}`}
     >
       <span
