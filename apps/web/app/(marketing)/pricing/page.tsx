@@ -194,11 +194,30 @@ export default function PricingPage() {
             </p>
           </div>
 
-          {/* Three-tier pricing grid */}
-          <div className='max-w-6xl mx-auto'>
-            <div className='grid md:grid-cols-3 gap-6'>
-              {/* Free Tier */}
-              <div className='rounded-xl border border-subtle bg-surface-1 p-8 flex flex-col'>
+          {/* Three-tier pricing grid - Linear style with outer wrapper */}
+          <div
+            className='mx-auto'
+            style={{ maxWidth: '1024px', padding: '0 24px' }}
+          >
+            {/* Outer grid wrapper - Linear style: dark bg, border, rounded */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                backgroundColor: 'rgb(15, 16, 17)',
+                border: '1px solid rgb(32, 33, 34)',
+                borderRadius: '12px',
+                overflow: 'visible',
+              }}
+            >
+              {/* Free Tier - with right separator border */}
+              <section
+                className='flex flex-col'
+                style={{
+                  padding: '24px',
+                  borderRight: '1px solid rgb(32, 33, 34)',
+                }}
+              >
                 <div className='mb-4'>
                   <span
                     className='text-primary-token'
@@ -213,17 +232,30 @@ export default function PricingPage() {
                     Free
                   </span>
                 </div>
-                <p className='text-sm text-secondary-token mb-4'>
+                <p
+                  className='mb-4'
+                  style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                >
                   Everything you need to start.
                 </p>
                 <div className='flex items-baseline mb-6'>
                   <span
-                    className='text-4xl font-semibold text-primary-token'
-                    style={{ fontSynthesisWeight: 'none' }}
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 590,
+                      letterSpacing: '-0.5px',
+                      fontSynthesisWeight: 'none',
+                    }}
                   >
                     $0
                   </span>
-                  <span className='ml-2 text-tertiary-token'>forever</span>
+                  <span
+                    className='ml-2'
+                    style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                  >
+                    forever
+                  </span>
                 </div>
                 <Link
                   href='/waitlist?plan=free'
@@ -244,20 +276,45 @@ export default function PricingPage() {
                 <ul className='space-y-3 grow'>
                   {FREE_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
-                      <Check className='w-4 h-4 text-tertiary-token mt-0.5 shrink-0' />
-                      <span className='text-sm text-secondary-token'>
+                      <Check
+                        className='w-4 h-4 mt-0.5 shrink-0'
+                        style={{ color: 'rgb(138, 143, 152)' }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: 'rgb(138, 143, 152)',
+                        }}
+                      >
                         {feature}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
 
-              {/* Pro Tier - Most Popular */}
-              <div className='rounded-xl border-2 border-strong bg-surface-2 p-8 flex flex-col relative'>
+              {/* Pro Tier - Featured card with own styling */}
+              <section
+                className='flex flex-col relative'
+                style={{
+                  padding: '39px 24px 24px',
+                  backgroundColor: 'rgb(20, 21, 22)',
+                  border: '1px solid rgb(32, 33, 34)',
+                  borderRadius: '12px',
+                  boxShadow: 'rgba(0, 0, 0, 0.2) 0px 4px 24px 0px',
+                  margin: '-1px',
+                }}
+              >
                 {/* Most Popular badge */}
                 <div className='absolute -top-3 left-1/2 -translate-x-1/2'>
-                  <span className='inline-flex items-center gap-1 px-3 py-1 rounded-full bg-btn-primary text-btn-primary-foreground text-xs font-semibold'>
+                  <span
+                    className='inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs'
+                    style={{
+                      backgroundColor: 'rgb(99, 102, 241)',
+                      color: 'white',
+                      fontWeight: 600,
+                    }}
+                  >
                     <Zap className='w-3 h-3' />
                     Most Popular
                   </span>
@@ -276,24 +333,40 @@ export default function PricingPage() {
                     Pro
                   </span>
                 </div>
-                <p className='text-sm text-secondary-token mb-4'>
+                <p
+                  className='mb-4'
+                  style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                >
                   Your identity. Your data.
                 </p>
                 <div className='flex items-baseline mb-2'>
                   <span
-                    className='text-4xl font-semibold text-primary-token'
-                    style={{ fontSynthesisWeight: 'none' }}
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 590,
+                      letterSpacing: '-0.5px',
+                      fontSynthesisWeight: 'none',
+                    }}
                   >
                     $39
                   </span>
-                  <span className='ml-2 text-tertiary-token'>/month</span>
+                  <span
+                    className='ml-2'
+                    style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                  >
+                    /month
+                  </span>
                 </div>
-                <p className='text-xs text-success mb-6'>
+                <p
+                  className='mb-6'
+                  style={{ fontSize: '12px', color: 'rgb(34, 197, 94)' }}
+                >
                   or $348/year (save 2 months)
                 </p>
                 <Link
                   href='/waitlist?plan=pro'
-                  className='block w-full bg-btn-primary text-btn-primary-foreground text-center hover:opacity-90 transition-opacity mb-6'
+                  className='block w-full text-center hover:opacity-90 transition-opacity mb-6'
                   style={{
                     fontSize: '15px',
                     fontWeight: 510,
@@ -301,6 +374,8 @@ export default function PricingPage() {
                     lineHeight: '40px',
                     padding: '0 16px',
                     borderRadius: '10px',
+                    backgroundColor: 'rgb(99, 102, 241)',
+                    color: 'white',
                     fontSynthesisWeight: 'none',
                   }}
                 >
@@ -309,17 +384,31 @@ export default function PricingPage() {
                 <ul className='space-y-3 grow'>
                   {PRO_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
-                      <Check className='w-4 h-4 text-primary-token mt-0.5 shrink-0' />
-                      <span className='text-sm text-secondary-token'>
+                      <Check
+                        className='w-4 h-4 mt-0.5 shrink-0'
+                        style={{ color: 'rgb(247, 248, 248)' }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: 'rgb(138, 143, 152)',
+                        }}
+                      >
                         {feature}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
 
-              {/* Growth Tier */}
-              <div className='rounded-xl border border-subtle bg-surface-1 p-8 flex flex-col'>
+              {/* Growth Tier - with left separator border */}
+              <section
+                className='flex flex-col'
+                style={{
+                  padding: '24px',
+                  borderLeft: '1px solid rgb(32, 33, 34)',
+                }}
+              >
                 <div className='mb-4 flex items-center gap-2'>
                   <span
                     className='text-primary-token'
@@ -333,23 +422,49 @@ export default function PricingPage() {
                   >
                     Growth
                   </span>
-                  <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'>
+                  <span
+                    className='px-2 py-0.5 rounded-full'
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 500,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      backgroundColor: 'rgba(251, 191, 36, 0.15)',
+                      color: 'rgb(251, 191, 36)',
+                    }}
+                  >
                     Coming Soon
                   </span>
                 </div>
-                <p className='text-sm text-secondary-token mb-4'>
+                <p
+                  className='mb-4'
+                  style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                >
                   Automate. Retarget. Scale.
                 </p>
                 <div className='flex items-baseline mb-2'>
                   <span
-                    className='text-4xl font-semibold text-primary-token'
-                    style={{ fontSynthesisWeight: 'none' }}
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 590,
+                      letterSpacing: '-0.5px',
+                      fontSynthesisWeight: 'none',
+                    }}
                   >
                     $99
                   </span>
-                  <span className='ml-2 text-tertiary-token'>/month</span>
+                  <span
+                    className='ml-2'
+                    style={{ fontSize: '14px', color: 'rgb(138, 143, 152)' }}
+                  >
+                    /month
+                  </span>
                 </div>
-                <p className='text-xs text-success mb-6'>
+                <p
+                  className='mb-6'
+                  style={{ fontSize: '12px', color: 'rgb(34, 197, 94)' }}
+                >
                   or $948/year (save 2 months)
                 </p>
                 <Link
@@ -371,14 +486,22 @@ export default function PricingPage() {
                 <ul className='space-y-3 grow'>
                   {GROWTH_FEATURES.map(feature => (
                     <li key={feature} className='flex items-start gap-3'>
-                      <Check className='w-4 h-4 text-tertiary-token mt-0.5 shrink-0' />
-                      <span className='text-sm text-secondary-token'>
+                      <Check
+                        className='w-4 h-4 mt-0.5 shrink-0'
+                        style={{ color: 'rgb(138, 143, 152)' }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: 'rgb(138, 143, 152)',
+                        }}
+                      >
                         {feature}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </section>
             </div>
 
             {/* Trust indicators */}
