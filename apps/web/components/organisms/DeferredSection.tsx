@@ -65,11 +65,14 @@ export function DeferredSection({
         <div // NOSONAR S6819
           aria-hidden='true'
           role='presentation'
-          className={cn(
-            'w-full rounded-2xl bg-surface-0/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]',
-            placeholderClassName
-          )}
-          style={{ minHeight: placeholderHeight, minWidth: placeholderWidth }}
+          className={cn('w-full', placeholderClassName)}
+          style={{
+            minHeight: placeholderHeight,
+            minWidth: placeholderWidth,
+            backgroundColor: 'var(--linear-bg-surface-0)',
+            opacity: 0.4,
+            borderRadius: 'var(--linear-radius-lg)',
+          }}
         />
       )}
     </div>

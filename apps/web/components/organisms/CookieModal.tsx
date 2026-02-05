@@ -1,7 +1,8 @@
 'use client';
 
-import { Button, Switch } from '@jovie/ui';
+import { Switch } from '@jovie/ui';
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import {
   Dialog,
@@ -35,6 +36,27 @@ const COOKIE_CATEGORIES = [
   },
 ] as const;
 
+const secondaryButtonStyle: CSSProperties = {
+  backgroundColor: 'var(--linear-bg-button)',
+  color: 'var(--linear-text-primary)',
+  border: '1px solid var(--linear-border-default)',
+  borderRadius: 'var(--linear-radius-sm)',
+  fontSize: '12px',
+  fontWeight: 'var(--linear-font-weight-medium)',
+  padding: '6px 12px',
+  height: '28px',
+};
+
+const primaryButtonStyle: CSSProperties = {
+  backgroundColor: 'var(--linear-btn-primary-bg)',
+  color: 'var(--linear-btn-primary-fg)',
+  borderRadius: 'var(--linear-radius-sm)',
+  fontSize: '12px',
+  fontWeight: 'var(--linear-font-weight-medium)',
+  padding: '6px 12px',
+  height: '28px',
+};
+
 interface CookieModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
@@ -66,11 +88,17 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       size='sm'
       className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] sm:mx-auto sm:w-full'
     >
-      <DialogTitle className='text-lg font-semibold text-primary-token'>
+      <DialogTitle
+        style={{
+          fontSize: '14px',
+          fontWeight: 'var(--linear-font-weight-semibold)',
+          color: 'var(--linear-text-primary)',
+        }}
+      >
         Cookie preferences
       </DialogTitle>
 
-      <DialogBody className='mt-4 space-y-0'>
+      <DialogBody style={{ marginTop: '12px' }}>
         {COOKIE_CATEGORIES.map(category => {
           const titleId = `cookie-${category.id}-title`;
           const descId = `cookie-${category.id}-desc`;
@@ -78,18 +106,34 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           return (
             <div
               key={category.id}
-              className='flex items-start justify-between gap-4 border-b border-subtle py-4 last:border-0'
+              className='flex items-start justify-between last:border-0'
+              style={{
+                gap: '12px',
+                borderBottom: '1px solid var(--linear-border-subtle)',
+                padding: '12px 0',
+              }}
             >
-              <div className='min-w-0 flex-1 space-y-1'>
+              <div
+                className='min-w-0 flex-1'
+                style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+              >
                 <span
                   id={titleId}
-                  className='text-sm font-medium text-primary-token'
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'var(--linear-font-weight-medium)',
+                    color: 'var(--linear-text-primary)',
+                  }}
                 >
                   {category.label}
                 </span>
                 <p
                   id={descId}
-                  className='text-sm leading-relaxed text-secondary-token'
+                  style={{
+                    fontSize: '12px',
+                    lineHeight: 1.5,
+                    color: 'var(--linear-text-secondary)',
+                  }}
                 >
                   {category.description}
                 </p>
@@ -107,24 +151,42 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           );
         })}
 
-        <p className='pt-4 text-center text-xs text-tertiary-token'>
+        <p
+          className='text-center'
+          style={{
+            paddingTop: '12px',
+            fontSize: '11px',
+            color: 'var(--linear-text-tertiary)',
+          }}
+        >
           For more details, see our{' '}
           <Link
             href='/legal/cookies'
-            className='underline hover:text-primary-token'
+            className='underline hover:opacity-80'
+            style={{ color: 'var(--linear-text-secondary)' }}
           >
             Cookie Policy
           </Link>
         </p>
       </DialogBody>
 
-      <DialogActions className='mt-6'>
-        <Button variant='outline' onClick={onClose}>
+      <DialogActions style={{ marginTop: '16px' }}>
+        <button
+          type='button'
+          onClick={onClose}
+          className='transition-opacity hover:opacity-80'
+          style={secondaryButtonStyle}
+        >
           Cancel
-        </Button>
-        <Button variant='primary' onClick={save}>
+        </button>
+        <button
+          type='button'
+          onClick={save}
+          className='transition-opacity hover:opacity-90'
+          style={primaryButtonStyle}
+        >
           Save preferences
-        </Button>
+        </button>
       </DialogActions>
     </Dialog>
   );

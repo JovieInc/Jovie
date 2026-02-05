@@ -41,11 +41,10 @@ export function HeaderNav({
       style={{
         fontSynthesisWeight: 'none',
         borderStyle: 'none none solid',
-        borderColor:
-          'rgb(247, 248, 248) rgb(247, 248, 248) rgba(255, 255, 255, 0.08)',
+        borderColor: `var(--linear-text-primary) var(--linear-text-primary) var(--linear-border-subtle)`,
         zIndex: 100,
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+        backdropFilter: `blur(var(--linear-blur-header))`,
+        WebkitBackdropFilter: `blur(var(--linear-blur-header))`,
         minWidth: 0,
         minHeight: 0,
         ...style,
@@ -58,8 +57,8 @@ export function HeaderNav({
         style={{
           display: 'flex',
           width: '100%',
-          maxWidth: '1032px',
-          padding: '0 24px',
+          maxWidth: 'var(--linear-container-max)',
+          padding: `0 var(--linear-container-padding)`,
           margin: '0 auto',
         }}
       >

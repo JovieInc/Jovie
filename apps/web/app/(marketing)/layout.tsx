@@ -11,8 +11,8 @@ export default function MarketingLayout({
     <div
       className='marketing-mono flex min-h-screen flex-col overflow-x-hidden'
       style={{
-        backgroundColor: 'rgb(8, 9, 10)', // Linear's dark background
-        color: 'rgb(247, 248, 248)', // Linear's light text
+        backgroundColor: 'var(--linear-bg-footer)',
+        color: 'var(--linear-text-primary)',
       }}
     >
       <SkipToContent />
@@ -23,9 +23,9 @@ export default function MarketingLayout({
         style={{
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: '64px', // Linear has 64px padding-top on main
+          paddingTop: 'var(--linear-header-height)',
           borderStyle: 'none',
-          borderColor: 'rgb(247, 248, 248)',
+          borderColor: 'var(--linear-text-primary)',
         }}
       >
         {children}

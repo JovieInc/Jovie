@@ -51,9 +51,9 @@ export function MarketingHeader({
       containerSize='homepage'
       className='border-b'
       style={{
-        backgroundColor: 'rgba(11, 11, 11, 0.8)', // Linear's exact header bg
-        borderBottomColor: 'rgba(255, 255, 255, 0.08)', // Linear's border
-        color: 'rgb(247, 248, 248)', // Linear's text color
+        backgroundColor: 'var(--linear-bg-header)',
+        borderBottomColor: 'var(--linear-border-subtle)',
+        color: 'var(--linear-text-primary)',
       }}
     />
   );
