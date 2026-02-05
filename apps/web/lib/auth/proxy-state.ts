@@ -146,6 +146,66 @@ function cacheUserState(
   });
 }
 
+/** Default state for unauthenticated or unknown users */
+const DEFAULT_WAITLIST_STATE: ProxyUserState = {
+  needsWaitlist: true,
+  needsOnboarding: false,
+  isActive: false,
+};
+
+/**
+ * Execute the database query with timeout protection
+ */
+async function executeUserStateQuery(clerkUserId: string) {
+  const queryPromise = db
+    .select({
+      dbUserId: users.id,
+      userStatus: users.userStatus,
+      profileId: creatorProfiles.id,
+      profileComplete: creatorProfiles.onboardingCompletedAt,
+    })
+    .from(users)
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
+    .where(
+      and(
+        eq(users.clerkId, clerkUserId),
+        isNull(users.deletedAt),
+        ne(users.userStatus, 'banned')
+      )
+    )
+    .limit(1);
+
+  // Race the query against a timeout to prevent proxy hanging
+  return Promise.race([
+    queryPromise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('[proxy-state] DB query timeout after 5s')),
+        DB_QUERY_TIMEOUT_MS
+      )
+    ),
+  ]);
+}
+
+/**
+ * Log database query performance to Sentry
+ */
+function logDbQueryPerformance(durationMs: number, userFound: boolean): void {
+  const isSlow = durationMs > 1000;
+  Sentry.addBreadcrumb({
+    category: 'proxy-state',
+    message: 'DB query completed',
+    level: isSlow ? 'warning' : 'info',
+    data: { durationMs, userFound, slow: isSlow },
+  });
+}
+
 /**
  * Lightweight user state check for proxy.ts
  *
@@ -166,7 +226,7 @@ export async function getUserState(
     captureWarning(
       '[proxy-state] getUserState called with missing clerkUserId'
     );
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return DEFAULT_WAITLIST_STATE;
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
@@ -178,57 +238,11 @@ export async function getUserState(
   }
 
   try {
-    // Single query with join - optimized for proxy performance
-    // Filter out deleted and banned users to prevent misrouting
     const dbQueryStart = Date.now();
-    const queryPromise = db
-      .select({
-        dbUserId: users.id,
-        userStatus: users.userStatus,
-        profileId: creatorProfiles.id,
-        profileComplete: creatorProfiles.onboardingCompletedAt,
-      })
-      .from(users)
-      .leftJoin(
-        creatorProfiles,
-        and(
-          eq(creatorProfiles.userId, users.id),
-          eq(creatorProfiles.isClaimed, true)
-        )
-      )
-      .where(
-        and(
-          eq(users.clerkId, clerkUserId),
-          isNull(users.deletedAt),
-          ne(users.userStatus, 'banned')
-        )
-      )
-      .limit(1);
-
-    // Race the query against a timeout to prevent proxy hanging
-    const [result] = await Promise.race([
-      queryPromise,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('[proxy-state] DB query timeout after 5s')),
-          DB_QUERY_TIMEOUT_MS
-        )
-      ),
-    ]);
-
+    const [result] = await executeUserStateQuery(clerkUserId);
     const dbQueryDuration = Date.now() - dbQueryStart;
 
-    // Track DB query performance (only on cache miss path)
-    Sentry.addBreadcrumb({
-      category: 'proxy-state',
-      message: 'DB query completed',
-      level: dbQueryDuration > 1000 ? 'warning' : 'info',
-      data: {
-        durationMs: dbQueryDuration,
-        userFound: !!result?.dbUserId,
-        slow: dbQueryDuration > 1000,
-      },
-    });
+    logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
     const userState = determineUserState(result);
 
@@ -243,8 +257,7 @@ export async function getUserState(
       operation: 'getProxyUserState',
     });
 
-    // Safe fallback: treat as needing waitlist
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return DEFAULT_WAITLIST_STATE;
   }
 }
 
