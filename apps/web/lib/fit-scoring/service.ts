@@ -8,6 +8,7 @@
 import {
   and,
   desc,
+  inArray,
   sql as drizzleSql,
   eq,
   isNotNull,
@@ -201,40 +202,56 @@ export async function calculateMissingFitScores(
     return 0;
   }
 
-  const results = await Promise.all(
-    profiles.map(async profile => {
-      const input: FitScoreInput = {
-        ingestionSourcePlatform: profile.ingestionSourcePlatform,
-        hasPaidTier: false,
-        socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
-        hasSpotifyId: !!profile.spotifyId,
-        spotifyPopularity: profile.spotifyPopularity,
-        genres: profile.genres,
-        latestReleaseDate: profile.latestReleaseDate ?? null,
-      };
+  // Calculate all scores in memory first (no DB calls)
+  type ProfileForScoring = (typeof profiles)[number];
+  const updates = profiles.map((profile: ProfileForScoring) => {
+    const input: FitScoreInput = {
+      ingestionSourcePlatform: profile.ingestionSourcePlatform,
+      hasPaidTier: false,
+      socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
+      hasSpotifyId: !!profile.spotifyId,
+      spotifyPopularity: profile.spotifyPopularity,
+      genres: profile.genres,
+      latestReleaseDate: profile.latestReleaseDate ?? null,
+    };
 
-      const { score, breakdown } = calculateFitScore(input);
+    const { score, breakdown } = calculateFitScore(input);
+    return { id: profile.id, score, breakdown };
+  });
 
-      await db
-        .update(creatorProfiles)
-        .set({
-          fitScore: score,
-          fitScoreBreakdown: breakdown,
-          fitScoreUpdatedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profile.id));
+  // Batch update all profiles in a single query using CASE expressions
+  if (updates.length > 0) {
+    const now = new Date();
+    const ids = updates.map((u: (typeof updates)[number]) => u.id);
 
-      return true;
-    })
-  );
+    // Build CASE expressions for score and breakdown
+    const scoreCase = drizzleSql.raw(
+      `CASE ${updates.map((u: (typeof updates)[number]) => `WHEN id = '${u.id}' THEN ${u.score}`).join(' ')} END`
+    );
+    const breakdownCase = drizzleSql.raw(
+      `CASE ${updates.map((u: (typeof updates)[number]) => `WHEN id = '${u.id}' THEN '${JSON.stringify(u.breakdown).replaceAll("'", "''")}'::jsonb`).join(' ')} END`
+    );
 
-  return results.filter(Boolean).length;
+    await db
+      .update(creatorProfiles)
+      .set({
+        fitScore: scoreCase,
+        fitScoreBreakdown: breakdownCase,
+        fitScoreUpdatedAt: now,
+        updatedAt: now,
+      })
+      .where(inArray(creatorProfiles.id, ids));
+  }
+
+  return updates.length;
 }
 
 /**
  * Recalculate fit scores for all unclaimed profiles.
  * Use this after updating scoring criteria.
+ *
+ * Optimized to batch DB operations: fetches all data with JOINs
+ * and updates in batches using CASE expressions.
  *
  * @param db - Database client
  * @param batchSize - Number of profiles to process per batch
@@ -248,10 +265,42 @@ export async function recalculateAllFitScores(
   let offset = 0;
 
   while (true) {
+    // Fetch profiles with all data needed for scoring in a single query
     const profiles = await db
-      .select({ id: creatorProfiles.id })
+      .select({
+        id: creatorProfiles.id,
+        spotifyId: creatorProfiles.spotifyId,
+        spotifyPopularity: creatorProfiles.spotifyPopularity,
+        genres: creatorProfiles.genres,
+        ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+        socialLinkPlatforms: drizzleSql<string[]>`
+          coalesce(
+            array_agg(distinct ${socialLinks.platform})
+              filter (where ${socialLinks.platform} is not null),
+            '{}'
+          )
+        `,
+        latestReleaseDate: drizzleSql<Date | null>`
+          max(${discogReleases.releaseDate})
+        `,
+      })
       .from(creatorProfiles)
+      .leftJoin(
+        socialLinks,
+        and(
+          eq(socialLinks.creatorProfileId, creatorProfiles.id),
+          eq(socialLinks.state, 'active')
+        )
+      )
+      .leftJoin(
+        discogReleases,
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfiles.id),
+          isNotNull(discogReleases.releaseDate)
+        )
+      )
       .where(eq(creatorProfiles.isClaimed, false))
+      .groupBy(creatorProfiles.id)
       .limit(batchSize)
       .offset(offset);
 
@@ -259,11 +308,46 @@ export async function recalculateAllFitScores(
       break;
     }
 
-    for (const profile of profiles) {
-      const result = await calculateAndStoreFitScore(db, profile.id);
-      if (result) {
-        totalScored++;
-      }
+    // Calculate all scores in memory
+    type BatchProfileForScoring = (typeof profiles)[number];
+    const updates = profiles.map((profile: BatchProfileForScoring) => {
+      const input: FitScoreInput = {
+        ingestionSourcePlatform: profile.ingestionSourcePlatform,
+        hasPaidTier: false,
+        socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
+        hasSpotifyId: !!profile.spotifyId,
+        spotifyPopularity: profile.spotifyPopularity,
+        genres: profile.genres,
+        latestReleaseDate: profile.latestReleaseDate ?? null,
+      };
+
+      const { score, breakdown } = calculateFitScore(input);
+      return { id: profile.id, score, breakdown };
+    });
+
+    // Batch update all profiles in a single query
+    if (updates.length > 0) {
+      const now = new Date();
+      const ids = updates.map((u: (typeof updates)[number]) => u.id);
+
+      const scoreCase = drizzleSql.raw(
+        `CASE ${updates.map((u: (typeof updates)[number]) => `WHEN id = '${u.id}' THEN ${u.score}`).join(' ')} END`
+      );
+      const breakdownCase = drizzleSql.raw(
+        `CASE ${updates.map((u: (typeof updates)[number]) => `WHEN id = '${u.id}' THEN '${JSON.stringify(u.breakdown).replaceAll("'", "''")}'::jsonb`).join(' ')} END`
+      );
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          fitScore: scoreCase,
+          fitScoreBreakdown: breakdownCase,
+          fitScoreUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(inArray(creatorProfiles.id, ids));
+
+      totalScored += updates.length;
     }
 
     offset += batchSize;
