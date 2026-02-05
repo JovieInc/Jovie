@@ -32,7 +32,7 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
     'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
-  if (isChecked) return cn(baseClasses, 'bg-[#ebebf6] dark:bg-[#1b1d38]');
+  if (isChecked) return cn(baseClasses, 'bg-accent-subtle');
   if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
   return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
 };

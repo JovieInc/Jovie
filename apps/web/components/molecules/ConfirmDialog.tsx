@@ -1,0 +1,115 @@
+'use client';
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@jovie/ui';
+import { useState } from 'react';
+
+export interface ConfirmDialogProps {
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly title: string;
+  readonly description: string;
+  readonly confirmLabel?: string;
+  readonly cancelLabel?: string;
+  readonly variant?: 'default' | 'destructive';
+  readonly onConfirm: () => void | Promise<void>;
+  readonly isLoading?: boolean;
+}
+
+/**
+ * A reusable confirmation dialog component that replaces native browser confirm().
+ * Provides consistent styling, accessibility, and keyboard handling.
+ */
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  variant = 'default',
+  onConfirm,
+  isLoading = false,
+}: ConfirmDialogProps) {
+  const [isPending, setIsPending] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsPending(true);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const loading = isLoading || isPending;
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={loading}>
+            {cancelLabel}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirm}
+            disabled={loading}
+            variant={variant === 'destructive' ? 'destructive' : 'primary'}
+          >
+            {loading ? 'Please wait...' : confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/**
+ * Hook for managing confirm dialog state.
+ * Returns state and handlers for opening/closing the dialog.
+ */
+export function useConfirmDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    (() => void | Promise<void>) | null
+  >(null);
+
+  const confirm = (action: () => void | Promise<void>) => {
+    setPendingAction(() => action);
+    setIsOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    if (pendingAction) {
+      await pendingAction();
+      setPendingAction(null);
+    }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setPendingAction(null);
+    }
+  };
+
+  return {
+    isOpen,
+    confirm,
+    onConfirm: handleConfirm,
+    onOpenChange: handleOpenChange,
+  };
+}

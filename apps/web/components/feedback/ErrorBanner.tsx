@@ -56,7 +56,7 @@ export function ErrorBanner({
       });
   };
   const actionClass =
-    'inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150b0b] dark:focus-visible:ring-offset-[#0d0a0a]';
+    'inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-error-subtle';
 
   const renderAction = (action: ErrorBannerAction, index: number) => {
     if (action.href) {
@@ -69,7 +69,7 @@ export function ErrorBanner({
             href={action.href}
             className={cn(
               actionClass,
-              'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+              'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
             )}
           >
             {action.label}
@@ -114,7 +114,7 @@ export function ErrorBanner({
       aria-label='Error'
       data-testid={testId ?? 'app-error-banner'}
       className={cn(
-        'rounded-2xl border border-red-500/30 bg-[rgba(140,26,26,0.12)] px-5 py-4 text-[#f8e8e8] shadow-[0_18px_40px_-20px_rgba(0,0,0,0.75)] backdrop-blur-sm dark:border-red-900/60 dark:bg-[rgba(70,12,12,0.45)] dark:text-red-50',
+        'rounded-2xl border border-error/30 bg-error-subtle px-5 py-4 text-error-foreground shadow-xl backdrop-blur-sm dark:border-error/40',
         className
       )}
     >

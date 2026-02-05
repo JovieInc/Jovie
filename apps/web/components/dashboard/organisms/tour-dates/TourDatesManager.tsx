@@ -9,6 +9,7 @@ import {
   type TourDateViewModel,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   useDeleteTourDateMutation,
   useDisconnectBandsintownMutation,
@@ -35,6 +36,9 @@ export function TourDatesManager({
     useState<TourDateViewModel | null>(null);
   const [isConnected, setIsConnected] = useState(connectionStatus.connected);
   const [hasApiKey, setHasApiKey] = useState(connectionStatus.hasApiKey);
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tourDateToDelete, setTourDateToDelete] = useState<string | null>(null);
 
   const syncMutation = useSyncFromBandsintownMutation(profileId);
   const disconnectMutation = useDisconnectBandsintownMutation(profileId);
@@ -56,15 +60,11 @@ export function TourDatesManager({
     }
   }, [syncMutation]);
 
-  const handleDisconnect = useCallback(async () => {
-    if (
-      !confirm(
-        'Are you sure you want to disconnect Bandsintown? This will remove all synced tour dates.'
-      )
-    ) {
-      return;
-    }
+  const handleDisconnectClick = useCallback(() => {
+    setDisconnectDialogOpen(true);
+  }, []);
 
+  const handleDisconnectConfirm = useCallback(async () => {
     try {
       await disconnectMutation.mutateAsync();
       setIsConnected(false);
@@ -79,30 +79,31 @@ export function TourDatesManager({
     }
   }, [disconnectMutation]);
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      if (!confirm('Are you sure you want to delete this tour date?')) {
-        return;
-      }
+  const handleDeleteClick = useCallback((id: string) => {
+    setTourDateToDelete(id);
+    setDeleteDialogOpen(true);
+  }, []);
 
-      // Optimistically remove from list
-      const previousTourDates = tourDates;
-      setTourDates(prev => prev.filter(td => td.id !== id));
-      if (selectedTourDate?.id === id) {
-        setSelectedTourDate(null);
-      }
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!tourDateToDelete) return;
 
-      try {
-        await deleteMutation.mutateAsync(id);
-        toast.success('Tour date deleted');
-      } catch {
-        // Rollback on error
-        setTourDates(previousTourDates);
-        toast.error('Failed to delete tour date');
-      }
-    },
-    [selectedTourDate, tourDates, deleteMutation]
-  );
+    const id = tourDateToDelete;
+    // Optimistically remove from list
+    const previousTourDates = tourDates;
+    setTourDates(prev => prev.filter(td => td.id !== id));
+    if (selectedTourDate?.id === id) {
+      setSelectedTourDate(null);
+    }
+
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success('Tour date deleted');
+    } catch {
+      // Rollback on error
+      setTourDates(previousTourDates);
+      toast.error('Failed to delete tour date');
+    }
+  }, [tourDateToDelete, selectedTourDate, tourDates, deleteMutation]);
 
   const handleConnected = useCallback((newTourDates: TourDateViewModel[]) => {
     setTourDates(newTourDates);
@@ -165,7 +166,7 @@ export function TourDatesManager({
               <Button
                 variant='ghost'
                 size='sm'
-                onClick={handleDisconnect}
+                onClick={handleDisconnectClick}
                 disabled={disconnectMutation.isPending}
                 className='text-tertiary-token hover:text-secondary-token'
               >
@@ -182,7 +183,7 @@ export function TourDatesManager({
             <TourDatesTable
               tourDates={tourDates}
               onEdit={setSelectedTourDate}
-              onDelete={handleDelete}
+              onDelete={handleDeleteClick}
               onSync={isConnected ? handleSync : undefined}
               isSyncing={syncMutation.isPending}
             />
@@ -222,6 +223,32 @@ export function TourDatesManager({
           />
         </div>
       )}
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={disconnectDialogOpen}
+        onOpenChange={setDisconnectDialogOpen}
+        title='Disconnect Bandsintown?'
+        description='This will remove all synced tour dates. You can reconnect later to sync them again.'
+        confirmLabel='Disconnect'
+        variant='destructive'
+        onConfirm={handleDisconnectConfirm}
+        isLoading={disconnectMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={open => {
+          setDeleteDialogOpen(open);
+          if (!open) setTourDateToDelete(null);
+        }}
+        title='Delete tour date?'
+        description='This action cannot be undone. The tour date will be permanently removed.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={handleDeleteConfirm}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

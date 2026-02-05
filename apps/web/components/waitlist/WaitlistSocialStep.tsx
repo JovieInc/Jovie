@@ -78,10 +78,10 @@ export function WaitlistSocialStep({
             return (
               <label
                 key={option.value}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909] ${
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base ${
                   isSelected
-                    ? 'bg-[#1e2025] text-[#e3e4e6] border-[#2c2e33]'
-                    : 'bg-transparent text-[#6b6f76] dark:text-[#969799] border-[#d7d9de] dark:border-[#2c2e33] hover:bg-[#f0f0f0] dark:hover:bg-[#1e2025]'
+                    ? 'bg-surface-3 text-primary-token border-subtle'
+                    : 'bg-transparent text-tertiary-token border-subtle hover:bg-surface-2'
                 }`}
               >
                 <input
@@ -133,7 +133,7 @@ export function WaitlistSocialStep({
             />
           </>
         ) : (
-          <div className='w-full flex items-center gap-2 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3 focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]'>
+          <div className='w-full flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base'>
             <span className='text-sm text-secondary-token whitespace-nowrap'>
               {getSocialPlatformPrefix(socialPlatform).display}
             </span>

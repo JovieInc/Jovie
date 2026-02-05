@@ -78,8 +78,11 @@ export function JovieChat({
                     <BrandLogo size={16} tone='auto' />
                   </div>
                   <div className='rounded-2xl bg-surface-2 px-4 py-3'>
-                    <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
+                    <Loader2 className='h-4 w-4 animate-spin motion-reduce:animate-none text-secondary-token' />
                   </div>
+                  <span className='sr-only' aria-live='polite'>
+                    Jovie is thinking...
+                  </span>
                 </div>
               )}
               <div ref={messagesEndRef} />

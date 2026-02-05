@@ -201,11 +201,11 @@ export function WaitlistSpotifySearch({
     return (
       <div className='space-y-2'>
         {selectedArtistName ? (
-          <div className='w-full flex items-center gap-3 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3'>
-            <div className='flex items-center justify-center w-6 h-6 rounded-full bg-[#1DB954]/15'>
+          <div className='w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3'>
+            <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15'>
               <SocialIcon
                 platform='spotify'
-                className='w-3.5 h-3.5 text-[#1DB954]'
+                className='w-3.5 h-3.5 text-brand-spotify'
               />
             </div>
             <span className='flex-1 text-sm text-primary-token truncate'>
@@ -277,14 +277,14 @@ export function WaitlistSpotifySearch({
       </label>
       <div
         className={cn(
-          'w-full flex items-center gap-3 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] px-4 py-3',
-          'focus-within:ring-2 focus-within:ring-[#6c78e6]/40 focus-within:ring-offset-2 focus-within:ring-offset-[#f5f5f5] dark:focus-within:ring-offset-[#090909]'
+          'w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3',
+          'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base'
         )}
       >
-        <div className='flex items-center justify-center w-6 h-6 rounded-full bg-[#1DB954]/15 shrink-0'>
+        <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15 shrink-0'>
           <SocialIcon
             platform='spotify'
-            className='w-3.5 h-3.5 text-[#1DB954]'
+            className='w-3.5 h-3.5 text-brand-spotify'
           />
         </div>
         <input
@@ -313,14 +313,14 @@ export function WaitlistSpotifySearch({
           }
         />
         {state === 'loading' && (
-          <div className='w-4 h-4 border-2 border-[#6b6f76] border-t-transparent rounded-full animate-spin' />
+          <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
         )}
       </div>
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
         <div
-          className='absolute z-50 w-full mt-1 rounded-[6px] border border-[#d7d9de] dark:border-[#2c2e33] bg-white dark:bg-[#0f1011] shadow-lg overflow-hidden'
+          className='absolute z-50 w-full mt-1 rounded-lg border border-subtle bg-surface-0 shadow-lg overflow-hidden'
           style={{ top: '100%' }}
         >
           <select
@@ -373,10 +373,10 @@ export function WaitlistSpotifySearch({
                   key={key}
                   className='flex items-center gap-3 animate-pulse'
                 >
-                  <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025]' />
+                  <div className='w-10 h-10 rounded-full bg-surface-2' />
                   <div className='flex-1 space-y-1'>
-                    <div className='h-4 w-32 bg-[#f0f0f0] dark:bg-[#1e2025] rounded' />
-                    <div className='h-3 w-20 bg-[#f0f0f0] dark:bg-[#1e2025] rounded' />
+                    <div className='h-4 w-32 bg-surface-2 rounded' />
+                    <div className='h-3 w-20 bg-surface-2 rounded' />
                   </div>
                 </div>
               ))}
@@ -412,8 +412,8 @@ export function WaitlistSpotifySearch({
                   className={cn(
                     'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
                     index === activeIndex
-                      ? 'bg-[#f0f0f0] dark:bg-[#1e2025]'
-                      : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
+                      ? 'bg-surface-2'
+                      : 'hover:bg-surface-2/50'
                   )}
                   onClick={() => handleArtistSelect(artist)}
                   onKeyDown={event =>
@@ -423,7 +423,7 @@ export function WaitlistSpotifySearch({
                   }
                   onMouseEnter={() => setActiveIndex(index)}
                 >
-                  <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] overflow-hidden shrink-0 relative'>
+                  <div className='w-10 h-10 rounded-full bg-surface-2 overflow-hidden shrink-0 relative'>
                     {artist.imageUrl ? (
                       <Image
                         src={artist.imageUrl}
@@ -437,7 +437,7 @@ export function WaitlistSpotifySearch({
                       <div className='w-full h-full flex items-center justify-center'>
                         <SocialIcon
                           platform='spotify'
-                          className='w-5 h-5 text-[#6b6f76]'
+                          className='w-5 h-5 text-tertiary-token'
                         />
                       </div>
                     )}
@@ -453,7 +453,7 @@ export function WaitlistSpotifySearch({
                     )}
                   </div>
                   {artist.verified && (
-                    <div className='shrink-0 text-[#1DB954]'>
+                    <div className='shrink-0 text-brand-spotify'>
                       <svg
                         className='w-4 h-4'
                         viewBox='0 0 20 20'
@@ -478,10 +478,10 @@ export function WaitlistSpotifySearch({
             type='button'
             tabIndex={0}
             className={cn(
-              'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-[#d7d9de] dark:border-[#2c2e33] border-l-0 border-r-0 border-b-0 bg-transparent w-full text-left',
+              'flex items-center gap-3 p-3 cursor-pointer transition-colors border-t border-subtle border-l-0 border-r-0 border-b-0 bg-transparent w-full text-left',
               activeIndex === manualAddIndex
-                ? 'bg-[#f0f0f0] dark:bg-[#1e2025]'
-                : 'hover:bg-[#f0f0f0]/50 dark:hover:bg-[#1e2025]/50'
+                ? 'bg-surface-2'
+                : 'hover:bg-surface-2/50'
             )}
             onClick={handleManualAddClick}
             onKeyDown={event =>
@@ -489,9 +489,9 @@ export function WaitlistSpotifySearch({
             }
             onMouseEnter={() => setActiveIndex(manualAddIndex)}
           >
-            <div className='w-10 h-10 rounded-full bg-[#f0f0f0] dark:bg-[#1e2025] flex items-center justify-center'>
+            <div className='w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center'>
               <svg
-                className='w-5 h-5 text-[#6b6f76]'
+                className='w-5 h-5 text-tertiary-token'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
