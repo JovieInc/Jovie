@@ -178,9 +178,7 @@ export interface UseLinksPersistenceReturn {
  * Calculate initial version from links array
  */
 function calculateInitialVersion(links: ProfileSocialLink[]): number {
-  const versions = links
-    .map(l => l.version ?? 1)
-    .filter(v => typeof v === 'number');
+  const versions = links.map(l => l.version ?? 1);
   return versions.length > 0 ? Math.max(...versions) : 0;
 }
 

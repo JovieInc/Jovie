@@ -378,20 +378,7 @@ async function createNewWaitlistEntry(params: {
   });
 
   // 4. Upsert users.userStatus to 'waitlist_pending'
-  await db
-    .insert(users)
-    .values({
-      clerkId: userId,
-      email: emailRaw,
-      userStatus: 'waitlist_pending',
-    })
-    .onConflictDoUpdate({
-      target: users.clerkId,
-      set: {
-        userStatus: 'waitlist_pending',
-        updatedAt: new Date(),
-      },
-    });
+  await upsertUserAsPending(userId, emailRaw);
 }
 
 /**

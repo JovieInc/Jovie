@@ -339,9 +339,7 @@ async function fetchSubscribersData(
   const orderFn = safe.direction === 'asc' ? asc : desc;
   const offset = (safe.page - 1) * safe.pageSize;
 
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+  const ownershipFilter = buildOwnershipFilter(clerkUserId);
 
   const baseQuery = tx
     .select({

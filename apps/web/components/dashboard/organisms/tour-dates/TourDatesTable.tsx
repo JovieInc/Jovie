@@ -347,9 +347,9 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: (
-          { row } // NOSONAR
-        ) => <ActionsCell tourDate={row.original} onEdit={onEdit} />,
+        cell: ({ row }) => (
+          <ActionsCell tourDate={row.original} onEdit={onEdit} />
+        ), // NOSONAR
         size: 80,
       }),
     ];
