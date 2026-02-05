@@ -18,7 +18,7 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = 'We encountered an error loading this page. ' + 'Please try again.',
+  message = 'We encountered an error loading this page. Please try again.',
 }: ErrorBoundaryProps) {
   const router = useRouter();
   const [timestamp] = useState(() => new Date());

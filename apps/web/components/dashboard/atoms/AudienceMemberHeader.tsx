@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '@/lib/utils';
 
 export interface AudienceMemberHeaderProps {

@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import Image from 'next/image';
-import { QRCode } from '@/components/atoms/QRCode';
+import { QRCode } from '@/components/molecules/QRCode';
 import { publicEnv } from '@/lib/env-public';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';

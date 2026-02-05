@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import { Container } from '@/components/site/Container';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';

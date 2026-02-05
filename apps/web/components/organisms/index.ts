@@ -7,9 +7,12 @@ export * from './BrandingBadge';
 export * from './CookieBannerSection';
 export * from './CookieModal';
 export * from './CTASection';
+// Migrated from atoms (uses hooks/Sentry/router - atomic design compliance)
+export * from './DashboardErrorFallback';
 export * from './DeferredSection';
 // Migrated from /ui
 export * from './EmptyState';
+export * from './ErrorBoundary';
 export * from './FeaturedArtistsSection';
 export * from './HeaderNav';
 export * from './HeroSection';
