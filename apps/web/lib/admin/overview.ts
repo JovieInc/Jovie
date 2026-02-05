@@ -6,6 +6,7 @@ import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminMercuryMetrics } from './mercury-metrics';
@@ -230,7 +231,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         .select({ count: drizzleSql<number>`count(*)` })
         .from(stripeWebhookEvents)
         .where(
-          drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`
+          drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`
         );
       totalEvents = Number(rows[0]?.count ?? 0);
     } catch {
@@ -256,7 +257,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         .from(stripeWebhookEvents)
         .where(
           and(
-            drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`,
+            drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`,
             inArray(stripeWebhookEvents.type, [
               'checkout.session.completed',
               'customer.subscription.created',
@@ -523,7 +524,7 @@ export async function getAdminActivityFeed(
           })
           .from(creatorProfiles)
           .where(
-            drizzleSql`${creatorProfiles.createdAt} >= ${sevenDaysAgo}::timestamp`
+            drizzleSql`${creatorProfiles.createdAt} >= ${sqlTimestamp(sevenDaysAgo)}`
           )
           .orderBy(desc(creatorProfiles.createdAt))
           .limit(limit)
@@ -542,7 +543,7 @@ export async function getAdminActivityFeed(
             })
             .from(stripeWebhookEvents)
             .where(
-              drizzleSql`${stripeWebhookEvents.createdAt} >= ${sevenDaysAgo}::timestamp`
+              drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(sevenDaysAgo)}`
             )
             .orderBy(desc(stripeWebhookEvents.createdAt))
             .limit(limit);
