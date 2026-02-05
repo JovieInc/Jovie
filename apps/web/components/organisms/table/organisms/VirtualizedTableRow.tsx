@@ -65,13 +65,7 @@ function VirtualizedTableRowComponent<TData>({
     [onKeyDown, rowIndex, rowData]
   );
 
-  const handleFocus = useCallback(() => {
-    if (shouldEnableKeyboardNav) {
-      onFocusChange(rowIndex);
-    }
-  }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
-
-  const handleMouseEnter = useCallback(() => {
+  const handleFocusChange = useCallback(() => {
     if (shouldEnableKeyboardNav) {
       onFocusChange(rowIndex);
     }
@@ -112,8 +106,8 @@ function VirtualizedTableRowComponent<TData>({
       )}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
-      onMouseEnter={handleMouseEnter}
+      onFocus={handleFocusChange}
+      onMouseEnter={handleFocusChange}
       onContextMenu={handleContextMenu}
       style={
         shouldVirtualize && virtualStart !== undefined

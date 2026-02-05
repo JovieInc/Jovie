@@ -19,6 +19,7 @@ import {
   SearchableSubmenu,
   type SearchableSubmenuSection,
 } from '@jovie/ui';
+import { captureException } from '@sentry/nextjs';
 import {
   Check,
   Copy,
@@ -231,7 +232,7 @@ export function UTMCopyDropdown({
         onCopy?.(urlToCopy, withUTM, presetId);
         setIsOpen(false);
       } catch (error) {
-        console.error('Failed to copy:', error);
+        captureException(error, { extra: { context: 'utm-copy-dropdown' } });
         toast.error('Failed to copy to clipboard');
       }
     },
