@@ -13,19 +13,35 @@ export function WallOfLinksUI() {
 
   return (
     <div className='w-full max-w-[320px] mx-auto'>
-      <div className='p-6 rounded-2xl bg-surface-1/50 border border-default min-h-[280px]'>
+      <div
+        className='p-6 min-h-[280px]'
+        style={{
+          backgroundColor: 'var(--linear-bg-surface-1)',
+          border: '1px solid var(--linear-border-default)',
+          borderRadius: 'var(--linear-radius-lg)',
+        }}
+      >
         {/* Profile info */}
-        <div className='mb-6'>
-          <div className='flex flex-col items-center gap-3'>
+        <div style={{ marginBottom: 'var(--linear-space-6)' }}>
+          <div
+            className='flex flex-col items-center'
+            style={{ gap: 'var(--linear-space-3)' }}
+          >
             <div className='w-16 h-16 rounded-full bg-linear-to-br from-blue-500 to-cyan-500' />
-            <div className='text-sm font-medium text-secondary-token'>
+            <div
+              style={{
+                fontSize: 'var(--linear-body-sm-size)',
+                fontWeight: 'var(--linear-font-weight-medium)',
+                color: 'var(--linear-text-secondary)',
+              }}
+            >
               @artist
             </div>
           </div>
         </div>
 
         {/* Links */}
-        <div className='space-y-2.5'>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {links.map((link, index) => (
             <motion.div
               key={link.id}
@@ -38,14 +54,28 @@ export function WallOfLinksUI() {
                 delay: reducedMotion ? 0 : index * 0.05,
                 duration: reducedMotion ? 0 : 0.3,
               }}
-              className='h-10 px-4 rounded-lg bg-surface-2/50 border border-subtle flex items-center justify-center text-sm text-secondary-token'
+              className='h-10 px-4 flex items-center justify-center'
+              style={{
+                backgroundColor: 'var(--linear-bg-surface-2)',
+                border: '1px solid var(--linear-border-subtle)',
+                borderRadius: 'var(--linear-radius-sm)',
+                fontSize: 'var(--linear-body-sm-size)',
+                color: 'var(--linear-text-secondary)',
+              }}
             >
               {link.label}
             </motion.div>
           ))}
 
           {/* More links indicator */}
-          <div className='pt-1 text-center text-xs text-tertiary-token'>
+          <div
+            className='text-center'
+            style={{
+              paddingTop: 'var(--linear-space-1)',
+              fontSize: 'var(--linear-label-size)',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
             + 3 more links
           </div>
         </div>
