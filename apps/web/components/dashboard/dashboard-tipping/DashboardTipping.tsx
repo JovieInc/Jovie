@@ -4,7 +4,7 @@ import { Button, Input } from '@jovie/ui';
 import { Check, Wallet, X } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { getQrCodeUrl } from '@/components/atoms/QRCode';
+import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';

@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { Icon } from '@/components/atoms/Icon';
 import { Card, CardContent, CardHeader } from '@/components/molecules/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkeleton';

@@ -18,3 +18,9 @@ export * from './TipSelector';
 
 // Migrated from atoms (has business logic - useState, useEffect, API calls)
 export * from './WrappedSocialLink';
+
+// Migrated from atoms (uses hooks/state - atomic design compliance)
+export * from './Avatar';
+export * from './OptimizedImage';
+export * from './ProfileNavButton';
+export * from './QRCode';

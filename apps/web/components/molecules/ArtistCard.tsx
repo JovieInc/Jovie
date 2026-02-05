@@ -2,7 +2,7 @@
 
 import { type MotionProps, motion, useReducedMotion } from 'motion/react';
 import Link from 'next/link';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 
 // Animation constants for spring physics
 const CONTAINER_SPRING_STIFFNESS = 300;

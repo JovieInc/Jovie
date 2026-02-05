@@ -11,7 +11,7 @@ import React, {
 import { generateSEOAltText } from '@/lib/images/seo';
 import { versionImageUrl } from '@/lib/images/versioning';
 import { cn } from '@/lib/utils';
-import { PlaceholderImage } from './PlaceholderImage';
+import { PlaceholderImage } from '@/components/atoms/PlaceholderImage';
 
 interface OptimizedImageProps {
   readonly src?: string | null;

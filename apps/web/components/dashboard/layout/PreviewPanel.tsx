@@ -11,7 +11,7 @@ import {
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { getQrCodeUrl } from '@/components/atoms/QRCode';
+import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { DrawerHeader } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';

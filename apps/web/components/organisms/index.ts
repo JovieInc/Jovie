@@ -21,3 +21,7 @@ export * from './SmartHandleInput';
 export * from './SocialBar';
 export * from './TipSection';
 export * from './user-button';
+
+// Migrated from atoms (uses hooks/Sentry/router - atomic design compliance)
+export * from './DashboardErrorFallback';
+export * from './ErrorBoundary';

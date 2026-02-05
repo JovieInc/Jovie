@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from 'react';
 import type { UploadErrorCode } from '@/app/api/images/upload/route';
-import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
+import { Avatar, type AvatarProps } from '@/components/molecules/Avatar';
 import { AvatarUploadAnnouncer } from '@/components/atoms/AvatarUploadAnnouncer';
 import { AvatarUploadOverlay } from '@/components/atoms/AvatarUploadOverlay';
 import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';

@@ -1,7 +1,7 @@
 'use client';
 
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
-import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
+import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
