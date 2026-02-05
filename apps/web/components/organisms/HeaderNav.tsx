@@ -35,12 +35,17 @@ export function HeaderNav({
   return (
     <header
       data-testid='header-nav'
-      className={cn('sticky top-0 z-50 w-full', className)}
+      className={cn('fixed top-0 left-0 right-0 w-full', className)}
       style={{
         fontSynthesisWeight: 'none',
         borderStyle: 'none none solid',
         borderColor:
           'rgb(247, 248, 248) rgb(247, 248, 248) rgba(255, 255, 255, 0.08)',
+        zIndex: 100, // Linear's exact z-index
+        backdropFilter: 'blur(20px)', // Linear's backdrop blur
+        WebkitBackdropFilter: 'blur(20px)', // Safari support
+        minWidth: 0,
+        minHeight: 0,
         ...style,
       }}
     >
