@@ -21,13 +21,15 @@ The Jovie codebase has a **well-documented atomic design system** defined in `/a
 
 ## Atomic Design Principles (Per COMPONENTS.md)
 
-### Atoms Must Have:
+### Atoms Must Have
+
 - Zero business logic
 - Props-driven behavior
 - ForwardRef for DOM elements
 - DisplayName for debugging
 
-### Atoms Must NOT Use:
+### Atoms Must NOT Use
+
 - `useState`, `useEffect`, `useQuery`, `useMutation`
 - `useAuth`, `useCallback`, `useRef`, `useMemo`
 - External API calls or feature dependencies
@@ -161,12 +163,14 @@ export function QRCode({...}) {
 ### Issues & Inconsistencies
 
 1. **Nested Atomic Structures**
-   ```
+
+   ```text
    /components/organisms/table/
    ├── atoms/      # 3-level nesting
    ├── molecules/
    └── organisms/
    ```
+
    Unclear if these should be promoted to global atoms.
 
 2. **Non-Atomic Directories**
@@ -193,7 +197,7 @@ export function QRCode({...}) {
 | `atoms/DashboardErrorFallback.tsx` | `organisms/DashboardErrorBoundary.tsx` | P0 |
 | `atoms/ErrorBoundary.tsx` | `organisms/ErrorBoundaryProvider.tsx` | P0 |
 
-### Phase 2: Medium Priority Refactoring
+### Phase 2: Medium-Priority Refactoring
 
 1. Refactor `ProfileNavButton.tsx` to molecule
 2. Simplify `AmountSelector.tsx` (remove useCallback)
@@ -202,6 +206,7 @@ export function QRCode({...}) {
 ### Phase 3: Documentation & Tooling
 
 1. Add ESLint rule to detect hooks in atoms:
+
    ```javascript
    // .eslintrc.js
    rules: {
@@ -216,6 +221,7 @@ export function QRCode({...}) {
      }]
    }
    ```
+
    (Apply only to `**/atoms/**/*.tsx` files)
 
 2. Document nested atomic structure guidelines
