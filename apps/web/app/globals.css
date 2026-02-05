@@ -70,9 +70,10 @@ body {
 }
 
 @theme {
+  /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
-    var(--font-inter), "Inter Variable", -apple-system, BlinkMacSystemFont,
-    "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+    var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui",
+    "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
@@ -305,67 +306,62 @@ body {
 
 @layer components {
   .heading-linear {
-    font-feature-settings:
-      "cv01",
-      "ss03",
-      "rlig" 1,
-      "calt" 1;
-    font-variation-settings: "opsz" 28;
-    letter-spacing: -0.0325em;
-    font-weight: 538;
-    line-height: 1.1;
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    letter-spacing: var(--linear-tracking-headline);
+    font-weight: var(--linear-font-weight-semibold);
+    line-height: var(--linear-leading-snug);
     text-wrap: balance;
   }
 
   .text-linear {
-    font-feature-settings:
-      "cv01",
-      "ss03",
-      "rlig" 1,
-      "calt" 1;
-    font-variation-settings: "opsz" 28;
-    letter-spacing: -0.011em;
-    line-height: 1.6;
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    letter-spacing: var(--linear-tracking-body);
+    line-height: var(--linear-leading-normal);
   }
 
   .marketing-h1-linear {
-    font-size: clamp(2.5rem, 5vw + 1rem, 5rem); /* 40px → 80px */
-    font-weight: 538; /* Linear's exact weight */
-    letter-spacing: -0.0325em;
-    line-height: 1.1;
-    font-feature-settings:
-      "cv01",
-      "ss03",
-      "rlig" 1,
-      "calt" 1;
-    font-variation-settings: "opsz" 28; /* Optical sizing */
+    font-size: clamp(
+      var(--linear-h1-size-sm),
+      5vw +
+      1rem,
+      var(--linear-h1-size-lg)
+    );
+    font-weight: var(--linear-font-weight-semibold);
+    letter-spacing: var(--linear-tracking-headline);
+    line-height: var(--linear-leading-snug);
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
 
   .marketing-h2-linear {
-    font-size: clamp(2rem, 3vw + 1rem, 3.5rem); /* 32px → 56px */
-    font-weight: 538;
-    letter-spacing: -0.028em;
+    font-size: clamp(
+      var(--linear-h2-size-sm),
+      3vw +
+      1rem,
+      var(--linear-h2-size-lg)
+    );
+    font-weight: var(--linear-font-weight-semibold);
+    letter-spacing: var(--linear-tracking-subheadline);
     line-height: 1.2;
-    font-feature-settings:
-      "cv01",
-      "ss03",
-      "rlig" 1,
-      "calt" 1;
-    font-variation-settings: "opsz" 28;
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
 
   .marketing-lead-linear {
-    font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem); /* 16px → 20px */
-    font-feature-settings:
-      "cv01",
-      "ss03",
-      "rlig" 1,
-      "calt" 1;
-    font-variation-settings: "opsz" 28;
-    letter-spacing: -0.011em;
-    line-height: 1.6;
+    font-size: clamp(
+      var(--linear-body-lg-size-sm),
+      1.5vw +
+      0.5rem,
+      var(--linear-body-lg-size-lg)
+    );
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    letter-spacing: var(--linear-tracking-body);
+    line-height: var(--linear-leading-normal);
   }
 
   .marketing-body {
@@ -395,6 +391,9 @@ body {
 
 @layer base {
   .marketing-mono {
+    /* Linear uses normal letter-spacing */
+    letter-spacing: normal;
+
     /* Light mode - Linear-inspired minimal aesthetic */
     --color-bg-base: #ffffff;
     --color-bg-surface-0: #fafbfc;
@@ -450,21 +449,114 @@ body {
    ============================================ */
 
 @layer components {
-  /* Linear Button */
+  /* Linear Nav Link - uses Linear tokens */
+  .nav-link-linear {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--linear-button-height-sm);
+    padding: 0 var(--linear-space-3);
+    margin: 0;
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    line-height: var(--linear-caption-leading);
+    color: var(--linear-text-secondary);
+    background-color: transparent;
+    border: none;
+    border-radius: var(--linear-radius-sm);
+    outline-color: transparent;
+    min-width: 0;
+    min-height: 0;
+    transition:
+      color var(--linear-duration-fast) var(--linear-ease),
+      background var(--linear-duration-fast) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-bg-hover);
+      color: var(--linear-text-primary);
+    }
+  }
+
+  /* Linear Nav Login Button - uses Linear tokens */
+  .btn-linear-login {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--linear-button-height-sm);
+    padding: 0 var(--linear-space-3);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    line-height: var(--linear-caption-leading);
+    color: var(--linear-text-secondary);
+    background-color: transparent;
+    border: none;
+    border-radius: var(--linear-radius-sm);
+    outline-color: transparent;
+    min-width: 0;
+    min-height: 0;
+    transition:
+      color var(--linear-duration-fast) var(--linear-ease),
+      background var(--linear-duration-fast) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-bg-hover);
+      color: var(--linear-text-primary);
+    }
+  }
+
+  /* Linear Nav Signup Button - uses Linear tokens */
+  .btn-linear-signup {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--linear-gap-buttons);
+    height: var(--linear-button-height-sm);
+    padding: 0 var(--linear-space-3);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    line-height: var(--linear-button-height-sm);
+    color: var(--linear-btn-primary-fg);
+    background-color: var(--linear-btn-primary-bg);
+    border: 1px solid var(--linear-btn-primary-border);
+    border-radius: var(--linear-radius-sm);
+    outline-color: transparent;
+    max-width: 100%;
+    box-shadow: var(--linear-shadow-button);
+    transition:
+      border var(--linear-duration-normal) var(--linear-ease),
+      background-color var(--linear-duration-normal) var(--linear-ease),
+      color var(--linear-duration-normal) var(--linear-ease),
+      box-shadow var(--linear-duration-normal) var(--linear-ease),
+      opacity var(--linear-duration-normal) var(--linear-ease),
+      filter var(--linear-duration-normal) var(--linear-ease),
+      transform var(--linear-duration-normal) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-btn-primary-hover);
+    }
+  }
+
+  /* Linear Button - Primary CTA styling using tokens */
   .btn-linear-primary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    height: 2.5rem; /* 40px */
-    padding: 0 1.5rem;
-    border-radius: 8px; /* Linear uses 8px */
-    font-size: 15px;
-    font-weight: 500;
-    letter-spacing: -0.011em;
-    background-color: var(--color-btn-primary-bg);
-    color: var(--color-btn-primary-fg);
-    border: 1px solid rgba(255, 255, 255, 0.1); /* subtle white border */
+    gap: var(--linear-gap-buttons);
+    height: var(--linear-button-height-sm);
+    padding: 0 var(--linear-space-3);
+    border-radius: var(--linear-radius-sm);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    line-height: var(--linear-button-height-sm);
+    letter-spacing: var(--linear-tracking-normal);
+    background-color: var(--linear-btn-primary-bg);
+    color: var(--linear-btn-primary-fg);
+    border: 1px solid var(--linear-btn-primary-border);
+    max-width: 100%;
+    box-shadow: var(--linear-shadow-button);
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
 
     &:hover {
@@ -472,24 +564,57 @@ body {
     }
   }
 
-  /* Linear Spacing System */
+  /* Linear Spacing System - generous vertical rhythm */
   .section-spacing-linear {
-    padding-top: 4rem; /* 64px */
-    padding-bottom: 4rem;
+    padding-top: var(--linear-section-py-sm); /* 80px mobile */
+    padding-bottom: var(--linear-section-py-sm);
 
-    @media (min-width: 640px) {
-      padding-top: 5rem; /* 80px */
-      padding-bottom: 5rem;
+    @media (min-width: 768px) {
+      padding-top: var(--linear-section-py-md); /* 120px tablet */
+      padding-bottom: var(--linear-section-py-md);
     }
 
     @media (min-width: 1024px) {
-      padding-top: 6rem; /* 96px */
-      padding-bottom: 6rem;
+      padding-top: var(--linear-section-py-lg); /* 160px desktop */
+      padding-bottom: var(--linear-section-py-lg);
+    }
+  }
+
+  /* Smaller section spacing for tighter groupings */
+  .section-spacing-linear-sm {
+    padding-top: var(--linear-space-16); /* 64px */
+    padding-bottom: var(--linear-space-16);
+
+    @media (min-width: 768px) {
+      padding-top: var(--linear-space-20); /* 80px */
+      padding-bottom: var(--linear-space-20);
+    }
+
+    @media (min-width: 1024px) {
+      padding-top: var(--linear-space-24); /* 96px */
+      padding-bottom: var(--linear-space-24);
     }
   }
 
   .section-gap-linear {
-    gap: 2rem; /* 32px Linear rhythm */
+    gap: var(--linear-content-gap-sm); /* 48px */
+
+    @media (min-width: 768px) {
+      gap: var(--linear-content-gap-md); /* 64px */
+    }
+
+    @media (min-width: 1024px) {
+      gap: var(--linear-content-gap-lg); /* 80px */
+    }
+  }
+
+  /* Heading to content gap */
+  .heading-gap-linear {
+    margin-bottom: var(--linear-content-gap-sm);
+
+    @media (min-width: 768px) {
+      margin-bottom: var(--linear-content-gap-md);
+    }
   }
 
   .text-destructive {

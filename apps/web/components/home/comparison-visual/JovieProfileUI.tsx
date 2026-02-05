@@ -144,19 +144,41 @@ export function JovieProfileUI() {
 
   return (
     <div ref={containerRef} className='w-full max-w-[320px] mx-auto'>
-      <div className='p-6 rounded-2xl bg-surface-1/50 border border-default min-h-[280px]'>
+      <div
+        className='p-6 min-h-[280px]'
+        style={{
+          backgroundColor: 'var(--linear-bg-surface-1)',
+          border: '1px solid var(--linear-border-default)',
+          borderRadius: 'var(--linear-radius-lg)',
+        }}
+      >
         {/* Profile info */}
-        <div className='mb-6'>
-          <div className='flex flex-col items-center gap-3'>
+        <div style={{ marginBottom: 'var(--linear-space-6)' }}>
+          <div
+            className='flex flex-col items-center'
+            style={{ gap: 'var(--linear-space-3)' }}
+          >
             <div className='w-16 h-16 rounded-full bg-linear-to-br from-purple-500 to-pink-500' />
-            <div className='text-sm font-medium text-secondary-token'>
+            <div
+              style={{
+                fontSize: 'var(--linear-body-sm-size)',
+                fontWeight: 'var(--linear-font-weight-medium)',
+                color: 'var(--linear-text-secondary)',
+              }}
+            >
               @artist
             </div>
           </div>
         </div>
 
         {/* Dynamic content - fixed height container */}
-        <div className='space-y-3'>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--linear-space-3)',
+          }}
+        >
           <div className='relative h-[100px]'>
             <AnimatePresence mode='wait'>
               {phase === 'typing' && (
@@ -166,19 +188,49 @@ export function JovieProfileUI() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className='absolute inset-0 space-y-2'
+                  className='absolute inset-0'
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--linear-space-2)',
+                  }}
                 >
                   {/* Email input */}
-                  <div className='h-11 px-4 rounded-lg bg-surface-0 border border-subtle flex items-center'>
-                    <span className='text-sm text-primary-token'>
+                  <div
+                    className='h-11 px-4 flex items-center'
+                    style={{
+                      backgroundColor: 'var(--linear-bg-surface-0)',
+                      border: '1px solid var(--linear-border-subtle)',
+                      borderRadius: 'var(--linear-radius-sm)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 'var(--linear-body-sm-size)',
+                        color: 'var(--linear-text-primary)',
+                      }}
+                    >
                       {typedText}
-                      <span className='animate-pulse text-accent'>|</span>
+                      <span
+                        className='animate-pulse'
+                        style={{ color: 'var(--linear-accent-bg)' }}
+                      >
+                        |
+                      </span>
                     </span>
                   </div>
                   {/* Subscribe button */}
                   <button
                     type='button'
-                    className='w-full h-11 px-5 rounded-lg bg-btn-primary text-btn-primary-foreground border border-subtle text-sm font-semibold hover:opacity-90 transition-colors'
+                    className='w-full h-11 px-5 hover:opacity-90 transition-opacity'
+                    style={{
+                      backgroundColor: 'var(--linear-btn-primary-bg)',
+                      color: 'var(--linear-btn-primary-fg)',
+                      border: '1px solid var(--linear-border-subtle)',
+                      borderRadius: 'var(--linear-radius-sm)',
+                      fontSize: 'var(--linear-body-sm-size)',
+                      fontWeight: 'var(--linear-font-weight-semibold)',
+                    }}
                   >
                     Subscribe
                   </button>
@@ -194,7 +246,12 @@ export function JovieProfileUI() {
                   transition={{ duration: 0.2 }}
                   className='absolute inset-0 flex items-center justify-center'
                 >
-                  <div className='text-sm text-secondary-token'>
+                  <div
+                    style={{
+                      fontSize: 'var(--linear-body-sm-size)',
+                      color: 'var(--linear-text-secondary)',
+                    }}
+                  >
                     Subscribing...
                   </div>
                 </motion.div>
@@ -213,7 +270,15 @@ export function JovieProfileUI() {
                 >
                   <button
                     type='button'
-                    className='w-full h-11 px-5 rounded-lg flex items-center justify-center text-sm font-semibold shadow-sm transition-colors bg-btn-primary text-btn-primary-foreground border border-subtle hover:opacity-90'
+                    className='w-full h-11 px-5 flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity'
+                    style={{
+                      backgroundColor: 'var(--linear-btn-primary-bg)',
+                      color: 'var(--linear-btn-primary-fg)',
+                      border: '1px solid var(--linear-border-subtle)',
+                      borderRadius: 'var(--linear-radius-sm)',
+                      fontSize: 'var(--linear-body-sm-size)',
+                      fontWeight: 'var(--linear-font-weight-semibold)',
+                    }}
                   >
                     {CTA_BUTTON_LABELS[phase]}
                   </button>
@@ -254,7 +319,13 @@ export function JovieProfileUI() {
           </div>
 
           {/* Supporting text */}
-          <div className='text-center text-xs text-tertiary-token'>
+          <div
+            className='text-center'
+            style={{
+              fontSize: 'var(--linear-label-size)',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
             {isSubscribed ? 'CTA adapts per visitor' : 'Join the community'}
           </div>
         </div>

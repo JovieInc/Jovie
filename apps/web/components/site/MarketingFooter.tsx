@@ -14,5 +14,8 @@ export function MarketingFooter() {
     return <Footer version='minimal' containerSize='homepage' />;
   }
 
-  return <Footer brandingMark='icon' containerSize='md' />;
+  // Use regular footer with Linear styling (handled internally by Footer)
+  return (
+    <Footer version='regular' brandingMark='icon' containerSize='homepage' />
+  );
 }

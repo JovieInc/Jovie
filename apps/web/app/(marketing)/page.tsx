@@ -217,11 +217,10 @@ const ORGANIZATION_SCHEMA = jsonLd({
 export default function HomePage() {
   return (
     <div
-      className='relative min-h-screen bg-base text-primary-token'
+      className='relative min-h-screen'
       style={{
-        // Inline fallbacks prevent blank/black flash before CSS loads (ENG-001)
-        backgroundColor: 'var(--color-bg-base, #f6f6f6)',
-        color: 'var(--color-text-primary-token, #0c0c0c)',
+        backgroundColor: 'var(--linear-bg-footer)',
+        color: 'var(--linear-text-primary)',
       }}
     >
       {/* Structured Data */}
@@ -250,38 +249,22 @@ export default function HomePage() {
       {/* 3. Comparison Section */}
       <ComparisonSection />
 
-      <DeferredSection
-        placeholderHeight={560}
-        className='section-spacing-linear'
-        placeholderClassName='bg-surface-0/30'
-      >
+      <DeferredSection placeholderHeight={560}>
         {/* 4. What You Get Section */}
         <WhatYouGetSection />
       </DeferredSection>
 
-      <DeferredSection
-        placeholderHeight={640}
-        className='section-spacing-linear'
-        placeholderClassName='bg-surface-0/30'
-      >
+      <DeferredSection placeholderHeight={640}>
         {/* 5. How It Works Section */}
         <HowItWorksSection />
       </DeferredSection>
 
-      <DeferredSection
-        placeholderHeight={520}
-        className='section-spacing-linear'
-        placeholderClassName='bg-surface-0/30'
-      >
+      <DeferredSection placeholderHeight={520}>
         {/* 6. See It In Action Section */}
         <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
       </DeferredSection>
 
-      <DeferredSection
-        placeholderHeight={480}
-        className='section-spacing-linear'
-        placeholderClassName='bg-surface-0/30'
-      >
+      <DeferredSection placeholderHeight={480}>
         {/* 7. Final CTA Section */}
         <FinalCTASection />
       </DeferredSection>
