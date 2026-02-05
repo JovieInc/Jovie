@@ -454,6 +454,72 @@ body {
    ============================================ */
 
 @layer components {
+  /* Linear Nav Login Button - exact specs from comparison */
+  .btn-linear-login {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 510;
+    line-height: 19.5px;
+    color: rgb(138, 143, 152); /* Linear's muted gray */
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    outline-color: transparent;
+    min-width: 0;
+    min-height: 0;
+    transition:
+      color 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      background 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+      color: rgb(247, 248, 248);
+    }
+  }
+
+  /* Linear Nav Signup Button - exact specs from comparison */
+  .btn-linear-signup {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 510;
+    line-height: 32px;
+    color: rgb(8, 9, 10);
+    background-color: rgb(230, 230, 230);
+    border: 1px solid rgb(230, 230, 230);
+    border-radius: 8px;
+    outline-color: transparent;
+    max-width: 100%;
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+      rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+      rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+      rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+      rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+    transition:
+      border 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      background-color 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      color 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      box-shadow 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      opacity 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      filter 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      transform 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    &:hover {
+      background-color: rgb(255, 255, 255);
+    }
+  }
+
   /* Linear Button - Pixel-perfect Linear.app CTA styling (light gray) */
   .btn-linear-primary {
     display: inline-flex;
