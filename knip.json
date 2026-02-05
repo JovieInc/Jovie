@@ -1,0 +1,80 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {},
+    "apps/web": {
+      "entry": [
+        "instrumentation.{ts,js}",
+        "next.config.{js,ts}",
+        "sentry.*.config.ts"
+      ],
+      "project": ["**/*.{ts,tsx,js,jsx,mjs}"],
+      "ignore": [
+        ".next/**",
+        "drizzle/migrations/**",
+        "drizzle.config.ts",
+        ".storybook/**"
+      ],
+      "ignoreDependencies": [
+        "@tailwindcss/forms",
+        "@tailwindcss/line-clamp",
+        "@tailwindcss/typography",
+        "critters",
+        "import-in-the-middle",
+        "require-in-the-middle",
+        "ignore-loader",
+        "@fontsource-variable/inter",
+        "geist",
+        "drizzle-kit"
+      ],
+      "playwright": {
+        "config": [
+          "playwright.config.ts",
+          "playwright.synthetic.config.ts",
+          "playwright.config.nightly.ts",
+          "playwright.config.noauth.ts",
+          "playwright.config.headed.ts"
+        ],
+        "entry": ["tests/e2e/**/*.spec.ts"]
+      },
+      "storybook": {
+        "config": [".storybook/main.ts"],
+        "entry": ["**/*.stories.{ts,tsx}"]
+      },
+      "vitest": {
+        "config": [
+          "vitest.config.mts",
+          "vitest.config.ci.mts",
+          "vitest.config.fast.mts",
+          "vitest.config.minimal.mts",
+          "vitest.config.mjs"
+        ],
+        "entry": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"]
+      },
+      "next": {
+        "entry": ["next.config.{js,ts}", "instrumentation.{ts,js}"]
+      },
+      "eslint": {
+        "config": ["eslint.config.js", "eslint-server-boundaries.config.js"]
+      },
+      "drizzle": false
+    },
+    "apps/should-i-make": {
+      "entry": ["next.config.{js,ts}"],
+      "project": ["**/*.{ts,tsx,js,jsx}"],
+      "ignore": [".next/**"],
+      "ignoreDependencies": ["@fontsource-variable/inter"],
+      "next": {
+        "entry": ["next.config.{js,ts}"]
+      }
+    },
+    "packages/ui": {
+      "entry": ["index.ts", "atoms/*.{ts,tsx}", "lib/*.ts", "theme/*.ts"],
+      "project": ["**/*.{ts,tsx}"],
+      "vitest": {
+        "config": ["vitest.config.ts"],
+        "entry": ["**/*.test.{ts,tsx}"]
+      }
+    }
+  }
+}
