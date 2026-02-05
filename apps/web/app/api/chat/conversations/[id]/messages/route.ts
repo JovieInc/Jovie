@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
@@ -28,26 +28,24 @@ interface RouteParams {
 }
 
 /**
- * Auto-generate a title from the first user message if no title exists
+ * Auto-generate a title from the first user message if no title exists.
+ * Uses a single guarded UPDATE to eliminate round-trip and prevent race conditions.
  */
 async function maybeGenerateTitle(
   conversationId: string,
   messageContent: string
 ): Promise<void> {
-  const [conv] = await db
-    .select({ title: chatConversations.title })
-    .from(chatConversations)
-    .where(eq(chatConversations.id, conversationId))
-    .limit(1);
-
-  if (conv?.title) return;
-
   const autoTitle = messageContent.slice(0, 50).trim();
   const suffix = autoTitle.length >= 50 ? '...' : '';
   await db
     .update(chatConversations)
     .set({ title: autoTitle + suffix })
-    .where(eq(chatConversations.id, conversationId));
+    .where(
+      and(
+        eq(chatConversations.id, conversationId),
+        isNull(chatConversations.title)
+      )
+    );
 }
 
 /**
