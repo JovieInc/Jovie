@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { ProfileNavButton } from './ProfileNavButton';
 
 const meta: Meta<typeof ProfileNavButton> = {
-  title: 'Atoms/ProfileNavButton',
+  title: 'Molecules/ProfileNavButton',
   component: ProfileNavButton,
   parameters: {
     layout: 'centered',
