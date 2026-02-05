@@ -4,7 +4,9 @@ import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { cn } from '@/lib/utils';
 
-// Linear header structure: full-width nav with flex layout
+// Linear header structure: full-width header with centered ~1000px content
+// Linear uses ~224px margins on 1440px viewport = ~984px content width
+// maxWidth 1032px - 48px (24px padding each side) = 984px content
 // See globals.css for .nav-link-linear styles
 
 export interface HeaderNavProps {
@@ -49,22 +51,20 @@ export function HeaderNav({
         ...style,
       }}
     >
-      {/* Linear-style full-width nav with flex layout */}
+      {/* Linear-style centered content container */}
       <nav
-        className='flex items-center w-full h-16'
+        className='flex items-center h-16 mx-auto'
         aria-label='Primary navigation'
         style={{
           display: 'flex',
-          maxWidth: 'none',
-          padding: 0,
-          margin: 0,
+          width: '100%',
+          maxWidth: '1032px',
+          padding: '0 24px',
+          margin: '0 auto',
         }}
       >
-        {/* Logo section - left aligned with padding */}
-        <div
-          className='flex items-center'
-          style={{ paddingLeft: '24px', minWidth: '200px' }}
-        >
+        {/* Logo section - left aligned */}
+        <div className='flex items-center'>
           <LogoLink logoSize={logoSize} variant={logoVariant} />
         </div>
 
@@ -84,15 +84,8 @@ export function HeaderNav({
           </div>
         )}
 
-        {/* Auth actions - right aligned with padding */}
-        <div
-          className='flex items-center gap-1'
-          style={{
-            paddingRight: '24px',
-            minWidth: '200px',
-            justifyContent: 'flex-end',
-          }}
-        >
+        {/* Auth actions - right aligned */}
+        <div className='flex items-center gap-1'>
           <AuthActions />
         </div>
       </nav>
