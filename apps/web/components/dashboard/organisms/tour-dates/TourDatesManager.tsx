@@ -15,6 +15,7 @@ import {
   useDisconnectBandsintownMutation,
   useSyncFromBandsintownMutation,
 } from '@/lib/queries/useTourDateMutations';
+import { cn } from '@/lib/utils';
 import { TourDateSidebar } from './TourDateSidebar';
 import { TourDatesEmptyState } from './TourDatesEmptyState';
 import { TourDatesTable } from './TourDatesTable';
@@ -159,7 +160,10 @@ export function TourDatesManager({
               >
                 <Icon
                   name='RefreshCw'
-                  className={`mr-1.5 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`}
+                  className={cn(
+                    'mr-1.5 h-4 w-4',
+                    syncMutation.isPending && 'animate-spin'
+                  )}
                 />
                 Sync
               </Button>
@@ -203,7 +207,10 @@ export function TourDatesManager({
                 >
                   <Icon
                     name='RefreshCw'
-                    className={`mr-1.5 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`}
+                    className={cn(
+                      'mr-1.5 h-4 w-4',
+                      syncMutation.isPending && 'animate-spin'
+                    )}
                   />
                   Sync from Bandsintown
                 </Button>
