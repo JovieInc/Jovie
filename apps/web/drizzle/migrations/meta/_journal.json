@@ -162,6 +162,13 @@
       "when": 1770091962199,
       "tag": "0022_big_vengeance",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1770339600000,
+      "tag": "0023_optimize_social_links_platform_type_query",
+      "breakpoints": true
     }
   ]
 }
