@@ -4,10 +4,11 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
-import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
@@ -45,46 +46,8 @@ export function SignUpForm() {
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClerkStalled = useLoadingStall(isLoaded);
 
-  // Handle password-related hash fragments that Clerk may add
-  // Since Jovie is passwordless, we strip these invalid hashes
-  useEffect(() => {
-    const hash = globalThis.location.hash;
-    const passwordHashFragments = [
-      '#reset-password',
-      '#/reset-password',
-      '#forgot-password',
-      '#/forgot-password',
-      '#set-password',
-      '#/set-password',
-    ];
-
-    if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
-      // Clear the hash from the URL without triggering a reload
-      globalThis.history.replaceState(
-        null,
-        '',
-        globalThis.location.pathname + globalThis.location.search
-      );
-    }
-  }, []);
-
-  // Store redirect URL from query params on mount
-  useEffect(() => {
-    try {
-      const redirectUrl = new URL(globalThis.location.href).searchParams.get(
-        'redirect_url'
-      );
-      const sanitized = sanitizeRedirectUrl(redirectUrl);
-      if (sanitized) {
-        globalThis.sessionStorage.setItem(
-          AUTH_STORAGE_KEYS.REDIRECT_URL,
-          sanitized
-        );
-      }
-    } catch {
-      // Ignore errors
-    }
-  }, []);
+  // Shared auth page setup (hash cleanup, redirect URL storage)
+  useAuthPageSetup();
 
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
@@ -120,7 +83,7 @@ export function SignUpForm() {
         clearTimeout(redirectTimerRef.current);
       }
     };
-  }, [shouldSuggestSignIn, email, router, buildSignInUrl]);
+  }, [shouldSuggestSignIn, email, router, buildSignInUrl, isRedirecting]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
@@ -213,18 +176,18 @@ export function SignUpForm() {
         )}
 
         {step === 'method' && (
-          <p className='mt-6 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center'>
+          <p className='mt-6 text-sm text-secondary-token text-center'>
             By signing up, you agree to our{' '}
             <Link
               href='/legal/terms'
-              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+              className='text-primary-token hover:underline focus-ring-themed rounded-md'
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
               href='/legal/privacy'
-              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+              className='text-primary-token hover:underline focus-ring-themed rounded-md'
             >
               Privacy Policy
             </Link>

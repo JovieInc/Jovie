@@ -1,0 +1,352 @@
+/**
+ * Linear Design Tokens
+ *
+ * Extracted from Linear.app marketing pages.
+ * All colors converted to OKLCH for perceptual uniformity.
+ *
+ * Usage:
+ * - Import this file in design-system.css
+ * - Use var(--linear-*) in marketing components
+ * - Run `pnpm linear:extract` to regenerate from Linear.app
+ *
+ * @see https://linear.app
+ */
+
+:root {
+  /* ============================================
+     LINEAR COLOR PRIMITIVES (OKLCH)
+     Extracted from Linear.app, converted to OKLCH
+     ============================================ */
+
+  /* Lightness scale (Linear's gray ramp) */
+  --linear-l-0: 5%; /* rgb(8,9,10) → near black */
+  --linear-l-1: 7%; /* rgb(11,11,11) → page bg */
+  --linear-l-2: 9%; /* rgb(15,16,17) → surface-0 */
+  --linear-l-3: 11%; /* rgb(20,21,22) → surface-1 */
+  --linear-l-4: 16%; /* rgb(32,33,34) → surface-2/borders */
+  --linear-l-5: 20%; /* rgb(40,40,44) → button bg */
+  --linear-l-6: 58%; /* rgb(138,143,152) → secondary text */
+  --linear-l-7: 97%; /* rgb(247,248,248) → primary text */
+
+  /* Base chroma for Linear's neutral grays */
+  --linear-chroma: 0.008;
+  --linear-hue: 260; /* Slight blue-ish tint */
+
+  /* ============================================
+     TEXT COLORS (OKLCH)
+     ============================================ */
+
+  /* Primary text - rgb(247, 248, 248) → oklch(97% 0.005 260) */
+  --linear-text-primary: oklch(97% 0.005 260);
+
+  /* Secondary text - rgb(138, 143, 152) → oklch(62% 0.015 255) */
+  --linear-text-secondary: oklch(62% 0.015 255);
+
+  /* Tertiary text - rgb(115, 115, 120) → oklch(55% 0.01 260) */
+  --linear-text-tertiary: oklch(55% 0.01 260);
+
+  /* Inverse text (on light backgrounds) - rgb(8, 9, 10) → oklch(5% 0.005 260) */
+  --linear-text-inverse: oklch(5% 0.005 260);
+
+  /* ============================================
+     BACKGROUNDS (OKLCH)
+     ============================================ */
+
+  /* Page background - rgb(11, 11, 11) → oklch(7% 0.008 260) */
+  --linear-bg-page: oklch(7% 0.008 260);
+
+  /* Header background with transparency - rgba(11, 11, 11, 0.8) */
+  --linear-bg-header: oklch(7% 0.008 260 / 0.8);
+
+  /* Surface levels */
+  /* Surface-0: rgb(15, 16, 17) → oklch(9% 0.008 260) */
+  --linear-bg-surface-0: oklch(9% 0.008 260);
+
+  /* Surface-1: rgb(20, 21, 22) → oklch(11% 0.008 260) */
+  --linear-bg-surface-1: oklch(11% 0.008 260);
+
+  /* Surface-2: rgb(32, 33, 34) → oklch(16% 0.008 260) */
+  --linear-bg-surface-2: oklch(16% 0.008 260);
+
+  /* Button background - rgb(40, 40, 44) → oklch(20% 0.01 260) */
+  --linear-bg-button: oklch(20% 0.01 260);
+
+  /* Footer background - rgb(8, 9, 10) → oklch(5% 0.005 260) */
+  --linear-bg-footer: oklch(5% 0.005 260);
+
+  /* Footer border - rgb(35, 37, 42) → oklch(18% 0.01 260) */
+  --linear-border-footer: oklch(18% 0.01 260);
+
+  /* Hover state - rgba(255, 255, 255, 0.08) */
+  --linear-bg-hover: oklch(100% 0 0 / 0.08);
+
+  /* ============================================
+     BORDERS (OKLCH with alpha)
+     ============================================ */
+
+  /* Subtle border - rgba(255, 255, 255, 0.08) */
+  --linear-border-subtle: oklch(100% 0 0 / 0.08);
+
+  /* Default border - rgb(32, 33, 34) → oklch(16% 0.008 260) */
+  --linear-border-default: oklch(16% 0.008 260);
+
+  /* Strong border - rgba(255, 255, 255, 0.18) */
+  --linear-border-strong: oklch(100% 0 0 / 0.18);
+
+  /* ============================================
+     BUTTON COLORS
+     ============================================ */
+
+  /* Primary button (light/signup) - rgb(230, 230, 230) */
+  --linear-btn-primary-bg: oklch(92% 0 0);
+  --linear-btn-primary-fg: oklch(5% 0.005 260);
+  --linear-btn-primary-hover: oklch(100% 0 0);
+  --linear-btn-primary-border: oklch(92% 0 0);
+
+  /* Secondary button (dark/gray) - rgb(40, 40, 44) */
+  --linear-btn-secondary-bg: oklch(20% 0.01 260);
+  --linear-btn-secondary-fg: oklch(97% 0.005 260);
+  --linear-btn-secondary-hover: oklch(25% 0.01 260);
+
+  /* Accent button (featured/pro) - rgb(99, 102, 241) → indigo */
+  --linear-btn-accent-bg: oklch(55% 0.25 270);
+  --linear-btn-accent-fg: oklch(100% 0 0);
+  --linear-btn-accent-hover: oklch(60% 0.25 270);
+
+  /* ============================================
+     ACCENT COLORS
+     ============================================ */
+
+  /* Success green - rgb(34, 197, 94) */
+  --linear-success: oklch(72% 0.2 145);
+
+  /* Warning amber - rgb(251, 191, 36) */
+  --linear-warning: oklch(82% 0.17 85);
+  --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
+
+  /* Indigo accent - rgb(99, 102, 241) */
+  --linear-accent: oklch(55% 0.25 270);
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+
+  /* Font weights - Linear uses Inter variable font with precise weights */
+  --linear-font-weight-normal: 400;
+  --linear-font-weight-medium: 510;
+  --linear-font-weight-semibold: 538;
+  --linear-font-weight-bold: 590;
+
+  /* Letter spacing */
+  --linear-tracking-headline: -0.022em;
+  --linear-tracking-subheadline: -0.0175em;
+  --linear-tracking-body: -0.011em;
+  --linear-tracking-normal: normal;
+
+  /* Line heights */
+  --linear-leading-none: 1;
+  --linear-leading-tight: 1.06;
+  --linear-leading-snug: 1.08;
+  --linear-leading-normal: 1.6;
+  --linear-leading-relaxed: 1.33;
+
+  /* Font features - Linear's OpenType features */
+  --linear-font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
+  --linear-font-optical-sizing: 28;
+
+  /* ============================================
+     TYPE SCALE (Desktop)
+     ============================================ */
+
+  /* H1 Hero - 64px */
+  --linear-h1-size: 64px;
+  --linear-h1-weight: var(--linear-font-weight-medium);
+  --linear-h1-leading: 67.84px;
+  --linear-h1-tracking: -1.408px;
+
+  /* H2 Section - 36px */
+  --linear-h2-size: 36px;
+  --linear-h2-weight: var(--linear-font-weight-bold);
+  --linear-h2-leading: 47.88px;
+  --linear-h2-tracking: -0.432px;
+
+  /* H3 Card title - 24px */
+  --linear-h3-size: 24px;
+  --linear-h3-weight: var(--linear-font-weight-bold);
+  --linear-h3-leading: 31.92px;
+  --linear-h3-tracking: -0.288px;
+
+  /* H4 Subheading - 18px */
+  --linear-h4-size: 18px;
+  --linear-h4-weight: var(--linear-font-weight-semibold);
+  --linear-h4-leading: 24px;
+
+  /* Body large - 17px */
+  --linear-body-lg-size: 17px;
+  --linear-body-lg-weight: var(--linear-font-weight-normal);
+  --linear-body-lg-leading: 27.2px;
+
+  /* Body - 15px */
+  --linear-body-size: 15px;
+  --linear-body-weight: var(--linear-font-weight-medium);
+  --linear-body-leading: 24px;
+
+  /* Body small - 14px */
+  --linear-body-sm-size: 14px;
+  --linear-body-sm-weight: var(--linear-font-weight-normal);
+  --linear-body-sm-leading: 22.4px;
+
+  /* Caption - 13px */
+  --linear-caption-size: 13px;
+  --linear-caption-weight: var(--linear-font-weight-medium);
+  --linear-caption-leading: 19.5px;
+
+  /* Label - 12px */
+  --linear-label-size: 12px;
+  --linear-label-weight: var(--linear-font-weight-normal);
+  --linear-label-leading: 19.2px;
+
+  /* ============================================
+     LAYOUT
+     ============================================ */
+
+  /* Container */
+  --linear-container-max: 1032px;
+  --linear-container-padding: 24px;
+  --linear-content-max: 984px; /* 1032 - 48 (padding) */
+
+  /* Section widths */
+  --linear-hero-section-max: 1024px;
+  --linear-hero-h1-width: 900px;
+  --linear-hero-lead-width: 821.469px;
+  --linear-pricing-grid-max: 1024px;
+
+  /* Heights */
+  --linear-header-height: 64px;
+  --linear-hero-height: 392px;
+  --linear-button-height-sm: 32px;
+  --linear-button-height-md: 40px;
+
+  /* Border radius */
+  --linear-radius-sm: 8px;
+  --linear-radius-md: 10px;
+  --linear-radius-lg: 12px;
+  --linear-radius-full: 9999px;
+
+  /* ============================================
+     SPACING
+     ============================================ */
+
+  --linear-space-1: 4px;
+  --linear-space-2: 8px;
+  --linear-space-3: 12px;
+  --linear-space-4: 16px;
+  --linear-space-5: 20px;
+  --linear-space-6: 24px;
+  --linear-space-8: 32px;
+  --linear-space-10: 40px;
+  --linear-space-12: 48px;
+  --linear-space-16: 64px;
+  --linear-space-20: 80px;
+  --linear-space-24: 96px;
+  --linear-space-28: 112px;
+  --linear-space-32: 128px;
+  --linear-space-40: 160px;
+
+  /* Component spacing */
+  --linear-gap-nav: 4px;
+  --linear-gap-buttons: 8px;
+  --linear-gap-cards: 24px;
+
+  /* Section spacing - Linear uses generous vertical rhythm */
+  --linear-section-py-sm: 80px; /* Mobile: 80px */
+  --linear-section-py-md: 120px; /* Tablet: 120px */
+  --linear-section-py-lg: 160px; /* Desktop: 160px */
+
+  /* Content spacing within sections */
+  --linear-content-gap-sm: 48px; /* Gap between heading and content */
+  --linear-content-gap-md: 64px;
+  --linear-content-gap-lg: 80px;
+
+  /* Footer spacing */
+  --linear-footer-py: 48px;
+  --linear-footer-py-lg: 64px;
+
+  /* ============================================
+     EFFECTS
+     ============================================ */
+
+  /* Blur */
+  --linear-blur-header: 20px;
+
+  /* Shadows */
+  --linear-shadow-button:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+
+  --linear-shadow-card: oklch(0% 0 0 / 0.2) 0px 4px 24px 0px;
+
+  --linear-shadow-card-elevated:
+    oklch(0% 0 0 / 0.3) 0px 8px 32px 0px, oklch(0% 0 0 / 0.1) 0px 4px 16px 0px;
+
+  /* Transitions */
+  --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --linear-duration-fast: 100ms;
+  --linear-duration-normal: 160ms;
+  --linear-duration-slow: 300ms;
+
+  /* ============================================
+     BREAKPOINTS
+     (CSS cannot use custom properties in media queries,
+     but these are documented for reference)
+     ============================================ */
+
+  /* --linear-bp-sm: 640px; */
+  /* --linear-bp-md: 768px; */
+  /* --linear-bp-lg: 1024px; */
+  /* --linear-bp-xl: 1280px; */
+  /* --linear-bp-2xl: 1440px; */
+
+  /* ============================================
+     RESPONSIVE TYPOGRAPHY
+     (Mobile → Desktop scaling)
+     ============================================ */
+
+  /* H1: 40px → 52px → 64px */
+  --linear-h1-size-sm: 40px;
+  --linear-h1-size-md: 52px;
+  --linear-h1-size-lg: 64px;
+
+  /* H2: 24px → 32px → 36px */
+  --linear-h2-size-sm: 24px;
+  --linear-h2-size-md: 32px;
+  --linear-h2-size-lg: 36px;
+
+  /* Body: 16px → 17px */
+  --linear-body-lg-size-sm: 16px;
+  --linear-body-lg-size-lg: 17px;
+}
+
+/* ============================================
+   SEMANTIC ALIASES
+   Map Linear tokens to semantic names for easier use
+   ============================================ */
+
+:root {
+  /* Semantic text */
+  --linear-color-text: var(--linear-text-primary);
+  --linear-color-text-muted: var(--linear-text-secondary);
+  --linear-color-text-subtle: var(--linear-text-tertiary);
+
+  /* Semantic backgrounds */
+  --linear-color-bg: var(--linear-bg-page);
+  --linear-color-bg-elevated: var(--linear-bg-surface-0);
+  --linear-color-bg-card: var(--linear-bg-surface-1);
+
+  /* Semantic borders */
+  --linear-color-border: var(--linear-border-default);
+  --linear-color-divider: var(--linear-border-subtle);
+}

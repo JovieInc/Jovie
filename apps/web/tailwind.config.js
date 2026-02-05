@@ -26,6 +26,39 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      // Linear font weights - Inter variable font precise weights
+      fontWeight: {
+        'linear-normal': 'var(--linear-font-weight-normal)',
+        'linear-medium': 'var(--linear-font-weight-medium)',
+        'linear-semibold': 'var(--linear-font-weight-semibold)',
+        'linear-bold': 'var(--linear-font-weight-bold)',
+      },
+
+      // Linear spacing tokens
+      spacing: {
+        'linear-1': 'var(--linear-space-1)',
+        'linear-2': 'var(--linear-space-2)',
+        'linear-3': 'var(--linear-space-3)',
+        'linear-4': 'var(--linear-space-4)',
+        'linear-6': 'var(--linear-space-6)',
+        'linear-8': 'var(--linear-space-8)',
+      },
+
+      // Linear border radius
+      borderRadius: {
+        'linear-sm': 'var(--linear-radius-sm)',
+        'linear-md': 'var(--linear-radius-md)',
+        'linear-lg': 'var(--linear-radius-lg)',
+      },
+
+      // Linear max-width for containers
+      maxWidth: {
+        'linear-container': 'var(--linear-container-max)',
+        'linear-content': 'var(--linear-content-max)',
+        'linear-hero': 'var(--linear-hero-section-max)',
+        'linear-pricing': 'var(--linear-pricing-grid-max)',
+      },
+
       // Tier 1: Design token colors - auto-generates text-*, bg-*, border-* utilities
       colors: {
         // Primary text tokens

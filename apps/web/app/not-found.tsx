@@ -8,7 +8,7 @@ export default function NotFound() {
     <div className='min-h-screen bg-base'>
       <Header />
 
-      <main>
+      <main style={{ paddingTop: 'var(--linear-header-height, 64px)' }}>
         <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
           <div className='w-full max-w-xl mx-auto text-center px-4 py-16 animate-fade-in-up'>
             <div className='mb-10 relative'>
