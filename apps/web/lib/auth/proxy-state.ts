@@ -111,7 +111,7 @@ function determineUserState(
 ): ProxyUserState {
   // No DB user → needs waitlist/signup
   if (!result?.dbUserId) {
-    return DEFAULT_WAITLIST_STATE;
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   // Check waitlist approval using userStatus lifecycle
@@ -120,16 +120,16 @@ function determineUserState(
   );
 
   if (!isWaitlistApproved) {
-    return DEFAULT_WAITLIST_STATE;
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   // Has approval but no profile or incomplete → needs onboarding
   if (!result.profileId || !result.profileComplete) {
-    return NEEDS_ONBOARDING_STATE;
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 
   // Fully active user
-  return ACTIVE_USER_STATE;
+  return { ...ACTIVE_USER_STATE };
 }
 
 /**
@@ -244,7 +244,7 @@ export async function getUserState(
     captureWarning(
       '[proxy-state] getUserState called with missing clerkUserId'
     );
-    return DEFAULT_WAITLIST_STATE;
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
@@ -275,7 +275,7 @@ export async function getUserState(
       operation: 'getProxyUserState',
     });
 
-    return DEFAULT_WAITLIST_STATE;
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 }
 
