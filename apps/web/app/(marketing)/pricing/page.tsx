@@ -165,15 +165,30 @@ export default function PricingPage() {
 
       <Container size='lg'>
         <div className='py-20 sm:py-28'>
-          {/* Header */}
+          {/* Header - Linear style: 64px/510 weight/tight letter-spacing */}
           <div className='text-center mb-16'>
             <h1
-              className='text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-primary-token leading-[1.1]'
-              style={{ fontSynthesisWeight: 'none' }}
+              className='text-primary-token'
+              style={{
+                fontSize: '64px',
+                fontWeight: 510,
+                lineHeight: '67.84px',
+                letterSpacing: '-1.408px',
+                fontSynthesisWeight: 'none',
+              }}
             >
               Turn listeners into superfans.
             </h1>
-            <p className='mt-6 text-lg text-secondary-token max-w-2xl mx-auto'>
+            <p
+              className='mt-6 mx-auto'
+              style={{
+                fontSize: '17px',
+                fontWeight: 400,
+                lineHeight: '27.2px',
+                color: 'rgb(138, 143, 152)',
+                maxWidth: '600px',
+              }}
+            >
               The link-in-bio built for musicians. Own your audience data,
               automate fan engagement, and grow your career.
             </p>
@@ -185,7 +200,16 @@ export default function PricingPage() {
               {/* Free Tier */}
               <div className='rounded-xl border border-subtle bg-surface-1 p-8 flex flex-col'>
                 <div className='mb-4'>
-                  <span className='text-xs font-medium uppercase tracking-wide text-tertiary-token'>
+                  <span
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: 590,
+                      lineHeight: '31.92px',
+                      letterSpacing: '-0.288px',
+                      fontSynthesisWeight: 'none',
+                    }}
+                  >
                     Free
                   </span>
                 </div>
@@ -203,8 +227,17 @@ export default function PricingPage() {
                 </div>
                 <Link
                   href='/waitlist?plan=free'
-                  className='block w-full h-10 rounded-md border border-default bg-surface-1 text-primary-token text-sm font-medium text-center leading-10 hover:bg-surface-2 transition-colors mb-6'
-                  style={{ fontSynthesisWeight: 'none' }}
+                  className='block w-full text-primary-token text-center hover:opacity-90 transition-opacity mb-6'
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 510,
+                    height: '40px',
+                    lineHeight: '40px',
+                    padding: '0 16px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgb(40, 40, 44)',
+                    fontSynthesisWeight: 'none',
+                  }}
                 >
                   Start free →
                 </Link>
@@ -230,7 +263,16 @@ export default function PricingPage() {
                   </span>
                 </div>
                 <div className='mb-4'>
-                  <span className='text-xs font-medium uppercase tracking-wide text-primary-token'>
+                  <span
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: 590,
+                      lineHeight: '31.92px',
+                      letterSpacing: '-0.288px',
+                      fontSynthesisWeight: 'none',
+                    }}
+                  >
                     Pro
                   </span>
                 </div>
@@ -251,8 +293,16 @@ export default function PricingPage() {
                 </p>
                 <Link
                   href='/waitlist?plan=pro'
-                  className='block w-full h-10 rounded-md bg-btn-primary text-btn-primary-foreground text-sm font-medium text-center leading-10 hover:opacity-90 transition-opacity mb-6'
-                  style={{ fontSynthesisWeight: 'none' }}
+                  className='block w-full bg-btn-primary text-btn-primary-foreground text-center hover:opacity-90 transition-opacity mb-6'
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 510,
+                    height: '40px',
+                    lineHeight: '40px',
+                    padding: '0 16px',
+                    borderRadius: '10px',
+                    fontSynthesisWeight: 'none',
+                  }}
                 >
                   Get Pro access →
                 </Link>
@@ -271,7 +321,16 @@ export default function PricingPage() {
               {/* Growth Tier */}
               <div className='rounded-xl border border-subtle bg-surface-1 p-8 flex flex-col'>
                 <div className='mb-4 flex items-center gap-2'>
-                  <span className='text-xs font-medium uppercase tracking-wide text-tertiary-token'>
+                  <span
+                    className='text-primary-token'
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: 590,
+                      lineHeight: '31.92px',
+                      letterSpacing: '-0.288px',
+                      fontSynthesisWeight: 'none',
+                    }}
+                  >
                     Growth
                   </span>
                   <span className='text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'>
@@ -295,8 +354,17 @@ export default function PricingPage() {
                 </p>
                 <Link
                   href='/waitlist?plan=growth'
-                  className='block w-full h-10 rounded-md border border-default bg-surface-1 text-primary-token text-sm font-medium text-center leading-10 hover:bg-surface-2 transition-colors mb-6'
-                  style={{ fontSynthesisWeight: 'none' }}
+                  className='block w-full text-primary-token text-center hover:opacity-90 transition-opacity mb-6'
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 510,
+                    height: '40px',
+                    lineHeight: '40px',
+                    padding: '0 16px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgb(40, 40, 44)',
+                    fontSynthesisWeight: 'none',
+                  }}
                 >
                   Get Growth access →
                 </Link>
