@@ -28,10 +28,8 @@ import {
   selectDashboardProfile,
   type TippingStats,
 } from '@/lib/db/server';
-import { sqlAny } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
-import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 const { logger } = Sentry;
 
@@ -226,7 +224,7 @@ async function fetchChromeDataWithSession(
           db
             .select({
               totalActive: count(),
-              musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+              musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp')`,
             })
             .from(socialLinks)
             .where(
