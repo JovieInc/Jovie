@@ -4,10 +4,10 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
-import { AUTH_STORAGE_KEYS, sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
@@ -43,46 +43,8 @@ export function SignInForm() {
   const hasHandledEmailParam = useRef(false);
   const isClerkStalled = useLoadingStall(isLoaded);
 
-  // Handle password-related hash fragments that Clerk may add
-  // Since Jovie is passwordless, we strip these invalid hashes
-  useEffect(() => {
-    const hash = globalThis.location.hash;
-    const passwordHashFragments = [
-      '#reset-password',
-      '#/reset-password',
-      '#forgot-password',
-      '#/forgot-password',
-      '#set-password',
-      '#/set-password',
-    ];
-
-    if (passwordHashFragments.some(fragment => hash.startsWith(fragment))) {
-      // Clear the hash from the URL without triggering a reload
-      globalThis.history.replaceState(
-        null,
-        '',
-        globalThis.location.pathname + globalThis.location.search
-      );
-    }
-  }, []);
-
-  // Store redirect URL from query params on mount
-  useEffect(() => {
-    try {
-      const redirectUrl = new URL(globalThis.location.href).searchParams.get(
-        'redirect_url'
-      );
-      const sanitized = sanitizeRedirectUrl(redirectUrl);
-      if (sanitized) {
-        globalThis.sessionStorage.setItem(
-          AUTH_STORAGE_KEYS.REDIRECT_URL,
-          sanitized
-        );
-      }
-    } catch {
-      // Ignore errors
-    }
-  }, []);
+  // Shared auth page setup (hash cleanup, redirect URL storage)
+  useAuthPageSetup();
 
   // Handle email query parameter (e.g., from signup redirect)
   useEffect(() => {
@@ -164,11 +126,11 @@ export function SignInForm() {
 
         {/* Sign up suggestion when account not found */}
         {shouldSuggestSignUp && step === 'email' && (
-          <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center mt-4'>
+          <p className='text-sm text-secondary-token text-center mt-4'>
             No account found.{' '}
             <Link
               href='/signup'
-              className='text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md'
+              className='text-primary-token hover:underline focus-ring-themed rounded-md'
             >
               Sign up instead
             </Link>
