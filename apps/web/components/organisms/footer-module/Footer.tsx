@@ -284,10 +284,7 @@ export function Footer({
                 style={{ color: 'var(--linear-text-tertiary)' }}
               />
               {variant === 'minimal' && (
-                <p
-                  className='text-[11px] leading-4 font-normal tracking-tight'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
                   Made for musicians, by musicians
                 </p>
               )}

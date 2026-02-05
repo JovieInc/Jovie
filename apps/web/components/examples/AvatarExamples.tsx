@@ -8,7 +8,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,

@@ -46,11 +46,10 @@ function getCardHoverConfig(
 ): MotionProps['whileHover'] {
   if (!interactive) return undefined;
   return reducedMotion
-    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+    ? { boxShadow: '0 4px 6px -1px var(--shadow-color, rgba(0, 0, 0, 0.1))' }
     : {
         boxShadow:
-          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        borderColor: 'rgb(209, 213, 219)',
+          '0 10px 25px -5px var(--shadow-color, rgba(0, 0, 0, 0.1)), 0 10px 10px -5px var(--shadow-color, rgba(0, 0, 0, 0.04))',
       };
 }
 
@@ -167,8 +166,8 @@ export function FeatureCard({
 
       <motion.div
         className={`
-          relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm 
-          border border-gray-200 dark:border-white/10 rounded-2xl p-8
+          relative bg-surface-1/80 backdrop-blur-sm
+          border border-subtle rounded-2xl p-8
         `}
         whileHover={cardWhileHover}
         transition={cardTransition}
@@ -184,21 +183,21 @@ export function FeatureCard({
         </div>
 
         {/* Title */}
-        <h3 className='mt-6 text-xl font-semibold text-gray-900 dark:text-white'>
+        <h3 className='mt-6 text-xl font-semibold text-primary-token'>
           {title}
         </h3>
 
         {/* Metric badge */}
         {metric && (
           <div className='mt-2'>
-            <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80'>
+            <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-surface-2 text-secondary-token'>
               {metric}
             </span>
           </div>
         )}
 
         {/* Description */}
-        <p className='mt-4 text-gray-600 dark:text-white/70 leading-relaxed'>
+        <p className='mt-4 text-secondary-token leading-relaxed'>
           {description}
         </p>
       </motion.div>

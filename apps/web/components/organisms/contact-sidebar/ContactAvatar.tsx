@@ -9,7 +9,7 @@
 import { BadgeCheck } from 'lucide-react';
 import { memo } from 'react';
 
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
 import { formatUsername } from './utils';

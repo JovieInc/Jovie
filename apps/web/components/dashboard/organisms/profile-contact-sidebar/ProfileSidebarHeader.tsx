@@ -9,9 +9,9 @@
 import { Check, Contact, Copy, ExternalLink, QrCode, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 
 interface ProfileSidebarHeaderProps {

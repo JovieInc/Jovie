@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import ErrorBoundary from '@/components/atoms/ErrorBoundary';
+import ErrorBoundary from '@/components/organisms/ErrorBoundary';
 
 interface ErrorProps {
   readonly error: Error & { digest?: string };

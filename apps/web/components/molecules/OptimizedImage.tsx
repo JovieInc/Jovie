@@ -8,10 +8,10 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { PlaceholderImage } from '@/components/atoms/PlaceholderImage';
 import { generateSEOAltText } from '@/lib/images/seo';
 import { versionImageUrl } from '@/lib/images/versioning';
 import { cn } from '@/lib/utils';
-import { PlaceholderImage } from './PlaceholderImage';
 
 interface OptimizedImageProps {
   readonly src?: string | null;

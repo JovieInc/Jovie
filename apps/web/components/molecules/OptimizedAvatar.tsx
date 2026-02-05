@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
+import { Avatar, type AvatarProps } from '@/components/molecules/Avatar';
 
 interface OptimizedAvatarProps {
   readonly src: string | null | undefined;

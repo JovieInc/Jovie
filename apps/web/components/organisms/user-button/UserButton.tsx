@@ -5,8 +5,8 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
-import { Avatar } from '../../atoms/Avatar/Avatar';
 import { Icon } from '../../atoms/Icon';
+import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
 

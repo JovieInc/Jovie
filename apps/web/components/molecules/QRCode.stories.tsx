@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QRCode } from './QRCode';
 
 const meta: Meta<typeof QRCode> = {
-  title: 'Atoms/QRCode',
+  title: 'Molecules/QRCode',
   component: QRCode,
   parameters: {
     layout: 'centered',

@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Avatar } from '@/components/atoms/Avatar';
-import type { AvatarProps } from './Avatar';
+import { Avatar, type AvatarProps } from '@/components/molecules/Avatar';
 
 /**
  * @deprecated Use `Avatar` directly. This wrapper preserves legacy sizing while delegating to the unified Avatar.

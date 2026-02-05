@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { parseAsInteger, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import * as React from 'react';
-import { DashboardErrorFallback } from '@/components/atoms/DashboardErrorFallback';
+import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { audienceSortFields } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';

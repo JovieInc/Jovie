@@ -58,15 +58,25 @@ export function DSPButton({
       disabled={disabled}
       size={sizeMap[size]}
       style={{
-        backgroundColor: disabled ? '#9CA3AF' : backgroundColor,
-        color: disabled ? '#FFFFFF' : textColor,
+        backgroundColor: disabled ? undefined : backgroundColor,
+        color: disabled ? undefined : textColor,
       }}
-      className={cn('w-full max-w-md', className)}
+      className={cn(
+        'w-full max-w-md',
+        disabled && 'bg-surface-3 text-tertiary-token',
+        className
+      )}
+      aria-label={
+        /^https?:\/\//i.test(url)
+          ? `Open in ${name} (opens in new window)`
+          : `Open in ${name}`
+      }
       {...props}
     >
       <span className='inline-flex items-center gap-2'>
         <span
           className='shrink-0'
+          aria-hidden='true'
           // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
           dangerouslySetInnerHTML={{ __html: sanitizedLogo }}
         />

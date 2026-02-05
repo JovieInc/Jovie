@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { OptimizedImage } from '@/components/atoms/OptimizedImage';
+import { OptimizedImage } from '@/components/molecules/OptimizedImage';
 
 // Mock next/image
 vi.mock('next/image', () => ({

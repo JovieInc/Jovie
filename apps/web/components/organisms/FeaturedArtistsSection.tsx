@@ -82,6 +82,7 @@ function VirtualizedCreatorsRow({
 }: VirtualizedCreatorsRowProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual API limitation
   const virtualizer = useVirtualizer({
     count: creators.length,
     getScrollElement: () => scrollRef.current,
@@ -160,10 +161,10 @@ export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
         {/* Desktop: horizontal scroll with fade */}
         <div className='hidden md:block relative'>
           {/* Left fade gradient - more subtle */}
-          <div className='absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          <div className='absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-base to-transparent z-10 pointer-events-none' />
 
           {/* Right fade gradient - more subtle */}
-          <div className='absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          <div className='absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-base to-transparent z-10 pointer-events-none' />
 
           <VirtualizedCreatorsRow
             creators={creators}
@@ -183,10 +184,10 @@ export const FeaturedCreatorsSection = memo(function FeaturedCreatorsSection({
         {/* Mobile: swipe with fade */}
         <div className='md:hidden relative'>
           {/* Left fade gradient - mobile, more subtle */}
-          <div className='absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          <div className='absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-base to-transparent z-10 pointer-events-none' />
 
           {/* Right fade gradient - mobile, more subtle */}
-          <div className='absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          <div className='absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-base to-transparent z-10 pointer-events-none' />
 
           <VirtualizedCreatorsRow
             creators={creators}
