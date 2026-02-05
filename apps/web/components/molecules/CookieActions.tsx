@@ -47,7 +47,7 @@ export function CookieActions({
         <button
           type='button'
           onClick={onReject}
-          className='flex-1 sm:flex-none transition-opacity hover:opacity-80'
+          className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={secondaryButtonStyle}
         >
           Reject
@@ -55,7 +55,7 @@ export function CookieActions({
         <button
           type='button'
           onClick={onCustomize}
-          className='flex-1 sm:flex-none transition-opacity hover:opacity-80'
+          className='flex-1 sm:flex-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={secondaryButtonStyle}
         >
           Customize
@@ -64,7 +64,7 @@ export function CookieActions({
       <button
         type='button'
         onClick={onAcceptAll}
-        className='w-full sm:w-auto transition-opacity hover:opacity-90'
+        className='w-full sm:w-auto transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
         style={primaryButtonStyle}
       >
         Accept All

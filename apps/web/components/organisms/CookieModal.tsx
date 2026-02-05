@@ -174,7 +174,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         <button
           type='button'
           onClick={onClose}
-          className='transition-opacity hover:opacity-80'
+          className='transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={secondaryButtonStyle}
         >
           Cancel
@@ -182,7 +182,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         <button
           type='button'
           onClick={save}
-          className='transition-opacity hover:opacity-90'
+          className='transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
           style={primaryButtonStyle}
         >
           Save preferences

@@ -129,7 +129,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           <button
             type='button'
             onClick={handleReject}
-            className='transition-opacity hover:opacity-80'
+            className='transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
             style={secondaryButtonStyle}
           >
             Decline
@@ -137,7 +137,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           <button
             type='button'
             onClick={handleAccept}
-            className='transition-opacity hover:opacity-90'
+            className='transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
             style={primaryButtonStyle}
           >
             Accept
@@ -145,7 +145,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
           <button
             type='button'
             onClick={handleReject}
-            className='h-8 w-8 sm:hidden flex items-center justify-center transition-opacity hover:opacity-80'
+            className='h-8 w-8 sm:hidden flex items-center justify-center transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
             style={{
               color: 'var(--linear-text-secondary)',
               borderRadius: 'var(--linear-radius-sm)',
