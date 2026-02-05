@@ -88,6 +88,14 @@ async function tryGetCachedState(
   return null;
 }
 
+/** Statuses that indicate waitlist approval */
+const APPROVED_STATUSES = [
+  'waitlist_approved',
+  'profile_claimed',
+  'onboarding_incomplete',
+  'active',
+] as const;
+
 /**
  * Determine user state from database query result
  */
@@ -103,29 +111,25 @@ function determineUserState(
 ): ProxyUserState {
   // No DB user → needs waitlist/signup
   if (!result?.dbUserId) {
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return DEFAULT_WAITLIST_STATE;
   }
 
   // Check waitlist approval using userStatus lifecycle
-  const approvedStatuses = [
-    'waitlist_approved',
-    'profile_claimed',
-    'onboarding_incomplete',
-    'active',
-  ];
-  const isWaitlistApproved = approvedStatuses.includes(result.userStatus ?? '');
+  const isWaitlistApproved = APPROVED_STATUSES.includes(
+    result.userStatus as (typeof APPROVED_STATUSES)[number]
+  );
 
   if (!isWaitlistApproved) {
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return DEFAULT_WAITLIST_STATE;
   }
 
   // Has approval but no profile or incomplete → needs onboarding
   if (!result.profileId || !result.profileComplete) {
-    return { needsWaitlist: false, needsOnboarding: true, isActive: false };
+    return NEEDS_ONBOARDING_STATE;
   }
 
   // Fully active user
-  return { needsWaitlist: false, needsOnboarding: false, isActive: true };
+  return ACTIVE_USER_STATE;
 }
 
 /**
@@ -151,6 +155,20 @@ const DEFAULT_WAITLIST_STATE: ProxyUserState = {
   needsWaitlist: true,
   needsOnboarding: false,
   isActive: false,
+};
+
+/** State for users who need onboarding */
+const NEEDS_ONBOARDING_STATE: ProxyUserState = {
+  needsWaitlist: false,
+  needsOnboarding: true,
+  isActive: false,
+};
+
+/** State for fully active users */
+const ACTIVE_USER_STATE: ProxyUserState = {
+  needsWaitlist: false,
+  needsOnboarding: false,
+  isActive: true,
 };
 
 /**
