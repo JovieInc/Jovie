@@ -232,6 +232,7 @@ export function QRCode({...}) {
 ## Files Requiring Changes
 
 ### Critical (5 files)
+
 - `/apps/web/components/atoms/OptimizedImage.tsx`
 - `/apps/web/components/atoms/Avatar/Avatar.tsx`
 - `/apps/web/components/atoms/QRCode.tsx`
@@ -239,6 +240,7 @@ export function QRCode({...}) {
 - `/apps/web/components/atoms/ErrorBoundary.tsx`
 
 ### Medium (8 files)
+
 - `/apps/web/components/atoms/ProfileNavButton.tsx`
 - `/apps/web/components/atoms/AmountSelector.tsx`
 - `/apps/web/components/atoms/ProgressIndicator.tsx`
