@@ -46,6 +46,22 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
 
+### Change Detection (Path Guards)
+
+`ci-change-detect` runs once per workflow and decides which heavy jobs should run (build, tests, E2E, Drizzle). Downstream jobs read its outputs instead of re-running path checks, which reduces YAML duplication and avoids drift.
+
+## CI Overview (PR vs Main)
+
+```mermaid
+flowchart TD
+  PR["PR to main"] --> Fast["Fast checks (typecheck + lint + guardrails)"]
+  Fast -->|label: testing| FullPR["Full CI (build + unit + e2e + db)"]
+  Fast -->|no label| SkipPR["Skip full CI jobs"]
+  Main["Push to main"] --> FullMain["Full CI (build + unit + e2e)"]
+  FullMain --> Deploy["Deploy to production"]
+  Deploy --> Canary["Canary health gate + smoke tests"]
+```
+
 ## Auto-Merge
 
 The `auto-merge.yml` workflow handles automatic merging for:

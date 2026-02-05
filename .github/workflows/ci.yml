@@ -59,26 +59,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
+      - id: skip_docs
+        uses: ./.github/actions/skip-docs-only
+      - name: Skip guardrails (docs-only)
+        if: ${{ steps.skip_docs.outputs.skip == 'true' }}
         run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping guardrails."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping guardrails."
-            exit 0
-          fi
+          echo "Docs-only or empty diff. Skipping guardrails."
+          exit 0
       - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
       - name: Next.js proxy guard
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         run: pnpm --filter=@jovie/web run next:proxy-guard
 
   ci-biome:
@@ -89,26 +80,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
+      - id: skip_docs
+        uses: ./.github/actions/skip-docs-only
+      - name: Skip Biome (docs-only)
+        if: ${{ steps.skip_docs.outputs.skip == 'true' }}
         run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping Biome checks."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping Biome checks."
-            exit 0
-          fi
+          echo "Docs-only or empty diff. Skipping Biome checks."
+          exit 0
       - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
       - name: Run Biome CI (lint + format)
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         run: |
           # For PRs: only lint changed files (faster, pre-commit already ran on local)
           # For pushes to main: full lint to catch any issues
@@ -135,26 +117,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
+      - id: skip_docs
+        uses: ./.github/actions/skip-docs-only
+      - name: Skip ESLint (docs-only)
+        if: ${{ steps.skip_docs.outputs.skip == 'true' }}
         run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping ESLint."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping ESLint."
-            exit 0
-          fi
+          echo "Docs-only or empty diff. Skipping ESLint."
+          exit 0
       - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
       - name: Run ESLint server boundary checks
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         run: pnpm --filter=@jovie/web run lint:server-boundaries
 
   ci-typecheck:
@@ -166,26 +139,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
+      - id: skip_docs
+        uses: ./.github/actions/skip-docs-only
+      - name: Skip typecheck (docs-only)
+        if: ${{ steps.skip_docs.outputs.skip == 'true' }}
         run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping typecheck."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping typecheck."
-            exit 0
-          fi
+          echo "Docs-only or empty diff. Skipping typecheck."
+          exit 0
       - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
       - name: Cache Turbo
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: .turbo
@@ -194,6 +158,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: |
@@ -204,10 +169,57 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
+        if: ${{ steps.skip_docs.outputs.skip != 'true' }}
         run: pnpm turbo typecheck --filter=@jovie/web
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+  ci-change-detect:
+    name: Change Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build_run_full_ci: ${{ steps.build.outputs.run_full_ci }}
+      test_run_full_ci: ${{ steps.test.outputs.run_full_ci }}
+      e2e_run_full_ci: ${{ steps.e2e.outputs.run_full_ci }}
+      drizzle_run_full_ci: ${{ steps.drizzle.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+      - id: build
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'build'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+      - id: test
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+      - id: e2e
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+      - id: drizzle
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'drizzle'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
 
   neon-db:
     name: Neon DB
@@ -300,32 +312,22 @@ jobs:
     name: Migration Guard
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
+    needs: [ci-change-detect]
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.drizzle_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
-      # Skip notification (updated condition)
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci != 'true'
         run: |
           echo "Skipping migration guard as no DB/schema paths were changed."
           exit 0
       - name: Run Migration Guard
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: |
           # Make script executable
           chmod +x apps/web/scripts/check-migrations.sh
@@ -340,31 +342,20 @@ jobs:
 
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
+    needs: [neon-db, ci-change-detect]  # Optimized: only needs DB, can run parallel with typecheck/lint
     # Drizzle check runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.drizzle_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
 
-      # Check if Drizzle-related changes require running this job
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci != 'true'
         run: |
           echo "Skipping Drizzle check as no DB/schema paths were changed."
           echo "To force a full CI run, add the 'testing' label to the PR."
@@ -380,7 +371,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: |
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           if [ -n "$CANDIDATE" ]; then
@@ -391,7 +382,7 @@ jobs:
           fi
 
       - name: Fail if Neon DB URL is missing
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: |
           if [[ -z "$DATABASE_URL" ]]; then
             echo "No Neon ephemeral DATABASE_URL available. Refusing to run Drizzle check against staging/production DBs."
@@ -402,7 +393,7 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Drizzle Check
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:check
 
   ci-fast:
@@ -419,10 +410,11 @@ jobs:
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
+    needs: [ci-change-detect]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.drizzle_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -437,25 +429,15 @@ jobs:
           protected_branches: 'main,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
-
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci != 'true'
         run: |
           echo "Skipping DB migrate check: no DB/schema/migration paths were changed."
           exit 0
 
       - name: Determine sanitized Neon branch name
         id: sanitize-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: |
           RAW="${{ github.head_ref }}"
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
@@ -467,7 +449,7 @@ jobs:
 
       - name: Create or reuse Neon branch (with retry)
         id: create-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -476,7 +458,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: |
           CANDIDATE="${{ steps.create-branch.outputs.db_url }}"
           if [ -z "$CANDIDATE" ]; then
@@ -486,10 +468,10 @@ jobs:
           echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.drizzle_run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -553,29 +535,19 @@ jobs:
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Build runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-change-detect]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.build_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
 
-      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'build'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
       # Skip remaining steps if no relevant changes
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.build_run_full_ci != 'true'
         run: |
           echo "Skipping full CI as no critical paths were changed."
           echo "To force a full CI run, add the 'testing' label to the PR."
@@ -583,11 +555,11 @@ jobs:
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.build_run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Next build cache
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.build_run_full_ci == 'true'
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: .next/cache
@@ -596,16 +568,18 @@ jobs:
             ${{ runner.os }}-next-
 
       - name: Build
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
+        if: needs.ci-change-detect.outputs.build_run_full_ci == 'true'
+        run: pnpm turbo build --filter=@jovie/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
       - name: Pre-deploy Lighthouse performance check
-        if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: needs.ci-change-detect.outputs.build_run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           cd apps/web
 
@@ -644,42 +618,30 @@ jobs:
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
     # Unit tests run on all PRs (critical + changed) and push to main
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    needs: [ci-change-detect]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.test_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0  # Full history for vitest --changed
 
-      # Check if test-related changes require running this job
-      # For PRs: use path guard to skip docs-only changes (unless 'testing' label)
-      # For push to main: only run if test-related paths changed
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
       # Skip remaining steps if no relevant changes
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci != 'true'
         run: |
           echo "Skipping unit tests as no critical paths were changed."
           exit 0
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Load quarantined unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
         id: quarantine
         run: |
           FILE="apps/web/tests/quarantine.json"
@@ -701,25 +663,27 @@ jobs:
           fi
 
       - name: Run unit tests
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
         run: |
-          # Enable coverage on main branch and PRs for Codecov integration
-          COVERAGE_FLAG="--coverage"
-
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests with coverage"
+            COVERAGE_FLAG="--coverage"
+            echo "COVERAGE_ENABLED=true" >> $GITHUB_ENV
             # Run only *.critical.test.ts files - vitest matches "critical" substring in file paths
             # Full test suite runs in nightly CI, not on every main push
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running critical tests with coverage + tests changed since ${{ github.base_ref }}"
-            # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
-            # Then run tests for changed files (coverage already generated above)
+            echo "🔍 PR: Running critical tests + tests changed since ${{ github.base_ref }}"
+            echo "COVERAGE_ENABLED=false" >> $GITHUB_ENV
+            # First run critical tests (~8s) - vitest matches "critical" substring in file paths
+            cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            # Then run tests for changed files
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
             pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "📦 Full suite with coverage"
+            COVERAGE_FLAG="--coverage"
+            echo "COVERAGE_ENABLED=true" >> $GITHUB_ENV
             pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           fi
         env:
@@ -727,7 +691,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run quarantined unit tests (retries)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
         run: cd apps/web && pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
@@ -735,7 +699,7 @@ jobs:
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Upload coverage to Codecov
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true' && env.COVERAGE_ENABLED == 'true'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -749,40 +713,30 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
-    needs: [ci-fast]
+    needs: [ci-fast, ci-change-detect]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     # Reduced from 15 to 10 min after consolidating smoke tests (19 → 6 tests)
     timeout-minutes: 10
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.e2e_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
 
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: false
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
-
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci != 'true'
         run: |
           echo "Skipping E2E smoke; no E2E-relevant paths changed."
           exit 0
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
 
       - name: Create ephemeral Neon database branch (with retry)
         id: neon-branch
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -791,7 +745,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations (ephemeral Neon)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
@@ -800,7 +754,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
@@ -809,11 +763,11 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Run E2E Smoke (Chromium)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
           NODE_ENV: test
@@ -824,7 +778,7 @@ jobs:
         run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
+        if: failure() && needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
@@ -834,7 +788,7 @@ jobs:
           retention-days: 3
 
       - name: Cleanup ephemeral Neon branch
-        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        if: always() && needs.ci-change-detect.outputs.e2e_run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
         continue-on-error: true
         run: |
           curl -sS -X DELETE \
@@ -845,40 +799,30 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [ci-fast, ci-build, neon-db]
+    needs: [ci-fast, ci-build, neon-db, ci-change-detect]
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
+      run_full_ci: ${{ needs.ci-change-detect.outputs.e2e_run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 2
 
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci != 'true'
         run: |
           echo "Skipping E2E DB migrate as no critical paths were changed."
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       - name: Setup Node.js and pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Resolve Neon DB URL (job-local, with retry)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         id: resolve_neon
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
@@ -888,7 +832,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Resolve DATABASE_URL for E2E
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         run: |
           CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           if [ -n "$CANDIDATE" ]; then
@@ -898,7 +842,7 @@ jobs:
           fi
 
       - name: Fail if Neon DB URL is missing (E2E)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         run: |
           if [[ -z "$DATABASE_URL" ]]; then
             echo "No Neon ephemeral DATABASE_URL available. Refusing to run E2E against staging/production DBs."
@@ -906,7 +850,7 @@ jobs:
           fi
 
       - name: Run migrations for E2E DB
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.e2e_run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
@@ -1115,7 +1059,8 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    needs: [ci-typecheck]
+    needs: [ci-typecheck, ci-change-detect]
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -1123,31 +1068,21 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check for relevant changes
-        id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
-
       - name: Skip notification
-        if: steps.check_changes.outputs.run_full_ci != 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci != 'true'
         run: |
           echo "Skipping test performance budgets; no relevant paths changed."
           exit 0
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
 
       - name: Generate test performance profile
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
         run: pnpm test:profile
 
       - name: Enforce test performance budgets
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: needs.ci-change-detect.outputs.test_run_full_ci == 'true'
         run: |
           SUITE="critical"
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then

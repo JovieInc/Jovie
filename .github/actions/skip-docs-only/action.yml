@@ -1,0 +1,41 @@
+name: 'Skip docs-only changes'
+description: 'Detects docs-only or empty PR diffs to skip heavy jobs'
+outputs:
+  skip:
+    description: 'true if job should be skipped'
+    value: ${{ steps.diff.outputs.skip }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine whether to skip
+      id: diff
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if [ -z "${GITHUB_BASE_REF:-}" ]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        git fetch origin "${GITHUB_BASE_REF}" --depth=1
+        CHANGED_FILES=$(git diff --name-only "origin/${GITHUB_BASE_REF}" HEAD)
+
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "No diff vs base branch (merge-only / empty PR update)."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+          echo "Docs-only change detected."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "skip=false" >> "$GITHUB_OUTPUT"
