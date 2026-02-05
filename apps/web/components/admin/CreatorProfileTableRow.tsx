@@ -258,7 +258,7 @@ function CreatorProfileTableRowComponent({
         className={cn(
           'px-4 py-3 align-middle',
           isChecked
-            ? 'bg-[#ebebf6] dark:bg-[#1b1d38]'
+            ? 'bg-accent-subtle'
             : isSelected && 'bg-base dark:bg-surface-2'
         )}
       >

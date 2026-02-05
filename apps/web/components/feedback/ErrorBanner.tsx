@@ -84,7 +84,7 @@ export function ErrorBanner({
           onClick={action.onClick}
           className={cn(
             actionClass,
-            'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+            'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
           )}
         >
           {action.label}
@@ -99,7 +99,7 @@ export function ErrorBanner({
         onClick={action.onClick}
         className={cn(
           actionClass,
-          'border border-red-500/50 bg-red-500/15 text-[#fce2e2] shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:bg-red-500/25 hover:border-red-400/70 dark:border-red-500/40 dark:bg-red-900/30 dark:hover:bg-red-900/45'
+          'border border-error/50 bg-error/15 text-error-foreground shadow-lg hover:bg-error/25 hover:border-error/70'
         )}
       >
         {action.label}

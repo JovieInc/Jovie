@@ -167,7 +167,7 @@ export function WaitlistSocialStep({
             <p
               id='waitlist-primary-social-url-error'
               role='alert'
-              className='text-sm text-red-400'
+              className='text-sm text-error-foreground'
             >
               {fieldErrors.primarySocialUrl[0]}
             </p>

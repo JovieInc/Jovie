@@ -91,6 +91,7 @@ export function TourDatesManager({
     const id = tourDateToDelete;
     // Optimistically remove from list
     const previousTourDates = tourDates;
+    const previousSelectedTourDate = selectedTourDate;
     setTourDates(prev => prev.filter(td => td.id !== id));
     if (selectedTourDate?.id === id) {
       setSelectedTourDate(null);
@@ -102,6 +103,7 @@ export function TourDatesManager({
     } catch {
       // Rollback on error
       setTourDates(previousTourDates);
+      setSelectedTourDate(previousSelectedTourDate);
       toast.error('Failed to delete tour date');
     }
   }, [tourDateToDelete, selectedTourDate, tourDates, deleteMutation]);

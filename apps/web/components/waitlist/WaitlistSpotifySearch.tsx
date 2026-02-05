@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
+import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import {
   type KeyboardEvent,
@@ -454,18 +455,7 @@ export function WaitlistSpotifySearch({
                   </div>
                   {artist.verified && (
                     <div className='shrink-0 text-brand-spotify'>
-                      <svg
-                        className='w-4 h-4'
-                        viewBox='0 0 20 20'
-                        fill='currentColor'
-                        aria-hidden='true'
-                      >
-                        <path
-                          fillRule='evenodd'
-                          d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-                          clipRule='evenodd'
-                        />
-                      </svg>
+                      <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                     </div>
                   )}
                 </button>
@@ -490,20 +480,10 @@ export function WaitlistSpotifySearch({
             onMouseEnter={() => setActiveIndex(manualAddIndex)}
           >
             <div className='w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center'>
-              <svg
-                className='w-5 h-5 text-tertiary-token'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={2}
+              <Link2
+                className='h-5 w-5 text-tertiary-token'
                 aria-hidden='true'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'
-                />
-              </svg>
+              />
             </div>
             <div className='flex-1'>
               <div className='font-medium text-primary-token'>

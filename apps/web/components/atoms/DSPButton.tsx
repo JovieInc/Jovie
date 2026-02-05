@@ -66,7 +66,11 @@ export function DSPButton({
         disabled && 'bg-surface-3 text-tertiary-token',
         className
       )}
-      aria-label={`Open in ${name} (opens in new window)`}
+      aria-label={
+        /^https?:\/\//i.test(url)
+          ? `Open in ${name} (opens in new window)`
+          : `Open in ${name}`
+      }
       {...props}
     >
       <span className='inline-flex items-center gap-2'>

@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@jovie/ui';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 export interface ConfirmDialogProps {
   readonly open: boolean;
@@ -40,14 +40,18 @@ export function ConfirmDialog({
   isLoading = false,
 }: ConfirmDialogProps) {
   const [isPending, setIsPending] = useState(false);
+  const handlingRef = useRef(false);
 
   const handleConfirm = async () => {
+    if (handlingRef.current) return;
+    handlingRef.current = true;
     setIsPending(true);
     try {
       await onConfirm();
       onOpenChange(false);
     } finally {
       setIsPending(false);
+      handlingRef.current = false;
     }
   };
 
