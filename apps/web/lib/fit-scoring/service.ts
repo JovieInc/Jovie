@@ -46,25 +46,25 @@ async function batchUpdateFitScores(
   const now = new Date();
   const ids = scoredProfiles.map(p => p.id);
 
-  // Build CASE expressions for fit_score and fit_score_breakdown
-  // Note: IDs are UUIDs from our database, scores are calculated integers
-  const scoreCases = scoredProfiles
-    .map(p => `WHEN id = '${p.id}' THEN ${p.score}`)
-    .join(' ');
+  // Build parameterized CASE expressions for fit_score and fit_score_breakdown
+  const scoreCaseExpr = drizzleSql.join(
+    scoredProfiles.map(p => drizzleSql`WHEN id = ${p.id} THEN ${p.score}`),
+    drizzleSql` `
+  );
 
-  // Escape single quotes in JSON for PostgreSQL string literals
-  const breakdownCases = scoredProfiles
-    .map(p => {
-      const jsonStr = JSON.stringify(p.breakdown).replace(/'/g, "''");
-      return `WHEN id = '${p.id}' THEN '${jsonStr}'::jsonb`;
-    })
-    .join(' ');
+  const breakdownCaseExpr = drizzleSql.join(
+    scoredProfiles.map(
+      p =>
+        drizzleSql`WHEN id = ${p.id} THEN ${JSON.stringify(p.breakdown)}::jsonb`
+    ),
+    drizzleSql` `
+  );
 
   await db.execute(drizzleSql`
     UPDATE creator_profiles
     SET
-      fit_score = CASE ${drizzleSql.raw(scoreCases)} END,
-      fit_score_breakdown = CASE ${drizzleSql.raw(breakdownCases)} END,
+      fit_score = CASE ${scoreCaseExpr} END,
+      fit_score_breakdown = CASE ${breakdownCaseExpr} END,
       fit_score_updated_at = ${now},
       updated_at = ${now}
     WHERE id = ANY(${ids})
