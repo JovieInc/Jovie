@@ -36,6 +36,7 @@ async function maybeGenerateTitle(
   messageContent: string
 ): Promise<void> {
   const autoTitle = messageContent.slice(0, 50).trim();
+  if (!autoTitle) return;
   const suffix = autoTitle.length >= 50 ? '...' : '';
   await db
     .update(chatConversations)
