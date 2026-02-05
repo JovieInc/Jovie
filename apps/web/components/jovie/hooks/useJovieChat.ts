@@ -157,6 +157,14 @@ export function useJovieChat({
                 queryKey: queryKeys.chat.conversations(),
               });
             },
+            onError: () => {
+              setChatError({
+                type: 'server',
+                message: 'Failed to save messages. Please try again.',
+              });
+              pendingMessagesRef.current = null;
+              setIsSubmitting(false);
+            },
           }
         );
       }
