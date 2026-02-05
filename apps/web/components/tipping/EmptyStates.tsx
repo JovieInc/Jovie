@@ -87,12 +87,10 @@ export function TippingEmptyState({
 
         {/* Text content */}
         <div className='space-y-2'>
-          <h3 className='text-xl font-semibold text-gray-800 dark:text-gray-100'>
+          <h3 className='text-xl font-semibold text-primary-token'>
             {config.title}
           </h3>
-          <p className='text-gray-600 dark:text-gray-400 max-w-md'>
-            {config.description}
-          </p>
+          <p className='text-secondary-token max-w-md'>{config.description}</p>
         </div>
       </div>
     </div>
@@ -171,7 +169,7 @@ export function TippingMetricsSkeleton({
       </div>
 
       {/* Table skeleton */}
-      <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-6 shadow-sm'>
+      <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-2xl p-6 shadow-sm'>
         <LoadingSkeleton
           height='h-6'
           width='w-48'
@@ -180,7 +178,7 @@ export function TippingMetricsSkeleton({
         />
         <div className='space-y-4'>
           {/* Table header */}
-          <div className='grid grid-cols-3 gap-4 pb-2 border-b border-gray-200/30 dark:border-white/10'>
+          <div className='grid grid-cols-3 gap-4 pb-2 border-b border-subtle'>
             <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />
             <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />
             <LoadingSkeleton height='h-5' width='w-full' rounded='sm' />

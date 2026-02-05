@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { OptimizedImage } from './OptimizedImage';
 
 const meta: Meta<typeof OptimizedImage> = {
-  title: 'Atoms/OptimizedImage',
+  title: 'Molecules/OptimizedImage',
   component: OptimizedImage,
   tags: ['autodocs'],
   parameters: {

@@ -134,8 +134,9 @@ const TicketsCell = memo(function TicketsCell({
       rel='noopener noreferrer'
       className='inline-flex items-center gap-1 text-accent hover:underline'
       onClick={event => event.stopPropagation()}
+      aria-label='Buy tickets (opens in new tab)'
     >
-      <Icon name='Ticket' className='h-4 w-4' />
+      <Icon name='Ticket' className='h-4 w-4' aria-hidden='true' />
       <span className='text-sm'>Buy</span>
     </a>
   );
