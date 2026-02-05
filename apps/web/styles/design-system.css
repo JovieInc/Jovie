@@ -10,6 +10,9 @@
  * @see https://linear.app/now/how-we-redesigned-the-linear-ui
  */
 
+/* Import Linear-specific tokens for marketing pages */
+@import "./linear-tokens.css";
+
 /* ============================================
    THEME INPUTS - The only 3 variables needed
    ============================================ */
@@ -677,4 +680,44 @@
   --liquid-glass-item-hover: oklch(100% 0 0 / 6%);
   --liquid-glass-item-active: oklch(100% 0 0 / 10%);
   --liquid-glass-item-selected: oklch(100% 0 0 / 12%);
+}
+
+/* ============================================
+   MARKETING MODE - Linear Theme Bridge
+   ============================================
+
+   Activate Linear styling on marketing pages by adding
+   [data-theme="linear"] to a parent element or using
+   the .linear-marketing class.
+
+   This maps Linear tokens to the existing design system
+   variables for seamless integration.
+*/
+
+[data-theme="linear"],
+.linear-marketing {
+  /* Map Linear text colors to design system */
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+
+  /* Map Linear backgrounds to design system */
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+
+  /* Map Linear borders to design system */
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+
+  /* Map Linear buttons to design system */
+  --color-btn-primary-bg: var(--linear-btn-primary-bg);
+  --color-btn-primary-fg: var(--linear-btn-primary-fg);
+  --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
+  --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
+
+  /* Map Linear interactive states */
+  --color-interactive-hover: var(--linear-bg-hover);
 }

@@ -6,51 +6,85 @@ const features = [
     icon: RefreshCw,
     title: 'Auto-updating',
     description: 'New releases sync instantly. Nothing to manage.',
-    iconColor: 'text-blue-500',
+    iconColor: '#3b82f6', // blue
   },
   {
     icon: Mail,
     title: 'Built-in fan capture',
     description: 'Email and SMS on every visit. Automatic.',
-    iconColor: 'text-violet-500',
+    iconColor: '#8b5cf6', // violet
   },
   {
     icon: Palette,
     title: 'Beautiful by default',
     description: 'One design, perfected. No choices, no guesswork.',
-    iconColor: 'text-pink-500',
+    iconColor: '#ec4899', // pink
   },
   {
     icon: BarChart3,
     title: 'Simple analytics',
     description: 'Know who visits and what converts.',
-    iconColor: 'text-amber-500',
+    iconColor: '#f59e0b', // amber
   },
 ];
 
 export function WhatYouGetSection() {
   return (
-    <section className='section-spacing-linear bg-base relative overflow-hidden'>
+    <section
+      className='section-spacing-linear relative overflow-hidden'
+      style={{ backgroundColor: 'var(--linear-bg-page)' }}
+    >
       <Container size='homepage'>
         <div className='max-w-5xl mx-auto'>
-          <h2 className='marketing-h2-linear text-center mb-12'>
+          <h2
+            className='text-center heading-gap-linear'
+            style={{
+              fontSize: 'var(--linear-h2-size)',
+              fontWeight: 'var(--linear-font-weight-medium)',
+              lineHeight: 'var(--linear-h2-leading)',
+              letterSpacing: 'var(--linear-h2-tracking)',
+              color: 'var(--linear-text-primary)',
+            }}
+          >
             What you get
           </h2>
 
-          <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto'>
+          <div
+            className='grid grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
+            style={{ gap: 'var(--linear-space-10)' }}
+          >
             {features.map(feature => {
               const Icon = feature.icon;
               return (
-                <div key={feature.title} className='flex items-start gap-3'>
-                  {/* Linear 16px icon variant with accent color */}
+                <div
+                  key={feature.title}
+                  className='flex items-start'
+                  style={{ gap: 'var(--linear-space-3)' }}
+                >
                   <div className='flex items-center justify-center w-4 h-4 shrink-0 mt-1'>
-                    <Icon className={`w-4 h-4 ${feature.iconColor}`} />
+                    <Icon
+                      className='w-4 h-4'
+                      style={{ color: feature.iconColor }}
+                    />
                   </div>
-                  <div className='space-y-1'>
-                    <h3 className='text-sm font-medium text-primary-token'>
+                  <div>
+                    <h3
+                      style={{
+                        fontSize: 'var(--linear-body-sm-size)',
+                        fontWeight: 'var(--linear-font-weight-medium)',
+                        color: 'var(--linear-text-primary)',
+                        marginBottom: 'var(--linear-space-1)',
+                      }}
+                    >
                       {feature.title}
                     </h3>
-                    <p className='text-sm leading-relaxed text-tertiary-token'>
+                    <p
+                      style={{
+                        fontSize: 'var(--linear-body-sm-size)',
+                        lineHeight: 1.6,
+                        color: 'var(--linear-text-tertiary)',
+                      }}
+                    >
                       {feature.description}
                     </p>
                   </div>
