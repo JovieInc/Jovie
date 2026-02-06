@@ -19,6 +19,13 @@ const DEFAULT_TTL_SECONDS = 60; // 1 minute default
 const MAX_MEMORY_CACHE_SIZE = 5000;
 
 /**
+ * Sentinel wrapper to distinguish cached null/undefined from cache miss.
+ * Without this, queries returning null (e.g., 404 paths) are never cached,
+ * causing repeated database hits (cache stampede).
+ */
+type CacheEntry<T> = { __sentinel: true; value: T };
+
+/**
  * In-memory LRU cache for process-local caching.
  * Provides sub-millisecond access for hot data.
  */
@@ -158,34 +165,38 @@ export async function cacheQuery<T>(
 
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
-    const memoryResult = memoryCache.get(cacheKey) as T | null;
-    if (memoryResult !== null) {
-      return memoryResult;
+    const memoryResult = memoryCache.get(cacheKey) as CacheEntry<T> | null;
+    if (memoryResult !== null && memoryResult.__sentinel) {
+      return memoryResult.value;
     }
   }
 
   // Layer 2: Try Redis if enabled
   if (useRedis) {
-    const redisResult = await tryReadFromRedis<T>(cacheKey);
-    if (redisResult !== null) {
+    const redisResult = await tryReadFromRedis<CacheEntry<T>>(cacheKey);
+    if (redisResult !== null && redisResult.__sentinel) {
       // Populate memory cache from Redis hit
       if (!skipMemoryCache) {
         memoryCache.set(cacheKey, redisResult, ttlMs);
       }
-      return redisResult;
+      return redisResult.value;
     }
   }
 
   // Layer 3: Cache miss - execute query
   const result = await queryFn();
 
+  // Wrap in sentinel so null/undefined results are cached too,
+  // preventing repeated DB queries on 404/bot paths
+  const wrapped: CacheEntry<T> = { __sentinel: true, value: result };
+
   // Populate caches (fire-and-forget for non-blocking)
   if (!skipMemoryCache) {
-    memoryCache.set(cacheKey, result, ttlMs);
+    memoryCache.set(cacheKey, wrapped, ttlMs);
   }
 
   if (useRedis) {
-    writeToRedis(cacheKey, result, ttlSeconds);
+    writeToRedis(cacheKey, wrapped, ttlSeconds);
   }
 
   return result;
@@ -216,6 +227,8 @@ export async function invalidateCache(key: string): Promise<void> {
  * Invalidate all cached queries matching a prefix.
  * Useful for invalidating related caches (e.g., all profile caches for a user).
  *
+ * Clears both in-memory and Redis caches so other instances don't serve stale data.
+ *
  * @param prefix - Key prefix to match
  */
 export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
@@ -231,9 +244,34 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
     });
   }
 
-  // For Redis, we'd need SCAN which isn't ideal for Upstash REST API
-  // For now, rely on TTL expiration for Redis prefix invalidation
-  // In a production scenario, consider using Redis Pub/Sub for cache invalidation
+  // Invalidate Redis cache using SCAN to find matching keys
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    const keysToDelete: string[] = [];
+    let cursor: string | number = 0;
+
+    do {
+      const result: [string | number, string[]] = await redis.scan(cursor, {
+        match: `${fullPrefix}*`,
+        count: 100,
+      });
+      cursor = result[0];
+      keysToDelete.push(...result[1]);
+    } while (cursor !== 0 && cursor !== '0');
+
+    if (keysToDelete.length > 0) {
+      await Promise.all(keysToDelete.map(key => redis.del(key)));
+      Sentry.addBreadcrumb({
+        category: 'db-cache',
+        message: `Invalidated ${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
+        level: 'info',
+      });
+    }
+  } catch (error) {
+    captureWarning('[db-cache] Redis prefix invalidation failed', { error });
+  }
 }
 
 /**
@@ -252,7 +290,8 @@ export function getCacheStats(): {
 /**
  * Clear all caches. Use with caution - primarily for testing.
  */
-export function clearAllCaches(): void {
+export async function clearAllCaches(): Promise<void> {
   memoryCache.clear();
-  // Redis cache will expire naturally via TTL
+  // Clear Redis cache entries matching our prefix
+  await invalidateCacheByPrefix('');
 }

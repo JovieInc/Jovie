@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  checkAdminCreatorIngestRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
 import {
   detectFullExtractionPlatform,
@@ -263,6 +267,29 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Rate limiting - prevents excessive external API calls from rapid ingestion
+    const rateLimitResult = await checkAdminCreatorIngestRateLimit(
+      entitlements.userId!
+    );
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: rateLimitResult.reason,
+          retryAfter: Math.ceil(
+            (rateLimitResult.reset.getTime() - Date.now()) / 1000
+          ),
+        },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 

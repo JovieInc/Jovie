@@ -37,6 +37,8 @@ export { parseWindowToMs, RATE_LIMITERS } from './config';
 // Pre-configured Limiter Instances
 export {
   // Admin
+  adminCreatorIngestLimiter,
+  adminFitScoresLimiter,
   adminImpersonateLimiter,
   // AI Chat
   aiChatLimiter,
@@ -45,6 +47,11 @@ export {
   avatarUploadLimiter,
   // AI Chat convenience function
   checkAiChatRateLimit,
+  // Admin convenience functions
+  checkAdminCreatorIngestRateLimit,
+  checkAdminFitScoresRateLimit,
+  // DSP convenience functions
+  checkDspDiscoveryRateLimit,
   checkOnboardingRateLimit,
   // Spotify convenience functions
   checkSpotifyClaimRateLimit,
@@ -55,6 +62,8 @@ export {
   checkTrackingRateLimit,
   // Dashboard
   dashboardLinksLimiter,
+  // DSP
+  dspDiscoveryLimiter,
   generalLimiter,
   getAllLimiters,
   handleCheckLimiter,

@@ -19,6 +19,10 @@ import {
   recalculateAllFitScores,
 } from '@/lib/fit-scoring';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  checkAdminFitScoresRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -134,6 +138,29 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Rate limiting - prevents runaway compute from repeated recalculations
+    const rateLimitResult = await checkAdminFitScoresRateLimit(
+      entitlements.userId!
+    );
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: rateLimitResult.reason,
+          retryAfter: Math.ceil(
+            (rateLimitResult.reset.getTime() - Date.now()) / 1000
+          ),
+        },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 
