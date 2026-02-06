@@ -84,6 +84,7 @@ export function ContactSidebarHeader({
 
   if (showActions) {
     // Copy profile link - primary action
+    // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
     primaryActions.push({
       id: 'copy',
       label: isCopied ? 'Copied!' : 'Copy profile link',
@@ -112,7 +113,7 @@ export function ContactSidebarHeader({
         id: 'open',
         label: 'Open profile',
         icon: ExternalLink,
-        href: `/${contact.username}`,
+        href: `/${contact?.username}`,
       }
     );
   }
