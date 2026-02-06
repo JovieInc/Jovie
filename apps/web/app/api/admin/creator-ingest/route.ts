@@ -3,10 +3,6 @@ import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import {
-  checkAdminCreatorIngestRateLimit,
-  createRateLimitHeaders,
-} from '@/lib/rate-limit';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
 import {
   detectFullExtractionPlatform,
@@ -34,6 +30,10 @@ import {
   isValidHandle,
   normalizeHandle,
 } from '@/lib/ingestion/strategies/linktree';
+import {
+  checkAdminCreatorIngestRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
@@ -270,18 +270,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Defensive check - userId should be defined after auth guards
+    const adminUserId = entitlements.userId;
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Rate limiting - prevents excessive external API calls from rapid ingestion
-    const rateLimitResult = await checkAdminCreatorIngestRateLimit(
-      entitlements.userId!
-    );
+    const rateLimitResult = await checkAdminCreatorIngestRateLimit(adminUserId);
     if (!rateLimitResult.success) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+      );
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
           message: rateLimitResult.reason,
-          retryAfter: Math.ceil(
-            (rateLimitResult.reset.getTime() - Date.now()) / 1000
-          ),
+          retryAfter,
         },
         {
           status: 429,

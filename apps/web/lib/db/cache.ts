@@ -14,7 +14,7 @@ import * as Sentry from '@sentry/nextjs';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
-const CACHE_PREFIX = 'db:cache:';
+const CACHE_PREFIX = 'db:cache:v2:';
 const DEFAULT_TTL_SECONDS = 60; // 1 minute default
 const MAX_MEMORY_CACHE_SIZE = 5000;
 
@@ -22,8 +22,10 @@ const MAX_MEMORY_CACHE_SIZE = 5000;
  * Sentinel wrapper to distinguish cached null/undefined from cache miss.
  * Without this, queries returning null (e.g., 404 paths) are never cached,
  * causing repeated database hits (cache stampede).
+ *
+ * Named CacheSentinel to avoid confusion with CacheEntry from pacer/cache.ts.
  */
-type CacheEntry<T> = { __sentinel: true; value: T };
+type CacheSentinel<T> = { __sentinel: true; value: T };
 
 /**
  * In-memory LRU cache for process-local caching.
@@ -165,7 +167,7 @@ export async function cacheQuery<T>(
 
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
-    const memoryResult = memoryCache.get(cacheKey) as CacheEntry<T> | null;
+    const memoryResult = memoryCache.get(cacheKey) as CacheSentinel<T> | null;
     if (memoryResult !== null && memoryResult.__sentinel) {
       return memoryResult.value;
     }
@@ -173,7 +175,7 @@ export async function cacheQuery<T>(
 
   // Layer 2: Try Redis if enabled
   if (useRedis) {
-    const redisResult = await tryReadFromRedis<CacheEntry<T>>(cacheKey);
+    const redisResult = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
     if (redisResult !== null && redisResult.__sentinel) {
       // Populate memory cache from Redis hit
       if (!skipMemoryCache) {
@@ -188,7 +190,7 @@ export async function cacheQuery<T>(
 
   // Wrap in sentinel so null/undefined results are cached too,
   // preventing repeated DB queries on 404/bot paths
-  const wrapped: CacheEntry<T> = { __sentinel: true, value: result };
+  const wrapped: CacheSentinel<T> = { __sentinel: true, value: result };
 
   // Populate caches (fire-and-forget for non-blocking)
   if (!skipMemoryCache) {
@@ -262,7 +264,16 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
     } while (cursor !== 0 && cursor !== '0');
 
     if (keysToDelete.length > 0) {
-      await Promise.all(keysToDelete.map(key => redis.del(key)));
+      // Batch deletes via pipeline to minimize HTTP round-trips
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
+        const batch = keysToDelete.slice(i, i + BATCH_SIZE);
+        const pipeline = redis.pipeline();
+        for (const key of batch) {
+          pipeline.del(key);
+        }
+        await pipeline.exec();
+      }
       Sentry.addBreadcrumb({
         category: 'db-cache',
         message: `Invalidated ${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,

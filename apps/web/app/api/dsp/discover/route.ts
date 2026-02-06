@@ -50,14 +50,16 @@ export async function POST(request: Request) {
     // Rate limiting - protects 3rd-party platform APIs
     const rateLimitResult = await checkDspDiscoveryRateLimit(userId);
     if (!rateLimitResult.success) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+      );
       return NextResponse.json(
         {
           success: false,
           error: 'Rate limit exceeded',
           message: rateLimitResult.reason,
-          retryAfter: Math.ceil(
-            (rateLimitResult.reset.getTime() - Date.now()) / 1000
-          ),
+          retryAfter,
         },
         {
           status: 429,

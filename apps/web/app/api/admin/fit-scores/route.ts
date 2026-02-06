@@ -141,18 +141,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Defensive check - userId should be defined after auth guards
+    const adminUserId = entitlements.userId;
+    if (!adminUserId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Rate limiting - prevents runaway compute from repeated recalculations
-    const rateLimitResult = await checkAdminFitScoresRateLimit(
-      entitlements.userId!
-    );
+    const rateLimitResult = await checkAdminFitScoresRateLimit(adminUserId);
     if (!rateLimitResult.success) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+      );
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
           message: rateLimitResult.reason,
-          retryAfter: Math.ceil(
-            (rateLimitResult.reset.getTime() - Date.now()) / 1000
-          ),
+          retryAfter,
         },
         {
           status: 429,

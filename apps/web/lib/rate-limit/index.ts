@@ -36,53 +36,37 @@ export type { RateLimiterName } from './config';
 export { parseWindowToMs, RATE_LIMITERS } from './config';
 // Pre-configured Limiter Instances
 export {
-  // Admin
   adminCreatorIngestLimiter,
   adminFitScoresLimiter,
   adminImpersonateLimiter,
-  // AI Chat
   aiChatLimiter,
   apiLimiter,
-  // Auth & User
   avatarUploadLimiter,
-  // AI Chat convenience function
-  checkAiChatRateLimit,
-  // Admin convenience functions
   checkAdminCreatorIngestRateLimit,
   checkAdminFitScoresRateLimit,
-  // DSP convenience functions
+  checkAiChatRateLimit,
   checkDspDiscoveryRateLimit,
   checkOnboardingRateLimit,
-  // Spotify convenience functions
   checkSpotifyClaimRateLimit,
   checkSpotifyPublicSearchRateLimit,
   checkSpotifyRefreshRateLimit,
   checkSpotifySearchRateLimit,
-  // Convenience functions
   checkTrackingRateLimit,
-  // Dashboard
   dashboardLinksLimiter,
-  // DSP
   dspDiscoveryLimiter,
   generalLimiter,
   getAllLimiters,
   handleCheckLimiter,
-  // Health
   healthLimiter,
-  // Onboarding
   onboardingLimiter,
-  // Payment
   paymentIntentLimiter,
   publicClickLimiter,
-  // Public
   publicProfileLimiter,
   publicVisitLimiter,
-  // Spotify
   spotifyClaimLimiter,
   spotifyPublicSearchLimiter,
   spotifyRefreshLimiter,
   spotifySearchLimiter,
-  // Tracking
   trackingClicksLimiter,
   trackingIpClicksLimiter,
   trackingIpVisitsLimiter,
