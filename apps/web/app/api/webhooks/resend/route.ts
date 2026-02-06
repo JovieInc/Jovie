@@ -288,7 +288,8 @@ async function processBounceOrComplaint(
   const creatorProfileId = await getCreatorByMessageId(data.email_id);
 
   // Add all recipients to suppression list in parallel
-  const suppressionResults = await Promise.all(
+  // Use Promise.allSettled to prevent one failure from losing the entire batch
+  const suppressionSettled = await Promise.allSettled(
     emails.map(email =>
       addSuppression(email, reason, 'webhook', {
         sourceEventId: eventId,
@@ -302,6 +303,31 @@ async function processBounceOrComplaint(
     )
   );
 
+  const suppressionResults = suppressionSettled
+    .filter(
+      (
+        r
+      ): r is PromiseFulfilledResult<{
+        email: string;
+        result: { success: boolean; error?: string; alreadyExists?: boolean };
+      }> => r.status === 'fulfilled'
+    )
+    .map(r => r.value);
+
+  // Log any rejected suppression attempts
+  for (const settled of suppressionSettled) {
+    if (settled.status === 'rejected') {
+      logger.error('[Resend Webhook] Suppression attempt threw unexpectedly', {
+        error:
+          settled.reason instanceof Error
+            ? settled.reason.message
+            : String(settled.reason),
+        eventId,
+        reason,
+      });
+    }
+  }
+
   logSuppressionResults(suppressionResults, eventId, reason);
 
   // Attribute bounce/complaint to the sending creator's reputation
@@ -310,7 +336,8 @@ async function processBounceOrComplaint(
   }
 
   // Log all delivery outcomes and stop campaign enrollments in parallel
-  await Promise.all([
+  // Use Promise.allSettled so one failure doesn't prevent other operations
+  const secondaryResults = await Promise.allSettled([
     // Log delivery outcomes
     ...emails.map(email =>
       logDelivery({
@@ -335,6 +362,19 @@ async function processBounceOrComplaint(
       )
     ),
   ]);
+
+  // Log any failures from secondary operations
+  for (const settled of secondaryResults) {
+    if (settled.status === 'rejected') {
+      logger.error('[Resend Webhook] Secondary operation failed', {
+        error:
+          settled.reason instanceof Error
+            ? settled.reason.message
+            : String(settled.reason),
+        eventId,
+      });
+    }
+  }
 }
 
 /**
