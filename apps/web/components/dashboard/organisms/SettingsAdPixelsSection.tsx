@@ -222,7 +222,10 @@ export function SettingsAdPixelsSection() {
 
       savePixels({
         facebookPixelId: (formData.get('facebookPixelId') as string) ?? '',
-        facebookAccessToken: getTokenIfModified('facebookAccessToken', 'facebook'),
+        facebookAccessToken: getTokenIfModified(
+          'facebookAccessToken',
+          'facebook'
+        ),
         googleMeasurementId:
           (formData.get('googleMeasurementId') as string) ?? '',
         googleApiSecret: getTokenIfModified('googleApiSecret', 'google'),
