@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
@@ -29,16 +28,11 @@ export function DashboardMobileTabs({
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
 
-  const adminItems = useMemo(
-    () => (isAdmin ? ADMIN_ITEMS : undefined),
-    [isAdmin]
-  );
-
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
       expandedItems={EXPANDED_ITEMS}
-      adminItems={adminItems}
+      adminItems={isAdmin ? ADMIN_ITEMS : undefined}
       className={cn('lg:hidden', className)}
     />
   );

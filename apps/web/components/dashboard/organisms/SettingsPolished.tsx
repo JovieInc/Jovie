@@ -36,7 +36,6 @@ export function SettingsPolished({
     useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const [isBillingLoading, setIsBillingLoading] = useState(false);
-  const notificationsEnabled = true;
 
   const handleBilling = async () => {
     setIsBillingLoading(true);
@@ -108,22 +107,7 @@ export function SettingsPolished({
       id: 'notifications',
       title: 'Notifications',
       description: 'Manage your email preferences and communication settings.',
-      render: () =>
-        notificationsEnabled ? (
-          <SettingsNotificationsSection />
-        ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-[14px] font-medium text-primary-token mb-2'>
-                Notifications are not available yet
-              </h3>
-              <p className='text-sm text-secondary'>
-                We&apos;re focused on getting the core Jovie profile experience
-                right before launching notifications.
-              </p>
-            </div>
-          </DashboardCard>
-        ),
+      render: () => <SettingsNotificationsSection />,
     },
     {
       id: 'branding',
