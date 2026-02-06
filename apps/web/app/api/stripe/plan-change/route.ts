@@ -150,9 +150,11 @@ export async function GET() {
       );
     }
 
-    const planOptions = await getAvailablePlanChanges(
-      customerResult.customerId
-    );
+    // Fetch plan options and subscription in parallel (independent calls)
+    const [planOptions, subscription] = await Promise.all([
+      getAvailablePlanChanges(customerResult.customerId),
+      getActiveSubscription(customerResult.customerId),
+    ]);
 
     if (!planOptions) {
       return NextResponse.json(
@@ -161,8 +163,6 @@ export async function GET() {
       );
     }
 
-    // Check if there's a scheduled change
-    const subscription = await getActiveSubscription(customerResult.customerId);
     const hasScheduledChange = !!subscription?.schedule;
 
     return NextResponse.json(
