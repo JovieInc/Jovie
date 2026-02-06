@@ -366,7 +366,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         });
       }
     },
-    [links, linkIsVisible, idFor, onLinkAdded]
+    [links, idFor, onLinkAdded]
   );
 
   /**

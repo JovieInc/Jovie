@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { type ModelMessage, streamText, tool } from 'ai';
@@ -11,10 +11,7 @@ import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
-import {
-  createAuthenticatedCorsHeaders,
-  NO_CACHE_HEADERS,
-} from '@/lib/http/headers';
+import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
@@ -358,15 +355,12 @@ function createProfileEditTool(context: ArtistContext) {
 /**
  * OPTIONS - CORS preflight handler
  */
-export async function OPTIONS(req: Request) {
-  const origin = req.headers.get('origin');
-  const corsHeaders = createAuthenticatedCorsHeaders(origin);
-
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      ...NO_CACHE_HEADERS,
-      ...corsHeaders,
+      ...CORS_HEADERS,
+      'Access-Control-Max-Age': '86400',
     },
   });
 }
@@ -377,7 +371,7 @@ export async function POST(req: Request) {
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
-      { status: 401, headers: NO_CACHE_HEADERS }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
 
@@ -395,7 +389,7 @@ export async function POST(req: Request) {
       {
         status: 429,
         headers: {
-          ...NO_CACHE_HEADERS,
+          ...CORS_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
         },
       }
@@ -413,7 +407,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body' },
-      { status: 400, headers: NO_CACHE_HEADERS }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -426,7 +420,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: 'Missing profileId or artistContext' },
-      { status: 400, headers: NO_CACHE_HEADERS }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
@@ -435,24 +429,12 @@ export async function POST(req: Request) {
   if (messagesError) {
     return NextResponse.json(
       { error: messagesError },
-      { status: 400, headers: NO_CACHE_HEADERS }
+      { status: 400, headers: CORS_HEADERS }
     );
   }
 
   // After validation, we know messages is a valid ModelMessage array
   const validatedMessages = messages as ModelMessage[];
-
-  // Check for Anthropic API key
-  if (!process.env.ANTHROPIC_API_KEY) {
-    Sentry.captureMessage('ANTHROPIC_API_KEY is not configured', {
-      level: 'error',
-      tags: { feature: 'ai-chat' },
-    });
-    return NextResponse.json(
-      { error: 'AI chat is not configured. Please contact support.' },
-      { status: 503, headers: NO_CACHE_HEADERS }
-    );
-  }
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   let artistContext: ArtistContext;
@@ -461,7 +443,7 @@ export async function POST(req: Request) {
     if (!context) {
       return NextResponse.json(
         { error: 'Profile not found or unauthorized' },
-        { status: 404, headers: NO_CACHE_HEADERS }
+        { status: 404, headers: CORS_HEADERS }
       );
     }
     artistContext = context;
@@ -474,7 +456,7 @@ export async function POST(req: Request) {
           error: 'Invalid artistContext format',
           details: parseResult.error.flatten().fieldErrors,
         },
-        { status: 400, headers: NO_CACHE_HEADERS }
+        { status: 400, headers: CORS_HEADERS }
       );
     }
     artistContext = parseResult.data;
@@ -484,7 +466,7 @@ export async function POST(req: Request) {
 
   try {
     const result = streamText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: gateway('anthropic:claude-sonnet-4-20250514'),
       system: systemPrompt,
       messages: validatedMessages,
       tools: {
@@ -517,7 +499,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: 'Failed to process chat request', message },
-      { status: 500, headers: NO_CACHE_HEADERS }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 }

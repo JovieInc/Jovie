@@ -131,7 +131,7 @@ export function PreviewPanelContent() {
   return (
     <div className='h-full flex flex-col'>
       {/* Header with action buttons */}
-      <div className='flex h-12 items-center justify-between border-b border-subtle bg-surface-2/95 px-4 shrink-0 backdrop-blur-sm'>
+      <div className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'>
         <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
@@ -143,7 +143,7 @@ export function PreviewPanelContent() {
             trigger={
               <button
                 type='button'
-                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out'
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out'
                 aria-label='Profile actions'
               >
                 <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
@@ -156,7 +156,7 @@ export function PreviewPanelContent() {
             href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out inline-flex items-center justify-center'
+            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out inline-flex items-center justify-center'
             aria-label='Open profile in new tab'
           >
             <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
@@ -173,7 +173,7 @@ export function PreviewPanelContent() {
       {/* Preview Content */}
       <div className='flex-1 min-h-0 overflow-y-auto p-4'>
         <div className='flex flex-col items-center gap-4 pb-8'>
-          <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 dark:ring-white/10 shadow-sm shadow-black/10 dark:shadow-black/40'>
+          <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 dark:ring-white/5 shadow-sm shadow-black/10 dark:shadow-black/40'>
             <ProfilePreview
               username={username}
               displayName={displayName}
@@ -194,7 +194,7 @@ export function PreviewPanelContent() {
       </div>
 
       {/* Footer - URL Preview */}
-      <div className='shrink-0 border-t border-subtle bg-surface-2/95 p-4 backdrop-blur-sm'>
+      <div className='shrink-0 border-t border-subtle p-4'>
         <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>

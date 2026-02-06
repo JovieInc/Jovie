@@ -142,11 +142,12 @@ export function SettingsAdPixelsSection() {
   // Fetch existing pixel settings on mount
   const { data: existingSettings } = useQuery<PixelSettingsResponse>({
     queryKey: ['pixelSettings'],
-    queryFn: async () => {
-      const res = await fetch('/api/dashboard/pixels');
+    queryFn: async ({ signal }) => {
+      const res = await fetch('/api/dashboard/pixels', { signal });
       if (!res.ok) throw new Error('Failed to fetch pixel settings');
       return res.json();
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
   });
 
   const [pixelData, setPixelData] = useState({
@@ -246,7 +247,7 @@ export function SettingsAdPixelsSection() {
       <DashboardCard variant='settings'>
         <div className='flex items-center justify-between mb-6'>
           <div>
-            <h3 className='text-lg font-medium text-primary'>
+            <h3 className='text-[14px] font-medium text-primary-token'>
               Server-Side Pixel Tracking
             </h3>
             <p className='text-sm text-secondary-token mt-1'>

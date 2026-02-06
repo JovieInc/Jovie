@@ -267,7 +267,8 @@ export async function POST(request: NextRequest) {
     // Update social link click count in the background
     // Errors are captured but don't block the response
     if (linkType === 'social' && linkId) {
-      db.update(socialLinks)
+      void db
+        .update(socialLinks)
         .set({
           clicks: drizzleSql`${socialLinks.clicks} + 1`,
           updatedAt: new Date(),

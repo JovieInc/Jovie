@@ -147,15 +147,12 @@ export const cardTokens = {
       .replaceAll(/\s+/g, ' ')
       .trim(),
 
-    // Settings card - subtle hover, responsive padding
+    // Settings card - flat, no hover effects (Linear-style)
     settings: `
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
-      p-4 sm:p-6
-      shadow-[var(--shadow-sm)]
-      transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-md)]
+      p-4 sm:p-5
     `
       .replaceAll(/\s+/g, ' ')
       .trim(),

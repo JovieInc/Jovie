@@ -29,7 +29,7 @@ export function SidebarCollapsibleGroup({
   const tooltip = useMemo(() => label, [label]);
 
   return (
-    <SidebarGroup className={cn('space-y-1', className)}>
+    <SidebarGroup className={cn('space-y-0', className)}>
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
@@ -38,18 +38,18 @@ export function SidebarCollapsibleGroup({
             onClick={() => setOpen(value => !value)}
             tooltip={tooltip}
             className={cn(
-              'justify-between font-medium uppercase tracking-wider',
-              'text-sidebar-muted/70 hover:text-sidebar-foreground',
-              'h-7'
+              'justify-between font-medium',
+              'text-sidebar-item-icon hover:text-sidebar-item-foreground hover:bg-transparent',
+              'h-6'
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-[10px]'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-[12px]'>
               {label}
             </span>
             <ChevronRight
               className={cn(
-                'size-3.5 shrink-0 transition-transform duration-200 ease-out',
+                'size-3 shrink-0 opacity-50 transition-transform duration-200 ease-out',
                 open ? 'rotate-90' : 'rotate-0'
               )}
               aria-hidden='true'
@@ -65,9 +65,7 @@ export function SidebarCollapsibleGroup({
         )}
       >
         <div className='overflow-hidden'>
-          <SidebarGroupContent className='mt-0.5'>
-            {children}
-          </SidebarGroupContent>
+          <SidebarGroupContent className='mt-0'>{children}</SidebarGroupContent>
         </div>
       </div>
     </SidebarGroup>

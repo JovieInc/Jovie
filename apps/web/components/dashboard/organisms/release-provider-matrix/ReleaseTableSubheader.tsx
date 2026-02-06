@@ -89,7 +89,7 @@ function ReleaseViewSegmentedControl({
   onChange: (value: ReleaseView) => void;
 }) {
   return (
-    <fieldset className='inline-flex rounded-lg bg-surface-1 p-0.5 border-0'>
+    <fieldset className='inline-flex rounded-md bg-transparent p-0'>
       <legend className='sr-only'>Release type filter</legend>
       {RELEASE_VIEW_OPTIONS.map(option => (
         <button
@@ -98,10 +98,10 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'h-7 px-3 text-xs font-medium rounded-md transition-colors',
+            'h-7 px-2.5 text-xs font-medium rounded-md transition-colors',
             value === option.value
-              ? 'bg-surface-2 text-primary-token shadow-sm'
-              : 'text-secondary-token hover:text-primary-token'
+              ? 'bg-surface-2 text-primary-token'
+              : 'text-tertiary-token hover:text-secondary-token'
           )}
         >
           {option.label}
@@ -127,15 +127,13 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded'
+      className='flex w-full items-center justify-between gap-2 rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
     >
-      <span className='text-[11px] font-medium text-primary-token'>
-        {label}
-      </span>
+      <span className='text-[13px] text-secondary-token'>{label}</span>
       <span
         className={cn(
-          'flex h-4 w-7 items-center rounded-full p-0.5 transition-colors',
-          checked ? 'bg-primary' : 'bg-surface-3'
+          'flex h-[18px] w-[30px] items-center rounded-full p-[3px] transition-colors',
+          checked ? 'bg-primary' : 'bg-white/[0.12]'
         )}
       >
         <span
@@ -185,7 +183,7 @@ function LinearStyleDisplayMenu({
             variant='ghost'
             size='sm'
             className={cn(
-              'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-interactive-hover hover:text-primary-token',
+              'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
               triggerClassName
             )}
           >
@@ -194,13 +192,13 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent
-        align='end'
-        className='w-56 p-0 rounded-lg border border-subtle bg-white dark:bg-surface-2 shadow-lg'
-      >
-        {/* View options */}
+      <PopoverContent align='end' className='w-56 p-0'>
+        {/* List options */}
         {(onShowTracksChange || onGroupByYearChange) && (
-          <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
+          <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
+            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
+              List options
+            </p>
             {onShowTracksChange && (
               <ToggleSwitch
                 label='Show tracks'
@@ -218,48 +216,48 @@ function LinearStyleDisplayMenu({
           </div>
         )}
 
-        {/* Column visibility toggles - temporarily disabled for refinement
-        <div className='p-2.5'>
-          <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
-            Display properties
-          </p>
-          <div className='flex flex-wrap gap-1'>
-            {availableColumns.map(col => {
-              const isVisible = columnVisibility[col.id] !== false;
-              return (
-                <button
-                  key={col.id}
-                  type='button'
-                  onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
-                  aria-pressed={isVisible}
-                  aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
-                  className={cn(
-                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
-                    isVisible
-                      ? 'bg-surface-2 text-primary-token'
-                      : 'text-tertiary-token hover:bg-surface-2/50'
-                  )}
-                >
-                  {col.label}
-                </button>
-              );
-            })}
+        {/* Column visibility (Fields) */}
+        {availableColumns.length > 0 && (
+          <div className='px-2 py-1.5'>
+            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
+              Properties
+            </p>
+            <div className='flex flex-wrap gap-1 px-1'>
+              {availableColumns.map(col => {
+                const isVisible = columnVisibility[col.id] !== false;
+                return (
+                  <button
+                    key={col.id}
+                    type='button'
+                    onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
+                    aria-pressed={isVisible}
+                    aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
+                    className={cn(
+                      'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
+                      isVisible
+                        ? 'bg-white/[0.08] text-secondary-token'
+                        : 'text-tertiary-token hover:text-secondary-token hover:bg-white/[0.04]'
+                    )}
+                  >
+                    {col.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-        */}
-        {/* Reset to defaults - temporarily disabled with column visibility toggles
+        )}
+        {/* Reset to defaults */}
         {onResetToDefaults && (
-          <div className='border-t border-subtle px-2.5 py-2'>
+          <div className='border-t border-subtle px-3 py-1.5'>
             <button
               type='button'
               onClick={onResetToDefaults}
-              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1'
+              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
             >
               Reset to defaults
             </button>
           </div>
         )}
-        */}
       </PopoverContent>
     </Popover>
   );
@@ -292,10 +290,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   const pillButtonClass =
-    'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-interactive-hover hover:text-primary-token';
+    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-1.5'>
+    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
       {/* Left: Filter first, then release view toggle */}
       <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown

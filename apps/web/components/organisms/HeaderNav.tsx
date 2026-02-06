@@ -30,9 +30,7 @@ export function HeaderNav({
   hidePricingLink = false,
   containerSize: _containerSize = 'lg',
 }: HeaderNavProps = {}) {
-  // Note: sticky and containerSize props reserved for future use
-  void _sticky;
-  void _containerSize;
+  const navLinkClass = 'nav-link-linear focus-ring-themed';
 
   return (
     <header
@@ -73,10 +71,7 @@ export function HeaderNav({
         ) : (
           <div className='flex-1 flex items-center justify-center'>
             {hidePricingLink ? null : (
-              <Link
-                href='/pricing'
-                className='nav-link-linear focus-ring-themed'
-              >
+              <Link href='/pricing' className={navLinkClass}>
                 Pricing
               </Link>
             )}

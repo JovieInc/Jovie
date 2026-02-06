@@ -44,9 +44,20 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
-
 export async function POST(request: NextRequest) {
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    await captureCriticalError(
+      'STRIPE_WEBHOOK_SECRET is not configured',
+      new Error('Missing STRIPE_WEBHOOK_SECRET environment variable'),
+      { route: '/api/stripe/webhooks' }
+    );
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');

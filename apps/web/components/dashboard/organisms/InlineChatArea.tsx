@@ -27,7 +27,6 @@ import {
   useImperativeHandle,
   useRef,
 } from 'react';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useJovieChat } from '@/components/jovie/hooks';
 import type { ArtistContext } from '@/components/jovie/types';

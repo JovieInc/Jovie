@@ -9,6 +9,7 @@ import type { ChatMessage } from './useChatMutations';
 interface ConversationWithMessages {
   conversation: ChatConversation;
   messages: ChatMessage[];
+  hasMore: boolean;
 }
 
 interface ConversationOptions {

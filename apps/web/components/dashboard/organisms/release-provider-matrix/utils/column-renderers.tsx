@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';

@@ -57,7 +57,7 @@ export const TrackRow = memo(function TrackRow({
       map.set(provider.key, provider);
     }
     return map;
-  }, [track.providers]);
+  }, [track]);
 
   // Count available providers
   const availableCount = track.providers.filter(p => p.url).length;
@@ -71,7 +71,7 @@ export const TrackRow = memo(function TrackRow({
   }, [allProviders, providerMap]);
 
   return (
-    <tr className='group bg-surface-1/50 hover:bg-surface-1 border-l-2 border-l-transparent'>
+    <tr className='group hover:bg-surface-2/30 border-l-2 border-l-transparent'>
       {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && <td className='w-14' />}
 

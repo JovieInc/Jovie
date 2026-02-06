@@ -81,7 +81,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       map.set(provider.key, provider);
     }
     return map;
-  }, [release.providers]);
+  }, [release]);
 
   // Count available providers
   const availableCount = release.providers.filter(p => p.url).length;

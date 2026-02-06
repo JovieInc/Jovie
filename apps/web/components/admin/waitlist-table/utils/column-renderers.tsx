@@ -1,3 +1,5 @@
+'use client';
+
 import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';

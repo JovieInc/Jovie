@@ -82,7 +82,6 @@ function VirtualizedCreatorsRow({
 }: VirtualizedCreatorsRowProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual API limitation
   const virtualizer = useVirtualizer({
     count: creators.length,
     getScrollElement: () => scrollRef.current,

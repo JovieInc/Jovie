@@ -3,10 +3,14 @@ import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
-import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+  Pragma: 'no-cache',
+} as const;
 
 /** Maximum message length for initial messages */
 const MAX_INITIAL_MESSAGE_LENGTH = 4000;
@@ -25,7 +29,7 @@ export async function GET(req: Request) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: NO_CACHE_HEADERS }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -50,7 +54,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(
       { conversations },
-      { status: 200, headers: NO_CACHE_HEADERS }
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     logger.error('Error listing conversations:', error);
@@ -58,13 +62,13 @@ export async function GET(req: Request) {
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_CACHE_HEADERS }
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to list conversations' },
-      { status: 500, headers: NO_CACHE_HEADERS }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -80,7 +84,7 @@ export async function POST(req: Request) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: NO_CACHE_HEADERS }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -95,7 +99,7 @@ export async function POST(req: Request) {
         {
           error: `Maximum of ${MAX_CONVERSATIONS_PER_USER} conversations reached. Please delete old conversations.`,
         },
-        { status: 403, headers: NO_CACHE_HEADERS }
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -117,7 +121,7 @@ export async function POST(req: Request) {
         {
           error: `Initial message too long. Maximum is ${MAX_INITIAL_MESSAGE_LENGTH} characters.`,
         },
-        { status: 400, headers: NO_CACHE_HEADERS }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -132,7 +136,7 @@ export async function POST(req: Request) {
       .returning();
 
     // If there's an initial message, create it
-    if (initialMessage && initialMessage.trim()) {
+    if (initialMessage?.trim()) {
       await db.insert(chatMessages).values({
         conversationId: conversation.id,
         role: 'user',
@@ -142,7 +146,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { conversation },
-      { status: 201, headers: NO_CACHE_HEADERS }
+      { status: 201, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     logger.error('Error creating conversation:', error);
@@ -150,13 +154,13 @@ export async function POST(req: Request) {
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_CACHE_HEADERS }
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to create conversation' },
-      { status: 500, headers: NO_CACHE_HEADERS }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

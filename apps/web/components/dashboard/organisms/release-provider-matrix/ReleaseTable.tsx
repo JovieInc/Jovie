@@ -274,13 +274,12 @@ export function ReleaseTable({
       const isRowExpanded = showTracks && isExpanded(row.id);
 
       if (isSelected) {
-        return 'group bg-surface-1 bg-primary/5 dark:bg-surface-1 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-surface-2/50 dark:hover:bg-surface-2';
+        return 'bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-primary/8 dark:hover:bg-primary/15';
       }
       if (isRowExpanded) {
-        // Expanded parent row has slightly darker background (like Linear)
-        return 'group bg-surface-1 bg-surface-2/50 dark:bg-surface-1 dark:bg-surface-2/30 hover:bg-surface-2/50 dark:hover:bg-surface-2';
+        return 'bg-surface-2/30 hover:bg-surface-2/50';
       }
-      return 'group bg-surface-1 dark:bg-surface-1 hover:bg-surface-2/50 dark:hover:bg-surface-2';
+      return 'hover:bg-surface-2/50';
     },
     [selectedIdsRef, showTracks, isExpanded]
   );
@@ -299,7 +298,7 @@ export function ReleaseTable({
   );
 
   // Build column definitions (dynamic columns only)
-  // eslint-disable-next-line react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render
+  /* eslint-disable react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render */
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
@@ -348,7 +347,6 @@ export function ReleaseTable({
     return [checkboxColumn, releaseColumn, rightMetaColumn];
   }, [
     artistName,
-    onCopy,
     onClearSelection,
     headerCheckboxStateRef,
     selectedIdsRef,
@@ -359,6 +357,7 @@ export function ReleaseTable({
     isLoadingTracks,
     toggleExpansion,
   ]);
+  /* eslint-enable react-hooks/refs */
 
   // Transform columnVisibility to TanStack format (always show select and release)
   const tanstackColumnVisibility = useMemo(() => {

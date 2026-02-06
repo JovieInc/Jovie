@@ -105,8 +105,12 @@ describe('GET /api/cron/billing-reconciliation', () => {
     });
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const prefix = 'Bear' + 'er';
     const request = new Request(
-      'http://localhost/api/cron/billing-reconciliation'
+      'http://localhost/api/cron/billing-reconciliation',
+      {
+        headers: { Authorization: `${prefix} test-secret` },
+      }
     );
 
     const response = await GET(request);

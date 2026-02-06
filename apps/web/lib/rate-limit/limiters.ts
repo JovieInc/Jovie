@@ -81,6 +81,24 @@ export const adminImpersonateLimiter = createRateLimiter(
   RATE_LIMITERS.adminImpersonate
 );
 
+/**
+ * Admin fit-score recalculation rate limiter
+ * Limit: 5 recalculations per hour per admin
+ * Prevents runaway compute from repeated recalculate_all calls
+ */
+export const adminFitScoresLimiter = createRateLimiter(
+  RATE_LIMITERS.adminFitScores
+);
+
+/**
+ * Admin creator ingest rate limiter
+ * Limit: 10 ingestions per minute per admin
+ * Prevents excessive external API calls from rapid ingestion
+ */
+export const adminCreatorIngestLimiter = createRateLimiter(
+  RATE_LIMITERS.adminCreatorIngest
+);
+
 // ============================================================================
 // Tracking & Analytics
 // ============================================================================
@@ -403,6 +421,61 @@ export async function checkBandsintownSyncRateLimit(
   );
 }
 
+// ============================================================================
+// DSP Discovery Operations
+// ============================================================================
+
+/**
+ * Rate limiter for DSP artist discovery
+ * Limit: 10 discoveries per minute per user
+ * Protects 3rd-party platform APIs (Apple Music, Deezer, MusicBrainz)
+ */
+export const dspDiscoveryLimiter = createRateLimiter(
+  RATE_LIMITERS.dspDiscovery
+);
+
+/**
+ * Check DSP discovery rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkDspDiscoveryRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    dspDiscoveryLimiter,
+    userId,
+    'Discovery rate limit exceeded. Please wait before triggering another discovery.'
+  );
+}
+
+/**
+ * Check admin fit-scores rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAdminFitScoresRateLimit(
+  adminUserId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    adminFitScoresLimiter,
+    adminUserId,
+    'Fit score recalculation rate limit exceeded. Please wait before trying again.'
+  );
+}
+
+/**
+ * Check admin creator ingest rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAdminCreatorIngestRateLimit(
+  adminUserId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    adminCreatorIngestLimiter,
+    adminUserId,
+    'Creator ingest rate limit exceeded. Please wait before ingesting another profile.'
+  );
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -415,6 +488,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
     adminImpersonate: adminImpersonateLimiter,
+    adminFitScores: adminFitScoresLimiter,
+    adminCreatorIngest: adminCreatorIngestLimiter,
+    dspDiscovery: dspDiscoveryLimiter,
     trackingClicks: trackingClicksLimiter,
     trackingVisits: trackingVisitsLimiter,
     trackingIpClicks: trackingIpClicksLimiter,

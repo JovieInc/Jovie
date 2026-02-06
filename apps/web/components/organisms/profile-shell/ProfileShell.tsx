@@ -37,7 +37,6 @@ export function ProfileShell({
     notificationsContextValue,
     socialNetworkLinks,
     hasSocialLinks,
-    hasContacts,
   } = useProfileShell({
     artist,
     socialLinks,
@@ -103,8 +102,8 @@ export function ProfileShell({
 
         {showGradientBlurs && (
           <>
-            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-surface-2 blur-3xl opacity-40' />
-            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-surface-3 blur-3xl opacity-35' />
+            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
+            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
           </>
         )}
 
@@ -136,36 +135,15 @@ export function ProfileShell({
                           className='flex items-center gap-3'
                           data-testid='social-links'
                         >
-                          {hasSocialLinks
-                            ? socialNetworkLinks.map(link => (
-                                <SocialLinkComponent
-                                  key={link.id}
-                                  link={link}
-                                  handle={artist.handle}
-                                  artistName={artist.name}
-                                />
-                              ))
-                            : !hasContacts && (
-                                <div className='flex items-center space-x-2 rounded-lg border border-dashed border-subtle bg-surface-1 px-3 py-2 text-secondary-token'>
-                                  <svg
-                                    className='h-4 w-4 text-secondary-token'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    viewBox='0 0 24 24'
-                                    aria-hidden='true'
-                                  >
-                                    <path
-                                      strokeLinecap='round'
-                                      strokeLinejoin='round'
-                                      strokeWidth={2}
-                                      d='M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'
-                                    />
-                                  </svg>
-                                  <span className='text-xs'>
-                                    Links coming soon
-                                  </span>
-                                </div>
-                              )}
+                          {hasSocialLinks &&
+                            socialNetworkLinks.map(link => (
+                              <SocialLinkComponent
+                                key={link.id}
+                                link={link}
+                                handle={artist.handle}
+                                artistName={artist.name}
+                              />
+                            ))}
                           <ArtistContactsButton
                             contacts={contacts}
                             artistHandle={artist.handle}

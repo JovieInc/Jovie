@@ -58,7 +58,7 @@ export function PageErrorState({
             />
           </div>
         </div>
-        <h1 className='mb-3 text-xl font-semibold text-primary-token'>
+        <h1 className='mb-3 text-sm font-medium text-secondary-token'>
           {title}
         </h1>
         <p className='mb-4 text-secondary-token'>{message}</p>

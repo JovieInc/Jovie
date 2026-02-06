@@ -53,7 +53,7 @@ export function TableEmptyState({
   const content = (
     <div
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-4 py-12 px-4 text-center min-h-[400px]',
+        'flex flex-1 flex-col items-center justify-center gap-4 py-12 px-4 text-center',
         className
       )}
     >
@@ -63,9 +63,11 @@ export function TableEmptyState({
         </div>
       )}
       <div className='space-y-1'>
-        <p className='text-xl font-semibold text-primary-token'>{title}</p>
+        <p className='text-sm font-medium text-secondary-token'>{title}</p>
         {description && (
-          <p className='text-sm text-tertiary-token max-w-md'>{description}</p>
+          <p className='text-[13px] text-tertiary-token max-w-md'>
+            {description}
+          </p>
         )}
       </div>
       {(action || secondaryAction) && (

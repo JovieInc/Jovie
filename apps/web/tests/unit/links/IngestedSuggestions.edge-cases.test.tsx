@@ -4,6 +4,11 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 import {
   IngestedSuggestions,
   type SuggestedLink,

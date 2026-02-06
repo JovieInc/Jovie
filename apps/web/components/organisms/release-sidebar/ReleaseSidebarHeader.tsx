@@ -63,6 +63,7 @@ export function ReleaseSidebarHeader({
 
   if (showActions) {
     // Copy smart link - primary action
+    // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
     primaryActions.push({
       id: 'copy',
       label: isCopied ? 'Copied!' : 'Copy smart link',
@@ -91,7 +92,7 @@ export function ReleaseSidebarHeader({
         id: 'open',
         label: 'Open smart link',
         icon: ExternalLink,
-        href: release.smartLinkPath,
+        href: release?.smartLinkPath,
       }
     );
   }
@@ -103,7 +104,7 @@ export function ReleaseSidebarHeader({
       label: 'Copy release ID',
       icon: Hash,
       onClick: () => {
-        navigator.clipboard.writeText(release.id).catch(() => {
+        navigator.clipboard.writeText(release?.id ?? '').catch(() => {
           // Silently fail - clipboard may not be available
         });
       },

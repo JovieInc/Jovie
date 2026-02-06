@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 export interface ShortcutConfig {
   key: string;
@@ -39,6 +39,13 @@ export interface ShortcutConfig {
  * ```
  */
 export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
+  const shortcutsRef = useRef(shortcuts);
+
+  // Update ref in effect to avoid writing during render (React 19 guidance)
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+  });
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Build key string (e.g., "Meta+B", "Ctrl+Shift+A")
@@ -53,7 +60,9 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
       const key = parts.join('+');
 
       // Find matching shortcut that is enabled
-      const match = shortcuts.find(s => s.key === key && s.enabled !== false);
+      const match = shortcutsRef.current.find(
+        s => s.key === key && s.enabled !== false
+      );
 
       if (match) {
         e.preventDefault();
@@ -63,7 +72,7 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
 
     globalThis.addEventListener('keydown', handler);
     return () => globalThis.removeEventListener('keydown', handler);
-  }, [shortcuts]);
+  }, []);
 }
 
 /**

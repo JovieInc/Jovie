@@ -87,7 +87,7 @@ export function TippingEmptyState({
 
         {/* Text content */}
         <div className='space-y-2'>
-          <h3 className='text-xl font-semibold text-primary-token'>
+          <h3 className='text-sm font-medium text-secondary-token'>
             {config.title}
           </h3>
           <p className='text-secondary-token max-w-md'>{config.description}</p>

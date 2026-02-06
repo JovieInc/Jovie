@@ -44,7 +44,7 @@ export const CompletionBanner = memo(
         className='flex items-start gap-3'
       >
         <div
-          className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/5 dark:ring-white/10'
+          className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/3 dark:ring-white/5'
           aria-hidden='true'
         >
           <CheckCircle className='h-5 w-5 text-success' />

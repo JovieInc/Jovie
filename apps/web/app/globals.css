@@ -113,6 +113,18 @@ body {
   --color-brand-youtube-hover: var(--color-brand-youtube-hover);
   --color-brand-youtube-subtle: var(--color-brand-youtube-subtle);
 
+  /* Surface backgrounds — generates bg-base, bg-surface-0, bg-surface-1, etc. */
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+
+  /* Border tokens — generates border-subtle, border-default, border-strong */
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
+
   /* Additional text utilities */
   --color-muted-secondary: var(--color-text-muted-secondary);
 }
@@ -178,7 +190,7 @@ body {
   ::before,
   ::backdrop,
   ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
+    border-color: var(--color-border-subtle, currentcolor);
   }
 }
 
@@ -1073,6 +1085,9 @@ body {
   --color-sidebar-surface-hover: rgb(var(--sidebar-surface-hover));
   --color-sidebar-input-background: rgb(var(--sidebar-input-background));
   --color-sidebar-input-border: rgb(var(--sidebar-input-border));
+  --color-sidebar-item-foreground: rgb(var(--sidebar-item-foreground));
+  --color-sidebar-item-icon: rgb(var(--sidebar-item-icon));
+  --color-sidebar-accent-active: rgb(var(--sidebar-accent-active));
 
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);

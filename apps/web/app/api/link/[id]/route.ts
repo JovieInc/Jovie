@@ -150,7 +150,7 @@ export async function POST(
     }
 
     // Increment click count asynchronously
-    incrementClickCount(shortId).catch(async error => {
+    void incrementClickCount(shortId).catch(async error => {
       await captureError('Failed to increment click count', error, {
         shortId,
         route: '/api/link/[id]',

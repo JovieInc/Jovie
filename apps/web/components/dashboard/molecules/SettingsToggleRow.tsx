@@ -33,13 +33,13 @@ export function SettingsToggleRow({
   return (
     <div className={cn('flex items-start justify-between gap-6', className)}>
       <div className='flex-1'>
-        <h3 id={titleId} className='text-lg font-medium text-primary-token'>
+        <h3 id={titleId} className='text-[14px] font-medium text-primary-token'>
           {title}
         </h3>
         {description ? (
           <p
             id={descriptionId}
-            className='mt-2 text-sm text-secondary-token max-w-md'
+            className='mt-1 text-[13px] text-secondary-token max-w-md'
           >
             {description}
           </p>

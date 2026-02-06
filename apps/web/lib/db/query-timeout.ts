@@ -62,14 +62,16 @@ export class QueryTimeoutError extends Error {
 }
 
 /**
- * Sets the PostgreSQL statement timeout for a transaction/session
- * This is set at the PostgreSQL level and will cancel queries that exceed the timeout
+ * Sets the PostgreSQL statement timeout for the current session.
+ * Uses SET (session-scoped) instead of SET LOCAL, because SET LOCAL is a
+ * no-op outside a transaction block and the Neon HTTP driver does not
+ * support transactions.
  */
 export async function setStatementTimeout(
   db: NeonDatabase,
   timeoutMs: number
 ): Promise<void> {
-  await db.execute(drizzleSql`SET LOCAL statement_timeout = ${timeoutMs}`);
+  await db.execute(drizzleSql`SET statement_timeout = ${timeoutMs}`);
 }
 
 /**

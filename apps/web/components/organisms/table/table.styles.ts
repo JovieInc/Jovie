@@ -25,10 +25,10 @@ export const alignment = {
 
 // Row Selection Colors
 export const selection = {
-  unchecked: 'hover:bg-(--color-cell-hover) transition-colors',
+  unchecked: 'hover:bg-surface-2/50 transition-colors',
   checked: 'bg-surface-2/70 hover:bg-surface-2',
-  selected: 'bg-primary/5 border-l-2 border-primary',
-  hover: 'hover:bg-(--color-cell-hover)',
+  selected: 'bg-primary/5 dark:bg-primary/10 border-l-2 border-primary',
+  hover: 'hover:bg-surface-2/50',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
