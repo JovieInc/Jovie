@@ -2,7 +2,7 @@ import { count, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
@@ -32,7 +32,9 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
     const parsed = limitParam ? parseInt(limitParam, 10) : 20;
-    const limit = Number.isFinite(parsed) ? Math.min(parsed, 50) : 20;
+    const limit = Number.isFinite(parsed)
+      ? Math.min(Math.max(parsed, 1), 50)
+      : 20;
 
     const conversations = await db
       .select({
@@ -107,9 +109,14 @@ export async function POST(req: Request) {
     const { title, initialMessage } = body;
 
     // Validate initial message length
-    if (initialMessage && initialMessage.trim().length > MAX_INITIAL_MESSAGE_LENGTH) {
+    if (
+      initialMessage &&
+      initialMessage.trim().length > MAX_INITIAL_MESSAGE_LENGTH
+    ) {
       return NextResponse.json(
-        { error: `Initial message too long. Maximum is ${MAX_INITIAL_MESSAGE_LENGTH} characters.` },
+        {
+          error: `Initial message too long. Maximum is ${MAX_INITIAL_MESSAGE_LENGTH} characters.`,
+        },
         { status: 400, headers: NO_CACHE_HEADERS }
       );
     }

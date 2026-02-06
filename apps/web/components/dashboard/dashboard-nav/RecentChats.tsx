@@ -2,14 +2,12 @@
 
 import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
+import { useSearchParams } from 'next/navigation';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
@@ -20,6 +18,10 @@ const MAX_RECENT_CHATS = 10;
 function formatRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
+
+  // Guard against invalid or future dates
+  if (Number.isNaN(diffMs) || diffMs < 0) return 'now';
+
   const diffMins = Math.floor(diffMs / 60_000);
 
   if (diffMins < 1) return 'now';
@@ -35,7 +37,9 @@ function formatRelativeTime(date: Date): string {
 }
 
 export function RecentChats() {
-  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeConversationId = searchParams.get('conversation');
+
   const { data: conversations } = useChatConversationsQuery({
     limit: MAX_RECENT_CHATS,
   });
@@ -49,7 +53,7 @@ export function RecentChats() {
       <SidebarMenu>
         {conversations.map(convo => {
           const href = `${APP_ROUTES.PROFILE}?conversation=${convo.id}`;
-          const isActive = pathname.includes(convo.id);
+          const isActive = activeConversationId === convo.id;
           const title = convo.title || 'Untitled chat';
           const updatedAt = new Date(convo.updatedAt);
           const timeAgo = formatRelativeTime(updatedAt);

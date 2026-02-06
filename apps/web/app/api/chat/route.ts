@@ -1,8 +1,8 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { and, count, eq, sql as drizzleSql } from 'drizzle-orm';
 import { type ModelMessage, streamText, tool } from 'ai';
+import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
@@ -10,10 +10,13 @@ import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { NO_CACHE_HEADERS } from '@/lib/http/headers';
+import { sqlAny } from '@/lib/db/sql-helpers';
+import {
+  createAuthenticatedCorsHeaders,
+  NO_CACHE_HEADERS,
+} from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { sqlAny } from '@/lib/db/sql-helpers';
 
 export const maxDuration = 30;
 
@@ -45,23 +48,29 @@ const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
   genres: 'Music genres (comma-separated)',
 };
 
-interface ArtistContext {
-  displayName: string;
-  username: string;
-  bio: string | null;
-  genres: string[];
-  spotifyFollowers: number | null;
-  spotifyPopularity: number | null;
-  profileViews: number;
-  hasSocialLinks: boolean;
-  hasMusicLinks: boolean;
-  tippingStats: {
-    tipClicks: number;
-    tipsSubmitted: number;
-    totalReceivedCents: number;
-    monthReceivedCents: number;
-  };
-}
+/**
+ * Zod schema for validating client-provided artist context.
+ * Used when profileId is not provided (backward compatibility).
+ */
+const artistContextSchema = z.object({
+  displayName: z.string().max(100),
+  username: z.string().max(50),
+  bio: z.string().max(500).nullable(),
+  genres: z.array(z.string().max(50)).max(10),
+  spotifyFollowers: z.number().int().nonnegative().nullable(),
+  spotifyPopularity: z.number().int().min(0).max(100).nullable(),
+  profileViews: z.number().int().nonnegative(),
+  hasSocialLinks: z.boolean(),
+  hasMusicLinks: z.boolean(),
+  tippingStats: z.object({
+    tipClicks: z.number().int().nonnegative(),
+    tipsSubmitted: z.number().int().nonnegative(),
+    totalReceivedCents: z.number().int().nonnegative(),
+    monthReceivedCents: z.number().int().nonnegative(),
+  }),
+});
+
+type ArtistContext = z.infer<typeof artistContextSchema>;
 
 /**
  * Fetches artist context server-side from the database.
@@ -349,15 +358,15 @@ function createProfileEditTool(context: ArtistContext) {
 /**
  * OPTIONS - CORS preflight handler
  */
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
+  const origin = req.headers.get('origin');
+  const corsHeaders = createAuthenticatedCorsHeaders(origin);
+
   return new NextResponse(null, {
     status: 204,
     headers: {
       ...NO_CACHE_HEADERS,
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Max-Age': '86400',
+      ...corsHeaders,
     },
   });
 }
@@ -394,7 +403,11 @@ export async function POST(req: Request) {
   }
 
   // Parse and validate request body
-  let body: { messages?: unknown; profileId?: unknown; artistContext?: unknown };
+  let body: {
+    messages?: unknown;
+    profileId?: unknown;
+    artistContext?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -453,8 +466,18 @@ export async function POST(req: Request) {
     }
     artistContext = context;
   } else {
-    // Backward compatibility: accept client-provided artistContext
-    artistContext = body.artistContext as ArtistContext;
+    // Backward compatibility: accept client-provided artistContext with validation
+    const parseResult = artistContextSchema.safeParse(body.artistContext);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid artistContext format',
+          details: parseResult.error.flatten().fieldErrors,
+        },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
+    artistContext = parseResult.data;
   }
 
   const systemPrompt = buildSystemPrompt(artistContext);

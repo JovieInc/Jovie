@@ -28,13 +28,14 @@ interface UseJovieChatOptions {
 
 /**
  * Extracts tool call data from message parts for persistence.
+ * Only includes parts that have a toolInvocation property to ensure consistent shape.
  */
 function extractToolCalls(
   parts: Array<{ type: string; [key: string]: unknown }>
 ): Record<string, unknown>[] | undefined {
   const toolCalls = parts
-    .filter(p => p.type === 'tool-invocation')
-    .map(p => ({ type: p.type, toolInvocation: p.toolInvocation ?? p }));
+    .filter(p => p.type === 'tool-invocation' && p.toolInvocation != null)
+    .map(p => ({ type: p.type, toolInvocation: p.toolInvocation }));
 
   return toolCalls.length > 0 ? toolCalls : undefined;
 }
@@ -191,49 +192,54 @@ export function useJovieChat({
 
     // Extract tool calls for persistence
     const toolCalls = extractToolCalls(
-      lastAssistantMessage.parts as Array<{ type: string; [key: string]: unknown }>
+      lastAssistantMessage.parts as Array<{
+        type: string;
+        [key: string]: unknown;
+      }>
     );
 
     const { userMessage } = pendingMessagesRef.current;
 
-    if (userMessage) {
-      const messagesToPersist: Array<{
-        role: 'user' | 'assistant';
-        content: string;
-        toolCalls?: Record<string, unknown>[];
-      }> = [
-        { role: 'user', content: userMessage },
-        {
-          role: 'assistant',
-          content: assistantText,
-          ...(toolCalls ? { toolCalls } : {}),
-        },
-      ];
+    // Build messages to persist - user message may be empty if already persisted during conversation creation
+    const messagesToPersist: Array<{
+      role: 'user' | 'assistant';
+      content: string;
+      toolCalls?: Record<string, unknown>[];
+    }> = [];
 
-      addMessagesMutation.mutate(
-        {
-          conversationId: activeConversationId,
-          messages: messagesToPersist,
-        },
-        {
-          onSuccess: () => {
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.chat.conversation(activeConversationId),
-            });
-            queryClient.invalidateQueries({
-              queryKey: queryKeys.chat.conversations(),
-            });
-          },
-          onError: err => {
-            console.error('[useJovieChat] Failed to save messages:', err);
-            setChatError({
-              type: 'server',
-              message: 'Failed to save messages. Please try again.',
-            });
-          },
-        }
-      );
+    if (userMessage) {
+      messagesToPersist.push({ role: 'user', content: userMessage });
     }
+
+    messagesToPersist.push({
+      role: 'assistant',
+      content: assistantText,
+      ...(toolCalls ? { toolCalls } : {}),
+    });
+
+    addMessagesMutation.mutate(
+      {
+        conversationId: activeConversationId,
+        messages: messagesToPersist,
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.conversation(activeConversationId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.conversations(),
+          });
+        },
+        onError: err => {
+          console.error('[useJovieChat] Failed to save messages:', err);
+          setChatError({
+            type: 'server',
+            message: 'Failed to save messages. Please try again.',
+          });
+        },
+      }
+    );
 
     // Successfully extracted and dispatched — clear pending
     pendingMessagesRef.current = null;
@@ -277,9 +283,10 @@ export function useJovieChat({
           setActiveConversationId(result.conversation.id);
           onConversationCreate?.(result.conversation.id);
 
-          // Store pending message for later persistence
+          // User message already persisted via initialMessage in conversation creation.
+          // Only store pending ref to persist the assistant response.
           pendingMessagesRef.current = {
-            userMessage: trimmedText,
+            userMessage: '', // Empty - already persisted via initialMessage
             assistantMessage: '', // Will be filled when response completes
           };
         } catch (err) {
@@ -293,7 +300,7 @@ export function useJovieChat({
           return;
         }
       } else {
-        // Store pending message for persistence
+        // Store pending message for persistence (both user and assistant)
         pendingMessagesRef.current = {
           userMessage: trimmedText,
           assistantMessage: '', // Will be filled when response completes

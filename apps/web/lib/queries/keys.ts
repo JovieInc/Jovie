@@ -222,7 +222,12 @@ export const queryKeys = {
   // Chat conversations
   chat: {
     all: ['chat'] as const,
-    conversations: () => [...queryKeys.chat.all, 'conversations'] as const,
+    conversations: (limit?: number) =>
+      [
+        ...queryKeys.chat.all,
+        'conversations',
+        ...(limit === undefined ? [] : [{ limit }]),
+      ] as const,
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
   },
