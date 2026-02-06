@@ -52,7 +52,7 @@ export const DROPDOWN_CONTENT_BASE =
  * Shadow effect for elevated appearance
  */
 export const DROPDOWN_SHADOW =
-  'shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)]';
+  'shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,255,255,0.04)]';
 
 /**
  * Transform origin for dropdown menus (Radix specific)
@@ -230,9 +230,9 @@ export const MENU_SHORTCUT_BASE =
  */
 export const SELECT_TRIGGER_BASE =
   'flex h-10 w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3 py-2 ' +
-  'text-sm text-primary-token ring-offset-background ' +
+  'text-sm text-primary-token ' +
   'placeholder:text-tertiary-token ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ' +
+  'focus-visible:outline-none focus-visible:border-interactive ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
 
@@ -257,4 +257,4 @@ export const subMenuContentClasses = [
 /**
  * Select viewport padding
  */
-export const SELECT_VIEWPORT_BASE = 'p-0.5';
+export const SELECT_VIEWPORT_BASE = 'p-1';

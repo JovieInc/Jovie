@@ -397,7 +397,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <button
                 type='button'
                 onClick={resetToDefaults}
-                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2'
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover'
               >
                 Reset display
               </button>

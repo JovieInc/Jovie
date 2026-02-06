@@ -123,6 +123,24 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Admin fit-score recalculation: 5 per hour per admin - compute-intensive */
+  adminFitScores: {
+    name: 'Admin Fit Scores',
+    limit: 5,
+    window: '1 h',
+    prefix: 'admin:fit-scores',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Admin creator ingest: 10 per minute per admin - heavy ingestion job */
+  adminCreatorIngest: {
+    name: 'Admin Creator Ingest',
+    limit: 10,
+    window: '1 m',
+    prefix: 'admin:creator-ingest',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Tracking & Analytics
   // ---------------------------------------------------------------------------

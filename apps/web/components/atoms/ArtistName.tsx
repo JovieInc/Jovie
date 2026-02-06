@@ -48,9 +48,9 @@ export function ArtistName({
     <span className='inline-flex items-start justify-center gap-1.5'>
       <span
         className={cn(
-          'font-semibold text-gray-900 dark:text-white',
+          'font-semibold text-primary-token',
           showLink &&
-            'hover:text-gray-700 dark:hover:text-gray-300 transition-colors cursor-pointer',
+            'hover:text-secondary-token transition-colors cursor-pointer',
           className
         )}
       >
@@ -58,10 +58,7 @@ export function ArtistName({
       </span>
       {isVerified && (
         <span className='relative -top-[0.5em] -left-[0.25em]'>
-          <VerifiedBadge
-            size={badgeSizes[size]}
-            className='text-indigo-600 dark:text-indigo-400'
-          />
+          <VerifiedBadge size={badgeSizes[size]} className='text-accent' />
         </span>
       )}
     </span>
