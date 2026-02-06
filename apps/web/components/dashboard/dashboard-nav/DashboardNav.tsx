@@ -111,17 +111,14 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   return (
-    <nav
-      className='flex flex-1 flex-col px-2'
-      aria-label='Dashboard navigation'
-    >
+    <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       <SidebarGroup className='mb-1'>
         <SidebarGroupContent className='space-y-1'>
           {navSections.map((section, index) => (
             <div key={section.key} data-nav-section>
               {/* Section divider for visual separation (except for first section) */}
               {index > 0 && (
-                <div className='my-2 mx-1 border-t border-default' />
+                <div className='my-1.5 mx-1 border-t border-default/50' />
               )}
               {renderSection(section.items)}
             </div>
@@ -131,7 +128,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
       {isAdmin && !isInSettings && (
         <div
-          className='mt-2 pt-2 mx-1 border-t border-default'
+          className='mt-1.5 pt-1.5 mx-1 border-t border-default/50'
           data-testid='admin-nav-section'
         >
           <SidebarCollapsibleGroup label='Admin' defaultOpen>

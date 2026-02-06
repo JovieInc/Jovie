@@ -50,7 +50,7 @@ function buildProviderLabels() {
   );
 }
 
-async function requireProfile(): Promise<{
+async function requireProfile(profileId?: string): Promise<{
   id: string;
   spotifyId: string | null;
   handle: string;
@@ -61,15 +61,21 @@ async function requireProfile(): Promise<{
     redirect('/onboarding');
   }
 
-  if (!data.selectedProfile) {
+  let profile = data.selectedProfile;
+
+  // If a specific profile is requested, ensure the user owns it
+  if (profileId) {
+    profile = data.creatorProfiles.find(p => p.id === profileId) ?? null;
+  }
+
+  if (!profile) {
     throw new TypeError('Missing creator profile');
   }
 
   return {
-    id: data.selectedProfile.id,
-    spotifyId: data.selectedProfile.spotifyId ?? null,
-    handle:
-      data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
+    id: profile.id,
+    spotifyId: profile.spotifyId ?? null,
+    handle: profile.usernameNormalized ?? profile.username,
   };
 }
 
@@ -171,14 +177,16 @@ async function fetchReleaseMatrixCore(
  * Load release matrix with caching (30s TTL)
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
  */
-export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
+export async function loadReleaseMatrix(
+  profileId?: string
+): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect(`/sign-in?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
-  const profile = await requireProfile();
+  const profile = await requireProfile(profileId);
 
   // Cache with 30s TTL and tags for invalidation
   return unstable_cache(
