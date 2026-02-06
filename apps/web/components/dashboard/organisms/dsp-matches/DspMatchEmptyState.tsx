@@ -55,7 +55,7 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
       </div>
 
       <div className='space-y-1'>
-        <h3 className='text-base font-semibold text-primary-token'>{title}</h3>
+        <h3 className='text-sm font-medium text-secondary-token'>{title}</h3>
         <p className='text-sm text-secondary-token'>{description}</p>
       </div>
     </div>

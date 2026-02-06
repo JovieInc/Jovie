@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
  * Should be rendered at app-level to provide tooltip context.
  */
 const TooltipProvider = ({
-  delayDuration = 1000,
+  delayDuration = 700,
   skipDelayDuration = 300,
   ...props
 }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) => (
@@ -69,7 +69,7 @@ const TooltipContent = React.forwardRef<
   (
     {
       className,
-      sideOffset = 6,
+      sideOffset = 4,
       showArrow = false,
       children,
       testId = 'tooltip-content',
@@ -87,9 +87,9 @@ const TooltipContent = React.forwardRef<
           'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
           // Normalize height so presence of a shortcut badge doesn't shift positioning
           'min-h-[28px]',
-          // Linear-style: no visible border, shadow provides edge definition
-          'max-w-xs border border-transparent shadow-lg',
-          'dark:border-white/[0.03] bg-surface-3 text-primary-token',
+          // Linear-style: near-black bg, tight shadow, no visible border
+          'max-w-xs border border-transparent',
+          'bg-[#1c1e22] dark:bg-[#1c1e22] text-[#e3e4e5] shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -115,7 +115,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-surface-3'
+            className='fill-[#1c1e22]'
             data-testid='tooltip-arrow'
           />
         )}

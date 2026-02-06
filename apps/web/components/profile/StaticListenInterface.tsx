@@ -114,7 +114,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       {/* DSP Buttons */}
       <div className='space-y-3'>
         {availableDSPs.length === 0 ? (
-          <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl text-center'>
+          <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm text-center'>
             <p className='text-sm text-secondary-token'>
               Streaming links aren&apos;t available for this profile yet.
             </p>
@@ -127,7 +127,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
               onClick={() => handleDSPClick(dsp)}
               disabled={selectedDSP === dsp.key || isLoading}
               className={`
-                w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-semibold text-base
+                w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl font-medium text-[15px]
                 transition-all duration-150 ease-out will-change-transform
                 hover:scale-[1.01] hover:-translate-y-px active:scale-[0.99]
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-opacity-50

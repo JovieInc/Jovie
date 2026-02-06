@@ -118,7 +118,7 @@ export function BaseSidebarHeader({
             'ml-2 p-1.5 rounded-md shrink-0',
             'text-secondary-token hover:text-primary-token',
             'hover:bg-surface-1 transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+            'focus-visible:outline-none focus-visible:bg-interactive-hover'
           )}
           aria-label='Close sidebar'
         >

@@ -59,9 +59,9 @@ export function TableRow({
         // Hover state - uses design token for consistent dark/light mode
         'hover:bg-(--color-cell-hover)',
         // Selected state
-        selected && 'bg-surface-2/50',
-        // Keyboard focus state
-        keyboardFocused && 'ring-2 ring-inset ring-accent',
+        selected && 'bg-surface-2/70',
+        // Keyboard focus state — subtle bg highlight, no ring (Linear-style)
+        keyboardFocused && 'bg-surface-2/50',
         // Clickable cursor
         onClick && 'cursor-pointer',
         // Remove focus outline for clickable rows

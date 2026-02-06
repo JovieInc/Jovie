@@ -14,9 +14,18 @@ import * as Sentry from '@sentry/nextjs';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
-const CACHE_PREFIX = 'db:cache:';
+const CACHE_PREFIX = 'db:cache:v2:';
 const DEFAULT_TTL_SECONDS = 60; // 1 minute default
 const MAX_MEMORY_CACHE_SIZE = 5000;
+
+/**
+ * Sentinel wrapper to distinguish cached null/undefined from cache miss.
+ * Without this, queries returning null (e.g., 404 paths) are never cached,
+ * causing repeated database hits (cache stampede).
+ *
+ * Named CacheSentinel to avoid confusion with CacheEntry from pacer/cache.ts.
+ */
+type CacheSentinel<T> = { __sentinel: true; value: T };
 
 /**
  * In-memory LRU cache for process-local caching.
@@ -113,7 +122,7 @@ async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
   try {
     return await redis.get<T>(cacheKey);
   } catch (error) {
-    captureWarning('[db-cache] Redis read failed', { error });
+    captureWarning('[db-cache] Redis read failed', error);
     return null;
   }
 }
@@ -126,7 +135,7 @@ function writeToRedis<T>(cacheKey: string, value: T, ttlSeconds: number): void {
   if (!redis) return;
 
   redis.set(cacheKey, value, { ex: ttlSeconds }).catch(err => {
-    captureWarning('[db-cache] Redis write failed', { error: err });
+    captureWarning('[db-cache] Redis write failed', err);
   });
 }
 
@@ -158,34 +167,38 @@ export async function cacheQuery<T>(
 
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
-    const memoryResult = memoryCache.get(cacheKey) as T | null;
-    if (memoryResult !== null) {
-      return memoryResult;
+    const memoryResult = memoryCache.get(cacheKey) as CacheSentinel<T> | null;
+    if (memoryResult !== null && memoryResult.__sentinel) {
+      return memoryResult.value;
     }
   }
 
   // Layer 2: Try Redis if enabled
   if (useRedis) {
-    const redisResult = await tryReadFromRedis<T>(cacheKey);
-    if (redisResult !== null) {
+    const redisResult = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
+    if (redisResult !== null && redisResult.__sentinel) {
       // Populate memory cache from Redis hit
       if (!skipMemoryCache) {
         memoryCache.set(cacheKey, redisResult, ttlMs);
       }
-      return redisResult;
+      return redisResult.value;
     }
   }
 
   // Layer 3: Cache miss - execute query
   const result = await queryFn();
 
+  // Wrap in sentinel so null/undefined results are cached too,
+  // preventing repeated DB queries on 404/bot paths
+  const wrapped: CacheSentinel<T> = { __sentinel: true, value: result };
+
   // Populate caches (fire-and-forget for non-blocking)
   if (!skipMemoryCache) {
-    memoryCache.set(cacheKey, result, ttlMs);
+    memoryCache.set(cacheKey, wrapped, ttlMs);
   }
 
   if (useRedis) {
-    writeToRedis(cacheKey, result, ttlSeconds);
+    writeToRedis(cacheKey, wrapped, ttlSeconds);
   }
 
   return result;
@@ -207,7 +220,7 @@ export async function invalidateCache(key: string): Promise<void> {
   const redis = getRedis();
   if (redis) {
     await redis.del(cacheKey).catch(err => {
-      captureWarning('[db-cache] Redis delete failed', { error: err });
+      captureWarning('[db-cache] Redis delete failed', err);
     });
   }
 }
@@ -215,6 +228,8 @@ export async function invalidateCache(key: string): Promise<void> {
 /**
  * Invalidate all cached queries matching a prefix.
  * Useful for invalidating related caches (e.g., all profile caches for a user).
+ *
+ * Clears both in-memory and Redis caches so other instances don't serve stale data.
  *
  * @param prefix - Key prefix to match
  */
@@ -231,9 +246,52 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
     });
   }
 
-  // For Redis, we'd need SCAN which isn't ideal for Upstash REST API
-  // For now, rely on TTL expiration for Redis prefix invalidation
-  // In a production scenario, consider using Redis Pub/Sub for cache invalidation
+  // Invalidate Redis cache using SCAN to find matching keys
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    const keysToDelete: string[] = [];
+    let cursor: string | number = 0;
+
+    do {
+      const result: [string | number, string[]] = await redis.scan(cursor, {
+        match: `${fullPrefix}*`,
+        count: 100,
+      });
+      cursor = result[0];
+      keysToDelete.push(...result[1]);
+    } while (cursor !== 0 && cursor !== '0');
+
+    if (keysToDelete.length > 0) {
+      // Batch deletes via pipeline to minimize HTTP round-trips
+      const BATCH_SIZE = 500;
+      let failedDeletes = 0;
+      for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
+        const batch = keysToDelete.slice(i, i + BATCH_SIZE);
+        const pipeline = redis.pipeline();
+        for (const key of batch) {
+          pipeline.del(key);
+        }
+        const results = await pipeline.exec();
+        // Check for individual command failures in the pipeline
+        // Upstash pipeline results are typed as unknown[], errors are Error instances
+        for (const result of results) {
+          if (result instanceof Error) {
+            failedDeletes++;
+            captureWarning('[db-cache] Redis pipeline DEL failed', result);
+          }
+        }
+      }
+      Sentry.addBreadcrumb({
+        category: 'db-cache',
+        message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
+        level: 'info',
+      });
+    }
+  } catch (error) {
+    captureWarning('[db-cache] Redis prefix invalidation failed', error);
+  }
 }
 
 /**
@@ -252,7 +310,8 @@ export function getCacheStats(): {
 /**
  * Clear all caches. Use with caution - primarily for testing.
  */
-export function clearAllCaches(): void {
+export async function clearAllCaches(): Promise<void> {
   memoryCache.clear();
-  // Redis cache will expire naturally via TTL
+  // Clear Redis cache entries matching our prefix
+  await invalidateCacheByPrefix('');
 }

@@ -18,6 +18,10 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
+import {
+  checkDspDiscoveryRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 
 // ============================================================================
 // Request Schema
@@ -41,6 +45,27 @@ export async function POST(request: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limiting - protects 3rd-party platform APIs
+    const rateLimitResult = await checkDspDiscoveryRateLimit(userId);
+    if (!rateLimitResult.success) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Rate limit exceeded',
+          message: rateLimitResult.reason,
+          retryAfter,
+        },
+        {
+          status: 429,
+          headers: createRateLimitHeaders(rateLimitResult),
+        }
+      );
     }
 
     // Parse request body
