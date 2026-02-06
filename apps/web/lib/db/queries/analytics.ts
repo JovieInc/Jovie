@@ -15,12 +15,6 @@ import type {
   DashboardAnalyticsView,
 } from '@/types/analytics';
 
-/**
- * Time range for analytics queries.
- * Note: 'all' is capped at 1 year (365 days) for performance reasons.
- */
-type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
-
 type JsonArray<T> = T[] | string | null;
 
 const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
@@ -52,7 +46,7 @@ interface AnalyticsData {
 
 export async function getAnalyticsData(
   creatorProfileId: string,
-  range: TimeRange = '30d'
+  range: AnalyticsRange = '30d'
 ): Promise<AnalyticsData> {
   const now = new Date();
   let startDate = new Date();
@@ -233,7 +227,7 @@ export async function getAnalyticsData(
 // Helper function to get analytics for the current user
 export async function getUserAnalytics(
   clerkUserId: string,
-  range: TimeRange = '30d'
+  range: AnalyticsRange = '30d'
 ) {
   // Single JOIN query to get user and profile in one round-trip
   const result = await db

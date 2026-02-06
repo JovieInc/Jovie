@@ -131,58 +131,6 @@ async function updateNotificationStatus(
     .where(eq(fanReleaseNotifications.id, notificationId));
 }
 
-async function fetchReleaseDetails(releaseId: string) {
-  const [release] = await db
-    .select({
-      id: discogReleases.id,
-      title: discogReleases.title,
-      slug: discogReleases.slug,
-      artworkUrl: discogReleases.artworkUrl,
-      releaseDate: discogReleases.releaseDate,
-    })
-    .from(discogReleases)
-    .where(eq(discogReleases.id, releaseId))
-    .limit(1);
-
-  return release;
-}
-
-async function fetchCreatorProfile(creatorProfileId: string) {
-  const [creator] = await db
-    .select({
-      id: creatorProfiles.id,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, creatorProfileId))
-    .limit(1);
-
-  return creator;
-}
-
-async function fetchActiveSubscriber(subscriptionId: string) {
-  const [subscriber] = await db
-    .select({
-      id: notificationSubscriptions.id,
-      channel: notificationSubscriptions.channel,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-    })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        eq(notificationSubscriptions.id, subscriptionId),
-        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-      )
-    )
-    .limit(1);
-
-  return subscriber;
-}
-
 // ============================================================================
 // Batch Data Fetching
 // ============================================================================
@@ -319,15 +267,36 @@ async function processNotificationWithBatchedData(
   ctx: ProcessingContext,
   releasesMap: Map<
     string,
-    NonNullable<Awaited<ReturnType<typeof fetchReleaseDetails>>>
+    NonNullable<
+      Awaited<ReturnType<typeof batchFetchReleases>> extends Map<
+        string,
+        infer V
+      >
+        ? V
+        : never
+    >
   >,
   creatorsMap: Map<
     string,
-    NonNullable<Awaited<ReturnType<typeof fetchCreatorProfile>>>
+    NonNullable<
+      Awaited<ReturnType<typeof batchFetchCreatorProfiles>> extends Map<
+        string,
+        infer V
+      >
+        ? V
+        : never
+    >
   >,
   subscribersMap: Map<
     string,
-    NonNullable<Awaited<ReturnType<typeof fetchActiveSubscriber>>>
+    NonNullable<
+      Awaited<ReturnType<typeof batchFetchSubscribers>> extends Map<
+        string,
+        infer V
+      >
+        ? V
+        : never
+    >
   >,
   linksMap: Map<string, Array<{ providerId: string; url: string }>>
 ): Promise<ProcessResult> {
