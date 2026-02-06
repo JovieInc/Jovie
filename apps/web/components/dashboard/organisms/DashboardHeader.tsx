@@ -33,7 +33,7 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn('z-20 border-b border-subtle', className)}
     >
-      <div className='relative flex h-12 w-full items-center gap-2 px-4'>
+      <div className='relative flex h-[52px] w-full items-center gap-2 px-4'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -46,14 +46,14 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Mobile: Show current page title centered */}
-        <h1 className='flex-1 text-center text-[15px] font-semibold text-primary-token sm:hidden'>
+        <h1 className='flex-1 text-center text-[15px] font-semibold text-secondary-token sm:hidden'>
           <span className='block max-w-[200px] truncate mx-auto'>
             {currentLabel}
           </span>
         </h1>
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='hidden flex-1 items-center gap-3 sm:flex'>
-          <span className='text-[13px] font-medium text-primary-token'>
+          <span className='text-[13px] font-medium text-secondary-token'>
             {currentLabel}
           </span>
           {breadcrumbSuffix}

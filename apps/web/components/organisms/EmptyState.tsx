@@ -64,7 +64,7 @@ const variantStyles: Record<
 > = {
   default: {
     iconWrapper: 'text-tertiary-token',
-    heading: 'text-primary-token',
+    heading: 'text-secondary-token',
     description: 'text-tertiary-token',
   },
   search: {
@@ -198,7 +198,7 @@ export function EmptyState({
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
       className={cn(
-        'flex flex-col items-center justify-center px-4 py-12 text-center min-h-[400px]',
+        'flex flex-1 flex-col items-center justify-center px-4 py-12 text-center',
         className
       )}
     >
@@ -216,7 +216,7 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-1 text-xl font-semibold', styles.heading)}
+        className={cn('mb-1 text-sm font-medium', styles.heading)}
       >
         {heading}
       </h3>
@@ -224,7 +224,7 @@ export function EmptyState({
       {description && (
         <p
           id={descriptionId}
-          className={cn('mb-6 max-w-sm text-sm', styles.description)}
+          className={cn('mb-6 max-w-sm text-[13px]', styles.description)}
         >
           {description}
         </p>

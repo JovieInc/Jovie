@@ -19,8 +19,8 @@ const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(
       className={cn(
         'inline-flex items-center justify-center rounded-md px-1.5 py-0.5 font-sans text-[11px] font-medium',
         variant === 'tooltip'
-          ? // Tooltip variant: theme-aware for proper contrast
-            'border border-black/15 bg-black/10 text-neutral-700 dark:border-white/20 dark:bg-white/15 dark:text-white'
+          ? // Tooltip variant: always-dark bg to match tooltip
+            'border border-white/15 bg-white/10 text-[#a0a3a9]'
           : // Default variant: for use outside tooltips
             'border border-subtle bg-surface-1 text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.08)]',
         className

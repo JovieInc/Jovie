@@ -24,7 +24,10 @@ export function TablePaginationFooter({
   onPageSizeChange,
   className,
 }: TablePaginationFooterProps) {
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  // Hide pagination when there's no data
+  if (totalItems === 0) return null;
+
+  const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
   const canGoPrevious = currentPage > 1;
