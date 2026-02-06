@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
  * Should be rendered at app-level to provide tooltip context.
  */
 const TooltipProvider = ({
-  delayDuration = 1000,
+  delayDuration = 700,
   skipDelayDuration = 300,
   ...props
 }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) => (
@@ -69,7 +69,7 @@ const TooltipContent = React.forwardRef<
   (
     {
       className,
-      sideOffset = 6,
+      sideOffset = 4,
       showArrow = false,
       children,
       testId = 'tooltip-content',

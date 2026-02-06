@@ -194,10 +194,7 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent
-        align='end'
-        className='w-64 p-0 rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-white dark:bg-surface-2 shadow-lg'
-      >
+      <PopoverContent align='end' className='w-64 p-0'>
         {/* List options */}
         {(onShowTracksChange || onGroupByYearChange) && (
           <div className='border-b border-subtle px-2.5 py-2 space-y-2'>

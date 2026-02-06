@@ -231,14 +231,14 @@ export function CommonDropdown(props: CommonDropdownProps) {
         className={cn(dropdownMenuContentClasses, contentClassName)}
       >
         {searchable && (
-          <div className='relative mb-2'>
-            <Search className='absolute left-3 top-2.5 h-4 w-4 text-tertiary-token' />
+          <div className='relative px-2 pb-1 pt-1'>
+            <Search className='absolute left-4.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
             <input
               type='text'
               placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='w-full rounded-lg border border-subtle bg-surface-0 dark:bg-surface-2 py-2 pl-9 pr-3 text-sm text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-3 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
             />
           </div>
         )}
