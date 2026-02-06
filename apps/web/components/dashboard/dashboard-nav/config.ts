@@ -33,42 +33,52 @@ export const dashboardHome: NavItem = {
   description: 'Overview of your dashboard',
 };
 
+const profileNav: NavItem = {
+  name: 'Profile',
+  href: APP_ROUTES.PROFILE,
+  id: 'profile',
+  icon: UserCircle,
+  description: 'Update your profile and links',
+};
+
+const contactsNav: NavItem = {
+  name: 'Contacts',
+  href: APP_ROUTES.CONTACTS,
+  id: 'contacts',
+  icon: IdCard,
+  description: 'Manage your team and contact routes',
+};
+
+const releasesNav: NavItem = {
+  name: 'Releases',
+  href: APP_ROUTES.RELEASES,
+  id: 'releases',
+  icon: Music,
+  description: 'Link out every provider with one smart link',
+};
+
+const tourDatesNav: NavItem = {
+  name: 'Tour Dates',
+  href: APP_ROUTES.TOUR_DATES,
+  id: 'tour-dates',
+  icon: CalendarDays,
+  description: 'Sync and manage your tour dates',
+};
+
+const audienceNav: NavItem = {
+  name: 'Audience',
+  href: APP_ROUTES.AUDIENCE,
+  id: 'audience',
+  icon: Users,
+  description: 'Understand your audience demographics',
+};
+
 export const primaryNavigation: NavItem[] = [
-  {
-    name: 'Profile',
-    href: APP_ROUTES.PROFILE,
-    id: 'profile',
-    icon: UserCircle,
-    description: 'Update your profile and links',
-  },
-  {
-    name: 'Contacts',
-    href: APP_ROUTES.CONTACTS,
-    id: 'contacts',
-    icon: IdCard,
-    description: 'Manage your team and contact routes',
-  },
-  {
-    name: 'Releases',
-    href: APP_ROUTES.RELEASES,
-    id: 'releases',
-    icon: Music,
-    description: 'Link out every provider with one smart link',
-  },
-  {
-    name: 'Tour Dates',
-    href: APP_ROUTES.TOUR_DATES,
-    id: 'tour-dates',
-    icon: CalendarDays,
-    description: 'Sync and manage your tour dates',
-  },
-  {
-    name: 'Audience',
-    href: APP_ROUTES.AUDIENCE,
-    id: 'audience',
-    icon: Users,
-    description: 'Understand your audience demographics',
-  },
+  profileNav,
+  contactsNav,
+  releasesNav,
+  tourDatesNav,
+  audienceNav,
 ];
 
 export const secondaryNavigation: NavItem[] = [
@@ -186,15 +196,15 @@ export const adminNavigation: NavItem[] = [
 /** Items shown as icons in the bottom tab bar (max 4). */
 export const mobilePrimaryNavigation: NavItem[] = [
   dashboardHome,
-  primaryNavigation[0], // Profile
-  primaryNavigation[1], // Contacts
-  primaryNavigation[4], // Audience
+  profileNav,
+  contactsNav,
+  audienceNav,
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
-  primaryNavigation[2], // Releases
-  primaryNavigation[3], // Tour Dates
-  ...secondaryNavigation, // Analytics, Earnings, Chat
+  releasesNav,
+  tourDatesNav,
+  ...secondaryNavigation,
   settingsNavItem,
 ];

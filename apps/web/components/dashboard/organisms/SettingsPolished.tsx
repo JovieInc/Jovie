@@ -42,25 +42,22 @@ export function SettingsPolished({
     await router.push(APP_ROUTES.SETTINGS_BILLING);
   };
 
-  const renderAccountSection = () => (
-    <div className='space-y-6'>
-      {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-        <AccountSettingsSection />
-      ) : (
-        <DashboardCard variant='settings'>
-          <div className='text-center py-4'>
-            <h3 className='text-[14px] font-medium text-primary-token mb-2'>
-              Account settings unavailable
-            </h3>
-            <p className='text-sm text-secondary'>
-              Clerk is not configured (missing publishable key). Set
-              NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-            </p>
-          </div>
-        </DashboardCard>
-      )}
-    </div>
-  );
+  const renderAccountSection = () =>
+    publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+      <AccountSettingsSection />
+    ) : (
+      <DashboardCard variant='settings'>
+        <div className='text-center py-4'>
+          <h3 className='text-[14px] font-medium text-primary-token mb-2'>
+            Account settings unavailable
+          </h3>
+          <p className='text-sm text-secondary'>
+            Clerk is not configured (missing publishable key). Set
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+          </p>
+        </div>
+      </DashboardCard>
+    );
 
   const renderProUpgradeCard = (
     title: string,

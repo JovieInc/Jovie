@@ -17,6 +17,9 @@ import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview'
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 
+const HEADER_ACTION_CLASS =
+  'h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out';
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -142,7 +145,7 @@ export function PreviewPanelContent() {
             trigger={
               <button
                 type='button'
-                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out'
+                className={HEADER_ACTION_CLASS}
                 aria-label='Profile actions'
               >
                 <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
@@ -155,7 +158,7 @@ export function PreviewPanelContent() {
             href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out inline-flex items-center justify-center'
+            className={`${HEADER_ACTION_CLASS} inline-flex items-center justify-center`}
             aria-label='Open profile in new tab'
           >
             <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
