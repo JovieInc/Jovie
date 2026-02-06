@@ -71,7 +71,7 @@ export const TrackRow = memo(function TrackRow({
   }, [allProviders, providerMap]);
 
   return (
-    <tr className='group bg-surface-1/50 hover:bg-surface-1 border-l-2 border-l-transparent'>
+    <tr className='group hover:bg-surface-2/30 border-l-2 border-l-transparent'>
       {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && <td className='w-14' />}
 
