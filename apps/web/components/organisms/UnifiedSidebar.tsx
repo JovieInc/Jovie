@@ -169,7 +169,7 @@ function FloatingSidebar({
               <button
                 type='button'
                 aria-label='Open workspace menu'
-                className='flex h-7 items-center gap-1.5 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+                className='flex h-7 items-center gap-1.5 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent'
               >
                 <BrandLogo size={16} tone='auto' className='h-4 w-4 shrink-0' />
                 <span className='text-sm font-semibold text-sidebar-foreground'>
@@ -246,7 +246,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 href={APP_ROUTES.DASHBOARD}
                 aria-label='Back to dashboard'
                 className={cn(
-                  'inline-flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium text-sidebar-item-foreground transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'inline-flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium text-sidebar-item-foreground transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
                   'group-data-[collapsible=icon]:justify-center'
                 )}
               >
@@ -265,7 +265,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                     type='button'
                     aria-label='Open workspace menu'
                     className={cn(
-                      'flex h-7 items-center gap-2 rounded-md px-2 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                      'flex h-7 items-center gap-2 rounded-md px-2 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
                       'group-data-[collapsible=icon]:justify-center'
                     )}
                   >
@@ -287,7 +287,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               <Link
                 href='/app'
                 aria-label='New chat'
-                className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden'
+                className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
               >
                 <SquarePen className='h-4 w-4' />
               </Link>
