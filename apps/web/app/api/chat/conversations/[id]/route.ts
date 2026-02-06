@@ -2,7 +2,7 @@ import { and, desc, eq, lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -63,7 +63,14 @@ export async function GET(req: Request, { params }: RouteParams) {
     // Build where conditions for messages
     const conditions = [eq(chatMessages.conversationId, id)];
     if (before) {
-      conditions.push(lt(chatMessages.createdAt, new Date(before)));
+      const beforeDate = new Date(before);
+      if (isNaN(beforeDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid "before" cursor' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      conditions.push(lt(chatMessages.createdAt, beforeDate));
     }
 
     // Fetch the most recent N messages (DESC + limit), then reverse to chronological order
