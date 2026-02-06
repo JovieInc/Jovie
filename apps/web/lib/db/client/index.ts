@@ -29,7 +29,7 @@ export { logDbError, logDbInfo } from './logging';
 export { DB_CONFIG, isRetryableError, withRetry } from './retry';
 
 // Session Helpers
-export { setSessionUser, withDb, withTransaction } from './session';
+export { setSessionUser, withDb } from './session';
 // Types
 export type {
   ActiveConnectionsRow,
