@@ -122,7 +122,7 @@ async function tryReadFromRedis<T>(cacheKey: string): Promise<T | null> {
   try {
     return await redis.get<T>(cacheKey);
   } catch (error) {
-    captureWarning('[db-cache] Redis read failed', { error });
+    captureWarning('[db-cache] Redis read failed', error);
     return null;
   }
 }
@@ -135,7 +135,7 @@ function writeToRedis<T>(cacheKey: string, value: T, ttlSeconds: number): void {
   if (!redis) return;
 
   redis.set(cacheKey, value, { ex: ttlSeconds }).catch(err => {
-    captureWarning('[db-cache] Redis write failed', { error: err });
+    captureWarning('[db-cache] Redis write failed', err);
   });
 }
 
@@ -220,7 +220,7 @@ export async function invalidateCache(key: string): Promise<void> {
   const redis = getRedis();
   if (redis) {
     await redis.del(cacheKey).catch(err => {
-      captureWarning('[db-cache] Redis delete failed', { error: err });
+      captureWarning('[db-cache] Redis delete failed', err);
     });
   }
 }
@@ -266,22 +266,31 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
     if (keysToDelete.length > 0) {
       // Batch deletes via pipeline to minimize HTTP round-trips
       const BATCH_SIZE = 500;
+      let failedDeletes = 0;
       for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
         const batch = keysToDelete.slice(i, i + BATCH_SIZE);
         const pipeline = redis.pipeline();
         for (const key of batch) {
           pipeline.del(key);
         }
-        await pipeline.exec();
+        const results = await pipeline.exec();
+        // Check for individual command failures in the pipeline
+        // Upstash pipeline results are typed as unknown[], errors are Error instances
+        for (const result of results) {
+          if (result instanceof Error) {
+            failedDeletes++;
+            captureWarning('[db-cache] Redis pipeline DEL failed', result);
+          }
+        }
       }
       Sentry.addBreadcrumb({
         category: 'db-cache',
-        message: `Invalidated ${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
+        message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
         level: 'info',
       });
     }
   } catch (error) {
-    captureWarning('[db-cache] Redis prefix invalidation failed', { error });
+    captureWarning('[db-cache] Redis prefix invalidation failed', error);
   }
 }
 
