@@ -11,7 +11,7 @@ import {
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
-import { getUserState } from '@/lib/auth/proxy-state';
+import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
@@ -336,16 +336,17 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 
-    // Only fetch state if we need it for routing decisions
-    const needsUserState =
-      pathInfo.isAuthPath ||
-      pathname === '/waitlist' ||
-      pathname === '/onboarding' ||
-      pathname === '/signin' ||
-      pathname === '/signup' ||
-      !pathname.startsWith('/api/');
+    // Only page routes need user state — API routes don't make routing decisions
+    const needsUserState = !pathname.startsWith('/api/');
 
-    if (needsUserState) {
+    // Skip the getUserState call for RSC prefetch requests when the user is
+    // already known-active from the in-memory cache. Active users don't need
+    // routing intervention (no waitlist/onboarding rewrite), so the prefetch
+    // can pass through immediately. The subsequent full navigation will still
+    // call getUserState normally.
+    const canSkipForPrefetch = isRSCPrefetch && isKnownActiveUser(userId);
+
+    if (needsUserState && !canSkipForPrefetch) {
       userState = await getUserState(userId);
     }
 

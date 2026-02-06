@@ -17,7 +17,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
-import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -206,7 +206,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [editingRelease, rows.length, closeEditor, openEditor, isSidebarOpen]);
 
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
-  const { setHeaderBadge, setHeaderActions } = useHeaderActions();
+  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context

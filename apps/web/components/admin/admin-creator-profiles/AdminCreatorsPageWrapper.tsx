@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
@@ -12,7 +12,7 @@ export function AdminCreatorsPageWrapper(
   props: Readonly<AdminCreatorProfilesWithSidebarProps>
 ) {
   const router = useRouter();
-  const { setHeaderActions } = useHeaderActions();
+  const { setHeaderActions } = useSetHeaderActions();
 
   const handleIngestPending = useCallback(() => {
     router.refresh();

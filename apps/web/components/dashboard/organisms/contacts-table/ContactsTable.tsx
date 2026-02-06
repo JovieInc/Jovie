@@ -8,7 +8,7 @@ import type { EditableContact } from '@/components/dashboard/hooks/useContactsMa
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { UnifiedTable } from '@/components/organisms/table';
-import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
@@ -64,7 +64,7 @@ export const ContactsTable = memo(function ContactsTable({
   }, [selectedContact, contacts.length, isSidebarOpen]);
 
   // Set header actions (drawer toggle on right)
-  const { setHeaderActions } = useHeaderActions();
+  const { setHeaderActions } = useSetHeaderActions();
 
   // Memoize drawer toggle to avoid creating new JSX on every render
   const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
