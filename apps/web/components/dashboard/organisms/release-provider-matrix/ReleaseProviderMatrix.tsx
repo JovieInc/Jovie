@@ -268,7 +268,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       {/* Main content area */}
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
-        <div className='flex-1 min-h-0 flex flex-col bg-base'>
+        <div className='flex-1 min-h-0 flex flex-col'>
           {/* Sticky subheader - outside scroll container */}
           {showReleasesTable && (
             <ReleaseTableSubheader
@@ -381,7 +381,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
+            <div className='flex items-center justify-between border-t border-subtle px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
                 {filteredRows.length === rows.length
                   ? `${totalReleases}`
