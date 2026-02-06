@@ -127,7 +127,7 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded'
+      className='flex w-full items-center justify-between gap-2 rounded focus-visible:outline-none focus-visible:bg-interactive-hover'
     >
       <span className='text-[11px] font-medium text-primary-token'>
         {label}
@@ -235,7 +235,7 @@ function LinearStyleDisplayMenu({
                     aria-pressed={isVisible}
                     aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
                     className={cn(
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
                       isVisible
                         ? 'bg-accent/20 text-accent'
                         : 'text-tertiary-token hover:bg-surface-2/50'
@@ -254,7 +254,7 @@ function LinearStyleDisplayMenu({
             <button
               type='button'
               onClick={onResetToDefaults}
-              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1'
+              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover'
             >
               Reset to defaults
             </button>
