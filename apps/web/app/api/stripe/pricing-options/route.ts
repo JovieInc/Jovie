@@ -8,8 +8,7 @@ import { getAvailablePricing } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+export const revalidate = 3600;
 
 export async function GET() {
   try {
@@ -23,18 +22,15 @@ export async function GET() {
       description: option.description,
     }));
 
-    return NextResponse.json(
-      {
-        pricingOptions,
-        options: pricingOptions,
-      },
-      { headers: NO_STORE_HEADERS }
-    );
+    return NextResponse.json({
+      pricingOptions,
+      options: pricingOptions,
+    });
   } catch (error) {
     logger.error('Error getting pricing options:', error);
     return NextResponse.json(
       { error: 'Failed to get pricing options' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500 }
     );
   }
 }

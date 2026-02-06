@@ -1,3 +1,5 @@
+'use client';
+
 import { cn } from '@/lib/utils';
 import { SortableHeaderButton } from '../SortableHeaderButton';
 import type { TableCellProps } from './TableCell';
