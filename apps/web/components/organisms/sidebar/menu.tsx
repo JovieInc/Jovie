@@ -37,7 +37,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout and typography
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-[13px] font-[450] leading-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-[13px] font-normal leading-tight outline-none',
     // Transitions
     'transition-all duration-150 ease-out active:duration-50',
     // Default text color - muted sidebar tokens matching Linear
@@ -46,8 +46,8 @@ const sidebarMenuButtonVariants = cva(
     'hover:text-sidebar-foreground hover:bg-sidebar-accent',
     // Active state - subtle bg highlight like Linear
     'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
-    // Focus state
-    'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar-background',
+    // Focus state - subtle bg like Linear (no rings)
+    'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
     'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
     // Menu action spacing
@@ -190,7 +190,7 @@ export const SidebarMenuAction = React.forwardRef<
       className={cn(
         'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-colors duration-150 ease-out',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
-        'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:text-sidebar-foreground',
+        'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none',
         '[&>svg]:size-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
@@ -308,7 +308,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       className={cn(
         'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-[13px] text-sidebar-item-foreground outline-none transition-colors duration-150',
         'hover:bg-sidebar-accent hover:text-sidebar-foreground',
-        'focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+        'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
         '[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',

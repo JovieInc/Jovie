@@ -31,8 +31,13 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     return FREE_ENTITLEMENTS;
   }
 
-  const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
-  const clerkEmail = clerkIdentity.email;
+  let clerkEmail: string | null = null;
+  try {
+    const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
+    clerkEmail = clerkIdentity.email;
+  } catch (error) {
+    console.error('Failed to load Clerk user for entitlements', error);
+  }
 
   // Get billing info which includes isAdmin (avoids redundant DB query)
   const billing = await getUserBillingInfo();

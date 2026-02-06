@@ -118,7 +118,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -164,7 +164,7 @@ function ActiveFilterPill({
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
+        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -232,11 +232,7 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(
-        MENU_ITEM_BASE,
-        'gap-2 pl-2 pr-2 w-full',
-        checked && 'text-primary-token'
-      )}
+      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
     >
       <span
         className={cn(
@@ -576,7 +572,7 @@ export function ReleaseFilterDropdown({
                       }}
                     >
                       <DropdownMenuPrimitive.SubTrigger
-                        className={cn(MENU_ITEM_BASE, 'gap-2 justify-between')}
+                        className={cn(MENU_ITEM_BASE, 'justify-between')}
                       >
                         <div className='flex items-center gap-2'>
                           <Icon
@@ -639,7 +635,7 @@ export function ReleaseFilterDropdown({
                   <DropdownMenuPrimitive.Item
                     className={cn(
                       MENU_ITEM_BASE,
-                      'gap-2 text-tertiary-token hover:text-primary-token'
+                      'text-tertiary-token hover:text-primary-token'
                     )}
                     onSelect={() => {
                       onFiltersChange({

@@ -37,7 +37,7 @@ export function SettingsAppearanceSection() {
   return (
     <div>
       <DashboardCard variant='settings' className='space-y-4'>
-        <h3 className='text-lg font-medium text-primary mb-6'>
+        <h3 className='text-[14px] font-medium text-primary-token mb-4'>
           Interface Theme
         </h3>
 

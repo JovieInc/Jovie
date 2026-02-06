@@ -247,7 +247,7 @@ export function SettingsAdPixelsSection() {
       <DashboardCard variant='settings'>
         <div className='flex items-center justify-between mb-6'>
           <div>
-            <h3 className='text-lg font-medium text-primary'>
+            <h3 className='text-[14px] font-medium text-primary-token'>
               Server-Side Pixel Tracking
             </h3>
             <p className='text-sm text-secondary-token mt-1'>

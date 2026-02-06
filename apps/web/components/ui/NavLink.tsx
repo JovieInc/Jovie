@@ -32,7 +32,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
       className: cn(
         'h-auto px-0 py-0 text-sm font-medium transition-colors',
         'hover:text-primary-token focus-visible:text-primary-token',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         'rounded-md',
         variant === 'default' && 'text-muted-foreground hover:text-foreground',
         className

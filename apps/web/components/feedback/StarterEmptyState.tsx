@@ -1,3 +1,5 @@
+'use client';
+
 import { Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
@@ -98,7 +100,7 @@ export function StarterEmptyState({
         </div>
         <div className='flex-1 space-y-2'>
           <div>
-            <p className='text-xl font-semibold text-primary-token'>{title}</p>
+            <p className='text-sm font-medium text-secondary-token'>{title}</p>
             <p className='text-sm text-tertiary-token'>{description}</p>
           </div>
 
