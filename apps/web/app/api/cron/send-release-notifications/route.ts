@@ -662,21 +662,33 @@ export async function GET(request: Request) {
         batchFetchStreamingLinks(releaseIds),
       ]);
 
-    // Process all notifications with pre-fetched data
+    // Process notifications in parallel batches
     let totalSent = 0;
     let totalFailed = 0;
+    const BATCH_SIZE = 10;
 
-    for (const notification of pendingNotifications) {
-      const result = await processNotificationWithBatchedData(
-        { now, notification },
-        releasesMap,
-        creatorsMap,
-        subscribersMap,
-        linksMap
+    for (let i = 0; i < pendingNotifications.length; i += BATCH_SIZE) {
+      const batch = pendingNotifications.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(notification =>
+          processNotificationWithBatchedData(
+            { now, notification },
+            releasesMap,
+            creatorsMap,
+            subscribersMap,
+            linksMap
+          )
+        )
       );
 
-      if (result === 'sent') totalSent++;
-      if (result === 'failed') totalFailed++;
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          if (result.value === 'sent') totalSent++;
+          if (result.value === 'failed') totalFailed++;
+        } else {
+          totalFailed++;
+        }
+      }
     }
 
     logger.info(

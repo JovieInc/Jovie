@@ -67,7 +67,8 @@ export async function getAnalyticsData(
       startDate.setDate(now.getDate() - 90);
       break;
     case 'all':
-      startDate = new Date(0); // Unix epoch
+      startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 1);
       break;
   }
 
@@ -130,7 +131,7 @@ export async function getAnalyticsData(
             ),
             top_links as (
               select link_id as id, link_type as url, count(*) as clicks
-              from base_events
+              from ranged_events
               group by link_id, link_type
               order by clicks desc
               limit 5
