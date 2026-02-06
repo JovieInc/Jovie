@@ -37,7 +37,6 @@ export {
   validateDbConnection,
   withDb,
   withRetry,
-  withTransaction,
 } from './client/index';
 // Re-export table names from config
 export { TABLE_NAMES } from './config';
