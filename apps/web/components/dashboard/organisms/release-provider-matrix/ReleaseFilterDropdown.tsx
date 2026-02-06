@@ -118,7 +118,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -164,7 +164,7 @@ function ActiveFilterPill({
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
+        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />

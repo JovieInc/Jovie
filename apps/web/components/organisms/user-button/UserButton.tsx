@@ -65,7 +65,7 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-surface-2 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 text-left'
+          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
         >
           <div className='flex w-full items-center gap-3'>
             <Avatar
@@ -106,7 +106,7 @@ function buildDropdownItems({
         </button>
       ),
     },
-    { type: 'custom', id: 'spacer-1', render: () => <div className='h-2' /> },
+    { type: 'separator', id: 'sep-1' },
     {
       type: 'action',
       id: 'settings',
@@ -257,15 +257,19 @@ function buildDropdownItems({
       ),
       onClick: () => setIsFeedbackOpen(true),
     },
-    { type: 'custom', id: 'spacer-2', render: () => <div className='h-2' /> },
+    { type: 'separator', id: 'sep-2' },
     {
       type: 'action',
       id: 'sign-out',
       label: loading.signOut ? 'Signing out…' : 'Sign out',
-      icon: <Icon name='LogOut' className='h-4 w-4 text-red-500' />,
+      icon: (
+        <Icon
+          name='LogOut'
+          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
+        />
+      ),
       onClick: handleSignOut,
       disabled: loading.signOut,
-      variant: 'destructive',
       className: 'disabled:cursor-not-allowed disabled:opacity-60',
     }
   );

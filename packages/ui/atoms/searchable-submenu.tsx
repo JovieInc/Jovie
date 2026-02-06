@@ -350,7 +350,7 @@ export function SearchableSubmenu({
                 className={cn(
                   'w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-8 text-sm',
                   'text-primary-token placeholder:text-tertiary-token',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                  'focus-visible:outline-none focus-visible:border-interactive'
                 )}
                 aria-label={searchPlaceholder}
                 aria-controls={listId}
@@ -613,7 +613,7 @@ export function SearchableList({
           className={cn(
             'w-full rounded-lg border border-subtle bg-surface-2 py-2 pl-9 pr-3 text-sm',
             'text-primary-token placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            'focus-visible:outline-none focus-visible:border-interactive'
           )}
         />
       </div>

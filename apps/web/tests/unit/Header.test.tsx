@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Import the individual atomic components to test them directly
 import { LogoLink } from '@/components/atoms/LogoLink';
-import { AuthActions } from '@/components/molecules/AuthActions';
 import { NavLink } from '@/components/atoms/NavLink';
+import { AuthActions } from '@/components/molecules/AuthActions';
 
 // Mock Clerk
 vi.mock('@clerk/nextjs', () => ({

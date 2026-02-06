@@ -37,7 +37,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout and typography
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-[13px] font-[450] leading-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-[13px] font-normal leading-tight outline-none',
     // Transitions
     'transition-all duration-150 ease-out active:duration-50',
     // Default text color - muted sidebar tokens matching Linear

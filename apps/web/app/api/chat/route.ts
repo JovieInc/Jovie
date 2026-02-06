@@ -1,4 +1,4 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { type ModelMessage, streamText, tool } from 'ai';
@@ -324,23 +324,11 @@ export async function POST(req: Request) {
   // After validation, we know messages is a valid ModelMessage array
   const validatedMessages = messages as ModelMessage[];
 
-  // Check for Anthropic API key
-  if (!process.env.ANTHROPIC_API_KEY) {
-    Sentry.captureMessage('ANTHROPIC_API_KEY is not configured', {
-      level: 'error',
-      tags: { feature: 'ai-chat' },
-    });
-    return NextResponse.json(
-      { error: 'AI chat is not configured. Please contact support.' },
-      { status: 503, headers: CORS_HEADERS }
-    );
-  }
-
   const systemPrompt = buildSystemPrompt(artistContext as ArtistContext);
 
   try {
     const result = streamText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: gateway('anthropic:claude-sonnet-4-20250514'),
       system: systemPrompt,
       messages: validatedMessages,
       tools: {

@@ -51,7 +51,7 @@ export function UniversalLinkInputPlatformSelector({
         <button
           type='button'
           disabled={disabled}
-          className='relative flex h-11 w-11 items-center justify-center rounded-xl hover:bg-surface-2 transition-colors shrink-0 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95 sm:h-10 sm:w-10 sm:rounded-full'
+          className='relative flex h-11 w-11 items-center justify-center rounded-xl hover:bg-surface-2 transition-colors shrink-0 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95 sm:h-10 sm:w-10 sm:rounded-full'
           aria-label='Select platform'
         >
           <div

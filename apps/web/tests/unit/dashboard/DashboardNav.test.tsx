@@ -7,7 +7,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/');
+const mockUsePathname = vi.fn(() => '/app/profile');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
@@ -72,9 +72,9 @@ describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    expect(getByRole('link', { name: 'Dashboard' })).toBeDefined();
     expect(getByRole('link', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Contacts' })).toBeDefined();
+    expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
 
@@ -87,16 +87,16 @@ describe('DashboardNav', () => {
   it('applies active state to current page', () => {
     const { getByRole } = renderDashboardNav();
 
-    const activeLink = getByRole('link', { name: 'Dashboard' });
+    const activeLink = getByRole('link', { name: 'Profile' });
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    const overviewLink = container.querySelector('[href="/"]');
-    expect(overviewLink).toBeDefined();
-    expect(overviewLink?.className).toContain('justify-center');
+    const profileLink = container.querySelector('[href="/app/profile"]');
+    expect(profileLink).toBeTruthy();
+    expect(profileLink?.className).toContain('justify-center');
   });
 
   it('differentiates primary and secondary nav styling', () => {
@@ -115,11 +115,11 @@ describe('DashboardNav', () => {
   });
 
   it('renders with different pathname', () => {
-    mockUsePathname.mockReturnValueOnce('/profile');
+    mockUsePathname.mockReturnValueOnce('/app/contacts');
 
     const { getByRole } = renderDashboardNav();
 
-    const profileLink = getByRole('link', { name: 'Profile' });
-    expect(profileLink.getAttribute('aria-current')).toBe('page');
+    const contactsLink = getByRole('link', { name: 'Contacts' });
+    expect(contactsLink.getAttribute('aria-current')).toBe('page');
   });
 });

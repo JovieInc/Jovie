@@ -111,6 +111,7 @@ async function getSpotifyToken(): Promise<string | null> {
         ).toString('base64')}`,
       },
       body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {

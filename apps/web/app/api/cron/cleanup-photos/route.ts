@@ -71,6 +71,26 @@ export async function GET(request: Request) {
     const blobUrlsToDelete = collectBlobUrls(orphanedRecords);
     const blobsDeleted = await deleteBlobsIfConfigured(blobUrlsToDelete);
 
+    // If blob deletion failed (-1), skip DB record deletion to avoid orphaning blobs.
+    // The next cron run will retry both blob and DB cleanup.
+    if (blobsDeleted < 0 && blobUrlsToDelete.length > 0) {
+      logger.warn(
+        `[cleanup-photos] Skipping DB record deletion — blob cleanup failed for ${blobUrlsToDelete.length} URLs`
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            'Blob deletion failed; DB records preserved to avoid orphaning blobs',
+          deleted: 0,
+          blobsDeleted: 0,
+          blobsFailed: blobUrlsToDelete.length,
+          details: buildCleanupDetails(orphanedRecords),
+        },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Delete database records in a single batch operation
     const recordIds = orphanedRecords.map(r => r.id);
     if (recordIds.length > 0) {

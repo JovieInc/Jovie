@@ -321,10 +321,22 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const fetchOptionsRef = useRef(fetchOptions);
+  const urlsRef = useRef(urls);
+
+  // Sync refs in effect to match useDedupedFetch pattern and avoid writing during render
+  useEffect(() => {
+    fetchOptionsRef.current = fetchOptions;
+    urlsRef.current = urls;
+  });
+
+  // Use null character as separator to avoid collisions with URLs containing commas
+  const urlsKey = urls.join('\0');
 
   const fetchAll = useCallback(
     async (forceRefresh = false) => {
-      if (skip || urls.every(url => url === null)) return;
+      const currentUrls = urlsRef.current;
+      if (skip || currentUrls.every(url => url === null)) return;
 
       abortControllerRef.current?.abort();
       const controller = new AbortController();
@@ -333,14 +345,16 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
       setState(prev => ({
         ...prev,
         loading: true,
-        errors: urls.map(() => null),
+        // Reset both data and errors to match new URL count
+        data: currentUrls.map((_url, i) => prev.data[i] ?? null),
+        errors: currentUrls.map(() => null),
       }));
 
       const results = await Promise.allSettled(
-        urls.map(async url => {
+        currentUrls.map(async url => {
           if (url === null) return null;
           const result = await dedupedFetchWithMeta(url, {
-            ...fetchOptions,
+            ...fetchOptionsRef.current,
             forceRefresh,
             signal: controller.signal,
           });
@@ -365,7 +379,8 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
         });
       }
     },
-    [urls, skip, fetchOptions]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- urlsRef and fetchOptionsRef are intentionally read from refs to avoid stale closures; urlsKey tracks meaningful URL changes
+    [urlsKey, skip]
   );
 
   useEffect(() => {

@@ -4,6 +4,11 @@
 
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 import { IngestedSuggestions } from '@/components/dashboard/organisms/links/IngestedSuggestions';
 import { track } from '@/lib/analytics';
 import {

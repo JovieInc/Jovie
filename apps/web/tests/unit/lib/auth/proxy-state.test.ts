@@ -18,6 +18,43 @@ vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
 }));
 
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: { id: 'id', clerkId: 'clerkId', status: 'status' },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: {
+    userId: 'userId',
+    onboardingCompletedAt: 'onboardingCompletedAt',
+  },
+}));
+
+// Mock heavy dependencies to prevent slow module resolution timeouts
+vi.mock('server-only', () => ({}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  withScope: vi.fn((cb: (scope: unknown) => void) =>
+    cb({ setExtra: vi.fn(), setTag: vi.fn() })
+  ),
+  Severity: { Error: 'error', Warning: 'warning', Info: 'info' },
+}));
+
+vi.mock('@/lib/analytics/runtime-aware', () => ({
+  trackEvent: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/sentry/init', () => ({
+  getSentryMode: vi.fn().mockReturnValue('disabled'),
+  isSentryInitialized: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('@/lib/redis', () => ({
+  getRedis: vi.fn().mockReturnValue(null),
+}));
+
 describe('proxy-state.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();

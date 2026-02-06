@@ -10,6 +10,7 @@ import {
   type ProfileNextAction,
   resolveProfileNextAction,
 } from '@/lib/profile-next-action';
+import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 const ArtistNotificationsCTA = dynamic(
@@ -53,6 +54,9 @@ type ProfilePrimaryCTAProps = {
   readonly autoOpenCapture?: boolean;
   readonly showCapture?: boolean;
 };
+
+const ctaLinkClass =
+  'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-3.5 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)';
 
 export function ProfilePrimaryCTA({
   artist,
@@ -141,7 +145,7 @@ export function ProfilePrimaryCTA({
           href={nextAction.url}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-4 text-lg font-semibold text-btn-primary-foreground shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+          className={ctaLinkClass}
           aria-label='Open in Spotify'
         >
           Open in Spotify
@@ -156,7 +160,7 @@ export function ProfilePrimaryCTA({
         <Link
           href={`/${artist.handle}/listen`}
           prefetch={false}
-          className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-4 text-lg font-semibold text-btn-primary-foreground shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+          className={cn(ctaLinkClass, 'max-w-sm')}
           aria-label='Open Listen page with music links'
         >
           Listen now

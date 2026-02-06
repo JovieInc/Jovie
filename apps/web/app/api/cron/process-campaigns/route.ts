@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 
 import { processCampaigns } from '@/lib/email/campaigns/processor';
+import { env } from '@/lib/env-server';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
@@ -16,18 +17,14 @@ export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 export async function GET(request: Request) {
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  // Verify cron secret in all environments
+  const authHeader = request.headers.get('authorization');
+  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const startTime = Date.now();
