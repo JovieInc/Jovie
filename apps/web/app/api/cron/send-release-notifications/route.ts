@@ -23,6 +23,9 @@ const MAX_NOTIFICATIONS_PER_RUN = 100;
 // for longer than this, reset it to "pending" for retry
 const SENDING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
+// Number of notifications to process concurrently within each batch
+const CONCURRENCY_BATCH_SIZE = 10;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -464,15 +467,17 @@ function createEmptyResponse(now: Date): NextResponse {
 function createSuccessResponse(
   totalSent: number,
   totalFailed: number,
+  totalSkipped: number,
   processed: number,
   now: Date
 ): NextResponse {
   return NextResponse.json(
     {
       success: true,
-      message: `Sent ${totalSent} notifications, ${totalFailed} failed`,
+      message: `Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`,
       sent: totalSent,
       failed: totalFailed,
+      skipped: totalSkipped,
       processed,
       timestamp: now.toISOString(),
     },
@@ -551,7 +556,7 @@ export async function GET(request: Request) {
     // Process notifications in parallel batches
     let totalSent = 0;
     let totalFailed = 0;
-    const CONCURRENCY_BATCH_SIZE = 10;
+    let totalSkipped = 0;
 
     for (
       let i = 0;
@@ -574,7 +579,8 @@ export async function GET(request: Request) {
       for (const result of results) {
         if (result.status === 'fulfilled') {
           if (result.value === 'sent') totalSent++;
-          if (result.value === 'failed') totalFailed++;
+          else if (result.value === 'failed') totalFailed++;
+          else if (result.value === 'skipped') totalSkipped++;
         } else {
           totalFailed++;
         }
@@ -582,12 +588,13 @@ export async function GET(request: Request) {
     }
 
     logger.info(
-      `[send-release-notifications] Sent ${totalSent} notifications, ${totalFailed} failed`
+      `[send-release-notifications] Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`
     );
 
     return createSuccessResponse(
       totalSent,
       totalFailed,
+      totalSkipped,
       pendingNotifications.length,
       now
     );

@@ -15,6 +15,10 @@ import type {
   DashboardAnalyticsView,
 } from '@/types/analytics';
 
+/**
+ * Time range for analytics queries.
+ * Note: 'all' is capped at 1 year (365 days) for performance reasons.
+ */
 type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
 
 type JsonArray<T> = T[] | string | null;

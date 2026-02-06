@@ -1,3 +1,7 @@
+/**
+ * Time range for analytics queries.
+ * Note: 'all' is capped at 1 year (365 days) for performance reasons.
+ */
 export type AnalyticsRange = '1d' | '7d' | '30d' | '90d' | 'all';
 
 export type DashboardAnalyticsView = 'traffic' | 'full';

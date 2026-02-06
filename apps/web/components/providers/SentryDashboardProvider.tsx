@@ -220,8 +220,13 @@ export function useSentryDashboardState(): {
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
+    let isChecking = false;
 
     const checkState = async (): Promise<void> => {
+      // Reentrancy guard: prevent concurrent invocations if the async import takes longer than the polling interval
+      if (isChecking) return;
+      isChecking = true;
+
       try {
         const { getUpgradeState, isUpgraded } = await import(
           '@/lib/sentry/lazy-replay'
@@ -248,6 +253,8 @@ export function useSentryDashboardState(): {
           upgradeState: 'failed',
         });
         if (interval) clearInterval(interval);
+      } finally {
+        isChecking = false;
       }
     };
 
