@@ -232,11 +232,7 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(
-        MENU_ITEM_BASE,
-        'gap-2 pl-2 pr-2 w-full',
-        checked && 'text-primary-token'
-      )}
+      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
     >
       <span
         className={cn(
@@ -576,7 +572,7 @@ export function ReleaseFilterDropdown({
                       }}
                     >
                       <DropdownMenuPrimitive.SubTrigger
-                        className={cn(MENU_ITEM_BASE, 'gap-2 justify-between')}
+                        className={cn(MENU_ITEM_BASE, 'justify-between')}
                       >
                         <div className='flex items-center gap-2'>
                           <Icon
@@ -639,7 +635,7 @@ export function ReleaseFilterDropdown({
                   <DropdownMenuPrimitive.Item
                     className={cn(
                       MENU_ITEM_BASE,
-                      'gap-2 text-tertiary-token hover:text-primary-token'
+                      'text-tertiary-token hover:text-primary-token'
                     )}
                     onSelect={() => {
                       onFiltersChange({
