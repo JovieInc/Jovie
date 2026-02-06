@@ -1,11 +1,14 @@
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { CORS_HEADERS } from '@/lib/http/headers';
+import { NO_CACHE_HEADERS } from '@/lib/http/headers';
+import { getClientIP } from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Schema for validating the edit request body
@@ -14,6 +17,8 @@ const confirmEditSchema = z.object({
   profileId: z.string().uuid(),
   field: z.enum(['displayName', 'bio', 'genres']),
   newValue: z.union([z.string(), z.array(z.string())]),
+  conversationId: z.string().uuid().optional(),
+  messageId: z.string().uuid().optional(),
 });
 
 /**
@@ -28,7 +33,7 @@ export async function POST(req: Request) {
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { status: 401, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -39,7 +44,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -47,23 +52,24 @@ export async function POST(req: Request) {
   if (!parseResult.success) {
     return NextResponse.json(
       { error: 'Invalid request', details: parseResult.error.flatten() },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
-  const { profileId, field, newValue } = parseResult.data;
+  const { profileId, field, newValue, conversationId, messageId } =
+    parseResult.data;
 
   // Validate field-specific value types
   if (field === 'genres' && !Array.isArray(newValue)) {
     return NextResponse.json(
       { error: 'Genres must be an array' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
   if (field !== 'genres' && typeof newValue !== 'string') {
     return NextResponse.json(
       { error: `${field} must be a string` },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -83,14 +89,14 @@ export async function POST(req: Request) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404, headers: NO_CACHE_HEADERS }
       );
     }
 
     if (profile.userId !== userId) {
       return NextResponse.json(
         { error: 'Unauthorized - not your profile' },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -106,14 +112,21 @@ export async function POST(req: Request) {
       })
       .where(eq(creatorProfiles.id, profileId));
 
-    // Log to audit table
+    // Log to audit table with full traceability
+    const ipAddress = getClientIP(req);
+    const userAgent = req.headers.get('user-agent');
+
     await db.insert(chatAuditLog).values({
       userId,
       creatorProfileId: profileId,
+      conversationId: conversationId ?? null,
+      messageId: messageId ?? null,
       action: 'profile_edit',
       field,
       previousValue: JSON.stringify(oldValue),
       newValue: JSON.stringify(newValue),
+      ipAddress: ipAddress ?? null,
+      userAgent: userAgent ?? null,
     });
 
     return NextResponse.json(
@@ -122,13 +135,17 @@ export async function POST(req: Request) {
         field,
         newValue,
       },
-      { headers: CORS_HEADERS }
+      { headers: NO_CACHE_HEADERS }
     );
   } catch (error) {
-    console.error('[confirm-edit] Error applying edit:', error);
+    logger.error('[confirm-edit] Error applying edit:', error);
+    Sentry.captureException(error, {
+      tags: { feature: 'ai-chat', operation: 'confirm-edit' },
+      extra: { userId, profileId, field },
+    });
     return NextResponse.json(
       { error: 'Failed to apply edit' },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

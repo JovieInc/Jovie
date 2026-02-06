@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -11,6 +11,12 @@ const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
   Pragma: 'no-cache',
 } as const;
+
+/** Maximum message length for initial messages */
+const MAX_INITIAL_MESSAGE_LENGTH = 4000;
+
+/** Maximum conversations per user */
+const MAX_CONVERSATIONS_PER_USER = 200;
 
 /**
  * GET /api/chat/conversations
@@ -29,8 +35,9 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
-    const limit = limitParam
-      ? Math.min(Number.parseInt(limitParam, 10), 50)
+    const parsed = limitParam ? parseInt(limitParam, 10) : 20;
+    const limit = Number.isFinite(parsed)
+      ? Math.min(Math.max(parsed, 1), 50)
       : 20;
 
     const conversations = await db
@@ -81,6 +88,21 @@ export async function POST(req: Request) {
       );
     }
 
+    // Check conversation count limit
+    const [{ value: conversationCount }] = await db
+      .select({ value: count() })
+      .from(chatConversations)
+      .where(eq(chatConversations.creatorProfileId, profile.id));
+
+    if (conversationCount >= MAX_CONVERSATIONS_PER_USER) {
+      return NextResponse.json(
+        {
+          error: `Maximum of ${MAX_CONVERSATIONS_PER_USER} conversations reached. Please delete old conversations.`,
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     let body: { title?: string; initialMessage?: string } = {};
     try {
       body = await req.json();
@@ -89,6 +111,19 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
+
+    // Validate initial message length
+    if (
+      initialMessage &&
+      initialMessage.trim().length > MAX_INITIAL_MESSAGE_LENGTH
+    ) {
+      return NextResponse.json(
+        {
+          error: `Initial message too long. Maximum is ${MAX_INITIAL_MESSAGE_LENGTH} characters.`,
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Create the conversation
     const [conversation] = await db

@@ -2,10 +2,18 @@ import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { type ModelMessage, streamText, tool } from 'ai';
+import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { db } from '@/lib/db';
+import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { sqlAny } from '@/lib/db/sql-helpers';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
+import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 export const maxDuration = 30;
 
@@ -37,21 +45,118 @@ const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
   genres: 'Music genres (comma-separated)',
 };
 
-interface ArtistContext {
-  displayName: string;
-  username: string;
-  bio: string | null;
-  genres: string[];
-  spotifyFollowers: number | null;
-  spotifyPopularity: number | null;
-  profileViews: number;
-  hasSocialLinks: boolean;
-  hasMusicLinks: boolean;
-  tippingStats: {
-    tipClicks: number;
-    tipsSubmitted: number;
-    totalReceivedCents: number;
-    monthReceivedCents: number;
+/**
+ * Zod schema for validating client-provided artist context.
+ * Used when profileId is not provided (backward compatibility).
+ */
+const artistContextSchema = z.object({
+  displayName: z.string().max(100),
+  username: z.string().max(50),
+  bio: z.string().max(500).nullable(),
+  genres: z.array(z.string().max(50)).max(10),
+  spotifyFollowers: z.number().int().nonnegative().nullable(),
+  spotifyPopularity: z.number().int().min(0).max(100).nullable(),
+  profileViews: z.number().int().nonnegative(),
+  hasSocialLinks: z.boolean(),
+  hasMusicLinks: z.boolean(),
+  tippingStats: z.object({
+    tipClicks: z.number().int().nonnegative(),
+    tipsSubmitted: z.number().int().nonnegative(),
+    totalReceivedCents: z.number().int().nonnegative(),
+    monthReceivedCents: z.number().int().nonnegative(),
+  }),
+});
+
+type ArtistContext = z.infer<typeof artistContextSchema>;
+
+/**
+ * Fetches artist context server-side from the database.
+ * Validates that the profile belongs to the authenticated user.
+ */
+async function fetchArtistContext(
+  profileId: string,
+  clerkUserId: string
+): Promise<ArtistContext | null> {
+  // Fetch profile with ownership check via user join
+  const [result] = await db
+    .select({
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+      bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+      profileViews: creatorProfiles.profileViews,
+      userClerkId: users.clerkId,
+    })
+    .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!result || result.userClerkId !== clerkUserId) {
+    return null;
+  }
+
+  // Fetch link counts and tipping stats in parallel
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
+  const startOfMonthISO = startOfMonth.toISOString();
+
+  const [linkCounts, tipTotals, clickStats] = await Promise.all([
+    db
+      .select({
+        totalActive: count(),
+        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          eq(socialLinks.state, 'active')
+        )
+      )
+      .then(r => r[0]),
+    db
+      .select({
+        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
+        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
+        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, profileId))
+      .then(r => r[0]),
+    db
+      .select({
+        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+      })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, profileId),
+          eq(clickEvents.linkType, 'tip')
+        )
+      )
+      .then(r => r[0]),
+  ]);
+
+  return {
+    displayName: result.displayName ?? result.username,
+    username: result.username,
+    bio: result.bio,
+    genres: result.genres ?? [],
+    spotifyFollowers: result.spotifyFollowers,
+    spotifyPopularity: result.spotifyPopularity,
+    profileViews: result.profileViews ?? 0,
+    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
+    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    tippingStats: {
+      tipClicks: Number(clickStats?.total ?? 0),
+      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
+      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
+      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
+    },
   };
 }
 
@@ -292,7 +397,11 @@ export async function POST(req: Request) {
   }
 
   // Parse and validate request body
-  let body: { messages?: unknown; artistContext?: unknown };
+  let body: {
+    messages?: unknown;
+    profileId?: unknown;
+    artistContext?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -302,12 +411,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages, artistContext } = body;
+  const { messages, profileId } = body;
 
-  // Validate artist context
-  if (!artistContext || typeof artistContext !== 'object') {
+  // Validate that either profileId or artistContext is provided
+  if (
+    (!profileId || typeof profileId !== 'string') &&
+    (!body.artistContext || typeof body.artistContext !== 'object')
+  ) {
     return NextResponse.json(
-      { error: 'Missing or invalid artist context' },
+      { error: 'Missing profileId or artistContext' },
       { status: 400, headers: CORS_HEADERS }
     );
   }
@@ -324,7 +436,33 @@ export async function POST(req: Request) {
   // After validation, we know messages is a valid ModelMessage array
   const validatedMessages = messages as ModelMessage[];
 
-  const systemPrompt = buildSystemPrompt(artistContext as ArtistContext);
+  // Fetch artist context server-side (preferred) or fall back to client-provided
+  let artistContext: ArtistContext;
+  if (profileId && typeof profileId === 'string') {
+    const context = await fetchArtistContext(profileId, userId);
+    if (!context) {
+      return NextResponse.json(
+        { error: 'Profile not found or unauthorized' },
+        { status: 404, headers: CORS_HEADERS }
+      );
+    }
+    artistContext = context;
+  } else {
+    // Backward compatibility: accept client-provided artistContext with validation
+    const parseResult = artistContextSchema.safeParse(body.artistContext);
+    if (!parseResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Invalid artistContext format',
+          details: parseResult.error.flatten().fieldErrors,
+        },
+        { status: 400, headers: CORS_HEADERS }
+      );
+    }
+    artistContext = parseResult.data;
+  }
+
+  const systemPrompt = buildSystemPrompt(artistContext);
 
   try {
     const result = streamText({
@@ -332,9 +470,17 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: validatedMessages,
       tools: {
-        proposeProfileEdit: createProfileEditTool(
-          artistContext as ArtistContext
-        ),
+        proposeProfileEdit: createProfileEditTool(artistContext),
+      },
+      abortSignal: req.signal,
+      onError: ({ error }) => {
+        Sentry.captureException(error, {
+          tags: { feature: 'ai-chat', errorType: 'streaming' },
+          extra: {
+            userId,
+            messageCount: validatedMessages.length,
+          },
+        });
       },
     });
 
