@@ -29,12 +29,13 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   onTap,
 }: AudienceMobileCardProps) {
   const displayName = member.displayName || 'Visitor';
-  const secondaryLabel =
-    member.type === 'email'
-      ? member.email
-      : member.type === 'sms'
-        ? member.phone
-        : null;
+
+  let secondaryLabel: string | null = null;
+  if (member.type === 'email') {
+    secondaryLabel = member.email;
+  } else if (member.type === 'sms') {
+    secondaryLabel = member.phone;
+  }
 
   return (
     <button
