@@ -123,7 +123,7 @@ export function PreviewPanel() {
       width={PREVIEW_PANEL_WIDTH}
       ariaLabel='Live Preview'
       contextMenuItems={actionMenuItems}
-      className='bg-surface-1'
+      className='bg-surface-2'
     >
       <div className='flex h-full flex-col'>
         {/* Header with action buttons */}
@@ -185,7 +185,7 @@ export function PreviewPanel() {
         </div>
 
         {/* Footer - URL Preview */}
-        <div className='shrink-0 border-t border-subtle bg-surface-0/95 p-4 backdrop-blur-sm'>
+        <div className='shrink-0 border-t border-subtle p-4'>
           <h3 className='text-[13px] font-medium text-primary-token mb-2'>
             Your Profile URL
           </h3>

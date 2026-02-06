@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 // Delay before hiding floating sidebar (milliseconds)
 const FLOATING_SIDEBAR_HIDE_DELAY_MS = 150;
 const TRIGGER_ZONE = 20; // pixels from left edge
-const SIDEBAR_WIDTH = 250; // keep visible while over sidebar
+const SIDEBAR_WIDTH = 270; // keep visible while over sidebar
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -158,10 +158,10 @@ function FloatingSidebar({
   profileHref: string | undefined;
 }) {
   return (
-    <div className='fixed inset-y-0 left-0 z-50 w-[240px] p-3 animate-in slide-in-from-left duration-200'>
+    <div className='fixed inset-y-0 left-0 z-50 w-[270px] p-3 animate-in slide-in-from-left duration-200'>
       <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
         {/* Header */}
-        <div className='flex h-12 items-center px-3.5'>
+        <div className='flex h-12 items-center px-2'>
           <UserButton
             profileHref={profileHref}
             settingsHref={APP_ROUTES.SETTINGS}
@@ -190,7 +190,7 @@ function FloatingSidebar({
         </div>
 
         {/* Content */}
-        <div className='flex-1 overflow-y-auto px-3.5'>
+        <div className='flex-1 overflow-y-auto px-2'>
           {isDashboardOrAdmin ? (
             <DashboardNav />
           ) : (
@@ -233,11 +233,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         collapsible='offcanvas'
         className={cn(
           'bg-base',
-          '[--sidebar-width:220px]',
+          '[--sidebar-width:250px]',
           'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
         )}
       >
-        <SidebarHeader className='relative h-12 justify-center gap-0 px-3.5 py-0'>
+        <SidebarHeader className='relative h-12 justify-center gap-0 px-2 py-0'>
           <div className='flex w-full items-center'>
             {/* Logo/Header Area - varies by section */}
             {isInSettings ? (
@@ -265,7 +265,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                     type='button'
                     aria-label='Open workspace menu'
                     className={cn(
-                      'flex h-7 items-center gap-1.5 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                      'flex h-7 items-center gap-2 rounded-md px-2 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                       'group-data-[collapsible=icon]:justify-center'
                     )}
                   >
@@ -345,7 +345,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         </SidebarHeader>
 
         {/* Navigation Content */}
-        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-3.5'>
+        <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
           <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
             <SidebarGroupContent className='flex-1'>
               {isDashboardOrAdmin ? (
