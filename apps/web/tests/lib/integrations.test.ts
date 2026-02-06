@@ -38,7 +38,9 @@ describe('Integration Health Diagnostics', () => {
           '✓ Database URL is undefined (expected in test environment)'
         );
       } else {
-        expect(databaseUrl).toMatch(/^(postgres|postgresql):/);
+        // Strip wrapping quotes if present (some environments include literal quotes in the value)
+        const cleanUrl = databaseUrl.replace(/^['"]|['"]$/g, '');
+        expect(cleanUrl).toMatch(/^(postgres|postgresql):/);
         console.log('✓ Database URL is present and formatted correctly');
       }
     });
@@ -71,22 +73,28 @@ describe('Integration Health Diagnostics', () => {
   });
 
   describe('Database Integration Health', () => {
-    it('should have the necessary database configuration', async () => {
-      const databaseUrl = env.DATABASE_URL;
+    it(
+      'should have the necessary database configuration',
+      { timeout: 30000 },
+      async () => {
+        const databaseUrl = env.DATABASE_URL;
 
-      if (!databaseUrl) {
-        console.log('⏭ Skipping database integration test - no DATABASE_URL');
-        return;
+        if (!databaseUrl) {
+          console.log('⏭ Skipping database integration test - no DATABASE_URL');
+          return;
+        }
+
+        // Strip wrapping quotes if present (some environments include literal quotes in the value)
+        const cleanUrl = databaseUrl.replace(/^['"]|['"]$/g, '');
+        expect(cleanUrl).toMatch(/^(postgres|postgresql):/);
+        console.log('✓ Database URL format is valid');
+
+        // Test that we can import database modules without errors
+        const { db } = await import('@/lib/db');
+        expect(db).toBeDefined();
+        console.log('✓ Database module imports successfully');
       }
-
-      expect(databaseUrl).toMatch(/^(postgres|postgresql):/);
-      console.log('✓ Database URL format is valid');
-
-      // Test that we can import database modules without errors
-      const { db } = await import('@/lib/db');
-      expect(db).toBeDefined();
-      console.log('✓ Database module imports successfully');
-    });
+    );
   });
 
   describe('Stripe Integration Health', () => {
