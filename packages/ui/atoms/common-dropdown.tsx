@@ -45,14 +45,25 @@ import {
   isSubmenu,
 } from './common-dropdown-types';
 
-/** Renders an icon component, handling both function components and JSX elements */
+/** Renders an icon component, handling function components, forwardRef objects, and JSX elements */
 function renderIcon(
   IconComponent: React.ComponentType<{ className?: string }> | React.ReactNode,
   className: string
 ): React.ReactNode {
   if (!IconComponent) return null;
-  if (typeof IconComponent === 'function') {
-    return <IconComponent className={className} />;
+  // Already a rendered React element (e.g. <Icon /> JSX) — return as-is
+  if (React.isValidElement(IconComponent)) {
+    return IconComponent;
+  }
+  // Component reference: function component OR forwardRef/memo object (e.g. Lucide icons)
+  if (
+    typeof IconComponent === 'function' ||
+    (typeof IconComponent === 'object' &&
+      IconComponent !== null &&
+      '$$typeof' in IconComponent)
+  ) {
+    const Comp = IconComponent as React.ComponentType<{ className?: string }>;
+    return <Comp className={className} />;
   }
   return IconComponent;
 }
@@ -459,7 +470,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
             <Check className='h-4 w-4' />
           </ItemIndicator>
         </span>
-        {IconComponent && <IconComponent className='h-4 w-4' />}
+        {renderIcon(IconComponent, 'h-4 w-4')}
         {item.label}
       </CheckboxItem>
     );
