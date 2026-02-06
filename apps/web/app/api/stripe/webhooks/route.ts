@@ -16,6 +16,8 @@
  *
  * Architecture:
  * - This route handles signature verification and idempotency
+ * - Idempotency relies on the unique constraint on stripe_event_id (not transactions)
+ * - Neon HTTP driver does not support transactions; operations are sequential
  * - Event processing is delegated to domain-specific handlers via getHandler()
  * - Handlers are registered in lib/stripe/webhooks/registry.ts
  */
@@ -24,7 +26,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
-import { withTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -77,70 +79,79 @@ export async function POST(request: NextRequest) {
 
     const stripeCreatedAt = stripeTimestampToDate(event.created);
 
-    // Use a transaction for atomic webhook processing:
-    // 1. Insert or get existing webhook record
-    // 2. Check if already processed (idempotency)
+    // Sequential webhook processing with idempotency via unique constraint:
+    // 1. Insert-or-skip webhook record (unique on stripe_event_id)
+    // 2. Check if already processed
     // 3. Process the event
     // 4. Mark as processed
-    // If any step fails, the transaction rolls back for clean retry
-    const { error: txError } = await withTransaction(async tx => {
-      // Check if event already exists
-      const [existingEvent] = await tx
-        .select({
-          id: stripeWebhookEvents.id,
-          processedAt: stripeWebhookEvents.processedAt,
+    // NOTE: Neon HTTP driver does not support transactions. If step 3 fails,
+    // the unprocessed record remains and Stripe's retry will re-attempt.
+    try {
+      // Attempt insert; unique constraint on stripeEventId handles duplicates
+      const [insertedRecord] = await db
+        .insert(stripeWebhookEvents)
+        .values({
+          stripeEventId: event.id,
+          type: event.type,
+          stripeObjectId: getStripeObjectId(event),
+          stripeCreatedAt,
+          payload: event as unknown as Record<string, unknown>,
         })
-        .from(stripeWebhookEvents)
-        .where(eq(stripeWebhookEvents.stripeEventId, event.id))
-        .limit(1);
-
-      if (existingEvent?.processedAt) {
-        // Already processed - skip (idempotent)
-        return { skipped: true, reason: 'already_processed' };
-      }
+        .onConflictDoNothing()
+        .returning({ id: stripeWebhookEvents.id });
 
       let webhookRecordId: string;
 
-      if (existingEvent) {
-        // Event exists but wasn't processed (previous failure) - retry processing
-        webhookRecordId = existingEvent.id;
+      if (insertedRecord) {
+        // New event — use the newly inserted record
+        webhookRecordId = insertedRecord.id;
       } else {
-        // New event - insert record
-        const [newRecord] = await tx
-          .insert(stripeWebhookEvents)
-          .values({
-            stripeEventId: event.id,
-            type: event.type,
-            stripeObjectId: getStripeObjectId(event),
-            stripeCreatedAt,
-            payload: event as unknown as Record<string, unknown>,
+        // Conflict: event already exists — check if already processed
+        const [existingEvent] = await db
+          .select({
+            id: stripeWebhookEvents.id,
+            processedAt: stripeWebhookEvents.processedAt,
           })
-          .returning({ id: stripeWebhookEvents.id });
+          .from(stripeWebhookEvents)
+          .where(eq(stripeWebhookEvents.stripeEventId, event.id))
+          .limit(1);
 
-        if (!newRecord) {
-          throw new Error('Failed to insert webhook event record');
+        if (!existingEvent) {
+          throw new Error(
+            'Webhook record disappeared after conflict — possible data race'
+          );
         }
-        webhookRecordId = newRecord.id;
+
+        if (existingEvent.processedAt) {
+          // Already processed — skip (idempotent)
+          return NextResponse.json(
+            { received: true },
+            { headers: NO_STORE_HEADERS }
+          );
+        }
+
+        // Exists but unprocessed (previous failure) — retry processing
+        webhookRecordId = existingEvent.id;
       }
 
       // Process the event (handlers throw on failure)
       await processWebhookEvent(event, stripeCreatedAt);
 
-      // Mark event as processed atomically within the transaction
-      await tx
+      // Mark event as processed
+      await db
         .update(stripeWebhookEvents)
         .set({ processedAt: new Date() })
         .where(eq(stripeWebhookEvents.id, webhookRecordId));
-
-      return { skipped: false, processed: true };
-    });
-
-    if (txError) {
-      await captureCriticalError('Stripe webhook transaction failed', txError, {
-        route: '/api/stripe/webhooks',
-        eventId: event.id,
-        eventType: event.type,
-      });
+    } catch (processingError) {
+      await captureCriticalError(
+        'Stripe webhook processing failed',
+        processingError,
+        {
+          route: '/api/stripe/webhooks',
+          eventId: event.id,
+          eventType: event.type,
+        }
+      );
       return NextResponse.json(
         { error: 'Webhook processing failed' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -167,7 +178,7 @@ export async function POST(request: NextRequest) {
  *
  * @param event - The Stripe webhook event
  * @param stripeCreatedAt - When Stripe created the event (for event ordering)
- * @throws If the handler throws (triggers transaction rollback)
+ * @throws If the handler throws (leaves event unprocessed for Stripe retry)
  */
 async function processWebhookEvent(
   event: Stripe.Event,
@@ -195,7 +206,7 @@ async function processWebhookEvent(
   };
 
   // Delegate to the domain-specific handler
-  // Handlers throw on unrecoverable errors to trigger transaction rollback
+  // Handlers throw on unrecoverable errors, leaving the event unprocessed for retry
   const result = await handler.handle(context);
 
   // If the handler returned an error (not thrown), log it

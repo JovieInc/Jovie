@@ -1,15 +1,15 @@
 /**
  * Stripe Webhooks Tests - Idempotency Handling
  */
-import './webhooks.test-utils';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mockConstructEvent,
+  mockDbInsert,
+  mockDbSelect,
   mockGetHandler,
   mockGetPlanFromPriceId,
   mockHandlerHandle,
-  mockWithTransaction,
   setSkipProcessing,
 } from './webhooks.test-utils';
 
@@ -53,7 +53,10 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
     expect(data.received).toBe(true);
 
     expect(mockConstructEvent).toHaveBeenCalled();
-    expect(mockWithTransaction).toHaveBeenCalled();
+    // Insert was attempted (returned empty due to conflict)
+    expect(mockDbInsert).toHaveBeenCalled();
+    // Select was called to check existing record
+    expect(mockDbSelect).toHaveBeenCalled();
     // Should not call handler for duplicate events
     expect(mockHandlerHandle).not.toHaveBeenCalled();
   });
