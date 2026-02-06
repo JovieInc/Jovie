@@ -21,7 +21,9 @@ export const {
   mockRetrieve,
   mockUpdateBilling,
   mockGetPlanFromPriceId,
-  mockWithTransaction,
+  mockDbInsert,
+  mockDbSelect,
+  mockDbUpdate,
   mockGetHandler,
   mockGetStripeObjectId,
   mockStripeTimestampToDate,
@@ -32,42 +34,42 @@ export const {
     () => 'standard'
   );
 
-  const mockTx = vi.fn(async (callback: any) => {
-    // Import skipProcessing dynamically to get current value
-    const { skipProcessing: skip } = await import('./webhooks.test-utils');
+  // Mock db.insert().values().onConflictDoNothing().returning()
+  const dbInsert = vi.fn(() => ({
+    values: vi.fn(() => ({
+      onConflictDoNothing: vi.fn(() => ({
+        returning: vi.fn(async () => {
+          // Import skipProcessing dynamically to get current value
+          const { skipProcessing: skip } = await import(
+            './webhooks.test-utils'
+          );
+          // If skip mode, simulate conflict (return empty = row already exists)
+          return skip ? [] : [{ id: 'webhook-1' }];
+        }),
+      })),
+    })),
+  }));
 
-    // Create a mock transaction context
-    const txContext = {
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(() =>
-              Promise.resolve(
-                skip ? [{ id: 'existing-id', processedAt: new Date() }] : []
-              )
-            ),
-          })),
-        })),
+  // Mock db.select().from().where().limit()
+  const dbSelect = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        limit: vi.fn(async () => {
+          const { skipProcessing: skip } = await import(
+            './webhooks.test-utils'
+          );
+          return skip ? [{ id: 'existing-id', processedAt: new Date() }] : [];
+        }),
       })),
-      insert: vi.fn(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn(() => Promise.resolve([{ id: 'webhook-1' }])),
-        })),
-      })),
-      update: vi.fn(() => ({
-        set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve()),
-        })),
-      })),
-    };
+    })),
+  }));
 
-    try {
-      const result = await callback(txContext);
-      return { data: result, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  });
+  // Mock db.update().set().where()
+  const dbUpdate = vi.fn(() => ({
+    set: vi.fn(() => ({
+      where: vi.fn(() => Promise.resolve()),
+    })),
+  }));
 
   // Mock handler handle method
   const mockHandle = vi.fn();
@@ -77,7 +79,9 @@ export const {
     mockRetrieve: vi.fn(),
     mockUpdateBilling: vi.fn(),
     mockGetPlanFromPriceId: mockGetPlan,
-    mockWithTransaction: mockTx,
+    mockDbInsert: dbInsert,
+    mockDbSelect: dbSelect,
+    mockDbUpdate: dbUpdate,
     mockGetHandler: vi.fn(),
     mockGetStripeObjectId: vi.fn(() => 'obj_123'),
     mockStripeTimestampToDate: vi.fn(
@@ -101,17 +105,11 @@ vi.mock('@/lib/stripe/client', () => ({
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: {},
-  users: {
-    clerkId: 'clerk_id_column',
-    stripeCustomerId: 'stripe_customer_id_column',
+  db: {
+    insert: mockDbInsert,
+    select: mockDbSelect,
+    update: mockDbUpdate,
   },
-  stripeWebhookEvents: {
-    id: 'id',
-    stripeEventId: 'stripe_event_id',
-    processedAt: 'processed_at',
-  },
-  withTransaction: mockWithTransaction,
 }));
 
 vi.mock('@/lib/db/schema', () => ({

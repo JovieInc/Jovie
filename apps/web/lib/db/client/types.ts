@@ -10,6 +10,17 @@ import type * as schema from '../schema';
 
 export type DbType = NeonHttpDatabase<typeof schema>;
 
+/**
+ * Inferred transaction parameter type from Drizzle's `.transaction()` method.
+ *
+ * WARNING: The Neon HTTP driver does NOT support interactive transactions.
+ * This type exists only for `DbOrTransaction` compatibility in function
+ * signatures that accept either a db or transaction context. Do not attempt
+ * to create instances via `db.transaction()` — it will throw at runtime.
+ *
+ * @see https://neon.tech/docs/serverless/serverless-driver#transaction-support
+ * @deprecated Prefer using `DbType` directly. Transactions are unavailable with the Neon HTTP driver.
+ */
 export type TransactionType = Parameters<DbType['transaction']>[0] extends (
   tx: infer T
 ) => unknown

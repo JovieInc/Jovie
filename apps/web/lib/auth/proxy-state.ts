@@ -15,13 +15,53 @@ export interface ProxyUserState {
 }
 
 // Redis cache settings for user state
-// Short TTL for transitional users, longer TTL for stable active users
+// Transitional users get shorter TTL, active users get longer TTL.
+// Safe to use longer TTLs because all state transitions (waitlist approval,
+// onboarding completion, user deletion) explicitly call invalidateProxyUserStateCache().
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
-const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for transitional users
-const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - longer for stable active users
+const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (invalidation is explicit)
+const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts
 const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
+
+// ---------------------------------------------------------------------------
+// In-memory cache layer
+// ---------------------------------------------------------------------------
+// Short-lived Map that sits in front of Redis to collapse rapid-fire middleware
+// calls (page load + RSC prefetches + client navigations) into a single
+// Redis/DB round-trip. Persists across requests in warm Edge Runtime isolates.
+// ---------------------------------------------------------------------------
+const MEMORY_CACHE_TTL_ACTIVE_MS = 10_000; // 10s for active users
+const MEMORY_CACHE_TTL_TRANSITIONAL_MS = 5_000; // 5s for transitional users
+const MEMORY_CACHE_MAX_ENTRIES = 1_000;
+
+interface MemoryCacheEntry {
+  state: ProxyUserState;
+  expiresAt: number;
+}
+
+const memoryCache = new Map<string, MemoryCacheEntry>();
+
+function tryGetMemoryCachedState(cacheKey: string): ProxyUserState | null {
+  const entry = memoryCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() < entry.expiresAt) return entry.state;
+  memoryCache.delete(cacheKey);
+  return null;
+}
+
+function setMemoryCachedState(cacheKey: string, state: ProxyUserState): void {
+  // Simple eviction: drop oldest entry when at capacity
+  if (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const firstKey = memoryCache.keys().next().value;
+    if (firstKey) memoryCache.delete(firstKey);
+  }
+  const ttlMs = state.isActive
+    ? MEMORY_CACHE_TTL_ACTIVE_MS
+    : MEMORY_CACHE_TTL_TRANSITIONAL_MS;
+  memoryCache.set(cacheKey, { state, expiresAt: Date.now() + ttlMs });
+}
 
 /** Get a human-readable label for user state (for logging) */
 function getUserStateLabel(state: ProxyUserState): string {
@@ -33,7 +73,7 @@ function getUserStateLabel(state: ProxyUserState): string {
 /**
  * Determine the appropriate cache TTL based on user state.
  * - Active users (stable state): 5 minutes - state rarely changes
- * - Transitional users (waitlist/onboarding): 30 seconds - need fresher state
+ * - Transitional users (waitlist/onboarding): 2 minutes - explicit invalidation on state change
  */
 function getTtlForUserState(state: ProxyUserState): number {
   return state.isActive
@@ -249,12 +289,20 @@ export async function getUserState(
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
 
-  // Try Redis cache first to avoid cold Neon DB queries
+  // Layer 1: In-memory cache (avoids Redis round-trip entirely)
+  const memoryCached = tryGetMemoryCachedState(cacheKey);
+  if (memoryCached) {
+    return memoryCached;
+  }
+
+  // Layer 2: Redis cache (avoids cold Neon DB queries)
   const cached = await tryGetCachedState(cacheKey, clerkUserId);
   if (cached) {
+    setMemoryCachedState(cacheKey, cached);
     return cached;
   }
 
+  // Layer 3: Database query
   try {
     const dbQueryStart = Date.now();
     const [result] = await executeUserStateQuery(clerkUserId);
@@ -264,7 +312,8 @@ export async function getUserState(
 
     const userState = determineUserState(result);
 
-    // Cache the result in Redis (fire-and-forget)
+    // Populate both cache layers
+    setMemoryCachedState(cacheKey, userState);
     const ttl = getTtlForUserState(userState);
     cacheUserState(cacheKey, userState, ttl);
 
@@ -280,6 +329,17 @@ export async function getUserState(
 }
 
 /**
+ * Synchronous check whether a user is known-active from the in-memory cache.
+ * Used by proxy.ts to skip getUserState on RSC prefetch requests for active
+ * users — they don't need routing intervention so prefetch can pass through.
+ */
+export function isKnownActiveUser(clerkUserId: string): boolean {
+  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
+  const entry = memoryCache.get(cacheKey);
+  return !!entry && Date.now() < entry.expiresAt && entry.state.isActive;
+}
+
+/**
  * Invalidate the Redis cache for a user's proxy state.
  * Call this after user state changes (onboarding completion, waitlist approval, etc.)
  *
@@ -288,10 +348,14 @@ export async function getUserState(
 export async function invalidateProxyUserStateCache(
   clerkUserId: string
 ): Promise<void> {
+  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
+
+  // Clear in-memory cache (only effective within the same isolate, but harmless)
+  memoryCache.delete(cacheKey);
+
   const redis = getRedis();
   if (!redis) return;
 
-  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
   try {
     await redis.del(cacheKey);
   } catch (error) {
