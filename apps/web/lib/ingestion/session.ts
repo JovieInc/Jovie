@@ -16,8 +16,10 @@ export async function withSystemIngestionSession<T>(
 ): Promise<T> {
   validateClerkUserId(SYSTEM_INGESTION_USER);
 
+  // is_local=false (session-scoped) because the Neon HTTP driver has no
+  // transaction context — is_local=true would be silently discarded.
   await db.execute(
-    drizzleSql`SELECT set_config('app.user_id', ${SYSTEM_INGESTION_USER}, true), set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
+    drizzleSql`SELECT set_config('app.user_id', ${SYSTEM_INGESTION_USER}, false), set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, false)`
   );
 
   return operation(db);
