@@ -5,6 +5,7 @@ export interface UserButtonProps {
   readonly profileHref?: string;
   readonly settingsHref?: string;
   readonly showUserInfo?: boolean;
+  readonly trigger?: React.ReactNode;
 }
 
 export interface UserDisplayInfo {
