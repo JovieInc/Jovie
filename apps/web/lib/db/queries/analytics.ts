@@ -275,7 +275,9 @@ function toStartDate(range: AnalyticsRange): Date {
       startDate.setDate(now.getDate() - 90);
       break;
     case 'all':
-      startDate = new Date(0);
+      // Use 1-year lookback for consistency with getAnalyticsData
+      startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 1);
       break;
   }
 

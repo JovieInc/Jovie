@@ -322,11 +322,16 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
   const fetchOptionsRef = useRef(fetchOptions);
-  fetchOptionsRef.current = fetchOptions;
   const urlsRef = useRef(urls);
-  urlsRef.current = urls;
 
-  const urlsKey = urls.join(',');
+  // Sync refs in effect to match useDedupedFetch pattern and avoid writing during render
+  useEffect(() => {
+    fetchOptionsRef.current = fetchOptions;
+    urlsRef.current = urls;
+  });
+
+  // Use null character as separator to avoid collisions with URLs containing commas
+  const urlsKey = urls.join('\0');
 
   const fetchAll = useCallback(
     async (forceRefresh = false) => {
@@ -340,6 +345,8 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
       setState(prev => ({
         ...prev,
         loading: true,
+        // Reset both data and errors to match new URL count
+        data: currentUrls.map((_url, i) => prev.data[i] ?? null),
         errors: currentUrls.map(() => null),
       }));
 
@@ -372,7 +379,7 @@ export function useDedupedFetchAll<T extends unknown[] = unknown[]>(
         });
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- urlsRef and fetchOptionsRef are intentionally read from refs to avoid stale closures; urlsKey tracks meaningful URL changes
     [urlsKey, skip]
   );
 

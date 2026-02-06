@@ -2,14 +2,13 @@ import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dashboardIdempotencyKeys } from '@/lib/db/schema/links';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * Cron job to clean up expired idempotency keys.
@@ -22,7 +21,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 export async function GET(request: Request) {
   // Verify cron secret in all environments
   const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: NO_STORE_HEADERS }

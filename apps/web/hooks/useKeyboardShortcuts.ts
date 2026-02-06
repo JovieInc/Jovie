@@ -40,7 +40,11 @@ export interface ShortcutConfig {
  */
 export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
   const shortcutsRef = useRef(shortcuts);
-  shortcutsRef.current = shortcuts;
+
+  // Update ref in effect to avoid writing during render (React 19 guidance)
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+  });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

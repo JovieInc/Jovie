@@ -252,12 +252,13 @@ export function useSentryDashboardState(): {
     };
 
     if (typeof window !== 'undefined') {
-      checkState();
-
-      // Re-check periodically while upgrading
+      // Assign interval first so checkState can clear it if we're already in terminal state
       interval = setInterval(() => {
         checkState();
       }, 500);
+
+      // Also run immediately
+      checkState();
 
       return () => {
         if (interval) clearInterval(interval);
