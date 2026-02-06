@@ -74,8 +74,7 @@ export const searchQueryParser = parseAsString;
  * Valid sort fields for the release table.
  */
 export const releaseSortFields = [
-  'releaseDate',
-  'title',
+  'release',
   'releaseType',
   'popularity',
   'primaryIsrc',
@@ -91,7 +90,7 @@ export type ReleaseSortField = (typeof releaseSortFields)[number];
  * Parser for release table sort field.
  */
 export const releaseSortParser =
-  parseAsStringLiteral(releaseSortFields).withDefault('releaseDate');
+  parseAsStringLiteral(releaseSortFields).withDefault('release');
 
 /**
  * Search params cache for release table pages.
