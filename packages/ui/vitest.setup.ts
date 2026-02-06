@@ -18,9 +18,15 @@ afterEach(() => {
 
 // Mock ResizeObserver (not available in jsdom)
 globalThis.ResizeObserver = class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  observe() {
+    // No-op: jsdom does not implement ResizeObserver
+  }
+  unobserve() {
+    // No-op: jsdom does not implement ResizeObserver
+  }
+  disconnect() {
+    // No-op: jsdom does not implement ResizeObserver
+  }
 };
 
 // Mock pointer capture methods (not available in jsdom, required by Radix UI)
