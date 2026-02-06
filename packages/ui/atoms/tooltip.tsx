@@ -87,9 +87,9 @@ const TooltipContent = React.forwardRef<
           'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
           // Normalize height so presence of a shortcut badge doesn't shift positioning
           'min-h-[28px]',
-          // Theme-aware surface with subtle border using design tokens
-          'max-w-xs border shadow-lg',
-          'border-default bg-surface-2 text-primary-token',
+          // Linear-style: no visible border, shadow provides edge definition
+          'max-w-xs border border-transparent shadow-lg',
+          'dark:border-white/[0.03] bg-surface-3 text-primary-token',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -115,7 +115,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-surface-2'
+            className='fill-surface-3'
             data-testid='tooltip-arrow'
           />
         )}

@@ -142,11 +142,12 @@ export function SettingsAdPixelsSection() {
   // Fetch existing pixel settings on mount
   const { data: existingSettings } = useQuery<PixelSettingsResponse>({
     queryKey: ['pixelSettings'],
-    queryFn: async () => {
-      const res = await fetch('/api/dashboard/pixels');
+    queryFn: async ({ signal }) => {
+      const res = await fetch('/api/dashboard/pixels', { signal });
       if (!res.ok) throw new Error('Failed to fetch pixel settings');
       return res.json();
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
   });
 
   const [pixelData, setPixelData] = useState({

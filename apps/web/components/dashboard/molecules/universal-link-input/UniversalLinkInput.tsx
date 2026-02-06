@@ -19,7 +19,6 @@ import {
 } from '@floating-ui/react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
 
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import {
   getPlatformIconMetadata,
   SocialIcon,

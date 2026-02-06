@@ -29,7 +29,6 @@ import {
   useRef,
   useState,
 } from 'react';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { queryKeys } from '@/lib/queries/keys';
 import {

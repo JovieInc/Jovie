@@ -5,8 +5,6 @@
  * version tracking, cache behavior, and error handling.
  */
 
-/* eslint-disable @jovie/use-client-directive -- test file uses renderHook */
-
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
