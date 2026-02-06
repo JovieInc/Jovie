@@ -22,7 +22,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
   SidebarShortcutHint,
   SidebarTrigger,
   useSidebar,
@@ -179,7 +178,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         collapsible='offcanvas'
         className={cn(
           'bg-base',
-          '[--sidebar-width:236px]',
+          '[--sidebar-width:240px]',
           'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
         )}
       >
@@ -207,15 +206,15 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 href={isAdmin ? '/app/admin' : '/app'}
                 aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
                 className={cn(
-                  'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                  'flex h-7 flex-1 items-center gap-2 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
                   'group-data-[collapsible=icon]:justify-center'
                 )}
               >
                 <div className='flex items-center justify-center'>
-                  <BrandLogo size={16} tone='auto' className='h-5 w-5' />
+                  <BrandLogo size={16} tone='auto' className='h-4 w-4' />
                 </div>
-                <span className='sr-only group-data-[collapsible=icon]:hidden'>
-                  {isAdmin ? 'Admin' : 'Dashboard'}
+                <span className='text-[13px] font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden'>
+                  {isAdmin ? 'Admin' : 'Jovie'}
                 </span>
               </Link>
             )}
@@ -307,8 +306,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         {/* Footer - for dashboard and admin (branding + user button) */}
         {isDashboardOrAdmin && (
           <SidebarFooter className='mt-auto'>
-            <SidebarSeparator className='mx-0' />
-            <div className='px-2 py-3'>
+            <div className='px-2 py-2'>
               <div
                 className={cn(
                   isCollapsed
@@ -331,7 +329,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
       {/* Floating sidebar - shows on hover when collapsed */}
       {isCollapsed && !isMobile && isFloatingVisible && (
-        <div className='fixed inset-y-0 left-0 z-50 w-[236px] p-3 animate-in slide-in-from-left duration-200'>
+        <div className='fixed inset-y-0 left-0 z-50 w-[240px] p-3 animate-in slide-in-from-left duration-200'>
           <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
             {/* Header */}
             <div className='relative pb-0 p-2'>
@@ -339,11 +337,14 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 <Link
                   href={isAdmin ? '/app/admin' : '/app'}
                   aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
-                  className='flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  className='flex h-7 flex-1 items-center gap-2 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 >
                   <div className='flex items-center justify-center'>
-                    <BrandLogo size={16} tone='auto' className='h-5 w-5' />
+                    <BrandLogo size={16} tone='auto' className='h-4 w-4' />
                   </div>
+                  <span className='text-[13px] font-semibold text-sidebar-foreground'>
+                    {isAdmin ? 'Admin' : 'Jovie'}
+                  </span>
                 </Link>
               </div>
             </div>
@@ -363,8 +364,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
             {/* Footer */}
             {isDashboardOrAdmin && (
-              <div className='mt-auto border-t border-subtle'>
-                <div className='px-2 py-3'>
+              <div className='mt-auto'>
+                <div className='px-2 py-2'>
                   <UserButton
                     showUserInfo={true}
                     profileHref={profileHref}

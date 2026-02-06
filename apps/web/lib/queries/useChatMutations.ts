@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createMutationFn } from './fetch';
+import { createMutationFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { ChatConversation } from './useChatConversationsQuery';
 
@@ -81,7 +81,7 @@ export function useAddMessagesMutation() {
 
   return useMutation({
     mutationFn: async ({ conversationId, messages }: AddMessagesInput) => {
-      const response = await fetch(
+      return fetchWithTimeout<AddMessagesResponse>(
         `/api/chat/conversations/${conversationId}/messages`,
         {
           method: 'POST',
@@ -89,10 +89,6 @@ export function useAddMessagesMutation() {
           body: JSON.stringify({ messages }),
         }
       );
-      if (!response.ok) {
-        throw new Error('Failed to add messages');
-      }
-      return response.json() as Promise<AddMessagesResponse>;
     },
     onSuccess: (_, { conversationId }) => {
       queryClient.invalidateQueries({
@@ -113,7 +109,7 @@ export function useUpdateConversationMutation() {
 
   return useMutation({
     mutationFn: async ({ conversationId, title }: UpdateConversationInput) => {
-      const response = await fetch(
+      return fetchWithTimeout<UpdateConversationResponse>(
         `/api/chat/conversations/${conversationId}`,
         {
           method: 'PATCH',
@@ -121,10 +117,6 @@ export function useUpdateConversationMutation() {
           body: JSON.stringify({ title }),
         }
       );
-      if (!response.ok) {
-        throw new Error('Failed to update conversation');
-      }
-      return response.json() as Promise<UpdateConversationResponse>;
     },
     onSuccess: (_, { conversationId }) => {
       queryClient.invalidateQueries({
@@ -145,16 +137,12 @@ export function useDeleteConversationMutation() {
 
   return useMutation({
     mutationFn: async ({ conversationId }: DeleteConversationInput) => {
-      const response = await fetch(
+      return fetchWithTimeout<DeleteConversationResponse>(
         `/api/chat/conversations/${conversationId}`,
         {
           method: 'DELETE',
         }
       );
-      if (!response.ok) {
-        throw new Error('Failed to delete conversation');
-      }
-      return response.json() as Promise<DeleteConversationResponse>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
