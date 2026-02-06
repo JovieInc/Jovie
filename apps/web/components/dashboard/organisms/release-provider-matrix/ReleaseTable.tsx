@@ -299,7 +299,7 @@ export function ReleaseTable({
   );
 
   // Build column definitions (dynamic columns only)
-  // eslint-disable-next-line react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render
+  /* eslint-disable react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render */
   const columns = useMemo(() => {
     const checkboxColumn = columnHelper.display({
       id: 'select',
@@ -348,7 +348,6 @@ export function ReleaseTable({
     return [checkboxColumn, releaseColumn, rightMetaColumn];
   }, [
     artistName,
-    onCopy,
     onClearSelection,
     headerCheckboxStateRef,
     selectedIdsRef,
@@ -359,6 +358,7 @@ export function ReleaseTable({
     isLoadingTracks,
     toggleExpansion,
   ]);
+  /* eslint-enable react-hooks/refs */
 
   // Transform columnVisibility to TanStack format (always show select and release)
   const tanstackColumnVisibility = useMemo(() => {

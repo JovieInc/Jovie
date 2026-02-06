@@ -434,11 +434,15 @@ export function ReleaseFilterDropdown({
   }, [filters, onFiltersChange]);
 
   // Filter categories by main search
-  const FILTER_CATEGORIES = [
-    { id: 'releaseType', label: 'Release Type', iconName: 'Disc3' },
-    { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
-    { id: 'label', label: 'Label', iconName: 'Building2' },
-  ] as const;
+  const FILTER_CATEGORIES = useMemo(
+    () =>
+      [
+        { id: 'releaseType', label: 'Release Type', iconName: 'Disc3' },
+        { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
+        { id: 'label', label: 'Label', iconName: 'Building2' },
+      ] as const,
+    []
+  );
 
   const filteredCategories = useMemo(() => {
     if (!mainSearch.trim()) return FILTER_CATEGORIES;
@@ -446,7 +450,7 @@ export function ReleaseFilterDropdown({
     return FILTER_CATEGORIES.filter(cat =>
       cat.label.toLowerCase().includes(query)
     );
-  }, [mainSearch]);
+  }, [mainSearch, FILTER_CATEGORIES]);
 
   // Filter label options by search
   const filteredLabelOptions = useMemo(() => {
