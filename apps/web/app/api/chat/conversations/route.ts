@@ -1,16 +1,18 @@
-import { desc, eq } from 'drizzle-orm';
+import { count, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate',
-  Pragma: 'no-cache',
-} as const;
+/** Maximum message length for initial messages */
+const MAX_INITIAL_MESSAGE_LENGTH = 4000;
+
+/** Maximum conversations per user */
+const MAX_CONVERSATIONS_PER_USER = 200;
 
 /**
  * GET /api/chat/conversations
@@ -23,13 +25,14 @@ export async function GET(req: Request) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
+        { status: 404, headers: NO_CACHE_HEADERS }
       );
     }
 
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
-    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : 20;
+    const parsed = limitParam ? parseInt(limitParam, 10) : 20;
+    const limit = Number.isFinite(parsed) ? Math.min(parsed, 50) : 20;
 
     const conversations = await db
       .select({
@@ -45,7 +48,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json(
       { conversations },
-      { status: 200, headers: NO_STORE_HEADERS }
+      { status: 200, headers: NO_CACHE_HEADERS }
     );
   } catch (error) {
     logger.error('Error listing conversations:', error);
@@ -53,13 +56,13 @@ export async function GET(req: Request) {
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
+        { status: 401, headers: NO_CACHE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to list conversations' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
@@ -75,7 +78,22 @@ export async function POST(req: Request) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
+        { status: 404, headers: NO_CACHE_HEADERS }
+      );
+    }
+
+    // Check conversation count limit
+    const [{ value: conversationCount }] = await db
+      .select({ value: count() })
+      .from(chatConversations)
+      .where(eq(chatConversations.creatorProfileId, profile.id));
+
+    if (conversationCount >= MAX_CONVERSATIONS_PER_USER) {
+      return NextResponse.json(
+        {
+          error: `Maximum of ${MAX_CONVERSATIONS_PER_USER} conversations reached. Please delete old conversations.`,
+        },
+        { status: 429, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -87,6 +105,14 @@ export async function POST(req: Request) {
     }
 
     const { title, initialMessage } = body;
+
+    // Validate initial message length
+    if (initialMessage && initialMessage.trim().length > MAX_INITIAL_MESSAGE_LENGTH) {
+      return NextResponse.json(
+        { error: `Initial message too long. Maximum is ${MAX_INITIAL_MESSAGE_LENGTH} characters.` },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
 
     // Create the conversation
     const [conversation] = await db
@@ -109,7 +135,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { conversation },
-      { status: 201, headers: NO_STORE_HEADERS }
+      { status: 201, headers: NO_CACHE_HEADERS }
     );
   } catch (error) {
     logger.error('Error creating conversation:', error);
@@ -117,13 +143,13 @@ export async function POST(req: Request) {
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
+        { status: 401, headers: NO_CACHE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to create conversation' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

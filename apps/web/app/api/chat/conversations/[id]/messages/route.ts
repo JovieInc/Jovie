@@ -4,14 +4,10 @@ import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate',
-  Pragma: 'no-cache',
-} as const;
 
 const messageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -62,7 +58,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Profile not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
+        { status: 404, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -81,7 +77,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (!conversation) {
       return NextResponse.json(
         { error: 'Conversation not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
+        { status: 404, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -91,7 +87,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     } catch {
       return NextResponse.json(
         { error: 'Invalid request body' },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -108,7 +104,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     } else {
       return NextResponse.json(
         { error: 'Invalid message format', details: singleResult.error.issues },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -139,7 +135,7 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     return NextResponse.json(
       { messages: insertedMessages },
-      { status: 201, headers: NO_STORE_HEADERS }
+      { status: 201, headers: NO_CACHE_HEADERS }
     );
   } catch (error) {
     logger.error('Error adding message:', error);
@@ -147,13 +143,13 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
+        { status: 401, headers: NO_CACHE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to add message' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

@@ -21,6 +21,7 @@ import {
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
+import { RecentChats } from './RecentChats';
 import type { DashboardNavProps, NavItem } from './types';
 
 function isItemActive(pathname: string, item: NavItem): boolean {
@@ -125,6 +126,12 @@ export function DashboardNav(_: DashboardNavProps) {
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
+
+      {!isInSettings && (
+        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50'>
+          <RecentChats />
+        </div>
+      )}
 
       {isAdmin && !isInSettings && (
         <div

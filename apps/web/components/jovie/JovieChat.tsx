@@ -15,6 +15,7 @@ import { useJovieChat } from './hooks';
 import type { JovieChatProps } from './types';
 
 export function JovieChat({
+  profileId,
   artistContext,
   conversationId,
   onConversationCreate,
@@ -35,6 +36,7 @@ export function JovieChat({
     handleRetry,
     handleSuggestedPrompt,
   } = useJovieChat({
+    profileId,
     artistContext,
     conversationId,
     onConversationCreate,

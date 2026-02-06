@@ -17,7 +17,10 @@ export interface ArtistContext {
 }
 
 export interface JovieChatProps {
-  readonly artistContext: ArtistContext;
+  /** Profile ID for server-side context fetching (preferred) */
+  readonly profileId?: string;
+  /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
+  readonly artistContext?: ArtistContext;
   /** Conversation ID to load and continue */
   readonly conversationId?: string | null;
   /** Callback when a new conversation is created */

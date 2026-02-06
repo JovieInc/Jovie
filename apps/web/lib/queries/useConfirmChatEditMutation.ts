@@ -16,6 +16,8 @@ export interface ConfirmChatEditInput {
   profileId: string;
   field: 'displayName' | 'bio' | 'genres';
   newValue: string | string[];
+  conversationId?: string;
+  messageId?: string;
 }
 
 interface ConfirmChatEditResponse {
@@ -30,7 +32,7 @@ export function useConfirmChatEditMutation() {
       '/api/chat/confirm-edit',
       'POST'
     ),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       // Invalidate profile to reflect the applied edit
       queryClient.invalidateQueries({
         queryKey: queryKeys.user.profile(),

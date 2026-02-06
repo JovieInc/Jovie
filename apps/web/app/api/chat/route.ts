@@ -1,11 +1,19 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
+import { and, count, eq, sql as drizzleSql } from 'drizzle-orm';
 import { type ModelMessage, streamText, tool } from 'ai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { CORS_HEADERS } from '@/lib/http/headers';
+import { db } from '@/lib/db';
+import { clickEvents, tips } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
+import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { sqlAny } from '@/lib/db/sql-helpers';
 
 export const maxDuration = 30;
 
@@ -52,6 +60,97 @@ interface ArtistContext {
     tipsSubmitted: number;
     totalReceivedCents: number;
     monthReceivedCents: number;
+  };
+}
+
+/**
+ * Fetches artist context server-side from the database.
+ * Validates that the profile belongs to the authenticated user.
+ */
+async function fetchArtistContext(
+  profileId: string,
+  clerkUserId: string
+): Promise<ArtistContext | null> {
+  // Fetch profile with ownership check via user join
+  const [result] = await db
+    .select({
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+      bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+      profileViews: creatorProfiles.profileViews,
+      userClerkId: users.clerkId,
+    })
+    .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (!result || result.userClerkId !== clerkUserId) {
+    return null;
+  }
+
+  // Fetch link counts and tipping stats in parallel
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
+  const startOfMonthISO = startOfMonth.toISOString();
+
+  const [linkCounts, tipTotals, clickStats] = await Promise.all([
+    db
+      .select({
+        totalActive: count(),
+        musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          eq(socialLinks.state, 'active')
+        )
+      )
+      .then(r => r[0]),
+    db
+      .select({
+        totalReceived: drizzleSql<number>`COALESCE(SUM(${tips.amountCents}), 0)`,
+        monthReceived: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${tips.createdAt} >= ${startOfMonthISO}::timestamp THEN ${tips.amountCents} ELSE 0 END), 0)`,
+        tipsSubmitted: drizzleSql<number>`COALESCE(COUNT(${tips.id}), 0)`,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, profileId))
+      .then(r => r[0]),
+    db
+      .select({
+        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+      })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, profileId),
+          eq(clickEvents.linkType, 'tip')
+        )
+      )
+      .then(r => r[0]),
+  ]);
+
+  return {
+    displayName: result.displayName ?? result.username,
+    username: result.username,
+    bio: result.bio,
+    genres: result.genres ?? [],
+    spotifyFollowers: result.spotifyFollowers,
+    spotifyPopularity: result.spotifyPopularity,
+    profileViews: result.profileViews ?? 0,
+    hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
+    hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
+    tippingStats: {
+      tipClicks: Number(clickStats?.total ?? 0),
+      tipsSubmitted: Number(tipTotals?.tipsSubmitted ?? 0),
+      totalReceivedCents: Number(tipTotals?.totalReceived ?? 0),
+      monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
+    },
   };
 }
 
@@ -254,7 +353,10 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      ...CORS_HEADERS,
+      ...NO_CACHE_HEADERS,
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -266,7 +368,7 @@ export async function POST(req: Request) {
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { status: 401, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -284,7 +386,7 @@ export async function POST(req: Request) {
       {
         status: 429,
         headers: {
-          ...CORS_HEADERS,
+          ...NO_CACHE_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
         },
       }
@@ -292,23 +394,26 @@ export async function POST(req: Request) {
   }
 
   // Parse and validate request body
-  let body: { messages?: unknown; artistContext?: unknown };
+  let body: { messages?: unknown; profileId?: unknown; artistContext?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
-  const { messages, artistContext } = body;
+  const { messages, profileId } = body;
 
-  // Validate artist context
-  if (!artistContext || typeof artistContext !== 'object') {
+  // Validate that either profileId or artistContext is provided
+  if (
+    (!profileId || typeof profileId !== 'string') &&
+    (!body.artistContext || typeof body.artistContext !== 'object')
+  ) {
     return NextResponse.json(
-      { error: 'Missing or invalid artist context' },
-      { status: 400, headers: CORS_HEADERS }
+      { error: 'Missing profileId or artistContext' },
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -317,7 +422,7 @@ export async function POST(req: Request) {
   if (messagesError) {
     return NextResponse.json(
       { error: messagesError },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: NO_CACHE_HEADERS }
     );
   }
 
@@ -332,11 +437,27 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(
       { error: 'AI chat is not configured. Please contact support.' },
-      { status: 503, headers: CORS_HEADERS }
+      { status: 503, headers: NO_CACHE_HEADERS }
     );
   }
 
-  const systemPrompt = buildSystemPrompt(artistContext as ArtistContext);
+  // Fetch artist context server-side (preferred) or fall back to client-provided
+  let artistContext: ArtistContext;
+  if (profileId && typeof profileId === 'string') {
+    const context = await fetchArtistContext(profileId, userId);
+    if (!context) {
+      return NextResponse.json(
+        { error: 'Profile not found or unauthorized' },
+        { status: 404, headers: NO_CACHE_HEADERS }
+      );
+    }
+    artistContext = context;
+  } else {
+    // Backward compatibility: accept client-provided artistContext
+    artistContext = body.artistContext as ArtistContext;
+  }
+
+  const systemPrompt = buildSystemPrompt(artistContext);
 
   try {
     const result = streamText({
@@ -344,10 +465,9 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: validatedMessages,
       tools: {
-        proposeProfileEdit: createProfileEditTool(
-          artistContext as ArtistContext
-        ),
+        proposeProfileEdit: createProfileEditTool(artistContext),
       },
+      abortSignal: req.signal,
     });
 
     return result.toUIMessageStreamResponse();
@@ -365,7 +485,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: 'Failed to process chat request', message },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
