@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -29,7 +29,9 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
-    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : 20;
+    const limit = limitParam
+      ? Math.min(Number.parseInt(limitParam, 10), 50)
+      : 20;
 
     const conversations = await db
       .select({
@@ -99,7 +101,7 @@ export async function POST(req: Request) {
       .returning();
 
     // If there's an initial message, create it
-    if (initialMessage && initialMessage.trim()) {
+    if (initialMessage?.trim()) {
       await db.insert(chatMessages).values({
         conversationId: conversation.id,
         role: 'user',

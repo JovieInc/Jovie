@@ -49,10 +49,11 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 export async function setupDbSession(clerkUserId?: string) {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  // Set the session variables for RLS in a single query
-  // Using sql.raw with validated input to prevent SQL injection
+  // Set the session variables for RLS in a single query.
+  // is_local=false (session-scoped) because the Neon HTTP driver has no
+  // transaction context — is_local=true would be silently discarded.
   await db.execute(
-    drizzleSql`SELECT set_config('app.user_id', ${userId}, true), set_config('app.clerk_user_id', ${userId}, true)`
+    drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`
   );
 
   return { userId };
@@ -78,24 +79,26 @@ export type IsolationLevel =
   | 'serializable';
 
 /**
- * Run DB operations inside a transaction with RLS session set.
- * Ensures SET LOCAL app.clerk_user_id is applied within the transaction scope.
+ * Run DB operations with RLS session variables set.
+ * Sets app.user_id and app.clerk_user_id via session-scoped set_config
+ * before executing the operation.
  *
- * @param operation - The database operation to execute within the transaction
+ * Note: The Neon HTTP driver does not support transactions. The operation
+ * runs directly against db without transaction isolation. Callers should
+ * also filter by userId in WHERE clauses for defense-in-depth.
+ *
+ * @param operation - The database operation to execute
  * @param options.clerkUserId - Optional explicit Clerk user ID (uses auth() if not provided)
- * @param options.isolationLevel - Transaction isolation level (default: read_committed)
- *   - 'read_committed': Default, allows phantom reads between SELECT and INSERT
- *   - 'repeatable_read': Prevents non-repeatable reads
- *   - 'serializable': Strictest, prevents all concurrency anomalies (use for critical operations like profile creation)
+ * @param options.isolationLevel - Unused with Neon HTTP driver (retained for API compatibility)
  */
 export async function withDbSessionTx<T>(
   operation: (tx: DbOrTransaction, userId: string) => Promise<T>,
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
-  const userId = await resolveClerkUserId(options?.clerkUserId);
-
-  // The neon-http driver does not support transactions.
-  // Execute the operation directly without wrapping in a transaction.
+  // Set RLS session variables via setupDbSession (session-scoped).
+  // The neon-http driver does not support transactions, so the operation
+  // runs directly against db. Callers must also filter by userId.
+  const { userId } = await setupDbSession(options?.clerkUserId);
   return operation(db, userId);
 }
 

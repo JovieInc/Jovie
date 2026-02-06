@@ -27,6 +27,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 // Delay before hiding floating sidebar (milliseconds)
@@ -143,6 +144,73 @@ function SettingsNavigation({
   );
 }
 
+/** Floating sidebar overlay shown on hover when sidebar is collapsed */
+function FloatingSidebar({
+  isAdmin,
+  isDashboardOrAdmin,
+  navigation,
+  pathname,
+  section,
+  profileHref,
+}: {
+  isAdmin: boolean;
+  isDashboardOrAdmin: boolean;
+  navigation: NavItem[];
+  pathname: string;
+  section: string;
+  profileHref: string | undefined;
+}) {
+  return (
+    <div className='fixed inset-y-0 left-0 z-50 w-[240px] p-3 animate-in slide-in-from-left duration-200'>
+      <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
+        {/* Header */}
+        <div className='relative pb-0 p-2'>
+          <div className='flex items-center gap-2 py-1'>
+            <Link
+              href={isAdmin ? APP_ROUTES.ADMIN : APP_ROUTES.DASHBOARD}
+              aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
+              className='flex h-7 flex-1 items-center gap-2 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            >
+              <div className='flex items-center justify-center'>
+                <BrandLogo size={16} tone='auto' className='h-4 w-4' />
+              </div>
+              <span className='text-[13px] font-semibold text-sidebar-foreground'>
+                {isAdmin ? 'Admin' : 'Jovie'}
+              </span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className='flex-1 overflow-y-auto px-2'>
+          {isDashboardOrAdmin ? (
+            <DashboardNav />
+          ) : (
+            <SettingsNavigation
+              navigation={navigation}
+              pathname={pathname}
+              section={section}
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        {isDashboardOrAdmin && (
+          <div className='mt-auto'>
+            <div className='px-2 py-2'>
+              <UserButton
+                showUserInfo={true}
+                profileHref={profileHref}
+                settingsHref={APP_ROUTES.SETTINGS}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * UnifiedSidebar - Single sidebar component for all post-auth sections
  *
@@ -188,7 +256,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             {isInSettings ? (
               // Settings: Back button to dashboard
               <Link
-                href='/app'
+                href={APP_ROUTES.DASHBOARD}
                 aria-label='Back to dashboard'
                 className={cn(
                   'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
@@ -203,7 +271,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             ) : (
               // Dashboard & Admin: Just logo
               <Link
-                href={isAdmin ? '/app/admin' : '/app'}
+                href={isAdmin ? APP_ROUTES.ADMIN : APP_ROUTES.DASHBOARD}
                 aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
                 className={cn(
                   'flex h-7 flex-1 items-center gap-2 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
@@ -317,7 +385,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
                 <UserButton
                   showUserInfo={!isCollapsed}
                   profileHref={profileHref}
-                  settingsHref='/app/settings'
+                  settingsHref={APP_ROUTES.SETTINGS}
                 />
               </div>
             </div>
@@ -329,53 +397,14 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
 
       {/* Floating sidebar - shows on hover when collapsed */}
       {isCollapsed && !isMobile && isFloatingVisible && (
-        <div className='fixed inset-y-0 left-0 z-50 w-[240px] p-3 animate-in slide-in-from-left duration-200'>
-          <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
-            {/* Header */}
-            <div className='relative pb-0 p-2'>
-              <div className='flex items-center gap-2 py-1'>
-                <Link
-                  href={isAdmin ? '/app/admin' : '/app'}
-                  aria-label={isAdmin ? 'Go to admin' : 'Go to dashboard'}
-                  className='flex h-7 flex-1 items-center gap-2 rounded-md px-1 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                >
-                  <div className='flex items-center justify-center'>
-                    <BrandLogo size={16} tone='auto' className='h-4 w-4' />
-                  </div>
-                  <span className='text-[13px] font-semibold text-sidebar-foreground'>
-                    {isAdmin ? 'Admin' : 'Jovie'}
-                  </span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className='flex-1 overflow-y-auto px-2'>
-              {isDashboardOrAdmin ? (
-                <DashboardNav />
-              ) : (
-                <SettingsNavigation
-                  navigation={navigation}
-                  pathname={pathname}
-                  section={section}
-                />
-              )}
-            </div>
-
-            {/* Footer */}
-            {isDashboardOrAdmin && (
-              <div className='mt-auto'>
-                <div className='px-2 py-2'>
-                  <UserButton
-                    showUserInfo={true}
-                    profileHref={profileHref}
-                    settingsHref='/app/settings'
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <FloatingSidebar
+          isAdmin={isAdmin}
+          isDashboardOrAdmin={isDashboardOrAdmin}
+          navigation={navigation}
+          pathname={pathname}
+          section={section}
+          profileHref={profileHref}
+        />
       )}
     </>
   );
