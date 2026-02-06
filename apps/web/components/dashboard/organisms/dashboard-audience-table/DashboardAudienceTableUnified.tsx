@@ -6,6 +6,7 @@ import { BellRing, Copy, Download, Eye, Phone, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
+import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
@@ -349,38 +350,58 @@ export const DashboardAudienceTableUnified = memo(
                   secondaryAction={emptyStateSecondaryAction}
                 />
               ) : (
-                <UnifiedTable
-                  data={rows}
-                  columns={columns}
-                  isLoading={false}
-                  emptyState={
-                    <EmptyState
-                      icon={emptyStateIcon}
-                      heading={emptyStateHeading}
-                      description={emptyStateDescription}
-                      action={emptyStatePrimaryAction}
-                      secondaryAction={emptyStateSecondaryAction}
+                <>
+                  {/* Mobile card list */}
+                  <div className='flex flex-col gap-2 p-3 md:hidden'>
+                    {rows.map(member => (
+                      <AudienceMobileCard
+                        key={member.id}
+                        member={member}
+                        mode={mode}
+                        isSelected={selectedMember?.id === member.id}
+                        onTap={setSelectedMember}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Desktop table */}
+                  <div className='hidden md:block h-full'>
+                    <UnifiedTable
+                      data={rows}
+                      columns={columns}
+                      isLoading={false}
+                      emptyState={
+                        <EmptyState
+                          icon={emptyStateIcon}
+                          heading={emptyStateHeading}
+                          description={emptyStateDescription}
+                          action={emptyStatePrimaryAction}
+                          secondaryAction={emptyStateSecondaryAction}
+                        />
+                      }
+                      getRowId={row => row.id}
+                      enableVirtualization={true}
+                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                      className='text-[13px]'
+                      getRowClassName={getRowClassName}
+                      onRowClick={row => setSelectedMember(row)}
+                      getContextMenuItems={getContextMenuItems}
                     />
-                  }
-                  getRowId={row => row.id}
-                  enableVirtualization={true}
-                  minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                  className='text-[13px]'
-                  getRowClassName={getRowClassName}
-                  onRowClick={row => setSelectedMember(row)}
-                  getContextMenuItems={getContextMenuItems}
-                />
+                  </div>
+                </>
               )}
             </div>
 
             {/* Footer - shrink-0 ensures it stays anchored to bottom when drawer opens */}
-            <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-4 py-2 text-xs text-secondary-token'>
+            <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-3 py-2 text-xs text-secondary-token md:px-4'>
               <span className='tracking-wide'>{paginationLabel()}</span>
               <div className='flex items-center gap-3'>
-                <AdminPageSizeSelect
-                  initialPageSize={pageSize}
-                  onPageSizeChange={onPageSizeChange}
-                />
+                <div className='hidden md:block'>
+                  <AdminPageSizeSelect
+                    initialPageSize={pageSize}
+                    onPageSizeChange={onPageSizeChange}
+                  />
+                </div>
                 <div className='flex gap-2'>
                   <Button
                     variant='ghost'

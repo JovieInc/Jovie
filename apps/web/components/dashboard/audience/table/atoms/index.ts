@@ -1,5 +1,7 @@
 export type { AudienceActionsCellProps } from './AudienceActionsCell';
 export { AudienceActionsCell } from './AudienceActionsCell';
+export type { AudienceMobileCardProps } from './AudienceMobileCard';
+export { AudienceMobileCard } from './AudienceMobileCard';
 export type { AudienceCountryCellProps } from './AudienceCountryCell';
 export { AudienceCountryCell } from './AudienceCountryCell';
 export type { AudienceCreatedAtCellProps } from './AudienceCreatedAtCell';
