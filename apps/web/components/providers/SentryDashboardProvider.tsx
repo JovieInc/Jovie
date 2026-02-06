@@ -233,8 +233,9 @@ export function useSentryDashboardState(): {
           upgradeState,
         });
 
-        // Stop polling once in a terminal state
+        // Stop polling once in a terminal state (not idle, checking, or upgrading)
         if (
+          upgradeState !== 'idle' &&
           upgradeState !== 'checking' &&
           upgradeState !== 'upgrading'
         ) {
