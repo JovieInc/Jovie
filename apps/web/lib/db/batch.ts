@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, getTableName } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 
-import { type DbOrTransaction, db, type TransactionType } from './index';
+import { type DbOrTransaction, db } from './index';
 
 /** Escape single quotes for SQL string literals */
 function escapeSql(value: string): string {
@@ -132,15 +132,15 @@ export async function batchUpdateSortOrder<T extends PgTable>(
 /**
  * Generic batch update with sequential operations.
  * Executes individual updates sequentially for complex update patterns.
- * The neon-http driver does not support transactions.
+ * Note: No transaction guarantees — Neon HTTP driver does not support them.
  *
  * @param updates - Array of id and data pairs
  * @param updateFn - Function to perform single update
  */
-export async function batchUpdateInTransaction<T>(
+export async function batchUpdateSequential<T>(
   updates: Array<{ id: string; data: Partial<T> }>,
   updateFn: (
-    tx: DbOrTransaction | TransactionType,
+    dbClient: DbOrTransaction,
     id: string,
     data: Partial<T>
   ) => Promise<void>
