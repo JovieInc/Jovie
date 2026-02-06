@@ -127,15 +127,13 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded'
+      className='flex w-full items-center justify-between gap-2 rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
     >
-      <span className='text-[11px] font-medium text-primary-token'>
-        {label}
-      </span>
+      <span className='text-[13px] text-secondary-token'>{label}</span>
       <span
         className={cn(
-          'flex h-4 w-7 items-center rounded-full p-0.5 transition-colors',
-          checked ? 'bg-primary' : 'bg-surface-3'
+          'flex h-[18px] w-[30px] items-center rounded-full p-[3px] transition-colors',
+          checked ? 'bg-primary' : 'bg-white/[0.12]'
         )}
       >
         <span
@@ -194,14 +192,11 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent
-        align='end'
-        className='w-64 p-0 rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-white dark:bg-surface-2 shadow-lg'
-      >
+      <PopoverContent align='end' className='w-56 p-0'>
         {/* List options */}
         {(onShowTracksChange || onGroupByYearChange) && (
-          <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
-            <p className='text-[10px] uppercase tracking-wider text-tertiary-token'>
+          <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
+            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
               List options
             </p>
             {onShowTracksChange && (
@@ -223,11 +218,11 @@ function LinearStyleDisplayMenu({
 
         {/* Column visibility (Fields) */}
         {availableColumns.length > 0 && (
-          <div className='px-2.5 py-2'>
-            <p className='mb-1.5 text-[10px] uppercase tracking-wider text-tertiary-token'>
-              Fields
+          <div className='px-2 py-1.5'>
+            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
+              Properties
             </p>
-            <div className='flex flex-wrap gap-1'>
+            <div className='flex flex-wrap gap-1 px-1'>
               {availableColumns.map(col => {
                 const isVisible = columnVisibility[col.id] !== false;
                 return (
@@ -238,10 +233,10 @@ function LinearStyleDisplayMenu({
                     aria-pressed={isVisible}
                     aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
                     className={cn(
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
+                      'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
                       isVisible
-                        ? 'bg-accent/20 text-accent'
-                        : 'text-tertiary-token hover:bg-surface-2/50'
+                        ? 'bg-white/[0.08] text-secondary-token'
+                        : 'text-tertiary-token hover:text-secondary-token hover:bg-white/[0.04]'
                     )}
                   >
                     {col.label}
@@ -253,11 +248,11 @@ function LinearStyleDisplayMenu({
         )}
         {/* Reset to defaults */}
         {onResetToDefaults && (
-          <div className='border-t border-subtle px-2.5 py-2'>
+          <div className='border-t border-subtle px-3 py-1.5'>
             <button
               type='button'
               onClick={onResetToDefaults}
-              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1'
+              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
             >
               Reset to defaults
             </button>
@@ -298,7 +293,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
     'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 sm:px-4 lg:px-6 py-1'>
+    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
       {/* Left: Filter first, then release view toggle */}
       <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown

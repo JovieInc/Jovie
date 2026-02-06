@@ -58,11 +58,11 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-surface-1 dark:bg-surface-2 p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
       <div className='relative'>
         <Icon
           name='Search'
-          className='pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
+          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
         />
         <input
           ref={inputRef}
@@ -71,7 +71,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='h-7 w-full rounded-md border border-subtle bg-surface-1 pl-7 pr-7 text-xs text-primary-token placeholder:text-tertiary-token focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:bg-surface-2'
+          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
         />
         {value && (
           <button
@@ -124,7 +124,7 @@ function SubmenuCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full justify-between gap-2',
+        'w-full justify-between',
         checked && 'bg-primary/5 dark:bg-primary/10'
       )}
     >
@@ -239,7 +239,7 @@ export function FilterSubmenu<T extends string = string>({
   return (
     <DropdownMenuPrimitive.Sub onOpenChange={handleOpenChange}>
       <DropdownMenuPrimitive.SubTrigger
-        className={cn(MENU_ITEM_BASE, 'gap-2 justify-between')}
+        className={cn(MENU_ITEM_BASE, 'justify-between')}
       >
         <div className='flex items-center gap-2'>
           <Icon

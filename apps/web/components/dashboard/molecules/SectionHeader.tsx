@@ -16,11 +16,7 @@ export function SectionHeader({
   className,
 }: SectionHeaderProps) {
   return (
-    <div
-      className={
-        className ?? 'px-4 sm:px-6 py-4 sm:py-5 border-b border-subtle'
-      }
-    >
+    <div className={className ?? 'px-4 py-4 sm:py-5 border-b border-subtle'}>
       <div className='flex items-start sm:items-center justify-between gap-3'>
         <div className='min-w-0 flex-1'>
           <h3 className='text-[15px] sm:text-base font-semibold tracking-tight text-primary-token'>

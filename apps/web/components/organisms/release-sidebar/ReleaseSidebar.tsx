@@ -127,7 +127,7 @@ export function ReleaseSidebar({
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
-      className='bg-surface-1'
+      className='bg-surface-2'
     >
       <div data-testid='release-sidebar' className='flex h-full flex-col'>
         <ReleaseSidebarHeader

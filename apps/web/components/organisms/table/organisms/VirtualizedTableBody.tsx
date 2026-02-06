@@ -173,18 +173,21 @@ export function VirtualizedTableBody<TData>({
   getExpandableRowId,
   columnCount,
 }: VirtualizedTableBodyProps<TData>) {
-  // Determine which items to iterate over
-  const items = shouldVirtualize && virtualRows ? virtualRows : rows;
+  // Determine which items to iterate over.
+  // Fall back to non-virtualized rendering if virtualizer hasn't produced items yet
+  // (can happen when the scroll container hasn't been measured by ResizeObserver).
+  const useVirtual = shouldVirtualize && (virtualRows?.length ?? 0) > 0;
+  const items = useVirtual ? virtualRows! : rows;
 
   return (
     <tbody
       style={{
-        position: shouldVirtualize ? 'relative' : undefined,
-        height: shouldVirtualize && totalSize ? `${totalSize}px` : undefined,
+        position: useVirtual ? 'relative' : undefined,
+        height: useVirtual && totalSize ? `${totalSize}px` : undefined,
       }}
     >
       {/* Top padding for virtualization */}
-      {shouldVirtualize && paddingTop !== undefined && paddingTop > 0 && (
+      {useVirtual && paddingTop !== undefined && paddingTop > 0 && (
         <tr>
           <td style={{ height: `${paddingTop}px` }} />
         </tr>
@@ -193,7 +196,7 @@ export function VirtualizedTableBody<TData>({
       {/* Rows */}
       {items.map((item, listIndex) => {
         // Extract row data based on virtualization mode
-        const { row, virtualItem, rowIndex } = shouldVirtualize
+        const { row, virtualItem, rowIndex } = useVirtual
           ? {
               virtualItem: item as VirtualItem,
               row: rows[(item as VirtualItem).index]!,
@@ -220,7 +223,7 @@ export function VirtualizedTableBody<TData>({
             rowIndex={rowIndex}
             rowRefsMap={rowRefsMap}
             shouldEnableKeyboardNav={shouldEnableKeyboardNav}
-            shouldVirtualize={shouldVirtualize}
+            shouldVirtualize={useVirtual}
             virtualStart={virtualItem?.start}
             focusedIndex={focusedIndex}
             onRowClick={onRowClick}
@@ -263,7 +266,7 @@ export function VirtualizedTableBody<TData>({
       })}
 
       {/* Bottom padding for virtualization */}
-      {shouldVirtualize && paddingBottom !== undefined && paddingBottom > 0 && (
+      {useVirtual && paddingBottom !== undefined && paddingBottom > 0 && (
         <tr>
           <td style={{ height: `${paddingBottom}px` }} />
         </tr>

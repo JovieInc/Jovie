@@ -123,7 +123,7 @@ export function PreviewPanel() {
       width={PREVIEW_PANEL_WIDTH}
       ariaLabel='Live Preview'
       contextMenuItems={actionMenuItems}
-      className='bg-surface-1'
+      className='bg-surface-2'
     >
       <div className='flex h-full flex-col'>
         {/* Header with action buttons */}
@@ -139,7 +139,7 @@ export function PreviewPanel() {
                 trigger={
                   <button
                     type='button'
-                    className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out'
+                    className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out'
                     aria-label='Profile actions'
                   >
                     <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
@@ -152,7 +152,7 @@ export function PreviewPanel() {
                 href={profileUrl}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ease-out inline-flex items-center justify-center'
+                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out inline-flex items-center justify-center'
                 aria-label='Open profile in new tab'
               >
                 <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
@@ -185,7 +185,7 @@ export function PreviewPanel() {
         </div>
 
         {/* Footer - URL Preview */}
-        <div className='shrink-0 border-t border-subtle bg-surface-0/95 p-4 backdrop-blur-sm'>
+        <div className='shrink-0 border-t border-subtle p-4'>
           <h3 className='text-[13px] font-medium text-primary-token mb-2'>
             Your Profile URL
           </h3>

@@ -1,3 +1,5 @@
+'use client';
+
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';

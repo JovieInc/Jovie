@@ -35,7 +35,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    void publicProfileLimiter.limit(clientIP);
+    void publicProfileLimiter.limit(clientIP).catch(() => {
+      // Rate limiter errors are non-critical; getStatus above provides fallback protection
+    });
 
     const botResult = detectBot(request, '/api/profile/view');
     if (botResult.isBot) {

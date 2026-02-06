@@ -43,7 +43,7 @@ export const ExpandButton = memo(function ExpandButton({
         'flex items-center justify-center w-5 h-5 rounded',
         'text-tertiary-token hover:text-secondary-token',
         'hover:bg-surface-2 transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        'focus-visible:outline-none focus-visible:bg-interactive-hover',
         'disabled:opacity-50 disabled:cursor-not-allowed'
       )}
       aria-expanded={isExpanded}
