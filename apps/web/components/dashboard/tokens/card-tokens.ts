@@ -20,6 +20,13 @@ const timing = {
   easing: 'ease-[cubic-bezier(0.16,1,0.3,1)]', // Linear's signature easing
 } as const;
 
+/** Collapse multi-line template class strings into a single line. */
+function tw(strings: TemplateStringsArray, ...values: unknown[]): string {
+  return String.raw({ raw: strings }, ...values)
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
 export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
   base: `bg-surface-1 border border-subtle rounded-xl transition-all ${timing.slow} ${timing.easing}`,
@@ -65,34 +72,28 @@ export const cardTokens = {
 
   // Interactive states - Linear-inspired responsiveness
   interactive: {
-    hover: `
+    hover: tw`
       hover:bg-[var(--color-bg-surface-2)]
       hover:border-[var(--color-border-default)]
       hover:shadow-[var(--shadow-lg)]
       hover:-translate-y-0.5
       transition-all ${timing.normal} ${timing.easing}
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
-    active: `
+    active: tw`
       active:bg-[var(--color-bg-surface-3)]
       active:shadow-[var(--shadow-sm)]
       active:translate-y-0
       active:scale-[0.99]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
-    focus: `
+    focus: tw`
       focus-visible:outline-none
       focus-visible:ring-2
       focus-visible:ring-[var(--color-accent)]
       focus-visible:ring-offset-2
       focus-visible:ring-offset-[var(--color-bg-base)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
   },
 
   // Glass effects for modern UI depth
@@ -113,19 +114,17 @@ export const cardTokens = {
   // Enhanced variant compositions with Linear-level sophistication
   variants: {
     // Default static card - responsive padding
-    default: `
+    default: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
       p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Interactive clickable card - full hover effects, responsive padding
-    interactive: `
+    interactive: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
@@ -143,46 +142,38 @@ export const cardTokens = {
       focus-visible:ring-2
       focus-visible:ring-[var(--color-accent)]
       focus-visible:ring-offset-2
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Settings card - flat, no hover effects (Linear-style)
-    settings: `
+    settings: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
       p-4 sm:p-5
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Analytics/metric card - minimal, data-focused
-    analytics: `
+    analytics: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
       p-5
       transition-colors ${timing.fast} ${timing.easing}
       hover:border-[var(--color-border-default)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Empty state card - centered content, responsive padding
-    'empty-state': `
+    'empty-state': tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-xl
       p-6 sm:p-8
       text-center
       shadow-[var(--shadow-sm)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Elevated card - stands out with stronger border, responsive padding
-    elevated: `
+    elevated: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-default)]
       rounded-xl
@@ -190,12 +181,10 @@ export const cardTokens = {
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Floating card - modal-like presence, responsive padding
-    floating: `
+    floating: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-default)]
       rounded-xl
@@ -203,12 +192,10 @@ export const cardTokens = {
       shadow-[var(--shadow-xl)]
       backdrop-blur-lg
       transition-all ${timing.slow} ${timing.easing}
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Onboarding card - gradient border effect, responsive padding
-    onboarding: `
+    onboarding: tw`
       relative
       bg-[var(--color-bg-surface-1)]
       rounded-2xl
@@ -217,12 +204,10 @@ export const cardTokens = {
       ring-1
       ring-[var(--color-border-subtle)]
       transition-all ${timing.slow} ${timing.easing}
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Feature card - for showcasing features, responsive padding
-    feature: `
+    feature: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-2xl
@@ -231,30 +216,24 @@ export const cardTokens = {
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
       hover:border-[var(--color-accent-subtle)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Compact card - for dense layouts
-    compact: `
+    compact: tw`
       bg-[var(--color-bg-surface-1)]
       border border-[var(--color-border-subtle)]
       rounded-lg
       p-4
       transition-all ${timing.fast} ${timing.easing}
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
 
     // Ghost card - minimal, no background
-    ghost: `
+    ghost: tw`
       rounded-xl
       p-6
       transition-all ${timing.normal} ${timing.easing}
       hover:bg-[var(--color-interactive-hover)]
-    `
-      .replaceAll(/\s+/g, ' ')
-      .trim(),
+    `,
   },
 } as const;
 

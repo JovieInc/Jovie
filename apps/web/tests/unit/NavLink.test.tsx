@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { NavLink } from '@/components/ui/NavLink';
+import { NavLink } from '@/components/atoms/NavLink';
 
 describe('NavLink', () => {
   it('renders with default variant', () => {

@@ -17,6 +17,17 @@ import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview'
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * PreviewPanelContent - Profile preview drawer content
  *
@@ -51,14 +62,7 @@ export function PreviewPanelContent() {
       const qrUrl = getQrCodeUrl(profileUrl, 512);
       const response = await fetch(qrUrl);
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${username || 'jovie'}-qr-code.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${username || 'jovie'}-qr-code.png`);
       toast.success('QR code downloaded');
     } catch {
       toast.error('Failed to download QR code');
@@ -75,15 +79,10 @@ export function PreviewPanelContent() {
         'END:VCARD',
       ].join('\n');
 
-      const blob = new Blob([vcard], { type: 'text/vcard' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${username || 'jovie'}.vcf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(
+        new Blob([vcard], { type: 'text/vcard' }),
+        `${username || 'jovie'}.vcf`
+      );
       toast.success('vCard downloaded');
     } catch {
       toast.error('Failed to download vCard');
