@@ -98,8 +98,7 @@
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
   },
   "dependencies": {
-    "@jovie/ui": "workspace:*",
-    "@ai-sdk/anthropic": "^3.0.35",
+    "@ai-sdk/gateway": "^3.0.36",
     "@ai-sdk/react": "^3.0.51",
     "@clerk/elements": "0.24.3",
     "@clerk/nextjs": "6.36.7",
@@ -109,6 +108,7 @@
     "@floating-ui/react": "^0.27.16",
     "@headlessui/react": "^2.2.8",
     "@hookform/resolvers": "^5.2.2",
+    "@jovie/ui": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.10",
