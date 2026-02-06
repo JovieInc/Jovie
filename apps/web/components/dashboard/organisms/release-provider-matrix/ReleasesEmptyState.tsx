@@ -108,7 +108,7 @@ export function ReleasesEmptyState({
           aria-hidden='true'
         />
       </div>
-      <h3 className='mt-4 text-xl font-semibold text-primary-token'>
+      <h3 className='mt-4 text-sm font-medium text-secondary-token'>
         Connect your music
       </h3>
       <p className='mt-1 max-w-sm text-sm text-tertiary-token'>

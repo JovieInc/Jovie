@@ -237,7 +237,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
           'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
         )}
       >
-        <SidebarHeader className='relative h-12 justify-center gap-0 px-2 py-0'>
+        <SidebarHeader className='relative h-[52px] justify-center gap-0 px-2 py-0'>
           <div className='flex w-full items-center'>
             {/* Logo/Header Area - varies by section */}
             {isInSettings ? (

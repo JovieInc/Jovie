@@ -84,7 +84,7 @@ export function TourDatesEmptyState({
             aria-hidden='true'
           />
         </div>
-        <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+        <h3 className='mt-4 text-sm font-medium text-secondary-token'>
           Set up Bandsintown Integration
         </h3>
         <p className='mt-1 max-w-md text-sm text-secondary-token'>
@@ -169,7 +169,7 @@ export function TourDatesEmptyState({
           aria-hidden='true'
         />
       </div>
-      <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+      <h3 className='mt-4 text-sm font-medium text-secondary-token'>
         Connect your tour dates
       </h3>
       <p className='mt-1 max-w-sm text-sm text-secondary-token'>
