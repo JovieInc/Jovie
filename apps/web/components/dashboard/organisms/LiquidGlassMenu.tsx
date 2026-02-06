@@ -1,7 +1,7 @@
 'use client';
 
 import type { LucideIcon } from 'lucide-react';
-import { MoreHorizontal, Search, Settings } from 'lucide-react';
+import { MoreHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,7 +24,6 @@ export interface LiquidGlassMenuProps {
   readonly expandedItems: LiquidGlassMenuItem[];
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
-  readonly onSettingsClick?: () => void;
   readonly onSearchClick?: () => void;
   readonly className?: string;
 }
@@ -156,7 +155,6 @@ export function LiquidGlassMenu({
   primaryItems,
   expandedItems,
   adminItems,
-  onSettingsClick,
   onSearchClick,
   className,
 }: LiquidGlassMenuProps): React.JSX.Element {
@@ -223,20 +221,6 @@ export function LiquidGlassMenu({
             className='relative z-10 py-3'
             aria-label='Expanded navigation menu'
           >
-            {/* Header with settings - workspace selector disabled until multi-workspace support */}
-            {onSettingsClick && (
-              <div className='flex items-center justify-end px-3 pb-2'>
-                <button
-                  type='button'
-                  onClick={onSettingsClick}
-                  aria-label='Settings'
-                  className='flex items-center justify-center size-10 rounded-full bg-bg-surface-2/80 hover:bg-bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
-                >
-                  <Settings className='size-5' aria-hidden='true' />
-                </button>
-              </div>
-            )}
-
             {/* Menu items - Linear compact style */}
             <div className='px-2'>
               {allMenuItems.map(item => {

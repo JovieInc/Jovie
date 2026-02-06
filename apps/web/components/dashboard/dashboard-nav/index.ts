@@ -1,5 +1,8 @@
 export {
   adminNavigation,
+  dashboardHome,
+  mobileExpandedNavigation,
+  mobilePrimaryNavigation,
   primaryNavigation,
   secondaryNavigation,
   settingsNavigation,
