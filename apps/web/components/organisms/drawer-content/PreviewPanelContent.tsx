@@ -131,7 +131,7 @@ export function PreviewPanelContent() {
   return (
     <div className='h-full flex flex-col'>
       {/* Header with action buttons */}
-      <div className='flex h-12 items-center justify-between border-b border-subtle bg-surface-2/95 px-4 shrink-0 backdrop-blur-sm'>
+      <div className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'>
         <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
@@ -194,7 +194,7 @@ export function PreviewPanelContent() {
       </div>
 
       {/* Footer - URL Preview */}
-      <div className='shrink-0 border-t border-subtle bg-surface-2/95 p-4 backdrop-blur-sm'>
+      <div className='shrink-0 border-t border-subtle p-4'>
         <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>

@@ -63,7 +63,7 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-1 border-l border-subtle',
+        'bg-surface-2 border-l border-subtle',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
@@ -89,7 +89,7 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'shrink-0 h-full flex flex-col',
-          'bg-surface-1 border-l border-subtle',
+          'bg-surface-2 border-l border-subtle',
           'transition-[width,opacity] duration-300 ease-out',
           'overflow-hidden',
           isOpen

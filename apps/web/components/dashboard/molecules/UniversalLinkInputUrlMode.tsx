@@ -1,3 +1,5 @@
+'use client';
+
 import { Input } from '@jovie/ui';
 import { X } from 'lucide-react';
 import React from 'react';

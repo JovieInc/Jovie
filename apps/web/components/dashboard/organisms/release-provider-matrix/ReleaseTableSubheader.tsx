@@ -298,7 +298,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
     'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 sm:px-4 lg:px-6 py-1'>
+    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
       {/* Left: Filter first, then release view toggle */}
       <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown
