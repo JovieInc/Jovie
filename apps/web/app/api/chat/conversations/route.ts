@@ -95,7 +95,7 @@ export async function POST(req: Request) {
         {
           error: `Maximum of ${MAX_CONVERSATIONS_PER_USER} conversations reached. Please delete old conversations.`,
         },
-        { status: 429, headers: NO_CACHE_HEADERS }
+        { status: 403, headers: NO_CACHE_HEADERS }
       );
     }
 

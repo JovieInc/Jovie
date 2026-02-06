@@ -82,8 +82,8 @@ const ALLOWED_ORIGINS = [
   'https://jovie.fm',
   'https://www.jovie.fm',
   'https://app.jovie.fm',
-  // Preview deployments
-  /^https:\/\/jovie-.*\.vercel\.app$/,
+  // Preview deployments - team slug is 'jovie'
+  /^https:\/\/jovie(-git-[a-z0-9-]+-jovie)?\.vercel\.app$/,
 ] as const;
 
 /**
@@ -115,9 +115,13 @@ function isAllowedOrigin(origin: string | null): string | null {
 /**
  * Creates CORS headers for authenticated endpoints.
  * Validates the origin against allowed origins instead of using wildcard.
+ *
+ * @param requestOrigin - The Origin header from the request
+ * @param methods - Allowed HTTP methods (defaults to 'POST, OPTIONS')
  */
 export function createAuthenticatedCorsHeaders(
-  requestOrigin: string | null
+  requestOrigin: string | null,
+  methods: string = 'POST, OPTIONS'
 ): Record<string, string> {
   const validatedOrigin = isAllowedOrigin(requestOrigin);
   if (!validatedOrigin) {
@@ -127,7 +131,7 @@ export function createAuthenticatedCorsHeaders(
 
   return {
     'Access-Control-Allow-Origin': validatedOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
   };

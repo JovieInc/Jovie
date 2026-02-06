@@ -491,6 +491,15 @@ export async function POST(req: Request) {
         proposeProfileEdit: createProfileEditTool(artistContext),
       },
       abortSignal: req.signal,
+      onError: ({ error }) => {
+        Sentry.captureException(error, {
+          tags: { feature: 'ai-chat', errorType: 'streaming' },
+          extra: {
+            userId,
+            messageCount: validatedMessages.length,
+          },
+        });
+      },
     });
 
     return result.toUIMessageStreamResponse();
