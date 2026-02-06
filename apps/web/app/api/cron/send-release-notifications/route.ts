@@ -46,6 +46,29 @@ interface ProcessingContext {
 
 type ProcessResult = 'sent' | 'failed' | 'skipped';
 
+// Type aliases for batch-fetched data to simplify function signatures
+type BatchRelease = {
+  id: string;
+  title: string;
+  slug: string;
+  artworkUrl: string | null;
+  releaseDate: Date | null;
+};
+
+type BatchCreator = {
+  id: string;
+  displayName: string | null;
+  username: string;
+  usernameNormalized: string;
+};
+
+type BatchSubscriber = {
+  id: string;
+  channel: string;
+  email: string | null;
+  phone: string | null;
+};
+
 // ============================================================================
 // Database Operations
 // ============================================================================
@@ -265,39 +288,9 @@ async function sendEmailNotification(
 
 async function processNotificationWithBatchedData(
   ctx: ProcessingContext,
-  releasesMap: Map<
-    string,
-    NonNullable<
-      Awaited<ReturnType<typeof batchFetchReleases>> extends Map<
-        string,
-        infer V
-      >
-        ? V
-        : never
-    >
-  >,
-  creatorsMap: Map<
-    string,
-    NonNullable<
-      Awaited<ReturnType<typeof batchFetchCreatorProfiles>> extends Map<
-        string,
-        infer V
-      >
-        ? V
-        : never
-    >
-  >,
-  subscribersMap: Map<
-    string,
-    NonNullable<
-      Awaited<ReturnType<typeof batchFetchSubscribers>> extends Map<
-        string,
-        infer V
-      >
-        ? V
-        : never
-    >
-  >,
+  releasesMap: Map<string, BatchRelease>,
+  creatorsMap: Map<string, BatchCreator>,
+  subscribersMap: Map<string, BatchSubscriber>,
   linksMap: Map<string, Array<{ providerId: string; url: string }>>
 ): Promise<ProcessResult> {
   try {
@@ -427,6 +420,8 @@ function createEmptyResponse(now: Date): NextResponse {
       message: 'No pending notifications to send',
       sent: 0,
       failed: 0,
+      skipped: 0,
+      processed: 0,
       timestamp: now.toISOString(),
     },
     { headers: NO_STORE_HEADERS }
