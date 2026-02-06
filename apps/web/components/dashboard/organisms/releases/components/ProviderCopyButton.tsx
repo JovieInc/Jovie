@@ -1,3 +1,5 @@
+'use client';
+
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
