@@ -169,6 +169,13 @@
       "when": 1770339600000,
       "tag": "0023_optimize_social_links_platform_type_query",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1770338344147,
+      "tag": "0024_bizarre_slapstick",
+      "breakpoints": true
     }
   ]
 }

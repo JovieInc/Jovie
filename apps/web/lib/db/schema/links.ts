@@ -64,26 +64,37 @@ export const socialLinks = pgTable(
 );
 
 // Social accounts table (for ingested/suspected accounts)
-export const socialAccounts = pgTable('social_accounts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  platform: text('platform').notNull(),
-  handle: text('handle'),
-  url: text('url'),
-  status: socialAccountStatusEnum('status').default('suspected').notNull(),
-  confidence: numeric('confidence', { precision: 3, scale: 2 }).default('0.00'),
-  isVerifiedFlag: boolean('is_verified_flag').default(false),
-  paidFlag: boolean('paid_flag').default(false),
-  rawData: jsonb('raw_data').$type<Record<string, unknown>>().default({}),
-  sourcePlatform: text('source_platform'),
-  sourceType: ingestionSourceTypeEnum('source_type')
-    .default('ingested')
-    .notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const socialAccounts = pgTable(
+  'social_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    platform: text('platform').notNull(),
+    handle: text('handle'),
+    url: text('url'),
+    status: socialAccountStatusEnum('status').default('suspected').notNull(),
+    confidence: numeric('confidence', { precision: 3, scale: 2 }).default(
+      '0.00'
+    ),
+    isVerifiedFlag: boolean('is_verified_flag').default(false),
+    paidFlag: boolean('paid_flag').default(false),
+    rawData: jsonb('raw_data').$type<Record<string, unknown>>().default({}),
+    sourcePlatform: text('source_platform'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('ingested')
+      .notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Covers: WHERE creatorProfileId = ? AND platform = ? AND status = ?
+    profilePlatformStatusIdx: index(
+      'idx_social_accounts_profile_platform_status'
+    ).on(table.creatorProfileId, table.platform, table.status),
+  })
+);
 
 // Wrapped links table (URL shortener/wrapper)
 export const wrappedLinks = pgTable('wrapped_links', {
