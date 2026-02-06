@@ -65,7 +65,7 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-surface-2 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 text-left'
+          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
         >
           <div className='flex w-full items-center gap-3'>
             <Avatar
