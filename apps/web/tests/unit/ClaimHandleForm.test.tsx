@@ -35,6 +35,30 @@ vi.mock('@jovie/ui', () => ({
     children: React.ReactNode;
     [key: string]: unknown;
   }) => <button {...props}>{children}</button>,
+  Input: Object.assign(
+    React.forwardRef<HTMLInputElement, Record<string, unknown>>(
+      function MockInput(
+        {
+          statusIcon: _si,
+          validationState: _vs,
+          loading: _l,
+          trailing: _t,
+          inputSize: _is,
+          error: _e,
+          helpText: _ht,
+          label: _lb,
+          ...props
+        },
+        ref
+      ) {
+        return React.createElement('input', {
+          ref,
+          ...(props as React.InputHTMLAttributes<HTMLInputElement>),
+        });
+      }
+    ),
+    { displayName: 'MockInput' }
+  ),
 }));
 
 // Mock fetch for handle checking
@@ -115,7 +139,7 @@ describe('ClaimHandleForm', () => {
     fireEvent.submit(form);
 
     // Check that shake class is added for invalid input
-    expect(input.parentElement).toHaveClass('jv-shake');
+    expect(input).toHaveClass('jv-shake');
   });
 
   test('shake animation triggers on invalid submission', () => {
@@ -130,7 +154,7 @@ describe('ClaimHandleForm', () => {
     fireEvent.submit(form);
 
     // Check that shake class is added
-    expect(input.parentElement).toHaveClass('jv-shake');
+    expect(input).toHaveClass('jv-shake');
   });
 
   describe('reduced motion support', () => {

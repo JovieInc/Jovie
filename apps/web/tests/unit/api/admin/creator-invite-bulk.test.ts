@@ -57,7 +57,37 @@ vi.mock('@/lib/utils/logger', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    debug: vi.fn(),
   },
+}));
+
+// Mock heavy transitive dependencies to prevent slow module resolution timeouts
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  withScope: vi.fn(),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: vi.fn(),
+  captureError: vi.fn(),
+  captureWarning: vi.fn(),
+  logFallback: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/runtime-aware', () => ({
+  trackEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/sentry/init', () => ({
+  getSentryMode: vi.fn().mockReturnValue('disabled'),
+  isSentryInitialized: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorClaimInvites: { id: 'id', creatorProfileId: 'creatorProfileId' },
+  creatorProfiles: {},
 }));
 
 // Shared test fixtures

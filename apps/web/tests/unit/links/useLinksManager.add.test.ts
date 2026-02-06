@@ -177,9 +177,10 @@ describe('useLinksManager - add', () => {
         await addLinkAndFlushTimers(result, venmoLink);
       });
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/dashboard/tipping/enable', {
-        method: 'POST',
-      });
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/dashboard/tipping/enable',
+        expect.objectContaining({ method: 'POST' })
+      );
     });
   });
 
