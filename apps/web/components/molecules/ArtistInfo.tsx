@@ -26,7 +26,7 @@ export function ArtistInfo({
     subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
   const subtitleClassName =
     resolvedSubtitle === DEFAULT_PROFILE_TAGLINE
-      ? 'text-[11px] sm:text-xs font-normal tracking-[0.2em] uppercase leading-none text-secondary-token opacity-70'
+      ? 'text-[11px] sm:text-xs font-normal tracking-[0.2em] uppercase leading-none text-tertiary-token'
       : 'text-base sm:text-lg leading-snug text-secondary-token line-clamp-2';
 
   const avatarSizeMap = {
@@ -37,7 +37,7 @@ export function ArtistInfo({
   } as const;
 
   const avatarContent = (
-    <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
+    <div className='rounded-full p-[2px] ring-1 ring-black/5 dark:ring-white/6 shadow-sm'>
       <Avatar
         src={artist.image_url || ''}
         alt={artist.name}
@@ -57,7 +57,7 @@ export function ArtistInfo({
       {linkToProfile ? (
         <Link
           href={`/${artist.handle}`}
-          className='transition-transform hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 rounded-full'
+          className='rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2'
           aria-label={`Go to ${artist.name}'s profile`}
         >
           {avatarContent}
