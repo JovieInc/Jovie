@@ -44,8 +44,8 @@ const sidebarMenuButtonVariants = cva(
     'text-sidebar-item-foreground',
     // Hover state - brighten on hover
     'hover:text-sidebar-foreground hover:bg-sidebar-accent',
-    // Active state - Linear: identical to inactive (no visual change)
-    'data-[active=true]:text-sidebar-item-foreground',
+    // Active state - subtle bg highlight like Linear
+    'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
     // Focus state
     'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar-background',
     // Disabled state
@@ -63,6 +63,8 @@ const sidebarMenuButtonVariants = cva(
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-150',
     'hover:[&>svg]:text-sidebar-item-foreground',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
+    'data-[active=true]:[&>svg]:text-sidebar-foreground',
+    'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-foreground',
   ].join(' '),
   {
     variants: {
