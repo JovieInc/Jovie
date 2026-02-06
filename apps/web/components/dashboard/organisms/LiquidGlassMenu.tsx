@@ -1,10 +1,16 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
 import { MoreHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type ComponentType,
+  type SVGProps,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -15,7 +21,7 @@ export type LiquidGlassMenuItem = {
   id: string;
   label: string;
   href: string;
-  icon: LucideIcon;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   badge?: number;
 };
 
