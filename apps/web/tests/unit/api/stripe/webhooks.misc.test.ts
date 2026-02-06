@@ -6,12 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getPost,
   mockConstructEvent,
+  mockDbInsert,
   mockGetHandler,
   mockGetPlanFromPriceId,
   mockGetStripeObjectId,
   mockHandlerHandle,
   mockStripeTimestampToDate,
-  mockWithTransaction,
   setSkipProcessing,
 } from './webhooks.test-utils';
 
@@ -110,7 +110,8 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
     expect(data.received).toBe(true);
 
     expect(mockConstructEvent).toHaveBeenCalled();
-    expect(mockWithTransaction).toHaveBeenCalled();
+    // Webhook event was inserted via db.insert
+    expect(mockDbInsert).toHaveBeenCalled();
   });
 
   it('returns 500 when handler indicates processing failed (legacy behavior)', async () => {
@@ -157,6 +158,6 @@ describe('/api/stripe/webhooks - Backwards Compatibility', () => {
     expect(data.error).toBe('Webhook processing failed');
 
     expect(mockConstructEvent).toHaveBeenCalled();
-    expect(mockWithTransaction).toHaveBeenCalled();
+    expect(mockDbInsert).toHaveBeenCalled();
   });
 });
