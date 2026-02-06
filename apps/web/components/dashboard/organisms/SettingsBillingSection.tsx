@@ -25,7 +25,7 @@ export function SettingsBillingSection() {
     <DashboardCard variant='settings'>
       <div className='text-center py-4'>
         <CreditCard className='mx-auto h-12 w-12 text-secondary mb-4' />
-        <h3 className='text-lg font-medium text-primary mb-2'>
+        <h3 className='text-[14px] font-medium text-primary-token mb-2'>
           Manage your plan
         </h3>
         <p className='text-sm text-secondary mb-4'>
