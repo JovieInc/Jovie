@@ -194,7 +194,7 @@ export function TourDatesManager({
               isSyncing={syncMutation.isPending}
             />
           ) : (
-            <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+            <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
               <p className='mt-4 text-sm text-secondary-token'>
                 No tour dates found

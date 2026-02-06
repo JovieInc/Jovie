@@ -76,7 +76,7 @@ export function TourDatesEmptyState({
   // Step 1: API Key Setup
   if (!hasApiKey) {
     return (
-      <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+      <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
         <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
           <Icon
             name='Key'
@@ -88,7 +88,7 @@ export function TourDatesEmptyState({
           Set up Bandsintown Integration
         </h3>
         <p className='mt-1 max-w-md text-sm text-secondary-token'>
-          To sync your tour dates, you'll need a free Bandsintown API key.
+          To sync your tour dates, you&apos;ll need a free Bandsintown API key.
         </p>
 
         <div className='mt-6 w-full max-w-md text-left'>
@@ -161,7 +161,7 @@ export function TourDatesEmptyState({
 
   // Step 2: Artist Connection
   return (
-    <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+    <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
       <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
         <Icon
           name='CalendarDays'
