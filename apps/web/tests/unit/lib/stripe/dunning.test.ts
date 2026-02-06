@@ -88,7 +88,7 @@ describe('dunning', () => {
       expect(shouldSendDunningEmail(10)).toBe(false);
     });
 
-    it('should not send email for attempt 0', () => {
+    it('should send email for attempt 0 (edge case)', () => {
       expect(shouldSendDunningEmail(0)).toBe(true);
     });
   });

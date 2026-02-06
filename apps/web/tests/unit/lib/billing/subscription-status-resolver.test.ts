@@ -80,7 +80,7 @@ describe('subscription-status-resolver', () => {
       expect(result.reason).toBe('db_is_pro_true_but_stripe_status_past_due');
     });
 
-    it('should detect no mismatch for DB not pro and trialing subscription', () => {
+    it('should detect mismatch when DB is not pro but subscription is trialing', () => {
       const result = detectStatusMismatch(false, makeSubscription('trialing'));
       expect(result.hasMismatch).toBe(true);
       expect(result.expectedIsPro).toBe(true);
