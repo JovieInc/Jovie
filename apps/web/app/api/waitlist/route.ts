@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, type TransactionType, waitlistEntries } from '@/lib/db';
-import { creatorProfiles, users, waitlistInvites } from '@/lib/db/schema';
+import { db, type TransactionType } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
@@ -209,6 +211,54 @@ async function findAvailableHandle(
 }
 
 /**
+ * Build update values for existing waitlist entry
+ */
+function buildWaitlistUpdateValues(params: {
+  fullName: string;
+  primaryGoal: string | null | undefined;
+  primarySocialUrl: string;
+  platform: string;
+  normalizedUrl: string;
+  spotifyUrl: string | null | undefined;
+  spotifyUrlNormalized: string | null;
+  sanitizedHeardAbout: string | null;
+  selectedPlan: string | null | undefined;
+}) {
+  return {
+    fullName: params.fullName,
+    primaryGoal: params.primaryGoal ?? null,
+    primarySocialUrl: params.primarySocialUrl,
+    primarySocialPlatform: params.platform,
+    primarySocialUrlNormalized: params.normalizedUrl,
+    spotifyUrl: params.spotifyUrl ?? null,
+    spotifyUrlNormalized: params.spotifyUrlNormalized,
+    heardAbout: params.sanitizedHeardAbout,
+    selectedPlan: params.selectedPlan ?? null,
+    updatedAt: new Date(),
+  };
+}
+
+/**
+ * Upsert user with waitlist_pending status
+ */
+async function upsertUserAsPending(userId: string, emailRaw: string) {
+  await db
+    .insert(users)
+    .values({
+      clerkId: userId,
+      email: emailRaw,
+      userStatus: 'waitlist_pending',
+    })
+    .onConflictDoUpdate({
+      target: users.clerkId,
+      set: {
+        userStatus: 'waitlist_pending',
+        updatedAt: new Date(),
+      },
+    });
+}
+
+/**
  * Handle existing waitlist entry update
  */
 async function handleExistingEntry(params: {
@@ -225,36 +275,11 @@ async function handleExistingEntry(params: {
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }): Promise<NextResponse> {
-  const {
-    existing,
-    userId,
-    emailRaw,
-    fullName,
-    primaryGoal,
-    primarySocialUrl,
-    platform,
-    normalizedUrl,
-    spotifyUrl,
-    spotifyUrlNormalized,
-    sanitizedHeardAbout,
-    selectedPlan,
-  } = params;
+  const { existing, userId, emailRaw, ...updateParams } = params;
 
   // Avoid overwriting invited/claimed/rejected states.
   if (existing.status === 'new') {
-    const updateValues = {
-      fullName,
-      primaryGoal: primaryGoal ?? null,
-      primarySocialUrl,
-      primarySocialPlatform: platform,
-      primarySocialUrlNormalized: normalizedUrl,
-      spotifyUrl: spotifyUrl ?? null,
-      spotifyUrlNormalized,
-      heardAbout: sanitizedHeardAbout,
-      selectedPlan: selectedPlan ?? null,
-      updatedAt: new Date(),
-    };
-
+    const updateValues = buildWaitlistUpdateValues(updateParams);
     await db
       .update(waitlistEntries)
       .set(updateValues)
@@ -262,20 +287,7 @@ async function handleExistingEntry(params: {
   }
 
   // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-  await db
-    .insert(users)
-    .values({
-      clerkId: userId,
-      email: emailRaw,
-      userStatus: 'waitlist_pending',
-    })
-    .onConflictDoUpdate({
-      target: users.clerkId,
-      set: {
-        userStatus: 'waitlist_pending',
-        updatedAt: new Date(),
-      },
-    });
+  await upsertUserAsPending(userId, emailRaw);
 
   return successResponse({ status: existing.status });
 }

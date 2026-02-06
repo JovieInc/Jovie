@@ -62,6 +62,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 }
 
 export function slugify(text: string): string {
+  if (!text) return '';
   const safeText = text.slice(0, 200);
   return safeText
     .toLowerCase()
@@ -84,7 +85,7 @@ export function extractSpotifyId(url: string): string | null {
   ];
 
   for (const pattern of patterns) {
-    const match = url.match(pattern);
+    const match = pattern.exec(url);
     if (match) {
       return match[1];
     }

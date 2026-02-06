@@ -1,6 +1,7 @@
 import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { dashboardIdempotencyKeys, db } from '@/lib/db';
+import { db } from '@/lib/db';
+import { dashboardIdempotencyKeys } from '@/lib/db/schema/links';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';

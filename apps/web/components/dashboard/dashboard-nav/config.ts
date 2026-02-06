@@ -2,9 +2,7 @@ import {
   Banknote,
   Bell,
   CalendarDays,
-  Home,
   IdCard,
-  MessageCircle,
   Music,
   Paintbrush,
   PieChart,
@@ -21,13 +19,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { NavItem } from './types';
 
 export const primaryNavigation: NavItem[] = [
-  {
-    name: 'Dashboard',
-    href: APP_ROUTES.DASHBOARD,
-    id: 'overview',
-    icon: Home,
-    description: 'Dashboard overview and quick stats',
-  },
   {
     name: 'Profile',
     href: APP_ROUTES.PROFILE,
@@ -72,13 +63,6 @@ export const secondaryNavigation: NavItem[] = [
     id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
-  },
-  {
-    name: 'Chat',
-    href: APP_ROUTES.CHAT,
-    id: 'chat',
-    icon: MessageCircle,
-    description: 'Ask Jovie about your career',
   },
 ];
 

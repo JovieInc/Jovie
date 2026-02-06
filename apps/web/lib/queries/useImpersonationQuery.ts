@@ -35,6 +35,7 @@ export function useImpersonationQuery() {
     queryKey: queryKeys.admin.impersonation(),
     queryFn: fetchImpersonationStatus,
     staleTime: 30_000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes after unmount
     refetchOnWindowFocus: true,
   });
 }

@@ -1,8 +1,9 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { type ModelMessage, streamText } from 'ai';
+import { type ModelMessage, streamText, tool } from 'ai';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 
@@ -13,6 +14,28 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
+
+/**
+ * Editable profile fields by tier:
+ * - Tier 1 (Safe): Non-destructive fields that can be freely edited
+ * - Tier 2 (Careful): Fields that need confirmation before applying
+ * - Tier 3 (Blocked): Cannot be edited via chat - requires settings page
+ */
+const EDITABLE_FIELDS = {
+  tier1: ['displayName', 'bio'] as const,
+  tier2: ['genres'] as const,
+  blocked: ['username', 'avatarUrl', 'spotifyId'] as const,
+};
+
+type EditableField =
+  | (typeof EDITABLE_FIELDS.tier1)[number]
+  | (typeof EDITABLE_FIELDS.tier2)[number];
+
+const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
+  displayName: 'Display name shown on your profile',
+  bio: 'Artist bio/description',
+  genres: 'Music genres (comma-separated)',
+};
 
 interface ArtistContext {
   displayName: string;
@@ -157,7 +180,71 @@ function buildSystemPrompt(context: ArtistContext): string {
 - Use bullet points for lists
 - Keep responses under 300 words unless asked for detail
 - Use simple language, avoid jargon
-- Be encouraging but realistic`;
+- Be encouraging but realistic
+
+## Profile Editing
+You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio, display name, or genres, use this tool to show them a preview.
+
+**Editable Fields:**
+- displayName: Their public display name
+- bio: Artist bio/description
+- genres: Music genres (as an array)
+
+**Blocked Fields (cannot edit via chat):**
+- username: Requires settings page
+- avatar/profile image: Requires settings page
+- Connected accounts: Requires settings page
+
+When asked to edit a blocked field, explain that they need to visit the settings page to make that change.`;
+}
+
+/**
+ * Creates the proposeProfileEdit tool for the AI to suggest profile changes.
+ * This tool only returns a preview - actual changes require user confirmation.
+ */
+function createProfileEditTool(context: ArtistContext) {
+  const profileEditSchema = z.object({
+    field: z
+      .enum(['displayName', 'bio', 'genres'])
+      .describe('The profile field to edit'),
+    newValue: z
+      .union([z.string(), z.array(z.string())])
+      .describe(
+        'The new value for the field. For genres, pass an array of strings.'
+      ),
+    reason: z
+      .string()
+      .optional()
+      .describe('Brief explanation of why this change was suggested'),
+  });
+
+  return tool({
+    description:
+      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name, bio, or genres.',
+    inputSchema: profileEditSchema,
+    execute: async ({ field, newValue, reason }) => {
+      // Validate the new value type matches the field
+      const isGenres = field === 'genres';
+      if (isGenres && !Array.isArray(newValue)) {
+        return { success: false, error: 'Genres must be an array of strings' };
+      }
+      if (!isGenres && typeof newValue !== 'string') {
+        return { success: false, error: `${field} must be a string` };
+      }
+
+      // Return preview data for the UI to render
+      return {
+        success: true,
+        preview: {
+          field,
+          fieldLabel: FIELD_DESCRIPTIONS[field],
+          currentValue: context[field],
+          newValue,
+          reason,
+        },
+      };
+    },
+  });
 }
 
 /**
@@ -256,6 +343,11 @@ export async function POST(req: Request) {
       model: anthropic('claude-sonnet-4-20250514'),
       system: systemPrompt,
       messages: validatedMessages,
+      tools: {
+        proposeProfileEdit: createProfileEditTool(
+          artistContext as ArtistContext
+        ),
+      },
     });
 
     return result.toUIMessageStreamResponse();

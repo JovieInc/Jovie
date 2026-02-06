@@ -4,10 +4,10 @@ import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
-  creatorProfiles,
   notificationSubscriptions,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {

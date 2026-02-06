@@ -2,7 +2,7 @@ import type { DbOrTransaction } from '@/lib/db';
 import {
   creatorAvatarCandidates,
   creatorProfileAttributes,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 const DEFAULT_CONFIDENCE = '0.700';

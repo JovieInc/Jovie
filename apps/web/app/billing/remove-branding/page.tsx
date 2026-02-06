@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import {
   createBillingPortalSession,
@@ -64,7 +65,7 @@ export default async function RemoveBrandingPage() {
   );
 
   if (alreadySubscribedToPrice) {
-    const returnUrl = `${baseUrl}/app/dashboard`;
+    const returnUrl = `${baseUrl}${APP_ROUTES.DASHBOARD}`;
     const portalSession = await createBillingPortalSession({
       customerId: customerResult.customerId,
       returnUrl,
@@ -72,7 +73,7 @@ export default async function RemoveBrandingPage() {
     if (portalSession.url) {
       redirect(portalSession.url);
     }
-    redirect('/app/dashboard');
+    redirect(APP_ROUTES.DASHBOARD);
   }
 
   const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));

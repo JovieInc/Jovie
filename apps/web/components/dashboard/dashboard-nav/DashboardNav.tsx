@@ -9,6 +9,7 @@ import {
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
@@ -20,16 +21,13 @@ import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
 import type { DashboardNavProps, NavItem } from './types';
 
-const PROFILE_HREF = '/app/dashboard/profile';
-const ADMIN_BASE_HREF = '/app/admin';
-
 function isItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.href) {
     return true;
   }
 
   // Admin routes need exact match to avoid false positives
-  if (item.href === ADMIN_BASE_HREF) {
+  if (item.href === APP_ROUTES.ADMIN) {
     return false;
   }
 
@@ -66,7 +64,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const secondaryItems = secondaryNavigation;
 
-  const isInSettings = pathname.startsWith('/app/settings');
+  const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
@@ -85,7 +83,7 @@ export function DashboardNav(_: DashboardNavProps) {
     (item: NavItem, _index: number) => {
       const isActive = isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
-      const isProfileItem = item.href === PROFILE_HREF;
+      const isProfileItem = item.href === APP_ROUTES.PROFILE;
 
       return (
         <NavMenuItem
@@ -111,28 +109,24 @@ export function DashboardNav(_: DashboardNavProps) {
   );
 
   return (
-    <nav
-      className='flex flex-1 flex-col px-2'
-      aria-label='Dashboard navigation'
-    >
+    <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       <SidebarGroup className='mb-1'>
-        <SidebarGroupContent className='space-y-1'>
+        <SidebarGroupContent className='space-y-0'>
           {navSections.map((section, index) => (
             <div key={section.key} data-nav-section>
               {/* Section divider for visual separation (except for first section) */}
               {index > 0 && (
-                <div className='my-2 mx-1 border-t border-default' />
+                <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
               )}
               {renderSection(section.items)}
             </div>
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
+
       {isAdmin && !isInSettings && (
-        <div
-          className='mt-2 pt-2 mx-1 border-t border-default'
-          data-testid='admin-nav-section'
-        >
+        <div data-testid='admin-nav-section'>
+          <div className='my-1.5 mx-2 border-t border-sidebar-border/10' />
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>

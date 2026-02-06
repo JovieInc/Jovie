@@ -14,7 +14,9 @@
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { billingAuditLog, stripeWebhookEvents, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
+import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
@@ -88,7 +90,7 @@ export async function GET() {
         .where(
           and(
             isNull(stripeWebhookEvents.processedAt),
-            drizzleSql`${stripeWebhookEvents.createdAt} < ${thirtyMinutesAgo}`
+            drizzleSql`${stripeWebhookEvents.createdAt} < ${sqlTimestamp(thirtyMinutesAgo)}`
           )
         ),
 

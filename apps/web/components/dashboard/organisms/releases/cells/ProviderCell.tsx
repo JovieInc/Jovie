@@ -27,7 +27,7 @@ interface ProviderConfig {
 }
 
 interface ProviderStatusDotProps {
-  status: 'available' | 'manual' | 'missing';
+  readonly status: 'available' | 'manual' | 'missing';
   readonly accent: string;
 }
 
@@ -67,7 +67,7 @@ const ProviderStatusDot = memo(function ProviderStatusDot({
 });
 
 interface AddProviderUrlPopoverProps {
-  providerLabel: string;
+  readonly providerLabel: string;
   readonly providerKey: ProviderKey;
   readonly accent: string;
   readonly onSave: (url: string) => Promise<void>;
@@ -229,7 +229,7 @@ function AddProviderUrlPopover({
 }
 
 interface ProviderActionButtonsProps {
-  provider: { url: string; path?: string };
+  readonly provider: { url: string; path?: string };
   readonly releaseTitle: string;
   readonly providerLabel: string;
   readonly testId: string;
@@ -298,10 +298,14 @@ function ProviderActionButtons({
 }
 
 interface ProviderCellProps {
-  release: ReleaseViewModel;
+  readonly release: ReleaseViewModel;
   readonly provider: ProviderKey;
   readonly config: ProviderConfig;
-  onCopy: (path: string, label: string, testId: string) => Promise<string>;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
   readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,

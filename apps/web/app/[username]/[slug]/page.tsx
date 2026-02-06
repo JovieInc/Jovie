@@ -17,11 +17,11 @@ import { UnreleasedReleaseHero } from '@/components/release';
 import { BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
-  creatorProfiles,
   discogReleases,
   discogTracks,
   providerLinks,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -112,8 +112,8 @@ function generateMusicStructuredData(
 }
 
 interface PageProps {
-  params: Promise<{ username: string; slug: string }>;
-  searchParams: Promise<{ dsp?: string }>;
+  readonly params: Promise<{ username: string; slug: string }>;
+  readonly searchParams: Promise<{ dsp?: string }>;
 }
 
 type ContentType = 'release' | 'track';

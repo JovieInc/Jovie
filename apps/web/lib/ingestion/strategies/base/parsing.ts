@@ -66,7 +66,7 @@ export function extractMetaContent(
     `<meta[^>]+(?:property|name)=["']${escapeRegex(property)}["'][^>]*content=["']([^"']+)["']`,
     'i'
   );
-  const propertyMatch = html.match(propertyRegex);
+  const propertyMatch = propertyRegex.exec(html);
   if (propertyMatch?.[1]) {
     return decodeHtmlEntities(propertyMatch[1].trim());
   }
@@ -76,7 +76,7 @@ export function extractMetaContent(
     `<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${escapeRegex(property)}["']`,
     'i'
   );
-  const altMatch = html.match(altRegex);
+  const altMatch = altRegex.exec(html);
   if (altMatch?.[1]) {
     return decodeHtmlEntities(altMatch[1].trim());
   }

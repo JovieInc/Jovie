@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ArtistName } from '@/components/atoms/ArtistName';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
 import { Artist } from '@/types/db';
 

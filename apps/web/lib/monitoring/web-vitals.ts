@@ -7,9 +7,8 @@ import { track } from '@/lib/analytics';
 export type MetricHandler = (metric: Metric) => void;
 
 declare global {
-  // eslint-disable-next-line no-var
   var jovieWebVitalsInitialized: boolean | undefined;
-  // eslint-disable-next-line no-var
+
   var jovieWebVitalsHandlers: Set<MetricHandler> | undefined;
 }
 

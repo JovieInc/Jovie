@@ -147,7 +147,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         {loading ? (
           <div className='flex items-center justify-center space-x-2'>
             <span
-              className='animate-spin motion-reduce:animate-none h-4 w-4 border-2 border-white border-t-transparent rounded-full'
+              className='animate-spin motion-reduce:animate-none h-4 w-4 border-2 border-current border-t-transparent rounded-full'
               aria-hidden='true'
             ></span>
             <span>Updating...</span>

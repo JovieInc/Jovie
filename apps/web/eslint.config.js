@@ -80,6 +80,42 @@ const baseConfig = {
             message:
               "Use DropdownMenu components from '@jovie/ui' instead of local atoms.",
           },
+          // Block barrel imports (index.ts) for better build performance
+          {
+            name: '@/components/atoms',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file: e.g., @/components/atoms/Button',
+          },
+          {
+            name: '@/components/molecules',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file.',
+          },
+          {
+            name: '@/components/organisms',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file.',
+          },
+          {
+            name: '@/components/dashboard',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file.',
+          },
+          {
+            name: '@/components/dashboard/molecules',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file.',
+          },
+          {
+            name: '@/components/dashboard/organisms',
+            message:
+              'Avoid barrel imports for better build performance. Import directly from the specific file.',
+          },
+          {
+            name: '@/lib/db/schema',
+            message:
+              'Avoid barrel imports for better build performance. Import from specific schema files: e.g., @/lib/db/schema/auth, @/lib/db/schema/profiles',
+          },
         ],
         patterns: [
           {
@@ -89,17 +125,6 @@ const baseConfig = {
               'components/atoms/Button',
             ],
             message: "Use Button from '@jovie/ui' instead of local atoms.",
-          },
-          {
-            group: [
-              '@/components/atoms',
-              '@/components/molecules',
-              '@/components/organisms',
-              '@/components/dashboard',
-              '@/lib/db/schema',
-            ],
-            message:
-              'Avoid barrel imports for better build performance. Import directly from the specific file: e.g., @/components/atoms/Button instead of @/components/atoms',
           },
         ],
       },
@@ -121,8 +146,7 @@ const baseConfig = {
     '@jovie/edge-runtime-node-imports': 'error',
     '@jovie/no-handler-initialization': 'error',
     '@jovie/server-only-imports': 'error',
-    // Warn initially for gradual adoption - promote to 'error' once violations are fixed
-    '@jovie/use-client-directive': 'warn',
+    '@jovie/use-client-directive': 'error',
     // Enforce readonly modifiers on React component props for type safety
     '@jovie/readonly-component-props': 'error',
     // Database guardrails - Neon HTTP driver restrictions
@@ -130,9 +154,8 @@ const baseConfig = {
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',
-    // TanStack Query best practices - warn initially for gradual adoption
-    '@jovie/require-query-cache-config': 'warn',
-    '@jovie/require-abort-signal': 'warn',
+    '@jovie/require-query-cache-config': 'error',
+    '@jovie/require-abort-signal': 'error',
   },
 };
 
@@ -183,6 +206,8 @@ module.exports = [
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/error-boundaries': 'off',
       'react-hooks/purity': 'off',
+      // Informational only - React Compiler already skips memoizing incompatible libraries
+      'react-hooks/incompatible-library': 'off',
     },
   },
   {
@@ -207,6 +232,20 @@ module.exports = [
     files: ['**/components/admin/**'],
     rules: {
       '@jovie/server-only-imports': 'off',
+    },
+  },
+  // Stories and test files don't run in Next.js App Router
+  {
+    files: [
+      '**/*.stories.tsx',
+      '**/*.stories.ts',
+      '**/tests/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+    ],
+    rules: {
+      '@jovie/use-client-directive': 'off',
+      '@next/next/no-img-element': 'off',
     },
   },
   // lib/db internal files are allowed to use database patterns

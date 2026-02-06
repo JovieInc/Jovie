@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 
 vi.mock('next/image', () => ({
   default: vi.fn().mockImplementation(
@@ -14,10 +14,7 @@ vi.mock('next/image', () => ({
       quality: _quality,
       sizes: _sizes,
       ...props
-    }: any) => (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={alt} {...props} />
-    )
+    }: any) => <img src={src} alt={alt} {...props} />
   ),
 }));
 

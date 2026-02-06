@@ -17,6 +17,7 @@ export function sleep(ms: number): Promise<void> {
  * Escape special regex characters in a string.
  */
 export function escapeRegex(str: string): string {
+  if (!str) return '';
   return str.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
@@ -26,6 +27,7 @@ export function escapeRegex(str: string): string {
  * (e.g., "&amp;lt;" should become "&lt;", not "<")
  */
 export function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
   // Decode once; if already decoded, return as-is
   if (!str.includes('&')) {
     return str;

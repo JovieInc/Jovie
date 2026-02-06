@@ -11,7 +11,9 @@ import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Result type for authenticated profile queries.

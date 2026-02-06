@@ -1,23 +1,14 @@
 import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
-import { DashboardOverviewSkeleton } from '@/components/dashboard/organisms/DashboardOverviewSkeleton';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { DashboardOverviewSection } from './dashboard/DashboardOverviewSection';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+export const metadata = {
+  title: 'Dashboard',
+  description: 'Manage your Jovie profile',
+};
 
-export default async function AppRootPage() {
-  const { userId } = await getCachedAuth();
+// eslint-disable-next-line @jovie/no-hardcoded-routes -- Legacy dashboard path for redirect
+const PROFILE_ROUTE = '/app/dashboard/profile';
 
-  if (!userId) {
-    redirect('/sign-in?redirect_url=/');
-  }
-
-  return (
-    <Suspense fallback={<DashboardOverviewSkeleton />}>
-      <DashboardOverviewSection />
-    </Suspense>
-  );
+// Redirect to profile page - the new default home
+export default function AppRootPage() {
+  redirect(PROFILE_ROUTE);
 }

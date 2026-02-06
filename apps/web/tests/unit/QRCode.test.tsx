@@ -1,14 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { QRCode } from '@/components/atoms/QRCode';
+import { QRCode } from '@/components/molecules/QRCode';
 
 // Mock Next.js Image component
 vi.mock('next/image', () => ({
   __esModule: true,
   default: ({ src, alt, width, height, onError, ...props }: any) => {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Test mock component
       <img
         src={src}
         alt={alt}

@@ -1,4 +1,4 @@
-import type { CreatorContact } from '@/lib/db/schema';
+import type { CreatorContact } from '@/lib/db/schema/profiles';
 import type { PublicContact } from '@/types/contacts';
 import {
   buildRoleSubject,

@@ -53,9 +53,10 @@ export default defineConfig({
     : 'html',
 
   // Global timeout settings
-  timeout: isSmokeOnly ? 30_000 : 60_000, // 30s for smoke, 60s for full
+  // Turbopack compilation can take 30+ seconds for dashboard, so smoke tests need more time
+  timeout: isSmokeOnly ? 90_000 : 120_000, // 90s for smoke (Turbopack), 120s for full
   expect: {
-    timeout: isSmokeOnly ? 10_000 : 15_000, // 10s for smoke, 15s for full
+    timeout: isSmokeOnly ? 20_000 : 20_000, // 20s for both (hydration can be slow)
     // Visual regression snapshot settings
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
@@ -76,9 +77,9 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:3100',
     trace: 'on-first-retry',
     video: videoMode,
-    // Faster navigation timeouts for smoke tests
-    navigationTimeout: isSmokeOnly ? 15_000 : 30_000,
-    actionTimeout: isSmokeOnly ? 10_000 : 15_000,
+    // Turbopack compilation needs longer timeouts even for smoke tests
+    navigationTimeout: isSmokeOnly ? 60_000 : 120_000, // 60s for smoke, 120s for full (Turbopack)
+    actionTimeout: isSmokeOnly ? 20_000 : 30_000, // Increased for slow page loads
     // Add Vercel bypass header when secret is available (for staging/canary)
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
     // Reuse authenticated session from global setup
@@ -127,7 +128,7 @@ export default defineConfig({
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,
-          timeout: 60000,
+          timeout: 300000, // Increased to 300s (5min) for Turbopack cold start
           stdout: 'pipe',
           stderr: 'pipe',
         },

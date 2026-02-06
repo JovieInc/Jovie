@@ -116,6 +116,7 @@ function extractFilename(src: string): string | null {
  * Clean and humanize filename for alt text
  */
 function cleanFilename(filename: string): string {
+  if (!filename) return '';
   return (
     filename
       // Remove file extension
@@ -329,10 +330,10 @@ export function generateSEOFilename(
 function getImageExtension(url: string): string | null {
   try {
     const pathname = new URL(url).pathname;
-    const match = pathname.match(/\.([a-zA-Z0-9]+)$/);
+    const match = /\.([a-zA-Z0-9]+)$/.exec(pathname);
     return match ? match[1].toLowerCase() : null;
   } catch {
-    const match = url.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+    const match = /\.([a-zA-Z0-9]+)(?:\?|$)/.exec(url);
     return match ? match[1].toLowerCase() : null;
   }
 }

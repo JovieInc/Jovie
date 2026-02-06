@@ -13,7 +13,7 @@
 
 import 'server-only';
 
-import { eq, sql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
@@ -250,7 +250,7 @@ async function getBestAvatarCandidate(
     })
     .from(creatorAvatarCandidates)
     .where(eq(creatorAvatarCandidates.creatorProfileId, creatorProfileId))
-    .orderBy(sql`${creatorAvatarCandidates.confidenceScore} DESC`)
+    .orderBy(drizzleSql`${creatorAvatarCandidates.confidenceScore} DESC`)
     .limit(1);
 
   return candidate ?? null;

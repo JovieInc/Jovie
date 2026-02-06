@@ -1,5 +1,15 @@
 import { expect, test } from './setup';
 
+/**
+ * Pricing Page Tests
+ *
+ * NOTE: These tests verify the public pricing page for unauthenticated
+ * visitors. Must run without saved auth to see correct CTAs.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Pricing Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/pricing');

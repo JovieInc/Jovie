@@ -7,7 +7,13 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  *
  * These tests verify the UI structure and elements of auth pages.
  * They work with mock Clerk keys and don't require real authentication.
+ *
+ * NOTE: These tests must run WITHOUT the saved authentication session,
+ * otherwise they'll be redirected to /app instead of showing auth pages.
  */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
 
 /**
  * Common test helpers to reduce duplication

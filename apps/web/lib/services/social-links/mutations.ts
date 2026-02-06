@@ -7,7 +7,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { batchUpdateSortOrder } from '@/lib/db/batch';
-import { socialLinks } from '@/lib/db/schema';
+import { socialLinks } from '@/lib/db/schema/links';
 import type {
   CreateLinkData,
   DashboardSocialLink,

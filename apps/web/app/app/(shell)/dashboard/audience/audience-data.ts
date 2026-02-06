@@ -4,13 +4,19 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   audienceMembers,
-  creatorProfiles,
   notificationSubscriptions,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
-import type { AudienceAction, AudienceMember, AudienceReferrer } from '@/types';
+import type {
+  AudienceAction,
+  AudienceIntentLevel,
+  AudienceMember,
+  AudienceMemberType,
+  AudienceReferrer,
+} from '@/types';
 
 export type AudienceMode = 'members' | 'subscribers';
 
@@ -72,6 +78,68 @@ const SUBSCRIBER_SORT_COLUMNS = {
   createdAt: notificationSubscriptions.createdAt,
 } as const;
 
+/**
+ * Build ownership filter based on clerk user ID
+ */
+function buildOwnershipFilter(clerkUserId: string | null) {
+  return clerkUserId
+    ? eq(users.clerkId, clerkUserId)
+    : drizzleSql<boolean>`true`;
+}
+
+/**
+ * Build member ID filter (optional)
+ */
+function buildMemberIdFilter(memberId: string | undefined) {
+  return memberId
+    ? eq(audienceMembers.id, memberId)
+    : drizzleSql<boolean>`true`;
+}
+
+/**
+ * Transform raw database row to AudienceServerRow
+ */
+function transformMemberRow(member: {
+  id: string;
+  type: AudienceMemberType;
+  displayName: string | null;
+  visits: number;
+  engagementScore: number;
+  intentLevel: AudienceIntentLevel;
+  geoCity: string | null;
+  geoCountry: string | null;
+  deviceType: string | null;
+  latestActions: unknown[] | Record<string, unknown>[] | null;
+  referrerHistory: unknown[] | Record<string, unknown>[] | null;
+  email: string | null;
+  phone: string | null;
+  spotifyConnected: boolean | null;
+  purchaseCount: number;
+  tags: string[] | null;
+  lastSeenAt: Date;
+}): AudienceServerRow {
+  return {
+    id: member.id,
+    type: member.type,
+    displayName: member.displayName ?? null,
+    locationLabel: normalizeLocationLabel(member.geoCity, member.geoCountry),
+    geoCity: member.geoCity,
+    geoCountry: member.geoCountry,
+    visits: member.visits,
+    engagementScore: member.engagementScore,
+    intentLevel: member.intentLevel,
+    latestActions: normalizeLatestActions(member.latestActions),
+    referrerHistory: normalizeReferrerHistory(member.referrerHistory),
+    email: member.email,
+    phone: member.phone,
+    spotifyConnected: Boolean(member.spotifyConnected),
+    purchaseCount: member.purchaseCount,
+    tags: Array.isArray(member.tags) ? member.tags : [],
+    deviceType: member.deviceType,
+    lastSeenAt: toISOStringOrNull(member.lastSeenAt),
+  };
+}
+
 function normalizeLocationLabel(
   geoCity: string | null,
   geoCountry: string | null
@@ -128,6 +196,58 @@ function normalizeReferrerHistory(value: unknown): AudienceReferrer[] {
   }));
 }
 
+/** Default member query params when validation fails */
+const DEFAULT_MEMBER_PARAMS = {
+  page: 1,
+  pageSize: 10,
+  sort: DEFAULT_MEMBER_SORT,
+  direction: 'desc' as const,
+};
+
+/**
+ * Parse and validate member query parameters
+ */
+function parseMemberQueryParams(
+  searchParams: Record<string, string | string[] | undefined>
+) {
+  const parsed = memberQuerySchema.safeParse({
+    page: searchParams.page,
+    pageSize: searchParams.pageSize,
+    sort: searchParams.sort ?? undefined,
+    direction: searchParams.direction ?? undefined,
+  });
+  return parsed.success ? parsed.data : DEFAULT_MEMBER_PARAMS;
+}
+
+/**
+ * Build select fields for member query
+ */
+function buildMemberSelectFields(includeDetails: boolean) {
+  return {
+    id: audienceMembers.id,
+    type: audienceMembers.type,
+    displayName: audienceMembers.displayName,
+    visits: audienceMembers.visits,
+    engagementScore: audienceMembers.engagementScore,
+    intentLevel: audienceMembers.intentLevel,
+    geoCity: audienceMembers.geoCity,
+    geoCountry: audienceMembers.geoCountry,
+    deviceType: audienceMembers.deviceType,
+    latestActions: includeDetails
+      ? audienceMembers.latestActions
+      : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
+    referrerHistory: includeDetails
+      ? audienceMembers.referrerHistory
+      : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
+    email: audienceMembers.email,
+    phone: audienceMembers.phone,
+    spotifyConnected: audienceMembers.spotifyConnected,
+    purchaseCount: audienceMembers.purchaseCount,
+    tags: audienceMembers.tags,
+    lastSeenAt: audienceMembers.lastSeenAt,
+  };
+}
+
 /**
  * Fetch audience members data
  */
@@ -139,67 +259,28 @@ async function fetchMembersData(
   includeDetails: boolean,
   memberId: string | undefined
 ): Promise<AudienceServerData> {
-  const parsed = memberQuerySchema.safeParse({
-    page: searchParams.page,
-    pageSize: searchParams.pageSize,
-    sort: searchParams.sort ?? undefined,
-    direction: searchParams.direction ?? undefined,
-  });
-
-  const safe = parsed.success
-    ? parsed.data
-    : {
-        page: 1,
-        pageSize: 10,
-        sort: DEFAULT_MEMBER_SORT,
-        direction: 'desc' as const,
-      };
-
+  const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
   const offset = (safe.page - 1) * safe.pageSize;
 
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+  const ownershipFilter = buildOwnershipFilter(clerkUserId);
+  const memberIdFilter = buildMemberIdFilter(memberId);
+  const whereClause = and(
+    ownershipFilter,
+    eq(audienceMembers.creatorProfileId, selectedProfileId),
+    memberIdFilter
+  );
 
   const baseQuery = tx
-    .select({
-      id: audienceMembers.id,
-      type: audienceMembers.type,
-      displayName: audienceMembers.displayName,
-      visits: audienceMembers.visits,
-      engagementScore: audienceMembers.engagementScore,
-      intentLevel: audienceMembers.intentLevel,
-      geoCity: audienceMembers.geoCity,
-      geoCountry: audienceMembers.geoCountry,
-      deviceType: audienceMembers.deviceType,
-      latestActions: includeDetails
-        ? audienceMembers.latestActions
-        : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
-      referrerHistory: includeDetails
-        ? audienceMembers.referrerHistory
-        : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
-      email: audienceMembers.email,
-      phone: audienceMembers.phone,
-      spotifyConnected: audienceMembers.spotifyConnected,
-      purchaseCount: audienceMembers.purchaseCount,
-      tags: audienceMembers.tags,
-      lastSeenAt: audienceMembers.lastSeenAt,
-    })
+    .select(buildMemberSelectFields(includeDetails))
     .from(audienceMembers)
     .innerJoin(
       creatorProfiles,
       eq(audienceMembers.creatorProfileId, creatorProfiles.id)
     )
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(audienceMembers.creatorProfileId, selectedProfileId),
-        memberId ? eq(audienceMembers.id, memberId) : drizzleSql<boolean>`true`
-      )
-    );
+    .where(whereClause);
 
   const totalQuery = tx
     .select({
@@ -211,43 +292,16 @@ async function fetchMembersData(
       eq(audienceMembers.creatorProfileId, creatorProfiles.id)
     )
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(audienceMembers.creatorProfileId, selectedProfileId),
-        memberId ? eq(audienceMembers.id, memberId) : drizzleSql<boolean>`true`
-      )
-    );
+    .where(whereClause);
 
   const [rows, [{ total }]] = await Promise.all([
     baseQuery.orderBy(orderFn(sortColumn)).limit(safe.pageSize).offset(offset),
     totalQuery,
   ]);
 
-  const members: AudienceServerRow[] = rows.map(member => ({
-    id: member.id,
-    type: member.type,
-    displayName: member.displayName ?? null,
-    locationLabel: normalizeLocationLabel(member.geoCity, member.geoCountry),
-    geoCity: member.geoCity,
-    geoCountry: member.geoCountry,
-    visits: member.visits,
-    engagementScore: member.engagementScore,
-    intentLevel: member.intentLevel,
-    latestActions: normalizeLatestActions(member.latestActions),
-    referrerHistory: normalizeReferrerHistory(member.referrerHistory),
-    email: member.email,
-    phone: member.phone,
-    spotifyConnected: Boolean(member.spotifyConnected),
-    purchaseCount: member.purchaseCount,
-    tags: Array.isArray(member.tags) ? member.tags : [],
-    deviceType: member.deviceType,
-    lastSeenAt: toISOStringOrNull(member.lastSeenAt),
-  }));
-
   return {
     mode: 'members',
-    rows: members,
+    rows: rows.map(transformMemberRow),
     total: Number(total ?? 0),
     page: safe.page,
     pageSize: safe.pageSize,

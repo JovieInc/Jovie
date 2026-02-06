@@ -157,6 +157,36 @@ jobs:
       - name: Run ESLint server boundary checks
         run: pnpm --filter=@jovie/web run lint:server-boundaries
 
+  ci-knip:
+    name: Knip (dead code)
+    # Detect unused files, dependencies, and exports
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping Knip."
+            exit 0
+          fi
+
+          # Skip for docs-only changes
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping Knip."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run Knip (unused files, deps & exports)
+        run: pnpm knip
+
   ci-typecheck:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
@@ -186,7 +216,7 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: .turbo
           # Use content hash for better cache hit rates (not commit SHA which changes every commit)
@@ -194,7 +224,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: |
             .cache/tsbuildinfo
@@ -408,13 +438,13 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-eslint, ci-knip, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), and guardrails succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), Knip (dead code), and guardrails succeeded"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -514,7 +544,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
@@ -588,7 +618,7 @@ jobs:
 
       - name: Cache Next build cache
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: .next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -599,7 +629,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -633,7 +663,7 @@ jobs:
           # Clean up
           kill $SERVER_PID 2>/dev/null || true
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
@@ -801,7 +831,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7  # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
@@ -819,7 +849,7 @@ jobs:
           NODE_ENV: test
           CI: true
           SMOKE_ONLY: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
 
@@ -928,7 +958,7 @@ jobs:
       - name: Build (smoke)
         run: pnpm --filter=@jovie/web run build
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -992,7 +1022,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key - chromium only for CI (Firefox runs weekly)
@@ -1048,7 +1078,7 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           SMOKE_ONLY: '1'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -1065,7 +1095,7 @@ jobs:
           NODE_ENV: test
           SMOKE_ONLY: '1'
           # Auth smoke requires real Clerk keys in CI
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           # Auth smoke signs in a configured E2E user
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -1080,8 +1110,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
@@ -1184,7 +1214,7 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
       - name: Deploy (PR preview, fast deployment for UI-only changes)
@@ -1486,7 +1516,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
@@ -1504,7 +1534,7 @@ jobs:
           CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
 
       - name: Upload Playwright Artifacts on Failure
@@ -1628,7 +1658,7 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
       - name: Deploy (production, prebuilt)

@@ -24,24 +24,27 @@ export interface ReleaseSidebarProps {
   readonly release: Release | null;
   readonly mode: ReleaseSidebarMode;
   readonly isOpen: boolean;
-  providerConfig: Record<ProviderKey, { label: string; accent: string }>;
+  readonly providerConfig: Record<
+    ProviderKey,
+    { label: string; accent: string }
+  >;
   /** Artist name to display in the sidebar header */
-  artistName?: string | null;
-  onClose?: () => void;
-  onRefresh?: () => void;
-  onReleaseChange?: (release: Release) => void;
-  onSave?: (release: Release) => void | Promise<void>;
-  isSaving?: boolean;
+  readonly artistName?: string | null;
+  readonly onClose?: () => void;
+  readonly onRefresh?: () => void;
+  readonly onReleaseChange?: (release: Release) => void;
+  readonly onSave?: (release: Release) => void | Promise<void>;
+  readonly isSaving?: boolean;
   /**
    * Optional artwork upload handler. When provided and mode === 'admin',
    * the artwork becomes uploadable and this callback is used to obtain
    * the new artwork URL.
    */
-  onArtworkUpload?: (file: File, release: Release) => Promise<string>;
+  readonly onArtworkUpload?: (file: File, release: Release) => Promise<string>;
   /**
    * Handler for adding a new DSP link
    */
-  onAddDspLink?: (
+  readonly onAddDspLink?: (
     releaseId: string,
     provider: ProviderKey,
     url: string
@@ -49,5 +52,8 @@ export interface ReleaseSidebarProps {
   /**
    * Handler for removing a DSP link
    */
-  onRemoveDspLink?: (releaseId: string, provider: ProviderKey) => Promise<void>;
+  readonly onRemoveDspLink?: (
+    releaseId: string,
+    provider: ProviderKey
+  ) => Promise<void>;
 }

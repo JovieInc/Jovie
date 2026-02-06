@@ -1,8 +1,10 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+/* eslint-disable no-restricted-imports -- Test requires full schema access */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as schema from '@/lib/db/schema';
-import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { withRlsAnonymous, withRlsUser } from '../setup-db';
 
 /**

@@ -215,6 +215,7 @@ export function useAvatarUpload({
       onUpload,
       resetStatus,
       setPreviewFromFile,
+      uploadStatus,
     ]
   );
 
@@ -277,6 +278,7 @@ export function useAvatarUpload({
       isUploading,
       uploadStatus,
       previewUrl,
+      uploadProgress,
       handleFileUpload,
       handleDragEnter,
       handleDragLeave,

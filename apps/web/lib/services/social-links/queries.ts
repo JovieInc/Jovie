@@ -6,7 +6,9 @@
 
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type { DashboardSocialLink, LinkSourceType, LinkState } from './types';
 
 // Bounded limit to prevent OOM

@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
-import { db, ingestionJobs } from '@/lib/db';
+import { db } from '@/lib/db';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
   canonicalIdentity,
   detectPlatform,
@@ -77,7 +78,7 @@ export async function enqueueLinktreeIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_linktree',
@@ -88,9 +89,21 @@ export async function enqueueLinktreeIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  // Race condition: another concurrent insert won — return the existing job's id
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueInstagramIngestionJob(params: {
@@ -139,7 +152,7 @@ export async function enqueueInstagramIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_instagram',
@@ -150,9 +163,20 @@ export async function enqueueInstagramIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueTikTokIngestionJob(params: {
@@ -201,7 +225,7 @@ export async function enqueueTikTokIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_tiktok',
@@ -212,9 +236,20 @@ export async function enqueueTikTokIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueTwitterIngestionJob(params: {
@@ -263,7 +298,7 @@ export async function enqueueTwitterIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_twitter',
@@ -274,9 +309,20 @@ export async function enqueueTwitterIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueBeaconsIngestionJob(params: {
@@ -325,7 +371,7 @@ export async function enqueueBeaconsIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_beacons',
@@ -336,9 +382,20 @@ export async function enqueueBeaconsIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueYouTubeIngestionJob(params: {
@@ -387,7 +444,7 @@ export async function enqueueYouTubeIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_youtube',
@@ -398,9 +455,20 @@ export async function enqueueYouTubeIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 export async function enqueueLayloIngestionJob(params: {
@@ -448,7 +516,7 @@ export async function enqueueLayloIngestionJob(params: {
     return existing[0].id;
   }
 
-  const [inserted] = await db
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'import_laylo',
@@ -459,9 +527,20 @@ export async function enqueueLayloIngestionJob(params: {
       priority: 0,
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 /**
@@ -478,7 +557,7 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   spotifyArtistId: string;
   targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
 }): Promise<string | null> {
-  const dedupKey = `dsp_discovery:${params.creatorProfileId}:${Date.now()}`;
+  const dedupKey = `dsp_discovery:${params.creatorProfileId}`;
 
   const payload = {
     creatorProfileId: params.creatorProfileId,
@@ -487,28 +566,19 @@ export async function enqueueDspArtistDiscoveryJob(params: {
     dedupKey,
   };
 
-  // Check for recent pending/processing jobs for this profile
-  const recentJob = await db
+  // Fast-path: check if a job already exists for this profile
+  const existing = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${params.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.status, 'pending'),
-          eq(ingestionJobs.status, 'processing')
-        )
-      )
-    )
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
     .limit(1);
 
-  // If there's already a pending/processing job, don't create another
-  if (recentJob.length > 0) {
-    return recentJob[0].id;
+  if (existing.length > 0) {
+    return existing[0].id;
   }
 
-  const [inserted] = await db
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'dsp_artist_discovery',
@@ -519,9 +589,21 @@ export async function enqueueDspArtistDiscoveryJob(params: {
       priority: 1, // Higher priority for user-triggered discovery
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  // Race condition: another concurrent insert won — return the existing job's id
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }
 
 /**
@@ -548,27 +630,19 @@ export async function enqueueDspTrackEnrichmentJob(params: {
     externalArtistId: params.externalArtistId,
   };
 
-  // Check for existing pending/processing job for this match
-  const existingJob = await db
+  // Fast-path: check if a job already exists for this match
+  const existing = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'dsp_track_enrichment'),
-        eq(ingestionJobs.dedupKey, dedupKey),
-        or(
-          eq(ingestionJobs.status, 'pending'),
-          eq(ingestionJobs.status, 'processing')
-        )
-      )
-    )
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
     .limit(1);
 
-  if (existingJob.length > 0) {
-    return existingJob[0].id;
+  if (existing.length > 0) {
+    return existing[0].id;
   }
 
-  const [inserted] = await db
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
+  const result = await db
     .insert(ingestionJobs)
     .values({
       jobType: 'dsp_track_enrichment',
@@ -579,7 +653,19 @@ export async function enqueueDspTrackEnrichmentJob(params: {
       priority: 2, // Medium priority for enrichment
       attempts: 0,
     })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
     .returning({ id: ingestionJobs.id });
 
-  return inserted?.id ?? null;
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  // Race condition: another concurrent insert won — return the existing job's id
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
 }

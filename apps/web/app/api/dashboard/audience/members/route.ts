@@ -2,7 +2,7 @@ import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { audienceMembers } from '@/lib/db/schema';
+import { audienceMembers } from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
 import { membersQuerySchema } from '@/lib/validation/schemas';
 

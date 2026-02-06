@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { signedLinkAccess } from '@/lib/db/schema';
+import { signedLinkAccess } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import {

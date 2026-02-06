@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { creatorClaimInvites } from '@/lib/db/schema';
+import { creatorClaimInvites } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -270,15 +270,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const { fitScoreThreshold, limit } = parsePreviewParams(searchParams);
 
-    const eligibleProfiles = await fetchProfilesByFitScore(
-      fitScoreThreshold,
-      limit
-    );
+    const [eligibleProfiles, totalEligible] = await Promise.all([
+      fetchProfilesByFitScore(fitScoreThreshold, limit),
+      getEligibleProfileCount(fitScoreThreshold),
+    ]);
 
     const withEmails = eligibleProfiles.filter(p => p.contactEmail);
     const withoutEmails = eligibleProfiles.filter(p => !p.contactEmail);
-
-    const totalEligible = await getEligibleProfileCount(fitScoreThreshold);
 
     return NextResponse.json(
       {

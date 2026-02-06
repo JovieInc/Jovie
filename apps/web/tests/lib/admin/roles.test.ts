@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/redis', () => ({
   redis: null,
+  getRedis: vi.fn(() => null),
 }));
 
 // Mock error tracking

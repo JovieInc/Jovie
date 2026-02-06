@@ -1,5 +1,8 @@
 import { expect, test } from './setup';
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Cookie banner', () => {
   test('shows based on country', async ({ page }) => {
     await page.goto('/');

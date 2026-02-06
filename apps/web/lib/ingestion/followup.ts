@@ -1,4 +1,5 @@
-import { type DbOrTransaction, ingestionJobs } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
   canonicalIdentity,
   detectPlatform,

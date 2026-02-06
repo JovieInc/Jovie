@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { OptimizedImage } from '@/components/atoms/OptimizedImage';
+import { OptimizedImage } from '@/components/molecules/OptimizedImage';
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -11,8 +11,6 @@ vi.mock('next/image', () => ({
     onLoad,
     ...props
   }: React.ComponentProps<'img'>) => (
-    // eslint-disable-next-line @next/next/no-img-element
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Test mock component
     <img
       src={src}
       alt={alt}

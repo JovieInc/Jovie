@@ -1,9 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
-import { creatorProfiles, eq, profilePhotos } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { buildSeoFilename } from '@/lib/images/config';
 import { avatarUploadLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';

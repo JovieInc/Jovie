@@ -108,6 +108,7 @@ export function useDashboardSocialLinksQuery(profileId: string) {
     queryFn: ({ signal }) => fetchSocialLinks(profileId, signal),
     enabled: Boolean(profileId),
     staleTime: 30_000, // Consider fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes after unmount
   });
 }
 

@@ -1,14 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 
 // Mock Next.js Image component with proper event handling
 vi.mock('next/image', () => ({
   default: vi
     .fn()
     .mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => (
-      // eslint-disable-next-line @next/next/no-img-element
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Test mock component
       <img
         src={src}
         alt={alt}

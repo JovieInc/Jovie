@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "idx_social_accounts_profile_platform_status" ON "social_accounts" USING btree ("creator_profile_id","platform","status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_creator_contacts_profile_active" ON "creator_contacts" USING btree ("creator_profile_id","is_active","sort_order","created_at");

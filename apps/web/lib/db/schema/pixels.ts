@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -177,7 +177,7 @@ export const creatorPixels = pgTable(
     // Index for finding enabled configs during forwarding
     enabledIdx: index('idx_creator_pixels_enabled')
       .on(table.enabled, table.profileId)
-      .where(sql`enabled = true`),
+      .where(drizzleSql`enabled = true`),
   })
 );
 

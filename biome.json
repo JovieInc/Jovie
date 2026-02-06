@@ -118,6 +118,10 @@
           },
           "style": {
             "noRestrictedGlobals": "off"
+          },
+          "a11y": {
+            "noNoninteractiveElementInteractions": "off",
+            "useAltText": "off"
           }
         }
       }

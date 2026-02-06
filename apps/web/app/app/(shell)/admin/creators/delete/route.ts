@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseDeletePayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { deleteCreatorOrUserAction } from '../../actions';
@@ -9,7 +10,7 @@ export const POST = createAdminRouteHandler({
   actionFn: deleteCreatorOrUserAction,
   parsePayload: parseDeletePayload,
   errorContext: {
-    route: '/app/admin/creators/delete',
+    route: `${APP_ROUTES.ADMIN_CREATORS}/delete`,
     action: 'delete_creator',
   },
   errorMessage: 'Failed to delete creator/user',

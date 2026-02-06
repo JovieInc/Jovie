@@ -9,6 +9,7 @@
  */
 
 import { syncEmailFromClerkByClerkId } from '@/lib/auth/clerk-sync';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { logger } from '@/lib/utils/logger';
 import type {
   ClerkEventType,
@@ -51,6 +52,10 @@ async function handleUserUpdated(
         };
       }
     }
+
+    // Invalidate proxy cache so middleware sees fresh state immediately
+    // This handles cases where Clerk metadata changes (admin actions, etc.)
+    await invalidateProxyUserStateCache(user.id);
 
     return {
       success: true,

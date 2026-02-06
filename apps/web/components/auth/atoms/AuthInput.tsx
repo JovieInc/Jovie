@@ -21,11 +21,11 @@ interface AuthInputProps
 
 const authInputClasses = cn(
   // Base styling - subtle borders for premium feel
-  'border border-gray-200 bg-white text-[#1f2023] dark:border-[#1f2123] dark:bg-[#0f1011] dark:text-white',
-  'placeholder:text-[#9aa0a6] dark:placeholder:text-[#595a5c]',
+  'border border-subtle bg-white dark:bg-surface-1 text-primary-token',
+  'placeholder:text-tertiary-token',
   'rounded-[6px]',
   // Focus ring
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909]',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0',
   // Mobile-optimized sizing - min 44px height for touch targets
   'h-[44px] min-h-[44px]',
   // Typography

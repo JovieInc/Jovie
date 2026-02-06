@@ -11,6 +11,7 @@ import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
+// eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
@@ -18,7 +19,6 @@ import type {
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   getProfileWithLinks as getCreatorProfileWithLinks,
-  getTopProfilesForStaticGeneration,
   isClaimTokenValid,
 } from '@/lib/services/profile';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -36,14 +36,14 @@ import {
 function generateProfileStructuredData(
   profile: CreatorProfile,
   genres: string[] | null,
-  socialLinks: LegacySocialLink[]
+  links: LegacySocialLink[]
 ) {
   const artistName = profile.display_name || profile.username;
   const profileUrl = `${BASE_URL}/${profile.username}`;
   const imageUrl = profile.avatar_url || `${BASE_URL}/og/default.png`;
 
   // Extract social profile URLs for sameAs
-  const socialUrls = socialLinks
+  const socialUrls = links
     .filter(link =>
       [
         'instagram',
@@ -105,17 +105,7 @@ function generateProfileStructuredData(
   return { musicGroupSchema, breadcrumbSchema };
 }
 
-// Note: runtime = 'edge' removed for cacheComponents compatibility
-// Edge runtime is incompatible with Cache Components
-// Use Node runtime for cache components support
-
-// Use a client wrapper to avoid ssr:false in a Server Component
-
-// Use centralized server helper for public data access
-
-// Using CreatorProfile type and convertCreatorProfileToArtist utility from types/db.ts
-
-// This helper returns both the legacy CreatorProfile and LegacySocialLink[] in one DB call.
+/** Fetches profile and social links in a single database call. */
 const fetchProfileAndLinks = async (
   username: string
 ): Promise<{
@@ -227,7 +217,16 @@ const fetchProfileAndLinks = async (
 // Cache public profile reads across requests; tags keep updates fast and precise.
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
+// IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
 const getCachedProfileAndLinks = async (username: string) => {
+  // Skip Next.js cache in test/development environments
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
+    return fetchProfileAndLinks(username);
+  }
+
   try {
     return await unstable_cache(
       async () => fetchProfileAndLinks(username),
@@ -265,7 +264,7 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
-  searchParams?: Promise<{
+  readonly searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
     claim_token?: string;
   }>;
@@ -342,32 +341,18 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  // Non-blocking feature flag check with timeout
   const dynamicEnabled = creatorIsPro;
-
-  // Social links loaded together with profile in a single cached helper
-  const socialLinks = links;
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
   );
 
-  // Determine subtitle based on mode
-  const getSubtitle = (currentMode: string) => {
-    switch (currentMode) {
-      case 'listen':
-        return PAGE_SUBTITLES.listen;
-      case 'tip':
-        return PAGE_SUBTITLES.tip;
-      case 'subscribe':
-        return PAGE_SUBTITLES.subscribe;
-      default:
-        return PAGE_SUBTITLES.profile;
-    }
-  };
+  const subtitle =
+    PAGE_SUBTITLES[mode as keyof typeof PAGE_SUBTITLES] ??
+    PAGE_SUBTITLES.profile;
 
   // Show tip button only in profile/default mode and when artist has venmo
-  const hasVenmoLink = socialLinks.some(link => link.platform === 'venmo');
+  const hasVenmoLink = links.some(link => link.platform === 'venmo');
   const showTipButton = mode === 'profile' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
@@ -381,7 +366,7 @@ export default async function ArtistPage({
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
     profile,
     genres,
-    socialLinks
+    links
   );
 
   return (
@@ -415,9 +400,9 @@ export default async function ArtistPage({
       <StaticArtistPage
         mode={mode}
         artist={artist}
-        socialLinks={socialLinks}
+        socialLinks={links}
         contacts={publicContacts}
-        subtitle={getSubtitle(mode)}
+        subtitle={subtitle}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
         enableDynamicEngagement={dynamicEnabled}
@@ -546,21 +531,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-// ISR: Revalidate public profiles every hour
-// This works with generateStaticParams to pre-render top profiles at build time
-// and revalidate them in the background on subsequent requests
-export const revalidate = 3600; // 1 hour
-
-// Pre-render top profiles at build time for instant TTFB
-// Featured and claimed profiles are prioritized, ordered by view count
-// Expanded to 250 profiles (from 100) for better coverage of high-traffic pages
-export async function generateStaticParams(): Promise<{ username: string }[]> {
-  try {
-    const profiles = await getTopProfilesForStaticGeneration(250);
-    return profiles;
-  } catch (error) {
-    console.error('[generateStaticParams] Failed to fetch profiles:', error);
-    // Return empty array on error - pages will be generated on-demand
-    return [];
-  }
-}
+// Dynamic rendering required for searchParams access (?mode=, ?claim_token=)
+// Redis edge cache (5 min TTL) provides fast responses without ISR
+export const dynamic = 'force-dynamic';

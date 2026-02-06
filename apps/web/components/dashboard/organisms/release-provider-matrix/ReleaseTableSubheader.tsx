@@ -47,7 +47,10 @@ interface ReleaseTableSubheaderProps {
   /** Column visibility state */
   readonly columnVisibility: Record<string, boolean>;
   /** Callback when column visibility changes */
-  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
+  readonly onColumnVisibilityChange: (
+    columnId: string,
+    visible: boolean
+  ) => void;
   /** Available columns to toggle */
   readonly availableColumns: readonly { id: string; label: string }[];
   /** Callback to reset display settings to defaults */
@@ -86,7 +89,7 @@ function ReleaseViewSegmentedControl({
   onChange: (value: ReleaseView) => void;
 }) {
   return (
-    <fieldset className='inline-flex rounded-lg bg-surface-1 p-0.5 border-0'>
+    <fieldset className='inline-flex rounded-md bg-transparent p-0'>
       <legend className='sr-only'>Release type filter</legend>
       {RELEASE_VIEW_OPTIONS.map(option => (
         <button
@@ -95,10 +98,10 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'h-7 px-3 text-xs font-medium rounded-md transition-colors',
+            'h-7 px-2.5 text-xs font-medium rounded-md transition-colors',
             value === option.value
-              ? 'bg-surface-2 text-primary-token shadow-sm'
-              : 'text-secondary-token hover:text-primary-token'
+              ? 'bg-surface-2 text-primary-token'
+              : 'text-tertiary-token hover:text-secondary-token'
           )}
         >
           {option.label}
@@ -182,7 +185,7 @@ function LinearStyleDisplayMenu({
             variant='ghost'
             size='sm'
             className={cn(
-              'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-[#c9c9cc] hover:bg-[#f2f2f2] hover:text-primary-token dark:border-transparent dark:bg-transparent dark:hover:border-white/20 dark:hover:bg-[#151618] dark:hover:text-white',
+              'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
               triggerClassName
             )}
           >
@@ -193,11 +196,14 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent
         align='end'
-        className='w-56 p-0 rounded-lg border border-subtle bg-white dark:bg-surface-2 shadow-lg'
+        className='w-64 p-0 rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-white dark:bg-surface-2 shadow-lg'
       >
-        {/* View options */}
+        {/* List options */}
         {(onShowTracksChange || onGroupByYearChange) && (
           <div className='border-b border-subtle px-2.5 py-2 space-y-2'>
+            <p className='text-[10px] uppercase tracking-wider text-tertiary-token'>
+              List options
+            </p>
             {onShowTracksChange && (
               <ToggleSwitch
                 label='Show tracks'
@@ -215,36 +221,37 @@ function LinearStyleDisplayMenu({
           </div>
         )}
 
-        {/* Column visibility toggles - temporarily disabled for refinement
-        <div className='p-2.5'>
-          <p className='mb-1.5 text-[11px] font-medium text-tertiary-token'>
-            Display properties
-          </p>
-          <div className='flex flex-wrap gap-1'>
-            {availableColumns.map(col => {
-              const isVisible = columnVisibility[col.id] !== false;
-              return (
-                <button
-                  key={col.id}
-                  type='button'
-                  onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
-                  aria-pressed={isVisible}
-                  aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
-                  className={cn(
-                    'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
-                    isVisible
-                      ? 'bg-surface-2 text-primary-token'
-                      : 'text-tertiary-token hover:bg-surface-2/50'
-                  )}
-                >
-                  {col.label}
-                </button>
-              );
-            })}
+        {/* Column visibility (Fields) */}
+        {availableColumns.length > 0 && (
+          <div className='px-2.5 py-2'>
+            <p className='mb-1.5 text-[10px] uppercase tracking-wider text-tertiary-token'>
+              Fields
+            </p>
+            <div className='flex flex-wrap gap-1'>
+              {availableColumns.map(col => {
+                const isVisible = columnVisibility[col.id] !== false;
+                return (
+                  <button
+                    key={col.id}
+                    type='button'
+                    onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
+                    aria-pressed={isVisible}
+                    aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1',
+                      isVisible
+                        ? 'bg-accent/20 text-accent'
+                        : 'text-tertiary-token hover:bg-surface-2/50'
+                    )}
+                  >
+                    {col.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-        */}
-        {/* Reset to defaults - temporarily disabled with column visibility toggles
+        )}
+        {/* Reset to defaults */}
         {onResetToDefaults && (
           <div className='border-t border-subtle px-2.5 py-2'>
             <button
@@ -256,7 +263,6 @@ function LinearStyleDisplayMenu({
             </button>
           </div>
         )}
-        */}
       </PopoverContent>
     </Popover>
   );
@@ -289,10 +295,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   const pillButtonClass =
-    'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-[#c9c9cc] hover:bg-[#f2f2f2] hover:text-primary-token dark:border-transparent dark:bg-transparent dark:hover:border-white/20 dark:hover:bg-[#151618] dark:hover:text-white';
+    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-1.5'>
+    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 sm:px-4 lg:px-6 py-1'>
       {/* Left: Filter first, then release view toggle */}
       <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown

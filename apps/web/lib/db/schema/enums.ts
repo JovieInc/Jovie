@@ -296,3 +296,9 @@ export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
   'sent',
   'failed',
 ]);
+
+// Chat Enums
+export const chatMessageRoleEnum = pgEnum('chat_message_role', [
+  'user',
+  'assistant',
+]);

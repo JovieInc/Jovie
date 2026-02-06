@@ -4,7 +4,6 @@ import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 
 declare global {
-  // eslint-disable-next-line no-var
   var joviePerformanceObservers:
     | {
         navigation?: PerformanceObserver;

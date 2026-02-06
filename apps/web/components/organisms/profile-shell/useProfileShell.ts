@@ -109,6 +109,7 @@ export function useProfileShell({
       channel,
       hasStoredContacts,
       hydrationStatus,
+      notificationsEnabled,
       notificationsState,
       openSubscription,
       registerInputFocus,

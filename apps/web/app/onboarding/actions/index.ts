@@ -8,6 +8,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -223,10 +224,10 @@ export async function completeOnboarding({
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete
-    revalidatePath('/app', 'layout');
+    revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
 
     if (redirectToDashboard) {
-      redirect('/app/dashboard');
+      redirect(APP_ROUTES.DASHBOARD);
     }
 
     return completion;

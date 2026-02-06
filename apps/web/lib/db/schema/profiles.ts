@@ -22,6 +22,7 @@ import {
   ingestionStatusEnum,
   photoStatusEnum,
 } from './enums';
+// eslint-disable-next-line import/no-cycle -- mutual FK references between profiles and waitlist tables
 import { waitlistEntries } from './waitlist';
 
 /**
@@ -197,24 +198,36 @@ export const creatorProfiles = pgTable(
 );
 
 // Creator contacts table
-export const creatorContacts = pgTable('creator_contacts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  role: contactRoleEnum('role').notNull(),
-  customLabel: text('custom_label'),
-  personName: text('person_name'),
-  companyName: text('company_name'),
-  territories: jsonb('territories').$type<string[]>().notNull().default([]),
-  email: text('email'),
-  phone: text('phone'),
-  preferredChannel: contactChannelEnum('preferred_channel'),
-  isActive: boolean('is_active').notNull().default(true),
-  sortOrder: integer('sort_order').notNull().default(0),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const creatorContacts = pgTable(
+  'creator_contacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    role: contactRoleEnum('role').notNull(),
+    customLabel: text('custom_label'),
+    personName: text('person_name'),
+    companyName: text('company_name'),
+    territories: jsonb('territories').$type<string[]>().notNull().default([]),
+    email: text('email'),
+    phone: text('phone'),
+    preferredChannel: contactChannelEnum('preferred_channel'),
+    isActive: boolean('is_active').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Covers: WHERE creatorProfileId = ? AND isActive = true ORDER BY sortOrder, createdAt
+    profileActiveIdx: index('idx_creator_contacts_profile_active').on(
+      table.creatorProfileId,
+      table.isActive,
+      table.sortOrder,
+      table.createdAt
+    ),
+  })
+);
 
 // Creator avatar candidates table for ingestion suggestions
 export const creatorAvatarCandidates = pgTable(

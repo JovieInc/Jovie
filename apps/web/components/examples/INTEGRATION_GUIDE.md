@@ -4,7 +4,7 @@ This guide shows how to migrate from existing avatar components to the new unifi
 
 ## Components Overview
 
-### `Avatar` (Atom)
+### `Avatar` (Molecule)
 - **Purpose**: Display-only avatar for public profiles, featured creators, previews
 - **Features**: Multiple sizes, fallback initials, optimized loading, accessibility
 - **Usage**: Replace `ArtistAvatar`, `OptimizedAvatar` for read-only contexts
@@ -31,9 +31,9 @@ import { ArtistAvatar } from '@/components/atoms/ArtistAvatar';
 
 **After:**
 ```tsx
-import { Avatar } from '@/components/atoms/Avatar';
+import { Avatar } from '@/components/molecules/Avatar';
 
-<Avatar 
+<Avatar
   src={user.avatar}
   alt={`${user.name}'s profile`}
   name={user.name}
@@ -57,7 +57,7 @@ import { AvatarUpload } from '@/components/ui/AvatarUpload';
 
 **After:**
 ```tsx
-import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
 <AvatarUploadable
   src={user.avatar}

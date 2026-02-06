@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getDbUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';

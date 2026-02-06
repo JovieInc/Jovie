@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -9,6 +9,7 @@ import {
 } from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   fetchBandsintownEvents,
@@ -16,7 +17,8 @@ import {
   verifyBandsintownArtist,
 } from '@/lib/bandsintown';
 import { db } from '@/lib/db';
-import { creatorProfiles, type TourDate, tourDates } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
@@ -161,19 +163,19 @@ async function upsertBandsintownEvents(
     .onConflictDoUpdate({
       target: [tourDates.profileId, tourDates.externalId, tourDates.provider],
       set: {
-        title: sql`excluded.title`,
-        startDate: sql`excluded.start_date`,
-        startTime: sql`excluded.start_time`,
-        venueName: sql`excluded.venue_name`,
-        city: sql`excluded.city`,
-        region: sql`excluded.region`,
-        country: sql`excluded.country`,
-        latitude: sql`excluded.latitude`,
-        longitude: sql`excluded.longitude`,
-        ticketUrl: sql`excluded.ticket_url`,
-        ticketStatus: sql`excluded.ticket_status`,
-        lastSyncedAt: sql`excluded.last_synced_at`,
-        rawData: sql`excluded.raw_data`,
+        title: drizzleSql`excluded.title`,
+        startDate: drizzleSql`excluded.start_date`,
+        startTime: drizzleSql`excluded.start_time`,
+        venueName: drizzleSql`excluded.venue_name`,
+        city: drizzleSql`excluded.city`,
+        region: drizzleSql`excluded.region`,
+        country: drizzleSql`excluded.country`,
+        latitude: drizzleSql`excluded.latitude`,
+        longitude: drizzleSql`excluded.longitude`,
+        ticketUrl: drizzleSql`excluded.ticket_url`,
+        ticketStatus: drizzleSql`excluded.ticket_status`,
+        lastSyncedAt: drizzleSql`excluded.last_synced_at`,
+        rawData: drizzleSql`excluded.raw_data`,
         updatedAt: now,
       },
     });
@@ -208,7 +210,7 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/tour-dates');
+    redirect(`/sign-in?redirect_url=${APP_ROUTES.TOUR_DATES}`);
   }
 
   const profile = await requireProfile();
@@ -310,8 +312,8 @@ export async function saveBandsintownApiKey(params: {
 
   const profile = await requireProfile();
 
-  // Basic validation
-  const trimmedKey = params.apiKey.trim();
+  // Basic validation - guard against undefined/null
+  const trimmedKey = params.apiKey?.trim() ?? '';
   if (trimmedKey.length < 10) {
     return {
       success: false,
@@ -335,7 +337,7 @@ export async function saveBandsintownApiKey(params: {
       profileId: profile.id,
     });
 
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.TOUR_DATES);
 
     return {
       success: true,
@@ -381,7 +383,7 @@ export async function removeBandsintownApiKey(): Promise<{
       profileId: profile.id,
     });
 
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.TOUR_DATES);
 
     return { success: true };
   } catch {
@@ -447,7 +449,7 @@ export async function connectBandsintownArtist(params: {
     isInitialConnect: true,
   });
 
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.TOUR_DATES);
 
   // Load updated tour dates
   const dates = await db
@@ -517,7 +519,7 @@ export async function syncFromBandsintown(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.TOUR_DATES);
 
   return {
     success: true,
@@ -583,7 +585,7 @@ export async function createTourDate(params: {
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.TOUR_DATES);
 
   return mapTourDateToViewModel(created);
 }
@@ -657,7 +659,7 @@ export async function updateTourDate(params: {
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.TOUR_DATES);
 
   return mapTourDateToViewModel(updated);
 }
@@ -693,7 +695,7 @@ export async function deleteTourDate(
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/tour-dates');
+  revalidatePath(APP_ROUTES.TOUR_DATES);
 
   return { success: true };
 }
@@ -731,7 +733,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
         )
       );
 
-    revalidatePath('/app/dashboard/tour-dates');
+    revalidatePath(APP_ROUTES.TOUR_DATES);
 
     return { success: true };
   } catch {

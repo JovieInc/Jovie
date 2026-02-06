@@ -3,19 +3,16 @@
 import {
   type ColumnDef,
   type ColumnPinningState,
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
   type OnChangeFn,
-  type Row,
   type RowSelectionState,
   type SortingState,
   useReactTable,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { type VirtualItem } from '@tanstack/react-virtual';
-import React, { memo, useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -23,11 +20,13 @@ import {
   type ContextMenuItemType,
   TableContextMenu,
 } from '../molecules/TableContextMenu';
-import { TableHeaderCell } from '../molecules/TableHeaderCell';
-import { cn, presets } from '../table.styles';
+import { cn } from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
+import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
 import { useTableVirtualization } from './useTableVirtualization';
+import { VirtualizedTableBody } from './VirtualizedTableBody';
+import { VirtualizedTableRow } from './VirtualizedTableRow';
 
 export interface UnifiedTableProps<TData> {
   /**
@@ -231,134 +230,6 @@ export interface UnifiedTableProps<TData> {
 }
 
 /**
- * Internal memoized row component to prevent inline handler recreation
- */
-interface TableRowProps<TData> {
-  row: Row<TData>;
-  readonly rowIndex: number;
-  readonly rowRefsMap: Map<number, HTMLTableRowElement>;
-  readonly shouldEnableKeyboardNav: boolean;
-  readonly shouldVirtualize: boolean;
-  readonly virtualStart?: number;
-  readonly focusedIndex: number;
-  readonly onRowClick?: (row: TData) => void;
-  readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
-  onKeyDown: (
-    event: React.KeyboardEvent,
-    rowIndex: number,
-    rowData: TData
-  ) => void;
-  readonly onFocusChange: (index: number) => void;
-  readonly getRowClassName?: (row: TData, index: number) => string;
-  readonly measureElement?: (el: HTMLTableRowElement | null) => void;
-}
-
-const TableRow = memo(function TableRow<TData>({
-  row,
-  rowIndex,
-  rowRefsMap,
-  shouldEnableKeyboardNav,
-  shouldVirtualize,
-  virtualStart,
-  focusedIndex,
-  onRowClick,
-  onRowContextMenu,
-  onKeyDown,
-  onFocusChange,
-  getRowClassName,
-  measureElement,
-}: TableRowProps<TData>) {
-  const rowData = row.original as TData;
-
-  const handleClick = useCallback(() => {
-    onRowClick?.(rowData);
-    onFocusChange(rowIndex);
-  }, [onRowClick, rowData, onFocusChange, rowIndex]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => onKeyDown(e, rowIndex, rowData),
-    [onKeyDown, rowIndex, rowData]
-  );
-
-  const handleFocus = useCallback(() => {
-    if (shouldEnableKeyboardNav) {
-      onFocusChange(rowIndex);
-    }
-  }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
-
-  const handleMouseEnter = useCallback(() => {
-    if (shouldEnableKeyboardNav) {
-      onFocusChange(rowIndex);
-    }
-  }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
-
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => onRowContextMenu?.(rowData, e),
-    [onRowContextMenu, rowData]
-  );
-
-  const handleRef = useCallback(
-    (el: HTMLTableRowElement | null) => {
-      if (el) {
-        rowRefsMap.set(rowIndex, el);
-      } else {
-        rowRefsMap.delete(rowIndex);
-      }
-      if (shouldVirtualize && el && measureElement) {
-        measureElement(el);
-      }
-    },
-    [rowRefsMap, rowIndex, shouldVirtualize, measureElement]
-  );
-
-  return (
-    <tr
-      key={row.id}
-      ref={handleRef}
-      data-index={rowIndex}
-      tabIndex={shouldEnableKeyboardNav ? 0 : undefined}
-      className={cn(
-        presets.tableRow,
-        onRowClick && 'cursor-pointer',
-        shouldEnableKeyboardNav &&
-          'focus-visible:outline-none focus-visible:bg-surface-2',
-        focusedIndex === rowIndex && 'bg-surface-2',
-        getRowClassName?.(rowData, rowIndex)
-      )}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      onFocus={handleFocus}
-      onMouseEnter={handleMouseEnter}
-      onContextMenu={handleContextMenu}
-      style={
-        shouldVirtualize && virtualStart !== undefined
-          ? {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${virtualStart}px)`,
-            }
-          : undefined
-      }
-    >
-      {row.getVisibleCells().map(cell => (
-        <td
-          key={cell.id}
-          className={presets.tableCell}
-          style={{
-            width:
-              cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
-          }}
-        >
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </td>
-      ))}
-    </tr>
-  );
-}) as <TData>(props: TableRowProps<TData>) => React.ReactElement;
-
-/**
  * UnifiedTable - TanStack Table wrapper with virtualization and atomic design
  *
  * Features:
@@ -551,6 +422,12 @@ export function UnifiedTable<TData>({
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
+  // Common table styles
+  const tableClassName = cn(
+    'w-full border-separate border-spacing-0 text-[13px]',
+    className
+  );
+
   // Loading state
   if (isLoading) {
     return (
@@ -558,33 +435,9 @@ export function UnifiedTable<TData>({
         ref={tableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
-        <table
-          className={cn(
-            'w-full border-separate border-spacing-0 text-[13px]',
-            className
-          )}
-          style={{ minWidth }}
-        >
+        <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Loading table data</caption>
-
-          {/* Header */}
-          <thead>
-            <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => (
-                <TableHeaderCell
-                  key={header.id}
-                  header={header}
-                  canSort={header.column.getCanSort()}
-                  sortDirection={header.column.getIsSorted()}
-                  stickyHeaderClass={presets.stickyHeader}
-                  tableHeaderClass={presets.tableHeader}
-                  onToggleSort={header.column.getToggleSortingHandler()}
-                />
-              ))}
-            </tr>
-          </thead>
-
-          {/* Loading skeleton */}
+          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           <LoadingTableBody
             rows={skeletonRows}
             columns={columnCount}
@@ -602,33 +455,9 @@ export function UnifiedTable<TData>({
         ref={tableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
-        <table
-          className={cn(
-            'w-full border-separate border-spacing-0 text-[13px]',
-            className
-          )}
-          style={{ minWidth }}
-        >
+        <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Empty table</caption>
-
-          {/* Header */}
-          <thead>
-            <tr>
-              {table.getHeaderGroups()[0]?.headers.map(header => (
-                <TableHeaderCell
-                  key={header.id}
-                  header={header}
-                  canSort={header.column.getCanSort()}
-                  sortDirection={header.column.getIsSorted()}
-                  stickyHeaderClass={presets.stickyHeader}
-                  tableHeaderClass={presets.tableHeader}
-                  onToggleSort={header.column.getToggleSortingHandler()}
-                />
-              ))}
-            </tr>
-          </thead>
-
-          {/* Empty state */}
+          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           <tbody>
             <tr>
               <td colSpan={columnCount} className='p-0'>
@@ -643,119 +472,84 @@ export function UnifiedTable<TData>({
 
   // Render grouped table if grouping is enabled
   if (groupingConfig && groupedData.length > 0) {
+    // Build row lookup map once for O(1) lookups: O(n)
+    const rowMap = new Map(
+      table
+        .getRowModel()
+        .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
+    );
+
     return (
       <div
         ref={tableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
-        <table
-          className={cn(
-            'w-full border-separate border-spacing-0 text-[13px]',
-            className
-          )}
-          style={{ minWidth }}
-        >
+        <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Grouped table data</caption>
+          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          <GroupedTableBody
+            groupedData={groupedData}
+            observeGroupHeader={observeGroupHeader}
+            visibleGroupIndex={visibleGroupIndex}
+            columns={columns.length}
+            renderRow={(item, index) => {
+              const row = rowMap.get(getRowId ? getRowId(item) : item);
+              if (!row) return null;
 
-          {/* Header */}
-          <thead>
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <TableHeaderCell
-                    key={header.id}
-                    header={header}
-                    canSort={header.column.getCanSort()}
-                    sortDirection={header.column.getIsSorted()}
-                    stickyHeaderClass={presets.stickyHeader}
-                    tableHeaderClass={presets.tableHeader}
-                    onToggleSort={header.column.getToggleSortingHandler()}
-                  />
-                ))}
-              </tr>
-            ))}
-          </thead>
+              const rowData = row.original as TData;
 
-          {/* Grouped Body */}
-          {(() => {
-            // Build row lookup map once for O(1) lookups: O(n)
-            const rowMap = new Map(
-              table
-                .getRowModel()
-                .rows.map(r => [
-                  getRowId ? getRowId(r.original) : r.original,
-                  r,
-                ])
-            );
+              // Build row element using memoized VirtualizedTableRow
+              const rowElement = (
+                <VirtualizedTableRow
+                  key={row.id}
+                  row={row}
+                  rowIndex={index}
+                  rowRefsMap={rowRefs.current}
+                  shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+                  shouldVirtualize={false}
+                  focusedIndex={focusedIndex}
+                  onRowClick={onRowClick}
+                  onRowContextMenu={onRowContextMenu}
+                  onKeyDown={handleKeyDown}
+                  onFocusChange={setFocusedIndex}
+                  getRowClassName={getRowClassName}
+                />
+              );
 
-            return (
-              <GroupedTableBody
-                groupedData={groupedData}
-                observeGroupHeader={observeGroupHeader}
-                visibleGroupIndex={visibleGroupIndex}
-                columns={columns.length}
-                renderRow={(item, index) => {
-                  const row = rowMap.get(getRowId ? getRowId(item) : item);
-                  if (!row) return null;
+              // Check if row is expanded and has expanded content
+              const rowId =
+                getExpandableRowId?.(rowData) ?? getRowId?.(rowData) ?? row.id;
+              const isExpanded = expandedRowIds?.has(rowId);
+              const expandedContent =
+                isExpanded && renderExpandedContent
+                  ? renderExpandedContent(rowData, columns.length)
+                  : null;
 
-                  const rowData = row.original as TData;
+              // Wrap with context menu if provided
+              const wrappedRowElement = getContextMenuItems ? (
+                <TableContextMenu
+                  key={row.id}
+                  items={getContextMenuItems(rowData)}
+                >
+                  {rowElement}
+                </TableContextMenu>
+              ) : (
+                rowElement
+              );
 
-                  // Build row element using memoized TableRow
-                  const rowElement = (
-                    <TableRow
-                      key={row.id}
-                      row={row}
-                      rowIndex={index}
-                      rowRefsMap={rowRefs.current}
-                      shouldEnableKeyboardNav={shouldEnableKeyboardNav}
-                      shouldVirtualize={false}
-                      focusedIndex={focusedIndex}
-                      onRowClick={onRowClick}
-                      onRowContextMenu={onRowContextMenu}
-                      onKeyDown={handleKeyDown}
-                      onFocusChange={setFocusedIndex}
-                      getRowClassName={getRowClassName}
-                    />
-                  );
+              // If expanded, render both row and expanded content
+              if (expandedContent) {
+                return (
+                  <React.Fragment key={row.id}>
+                    {wrappedRowElement}
+                    {expandedContent}
+                  </React.Fragment>
+                );
+              }
 
-                  // Check if row is expanded and has expanded content
-                  const rowId =
-                    getExpandableRowId?.(rowData) ??
-                    getRowId?.(rowData) ??
-                    row.id;
-                  const isExpanded = expandedRowIds?.has(rowId);
-                  const expandedContent =
-                    isExpanded && renderExpandedContent
-                      ? renderExpandedContent(rowData, columns.length)
-                      : null;
-
-                  // Wrap with context menu if provided
-                  const wrappedRowElement = getContextMenuItems ? (
-                    <TableContextMenu
-                      key={row.id}
-                      items={getContextMenuItems(rowData)}
-                    >
-                      {rowElement}
-                    </TableContextMenu>
-                  ) : (
-                    rowElement
-                  );
-
-                  // If expanded, render both row and expanded content
-                  if (expandedContent) {
-                    return (
-                      <React.Fragment key={row.id}>
-                        {wrappedRowElement}
-                        {expandedContent}
-                      </React.Fragment>
-                    );
-                  }
-
-                  return wrappedRowElement;
-                }}
-              />
-            );
-          })()}
+              return wrappedRowElement;
+            }}
+          />
         </table>
       </div>
     );
@@ -767,130 +561,33 @@ export function UnifiedTable<TData>({
       ref={tableContainerRef}
       className={cn('overflow-auto', containerClassName)}
     >
-      <table
-        className={cn(
-          'w-full border-separate border-spacing-0 text-[13px]',
-          className
-        )}
-        style={{ minWidth }}
-      >
+      <table className={tableClassName} style={{ minWidth }}>
         <caption className='sr-only'>Data table</caption>
-
-        {/* Header */}
-        <thead>
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <TableHeaderCell
-                  key={header.id}
-                  header={header}
-                  canSort={header.column.getCanSort()}
-                  sortDirection={header.column.getIsSorted()}
-                  stickyHeaderClass={presets.stickyHeader}
-                  tableHeaderClass={presets.tableHeader}
-                  onToggleSort={header.column.getToggleSortingHandler()}
-                />
-              ))}
-            </tr>
-          ))}
-        </thead>
-
-        {/* Body */}
-        <tbody
-          style={{
-            position: shouldVirtualize ? 'relative' : undefined,
-            height: shouldVirtualize ? `${totalSize}px` : undefined,
-          }}
-        >
-          {/* Top padding for virtualization */}
-          {shouldVirtualize && paddingTop > 0 && (
-            <tr>
-              <td style={{ height: `${paddingTop}px` }} />
-            </tr>
-          )}
-
-          {/* Rows */}
-          {(shouldVirtualize ? virtualRows : rows).map((item, listIndex) => {
-            // Extract row data based on virtualization mode
-            const { row, virtualItem, rowIndex } = shouldVirtualize
-              ? {
-                  virtualItem: item as VirtualItem,
-                  row: rows[(item as VirtualItem).index]!,
-                  rowIndex: (item as VirtualItem).index,
-                }
-              : {
-                  virtualItem: undefined,
-                  row: item as Row<TData>,
-                  rowIndex: listIndex,
-                };
-
-            const rowData = row.original as TData;
-
-            // Early return for custom row renderer
-            if (renderRow) {
-              return renderRow(rowData, rowIndex);
-            }
-
-            // Build base row element
-            const rowElement = (
-              <TableRow
-                key={row.id}
-                row={row}
-                rowIndex={rowIndex}
-                rowRefsMap={rowRefs.current}
-                shouldEnableKeyboardNav={shouldEnableKeyboardNav}
-                shouldVirtualize={shouldVirtualize}
-                virtualStart={virtualItem?.start}
-                focusedIndex={focusedIndex}
-                onRowClick={onRowClick}
-                onRowContextMenu={onRowContextMenu}
-                onKeyDown={handleKeyDown}
-                onFocusChange={setFocusedIndex}
-                getRowClassName={getRowClassName}
-                measureElement={rowVirtualizer.measureElement}
-              />
-            );
-
-            // Apply context menu wrapper if needed
-            const wrappedRow = getContextMenuItems ? (
-              <TableContextMenu
-                key={row.id}
-                items={getContextMenuItems(rowData)}
-              >
-                {rowElement}
-              </TableContextMenu>
-            ) : (
-              rowElement
-            );
-
-            // Check for expanded content
-            const rowId = getExpandableRowId
-              ? getExpandableRowId(rowData)
-              : (getRowId?.(rowData) ?? row.id);
-            const isExpanded = expandedRowIds?.has(rowId);
-
-            // Early return if no expanded content
-            if (!isExpanded || !renderExpandedContent) {
-              return wrappedRow;
-            }
-
-            // Render row with expanded content
-            const expandedContent = renderExpandedContent(rowData, columnCount);
-            return (
-              <React.Fragment key={row.id}>
-                {wrappedRow}
-                {expandedContent}
-              </React.Fragment>
-            );
-          })}
-
-          {/* Bottom padding for virtualization */}
-          {shouldVirtualize && paddingBottom > 0 && (
-            <tr>
-              <td style={{ height: `${paddingBottom}px` }} />
-            </tr>
-          )}
-        </tbody>
+        <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+        <VirtualizedTableBody
+          rows={rows}
+          shouldVirtualize={shouldVirtualize}
+          virtualRows={virtualRows}
+          totalSize={totalSize}
+          paddingTop={paddingTop}
+          paddingBottom={paddingBottom}
+          rowVirtualizer={rowVirtualizer}
+          rowRefsMap={rowRefs.current}
+          shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+          focusedIndex={focusedIndex}
+          onFocusChange={setFocusedIndex}
+          onRowClick={onRowClick}
+          onRowContextMenu={onRowContextMenu}
+          onKeyDown={handleKeyDown}
+          getContextMenuItems={getContextMenuItems}
+          getRowClassName={getRowClassName}
+          renderRow={renderRow}
+          getRowId={getRowId}
+          expandedRowIds={expandedRowIds}
+          renderExpandedContent={renderExpandedContent}
+          getExpandableRowId={getExpandableRowId}
+          columnCount={columnCount}
+        />
       </table>
     </div>
   );

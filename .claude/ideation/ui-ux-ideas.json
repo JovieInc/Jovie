@@ -328,21 +328,192 @@
       "effort": "low",
       "priority": "low",
       "related_linear_issues": []
+    },
+    {
+      "id": "uiux-021",
+      "title": "Replace native confirm() dialogs with custom ConfirmDialog component",
+      "description": "Replace browser native confirm() dialogs with a polished custom dialog component",
+      "rationale": "Native confirm() dialogs are jarring, unstyled, and inconsistent across browsers. They break the visual design language and cannot be dismissed with keyboard shortcuts consistently.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/tour-dates/TourDatesManager.tsx:61",
+        "apps/web/components/dashboard/organisms/tour-dates/TourDatesManager.tsx:84",
+        "apps/web/components/dashboard/organisms/tour-dates/TourDateSidebar.tsx:85"
+      ],
+      "current_state": "Using confirm('Are you sure...') for delete/disconnect confirmations",
+      "proposed_change": "Create a reusable ConfirmDialog component using AlertDialog from @jovie/ui with proper styling, keyboard handling, and focus management",
+      "user_benefit": "Consistent, accessible, and visually polished confirmation experience that matches the app design",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-022",
+      "title": "Migrate hardcoded colors in FeaturedArtistsSection to design tokens",
+      "description": "Replace hardcoded hex colors (#0D0E12) with design tokens",
+      "rationale": "Hardcoded colors don't respect theme changes and create maintenance burden. The gradient overlays use #0D0E12 which may not match actual dark mode background.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:163",
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:166",
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:186",
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:189"
+      ],
+      "current_state": "Using 'dark:from-[#0D0E12]' for gradient overlays",
+      "proposed_change": "Use CSS custom property: 'dark:from-base' or 'dark:from-surface-0' from tailwind tokens",
+      "user_benefit": "Consistent theme support and easier maintenance when dark mode colors change",
+      "effort": "low",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-023",
+      "title": "Migrate hardcoded colors in ErrorBanner to design tokens",
+      "description": "Replace numerous hardcoded hex/rgba colors with semantic design tokens",
+      "rationale": "ErrorBanner uses 15+ hardcoded colors like #fce2e2, #150b0b, rgba(140,26,26,0.12). These should use the error semantic tokens defined in tailwind.config.js.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/feedback/ErrorBanner.tsx:59",
+        "apps/web/components/feedback/ErrorBanner.tsx:72",
+        "apps/web/components/feedback/ErrorBanner.tsx:87",
+        "apps/web/components/feedback/ErrorBanner.tsx:102",
+        "apps/web/components/feedback/ErrorBanner.tsx:117"
+      ],
+      "current_state": "Hardcoded colors: text-[#fce2e2], bg-[rgba(140,26,26,0.12)], focus-visible:ring-offset-[#150b0b]",
+      "proposed_change": "Use existing tokens: text-error, bg-error-subtle, border-error, and extend tokens if needed",
+      "user_benefit": "Consistent error styling across the app, better dark mode support, easier to update brand colors",
+      "effort": "medium",
+      "priority": "high",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-024",
+      "title": "Add keyboard navigation hint to horizontally scrollable FeaturedCreatorsSection",
+      "description": "Provide visual/aria cues for keyboard-only users to navigate the horizontal carousel",
+      "rationale": "Hidden scrollbars and no visible navigation arrows make it unclear how to browse the carousel without a mouse or touchscreen.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:176",
+        "apps/web/components/organisms/FeaturedArtistsSection.tsx:199"
+      ],
+      "current_state": "Scrollbar hidden with CSS, no keyboard navigation hint",
+      "proposed_change": "Add left/right arrow buttons that appear on hover/focus, or add role='region' with aria-label describing how to navigate",
+      "user_benefit": "Keyboard and screen reader users can easily navigate the carousel",
+      "effort": "medium",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-025",
+      "title": "Migrate hardcoded colors in Footer to design tokens",
+      "description": "Replace hardcoded hex colors in footer with design tokens",
+      "rationale": "Footer uses hardcoded colors #6b6f76 and #9ca3af that don't match the design token system.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/organisms/footer-module/Footer.tsx:237"
+      ],
+      "current_state": "Using text-[#6b6f76] dark:text-[#9ca3af]",
+      "proposed_change": "Use text-tertiary-token or text-quaternary-token from design system",
+      "user_benefit": "Consistent typography that updates with theme changes",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-026",
+      "title": "Add missing aria-label to ticket link in TourDatesTable",
+      "description": "Add descriptive aria-label to external ticket links",
+      "rationale": "External links should have descriptive labels for screen reader users to understand their destination and that they open in a new tab.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/tour-dates/TourDatesTable.tsx:131-141"
+      ],
+      "current_state": "Link has no aria-label, only visual 'Buy' text",
+      "proposed_change": "Add aria-label='Buy tickets (opens in new tab)' to the anchor element",
+      "user_benefit": "Screen reader users know the link opens externally and its purpose",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-027",
+      "title": "Add live region announcement for JovieChat assistant responses",
+      "description": "Add aria-live region to announce when assistant is typing/responding",
+      "rationale": "Screen reader users don't get feedback when the assistant starts responding or when streaming completes.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/jovie/JovieChat.tsx:525-534"
+      ],
+      "current_state": "Loading spinner shown visually but not announced",
+      "proposed_change": "Add aria-live='polite' region with sr-only text like 'Jovie is typing...' and 'Response complete'",
+      "user_benefit": "Screen reader users know when the AI is responding and when they can read the response",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-028",
+      "title": "Migrate admin table selection colors to design tokens",
+      "description": "Replace hardcoded selection colors in admin creator table",
+      "rationale": "Selection state uses hardcoded colors #ebebf6 and #1b1d38 instead of design tokens.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/admin/CreatorProfileTableRow.tsx:35",
+        "apps/web/components/admin/CreatorProfileTableRow.tsx:261"
+      ],
+      "current_state": "Using bg-[#ebebf6] dark:bg-[#1b1d38] for selected rows",
+      "proposed_change": "Use bg-accent-subtle or create a new selection token in the design system",
+      "user_benefit": "Consistent selection styling that respects theme changes",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-029",
+      "title": "Standardize color usage in FeatureCard component",
+      "description": "Replace inline style boxShadow and borderColor with Tailwind classes",
+      "rationale": "FeatureCard uses inline JavaScript styles for shadows and borders instead of Tailwind utilities.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/components/molecules/FeatureCard.tsx:49-53"
+      ],
+      "current_state": "Using inline styles: boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', borderColor: 'rgb(209, 213, 219)'",
+      "proposed_change": "Use Tailwind shadow utilities and border-default token",
+      "user_benefit": "Consistent styling approach, better maintainability, proper dark mode support",
+      "effort": "low",
+      "priority": "medium",
+      "related_linear_issues": []
+    },
+    {
+      "id": "uiux-030",
+      "title": "Add transition animation to JovieChat suggested prompts",
+      "description": "Add hover/focus transition animations to suggested prompt buttons",
+      "rationale": "The suggested prompt buttons have hover states but transition is only on colors, could benefit from subtle scale or shadow transition for better feedback.",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/jovie/JovieChat.tsx:686-695"
+      ],
+      "current_state": "Only 'transition-colors duration-fast' on hover",
+      "proposed_change": "Add 'transition-all' to include border and transform properties, consider subtle hover:scale-[1.02] for tactile feedback",
+      "user_benefit": "More polished micro-interaction that makes the UI feel responsive",
+      "effort": "low",
+      "priority": "low",
+      "related_linear_issues": []
     }
   ],
   "summary": {
-    "total_ideas": 20,
+    "total_ideas": 30,
     "by_category": {
-      "usability": 4,
-      "accessibility": 9,
+      "usability": 5,
+      "accessibility": 13,
       "performance": 1,
-      "visual": 4,
-      "interaction": 3
+      "visual": 8,
+      "interaction": 4
     },
     "by_priority": {
-      "high": 5,
-      "medium": 9,
-      "low": 6
+      "high": 8,
+      "medium": 14,
+      "low": 8
     }
   }
 }

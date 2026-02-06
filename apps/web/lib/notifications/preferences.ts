@@ -1,9 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
 import { users } from '@/lib/db/schema/auth';
-// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import type {
   NotificationDeliveryChannel,

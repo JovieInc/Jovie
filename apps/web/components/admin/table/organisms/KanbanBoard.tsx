@@ -122,7 +122,7 @@ export function KanbanBoard<TData>({
 }
 
 interface KanbanColumnProps<TData> {
-  column: KanbanColumn<TData>;
+  readonly column: KanbanColumn<TData>;
   readonly renderCard: (item: TData, index: number) => React.ReactNode;
   readonly getItemId: (item: TData) => string;
   readonly onItemMove?: (

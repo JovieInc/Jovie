@@ -3,7 +3,8 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
@@ -14,18 +15,70 @@ export interface ProxyUserState {
 }
 
 // Redis cache settings for user state
-// Short TTL to balance freshness vs cold DB latency
+// Transitional users get shorter TTL, active users get longer TTL.
+// Safe to use longer TTLs because all state transitions (waitlist approval,
+// onboarding completion, user deletion) explicitly call invalidateProxyUserStateCache().
 const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
-const USER_STATE_CACHE_TTL_SECONDS = 30; // 30 seconds - short for routing decisions
+const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (invalidation is explicit)
+const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts
 const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
+
+// ---------------------------------------------------------------------------
+// In-memory cache layer
+// ---------------------------------------------------------------------------
+// Short-lived Map that sits in front of Redis to collapse rapid-fire middleware
+// calls (page load + RSC prefetches + client navigations) into a single
+// Redis/DB round-trip. Persists across requests in warm Edge Runtime isolates.
+// ---------------------------------------------------------------------------
+const MEMORY_CACHE_TTL_ACTIVE_MS = 10_000; // 10s for active users
+const MEMORY_CACHE_TTL_TRANSITIONAL_MS = 5_000; // 5s for transitional users
+const MEMORY_CACHE_MAX_ENTRIES = 1_000;
+
+interface MemoryCacheEntry {
+  state: ProxyUserState;
+  expiresAt: number;
+}
+
+const memoryCache = new Map<string, MemoryCacheEntry>();
+
+function tryGetMemoryCachedState(cacheKey: string): ProxyUserState | null {
+  const entry = memoryCache.get(cacheKey);
+  if (!entry) return null;
+  if (Date.now() < entry.expiresAt) return entry.state;
+  memoryCache.delete(cacheKey);
+  return null;
+}
+
+function setMemoryCachedState(cacheKey: string, state: ProxyUserState): void {
+  // Simple eviction: drop oldest entry when at capacity
+  if (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const firstKey = memoryCache.keys().next().value;
+    if (firstKey) memoryCache.delete(firstKey);
+  }
+  const ttlMs = state.isActive
+    ? MEMORY_CACHE_TTL_ACTIVE_MS
+    : MEMORY_CACHE_TTL_TRANSITIONAL_MS;
+  memoryCache.set(cacheKey, { state, expiresAt: Date.now() + ttlMs });
+}
 
 /** Get a human-readable label for user state (for logging) */
 function getUserStateLabel(state: ProxyUserState): string {
   if (state.isActive) return 'active';
   if (state.needsOnboarding) return 'onboarding';
   return 'waitlist';
+}
+
+/**
+ * Determine the appropriate cache TTL based on user state.
+ * - Active users (stable state): 5 minutes - state rarely changes
+ * - Transitional users (waitlist/onboarding): 2 minutes - explicit invalidation on state change
+ */
+function getTtlForUserState(state: ProxyUserState): number {
+  return state.isActive
+    ? USER_STATE_CACHE_TTL_ACTIVE_SECONDS
+    : USER_STATE_CACHE_TTL_SECONDS;
 }
 
 /**
@@ -75,6 +128,14 @@ async function tryGetCachedState(
   return null;
 }
 
+/** Statuses that indicate waitlist approval */
+const APPROVED_STATUSES = [
+  'waitlist_approved',
+  'profile_claimed',
+  'onboarding_incomplete',
+  'active',
+] as const;
+
 /**
  * Determine user state from database query result
  */
@@ -90,45 +151,117 @@ function determineUserState(
 ): ProxyUserState {
   // No DB user → needs waitlist/signup
   if (!result?.dbUserId) {
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   // Check waitlist approval using userStatus lifecycle
-  const approvedStatuses = [
-    'waitlist_approved',
-    'profile_claimed',
-    'onboarding_incomplete',
-    'active',
-  ];
-  const isWaitlistApproved = approvedStatuses.includes(result.userStatus ?? '');
+  const isWaitlistApproved = APPROVED_STATUSES.includes(
+    result.userStatus as (typeof APPROVED_STATUSES)[number]
+  );
 
   if (!isWaitlistApproved) {
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   // Has approval but no profile or incomplete → needs onboarding
   if (!result.profileId || !result.profileComplete) {
-    return { needsWaitlist: false, needsOnboarding: true, isActive: false };
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 
   // Fully active user
-  return { needsWaitlist: false, needsOnboarding: false, isActive: true };
+  return { ...ACTIVE_USER_STATE };
 }
 
 /**
  * Cache user state in Redis (fire-and-forget)
  */
-function cacheUserState(cacheKey: string, userState: ProxyUserState): void {
+function cacheUserState(
+  cacheKey: string,
+  userState: ProxyUserState,
+  ttlSeconds: number
+): void {
   const redis = getRedis();
   if (!redis) return;
 
-  redis
-    .set(cacheKey, userState, { ex: USER_STATE_CACHE_TTL_SECONDS })
-    .catch(cacheError => {
-      captureWarning('[proxy-state] Redis cache write failed', {
-        error: cacheError,
-      });
+  redis.set(cacheKey, userState, { ex: ttlSeconds }).catch(cacheError => {
+    captureWarning('[proxy-state] Redis cache write failed', {
+      error: cacheError,
     });
+  });
+}
+
+/** Default state for unauthenticated or unknown users */
+const DEFAULT_WAITLIST_STATE: ProxyUserState = {
+  needsWaitlist: true,
+  needsOnboarding: false,
+  isActive: false,
+};
+
+/** State for users who need onboarding */
+const NEEDS_ONBOARDING_STATE: ProxyUserState = {
+  needsWaitlist: false,
+  needsOnboarding: true,
+  isActive: false,
+};
+
+/** State for fully active users */
+const ACTIVE_USER_STATE: ProxyUserState = {
+  needsWaitlist: false,
+  needsOnboarding: false,
+  isActive: true,
+};
+
+/**
+ * Execute the database query with timeout protection
+ */
+async function executeUserStateQuery(clerkUserId: string) {
+  const queryPromise = db
+    .select({
+      dbUserId: users.id,
+      userStatus: users.userStatus,
+      profileId: creatorProfiles.id,
+      profileComplete: creatorProfiles.onboardingCompletedAt,
+    })
+    .from(users)
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
+    .where(
+      and(
+        eq(users.clerkId, clerkUserId),
+        isNull(users.deletedAt),
+        ne(users.userStatus, 'banned')
+      )
+    )
+    .limit(1);
+
+  // Race the query against a timeout to prevent proxy hanging
+  return Promise.race([
+    queryPromise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('[proxy-state] DB query timeout after 5s')),
+        DB_QUERY_TIMEOUT_MS
+      )
+    ),
+  ]);
+}
+
+/**
+ * Log database query performance to Sentry
+ */
+function logDbQueryPerformance(durationMs: number, userFound: boolean): void {
+  const isSlow = durationMs > 1000;
+  Sentry.addBreadcrumb({
+    category: 'proxy-state',
+    message: 'DB query completed',
+    level: isSlow ? 'warning' : 'info',
+    data: { durationMs, userFound, slow: isSlow },
+  });
 }
 
 /**
@@ -151,74 +284,38 @@ export async function getUserState(
     captureWarning(
       '[proxy-state] getUserState called with missing clerkUserId'
     );
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return { ...DEFAULT_WAITLIST_STATE };
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
 
-  // Try Redis cache first to avoid cold Neon DB queries
+  // Layer 1: In-memory cache (avoids Redis round-trip entirely)
+  const memoryCached = tryGetMemoryCachedState(cacheKey);
+  if (memoryCached) {
+    return memoryCached;
+  }
+
+  // Layer 2: Redis cache (avoids cold Neon DB queries)
   const cached = await tryGetCachedState(cacheKey, clerkUserId);
   if (cached) {
+    setMemoryCachedState(cacheKey, cached);
     return cached;
   }
 
+  // Layer 3: Database query
   try {
-    // Single query with join - optimized for proxy performance
-    // Filter out deleted and banned users to prevent misrouting
     const dbQueryStart = Date.now();
-    const queryPromise = db
-      .select({
-        dbUserId: users.id,
-        userStatus: users.userStatus,
-        profileId: creatorProfiles.id,
-        profileComplete: creatorProfiles.onboardingCompletedAt,
-      })
-      .from(users)
-      .leftJoin(
-        creatorProfiles,
-        and(
-          eq(creatorProfiles.userId, users.id),
-          eq(creatorProfiles.isClaimed, true)
-        )
-      )
-      .where(
-        and(
-          eq(users.clerkId, clerkUserId),
-          isNull(users.deletedAt),
-          ne(users.userStatus, 'banned')
-        )
-      )
-      .limit(1);
-
-    // Race the query against a timeout to prevent proxy hanging
-    const [result] = await Promise.race([
-      queryPromise,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('[proxy-state] DB query timeout after 5s')),
-          DB_QUERY_TIMEOUT_MS
-        )
-      ),
-    ]);
-
+    const [result] = await executeUserStateQuery(clerkUserId);
     const dbQueryDuration = Date.now() - dbQueryStart;
 
-    // Track DB query performance (only on cache miss path)
-    Sentry.addBreadcrumb({
-      category: 'proxy-state',
-      message: 'DB query completed',
-      level: dbQueryDuration > 1000 ? 'warning' : 'info',
-      data: {
-        durationMs: dbQueryDuration,
-        userFound: !!result?.dbUserId,
-        slow: dbQueryDuration > 1000,
-      },
-    });
+    logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
     const userState = determineUserState(result);
 
-    // Cache the result in Redis (fire-and-forget)
-    cacheUserState(cacheKey, userState);
+    // Populate both cache layers
+    setMemoryCachedState(cacheKey, userState);
+    const ttl = getTtlForUserState(userState);
+    cacheUserState(cacheKey, userState, ttl);
 
     return userState;
   } catch (error) {
@@ -227,9 +324,19 @@ export async function getUserState(
       operation: 'getProxyUserState',
     });
 
-    // Safe fallback: treat as needing waitlist
-    return { needsWaitlist: true, needsOnboarding: false, isActive: false };
+    return { ...DEFAULT_WAITLIST_STATE };
   }
+}
+
+/**
+ * Synchronous check whether a user is known-active from the in-memory cache.
+ * Used by proxy.ts to skip getUserState on RSC prefetch requests for active
+ * users — they don't need routing intervention so prefetch can pass through.
+ */
+export function isKnownActiveUser(clerkUserId: string): boolean {
+  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
+  const entry = memoryCache.get(cacheKey);
+  return !!entry && Date.now() < entry.expiresAt && entry.state.isActive;
 }
 
 /**
@@ -241,10 +348,14 @@ export async function getUserState(
 export async function invalidateProxyUserStateCache(
   clerkUserId: string
 ): Promise<void> {
+  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
+
+  // Clear in-memory cache (only effective within the same isolate, but harmless)
+  memoryCache.delete(cacheKey);
+
   const redis = getRedis();
   if (!redis) return;
 
-  const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
   try {
     await redis.del(cacheKey);
   } catch (error) {

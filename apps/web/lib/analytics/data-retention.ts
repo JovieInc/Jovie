@@ -15,7 +15,8 @@ import {
   audienceMembers,
   clickEvents,
   notificationSubscriptions,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
+import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { env } from '@/lib/env-server';
 
 // Default retention period in days
@@ -73,7 +74,7 @@ export async function cleanupAudienceMembers(
   const result = await db
     .delete(audienceMembers)
     .where(
-      drizzleSql`${audienceMembers.lastSeenAt} < ${cutoffDate}
+      drizzleSql`${audienceMembers.lastSeenAt} < ${sqlTimestamp(cutoffDate)}
         AND ${audienceMembers.type} = 'anonymous'
         AND ${audienceMembers.email} IS NULL
         AND ${audienceMembers.phone} IS NULL`
@@ -137,7 +138,7 @@ export async function runDataRetentionCleanup(options?: {
         .select({ count: drizzleSql<number>`COUNT(*)` })
         .from(audienceMembers)
         .where(
-          drizzleSql`${audienceMembers.lastSeenAt} < ${cutoffDate}
+          drizzleSql`${audienceMembers.lastSeenAt} < ${sqlTimestamp(cutoffDate)}
             AND ${audienceMembers.type} = 'anonymous'
             AND ${audienceMembers.email} IS NULL
             AND ${audienceMembers.phone} IS NULL`
@@ -215,7 +216,7 @@ export async function getRetentionStats(retentionDays?: number): Promise<{
       .select({ count: drizzleSql<number>`COUNT(*)` })
       .from(audienceMembers)
       .where(
-        drizzleSql`${audienceMembers.lastSeenAt} < ${cutoffDate}
+        drizzleSql`${audienceMembers.lastSeenAt} < ${sqlTimestamp(cutoffDate)}
           AND ${audienceMembers.type} = 'anonymous'
           AND ${audienceMembers.email} IS NULL
           AND ${audienceMembers.phone} IS NULL`

@@ -1,7 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
+  "globalDependencies": ["**/.env.*local", ".nvmrc", "pnpm-lock.yaml"],
   "ui": "tui",
+  "daemon": true,
   "remoteCache": {
     "enabled": true
   },
@@ -14,7 +15,25 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.test.{ts,tsx}",
+        "!**/*.spec.{ts,tsx}",
+        "!**/*.stories.{ts,tsx,mdx}",
+        "!**/tests/**",
+        "!**/__tests__/**",
+        "!**/coverage/**",
+        "!**/playwright-report/**"
+      ],
+      "outputs": [
+        ".next/standalone/**",
+        ".next/static/**",
+        ".next/server/**",
+        ".next/*.json",
+        ".next/BUILD_ID",
+        "!.next/cache/**",
+        "dist/**"
+      ],
       "env": [
         "NODE_ENV",
         "NEXT_PUBLIC_*",
@@ -40,45 +59,90 @@
     },
     "lint": {
       "dependsOn": ["^lint"],
-      "outputs": []
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "biome.json",
+        "eslint.config.js",
+        ".eslintrc*"
+      ],
+      "outputs": [".cache/eslint/**"]
     },
     "lint:fix": {
       "dependsOn": ["^lint:fix"],
-      "outputs": []
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "biome.json",
+        "eslint.config.js",
+        ".eslintrc*"
+      ],
+      "outputs": [],
+      "cache": false
     },
     "typecheck": {
       "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "tsconfig.*.json"],
       "outputs": [".cache/tsbuildinfo"]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "interruptible": true
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [],
+      "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
       "outputs": ["coverage/**"],
       "env": ["NODE_ENV", "CI"]
     },
     "test:fast": {
       "dependsOn": [],
+      "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
       "outputs": [],
       "env": ["NODE_ENV", "CI"]
     },
     "test:e2e": {
       "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
       "outputs": ["playwright-report/**", "test-results/**"],
-      "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*"]
+      "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*", "BASE_URL"]
     },
     "e2e:smoke": {
       "dependsOn": ["build"],
+      "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
     },
     "format": {
-      "outputs": []
+      "inputs": ["$TURBO_DEFAULT$", "biome.json"],
+      "outputs": [],
+      "cache": false
     },
     "format:check": {
+      "inputs": ["$TURBO_DEFAULT$", "biome.json"],
       "outputs": []
+    },
+    "drizzle:generate": {
+      "inputs": ["drizzle/**", "lib/db/schema/**"],
+      "outputs": ["drizzle/migrations/**"],
+      "cache": false
+    },
+    "drizzle:check": {
+      "inputs": ["drizzle/**", "lib/db/schema/**"],
+      "outputs": []
+    },
+    "storybook": {
+      "cache": false,
+      "persistent": true,
+      "interruptible": true
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".storybook/**",
+        "**/*.stories.{ts,tsx,mdx}"
+      ],
+      "outputs": ["storybook-static/**"]
     }
   }
 }

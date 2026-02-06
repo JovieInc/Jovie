@@ -9,7 +9,7 @@
   },
   "engines": {
     "node": ">=24.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": "9.15.4"
   },
   "packageManager": "pnpm@9.15.4",
   "pnpm": {
@@ -24,7 +24,12 @@
       "drizzle-orm": "0.45.1",
       "jsdom": "26.1.0",
       "react": "19.2.4",
-      "react-dom": "19.2.4"
+      "react-dom": "19.2.4",
+      "@modelcontextprotocol/sdk": ">=1.26.0",
+      "hono": ">=4.11.7",
+      "diff": ">=8.0.3",
+      "lodash": ">=4.17.23",
+      "@isaacs/brace-expansion": ">=5.0.1"
     }
   },
   "scripts": {
@@ -51,15 +56,17 @@
     "prepare": "husky",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
     "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
-    "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check"
+    "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
+    "knip": "knip"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "@commitlint/cli": "^20.3.0",
+    "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.3.0",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
+    "knip": "^5.83.0",
     "lint-staged": "^16.2.6",
     "turbo": "^2.7.6",
     "typescript": "^5"

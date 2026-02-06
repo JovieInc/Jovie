@@ -234,7 +234,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test('All dashboard pages load without errors', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes for 7 content pages
+    test.setTimeout(300_000); // 5 minutes for 8 pages (dev mode is slow)
 
     const results: PageHealthResult[] = [];
 
@@ -501,7 +501,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
    * admin access, the pages will return 404 and the test will skip.
    */
   test('All admin pages load without errors', async ({ page }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes for 6 admin pages
+    test.setTimeout(300_000); // 5 minutes for 6 admin pages (dev mode is slow)
 
     const results: PageHealthResult[] = [];
     let hasAdminAccess = true;

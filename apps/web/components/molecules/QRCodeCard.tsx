@@ -1,4 +1,4 @@
-import { QRCode } from '@/components/atoms/QRCode';
+import { QRCode } from '@/components/molecules/QRCode';
 
 interface QRCodeCardProps {
   readonly data: string;

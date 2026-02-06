@@ -6,7 +6,6 @@ import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
 
 declare global {
-  // eslint-disable-next-line no-var
   var JVConsent:
     | {
         onChange: (cb: (v: unknown) => void) => () => void;
@@ -95,9 +94,21 @@ export function CookieBannerSection({
       {showBanner && visible ? (
         <div
           data-testid='cookie-banner'
-          className='fixed inset-x-0 bottom-0 z-40 border-t border-default bg-surface-1 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-primary shadow-lg backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
+          className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
+          style={{
+            backgroundColor: 'var(--linear-bg-surface-1)',
+            borderTop: '1px solid var(--linear-border-default)',
+            boxShadow: 'var(--linear-shadow-card)',
+          }}
         >
-          <p className='mb-3 text-sm leading-relaxed text-secondary md:mb-0 md:flex-1'>
+          <p
+            className='mb-2 md:mb-0 md:flex-1'
+            style={{
+              fontSize: '12px',
+              lineHeight: '1.5',
+              color: 'var(--linear-text-secondary)',
+            }}
+          >
             We use cookies to improve your experience.
           </p>
 

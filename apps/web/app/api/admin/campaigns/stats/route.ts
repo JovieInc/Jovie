@@ -8,18 +8,17 @@
  * - Suppression statistics
  */
 
-import { count, eq, gte, sql } from 'drizzle-orm';
+import { count, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import {
   campaignEnrollments,
   campaignSequences,
-  creatorClaimInvites,
-  creatorProfiles,
   emailEngagement,
-  emailSuppressions,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/email-engagement';
+import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
+import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
 
@@ -180,17 +179,17 @@ async function buildEngagementStats(
   }
 
   // Pre-build the where clause separator to avoid nested template literals
-  const andSeparator = sql` AND `;
+  const andSeparator = drizzleSql` AND `;
   const whereClause =
     whereConditions.length > 0
-      ? sql`${sql.join(whereConditions, andSeparator)}`
+      ? drizzleSql`${drizzleSql.join(whereConditions, andSeparator)}`
       : undefined;
 
   const baseQuery = db
     .select({
       eventType: emailEngagement.eventType,
       count: count(),
-      uniqueCount: sql<number>`count(distinct ${emailEngagement.recipientHash})`,
+      uniqueCount: drizzleSql<number>`count(distinct ${emailEngagement.recipientHash})`,
     })
     .from(emailEngagement)
     .groupBy(emailEngagement.eventType);
@@ -234,7 +233,7 @@ async function buildConversionStats(
   const claimedQuery = dateFilter
     ? db
         .select({
-          count: sql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
+          count: drizzleSql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
         })
         .from(creatorClaimInvites)
         .innerJoin(
@@ -244,7 +243,7 @@ async function buildConversionStats(
         .where(gte(creatorClaimInvites.createdAt, dateFilter))
     : db
         .select({
-          count: sql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
+          count: drizzleSql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,
         })
         .from(creatorClaimInvites)
         .innerJoin(

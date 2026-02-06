@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
@@ -96,28 +97,33 @@ function buildSavePayload(normalized: LinkItem[]) {
   }));
 }
 
+/** Default error message for failed saves */
+const DEFAULT_SAVE_ERROR = 'Failed to save links. Please try again.';
+
+/**
+ * Get error message for FetchError based on status code
+ */
+function getFetchErrorMessage(error: FetchError): string {
+  if (error.status === 408) {
+    return 'Request timed out. Please try again.';
+  }
+  if (error.status >= 500) {
+    return 'Server error. Please try again later.';
+  }
+  return error.message || DEFAULT_SAVE_ERROR;
+}
+
 /**
  * Extract user-friendly error message from error
  */
 function extractErrorMessage(error: unknown): string {
-  const defaultMessage = 'Failed to save links. Please try again.';
-
-  if (!(error instanceof FetchError)) {
-    return error instanceof Error && error.message
-      ? error.message
-      : defaultMessage;
+  if (error instanceof FetchError) {
+    return getFetchErrorMessage(error);
   }
-
-  if (error.status === 408) {
-    return 'Request timed out. Please try again.';
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
-
-  if (error.status >= 500) {
-    return 'Server error. Please try again later.';
-  }
-
-  // For 4xx errors (except 408), preserve the error message
-  return error.message || defaultMessage;
+  return DEFAULT_SAVE_ERROR;
 }
 
 /**
@@ -169,6 +175,23 @@ export interface UseLinksPersistenceReturn {
 }
 
 /**
+ * Calculate initial version from links array
+ */
+function calculateInitialVersion(links: ProfileSocialLink[]): number {
+  const versions = links
+    .map(l => l.version ?? 1)
+    .filter(v => typeof v === 'number');
+  return versions.length > 0 ? Math.max(...versions) : 0;
+}
+
+/**
+ * Check if any link has an ingestable URL
+ */
+function hasIngestableLink(links: LinkItem[]): boolean {
+  return links.some(item => isIngestableUrl(item.normalizedUrl));
+}
+
+/**
  * Custom hook for managing link persistence
  *
  * Features:
@@ -216,12 +239,9 @@ export function useLinksPersistence({
   );
 
   // Track version for optimistic locking
-  const [linksVersion, setLinksVersion] = useState<number>(() => {
-    const versions = (activeInitialLinks || [])
-      .map(l => l.version ?? 1)
-      .filter(v => typeof v === 'number');
-    return versions.length > 0 ? Math.max(...versions) : 0;
-  });
+  const [linksVersion, setLinksVersion] = useState<number>(() =>
+    calculateInitialVersion(activeInitialLinks || [])
+  );
 
   // Ref for async access to links
   const linksRef = useRef<LinkItem[]>(links);
@@ -269,10 +289,7 @@ export function useLinksPersistence({
       );
 
       // Check for ingestable URLs and trigger suggestion sync
-      const hasIngestableLink =
-        suggestionsEnabled &&
-        normalized.some(item => isIngestableUrl(item.normalizedUrl));
-      if (hasIngestableLink) {
+      if (suggestionsEnabled && hasIngestableLink(normalized)) {
         setAutoRefreshUntilMs(Date.now() + 20000);
         onSyncSuggestions?.();
       }
@@ -352,7 +369,7 @@ export function useLinksPersistence({
         void captureError('Failed to save social links', error, {
           profileId,
           linkCount: normalized.length,
-          route: '/app/dashboard/links',
+          route: APP_ROUTES.PROFILE,
         });
 
         toast.error(extractErrorMessage(error));

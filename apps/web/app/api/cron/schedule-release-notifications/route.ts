@@ -1,11 +1,9 @@
-import { and, gte, inArray, lte, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import {
-  db,
-  discogReleases,
-  fanReleaseNotifications,
-  notificationSubscriptions,
-} from '@/lib/db';
+import { db } from '@/lib/db';
+import { notificationSubscriptions } from '@/lib/db/schema/analytics';
+import { discogReleases } from '@/lib/db/schema/content';
+import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
@@ -92,8 +90,8 @@ export async function GET(request: Request) {
             notificationSubscriptions.creatorProfileId,
             creatorProfileIds
           ),
-          sql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-          sql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
+          drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+          drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
         )
       );
 
@@ -164,7 +162,7 @@ export async function GET(request: Request) {
         .onConflictDoUpdate({
           target: fanReleaseNotifications.dedupKey,
           set: {
-            scheduledFor: sql`EXCLUDED.scheduled_for`,
+            scheduledFor: drizzleSql`EXCLUDED.scheduled_for`,
             status: 'pending',
             error: null,
             updatedAt: now,

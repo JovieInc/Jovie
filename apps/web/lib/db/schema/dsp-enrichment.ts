@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   decimal,
@@ -329,7 +329,7 @@ export const socialLinkSuggestions = pgTable(
     // Index for expiring old suggestions
     expiresIdx: index('social_link_suggestions_expires_idx')
       .on(table.expiresAt)
-      .where(sql`expires_at IS NOT NULL`),
+      .where(drizzleSql`expires_at IS NOT NULL`),
   })
 );
 

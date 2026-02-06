@@ -7,7 +7,22 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 });
 
 const nextConfig = {
-  turbopack: {},
+  // Transpile workspace packages for proper module resolution
+  transpilePackages: ['@jovie/ui'],
+  turbopack: {
+    // Resolve aliases matching tsconfig paths for consistent module resolution
+    resolveAlias: {
+      '@/*': './*',
+      '@/components/*': './components/*',
+      '@/atoms/*': './components/atoms/*',
+      '@/molecules/*': './components/molecules/*',
+      '@/organisms/*': './components/organisms/*',
+      '@/lib/*': './lib/*',
+      '@/types/*': './types/*',
+    },
+    // Prioritize common extensions for faster resolution
+    resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
+  },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
   typescript: {
@@ -268,6 +283,7 @@ const nextConfig = {
       '@headlessui/react',
       'lucide-react',
       'simple-icons',
+      'web-vitals', // Prevent ChunkLoadError in E2E tests
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-popover',
@@ -289,7 +305,6 @@ const nextConfig = {
       '@dnd-kit/core',
       '@dnd-kit/sortable',
       '@dnd-kit/utilities',
-      '@dnd-kit/modifiers',
       'framer-motion',
       'zod',
       '@tanstack/react-table',
@@ -385,10 +400,11 @@ const nextConfig = {
     }
 
     // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
+    // Note: tsconfig paths handle this for TypeScript, but webpack needs explicit alias
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      ['@jovie/ui']: path.resolve(__dirname, 'packages/ui'),
+      ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
     };
 
     return config;

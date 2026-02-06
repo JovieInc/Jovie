@@ -16,7 +16,7 @@ import {
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { userSettings, users } from '@/lib/db/schema';
+import { userSettings, users } from '@/lib/db/schema/auth';
 
 /**
  * Updates the sidebar collapsed state for the current user.

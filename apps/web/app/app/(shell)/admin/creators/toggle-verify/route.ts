@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { parseToggleVerifyPayload } from '@/lib/admin/payload-parsers';
 import { createAdminRouteHandler } from '@/lib/admin/route-factory';
 import { toggleCreatorVerifiedAction } from '../../actions';
@@ -13,7 +14,7 @@ export const POST = createAdminRouteHandler({
     isVerified: payload.nextVerified,
   }),
   errorContext: {
-    route: '/app/admin/creators/toggle-verify',
+    route: `${APP_ROUTES.ADMIN_CREATORS}/toggle-verify`,
     action: 'toggle_verify_creator',
   },
   errorMessage: 'Failed to update verification',

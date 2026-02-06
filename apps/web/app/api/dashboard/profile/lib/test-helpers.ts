@@ -8,7 +8,8 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 import { NO_STORE_HEADERS } from './constants';
 

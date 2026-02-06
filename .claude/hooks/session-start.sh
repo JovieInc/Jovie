@@ -45,6 +45,21 @@ fi
 
 echo "Setting up Claude Code environment..."
 
+# 0.5. Install GitHub CLI if not available
+if ! command -v gh &> /dev/null; then
+  echo "Installing GitHub CLI..."
+  GH_VERSION="2.67.0"
+  wget -q "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" -O /tmp/gh.tar.gz \
+    && tar -xzf /tmp/gh.tar.gz -C /tmp \
+    && cp /tmp/gh_${GH_VERSION}_linux_amd64/bin/gh /usr/local/bin/gh \
+    && chmod +x /usr/local/bin/gh \
+    && rm -rf /tmp/gh.tar.gz /tmp/gh_${GH_VERSION}_linux_amd64 \
+    && echo "GitHub CLI installed." \
+    || echo "WARNING: Failed to install GitHub CLI"
+else
+  echo "GitHub CLI already installed."
+fi
+
 # 1. Install dependencies if node_modules is missing or empty
 if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   echo "Installing dependencies (this may take a moment on first run)..."
@@ -86,6 +101,7 @@ fi
 echo "  Node.js: $NODE_VER $NODE_OK"
 echo "  pnpm:    $PNPM_VER $PNPM_OK"
 echo "  jq:      $(jq --version 2>/dev/null || echo 'not installed (hooks will use fallbacks)')"
+echo "  gh CLI:  $(gh --version 2>/dev/null | head -1 || echo 'not installed')"
 echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install first')"
 
 # 4. Check for node_modules/.bin in PATH

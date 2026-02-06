@@ -14,6 +14,7 @@ import {
 } from '../universalLinkInput.constants';
 import { useInputFocusController } from '../useInputFocusController';
 import type { PlatformOption, UseUniversalLinkInputReturn } from './types';
+import { useChatMode } from './useChatMode';
 import {
   isUnsafeUrl,
   looksLikeUrlOrDomain,
@@ -31,6 +32,10 @@ interface UseUniversalLinkInputOptions {
   prefillUrl?: string;
   onPrefillConsumed?: () => void;
   clearSignal: number;
+  /** Enable chat mode detection */
+  chatEnabled?: boolean;
+  /** Callback when user submits a chat message */
+  onChatSubmit?: (message: string) => void;
 }
 
 export function useUniversalLinkInput({
@@ -42,6 +47,8 @@ export function useUniversalLinkInput({
   prefillUrl,
   onPrefillConsumed,
   clearSignal,
+  chatEnabled = true,
+  onChatSubmit,
 }: UseUniversalLinkInputOptions): UseUniversalLinkInputReturn {
   const [url, setUrl] = useState('');
   const [searchMode, setSearchMode] = useState<ArtistSearchProvider | null>(
@@ -90,8 +97,14 @@ export function useUniversalLinkInput({
     return trimmed.length > 0 && trimmed.length < 2;
   }, [url]);
 
+  // Detect if input should be handled as chat
+  const { mode: inputMode, isChat } = useChatMode({
+    input: url,
+    chatEnabled,
+  });
+
   const shouldShowAutosuggest =
-    autosuggestOpen && platformSuggestions.length > 0;
+    autosuggestOpen && platformSuggestions.length > 0 && !isChat;
 
   useEffect(() => {
     if (!autosuggestOpen) return;
@@ -232,9 +245,21 @@ export function useUniversalLinkInput({
         }
       }
 
-      if (e.key === 'Enter' && detectedLink?.isValid) {
-        e.preventDefault();
-        handleAdd();
+      if (e.key === 'Enter') {
+        // Chat mode: submit to chat
+        if (isChat && onChatSubmit && url.trim()) {
+          e.preventDefault();
+          onChatSubmit(url.trim());
+          setUrl('');
+          onQueryChange?.('');
+          return;
+        }
+        // URL mode: add link
+        if (detectedLink?.isValid) {
+          e.preventDefault();
+          handleAdd();
+          return;
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         handleClear();
@@ -246,8 +271,12 @@ export function useUniversalLinkInput({
       detectedLink?.isValid,
       handleAdd,
       handleClear,
+      isChat,
+      onChatSubmit,
+      onQueryChange,
       platformSuggestions,
       shouldShowAutosuggest,
+      url,
     ]
   );
 
@@ -314,6 +343,7 @@ export function useUniversalLinkInput({
     platformSuggestions,
     shouldShowAutosuggest,
     isShortQuery,
+    inputMode,
     focusInput,
     handleUrlChange,
     handleAdd,

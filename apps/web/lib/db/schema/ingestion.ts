@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -35,7 +35,7 @@ export const ingestionJobs = pgTable(
     // Unique index for job deduplication
     dedupKeyUnique: uniqueIndex('idx_ingestion_jobs_dedup_key_unique')
       .on(table.dedupKey)
-      .where(sql`dedup_key IS NOT NULL`),
+      .where(drizzleSql`dedup_key IS NOT NULL`),
     // Index for job processing queries
     statusRunAtIdx: index('idx_ingestion_jobs_status_run_at').on(
       table.status,

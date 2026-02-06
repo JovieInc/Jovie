@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
-
 import { AdminCreatorsPageWrapper } from '@/components/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
+import { APP_ROUTES } from '@/constants/routes';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
 import { adminCreatorsSearchParams } from '@/lib/nuqs';
 
@@ -41,7 +41,7 @@ export default async function AdminCreatorsPage({
       total={total}
       search={q ?? ''}
       sort={sort}
-      basePath='/app/admin/creators'
+      basePath={APP_ROUTES.ADMIN_CREATORS}
     />
   );
 }

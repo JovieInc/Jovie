@@ -5,7 +5,9 @@
  * Import from here for backwards compatibility with existing code.
  *
  * @example
- * import { users, creatorProfiles, socialLinks } from '@/lib/db/schema';
+ * import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
  */
 
 // Admin
@@ -16,6 +18,8 @@ export * from './analytics';
 export * from './auth';
 // Billing (Stripe, Audit)
 export * from './billing';
+// Chat (Conversations, Messages, Audit)
+export * from './chat';
 // Content (Providers, Releases, Tracks)
 export * from './content';
 // DSP Enrichment (Cross-platform matches, enrichment data)

@@ -295,7 +295,7 @@ describe('Stripe webhook utils', () => {
       await invalidateBillingCache();
 
       expect(mockRevalidatePath).toHaveBeenCalledTimes(3);
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/billing');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings');
     });

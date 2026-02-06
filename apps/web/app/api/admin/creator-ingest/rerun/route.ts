@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   useDeleteTourDateMutation,
   useUpdateTourDateMutation,
@@ -36,6 +37,7 @@ export function TourDateSidebar({
     ticketUrl: '',
     ticketStatus: 'available' as TicketStatus,
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const updateMutation = useUpdateTourDateMutation(profileId);
   const deleteMutation = useDeleteTourDateMutation(profileId);
@@ -79,12 +81,12 @@ export function TourDateSidebar({
     }
   }, [tourDate, formData, updateMutation, onClose]);
 
-  const handleDelete = useCallback(async () => {
-    if (!tourDate) return;
+  const handleDeleteClick = useCallback(() => {
+    setDeleteDialogOpen(true);
+  }, []);
 
-    if (!confirm('Are you sure you want to delete this tour date?')) {
-      return;
-    }
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!tourDate) return;
 
     try {
       await deleteMutation.mutateAsync(tourDate.id);
@@ -308,7 +310,7 @@ export function TourDateSidebar({
           </Button>
           <Button
             variant='ghost'
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             disabled={isPending}
             className='text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20'
           >
@@ -316,6 +318,17 @@ export function TourDateSidebar({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title='Delete tour date?'
+        description='This action cannot be undone. The tour date will be permanently removed.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={handleDeleteConfirm}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

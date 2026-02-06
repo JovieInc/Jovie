@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';

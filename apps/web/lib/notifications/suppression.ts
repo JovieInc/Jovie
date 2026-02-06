@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { and, count, eq, gt, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
+import { suppressionReasonEnum } from '@/lib/db/schema/enums';
 import {
   categorySubscriptions,
   emailSuppressions,
   type NewEmailSuppression,
   notificationDeliveryLog,
   type SuppressionMetadata,
-} from '@/lib/db/schema';
-import { suppressionReasonEnum } from '@/lib/db/schema/enums';
+} from '@/lib/db/schema/suppression';
 import { logger } from '@/lib/utils/logger';
 
 /**

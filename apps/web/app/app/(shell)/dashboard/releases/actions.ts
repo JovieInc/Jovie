@@ -8,9 +8,10 @@ import {
   unstable_cache,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
@@ -49,7 +50,7 @@ function buildProviderLabels() {
   );
 }
 
-async function requireProfile(): Promise<{
+async function requireProfile(profileId?: string): Promise<{
   id: string;
   spotifyId: string | null;
   handle: string;
@@ -60,15 +61,21 @@ async function requireProfile(): Promise<{
     redirect('/onboarding');
   }
 
-  if (!data.selectedProfile) {
+  let profile = data.selectedProfile;
+
+  // If a specific profile is requested, ensure the user owns it
+  if (profileId) {
+    profile = data.creatorProfiles.find(p => p.id === profileId) ?? null;
+  }
+
+  if (!profile) {
     throw new TypeError('Missing creator profile');
   }
 
   return {
-    id: data.selectedProfile.id,
-    spotifyId: data.selectedProfile.spotifyId ?? null,
-    handle:
-      data.selectedProfile.usernameNormalized ?? data.selectedProfile.username,
+    id: profile.id,
+    spotifyId: profile.spotifyId ?? null,
+    handle: profile.usernameNormalized ?? profile.username,
   };
 }
 
@@ -170,14 +177,16 @@ async function fetchReleaseMatrixCore(
  * Load release matrix with caching (30s TTL)
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
  */
-export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
+export async function loadReleaseMatrix(
+  profileId?: string
+): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/releases');
+    redirect(`/sign-in?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
-  const profile = await requireProfile();
+  const profile = await requireProfile(profileId);
 
   // Cache with 30s TTL and tags for invalidation
   return unstable_cache(
@@ -209,7 +218,7 @@ export async function saveProviderOverride(params: {
       throw new TypeError('Profile mismatch');
     }
 
-    const trimmedUrl = params.url.trim();
+    const trimmedUrl = params.url?.trim() ?? '';
     if (!trimmedUrl) {
       throw new TypeError('URL is required');
     }
@@ -248,7 +257,7 @@ export async function saveProviderOverride(params: {
 
     // Invalidate cache and revalidate path
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath('/app/dashboard/releases');
+    revalidatePath(APP_ROUTES.RELEASES);
 
     return mapReleaseToViewModel(
       release,
@@ -310,7 +319,7 @@ export async function resetProviderOverride(params: {
 
     // Invalidate cache and revalidate path
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath('/app/dashboard/releases');
+    revalidatePath(APP_ROUTES.RELEASES);
 
     return mapReleaseToViewModel(
       release,
@@ -357,7 +366,7 @@ export async function syncFromSpotify(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath('/app/dashboard/releases');
+  revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
     void trackServerEvent('releases_synced', {
@@ -471,7 +480,7 @@ export async function connectSpotifyArtist(params: {
   // Sync releases from the connected artist
   const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
 
-  revalidatePath('/app/dashboard/releases');
+  revalidatePath(APP_ROUTES.RELEASES);
 
   // Map releases to view models
   const releases = result.releases.map(release =>

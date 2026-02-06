@@ -20,13 +20,13 @@ export * from './BrandLogo';
 export * from './CircleIconButton';
 export * from './CopyableMonospaceCell';
 export * from './Copyright';
-export * from './DashboardErrorFallback';
+// DashboardErrorFallback moved to organisms (uses hooks/router)
 export * from './Divider';
 export * from './DotBadge';
 export * from './DropdownMenu';
 export * from './DSPButton';
 export * from './EmptyCell';
-export * from './ErrorBoundary';
+// ErrorBoundary moved to organisms (uses hooks/Sentry)
 export * from './FooterLink';
 export * from './FrostedButton';
 export * from './GradientText';
@@ -45,12 +45,12 @@ export * from './LogoIcon';
 export * from './LogoLink';
 export * from './LogoLoader';
 export * from './NavLink';
-export * from './OptimizedImage';
+// OptimizedImage moved to molecules (uses hooks/state)
 export * from './PlaceholderImage';
 export * from './Popover';
-export * from './ProfileNavButton';
+// ProfileNavButton moved to molecules (uses hooks/state)
 export * from './ProgressIndicator';
-export * from './QRCode';
+// QRCode moved to molecules (uses hooks/external API)
 export * from './SectionHeading';
 export * from './Select';
 export * from './Separator';

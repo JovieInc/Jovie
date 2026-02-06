@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
   BILLING_FIELDS_FULL,

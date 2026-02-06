@@ -4,7 +4,7 @@
  * Shared type definitions for artist query operations.
  */
 
-import type { Artist, ArtistRole } from '@/lib/db/schema';
+import type { Artist, ArtistRole } from '@/lib/db/schema/content';
 
 export interface ArtistWithRole extends Artist {
   role: ArtistRole;

@@ -4,10 +4,11 @@ import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
   clickEvents,
-  creatorProfiles,
   notificationSubscriptions,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -113,17 +114,17 @@ export async function getAnalyticsData(
             ranged_events as (
               select *
               from base_events
-              where created_at >= ${startDate}
+              where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
               select *
               from base_events
-              where created_at >= ${recentThreshold}
+              where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
             clicks_last_30 as (
               select date(created_at) as date, count(*) as count
               from base_events
-              where created_at >= ${thirtyDaysAgo}
+              where created_at >= ${sqlTimestamp(thirtyDaysAgo)}
               group by date(created_at)
               order by date(created_at)
             ),
@@ -354,12 +355,12 @@ export async function getUserDashboardAnalytics(
             ranged_events as (
               select *
               from base_events
-              where created_at >= ${startDate}
+              where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
               select *
               from base_events
-              where created_at >= ${recentThreshold}
+              where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
             top_cities as (
               select city, count(*) as count
@@ -397,20 +398,20 @@ export async function getUserDashboardAnalytics(
               select 1
               from ${notificationSubscriptions}
               where ${notificationSubscriptions.creatorProfileId} = ${creatorProfile.id}
-                and ${notificationSubscriptions.createdAt} >= ${startDate}
+                and ${notificationSubscriptions.createdAt} >= ${sqlTimestamp(startDate)}
             ),
             audience_recent as (
               select 1
               from ${audienceMembers}
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
-                and ${audienceMembers.lastSeenAt} >= ${startDate}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
                 and ${audienceMembers.fingerprint} is not null
             ),
             audience_identified as (
               select 1
               from ${audienceMembers}
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
-                and ${audienceMembers.updatedAt} >= ${startDate}
+                and ${audienceMembers.updatedAt} >= ${sqlTimestamp(startDate)}
                 and ${audienceMembers.email} is not null
             )
             select

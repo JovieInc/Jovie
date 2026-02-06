@@ -2,10 +2,12 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -88,8 +90,8 @@ export async function toggleCreatorVerifiedAction(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }
 
 export async function bulkRerunCreatorIngestionAction(
@@ -153,8 +155,8 @@ export async function bulkRerunCreatorIngestionAction(
     return jobIds.filter(Boolean).length;
   });
 
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 
   return { queuedCount };
 }
@@ -205,8 +207,8 @@ export async function bulkSetCreatorsVerifiedAction(
       invalidateProfileCache(profile.usernameNormalized)
     )
   );
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }
 
 export async function updateCreatorAvatarAsAdmin(
@@ -231,8 +233,8 @@ export async function updateCreatorAvatarAsAdmin(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }
 
 export async function toggleCreatorFeaturedAction(
@@ -260,8 +262,8 @@ export async function toggleCreatorFeaturedAction(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
   revalidatePath('/'); // Featured creators show on homepage
 }
 
@@ -311,8 +313,8 @@ export async function bulkSetCreatorsFeaturedAction(
       invalidateProfileCache(profile.usernameNormalized)
     )
   );
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
   revalidatePath('/');
 }
 
@@ -341,8 +343,8 @@ export async function toggleCreatorMarketingAction(
     })
     .where(eq(creatorProfiles.id, profileId));
 
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }
 
 export async function deleteCreatorOrUserAction(
@@ -383,6 +385,6 @@ export async function deleteCreatorOrUserAction(
     await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
   }
 
-  revalidatePath('/app/admin');
-  revalidatePath('/app/admin/creators');
+  revalidatePath(APP_ROUTES.ADMIN);
+  revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }

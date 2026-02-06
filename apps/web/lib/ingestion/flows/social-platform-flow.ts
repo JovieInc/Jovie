@@ -11,7 +11,8 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import type { DbOrTransaction } from '@/lib/db';
-import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
 import { logger } from '@/lib/utils/logger';
 

@@ -1,6 +1,6 @@
 # Tech Debt Tracker
 
-> **Last Updated:** 2026-01-30
+> **Last Updated:** 2026-02-02
 > **Maintainers:** All AI agents and developers
 
 This document tracks technical debt in the Jovie codebase. AI agents **must** update this file when they address or discover tech debt items.
@@ -40,11 +40,17 @@ When you **discover** new tech debt:
 | `@ts-ignore` in production | ~15 | <5 | 2026-01-14 |
 | Deprecated files | ~40 → ~36 (4 removed, 4 imports migrated) | 0 | 2026-01-30 |
 | TODO comments | 6 | 0 | 2026-01-14 |
-| Empty catch blocks | **0** | 0 | 2026-01-14 |
+| Empty catch blocks | **1** | 0 | 2026-02-02 |
 
 ---
 
 ## Resolved Issues
+
+### 2026-02-02
+
+| Item | Priority | Resolution | Reference |
+|------|----------|------------|-----------|
+| Drizzle ORM type mismatches in API routes | P1 | Files refactored; no type suppressions remain. pnpm override pins `drizzle-orm` to `0.45.1` ensuring monorepo consistency | `claude/fix-drizzle-errors-TejEH` |
 
 ### 2026-01-14
 
@@ -68,8 +74,7 @@ When you **discover** new tech debt:
 
 | Item | Priority | Resolution | Reference |
 |------|----------|------------|-----------|
-| `@ts-nocheck` in `app/api/dashboard/profile/route.ts` | P0 | Removed file-level suppression; Drizzle type issues handled with targeted `@ts-expect-error` | `claude/audit-tech-debt-dQNmv` |
-| Empty catch block in `app/layout.tsx:171` | P0 | Added explanatory comment for intentional silent failure in theme detection | `claude/audit-tech-debt-dQNmv` |
+| `@ts-nocheck` in `app/api/dashboard/profile/route.ts` | P0 | Removed file-level suppression; route refactored to eliminate type errors without suppressions | `claude/audit-tech-debt-dQNmv` |
 
 ### 2026-01-04
 
@@ -85,19 +90,13 @@ When you **discover** new tech debt:
 
 _No critical issues currently open._
 
-### P1 - High (Drizzle ORM Type Mismatches)
+### P1 - High (Empty Catch Block)
 
-These require Drizzle ORM version alignment to fully resolve:
+| File | Line(s) | Description |
+|------|---------|-------------|
+| `app/app/(shell)/dashboard/DashboardLayoutClient.tsx` | 248-250 | Silent catch for localStorage errors; should use `logger.warn()` |
 
-| File | Lines | Description |
-|------|-------|-------------|
-| `app/api/dashboard/profile/route.ts` | 53, 58, 60, 331, 336, 347, 351 | Drizzle dual-version type mismatch |
-| `app/api/images/status/[id]/route.ts` | 51, 53, 55, 57, 59 | Drizzle dual-version type mismatch |
-| `app/api/images/upload/route.ts` | 394, 425, 476, 483 | Drizzle dual-version type mismatch |
-
-**Root Cause:** Package overrides in `package.json` pin `drizzle-orm` to `0.45.0` while some dependencies expect different versions.
-
-**Recommended Fix:** Align all Drizzle dependencies to a single version and remove overrides.
+**Recommended Fix:** Add `import { logger } from '@/lib/utils/logger'` and log the error with `logger.warn()`.
 
 ### P1 - High (Console Statements in Production)
 
@@ -182,6 +181,7 @@ Consider splitting for maintainability:
 
 | Date | Author | Change |
 |------|--------|--------|
+| 2026-02-02 | Claude | Corrected outdated entries: marked Drizzle P1 issues as resolved (files refactored, no suppressions remain); fixed incorrect empty catch location (was `app/layout.tsx:171`, actual is `DashboardLayoutClient.tsx:248`); updated metrics |
 | 2026-01-30 | Claude | Reviewed exhaustive-deps suppressions; archived 19 stale docs; deleted 4 deprecated files with no consumers; migrated 4 imports from deprecated paths |
 | 2026-01-03 | Claude | Initial tracker created from tech debt audit |
 | 2026-01-03 | Claude | Resolved P0: `@ts-nocheck` and empty catch block |

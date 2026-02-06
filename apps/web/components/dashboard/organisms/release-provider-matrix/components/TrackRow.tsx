@@ -57,7 +57,7 @@ export const TrackRow = memo(function TrackRow({
       map.set(provider.key, provider);
     }
     return map;
-  }, [track.providers]);
+  }, [track]);
 
   // Count available providers
   const availableCount = track.providers.filter(p => p.url).length;

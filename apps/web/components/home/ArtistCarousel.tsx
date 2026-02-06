@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { OptimizedImage } from '@/components/atoms/OptimizedImage';
+import { OptimizedImage } from '@/components/molecules/OptimizedImage';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 interface Artist {

@@ -17,7 +17,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
-import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -206,7 +206,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [editingRelease, rows.length, closeEditor, openEditor, isSidebarOpen]);
 
   // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
-  const { setHeaderBadge, setHeaderActions } = useHeaderActions();
+  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
@@ -268,7 +268,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       {/* Main content area */}
       <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
         <h1 className='sr-only'>Releases</h1>
-        <div className='flex-1 min-h-0 flex flex-col bg-base'>
+        <div className='flex-1 min-h-0 flex flex-col'>
           {/* Sticky subheader - outside scroll container */}
           {showReleasesTable && (
             <ReleaseTableSubheader
@@ -381,7 +381,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-base px-4 py-2 text-xs text-secondary-token sm:px-6'>
+            <div className='flex items-center justify-between border-t border-subtle px-4 py-2 text-xs text-secondary-token sm:px-6'>
               <span>
                 {filteredRows.length === rows.length
                   ? `${totalReleases}`

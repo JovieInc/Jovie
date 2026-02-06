@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles, tourDates } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tourDates } from '@/lib/db/schema/tour';
 
 /**
  * Generate ICS calendar file for a tour date

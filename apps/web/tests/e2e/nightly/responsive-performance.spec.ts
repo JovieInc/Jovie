@@ -7,6 +7,9 @@ import {
   TEST_PROFILES,
 } from '../utils/smoke-test-utils';
 
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 /**
  * Responsive & Performance Tests - Nightly
  *

@@ -51,6 +51,7 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
     <span data-testid={`icon-${platform}`} />
   ),
   getPlatformIcon: () => ({ hex: '1DB954' }),
+  getPlatformIconMetadata: () => ({ hex: '1DB954' }),
 }));
 
 // Mock color utils

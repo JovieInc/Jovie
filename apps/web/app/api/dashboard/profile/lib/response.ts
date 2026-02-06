@@ -6,7 +6,7 @@
 
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { invalidateProfileCache } from '@/lib/cache/profile';
-import type { creatorProfiles } from '@/lib/db/schema';
+import type { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 export function addAvatarCacheBust(

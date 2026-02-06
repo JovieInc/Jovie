@@ -7,7 +7,7 @@
 import { del } from '@vercel/blob';
 import { and, eq, lt, or, type SQL } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { profilePhotos } from '@/lib/db';
+import { profilePhotos } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;

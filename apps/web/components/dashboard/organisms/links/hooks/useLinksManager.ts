@@ -10,6 +10,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { popularityIndex } from '@/constants/app';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { findDuplicate, mergeDuplicate } from '../services/duplicate-detection';
 import { enrichLink, getSections } from '../services/link-enrichment';
@@ -356,16 +357,16 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
 
       // Step 13: Enable tipping if Venmo (non-blocking)
       if (visibilityApplied.platform.id === 'venmo') {
-        fetch('/api/dashboard/tipping/enable', { method: 'POST' }).catch(
-          error => {
-            Sentry.captureException(error, {
-              tags: { feature: 'tipping', action: 'enable' },
-            });
-          }
-        );
+        fetchWithTimeout('/api/dashboard/tipping/enable', {
+          method: 'POST',
+        }).catch(error => {
+          Sentry.captureException(error, {
+            tags: { feature: 'tipping', action: 'enable' },
+          });
+        });
       }
     },
-    [links, linkIsVisible, idFor, onLinkAdded]
+    [links, idFor, onLinkAdded]
   );
 
   /**

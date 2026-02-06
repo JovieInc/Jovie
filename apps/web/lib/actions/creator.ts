@@ -2,6 +2,7 @@ import 'server-only';
 
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/app/(shell)/dashboard/actions';
+import { APP_ROUTES } from '@/constants/routes';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
@@ -32,7 +33,7 @@ export async function updateCreatorProfileAction(
 ): Promise<{ success: boolean; data?: CreatorProfile; error?: string }> {
   try {
     const updated = await updateProfile(userId, updates);
-    revalidatePath('/app/dashboard/profile');
+    revalidatePath(APP_ROUTES.PROFILE);
     return { success: true, data: updated };
   } catch (error) {
     captureError('Error updating creator profile', error, { userId });

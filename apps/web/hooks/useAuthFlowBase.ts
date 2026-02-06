@@ -62,7 +62,7 @@ export interface UseAuthFlowBaseReturn {
 }
 
 export interface UseAuthFlowBaseOptions {
-  /** Default redirect URL after authentication (e.g., '/app/dashboard' or '/onboarding') */
+  /** Default redirect URL after authentication (e.g., '/app' or '/onboarding') */
   defaultRedirectUrl: string;
   /** Whether to read redirect URL from session storage (true for sign-in, false for sign-up) */
   useStoredRedirectUrl?: boolean;

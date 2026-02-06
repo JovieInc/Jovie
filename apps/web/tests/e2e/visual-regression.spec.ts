@@ -56,6 +56,9 @@ const snapshotOptions = {
   animations: 'disabled' as const,
 };
 
+// Override global storageState to run public page tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Visual Regression @visual-regression', () => {
   test.describe('Public Pages', () => {
     test('pricing page - light mode', async ({ page }) => {

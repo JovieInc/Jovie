@@ -3,7 +3,8 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';

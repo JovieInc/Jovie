@@ -267,6 +267,7 @@ export default function GlobalError({
             <button type='button' onClick={reset} className='btn btn-primary'>
               Try again
             </button>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Using <a> intentionally in global error boundary for resilience when routing may be broken */}
             <a href='/' className='btn btn-secondary'>
               Go home
             </a>

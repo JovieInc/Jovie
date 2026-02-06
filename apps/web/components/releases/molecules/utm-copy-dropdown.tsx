@@ -19,6 +19,7 @@ import {
   SearchableSubmenu,
   type SearchableSubmenuSection,
 } from '@jovie/ui';
+import { captureException } from '@sentry/nextjs';
 import {
   Check,
   Copy,
@@ -197,6 +198,17 @@ export function UTMCopyDropdown({
     [context.releaseSlug]
   );
 
+  // Build toast message for copy feedback
+  const buildCopyToastMessage = useCallback(
+    (withUTM: boolean, presetLabel?: string) => ({
+      message: withUTM
+        ? `${releaseLabel} copied with ${presetLabel} UTM`
+        : `${releaseLabel} smart link copied`,
+      description: withUTM ? 'Link includes tracking parameters' : undefined,
+    }),
+    [releaseLabel]
+  );
+
   // Copy URL to clipboard
   const copyToClipboard = useCallback(
     async (
@@ -211,27 +223,34 @@ export function UTMCopyDropdown({
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
 
-        // Show toast with feedback
-        const toastMessage = withUTM
-          ? `${releaseLabel} copied with ${presetLabel} UTM`
-          : `${releaseLabel} smart link copied`;
-
-        toast.success(toastMessage, {
-          id: testId || 'utm-copy',
-          description: withUTM
-            ? 'Link includes tracking parameters'
-            : undefined,
-        });
+        const { message, description } = buildCopyToastMessage(
+          withUTM,
+          presetLabel
+        );
+        toast.success(message, { id: testId || 'utm-copy', description });
 
         onCopy?.(urlToCopy, withUTM, presetId);
         setIsOpen(false);
       } catch (error) {
-        console.error('Failed to copy:', error);
+        captureException(error, { extra: { context: 'utm-copy-dropdown' } });
         toast.error('Failed to copy to clipboard');
       }
     },
-    [releaseLabel, testId, onCopy]
+    [buildCopyToastMessage, testId, onCopy]
   );
+
+  // Find category for a preset
+  const findPresetCategory = useCallback((presetId: string) => {
+    if (!UTM_PRESET_MAP[presetId]) return undefined;
+    return UTM_PRESET_CATEGORIES.find(c =>
+      c.presets.some(p => p.id === presetId)
+    )?.id;
+  }, []);
+
+  // Calculate time to select (called at click time, not render time)
+  const getTimeToSelect = useCallback(() => {
+    return Date.now() - openTimeRef.current;
+  }, []);
 
   // Handle preset selection
   const handlePresetSelect = useCallback(
@@ -244,19 +263,22 @@ export function UTMCopyDropdown({
 
       // Track usage for smart sorting
       trackPresetUsage(preset.id, {
-        category: UTM_PRESET_MAP[preset.id]
-          ? UTM_PRESET_CATEGORIES.find(c =>
-              c.presets.some(p => p.id === preset.id)
-            )?.id
-          : undefined,
+        category: findPresetCategory(preset.id),
         wasSearched,
         position,
-        timeToSelect: Date.now() - openTimeRef.current,
+        timeToSelect: getTimeToSelect(),
       });
 
       copyToClipboard(result.url, true, preset.id, preset.label);
     },
-    [url, context, trackPresetUsage, copyToClipboard]
+    [
+      url,
+      context,
+      trackPresetUsage,
+      findPresetCategory,
+      getTimeToSelect,
+      copyToClipboard,
+    ]
   );
 
   // Handle plain copy (no UTM)
@@ -309,6 +331,7 @@ export function UTMCopyDropdown({
     if (quickPresets.length > 0) {
       for (const preset of quickPresets) {
         const position = quickPresets.indexOf(preset);
+        // eslint-disable-next-line react-hooks/refs -- ref is only accessed at click time, not during render
         items.push({
           type: 'action',
           id: `quick-${preset.id}`,

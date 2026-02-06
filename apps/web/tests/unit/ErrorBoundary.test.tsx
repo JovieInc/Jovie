@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ErrorBoundary from '@/components/atoms/ErrorBoundary';
+import ErrorBoundary from '@/components/organisms/ErrorBoundary';
 import { isSentryInitialized } from '@/lib/sentry/init';
 
 // Mock dependencies

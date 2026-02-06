@@ -314,8 +314,7 @@ export function useSearchQuery(
  * These must match the column IDs in ReleaseTable.tsx
  */
 export const releaseSortFields = [
-  'releaseDate',
-  'title',
+  'release',
   'releaseType',
   'popularity',
   'primaryIsrc',
@@ -370,7 +369,7 @@ export interface ReleaseSortActions {
 export function useReleaseSortParams(): [ReleaseSortState, ReleaseSortActions] {
   const [state, setQueryStates] = useQueryStates(
     {
-      sort: parseAsStringLiteral(releaseSortFields).withDefault('releaseDate'),
+      sort: parseAsStringLiteral(releaseSortFields).withDefault('release'),
       direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault(
         'desc'
       ),

@@ -21,8 +21,11 @@ const ThemeToggle = dynamic(
 import {
   CONTAINER_SIZES,
   FOOTER_LINK_CLASS_NAME,
+  FOOTER_LINK_HOVER_CLASS,
+  FOOTER_LINK_STYLE,
   getVariantConfigs,
   SECTION_HEADING_CLASS_NAME,
+  SECTION_HEADING_STYLE,
 } from './config';
 import type { FooterProps } from './types';
 
@@ -101,19 +104,23 @@ export function Footer({
     return (
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
-        className={cn('border-t border-subtle bg-base', className)}
+        className={className}
+        style={{
+          backgroundColor: 'var(--linear-bg-footer)',
+          borderTop: '1px solid var(--linear-border-subtle)',
+        }}
         aria-label='Site footer'
       >
         <div
           className={cn(
-            'mx-auto px-5 sm:px-6 lg:px-8 pt-12 pb-8 sm:pt-10 sm:pb-6',
+            'mx-auto px-6 lg:px-8 pt-16 pb-12 lg:pt-20 lg:pb-16',
             maxWidthClass
           )}
         >
-          <div className='flex flex-col items-center gap-10 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] sm:items-start sm:gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
+          <div className='flex flex-col items-center gap-12 lg:gap-16 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] sm:items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
             <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
               <FooterBranding
-                variant='light'
+                variant='linear'
                 showCTA={false}
                 mark={brandingMark}
                 className={cn(
@@ -123,18 +130,26 @@ export function Footer({
               />
             </div>
 
-            <div className='grid w-full grid-cols-2 gap-8 text-center sm:grid-cols-2 sm:gap-6 sm:text-left lg:grid-cols-3'>
+            <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-2 sm:gap-8 sm:text-left lg:grid-cols-3 lg:gap-12'>
               <nav aria-labelledby='footer-product-heading'>
                 <h3
                   id='footer-product-heading'
                   className={SECTION_HEADING_CLASS_NAME}
+                  style={SECTION_HEADING_STYLE}
                 >
                   Product
                 </h3>
                 <ul className='space-y-1'>
                   {productLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
-                      <Link href={link.href} className={FOOTER_LINK_CLASS_NAME}>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          FOOTER_LINK_CLASS_NAME,
+                          FOOTER_LINK_HOVER_CLASS
+                        )}
+                        style={FOOTER_LINK_STYLE}
+                      >
                         {link.label}
                       </Link>
                     </li>
@@ -146,13 +161,21 @@ export function Footer({
                 <h3
                   id='footer-company-heading'
                   className={SECTION_HEADING_CLASS_NAME}
+                  style={SECTION_HEADING_STYLE}
                 >
                   Company
                 </h3>
                 <ul className='space-y-1'>
                   {companyLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
-                      <Link href={link.href} className={FOOTER_LINK_CLASS_NAME}>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          FOOTER_LINK_CLASS_NAME,
+                          FOOTER_LINK_HOVER_CLASS
+                        )}
+                        style={FOOTER_LINK_STYLE}
+                      >
                         {link.label}
                       </Link>
                     </li>
@@ -167,20 +190,32 @@ export function Footer({
                 <h3
                   id='footer-legal-heading'
                   className={SECTION_HEADING_CLASS_NAME}
+                  style={SECTION_HEADING_STYLE}
                 >
                   Legal
                 </h3>
                 <ul className='space-y-1'>
                   {legalLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
-                      <Link href={link.href} className={FOOTER_LINK_CLASS_NAME}>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          FOOTER_LINK_CLASS_NAME,
+                          FOOTER_LINK_HOVER_CLASS
+                        )}
+                        style={FOOTER_LINK_STYLE}
+                      >
                         {link.label}
                       </Link>
                     </li>
                   ))}
                   <li>
                     <CookieSettingsFooterButton
-                      className={FOOTER_LINK_CLASS_NAME}
+                      className={cn(
+                        FOOTER_LINK_CLASS_NAME,
+                        FOOTER_LINK_HOVER_CLASS
+                      )}
+                      style={FOOTER_LINK_STYLE}
                     />
                   </li>
                 </ul>
@@ -188,11 +223,15 @@ export function Footer({
             </div>
           </div>
 
-          <div className='mt-10 sm:mt-8 border-t border-subtle pt-6 sm:pt-5'>
+          <div
+            className='mt-12 lg:mt-16 pt-8 lg:pt-10'
+            style={{ borderTop: '1px solid var(--linear-border-subtle)' }}
+          >
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[11px] leading-4 font-medium tracking-[-0.01em] text-tertiary-token order-2 sm:order-1'
+                className='text-[12px] leading-4 font-normal tracking-[-0.01em] order-2 sm:order-1'
+                style={{ color: 'var(--linear-text-tertiary)' }}
               />
               {showThemeToggle && (
                 <div className='flex items-center gap-3 order-1 sm:order-2'>
@@ -200,12 +239,14 @@ export function Footer({
                     <ThemeToggle
                       appearance='icon'
                       shortcutKey={themeShortcutKey}
+                      variant='linear'
                     />
                   </div>
                   <div className='hidden sm:flex items-center'>
                     <ThemeToggle
                       appearance='segmented'
                       shortcutKey={themeShortcutKey}
+                      variant='linear'
                     />
                   </div>
                 </div>
@@ -217,9 +258,21 @@ export function Footer({
     );
   }
 
+  // Minimal/Marketing footer with Linear styling
   return (
-    <footer className={`${config.containerClass} ${className}`}>
-      <div className={config.contentClass}>
+    <footer
+      className={className}
+      style={{
+        backgroundColor: 'var(--linear-bg-footer)',
+        borderTop: '1px solid var(--linear-border-subtle)',
+      }}
+    >
+      <div
+        className={cn(
+          'mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
+          CONTAINER_SIZES[containerSize]
+        )}
+      >
         {config.layout === 'horizontal' && (
           <>
             <div
@@ -227,38 +280,32 @@ export function Footer({
             >
               <Copyright
                 variant={config.colorVariant}
-                className={
-                  variant === 'minimal'
-                    ? 'text-[11px] leading-4 font-medium tracking-tight text-secondary-token'
-                    : 'text-[12px] leading-4 font-medium tracking-tight text-tertiary-token'
-                }
+                className='text-[12px] leading-4 font-normal tracking-[-0.01em]'
+                style={{ color: 'var(--linear-text-tertiary)' }}
               />
               {variant === 'minimal' && (
-                <p className='text-[10px] leading-4 font-normal tracking-tight text-[#6b6f76] dark:text-[#505257]'>
+                <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
                   Made for musicians, by musicians
                 </p>
               )}
             </div>
 
             <div
-              className={`flex items-center ${variant === 'minimal' ? 'gap-2' : 'gap-4'}`}
+              className={`flex items-center ${variant === 'minimal' ? 'gap-3' : 'gap-4'}`}
             >
-              {config.showLinks && (
-                <FooterNavigation
-                  variant={config.colorVariant}
-                  ariaLabel={variant === 'minimal' ? 'Legal' : undefined}
-                  links={links}
-                  className={
-                    variant === 'minimal'
-                      ? 'gap-2 flex-wrap justify-center'
-                      : ''
-                  }
-                  linkClassName={
-                    variant === 'minimal'
-                      ? 'text-[11px] leading-4 font-medium tracking-tight'
-                      : ''
-                  }
-                />
+              {config.showLinks && links && links.length > 0 && (
+                <nav aria-label='Legal' className='flex items-center gap-3'>
+                  {links.map(link => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className='text-[12px] leading-4 font-normal tracking-[-0.01em] transition-colors duration-150 hover:[color:var(--linear-text-secondary)]'
+                      style={{ color: 'var(--linear-text-tertiary)' }}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
               )}
               {showThemeToggle && (
                 <>
@@ -266,12 +313,14 @@ export function Footer({
                     <ThemeToggle
                       appearance='icon'
                       shortcutKey={themeShortcutKey}
+                      variant='linear'
                     />
                   </div>
                   <div className='hidden md:flex items-center'>
                     <ThemeToggle
                       appearance={config.themeAppearance}
                       shortcutKey={themeShortcutKey}
+                      variant='linear'
                     />
                   </div>
                 </>

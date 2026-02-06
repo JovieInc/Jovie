@@ -31,7 +31,7 @@ interface ProviderConfig {
 }
 
 interface AvailabilityCellProps {
-  release: ReleaseViewModel;
+  readonly release: ReleaseViewModel;
   readonly allProviders: ProviderKey[];
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly onCopy: (
@@ -81,7 +81,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
       map.set(provider.key, provider);
     }
     return map;
-  }, [release.providers]);
+  }, [release]);
 
   // Count available providers
   const availableCount = release.providers.filter(p => p.url).length;

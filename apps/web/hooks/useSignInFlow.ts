@@ -8,6 +8,7 @@
 import { useSignIn } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   isSessionExists,
   isSignUpSuggested,
@@ -61,7 +62,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
   // Use shared auth flow base
   const base = useAuthFlowBase({
-    defaultRedirectUrl: '/app/dashboard',
+    defaultRedirectUrl: APP_ROUTES.DASHBOARD,
     useStoredRedirectUrl: true,
   });
 

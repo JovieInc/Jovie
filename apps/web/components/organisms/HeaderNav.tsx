@@ -2,16 +2,17 @@ import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
-import { Container } from '@/components/site/Container';
 import { cn } from '@/lib/utils';
 
-// Linear nav link styles - text color change only, no bg hover
-const navLinkClass =
-  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium text-secondary-token hover:text-primary-token transition-colors duration-150 focus-ring-themed';
+// Linear header structure: full-width header with centered ~1000px content
+// Linear uses ~224px margins on 1440px viewport = ~984px content width
+// maxWidth 1032px - 48px (24px padding each side) = 984px content
+// See globals.css for .nav-link-linear styles
 
 export interface HeaderNavProps {
   readonly sticky?: boolean;
   readonly className?: string;
+  readonly style?: React.CSSProperties;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly hideNav?: boolean;
@@ -22,67 +23,66 @@ export interface HeaderNavProps {
 export function HeaderNav({
   sticky: _sticky = true,
   className,
+  style,
   logoSize = 'sm',
   logoVariant = 'word',
   hideNav = false,
   hidePricingLink = false,
-  containerSize = 'lg',
+  containerSize: _containerSize = 'lg',
 }: HeaderNavProps = {}) {
-  // Note: sticky prop reserved for future use
-  void _sticky;
+  const navLinkClass = 'nav-link-linear focus-ring-themed';
+
   return (
     <header
       data-testid='header-nav'
-      className={cn('sticky top-0 z-50 w-full bg-base', className)}
-      style={{ fontSynthesisWeight: 'none' }}
+      className={cn('fixed top-0 left-0 right-0 w-full', className)}
+      style={{
+        fontSynthesisWeight: 'none',
+        borderStyle: 'none none solid',
+        borderColor: `var(--linear-text-primary) var(--linear-text-primary) var(--linear-border-subtle)`,
+        zIndex: 100,
+        backdropFilter: `blur(var(--linear-blur-header))`,
+        WebkitBackdropFilter: `blur(var(--linear-blur-header))`,
+        minWidth: 0,
+        minHeight: 0,
+        ...style,
+      }}
     >
-      <Container size={containerSize}>
-        <div className='flex h-16 items-center'>
-          {/* Logo - Left side */}
-          <div className='flex items-center'>
-            <LogoLink logoSize={logoSize} variant={logoVariant} />
-          </div>
-
-          {hideNav ? (
-            <div className='flex-1' aria-hidden='true' />
-          ) : (
-            <>
-              {/* Navigation - Center (hidden on mobile) */}
-              <div className='hidden md:flex flex-1 justify-center ml-8'>
-                <nav
-                  className='flex items-center'
-                  aria-label='Primary navigation'
-                >
-                  {hidePricingLink ? null : (
-                    <Link href='/pricing' className={navLinkClass}>
-                      Pricing
-                    </Link>
-                  )}
-                </nav>
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className='md:hidden flex-1 justify-center flex ml-4'>
-                <nav
-                  className='flex items-center'
-                  aria-label='Primary navigation'
-                >
-                  {hidePricingLink ? null : (
-                    <Link href='/pricing' className={navLinkClass}>
-                      Pricing
-                    </Link>
-                  )}
-                </nav>
-              </div>
-            </>
-          )}
-
-          {/* Actions - Right side */}
-          <div className='flex items-center gap-2'>
-            <AuthActions />
-          </div>
+      {/* Linear-style centered content container */}
+      <nav
+        className='flex items-center h-16 mx-auto'
+        aria-label='Primary navigation'
+        style={{
+          display: 'flex',
+          width: '100%',
+          maxWidth: 'var(--linear-container-max)',
+          padding: `0 var(--linear-container-padding)`,
+          margin: '0 auto',
+        }}
+      >
+        {/* Logo section - left aligned */}
+        <div className='flex items-center'>
+          <LogoLink logoSize={logoSize} variant={logoVariant} />
         </div>
-      </Container>
+
+        {/* Center nav links - flex-1 to take remaining space */}
+        {hideNav ? (
+          <div className='flex-1' aria-hidden='true' />
+        ) : (
+          <div className='flex-1 flex items-center justify-center'>
+            {hidePricingLink ? null : (
+              <Link href='/pricing' className={navLinkClass}>
+                Pricing
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Auth actions - right aligned */}
+        <div className='flex items-center gap-1'>
+          <AuthActions />
+        </div>
+      </nav>
     </header>
   );
 }

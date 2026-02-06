@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { ArtistContext } from './grouped-links/types';
 import { useLinksPersistence } from './links/hooks/useLinksPersistence';
 import { useProfileEditor } from './links/hooks/useProfileEditor';
 import { useSuggestionSync } from './links/hooks/useSuggestionSync';
@@ -14,7 +16,6 @@ import {
   convertDetectedLinksToLinkItems,
   convertLinksToDashboardFormat,
 } from './links/utils/link-transformers';
-import { ProfileEditorSection } from './ProfileEditorSection';
 
 const GROUPED_LINKS_MANAGER_LOADING_KEYS = Array.from(
   { length: 4 },
@@ -37,6 +38,26 @@ const GroupedLinksManager = dynamic(
             className='h-16 animate-pulse rounded-lg bg-surface-1'
           />
         ))}
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+// Lazy load ProfileEditorSection - only needed when sidebar is closed
+const ProfileEditorSection = dynamic(
+  () =>
+    import('./ProfileEditorSection').then(mod => ({
+      default: mod.ProfileEditorSection,
+    })),
+  {
+    loading: () => (
+      <div className='mb-4 flex items-start gap-4'>
+        <div className='h-20 w-20 animate-pulse rounded-full bg-surface-1' />
+        <div className='flex-1 space-y-2'>
+          <div className='h-6 w-48 animate-pulse rounded bg-surface-1' />
+          <div className='h-4 w-32 animate-pulse rounded bg-surface-1' />
+        </div>
       </div>
     ),
     ssr: false,
@@ -68,6 +89,27 @@ export function EnhancedDashboardLinks({
     handleInputKeyDown,
     handleInputBlur,
   } = useProfileEditor();
+
+  // Get dashboard data for chat context
+  const { selectedProfile, hasSocialLinks, hasMusicLinks, tippingStats } =
+    useDashboardData();
+
+  // Build artist context for chat
+  const artistContext = useMemo((): ArtistContext | undefined => {
+    if (!selectedProfile) return undefined;
+    return {
+      displayName: selectedProfile.displayName ?? selectedProfile.username,
+      username: selectedProfile.username,
+      bio: selectedProfile.bio,
+      genres: selectedProfile.genres ?? [],
+      spotifyFollowers: selectedProfile.spotifyFollowers,
+      spotifyPopularity: selectedProfile.spotifyPopularity,
+      profileViews: selectedProfile.profileViews ?? 0,
+      hasSocialLinks,
+      hasMusicLinks,
+      tippingStats,
+    };
+  }, [selectedProfile, hasSocialLinks, hasMusicLinks, tippingStats]);
 
   // Get sidebar state early to gate polling
   const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
@@ -242,6 +284,7 @@ export function EnhancedDashboardLinks({
           profileId={profileId}
           sidebarOpen={sidebarOpen}
           className={useChatLayout ? 'flex-1' : undefined}
+          artistContext={artistContext}
         />
       </div>
     </div>

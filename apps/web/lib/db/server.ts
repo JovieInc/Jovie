@@ -11,7 +11,7 @@ import 'server-only';
  * - lib/flags/server.ts
  */
 
-import type { CreatorProfile } from '@/lib/db/schema';
+import type { CreatorProfile } from '@/lib/db/schema/profiles';
 
 /**
  * Determines if a creator profile meets the minimum requirements

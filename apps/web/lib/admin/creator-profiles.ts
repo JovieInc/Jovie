@@ -11,7 +11,8 @@ import {
 } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 

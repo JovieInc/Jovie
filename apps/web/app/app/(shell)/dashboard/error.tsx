@@ -1,10 +1,10 @@
 'use client';
 
-import ErrorBoundary from '@/components/atoms/ErrorBoundary';
+import ErrorBoundary from '@/components/organisms/ErrorBoundary';
 
 interface ErrorProps {
-  error: Error & { digest?: string };
-  reset: () => void;
+  readonly error: Error & { digest?: string };
+  readonly reset: () => void;
 }
 
 export default function DashboardError({ error, reset }: Readonly<ErrorProps>) {

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateSocialLinksCache } from '@/lib/cache';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
-import { socialLinks } from '@/lib/db/schema';
+import { socialLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';

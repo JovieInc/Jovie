@@ -1,4 +1,5 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
+/* eslint-disable no-restricted-imports, @jovie/no-manual-db-pooling, @jovie/no-db-transaction -- Test requires full schema access, pooling for WebSocket driver, and transactions for RLS testing */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';

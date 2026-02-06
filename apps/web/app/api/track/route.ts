@@ -1,12 +1,9 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import {
-  audienceMembers,
-  clickEvents,
-  creatorProfiles,
-  socialLinks,
-} from '@/lib/db/schema';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
+import { socialLinks } from '@/lib/db/schema/links';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';

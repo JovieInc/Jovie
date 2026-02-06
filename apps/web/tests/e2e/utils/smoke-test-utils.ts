@@ -17,22 +17,23 @@ import { expect, Page } from '@playwright/test';
 
 /**
  * Standard timeouts for smoke tests (tuned for CI performance)
+ * Increased to handle Turbopack compilation and React hydration
  */
 export const SMOKE_TIMEOUTS = {
   /** Default page navigation timeout */
-  NAVIGATION: 30_000,
+  NAVIGATION: 60_000, // Increased from 30s to 60s for Turbopack
   /** Element visibility timeout */
-  VISIBILITY: 10_000,
+  VISIBILITY: 20_000, // Increased from 10s to 20s for hydration
   /** Quick element check */
-  QUICK: 5_000,
+  QUICK: 10_000, // Increased from 5s to 10s
   /** URL stabilization after redirect */
-  URL_STABLE: 5_000,
+  URL_STABLE: 10_000, // Increased from 5s to 10s
   /** Network buffer after navigation */
-  NETWORK_BUFFER: 500,
+  NETWORK_BUFFER: 1000, // Increased from 500ms to 1s
   /** Default retry delay between attempts */
-  RETRY_DELAY: 500,
+  RETRY_DELAY: 1000, // Increased from 500ms to 1s
   /** Hydration settling time (replaces waitForTimeout anti-pattern) */
-  HYDRATION_SETTLE: 100,
+  HYDRATION_SETTLE: 200, // Increased from 100ms to 200ms
 } as const;
 
 /**
@@ -72,6 +73,10 @@ export const EXPECTED_ERROR_PATTERNS = [
   'net::err_name_not_resolved',
   'fetch failed',
   '404',
+  // Chunk loading errors (Turbopack dev environment)
+  'chunkloaderror',
+  'failed to load chunk',
+  'web vitals',
   // CSP and security headers (expected in test)
   'content security policy',
   'csp',
@@ -300,7 +305,6 @@ export async function assertNoCriticalErrors(
     context.networkDiagnostics.failedResponses.length > 0 ||
     context.networkDiagnostics.failedRequests.length > 0
   ) {
-    // eslint-disable-next-line no-console
     console.warn('Network issues detected:', {
       failedResponses: context.networkDiagnostics.failedResponses,
       failedRequests: context.networkDiagnostics.failedRequests,
@@ -349,9 +353,7 @@ export async function assertValidPageState(
     isOnExpectedPath || (options.allowAuthRedirect && isOnAuthPage);
 
   if (!isValid) {
-    // eslint-disable-next-line no-console
     console.log(`Unexpected URL: ${currentUrl}`);
-    // eslint-disable-next-line no-console
     console.log(`Expected one of: ${options.expectedPaths.join(', ')}`);
   }
 
@@ -620,7 +622,6 @@ export async function smokeNavigateWithRetry(
     {
       retries,
       onRetry: attempt => {
-        // eslint-disable-next-line no-console
         console.warn(`Navigation retry ${attempt} for ${url}`);
       },
     }

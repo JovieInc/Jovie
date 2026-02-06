@@ -8,7 +8,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { queryKeys } from './keys';
 
@@ -132,13 +132,15 @@ export function useSuggestionsQuery({
   const lastDataUpdatedAtRef = useRef(0);
 
   // Reset backoff when fast polling is requested
-  if (fastPolling) {
-    stableCountRef.current = 0;
-    currentIntervalRef.current = POLLING_CONFIG.initialInterval;
-    errorCountRef.current = 0;
-    currentErrorIntervalRef.current = POLLING_CONFIG.errorInitialInterval;
-    lastErrorUpdatedAtRef.current = 0;
-  }
+  useEffect(() => {
+    if (fastPolling) {
+      stableCountRef.current = 0;
+      currentIntervalRef.current = POLLING_CONFIG.initialInterval;
+      errorCountRef.current = 0;
+      currentErrorIntervalRef.current = POLLING_CONFIG.errorInitialInterval;
+      lastErrorUpdatedAtRef.current = 0;
+    }
+  }, [fastPolling]);
 
   // Calculate adaptive interval based on data stability
   const getAdaptiveInterval = useCallback(

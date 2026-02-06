@@ -97,7 +97,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-surface-1 dark:bg-surface-2 p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
       <div className='relative'>
         <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -108,9 +108,9 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border border-subtle bg-surface-2 dark:bg-surface-3 py-1.5 pl-8 pr-7 text-xs',
+            'w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-xs',
             'text-primary-token placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+            'focus-visible:outline-none focus-visible:ring-0'
           )}
           aria-label={placeholder}
         />
@@ -150,7 +150,7 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-md bg-surface-2 text-[12px]'>
+    <div className='flex items-center gap-0.5 rounded-md bg-surface-2/80 text-[11px]'>
       <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
@@ -434,11 +434,15 @@ export function ReleaseFilterDropdown({
   }, [filters, onFiltersChange]);
 
   // Filter categories by main search
-  const FILTER_CATEGORIES = [
-    { id: 'releaseType', label: 'Release Type', iconName: 'Disc3' },
-    { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
-    { id: 'label', label: 'Label', iconName: 'Building2' },
-  ] as const;
+  const FILTER_CATEGORIES = useMemo(
+    () =>
+      [
+        { id: 'releaseType', label: 'Release Type', iconName: 'Disc3' },
+        { id: 'popularity', label: 'Popularity', iconName: 'Signal' },
+        { id: 'label', label: 'Label', iconName: 'Building2' },
+      ] as const,
+    []
+  );
 
   const filteredCategories = useMemo(() => {
     if (!mainSearch.trim()) return FILTER_CATEGORIES;
@@ -446,7 +450,7 @@ export function ReleaseFilterDropdown({
     return FILTER_CATEGORIES.filter(cat =>
       cat.label.toLowerCase().includes(query)
     );
-  }, [mainSearch]);
+  }, [mainSearch, FILTER_CATEGORIES]);
 
   // Filter label options by search
   const filteredLabelOptions = useMemo(() => {
@@ -489,7 +493,7 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-full border border-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-[#f2f2f2] hover:text-primary-token dark:border-[#1f2022] dark:bg-transparent dark:hover:border-[#2a2b2d] dark:hover:bg-[#151618] dark:hover:text-white',
+                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
                 buttonClassName
               )}
             >

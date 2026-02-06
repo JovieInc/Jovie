@@ -14,7 +14,8 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
-import { type CreatorProfile, creatorProfiles, users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
+import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
  * Updates a creator profile with the provided data.

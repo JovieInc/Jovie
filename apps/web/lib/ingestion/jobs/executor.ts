@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { creatorProfiles, type DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { enqueueFollowupIngestionJobs } from '../followup';
 import { normalizeAndMergeExtraction } from '../merge';

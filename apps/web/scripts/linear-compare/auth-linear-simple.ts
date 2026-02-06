@@ -1,0 +1,52 @@
+/**
+ * Linear Authentication Script (Simple)
+ *
+ * Opens Linear, waits for you to log in, then press Enter to save state.
+ */
+
+import { chromium } from '@playwright/test';
+import * as path from 'path';
+import * as readline from 'readline';
+
+const AUTH_FILE = path.join(__dirname, '../../auth-linear.json');
+
+async function authenticate() {
+  console.log('🔐 Opening Linear...');
+
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--window-size=1440,900'],
+  });
+
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
+  });
+
+  const page = await context.newPage();
+  await page.goto('https://linear.app');
+
+  // Wait for user input
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  await new Promise<void>(resolve => {
+    rl.question(
+      '\n✋ Press ENTER when you are logged into Linear dashboard... ',
+      () => {
+        rl.close();
+        resolve();
+      }
+    );
+  });
+
+  console.log('💾 Saving auth state...');
+  await context.storageState({ path: AUTH_FILE });
+
+  await browser.close();
+  console.log(`✅ Saved to: ${AUTH_FILE}`);
+}
+
+authenticate().catch(console.error);

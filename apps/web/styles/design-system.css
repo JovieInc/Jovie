@@ -10,12 +10,15 @@
  * @see https://linear.app/now/how-we-redesigned-the-linear-ui
  */
 
+/* Import Linear-specific tokens for marketing pages */
+@import "./linear-tokens.css";
+
 /* ============================================
    THEME INPUTS - The only 3 variables needed
    ============================================ */
 :root {
   /* Core Theme Inputs */
-  --theme-base-hue: 240;
+  --theme-base-hue: 272;
   /* Neutral foundation hue (blue-gray) */
   --theme-base-chroma: 0.015;
   /* Very low chroma for neutrals */
@@ -175,32 +178,24 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces - progressively lighter */
+  /* Dark mode surfaces - progressively lighter (Linear-style contrast) */
   /* prettier-ignore */ --color-bg-base: #090909; /* sidebar & page bg */
   /* prettier-ignore */ --color-bg-surface-0: #090909; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #101011; /* main content */
-  /* prettier-ignore */ --color-bg-surface-2: #17181a; /* contact sidebar/drawer */
-  /* prettier-ignore */ --color-bg-surface-3: #202124; /* Modals, tooltips */
+  /* prettier-ignore */ --color-bg-surface-1: #101012; /* main content — Linear exact: lch(4.8 0.7 272) */
+  /* prettier-ignore */ --color-bg-surface-2: #1b1d21; /* contact sidebar/drawer */
+  /* prettier-ignore */ --color-bg-surface-3: #21242a; /* Modals, tooltips */
 
   /* Text hierarchy - inverted for dark mode */
-  --color-text-primary-token: oklch(96% 0 0);
-  --color-text-secondary-token: oklch(
-    75% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    62% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    50% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-disabled-token: oklch(
-    40% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-primary-token: oklch(100% 0 272);
+  --color-text-secondary-token: oklch(92% 0.005 272);
+  --color-text-tertiary-token: oklch(68% 0.005 272);
+  --color-text-quaternary-token: oklch(47% 0.005 272);
+  --color-text-disabled-token: oklch(35% 0.005 272);
 
-  /* Border system - white-based for dark mode */
-  --color-border-subtle: oklch(100% 0 0 / 6%);
-  --color-border-default: oklch(100% 0 0 / 10%);
-  --color-border-strong: oklch(100% 0 0 / 18%);
+  /* Border system - white-based for dark mode (Linear-subtle) */
+  --color-border-subtle: oklch(22% 0.014 272);
+  --color-border-default: oklch(27% 0.014 272);
+  --color-border-strong: oklch(30% 0.014 272);
 
   /* Accent - slightly brighter in dark mode */
   --color-accent: oklch(65% var(--theme-accent-chroma) var(--theme-accent-hue));
@@ -229,7 +224,7 @@
   );
 
   /* Interactive states - white-based */
-  --color-interactive-hover: oklch(100% 0 0 / 5%);
+  --color-interactive-hover: oklch(100% 0 0 / 6%);
   --color-interactive-active: oklch(100% 0 0 / 10%);
 
   /* Table cell hover - #151618 (21, 22, 24) */
@@ -571,25 +566,31 @@
   --sidebar-surface-hover: 237 237 237; /* Neutral hover */
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 229 229;
+  --sidebar-item-foreground: 90 90 95;
+  --sidebar-item-icon: 115 115 120;
+  --sidebar-accent-active: 230 230 232;
 }
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
-  --sidebar-background: 9 9 9; /* Matches base */
-  --sidebar-foreground: 244 244 245;
-  --sidebar-primary: 244 244 245;
+  /* Linear-inspired: slightly lighter bg, semi-transparent accents */
+  --sidebar-background: 9 9 9; /* #090909 - matches bg-base */
+  --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
+  --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 32 33 37;
-  --sidebar-accent-foreground: 244 244 245;
-  --sidebar-border: 255 255 255 / 0.08;
+  --sidebar-accent: 255 255 255 / 0.08; /* Semi-transparent white for hover (Linear) */
+  --sidebar-accent-foreground: 227 228 229;
+  --sidebar-border: 255 255 255 / 0.06;
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 9 9 9; /* Matches base */
-  --sidebar-surface-hover: 32 33 37;
-  --sidebar-input-background: 32 33 37;
-  --sidebar-input-border: 255 255 255 / 0.08;
+  --sidebar-surface: 9 9 9; /* Matches bg-base */
+  --sidebar-surface-hover: 255 255 255 / 0.04; /* Subtle semi-transparent hover */
+  --sidebar-input-background: 255 255 255 / 0.06;
+  --sidebar-input-border: 255 255 255 / 0.06;
+  --sidebar-item-foreground: 227 228 229; /* Linear's default nav text */
+  --sidebar-item-icon: 148 149 151; /* Linear's nav icon, dimmer than text */
+  --sidebar-accent-active: 255 255 255 / 0.06; /* Subtler active state, Linear-style */
 }
 
 /* ============================================
@@ -605,11 +606,11 @@
 }
 
 :root.dark {
-  --menu-background: 24 24 31;
+  --menu-background: 27 29 33;
   --menu-foreground: 244 244 245;
   --menu-border: 255 255 255 / 0.1;
   --menu-shadow: 0 0 0 / 0.4;
-  --menu-item-hover: 30 30 39;
+  --menu-item-hover: 33 36 42;
   --menu-separator: 255 255 255 / 0.08;
 }
 
@@ -677,4 +678,44 @@
   --liquid-glass-item-hover: oklch(100% 0 0 / 6%);
   --liquid-glass-item-active: oklch(100% 0 0 / 10%);
   --liquid-glass-item-selected: oklch(100% 0 0 / 12%);
+}
+
+/* ============================================
+   MARKETING MODE - Linear Theme Bridge
+   ============================================
+
+   Activate Linear styling on marketing pages by adding
+   [data-theme="linear"] to a parent element or using
+   the .linear-marketing class.
+
+   This maps Linear tokens to the existing design system
+   variables for seamless integration.
+*/
+
+[data-theme="linear"],
+.linear-marketing {
+  /* Map Linear text colors to design system */
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+
+  /* Map Linear backgrounds to design system */
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+
+  /* Map Linear borders to design system */
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+
+  /* Map Linear buttons to design system */
+  --color-btn-primary-bg: var(--linear-btn-primary-bg);
+  --color-btn-primary-fg: var(--linear-btn-primary-fg);
+  --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
+  --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
+
+  /* Map Linear interactive states */
+  --color-interactive-hover: var(--linear-bg-hover);
 }

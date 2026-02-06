@@ -5,7 +5,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';

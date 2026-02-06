@@ -1,4 +1,5 @@
 #!/usr/bin/env -S tsx
+/* eslint-disable no-restricted-imports -- Script requires full schema access */
 
 /**
  * Drizzle Database Seed Script
@@ -16,22 +17,21 @@ import * as schema from '@/lib/db/schema';
 import {
   audienceMembers,
   clickEvents,
-  creatorContacts,
-  creatorProfiles,
+  notificationSubscriptions,
+  tips,
+} from '@/lib/db/schema/analytics';
+import { userSettings, users } from '@/lib/db/schema/auth';
+import {
   discogReleases,
   discogTracks,
   type NewProvider,
-  notificationSubscriptions,
   providerLinks,
   providers,
-  scraperConfigs,
   smartLinkTargets,
-  socialAccounts,
-  socialLinks,
-  tips,
-  userSettings,
-  users,
-} from '@/lib/db/schema';
+} from '@/lib/db/schema/content';
+import { scraperConfigs } from '@/lib/db/schema/ingestion';
+import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
+import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 
 // Load .env.local first to override defaults, then fallback to .env
 dotenvConfig({ path: '.env.local', override: true });

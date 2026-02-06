@@ -5,22 +5,71 @@
  * Provides methods for both individual and batch score calculations.
  */
 
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  sql as drizzleSql,
+  eq,
+  isNotNull,
+  isNull,
+} from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
-import {
-  creatorContacts,
-  creatorProfiles,
-  discogReleases,
-  socialLinks,
-} from '@/lib/db/schema';
+import { discogReleases } from '@/lib/db/schema/content';
+import { socialLinks } from '@/lib/db/schema/links';
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
+import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 
 import {
   calculateFitScore,
   FIT_SCORE_VERSION,
   type FitScoreInput,
 } from './calculator';
+
+/** Profile data with calculated score for batch updates */
+interface ScoredProfile {
+  id: string;
+  score: number;
+  breakdown: FitScoreBreakdown;
+}
+
+/**
+ * Batch update fit scores using PostgreSQL CASE expressions.
+ * Reduces N individual UPDATE queries to a single batch UPDATE.
+ */
+async function batchUpdateFitScores(
+  db: DbOrTransaction,
+  scoredProfiles: ScoredProfile[]
+): Promise<void> {
+  if (scoredProfiles.length === 0) return;
+
+  const now = new Date();
+  const ids = scoredProfiles.map(p => p.id);
+
+  // Build parameterized CASE expressions for fit_score and fit_score_breakdown
+  const scoreCaseExpr = drizzleSql.join(
+    scoredProfiles.map(p => drizzleSql`WHEN id = ${p.id} THEN ${p.score}`),
+    drizzleSql` `
+  );
+
+  const breakdownCaseExpr = drizzleSql.join(
+    scoredProfiles.map(
+      p =>
+        drizzleSql`WHEN id = ${p.id} THEN ${JSON.stringify(p.breakdown)}::jsonb`
+    ),
+    drizzleSql` `
+  );
+
+  await db.execute(drizzleSql`
+    UPDATE creator_profiles
+    SET
+      fit_score = CASE ${scoreCaseExpr} END,
+      fit_score_breakdown = CASE ${breakdownCaseExpr} END,
+      fit_score_updated_at = ${now},
+      updated_at = ${now}
+    WHERE id = ANY(${ids})
+  `);
+}
 
 /**
  * Calculate and store the fit score for a creator profile.
@@ -158,14 +207,14 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
-      socialLinkPlatforms: sql<string[]>`
+      socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
             filter (where ${socialLinks.platform} is not null),
           '{}'
         )
       `,
-      latestReleaseDate: sql<Date | null>`
+      latestReleaseDate: drizzleSql<Date | null>`
         max(${discogReleases.releaseDate})
       `,
     })
@@ -197,35 +246,25 @@ export async function calculateMissingFitScores(
     return 0;
   }
 
-  const results = await Promise.all(
-    profiles.map(async profile => {
-      const input: FitScoreInput = {
-        ingestionSourcePlatform: profile.ingestionSourcePlatform,
-        hasPaidTier: false,
-        socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
-        hasSpotifyId: !!profile.spotifyId,
-        spotifyPopularity: profile.spotifyPopularity,
-        genres: profile.genres,
-        latestReleaseDate: profile.latestReleaseDate ?? null,
-      };
+  // Calculate all scores in memory first
+  const scoredProfiles: ScoredProfile[] = profiles.map(profile => {
+    const input: FitScoreInput = {
+      ingestionSourcePlatform: profile.ingestionSourcePlatform,
+      hasPaidTier: false,
+      socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
+      hasSpotifyId: !!profile.spotifyId,
+      spotifyPopularity: profile.spotifyPopularity,
+      genres: profile.genres,
+      latestReleaseDate: profile.latestReleaseDate ?? null,
+    };
 
-      const { score, breakdown } = calculateFitScore(input);
+    const { score, breakdown } = calculateFitScore(input);
+    return { id: profile.id, score, breakdown };
+  });
 
-      await db
-        .update(creatorProfiles)
-        .set({
-          fitScore: score,
-          fitScoreBreakdown: breakdown,
-          fitScoreUpdatedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profile.id));
+  await batchUpdateFitScores(db, scoredProfiles);
 
-      return true;
-    })
-  );
-
-  return results.filter(Boolean).length;
+  return scoredProfiles.length;
 }
 
 /**
@@ -244,10 +283,54 @@ export async function recalculateAllFitScores(
   let offset = 0;
 
   while (true) {
+    // Fetch all needed data with batched JOINs (same as calculateMissingFitScores)
     const profiles = await db
-      .select({ id: creatorProfiles.id })
+      .select({
+        id: creatorProfiles.id,
+        spotifyId: creatorProfiles.spotifyId,
+        spotifyPopularity: creatorProfiles.spotifyPopularity,
+        genres: creatorProfiles.genres,
+        ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+        appleMusicId: creatorProfiles.appleMusicId,
+        soundcloudId: creatorProfiles.soundcloudId,
+        deezerId: creatorProfiles.deezerId,
+        tidalId: creatorProfiles.tidalId,
+        youtubeMusicId: creatorProfiles.youtubeMusicId,
+        socialLinkPlatforms: drizzleSql<string[]>`
+          coalesce(
+            array_agg(distinct ${socialLinks.platform})
+              filter (where ${socialLinks.platform} is not null),
+            '{}'
+          )
+        `,
+        latestReleaseDate: drizzleSql<Date | null>`
+          max(${discogReleases.releaseDate})
+        `,
+        hasContactEmail: drizzleSql<boolean>`
+          bool_or(${creatorContacts.email} is not null)
+        `,
+      })
       .from(creatorProfiles)
+      .leftJoin(
+        socialLinks,
+        and(
+          eq(socialLinks.creatorProfileId, creatorProfiles.id),
+          eq(socialLinks.state, 'active')
+        )
+      )
+      .leftJoin(
+        discogReleases,
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfiles.id),
+          isNotNull(discogReleases.releaseDate)
+        )
+      )
+      .leftJoin(
+        creatorContacts,
+        eq(creatorContacts.creatorProfileId, creatorProfiles.id)
+      )
       .where(eq(creatorProfiles.isClaimed, false))
+      .groupBy(creatorProfiles.id)
       .limit(batchSize)
       .offset(offset);
 
@@ -255,13 +338,37 @@ export async function recalculateAllFitScores(
       break;
     }
 
-    for (const profile of profiles) {
-      const result = await calculateAndStoreFitScore(db, profile.id);
-      if (result) {
-        totalScored++;
-      }
-    }
+    // Calculate all scores in memory
+    const scoredProfiles: ScoredProfile[] = profiles.map(profile => {
+      const dspPlatformCount = [
+        profile.spotifyId,
+        profile.appleMusicId,
+        profile.soundcloudId,
+        profile.deezerId,
+        profile.tidalId,
+        profile.youtubeMusicId,
+      ].filter(Boolean).length;
 
+      const input: FitScoreInput = {
+        ingestionSourcePlatform: profile.ingestionSourcePlatform,
+        hasPaidTier: false,
+        socialLinkPlatforms: profile.socialLinkPlatforms ?? [],
+        hasSpotifyId: !!profile.spotifyId,
+        spotifyPopularity: profile.spotifyPopularity,
+        genres: profile.genres,
+        latestReleaseDate: profile.latestReleaseDate ?? null,
+        hasContactEmail: profile.hasContactEmail ?? false,
+        hasAppleMusicId: !!profile.appleMusicId,
+        hasSoundCloudId: !!profile.soundcloudId,
+        dspPlatformCount,
+      };
+
+      const { score, breakdown } = calculateFitScore(input);
+      return { id: profile.id, score, breakdown };
+    });
+
+    await batchUpdateFitScores(db, scoredProfiles);
+    totalScored += scoredProfiles.length;
     offset += batchSize;
   }
 
@@ -306,7 +413,7 @@ export async function getTopFitProfiles(
       and(
         eq(creatorProfiles.isClaimed, false),
         isNotNull(creatorProfiles.fitScore),
-        sql`${creatorProfiles.fitScore} >= ${minScore}`
+        drizzleSql`${creatorProfiles.fitScore} >= ${minScore}`
       )
     )
     .orderBy(desc(creatorProfiles.fitScore))

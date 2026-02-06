@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * Onboarding Handle Race Conditions Tests
+ *
+ * NOTE: Tests homepage handle claim form for unauthenticated visitors.
+ * Must run without saved authentication.
+ */
+
+// Override global storageState to run these tests as unauthenticated
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('Onboarding Handle Race Conditions', () => {
   test.beforeEach(async ({ page }) => {
     // Mock the API endpoints to simulate network delays and control responses
