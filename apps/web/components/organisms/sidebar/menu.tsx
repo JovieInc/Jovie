@@ -15,7 +15,7 @@ export const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar='menu'
-    className={cn('flex w-full min-w-0 flex-col gap-0.5', className)}
+    className={cn('flex w-full min-w-0 flex-col gap-px', className)}
     {...props}
   />
 ));
@@ -37,7 +37,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout and typography
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-lg px-2.5 py-2 text-left text-[13px] font-medium leading-tight tracking-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-1 text-left text-[13px] font-medium leading-tight tracking-tight outline-none',
     // Transitions
     'transition-all duration-150 ease-out active:duration-50',
     // Default text color - uses semantic tokens for light/dark mode
@@ -70,9 +70,9 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background shadow-[0_0_0_1px_rgb(var(--sidebar-border))] hover:shadow-[0_0_0_1px_rgb(var(--sidebar-accent))]',
       },
       size: {
-        default: 'min-h-[40px]',
-        sm: 'min-h-[32px] text-xs',
-        lg: 'min-h-[44px] group-data-[collapsible=icon]:!size-9',
+        default: 'min-h-7',
+        sm: 'min-h-6 text-xs',
+        lg: 'min-h-9 group-data-[collapsible=icon]:!size-9',
       },
     },
     defaultVariants: {
@@ -236,7 +236,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
       ref={ref}
       data-sidebar='menu-skeleton'
       className={cn(
-        'rounded-md h-10 flex gap-2 px-3 items-center transition-all duration-200 ease-out',
+        'rounded-md h-7 flex gap-2 px-2 items-center transition-all duration-200 ease-out',
         'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center',
         className
       )}
@@ -270,7 +270,7 @@ export const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar='menu-sub'
     className={cn(
-      'ml-4 flex min-w-0 flex-col gap-0.5 border-l border-sidebar-border/60 pl-3 py-0.5',
+      'ml-4 flex min-w-0 flex-col gap-px border-l border-sidebar-border/60 pl-3 py-0.5',
       'group-data-[collapsible=icon]:hidden',
       className
     )}
@@ -302,7 +302,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-[32px] min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-2.5 text-[13px] text-secondary-token outline-none transition-colors duration-150',
+        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-[13px] text-secondary-token outline-none transition-colors duration-150',
         'hover:bg-sidebar-accent hover:text-primary-token',
         'focus-visible:ring-2 focus-visible:ring-sidebar-ring',
         'active:bg-sidebar-accent active:text-primary-token',
@@ -310,7 +310,7 @@ export const SidebarMenuSubButton = React.forwardRef<
         '[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-tertiary-token [&>svg]:transition-colors',
         'data-[active=true]:bg-sidebar-accent data-[active=true]:text-primary-token data-[active=true]:font-medium',
         'data-[active=true]:[&>svg]:text-secondary-token hover:[&>svg]:text-secondary-token',
-        size === 'sm' && 'text-xs min-h-[28px]',
+        size === 'sm' && 'text-xs min-h-5',
         'group-data-[collapsible=icon]:hidden',
         className
       )}

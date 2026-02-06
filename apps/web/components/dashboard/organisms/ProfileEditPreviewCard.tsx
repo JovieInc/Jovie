@@ -11,6 +11,7 @@ import { Button } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { useConfirmChatEditMutation } from '@/lib/queries/useConfirmChatEditMutation';
 import { cn } from '@/lib/utils';
 
 export interface ProfileEditPreview {
@@ -44,39 +45,26 @@ export function ProfileEditPreviewCard({
   onCancel,
   profileId,
 }: ProfileEditPreviewCardProps) {
-  const [isApplying, setIsApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const confirmEdit = useConfirmChatEditMutation();
 
   const handleApply = useCallback(async () => {
-    setIsApplying(true);
-    try {
-      const response = await fetch('/api/chat/confirm-edit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          field: preview.field,
-          newValue: preview.newValue,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to apply edit');
+    confirmEdit.mutate(
+      {
+        profileId,
+        field: preview.field,
+        newValue: preview.newValue,
+      },
+      {
+        onSuccess: () => {
+          setApplied(true);
+          toast.success(`${preview.fieldLabel} updated successfully`);
+          onApply?.();
+        },
       }
-
-      setApplied(true);
-      toast.success(`${preview.fieldLabel} updated successfully`);
-      onApply?.();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Failed to apply edit';
-      toast.error(message);
-    } finally {
-      setIsApplying(false);
-    }
-  }, [profileId, preview, onApply]);
+    );
+  }, [profileId, preview, onApply, confirmEdit]);
 
   const handleCancel = useCallback(() => {
     setCancelled(true);
@@ -155,10 +143,10 @@ export function ProfileEditPreviewCard({
           variant='primary'
           size='sm'
           onClick={handleApply}
-          disabled={isApplying}
+          disabled={confirmEdit.isPending}
           className='flex-1 gap-1.5'
         >
-          {isApplying ? (
+          {confirmEdit.isPending ? (
             <>
               <Loader2 className='h-3.5 w-3.5 animate-spin' />
               Applying...
@@ -175,7 +163,7 @@ export function ProfileEditPreviewCard({
           variant='secondary'
           size='sm'
           onClick={handleCancel}
-          disabled={isApplying}
+          disabled={confirmEdit.isPending}
           className='gap-1.5'
         >
           <X className='h-3.5 w-3.5' />

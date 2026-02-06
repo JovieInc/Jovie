@@ -578,20 +578,20 @@
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Maps to --color-bg-base (oklch(3.5% 0 0) = #090909 = rgb(9,9,9)) */
-  --sidebar-background: 9 9 9; /* Matches base */
+  /* Linear-inspired: slightly lighter bg, semi-transparent accents */
+  --sidebar-background: 16 16 18; /* #101012 - Linear-style dark sidebar */
   --sidebar-foreground: 244 244 245;
   --sidebar-primary: 244 244 245;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 32 33 37;
+  --sidebar-accent: 255 255 255 / 0.055; /* Semi-transparent white for hover/active */
   --sidebar-accent-foreground: 244 244 245;
   --sidebar-border: 255 255 255 / 0.08;
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 9 9 9; /* Matches base */
-  --sidebar-surface-hover: 32 33 37;
-  --sidebar-input-background: 32 33 37;
+  --sidebar-surface: 16 16 18; /* Matches updated bg */
+  --sidebar-surface-hover: 255 255 255 / 0.04; /* Subtle semi-transparent hover */
+  --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.08;
 }
 
