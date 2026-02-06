@@ -1,8 +1,8 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ interface RouteParams {
  * GET /api/chat/conversations/[id]
  * Get a conversation with all its messages
  */
-export async function GET(_req: Request, { params }: RouteParams) {
+export async function GET(req: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const { profile } = await getSessionContext({ requireProfile: true });
@@ -31,6 +31,15 @@ export async function GET(_req: Request, { params }: RouteParams) {
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Parse pagination params
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get('limit');
+    const limit = Math.min(
+      Math.max(parseInt(limitParam ?? '100', 10) || 100, 1),
+      200
+    );
+    const before = url.searchParams.get('before');
 
     // Get the conversation, ensuring it belongs to the user's profile
     const [conversation] = await db
@@ -51,8 +60,21 @@ export async function GET(_req: Request, { params }: RouteParams) {
       );
     }
 
-    // Get all messages for the conversation
-    const messages = await db
+    // Build where conditions for messages
+    const conditions = [eq(chatMessages.conversationId, id)];
+    if (before) {
+      const beforeDate = new Date(before);
+      if (isNaN(beforeDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid "before" cursor' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      conditions.push(lt(chatMessages.createdAt, beforeDate));
+    }
+
+    // Fetch the most recent N messages (DESC + limit), then reverse to chronological order
+    const rows = await db
       .select({
         id: chatMessages.id,
         role: chatMessages.role,
@@ -61,11 +83,16 @@ export async function GET(_req: Request, { params }: RouteParams) {
         createdAt: chatMessages.createdAt,
       })
       .from(chatMessages)
-      .where(eq(chatMessages.conversationId, id))
-      .orderBy(asc(chatMessages.createdAt));
+      .where(and(...conditions))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
+    rows.reverse();
 
     return NextResponse.json(
-      { conversation, messages },
+      { conversation, messages: rows, hasMore },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
