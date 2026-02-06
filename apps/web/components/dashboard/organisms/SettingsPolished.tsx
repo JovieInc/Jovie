@@ -50,7 +50,7 @@ export function SettingsPolished({
       ) : (
         <DashboardCard variant='settings'>
           <div className='text-center py-4'>
-            <h3 className='text-lg font-medium text-primary mb-2'>
+            <h3 className='text-[14px] font-medium text-primary-token mb-2'>
               Account settings unavailable
             </h3>
             <p className='text-sm text-secondary'>
@@ -114,7 +114,7 @@ export function SettingsPolished({
         ) : (
           <DashboardCard variant='settings'>
             <div className='text-center py-4'>
-              <h3 className='text-lg font-medium text-primary mb-2'>
+              <h3 className='text-[14px] font-medium text-primary-token mb-2'>
                 Notifications are not available yet
               </h3>
               <p className='text-sm text-secondary'>
@@ -174,7 +174,7 @@ export function SettingsPolished({
     : sections;
 
   return (
-    <div className='space-y-8 pb-8' data-testid='settings-polished'>
+    <div className='space-y-6 pb-6' data-testid='settings-polished'>
       {visibleSections.map(section => (
         <SettingsSection
           key={section.id}
