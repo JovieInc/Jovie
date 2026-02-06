@@ -35,6 +35,12 @@ export function verifyCronAuth(
     return null;
   }
 
+  if (!cronSecret) {
+    logger.error(
+      '[cron] CRON_SECRET is not configured — all cron requests will be rejected'
+    );
+  }
+
   const authHeader = request.headers.get('authorization');
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json(
@@ -90,6 +96,7 @@ export function collectBlobUrls(records: OrphanedPhotoRecord[]): string[] {
 
 /**
  * Delete blobs from Vercel Blob storage (best-effort).
+ * Returns the number of URLs deleted on success, or -1 on failure.
  */
 export async function deleteBlobsIfConfigured(urls: string[]): Promise<number> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -102,8 +109,11 @@ export async function deleteBlobsIfConfigured(urls: string[]): Promise<number> {
     await del(urls, { token });
     return urls.length;
   } catch (blobError) {
-    logger.warn('Failed to delete some blobs:', blobError);
-    return 0;
+    logger.error('[cleanup-photos] Failed to delete blobs from storage', {
+      error: blobError instanceof Error ? blobError.message : String(blobError),
+      urlCount: urls.length,
+    });
+    return -1;
   }
 }
 
