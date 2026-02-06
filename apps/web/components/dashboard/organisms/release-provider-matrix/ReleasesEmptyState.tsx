@@ -100,7 +100,7 @@ export function ReleasesEmptyState({
   );
 
   return (
-    <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
+    <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
       <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
         <Icon
           name='Disc3'
