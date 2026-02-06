@@ -112,17 +112,18 @@ export async function PUT(req: Request) {
       if (usernameGuard instanceof NextResponse) return usernameGuard;
 
       const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
-      const clerkSyncFailed = await syncClerkProfile({
-        clerkUserId,
-        clerkUpdates,
-        avatarUrl,
-      });
-
-      const updatedProfile = await updateProfileRecords({
-        clerkUserId,
-        dbProfileUpdates,
-        displayNameForUserUpdate,
-      });
+      const [clerkSyncFailed, updatedProfile] = await Promise.all([
+        syncClerkProfile({
+          clerkUserId,
+          clerkUpdates,
+          avatarUrl,
+        }),
+        updateProfileRecords({
+          clerkUserId,
+          dbProfileUpdates,
+          displayNameForUserUpdate,
+        }),
+      ]);
       if (updatedProfile instanceof NextResponse) return updatedProfile;
 
       await finalizeProfileResponse({
