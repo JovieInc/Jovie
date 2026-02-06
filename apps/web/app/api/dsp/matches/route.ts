@@ -98,7 +98,8 @@ export async function GET(request: Request) {
       })
       .from(dspArtistMatches)
       .where(and(...conditions))
-      .orderBy(dspArtistMatches.createdAt);
+      .orderBy(dspArtistMatches.createdAt)
+      .limit(100);
 
     // Transform decimal to number for JSON response
     const transformedMatches = matches.map(match => ({

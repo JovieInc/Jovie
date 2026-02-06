@@ -17,11 +17,14 @@ export const maxDuration = 120;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Process up to 100 notifications per run to avoid timeouts
-const BATCH_SIZE = 100;
+const MAX_NOTIFICATIONS_PER_RUN = 100;
 
 // Timeout for stuck "sending" rows - if a notification has been in "sending" state
 // for longer than this, reset it to "pending" for retry
 const SENDING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+// Number of notifications to process concurrently within each batch
+const CONCURRENCY_BATCH_SIZE = 10;
 
 // ============================================================================
 // Types
@@ -42,6 +45,29 @@ interface ProcessingContext {
 }
 
 type ProcessResult = 'sent' | 'failed' | 'skipped';
+
+// Type aliases for batch-fetched data to simplify function signatures
+type BatchRelease = {
+  id: string;
+  title: string;
+  slug: string;
+  artworkUrl: string | null;
+  releaseDate: Date | null;
+};
+
+type BatchCreator = {
+  id: string;
+  displayName: string | null;
+  username: string;
+  usernameNormalized: string;
+};
+
+type BatchSubscriber = {
+  id: string;
+  channel: string;
+  email: string | null;
+  phone: string | null;
+};
 
 // ============================================================================
 // Database Operations
@@ -90,7 +116,7 @@ async function fetchPendingNotifications(
       fanReleaseNotifications.scheduledFor,
       fanReleaseNotifications.createdAt
     )
-    .limit(BATCH_SIZE);
+    .limit(MAX_NOTIFICATIONS_PER_RUN);
 }
 
 async function claimNotification(
@@ -126,73 +152,6 @@ async function updateNotificationStatus(
       updatedAt: now,
     })
     .where(eq(fanReleaseNotifications.id, notificationId));
-}
-
-async function fetchReleaseDetails(releaseId: string) {
-  const [release] = await db
-    .select({
-      id: discogReleases.id,
-      title: discogReleases.title,
-      slug: discogReleases.slug,
-      artworkUrl: discogReleases.artworkUrl,
-      releaseDate: discogReleases.releaseDate,
-    })
-    .from(discogReleases)
-    .where(eq(discogReleases.id, releaseId))
-    .limit(1);
-
-  return release;
-}
-
-async function fetchCreatorProfile(creatorProfileId: string) {
-  const [creator] = await db
-    .select({
-      id: creatorProfiles.id,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, creatorProfileId))
-    .limit(1);
-
-  return creator;
-}
-
-async function fetchActiveSubscriber(subscriptionId: string) {
-  const [subscriber] = await db
-    .select({
-      id: notificationSubscriptions.id,
-      channel: notificationSubscriptions.channel,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-    })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        eq(notificationSubscriptions.id, subscriptionId),
-        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-      )
-    )
-    .limit(1);
-
-  return subscriber;
-}
-
-async function fetchStreamingLinks(releaseId: string) {
-  return db
-    .select({
-      providerId: providerLinks.providerId,
-      url: providerLinks.url,
-    })
-    .from(providerLinks)
-    .where(
-      and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.releaseId, releaseId)
-      )
-    );
 }
 
 // ============================================================================
@@ -327,119 +286,11 @@ async function sendEmailNotification(
   return success ? 'sent' : 'failed';
 }
 
-async function _processNotification(
-  ctx: ProcessingContext
-): Promise<ProcessResult> {
-  // Atomically claim the notification
-  const claimed = await claimNotification(ctx.notification.id, ctx.now);
-  if (!claimed) {
-    return 'skipped';
-  }
-
-  // Fetch release details
-  const release = await fetchReleaseDetails(ctx.notification.releaseId);
-  if (!release) {
-    throw new Error(`Release not found: ${ctx.notification.releaseId}`);
-  }
-
-  // Validate release date hasn't been rescheduled to future
-  if (release.releaseDate && release.releaseDate > ctx.now) {
-    await updateNotificationStatus(
-      ctx.notification.id,
-      ctx.now,
-      'cancelled',
-      'Release date changed to future date'
-    );
-    logger.info(
-      `[send-release-notifications] Cancelled notification ${ctx.notification.id} - release date changed to ${release.releaseDate.toISOString()}`
-    );
-    return 'skipped';
-  }
-
-  // Fetch creator profile
-  const creator = await fetchCreatorProfile(ctx.notification.creatorProfileId);
-  if (!creator) {
-    throw new Error(`Creator not found: ${ctx.notification.creatorProfileId}`);
-  }
-
-  // Fetch subscriber (also verifies they haven't unsubscribed)
-  const subscriber = await fetchActiveSubscriber(
-    ctx.notification.notificationSubscriptionId
-  );
-  if (!subscriber) {
-    await updateNotificationStatus(ctx.notification.id, ctx.now, 'cancelled');
-    return 'skipped';
-  }
-
-  // Fetch streaming links
-  const links = await fetchStreamingLinks(release.id);
-
-  // Build email content
-  const artistName = creator.displayName ?? creator.username;
-  const emailData = getReleaseDayNotificationEmail({
-    artistName,
-    releaseTitle: release.title,
-    artworkUrl: release.artworkUrl,
-    username: creator.usernameNormalized,
-    slug: release.slug,
-    streamingLinks: links.map(link => ({
-      providerId: link.providerId,
-      url: link.url,
-    })),
-  });
-
-  // Build sender context for "Artist Name via Jovie" emails
-  const senderContext: SenderContext = {
-    creatorProfileId: creator.id,
-    displayName: artistName,
-    emailType: 'release_notification',
-    referenceId: release.id,
-  };
-
-  // Send notification based on channel
-  if (subscriber.channel === 'email' && subscriber.email) {
-    return sendEmailNotification(
-      ctx,
-      { email: subscriber.email },
-      emailData,
-      senderContext
-    );
-  }
-
-  if (subscriber.channel === 'sms' && subscriber.phone) {
-    await updateNotificationStatus(
-      ctx.notification.id,
-      ctx.now,
-      'failed',
-      'SMS channel not yet implemented'
-    );
-    return 'failed';
-  }
-
-  // No valid contact info
-  await updateNotificationStatus(
-    ctx.notification.id,
-    ctx.now,
-    'failed',
-    'No valid contact information'
-  );
-  return 'failed';
-}
-
 async function processNotificationWithBatchedData(
   ctx: ProcessingContext,
-  releasesMap: Map<
-    string,
-    NonNullable<Awaited<ReturnType<typeof fetchReleaseDetails>>>
-  >,
-  creatorsMap: Map<
-    string,
-    NonNullable<Awaited<ReturnType<typeof fetchCreatorProfile>>>
-  >,
-  subscribersMap: Map<
-    string,
-    NonNullable<Awaited<ReturnType<typeof fetchActiveSubscriber>>>
-  >,
+  releasesMap: Map<string, BatchRelease>,
+  creatorsMap: Map<string, BatchCreator>,
+  subscribersMap: Map<string, BatchSubscriber>,
   linksMap: Map<string, Array<{ providerId: string; url: string }>>
 ): Promise<ProcessResult> {
   try {
@@ -569,6 +420,8 @@ function createEmptyResponse(now: Date): NextResponse {
       message: 'No pending notifications to send',
       sent: 0,
       failed: 0,
+      skipped: 0,
+      processed: 0,
       timestamp: now.toISOString(),
     },
     { headers: NO_STORE_HEADERS }
@@ -578,15 +431,17 @@ function createEmptyResponse(now: Date): NextResponse {
 function createSuccessResponse(
   totalSent: number,
   totalFailed: number,
+  totalSkipped: number,
   processed: number,
   now: Date
 ): NextResponse {
   return NextResponse.json(
     {
       success: true,
-      message: `Sent ${totalSent} notifications, ${totalFailed} failed`,
+      message: `Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`,
       sent: totalSent,
       failed: totalFailed,
+      skipped: totalSkipped,
       processed,
       timestamp: now.toISOString(),
     },
@@ -662,30 +517,48 @@ export async function GET(request: Request) {
         batchFetchStreamingLinks(releaseIds),
       ]);
 
-    // Process all notifications with pre-fetched data
+    // Process notifications in parallel batches
     let totalSent = 0;
     let totalFailed = 0;
+    let totalSkipped = 0;
 
-    for (const notification of pendingNotifications) {
-      const result = await processNotificationWithBatchedData(
-        { now, notification },
-        releasesMap,
-        creatorsMap,
-        subscribersMap,
-        linksMap
+    for (
+      let i = 0;
+      i < pendingNotifications.length;
+      i += CONCURRENCY_BATCH_SIZE
+    ) {
+      const batch = pendingNotifications.slice(i, i + CONCURRENCY_BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(notification =>
+          processNotificationWithBatchedData(
+            { now, notification },
+            releasesMap,
+            creatorsMap,
+            subscribersMap,
+            linksMap
+          )
+        )
       );
 
-      if (result === 'sent') totalSent++;
-      if (result === 'failed') totalFailed++;
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          if (result.value === 'sent') totalSent++;
+          else if (result.value === 'failed') totalFailed++;
+          else if (result.value === 'skipped') totalSkipped++;
+        } else {
+          totalFailed++;
+        }
+      }
     }
 
     logger.info(
-      `[send-release-notifications] Sent ${totalSent} notifications, ${totalFailed} failed`
+      `[send-release-notifications] Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`
     );
 
     return createSuccessResponse(
       totalSent,
       totalFailed,
+      totalSkipped,
       pendingNotifications.length,
       now
     );

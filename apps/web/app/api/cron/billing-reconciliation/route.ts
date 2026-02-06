@@ -56,15 +56,13 @@ interface ReconciliationResult {
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  // Verify cron secret in production
-  if (env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  // Verify cron secret in all environments
+  const authHeader = request.headers.get('authorization');
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const stats: ReconciliationStats = {
