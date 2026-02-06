@@ -427,6 +427,7 @@ export function useProfileNotificationsController({
       state,
       subscribedChannels,
       subscriptionDetails,
+      unsubscribeMutation,
     ]
   );
 

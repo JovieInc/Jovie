@@ -12,9 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { BASE_URL } from '@/constants/app';
 import { cn } from '@/lib/utils';

@@ -8,7 +8,7 @@ import {
 // Mock next/image
 vi.mock('next/image', () => ({
   default: (props: any) => {
-    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text -- Mock for next/image
+    // eslint-disable-next-line jsx-a11y/alt-text -- Mock for next/image
     return <img {...props} />;
   },
 }));

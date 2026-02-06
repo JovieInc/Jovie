@@ -3,13 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
-// eslint-disable-next-line no-restricted-imports -- Direct file import, not barrel
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
