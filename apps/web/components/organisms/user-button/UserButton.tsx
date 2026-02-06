@@ -278,6 +278,7 @@ export function UserButton({
   profileHref,
   settingsHref,
   showUserInfo = false,
+  trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const {
@@ -307,10 +308,10 @@ export function UserButton({
   // Handle loading state or no user
   if (!isLoaded || !user) {
     return showUserInfo ? (
-      <div className='flex w-full items-center gap-2.5 rounded-md border border-subtle bg-surface-1 px-2.5 py-1.5'>
-        <div className='h-6 w-6 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
-        <div className='flex-1 space-y-1'>
-          <div className='h-3 w-20 rounded-sm bg-surface-2 animate-pulse motion-reduce:animate-none' />
+      <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
+        <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
+        <div className='flex-1'>
+          <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
@@ -334,46 +335,48 @@ export function UserButton({
     handleOpenShortcuts: keyboardShortcuts?.open,
   });
 
-  // Custom trigger
-  const triggerElement = showUserInfo ? (
-    <button
-      type='button'
-      className='flex w-full items-center gap-2.5 rounded-md border border-sidebar-border bg-sidebar-surface px-2.5 py-1.5 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
-    >
-      <Avatar
-        src={userImageUrl}
-        alt={displayName || 'User avatar'}
-        name={displayName || userInitials}
-        size='xs'
-        className='shrink-0'
-      />
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-2 truncate'>
-          <p className='text-xs font-medium truncate'>{displayName}</p>
+  // Custom trigger — use provided trigger prop or build default
+  const triggerElement =
+    trigger ??
+    (showUserInfo ? (
+      <button
+        type='button'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+      >
+        <Avatar
+          src={userImageUrl}
+          alt={displayName || 'User avatar'}
+          name={displayName || userInitials}
+          size='xs'
+          className='shrink-0'
+        />
+        <div className='min-w-0 flex-1'>
+          <p className='text-[13px] font-normal text-sidebar-item-foreground truncate'>
+            {displayName}
+          </p>
         </div>
-      </div>
-      <Icon
-        name='ChevronRight'
-        className='w-3.5 h-3.5 text-tertiary-token'
-        aria-hidden='true'
-      />
-    </button>
-  ) : (
-    <Button
-      variant='ghost'
-      size='icon'
-      className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
-    >
-      <Avatar
-        src={userImageUrl}
-        alt={displayName || 'User avatar'}
-        name={displayName || userInitials}
-        size='xs'
-        className='h-5 w-5 shrink-0 ring-0 shadow-none'
-      />
-      <span className='sr-only'>Open user menu</span>
-    </Button>
-  );
+        <Icon
+          name='ChevronRight'
+          className='w-3 h-3 text-sidebar-item-icon'
+          aria-hidden='true'
+        />
+      </button>
+    ) : (
+      <Button
+        variant='ghost'
+        size='icon'
+        className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
+      >
+        <Avatar
+          src={userImageUrl}
+          alt={displayName || 'User avatar'}
+          name={displayName || userInitials}
+          size='xs'
+          className='h-5 w-5 shrink-0 ring-0 shadow-none'
+        />
+        <span className='sr-only'>Open user menu</span>
+      </Button>
+    ));
 
   return (
     <>
@@ -381,7 +384,7 @@ export function UserButton({
         variant='dropdown'
         items={dropdownItems}
         trigger={triggerElement}
-        align='end'
+        align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
       />

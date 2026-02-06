@@ -3,9 +3,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
 import { chatAuditLog } from '@/lib/db/schema/chat';
-// eslint-disable-next-line no-restricted-imports -- Direct schema imports, not barrel
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { CORS_HEADERS } from '@/lib/http/headers';
 

@@ -636,7 +636,7 @@ export function useFormState(
 
       return promise;
     },
-    [maxRetries, baseDelay, maxDelay, onRetry, shouldRetryAfterError]
+    [maxRetries, shouldRetryAfterError]
   );
 
   /**

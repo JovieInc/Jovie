@@ -147,7 +147,6 @@ function KanbanColumn<TData>({
   const containerRef = useRef<HTMLFieldSetElement>(null);
   const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual is used intentionally despite React Compiler limitations
   const rowVirtualizer = useVirtualizer({
     count: column.items.length,
     getScrollElement: () => containerRef.current,

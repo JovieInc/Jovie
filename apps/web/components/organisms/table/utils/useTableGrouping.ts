@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Configuration options for the useTableGrouping hook
@@ -144,21 +144,21 @@ export function useTableGrouping<T>({
   }, [enabled, data, getGroupKey, getGroupLabel]);
 
   // Handle intersection entry for sticky header tracking
-  const handleIntersectionEntry = (
-    entry: IntersectionObserverEntry,
-    groups: GroupedData<T>[]
-  ) => {
-    if (!entry.isIntersecting || entry.boundingClientRect.top > 0) return;
+  const handleIntersectionEntry = useCallback(
+    (entry: IntersectionObserverEntry, groups: GroupedData<T>[]) => {
+      if (!entry.isIntersecting || entry.boundingClientRect.top > 0) return;
 
-    // Use .dataset API instead of getAttribute for cleaner access
-    const key = (entry.target as HTMLElement).dataset.groupKey;
-    if (!key) return;
+      // Use .dataset API instead of getAttribute for cleaner access
+      const key = (entry.target as HTMLElement).dataset.groupKey;
+      if (!key) return;
 
-    const index = groups.findIndex(g => g.key === key);
-    if (index !== -1) {
-      setVisibleGroupIndex(index);
-    }
-  };
+      const index = groups.findIndex(g => g.key === key);
+      if (index !== -1) {
+        setVisibleGroupIndex(index);
+      }
+    },
+    []
+  );
 
   // Set up Intersection Observer for sticky header behavior
   useEffect(() => {
@@ -192,7 +192,7 @@ export function useTableGrouping<T>({
         observerRef.current.disconnect();
       }
     };
-  }, [enabled, groupedData]);
+  }, [enabled, groupedData, handleIntersectionEntry]);
 
   // Function to register a group header for observation
   const observeGroupHeader = (key: string, element: HTMLElement | null) => {

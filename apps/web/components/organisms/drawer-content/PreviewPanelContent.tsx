@@ -173,7 +173,7 @@ export function PreviewPanelContent() {
       {/* Preview Content */}
       <div className='flex-1 min-h-0 overflow-y-auto p-4'>
         <div className='flex flex-col items-center gap-4 pb-8'>
-          <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 dark:ring-white/10 shadow-sm shadow-black/10 dark:shadow-black/40'>
+          <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 dark:ring-white/5 shadow-sm shadow-black/10 dark:shadow-black/40'>
             <ProfilePreview
               username={username}
               displayName={displayName}
