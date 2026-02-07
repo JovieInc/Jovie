@@ -8,7 +8,7 @@
  */
 
 import { Button, Input } from '@jovie/ui';
-import { CheckCircle, Mail, ShieldAlert } from 'lucide-react';
+import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
@@ -49,11 +49,10 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
     <DashboardCard variant='settings'>
       <div className='flex items-start justify-between gap-6'>
         <div className='flex-1'>
-          <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-            <Mail className='h-5 w-5 text-accent' />
+          <h3 className='text-[14px] font-medium text-primary-token'>
             Email addresses
           </h3>
-          <p className='mt-1 text-sm text-secondary max-w-lg'>
+          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
             Manage the email addresses tied to your account. Set a verified
             email as primary to use it for sign-in and notifications.
           </p>

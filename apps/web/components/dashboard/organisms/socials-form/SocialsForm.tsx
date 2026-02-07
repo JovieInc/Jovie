@@ -51,7 +51,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   return (
     <div className='space-y-4' data-testid='socials-form'>
       <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold text-primary-token'>
+        <h3 className='text-[14px] font-medium text-primary-token'>
           Social Media Links
         </h3>
         <Button

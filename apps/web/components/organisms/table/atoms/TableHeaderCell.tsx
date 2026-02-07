@@ -44,7 +44,7 @@ export function TableHeaderCell({
         onClick={onSort}
       />
     ) : (
-      <span className='text-xs font-semibold uppercase tracking-wide'>
+      <span className='text-xs font-medium text-tertiary-token'>
         {children}
       </span>
     );

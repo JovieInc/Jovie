@@ -8,7 +8,7 @@
  */
 
 import { Button } from '@jovie/ui';
-import { WifiOff } from 'lucide-react';
+
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -86,11 +86,10 @@ export function SessionManagementCard({
     <DashboardCard variant='settings'>
       <div className='flex items-start justify-between gap-6'>
         <div className='flex-1'>
-          <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-            <WifiOff className='h-5 w-5 text-accent' />
+          <h3 className='text-[14px] font-medium text-primary-token'>
             Active sessions
           </h3>
-          <p className='mt-1 text-sm text-secondary max-w-lg'>
+          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
             Keep an eye on the devices signed in to your account. End sessions
             you no longer recognise.
           </p>
