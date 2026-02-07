@@ -69,9 +69,9 @@ describeArtist('Artist Profile Pages', () => {
       // Check page title
       await expect(page).toHaveTitle(/Dua Lipa/);
 
-      // Check meta description
+      // Check meta description exists (meta tags are in <head>, not visible)
       const metaDescription = page.locator('meta[name="description"]');
-      await expect(metaDescription).toBeVisible();
+      await expect(metaDescription).toHaveAttribute('content', /.+/);
     });
 
     test('is responsive on mobile', async ({ page }) => {
@@ -80,7 +80,7 @@ describeArtist('Artist Profile Pages', () => {
 
       // Check that content is still readable
       await expect(page.locator('h1')).toContainText('Dua Lipa');
-      await expect(page.getByText(/Levitating/)).toBeVisible();
+      await expect(page.getByText(/Levitating/).first()).toBeVisible();
     });
   });
 
@@ -117,9 +117,9 @@ describeArtist('Artist Profile Pages', () => {
     test('has proper structured data', async ({ page }) => {
       await page.goto('/dualipa');
 
-      // Check for structured data script
+      // Check for structured data script (script tags are in head, not visible)
       const structuredData = page.locator('script[type="application/ld+json"]');
-      await expect(structuredData).toBeVisible();
+      await expect(structuredData).toHaveCount(1);
     });
 
     test('has proper Open Graph tags', async ({ page }) => {
@@ -130,9 +130,9 @@ describeArtist('Artist Profile Pages', () => {
       const ogDescription = page.locator('meta[property="og:description"]');
       const ogImage = page.locator('meta[property="og:image"]');
 
-      await expect(ogTitle).toBeVisible();
-      await expect(ogDescription).toBeVisible();
-      await expect(ogImage).toBeVisible();
+      await expect(ogTitle).toHaveAttribute('content', /.+/);
+      await expect(ogDescription).toHaveAttribute('content', /.+/);
+      await expect(ogImage).toHaveAttribute('content', /.+/);
     });
 
     test('has proper Twitter Card tags', async ({ page }) => {
@@ -145,9 +145,9 @@ describeArtist('Artist Profile Pages', () => {
         'meta[name="twitter:description"]'
       );
 
-      await expect(twitterCard).toBeVisible();
-      await expect(twitterTitle).toBeVisible();
-      await expect(twitterDescription).toBeVisible();
+      await expect(twitterCard).toHaveAttribute('content', /.+/);
+      await expect(twitterTitle).toHaveAttribute('content', /.+/);
+      await expect(twitterDescription).toHaveAttribute('content', /.+/);
     });
   });
 

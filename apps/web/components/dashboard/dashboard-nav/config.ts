@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BarChart3,
   Bell,
   CalendarDays,
   Home,
@@ -68,6 +69,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
+  },
+  {
+    name: 'Analytics',
+    href: APP_ROUTES.ANALYTICS,
+    id: 'analytics',
+    icon: BarChart3,
+    description: 'View your performance analytics',
   },
 ];
 

@@ -78,7 +78,8 @@ export async function GET(request: Request) {
       conditions.push(eq(dspArtistMatches.status, statusFilter));
     }
 
-    // Fetch matches
+    // Fetch matches (capped to prevent unbounded result sets)
+    const MAX_MATCHES = 200;
     const matches = await db
       .select({
         id: dspArtistMatches.id,
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
       .from(dspArtistMatches)
       .where(and(...conditions))
       .orderBy(dspArtistMatches.createdAt)
-      .limit(100);
+      .limit(MAX_MATCHES);
 
     // Transform decimal to number for JSON response
     const transformedMatches = matches.map(match => ({
