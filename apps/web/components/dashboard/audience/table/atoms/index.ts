@@ -10,6 +10,8 @@ export type { AudienceLastSeenCellProps } from './AudienceLastSeenCell';
 export { AudienceLastSeenCell } from './AudienceLastSeenCell';
 export type { AudienceLocationCellProps } from './AudienceLocationCell';
 export { AudienceLocationCell } from './AudienceLocationCell';
+export type { AudienceMobileCardProps } from './AudienceMobileCard';
+export { AudienceMobileCard } from './AudienceMobileCard';
 export type { AudienceRowSelectionCellProps } from './AudienceRowSelectionCell';
 export { AudienceRowSelectionCell } from './AudienceRowSelectionCell';
 export type { AudienceTypeBadgeProps } from './AudienceTypeBadge';
