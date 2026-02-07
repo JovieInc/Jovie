@@ -22,6 +22,7 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
@@ -295,6 +296,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <ReleasesEmptyState
                 onConnected={handleArtistConnected}
                 onImportStart={handleImportStart}
+              />
+            )}
+
+            {/* Apple Music sync status banner */}
+            {showReleasesTable && rows[0]?.profileId && (
+              <AppleMusicSyncBanner
+                profileId={rows[0].profileId}
+                spotifyConnected={isConnected}
+                releases={rows}
+                className='mx-4 mt-2'
               />
             )}
 

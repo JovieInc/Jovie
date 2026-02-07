@@ -1,16 +1,16 @@
 import { redirect } from 'next/navigation';
 
-import { APP_ROUTES } from '@/constants/routes';
+import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../../dashboard/actions';
 
 export const runtime = 'nodejs';
 
-export default async function SettingsProfilePage() {
+export default async function SettingsArtistProfilePage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/profile');
+    redirect('/sign-in?redirect_url=/app/settings/artist-profile');
   }
 
   const dashboardData = await getDashboardData();
@@ -18,5 +18,5 @@ export default async function SettingsProfilePage() {
     redirect('/onboarding');
   }
 
-  redirect(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+  return <DashboardSettings focusSection='artist-profile' />;
 }

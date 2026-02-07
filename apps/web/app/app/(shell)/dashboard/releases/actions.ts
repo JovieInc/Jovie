@@ -37,6 +37,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
 
@@ -375,6 +376,13 @@ export async function syncFromSpotify(): Promise<{
       source: 'spotify',
     });
 
+    // Re-trigger DSP artist discovery on resync to pick up new ISRCs
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profile.id,
+      spotifyArtistId: profile.spotifyId,
+      targetProviders: ['apple_music'],
+    });
+
     return {
       success: true,
       message: `Successfully synced ${result.imported} releases from Spotify.`,
@@ -493,6 +501,14 @@ export async function connectSpotifyArtist(params: {
       imported: result.imported,
       source: 'spotify',
       isInitialConnect: true,
+    });
+
+    // Auto-trigger DSP artist discovery (Apple Music matching via ISRCs)
+    // Fire-and-forget: don't block the response on discovery
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profile.id,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: ['apple_music'],
     });
 
     return {

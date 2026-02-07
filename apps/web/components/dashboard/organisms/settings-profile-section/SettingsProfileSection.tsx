@@ -75,7 +75,7 @@ export function SettingsProfileSection({
       <div className='flex flex-col gap-6'>
         <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div>
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-secondary-token'>
               Photo, name, username.
             </p>
           </div>
@@ -99,7 +99,7 @@ export function SettingsProfileSection({
                 className='mx-auto animate-in fade-in duration-300'
               />
             </div>
-            <p className='text-sm text-secondary text-center mt-3'>
+            <p className='text-[13px] text-secondary-token text-center mt-3'>
               Drag & drop or click to upload.
             </p>
           </div>

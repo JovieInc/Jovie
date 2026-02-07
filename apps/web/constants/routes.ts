@@ -24,6 +24,7 @@ export const APP_ROUTES = {
 
   // Settings
   SETTINGS: '/app/settings',
+  SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
   SETTINGS_BRANDING: '/app/settings/branding',
