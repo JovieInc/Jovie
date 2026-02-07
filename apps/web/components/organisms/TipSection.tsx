@@ -7,6 +7,19 @@ import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { captureError } from '@/lib/error-tracking';
 
+const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
+
+function isAllowedVenmoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === 'https:' && ALLOWED_VENMO_HOSTS.has(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface TipSectionProps {
   readonly handle: string;
   readonly artistName: string;
@@ -53,19 +66,7 @@ export function TipSection({
 
   const handleVenmoPayment = (amount: number) => {
     if (!venmoLink || !onVenmoPayment) return;
-
-    // Validate Venmo URL host before opening
-    try {
-      const parsed = new URL(venmoLink);
-      if (
-        parsed.protocol !== 'https:' ||
-        (parsed.hostname !== 'venmo.com' && parsed.hostname !== 'www.venmo.com')
-      ) {
-        return;
-      }
-    } catch {
-      return;
-    }
+    if (!isAllowedVenmoUrl(venmoLink)) return;
 
     const sep = venmoLink.includes('?') ? '&' : '?';
     const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(

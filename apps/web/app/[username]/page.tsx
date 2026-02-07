@@ -326,10 +326,6 @@ interface Props {
   }>;
 }
 
-/**
- * Non-blocking feature flag check with timeout.
- * Returns false if the check takes too long, avoiding render delays.
- */
 export default async function ArtistPage({
   params,
   searchParams,
@@ -407,7 +403,6 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  const dynamicEnabled = creatorIsPro;
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
@@ -478,7 +473,7 @@ export default async function ArtistPage({
         subtitle={subtitle}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
-        enableDynamicEngagement={dynamicEnabled}
+        enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
