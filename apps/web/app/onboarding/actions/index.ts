@@ -12,6 +12,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { isSecureEnv } from '@/lib/env-server';
 import {
   createOnboardingError,
@@ -221,6 +222,12 @@ export async function completeOnboarding({
       maxAge: 120, // 2 minutes - enough time to view completion step before going to dashboard
       path: '/',
     });
+
+    // Invalidate public profile cache so the profile page reflects the new isPublic state.
+    // Without this, a stale not_found result cached by unstable_cache would persist
+    // for up to 1 hour after onboarding completes (e.g., waitlist profiles that were
+    // previously visited while isPublic was false).
+    await invalidateProfileCache(completion.username);
 
     // Invalidate dashboard data cache to prevent stale data causing redirect loops
     // This ensures the app layout gets fresh data showing onboarding is complete

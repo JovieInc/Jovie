@@ -58,35 +58,17 @@ export function identify(userId: string, traits?: Record<string, unknown>) {
   void traits;
 }
 
-// Feature flag constants for type safety
-export const FEATURE_FLAGS = {
-  CLAIM_HANDLE: 'feature_claim_handle',
-  BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
-} as const;
+// Re-export client hooks from feature-flags module
+export {
+  useFeatureGate as useFeatureFlag,
+  useFeatureGateWithLoading as useFeatureFlagWithLoading,
+} from '@/lib/feature-flags/client';
+export type { FeatureFlagKey as FeatureFlagName } from '@/lib/feature-flags/shared';
+export { FEATURE_FLAG_KEYS as FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
-export type FeatureFlagName =
-  (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
-
-// Lightweight feature flag helpers (client-only)
-// Use defaultValue for safe rendering before flags load
+// Lightweight helper for non-hook contexts
 export function isFeatureEnabled(_flag: string): boolean {
   void _flag;
+  // This is a static helper - use hooks in components
   return false;
-}
-
-export function useFeatureFlag(
-  _flag: string,
-  defaultValue: boolean = false
-): boolean {
-  void _flag;
-  return defaultValue;
-}
-
-// Hook with loading state to prevent flash of content
-export function useFeatureFlagWithLoading(
-  _flag: string,
-  defaultValue: boolean = false
-): { enabled: boolean; loading: boolean } {
-  void _flag;
-  return { enabled: defaultValue, loading: false };
 }

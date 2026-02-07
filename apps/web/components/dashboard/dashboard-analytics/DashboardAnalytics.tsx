@@ -2,10 +2,9 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { Globe, Link2, MapPin } from 'lucide-react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import type { ComponentType, SVGProps } from 'react';
 import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { AnalyticsFunnel } from './AnalyticsFunnel';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
@@ -24,6 +23,121 @@ function formatLinkType(linkType: string): string {
   return typeMap[linkType] || linkType;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Stat card — compact metric with optional meta line                */
+/* ------------------------------------------------------------------ */
+
+function StatCard({
+  label,
+  value,
+  meta,
+  loading,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly meta?: string;
+  readonly loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+        <LoadingSkeleton
+          height='h-3'
+          width='w-20'
+          rounded='sm'
+          className='mb-3'
+        />
+        <LoadingSkeleton height='h-7' width='w-16' rounded='sm' />
+      </div>
+    );
+  }
+
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <p className='text-[13px] text-secondary-token'>{label}</p>
+      <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
+        {value}
+      </p>
+      {meta && <p className='mt-1 text-[11px] text-tertiary-token'>{meta}</p>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  List section — ranked list inside a card                          */
+/* ------------------------------------------------------------------ */
+
+interface ListItem {
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
+}
+
+function ListSection({
+  title,
+  icon: Icon,
+  loading,
+  items,
+  emptyMessage,
+}: {
+  readonly title: string;
+  readonly icon: ComponentType<SVGProps<SVGSVGElement>>;
+  readonly loading: boolean;
+  readonly items: readonly ListItem[];
+  readonly emptyMessage: string;
+}) {
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <div className='flex items-center gap-2 mb-4'>
+        <Icon className='h-4 w-4 text-tertiary-token' />
+        <h3 className='text-[13px] font-medium text-secondary-token'>
+          {title}
+        </h3>
+      </div>
+
+      {loading ? (
+        <ul className='space-y-3' aria-hidden='true'>
+          {LOADING_SKELETON_KEYS.map(key => (
+            <li key={key} className='flex items-center justify-between'>
+              <LoadingSkeleton height='h-4' width='w-28' rounded='sm' />
+              <LoadingSkeleton height='h-4' width='w-10' rounded='sm' />
+            </li>
+          ))}
+        </ul>
+      ) : items.length > 0 ? (
+        <ul className='space-y-2.5'>
+          {items.map((item, index) => (
+            <li
+              key={item.key}
+              className='flex items-center justify-between group'
+            >
+              <div className='flex items-center gap-2 min-w-0 flex-1'>
+                <span className='text-[11px] font-medium text-tertiary-token w-4 tabular-nums'>
+                  {index + 1}
+                </span>
+                <span className='text-[13px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
+                  {item.label}
+                </span>
+              </div>
+              <span className='text-[13px] font-medium text-primary-token tabular-nums ml-2'>
+                {item.value}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className='text-[13px] text-tertiary-token py-4 text-center'>
+          {emptyMessage}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main analytics dashboard                                          */
+/* ------------------------------------------------------------------ */
+
 export function DashboardAnalytics() {
   const {
     artist,
@@ -41,16 +155,15 @@ export function DashboardAnalytics() {
 
   if (!artist) return null;
 
+  const fmt = Intl.NumberFormat();
+
   return (
-    <div className='space-y-8'>
+    <div className='space-y-6'>
       <h1 className='sr-only'>Analytics</h1>
+
       {/* Header */}
-      <div className='flex items-start justify-between'>
-        <div>
-          <p className='text-secondary-token'>
-            Track your audience growth and engagement
-          </p>
-        </div>
+      <div className='flex items-center justify-between'>
+        <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>
         <div className='flex items-center gap-2'>
           <DashboardRefreshButton
             ariaLabel='Refresh analytics'
@@ -73,240 +186,104 @@ export function DashboardAnalytics() {
         id={rangePanelId}
         role='tabpanel'
         aria-labelledby={activeRangeTabId}
-        className='space-y-8'
+        className='space-y-4'
       >
-        {/* Hero Funnel Section */}
-        <DashboardCard variant='analytics' className='p-8'>
-          <div className='text-center mb-8'>
-            <h2 className='text-lg font-semibold text-primary-token'>
-              Conversion Funnel
-            </h2>
-            <p className='text-sm text-secondary-token mt-1'>{rangeLabel}</p>
-          </div>
-
-          {loading ? (
-            <div className='flex flex-col items-center gap-4'>
-              <LoadingSkeleton height='h-24' width='w-full' rounded='lg' />
-              <LoadingSkeleton height='h-20' width='w-3/4' rounded='lg' />
-              <LoadingSkeleton height='h-16' width='w-1/2' rounded='lg' />
-            </div>
-          ) : (
-            <AnalyticsFunnel
-              profileViews={data?.profile_views ?? 0}
-              uniqueUsers={data?.unique_users ?? 0}
-              subscribers={data?.subscribers ?? 0}
-            />
-          )}
-
-          {error && (
-            <p className='mt-4 text-sm text-center text-destructive'>{error}</p>
-          )}
-        </DashboardCard>
-
-        {/* Stats Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-          {/* Top Cities */}
-          <DashboardCard variant='analytics' className='p-6'>
-            <div className='flex items-center gap-2 mb-5'>
-              <div className='flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--color-accent-subtle)]'>
-                <MapPin className='h-4 w-4 text-accent' />
-              </div>
-              <h3 className='text-sm font-semibold text-primary-token'>
-                Top Cities
-              </h3>
-            </div>
-
-            {loading ? (
-              <ul className='space-y-3' aria-hidden='true'>
-                {LOADING_SKELETON_KEYS.map(key => (
-                  <li key={key} className='flex items-center justify-between'>
-                    <LoadingSkeleton height='h-4' width='w-28' rounded='md' />
-                    <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul className='space-y-3'>
-                {(data?.top_cities ?? []).length > 0 ? (
-                  data?.top_cities.map((c, index) => (
-                    <li
-                      key={c.city}
-                      className='flex items-center justify-between group'
-                    >
-                      <div className='flex items-center gap-2'>
-                        <span className='text-xs font-medium text-tertiary-token w-4'>
-                          {index + 1}
-                        </span>
-                        <span className='text-sm text-secondary-token group-hover:text-primary-token transition-colors'>
-                          {c.city}
-                        </span>
-                      </div>
-                      <span className='text-sm font-semibold text-primary-token tabular-nums'>
-                        {Intl.NumberFormat().format(c.count)}
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <li className='text-sm text-secondary-token py-4 text-center'>
-                    No city data yet
-                  </li>
-                )}
-              </ul>
-            )}
-          </DashboardCard>
-
-          {/* Top Traffic Sources */}
-          <DashboardCard variant='analytics' className='p-6'>
-            <div className='flex items-center gap-2 mb-5'>
-              <div className='flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--color-accent-subtle)]'>
-                <Globe className='h-4 w-4 text-accent' />
-              </div>
-              <h3 className='text-sm font-semibold text-primary-token'>
-                Traffic Sources
-              </h3>
-            </div>
-
-            {loading ? (
-              <ul className='space-y-3' aria-hidden='true'>
-                {LOADING_SKELETON_KEYS.map(key => (
-                  <li key={key} className='flex items-center justify-between'>
-                    <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
-                    <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul className='space-y-3'>
-                {(data?.top_referrers ?? []).length > 0 ? (
-                  data?.top_referrers.map((r, index) => (
-                    <li
-                      key={r.referrer || 'direct'}
-                      className='flex items-center justify-between group'
-                    >
-                      <div className='flex items-center gap-2 min-w-0 flex-1'>
-                        <span className='text-xs font-medium text-tertiary-token w-4'>
-                          {index + 1}
-                        </span>
-                        <span className='text-sm text-secondary-token group-hover:text-primary-token transition-colors truncate'>
-                          {r.referrer || 'Direct'}
-                        </span>
-                      </div>
-                      <span className='text-sm font-semibold text-primary-token tabular-nums ml-2'>
-                        {Intl.NumberFormat().format(r.count)}
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <li className='text-sm text-secondary-token py-4 text-center'>
-                    No referrer data yet
-                  </li>
-                )}
-              </ul>
-            )}
-          </DashboardCard>
-
-          {/* Top Links */}
-          <DashboardCard variant='analytics' className='p-6'>
-            <div className='flex items-center gap-2 mb-5'>
-              <div className='flex items-center justify-center h-8 w-8 rounded-lg bg-[var(--color-accent-subtle)]'>
-                <Link2 className='h-4 w-4 text-accent' />
-              </div>
-              <h3 className='text-sm font-semibold text-primary-token'>
-                Top Links
-              </h3>
-            </div>
-
-            {loading ? (
-              <ul className='space-y-3' aria-hidden='true'>
-                {LOADING_SKELETON_KEYS.map(key => (
-                  <li key={key} className='flex items-center justify-between'>
-                    <LoadingSkeleton height='h-4' width='w-28' rounded='md' />
-                    <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul className='space-y-3'>
-                {(data?.top_links ?? []).length > 0 ? (
-                  data?.top_links?.map((link, index) => (
-                    <li
-                      key={link.id}
-                      className='flex items-center justify-between group'
-                    >
-                      <div className='flex items-center gap-2 min-w-0 flex-1'>
-                        <span className='text-xs font-medium text-tertiary-token w-4'>
-                          {index + 1}
-                        </span>
-                        <span className='text-sm text-secondary-token group-hover:text-primary-token transition-colors truncate'>
-                          {formatLinkType(link.url)}
-                        </span>
-                      </div>
-                      <span className='text-sm font-semibold text-primary-token tabular-nums ml-2'>
-                        {Intl.NumberFormat().format(link.clicks)}
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <li className='text-sm text-secondary-token py-4 text-center'>
-                    No link data yet
-                  </li>
-                )}
-              </ul>
-            )}
-          </DashboardCard>
+        {/* Primary metrics — conversion funnel as stat cards */}
+        <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+          <StatCard
+            label='Profile Views'
+            value={fmt.format(data?.profile_views ?? 0)}
+            meta='Total page visits'
+            loading={loading}
+          />
+          <StatCard
+            label='Unique Visitors'
+            value={fmt.format(data?.unique_users ?? 0)}
+            meta={
+              (data?.profile_views ?? 0) > 0
+                ? `${Math.round(((data?.unique_users ?? 0) / (data?.profile_views ?? 1)) * 100)}% of views`
+                : undefined
+            }
+            loading={loading}
+          />
+          <StatCard
+            label='Subscribers'
+            value={fmt.format(data?.subscribers ?? 0)}
+            meta={
+              (data?.unique_users ?? 0) > 0
+                ? `${Math.round(((data?.subscribers ?? 0) / (data?.unique_users ?? 1)) * 100)}% conversion`
+                : undefined
+            }
+            loading={loading}
+          />
         </div>
 
-        {/* Additional Metrics Row */}
-        {typeof data?.listen_clicks === 'number' &&
+        {/* Secondary metrics */}
+        {!loading &&
+          typeof data?.listen_clicks === 'number' &&
           typeof data?.identified_users === 'number' && (
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
-              <DashboardCard variant='analytics' className='p-5'>
-                <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token'>
-                  Capture Rate
-                </p>
-                <p className='mt-2 text-2xl font-bold tracking-tight text-primary-token'>
-                  {data.capture_rate ?? 0}%
-                </p>
-                <p className='mt-1 text-xs text-secondary-token'>
-                  Visitors to subscribers
-                </p>
-              </DashboardCard>
-
-              <DashboardCard variant='analytics' className='p-5'>
-                <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token'>
-                  Listen Clicks
-                </p>
-                <p className='mt-2 text-2xl font-bold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.listen_clicks)}
-                </p>
-                <p className='mt-1 text-xs text-secondary-token'>
-                  {rangeLabel}
-                </p>
-              </DashboardCard>
-
-              <DashboardCard variant='analytics' className='p-5'>
-                <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token'>
-                  Identified Users
-                </p>
-                <p className='mt-2 text-2xl font-bold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.identified_users)}
-                </p>
-                <p className='mt-1 text-xs text-secondary-token'>
-                  {rangeLabel}
-                </p>
-              </DashboardCard>
-
-              <DashboardCard variant='analytics' className='p-5'>
-                <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token'>
-                  Total Clicks
-                </p>
-                <p className='mt-2 text-2xl font-bold tracking-tight text-primary-token'>
-                  {Intl.NumberFormat().format(data.total_clicks ?? 0)}
-                </p>
-                <p className='mt-1 text-xs text-secondary-token'>All time</p>
-              </DashboardCard>
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-4'>
+              <StatCard
+                label='Capture Rate'
+                value={`${data.capture_rate ?? 0}%`}
+                meta='Visitors to subscribers'
+              />
+              <StatCard
+                label='Listen Clicks'
+                value={fmt.format(data.listen_clicks)}
+              />
+              <StatCard
+                label='Identified Users'
+                value={fmt.format(data.identified_users)}
+              />
+              <StatCard
+                label='Total Clicks'
+                value={fmt.format(data.total_clicks ?? 0)}
+                meta='All time'
+              />
             </div>
           )}
+
+        {error && (
+          <p className='text-[13px] text-center text-destructive'>{error}</p>
+        )}
+
+        {/* Lists */}
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          <ListSection
+            title='Top Cities'
+            icon={MapPin}
+            loading={loading}
+            items={(data?.top_cities ?? []).map(c => ({
+              key: c.city,
+              label: c.city,
+              value: fmt.format(c.count),
+            }))}
+            emptyMessage='No city data yet'
+          />
+          <ListSection
+            title='Traffic Sources'
+            icon={Globe}
+            loading={loading}
+            items={(data?.top_referrers ?? []).map(r => ({
+              key: r.referrer || 'direct',
+              label: r.referrer || 'Direct',
+              value: fmt.format(r.count),
+            }))}
+            emptyMessage='No referrer data yet'
+          />
+          <ListSection
+            title='Top Links'
+            icon={Link2}
+            loading={loading}
+            items={(data?.top_links ?? []).map(link => ({
+              key: link.id,
+              label: formatLinkType(link.url),
+              value: fmt.format(link.clicks),
+            }))}
+            emptyMessage='No link data yet'
+          />
+        </div>
       </div>
     </div>
   );
