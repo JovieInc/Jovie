@@ -85,7 +85,8 @@ export function RecentChats() {
       }
 
       notifications.success('Chat deleted');
-    } catch {
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
       notifications.error('Failed to delete chat');
     } finally {
       setDeleteTarget(null);
@@ -153,7 +154,7 @@ export function RecentChats() {
                         onClick={() => setDeleteTarget({ id: convo.id, title })}
                         className='text-destructive focus:text-destructive'
                       >
-                        <Trash2 className='size-4' />
+                        <Trash2 className='size-4' aria-hidden='true' />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -168,7 +169,7 @@ export function RecentChats() {
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={open => {
-          if (!open) setDeleteTarget(null);
+          if (!open && !deleteConversation.isPending) setDeleteTarget(null);
         }}
       >
         <AlertDialogContent className='max-w-sm'>
