@@ -121,7 +121,7 @@ const fetchProfileAndLinks = async (
   try {
     const result = await getCreatorProfileWithLinks(username);
 
-    if (!result || !result.isPublic) {
+    if (!result || result.isPublic === false) {
       return {
         profile: null,
         links: [],
@@ -218,6 +218,9 @@ const fetchProfileAndLinks = async (
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
 // IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
+// IMPORTANT: Only cache successful (status: 'ok') results. Caching not_found/error
+// results causes stale 404s that persist for up to 1 hour when a profile becomes
+// public (e.g., after onboarding completes for a waitlist profile).
 const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
@@ -228,15 +231,30 @@ const getCachedProfileAndLinks = async (username: string) => {
   }
 
   try {
-    return await unstable_cache(
-      async () => fetchProfileAndLinks(username),
+    const result = await unstable_cache(
+      async () => {
+        const data = await fetchProfileAndLinks(username);
+        // Only cache successful results to avoid stale 404s
+        if (data.status !== 'ok') {
+          throw new Error(`__nocache__:${data.status}`);
+        }
+        return data;
+      },
       [`public-profile-${username}`],
       {
         tags: ['public-profile', `public-profile:${username}`],
         revalidate: 3600, // 1 hour
       }
     )();
+    return result;
   } catch (error) {
+    // If the error is our sentinel for non-cacheable results, fetch directly
+    if (
+      error instanceof Error &&
+      error.message.startsWith('__nocache__:')
+    ) {
+      return fetchProfileAndLinks(username);
+    }
     // Cache layer failure - fall back to direct fetch
     captureWarning('[profile] Cache layer failed, using direct fetch', {
       error,
