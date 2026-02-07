@@ -18,26 +18,27 @@ type ViewPayload = z.infer<typeof viewSchema>;
 export async function POST(request: NextRequest) {
   try {
     const clientIP = extractClientIP(request.headers);
-    const rateLimitStatus = publicProfileLimiter.getStatus(clientIP);
 
-    if (rateLimitStatus.blocked) {
+    // Atomically check-and-decrement to avoid TOCTOU race between getStatus + limit
+    const rateLimitResult = await publicProfileLimiter.limit(clientIP);
+
+    if (!rateLimitResult.success) {
+      const retryAfterSeconds = Math.ceil(
+        (rateLimitResult.reset.getTime() - Date.now()) / 1000
+      );
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         {
           status: 429,
           headers: {
             ...NO_STORE_HEADERS,
-            'Retry-After': String(rateLimitStatus.retryAfterSeconds),
-            'X-RateLimit-Limit': String(rateLimitStatus.limit),
-            'X-RateLimit-Remaining': String(rateLimitStatus.remaining),
+            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
+            'X-RateLimit-Limit': String(rateLimitResult.limit),
+            'X-RateLimit-Remaining': String(rateLimitResult.remaining),
           },
         }
       );
     }
-
-    void publicProfileLimiter.limit(clientIP).catch(() => {
-      // Rate limiter errors are non-critical; getStatus above provides fallback protection
-    });
 
     const botResult = detectBot(request, '/api/profile/view');
     if (botResult.isBot) {
@@ -66,6 +67,17 @@ export async function POST(request: NextRequest) {
     }
 
     const { handle } = parsed.data satisfies ViewPayload;
+
+    // Per-handle rate limit: prevent a single IP from inflating views on one profile
+    const handleIpKey = `${handle}:${clientIP}`;
+    const handleResult = await publicProfileLimiter.limit(handleIpKey);
+    if (!handleResult.success) {
+      // Silently succeed — don't reveal per-handle limiting, just skip the increment
+      return NextResponse.json(
+        { success: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
 
     await incrementProfileViews(handle);
 

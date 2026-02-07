@@ -1,7 +1,6 @@
 import { type Metadata } from 'next';
 import { unstable_cache, unstable_noStore } from 'next/cache';
 import { notFound } from 'next/navigation';
-import Script from 'next/script';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
@@ -22,6 +21,11 @@ import {
   isClaimTokenValid,
 } from '@/lib/services/profile';
 import { toISOStringSafe } from '@/lib/utils/date';
+import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_PATTERN,
+} from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -105,6 +109,31 @@ function generateProfileStructuredData(
   return { musicGroupSchema, breadcrumbSchema };
 }
 
+/**
+ * Calculate profile completion percentage based on filled fields.
+ * Fields: displayName, bio, avatarUrl, spotifyUrl, appleMusicUrl, youtubeUrl,
+ * and having at least one social link.
+ */
+function calculateProfileCompletion(result: {
+  displayName?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  spotifyUrl?: string | null;
+  appleMusicUrl?: string | null;
+  youtubeUrl?: string | null;
+  socialLinks?: unknown[] | null;
+}): number {
+  const fields = [
+    result.displayName,
+    result.bio,
+    result.avatarUrl,
+    result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl, // any DSP link
+    result.socialLinks && result.socialLinks.length > 0 ? true : null,
+  ];
+  const filled = fields.filter(Boolean).length;
+  return Math.round((filled / fields.length) * 100);
+}
+
 /** Fetches profile and social links in a single database call. */
 const fetchProfileAndLinks = async (
   username: string
@@ -166,7 +195,7 @@ const fetchProfileAndLinks = async (
           .toLowerCase()
           .trim(),
       display_title: result.displayName || result.username,
-      profile_completion_pct: 80, // Calculate based on filled fields
+      profile_completion_pct: calculateProfileCompletion(result),
       created_at: toISOStringSafe(result.createdAt),
       updated_at: toISOStringSafe(result.updatedAt),
     };
@@ -306,6 +335,15 @@ export default async function ArtistPage({
   searchParams,
 }: Readonly<Props>) {
   const { username } = await params;
+
+  // Early reject obviously invalid usernames before hitting the database
+  if (
+    username.length > USERNAME_MAX_LENGTH ||
+    !USERNAME_PATTERN.test(username)
+  ) {
+    notFound();
+  }
+
   const resolvedSearchParams = await searchParams;
   const { mode = 'profile', claim_token: claimTokenParam } =
     resolvedSearchParams || {};
@@ -342,6 +380,7 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
+    creatorClerkId,
     latestRelease,
   } = profileResult;
 
@@ -398,23 +437,30 @@ export default async function ArtistPage({
 
   return (
     <>
-      {/* JSON-LD Structured Data for SEO */}
-      <Script
-        id='musicgroup-schema'
+      {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
+      <script
         type='application/ld+json'
-        strategy='afterInteractive'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(musicGroupSchema) }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLdStringify(musicGroupSchema),
+        }}
       />
-      <Script
-        id='breadcrumb-schema'
+      <script
         type='application/ld+json'
-        strategy='afterInteractive'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLdStringify(breadcrumbSchema),
+        }}
       />
 
-      <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      {/* Prevent claim token leakage via Referer header */}
+      {hasClaimToken && <meta name='referrer' content='no-referrer' />}
+
+      <ProfileViewTracker
+        handle={artist.handle}
+        artistId={artist.id}
+        ownerClerkId={creatorClerkId}
+      />
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       {showClaimBanner && (
@@ -443,7 +489,9 @@ export default async function ArtistPage({
 // Generate metadata for the page with comprehensive SEO
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  const { profile, genres, status } = await getProfileAndLinks(username);
+  const { profile, genres, status } = await getProfileAndLinks(
+    username.toLowerCase()
+  );
 
   if (status === 'error') {
     return {

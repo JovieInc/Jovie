@@ -10,7 +10,6 @@
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
-import Script from 'next/script';
 import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { UnreleasedReleaseHero } from '@/components/release';
@@ -29,6 +28,7 @@ import {
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
@@ -391,20 +391,20 @@ export default async function ContentSmartLinkPage({
 
   return (
     <>
-      {/* JSON-LD Structured Data for SEO */}
-      <Script
-        id='music-schema'
+      {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
+      <script
         type='application/ld+json'
-        strategy='afterInteractive'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(musicSchema) }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLdStringify(musicSchema),
+        }}
       />
-      <Script
-        id='breadcrumb-schema'
+      <script
         type='application/ld+json'
-        strategy='afterInteractive'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLdStringify(breadcrumbSchema),
+        }}
       />
 
       {isUnreleased ? (

@@ -202,7 +202,6 @@ export function StaticArtistPage({
   enableDynamicEngagement = false,
   latestRelease,
 }: StaticArtistPageProps) {
-  const isPublicProfileMode = mode === 'profile';
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
 
   return (
@@ -213,7 +212,7 @@ export function StaticArtistPage({
         contacts={contacts}
         subtitle={subtitle}
         showSocialBar={mode !== 'listen'}
-        showTipButton={isPublicProfileMode ? false : showTipButton}
+        showTipButton={showTipButton}
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}
