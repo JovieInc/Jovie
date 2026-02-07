@@ -1,12 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/universal-link-input';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { InlineChatAreaRef } from '../InlineChatArea';
@@ -90,6 +92,8 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   sidebarOpen = false,
   artistContext,
 }: GroupedLinksManagerProps<T>) {
+  const router = useRouter();
+
   // Link state management
   const {
     links,
@@ -148,10 +152,20 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   const [chatExpanded, setChatExpanded] = useState(false);
   const chatEnabled = !!artistContext;
 
-  // Chat submit handler
-  const handleChatSubmit = useCallback((message: string) => {
-    chatAreaRef.current?.submitMessage(message);
-  }, []);
+  // Chat submit handler — if InlineChatArea is mounted (Mode 3), submit inline;
+  // otherwise navigate to the dedicated chat page so the message isn't lost.
+  const handleChatSubmit = useCallback(
+    (message: string) => {
+      if (chatAreaRef.current) {
+        chatAreaRef.current.submitMessage(message);
+      } else {
+        // Encode message as a query param so the chat page can pick it up
+        const encoded = encodeURIComponent(message);
+        router.push(`${APP_ROUTES.CHAT}?q=${encoded}`);
+      }
+    },
+    [router]
+  );
 
   // Pending preview management
   const {
@@ -286,13 +300,7 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   }
 
   // Mode 2: Sidebar Closed, No Links - input at top with empty state
-  // TODO(chat-ux): InlineChatArea is NOT rendered here, so chat messages from
-  // UniversalLinkInput silently fail (chatAreaRef.current is null). New users
-  // who type a question see nothing happen. Fix options:
-  //   A) Render InlineChatArea here so chat works from day 1
-  //   B) Route new users to the full JovieChat component (components/jovie/JovieChat.tsx)
-  //      which already has a proper ChatGPT-style empty state with suggested prompts
-  //   C) Show SuggestedPrompts in this empty state to guide users toward links AND chat
+  // Chat messages typed here navigate to /app/chat via handleChatSubmit fallback.
   if (!hasAnyLinks) {
     return (
       <section

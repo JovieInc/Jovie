@@ -180,7 +180,7 @@ function FloatingSidebar({
           />
           {isDashboardOrAdmin && (
             <Link
-              href='/app'
+              href={APP_ROUTES.CHAT}
               aria-label='New chat'
               className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent'
             >
@@ -282,12 +282,10 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               />
             )}
 
-            {/* Compose icon - Linear-style */}
-            {/* TODO(chat-ux): aria-label says "New chat" but /app redirects to profile page.
-                Either link to a real chat page or change the label to match actual behavior. */}
+            {/* Compose icon - Linear-style: starts a new chat */}
             {!isInSettings && isDashboardOrAdmin && (
               <Link
-                href='/app'
+                href={APP_ROUTES.CHAT}
                 aria-label='New chat'
                 className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
               >

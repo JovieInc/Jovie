@@ -86,11 +86,6 @@ function getToolInvocations(
   return parts.filter(isToolInvocationPart);
 }
 
-// TODO(chat-ux): This component caps at max-h-80 (320px) and requires a click
-// to expand. For a ChatGPT-style experience, consider:
-//   - Removing the height cap or making it user-resizable
-//   - Auto-expanding to fill available space when the user is actively chatting
-//   - Using the full JovieChat component for dedicated chat sessions instead
 export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
   InlineChatAreaProps

@@ -86,15 +86,12 @@ export const secondaryNavigation: NavItem[] = [
     icon: Banknote,
     description: 'Manage tips and monetization',
   },
-  // TODO(chat-ux): Links to /app/chat which redirects to /app/dashboard/profile.
-  // Users clicking "Chat" expect a chat experience but land on profile editing.
-  // Either render JovieChat at /app/chat or remove this until chat has a dedicated route.
   {
     name: 'Chat',
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
-    description: 'Messages and conversations',
+    description: 'Ask Jovie anything about your profile',
   },
 ];
 

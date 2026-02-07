@@ -19,8 +19,10 @@ export function JovieChat({
   artistContext,
   conversationId,
   onConversationCreate,
+  initialQuery,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialQuerySubmitted = useRef(false);
 
   const {
     input,
@@ -35,12 +37,21 @@ export function JovieChat({
     handleSubmit,
     handleRetry,
     handleSuggestedPrompt,
+    submitMessage,
   } = useJovieChat({
     profileId,
     artistContext,
     conversationId,
     onConversationCreate,
   });
+
+  // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
+  useEffect(() => {
+    if (initialQuery && !initialQuerySubmitted.current && !isLoadingConversation) {
+      initialQuerySubmitted.current = true;
+      submitMessage(initialQuery);
+    }
+  }, [initialQuery, isLoadingConversation, submitMessage]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
