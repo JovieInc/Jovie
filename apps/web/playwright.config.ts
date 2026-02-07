@@ -56,7 +56,7 @@ export default defineConfig({
   // Turbopack compilation can take 30+ seconds for dashboard, so smoke tests need more time
   timeout: isSmokeOnly ? 90_000 : 120_000, // 90s for smoke (Turbopack), 120s for full
   expect: {
-    timeout: isSmokeOnly ? 20_000 : 20_000, // 20s for both (hydration can be slow)
+    timeout: 20_000,
     // Visual regression snapshot settings
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
@@ -89,7 +89,14 @@ export default defineConfig({
 
   projects: [
     {
+      name: 'auth-setup',
+      testMatch: /auth\.setup\.ts/,
+      // biome-ignore lint/suspicious/noExplicitAny: Playwright requires this pattern for setup projects
+      use: { storageState: undefined as any },
+    },
+    {
       name: 'chromium',
+      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
     // Only run Firefox in full-matrix workflow (weekly comprehensive testing)
@@ -97,6 +104,7 @@ export default defineConfig({
       ? [
           {
             name: 'firefox',
+            dependencies: ['auth-setup'],
             use: { ...devices['Desktop Firefox'] },
           },
         ]
@@ -106,6 +114,7 @@ export default defineConfig({
       ? [
           {
             name: 'webkit',
+            dependencies: ['auth-setup'],
             use: { ...devices['Desktop Safari'] },
           },
         ]

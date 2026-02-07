@@ -1,10 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Build extra HTTP headers for Vercel Deployment Protection bypass
+// Both headers are required for browser automation to work correctly
+// See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
 const extraHTTPHeaders: Record<string, string> = {};
 if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
   extraHTTPHeaders['x-vercel-protection-bypass'] =
     process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  extraHTTPHeaders['x-vercel-set-bypass-cookie'] = 'samesitenone';
 }
 
 const isCI = !!process.env.CI;
@@ -46,29 +49,40 @@ export default defineConfig({
     navigationTimeout: 45_000,
     actionTimeout: 20_000,
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
+    storageState: 'tests/.auth/user.json',
   },
 
   projects: [
     {
+      name: 'auth-setup',
+      testDir: '../',
+      testMatch: /auth\.setup\.ts/,
+      // biome-ignore lint/suspicious/noExplicitAny: Playwright requires this pattern for setup projects
+      use: { storageState: undefined as any },
+    },
+    {
       name: 'chromium',
+      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',
+      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Firefox'] },
     },
-    // WebKit for comprehensive cross-browser testing
     {
       name: 'webkit',
+      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Safari'] },
     },
-    // Mobile viewports for responsive testing
     {
       name: 'mobile-chrome',
+      dependencies: ['auth-setup'],
       use: { ...devices['Pixel 5'] },
     },
     {
       name: 'mobile-safari',
+      dependencies: ['auth-setup'],
       use: { ...devices['iPhone 12'] },
     },
   ],
