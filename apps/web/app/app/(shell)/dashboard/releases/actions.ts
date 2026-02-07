@@ -31,6 +31,7 @@ import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
 } from '@/lib/discography/spotify-import';
+import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import type {
   ProviderKey,
   ReleaseViewModel,
