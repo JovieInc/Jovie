@@ -128,6 +128,8 @@ export const EXPECTED_ERROR_PATTERNS = [
   // Browser-specific
   'deprecated',
   'passive event listener',
+  // Next.js internals — redirect() causes negative performance marks
+  'negative time stamp',
 ] as const;
 
 // ============================================================================
@@ -152,6 +154,7 @@ export interface NetworkDiagnostics {
 export interface SmokeTestContext {
   consoleErrors: string[];
   criticalErrors: string[];
+  uncaughtExceptions: string[];
   networkDiagnostics: NetworkDiagnostics;
 }
 
@@ -219,6 +222,7 @@ export function setupPageMonitoring(page: Page): {
 } {
   const consoleErrors: string[] = [];
   const consoleNetworkErrors: string[] = [];
+  const uncaughtExceptions: string[] = [];
   const failedResponses: NetworkDiagnostics['failedResponses'] = [];
   const failedRequests: NetworkDiagnostics['failedRequests'] = [];
 
@@ -229,6 +233,14 @@ export function setupPageMonitoring(page: Page): {
       if (text.includes('Failed to load resource')) {
         consoleNetworkErrors.push(text);
       }
+    }
+  };
+
+  // Capture uncaught exceptions (pageerror) — these are real crashes
+  const handlePageError = (error: Error) => {
+    const text = error.message || String(error);
+    if (!isExpectedError(text)) {
+      uncaughtExceptions.push(text);
     }
   };
 
@@ -258,6 +270,7 @@ export function setupPageMonitoring(page: Page): {
   };
 
   page.on('console', handleConsole);
+  page.on('pageerror', handlePageError);
   page.on('response', handleResponse);
   page.on('requestfailed', handleRequestFailed);
 
@@ -265,6 +278,7 @@ export function setupPageMonitoring(page: Page): {
     getContext: (): SmokeTestContext => ({
       consoleErrors,
       criticalErrors: filterCriticalErrors(consoleErrors),
+      uncaughtExceptions,
       networkDiagnostics: {
         pageUrl: page.url(),
         failedResponses,
@@ -275,6 +289,7 @@ export function setupPageMonitoring(page: Page): {
     }),
     cleanup: () => {
       page.off('console', handleConsole);
+      page.off('pageerror', handlePageError);
       page.off('response', handleResponse);
       page.off('requestfailed', handleRequestFailed);
     },
@@ -315,6 +330,12 @@ export async function assertNoCriticalErrors(
   expect(
     context.criticalErrors,
     `Critical console errors found:\n${context.criticalErrors.join('\n')}`
+  ).toHaveLength(0);
+
+  // Assert no uncaught exceptions
+  expect(
+    context.uncaughtExceptions,
+    `Uncaught exceptions found:\n${context.uncaughtExceptions.join('\n')}`
   ).toHaveLength(0);
 }
 

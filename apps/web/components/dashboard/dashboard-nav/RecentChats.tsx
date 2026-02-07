@@ -2,7 +2,7 @@
 
 import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -37,8 +37,8 @@ function formatRelativeTime(date: Date): string {
 }
 
 export function RecentChats() {
-  const searchParams = useSearchParams();
-  const activeConversationId = searchParams.get('conversation');
+  const params = useParams<{ id?: string }>();
+  const activeConversationId = params.id ?? null;
 
   const { data: conversations } = useChatConversationsQuery({
     limit: MAX_RECENT_CHATS,
@@ -52,7 +52,7 @@ export function RecentChats() {
     <SidebarCollapsibleGroup label='Recent Chats' defaultOpen={false}>
       <SidebarMenu>
         {conversations.map(convo => {
-          const href = `${APP_ROUTES.PROFILE}?conversation=${convo.id}`;
+          const href = `${APP_ROUTES.CHAT}/${convo.id}`;
           const isActive = activeConversationId === convo.id;
           const title = convo.title || 'Untitled chat';
           const updatedAt = new Date(convo.updatedAt);

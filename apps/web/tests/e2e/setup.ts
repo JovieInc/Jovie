@@ -61,11 +61,10 @@ export const test = base.extend({
     // Use the page
     await usePage(page);
 
-    // After test completion, check for console errors
+    // After test completion, log console errors and warnings
     if (consoleErrors.length > 0) {
       console.warn('Console errors detected during E2E test:');
       consoleErrors.forEach(error => console.warn('  -', error));
-      // Note: Not throwing here to avoid breaking existing tests, just logging
     }
 
     if (consoleWarnings.length > 0) {
