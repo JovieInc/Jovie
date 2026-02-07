@@ -30,7 +30,7 @@ export function SettingsProGateCard({
         <h3 className='text-[14px] font-medium text-primary-token mb-2'>
           {title}
         </h3>
-        <p className='text-sm text-secondary-token mb-4'>{description}</p>
+        <p className='text-[13px] text-secondary-token mb-4'>{description}</p>
         <Button
           onClick={onUpgrade}
           loading={loading}
