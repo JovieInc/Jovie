@@ -63,10 +63,8 @@ export {
   useFeatureGate as useFeatureFlag,
   useFeatureGateWithLoading as useFeatureFlagWithLoading,
 } from '@/lib/feature-flags/client';
-export type { FeatureFlagKey as FeatureFlagName } from '@/lib/feature-flags/server';
-// Feature flag constants for type safety
-// Re-export from server module for consistency
-export { FEATURE_FLAG_KEYS as FEATURE_FLAGS } from '@/lib/feature-flags/server';
+export type { FeatureFlagKey as FeatureFlagName } from '@/lib/feature-flags/shared';
+export { FEATURE_FLAG_KEYS as FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Lightweight helper for non-hook contexts
 export function isFeatureEnabled(_flag: string): boolean {

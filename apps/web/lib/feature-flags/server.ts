@@ -1,26 +1,13 @@
 import 'server-only';
 import Statsig from 'statsig-node';
 import { env } from '@/lib/env-server';
+import {
+  FEATURE_FLAG_KEYS,
+  type FeatureFlagKey,
+  type FeatureFlagsBootstrap,
+} from './shared';
 
-/**
- * Feature flag keys registry
- * Single source of truth for all feature flags used in the application
- */
-export const FEATURE_FLAG_KEYS = {
-  CLAIM_HANDLE: 'feature_claim_handle',
-  BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
-} as const;
-
-export type FeatureFlagKey =
-  (typeof FEATURE_FLAG_KEYS)[keyof typeof FEATURE_FLAG_KEYS];
-
-/**
- * Feature flags bootstrap payload
- * This is serialized and sent to the client for hydration
- */
-export interface FeatureFlagsBootstrap {
-  gates: Record<string, boolean>;
-}
+export { FEATURE_FLAG_KEYS, type FeatureFlagKey, type FeatureFlagsBootstrap };
 
 let statsigInitialized = false;
 
