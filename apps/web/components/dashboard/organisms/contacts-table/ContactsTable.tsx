@@ -18,7 +18,7 @@ interface ContactsTableProps {
   readonly contacts: EditableContact[];
   readonly artistName: string;
   readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
-  readonly onSave: (contact: EditableContact) => Promise<void>;
+  readonly onSave: (contact: EditableContact) => Promise<string | undefined>;
   readonly onDelete: (contact: EditableContact) => void;
   readonly onAddContact: (role?: ContactRole) => void;
 }
@@ -41,16 +41,11 @@ export const ContactsTable = memo(function ContactsTable({
     [contacts, selectedContactId]
   );
 
-  // Track previous contacts length to detect newly added contacts
-  const prevContactsLenRef = useRef(contacts.length);
+  // Auto-select newly added contacts using the isNew flag
   useEffect(() => {
-    const prevLen = prevContactsLenRef.current;
-    prevContactsLenRef.current = contacts.length;
-
-    // A new contact was added — auto-select it in the sidebar
-    if (contacts.length > prevLen && contacts.length > 0) {
-      const newest = contacts[contacts.length - 1];
-      setSelectedContactId(newest.id);
+    const newContact = contacts.find(c => c.isNew);
+    if (newContact) {
+      setSelectedContactId(newContact.id);
     }
   }, [contacts]);
 
@@ -116,7 +111,11 @@ export const ContactsTable = memo(function ContactsTable({
 
   const handleSave = useCallback(async () => {
     if (!selectedContact) return;
-    await onSave(selectedContact);
+    const savedId = await onSave(selectedContact);
+    // Update selection if the contact ID changed (temp → persisted)
+    if (savedId && savedId !== selectedContact.id) {
+      setSelectedContactId(savedId);
+    }
   }, [selectedContact, onSave]);
 
   const handleDelete = useCallback(() => {

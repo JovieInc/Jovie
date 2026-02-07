@@ -101,7 +101,7 @@ export interface UseContactsManagerReturn {
   updateContact: (id: string, updates: Partial<EditableContact>) => void;
   handleToggleTerritory: (contactId: string, territory: string) => void;
   addCustomTerritory: (contactId: string) => void;
-  handleSave: (contact: EditableContact) => Promise<void>;
+  handleSave: (contact: EditableContact) => Promise<string | undefined>;
   handleDelete: (contact: EditableContact) => void;
   confirmDelete: () => Promise<void>;
   cancelDelete: () => void;
@@ -226,7 +226,7 @@ export function useContactsManager({
   );
 
   const handleSave = useCallback(
-    async (contact: EditableContact) => {
+    async (contact: EditableContact): Promise<string | undefined> => {
       const contactId = contact.id;
       const isNewContact = contactId.startsWith('temp-');
 
@@ -271,6 +271,9 @@ export function useContactsManager({
             territory_count: saved.territories.length,
           }
         );
+
+        // Return persisted ID so callers can update selection
+        return saved.id;
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Unable to save contact';
@@ -279,6 +282,7 @@ export function useContactsManager({
           [contactId]: { ...prev[contactId], isSaving: false, error: message },
         }));
         toast.error(message);
+        return undefined;
       }
     },
     [profileId, artistHandle]
@@ -316,8 +320,9 @@ export function useContactsManager({
     const contactId = contact.id;
     setPendingDeleteContact(null);
 
-    // Store backup for rollback
-    const backup = contacts.find(c => c.id === contactId);
+    // Store backup for rollback (preserve original index)
+    const backupIndex = contacts.findIndex(c => c.id === contactId);
+    const backup = backupIndex >= 0 ? contacts[backupIndex] : undefined;
     const backupUiState = uiState[contactId];
 
     // Optimistic delete - remove immediately
@@ -341,9 +346,14 @@ export function useContactsManager({
         role: contact.role,
       });
     } catch (error) {
-      // Rollback on error
+      // Rollback on error — restore at original index to preserve order
       if (backup) {
-        setContacts(prev => [...prev, backup]);
+        setContacts(prev => {
+          const next = [...prev];
+          const insertAt = Math.min(backupIndex, next.length);
+          next.splice(insertAt, 0, backup);
+          return next;
+        });
         setUiState(prev => ({
           ...prev,
           [contactId]: backupUiState ?? { ...DEFAULT_UI_STATE },
