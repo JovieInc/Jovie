@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
@@ -39,8 +40,13 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     console.error('Failed to load Clerk user for entitlements', error);
   }
 
-  // Get billing info which includes isAdmin (avoids redundant DB query)
-  const billing = await getUserBillingInfo();
+  // Check admin status independently of billing using the dedicated admin
+  // role check (Redis-cached, 60s TTL). This avoids losing admin status when
+  // the billing query fails due to transient DB/connection issues.
+  const [adminStatus, billing] = await Promise.all([
+    checkAdminRole(userId),
+    getUserBillingInfo(),
+  ]);
 
   if (!billing.success || !billing.data) {
     return {
@@ -48,17 +54,11 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       userId,
       email: clerkEmail,
       isAuthenticated: true,
-      isAdmin: false,
+      isAdmin: adminStatus,
     };
   }
 
-  // Extract isAdmin from billing data (already fetched, no separate query needed)
-  const {
-    email: emailFromDb,
-    isPro,
-    plan: dbPlan,
-    isAdmin: adminStatus,
-  } = billing.data;
+  const { email: emailFromDb, isPro, plan: dbPlan } = billing.data;
   const effectiveEmail = emailFromDb || clerkEmail;
 
   // Determine plan from billing data
