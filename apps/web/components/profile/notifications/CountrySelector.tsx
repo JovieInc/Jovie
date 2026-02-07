@@ -91,10 +91,10 @@ const CountryOptionButton = memo(function CountryOptionButton({
     <button
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+      className={`w-full flex items-center gap-3 rounded-md px-2 py-1.5 text-[13px] font-medium leading-[20px] transition-colors duration-150 ease-out ${
         isSelected
-          ? 'bg-surface-2 text-primary-token'
-          : 'text-primary-token hover:bg-surface-1'
+          ? 'bg-interactive-hover text-primary-token'
+          : 'text-primary-token hover:bg-interactive-hover'
       }`}
       style={FONT_SYNTHESIS_STYLE}
     >
@@ -141,12 +141,8 @@ export function CountrySelector({
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align='start'
-        sideOffset={4}
-        className='w-64 p-1.5 rounded-xl border border-subtle bg-surface-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)]'
-      >
-        <div className='max-h-64 overflow-y-auto py-1'>
+      <PopoverContent align='start' sideOffset={4} className='w-64 p-1'>
+        <div className='max-h-64 overflow-y-auto'>
           {COUNTRY_OPTIONS.map(option => (
             <CountryOptionButton
               key={option.code}

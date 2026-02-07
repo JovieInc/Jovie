@@ -117,11 +117,7 @@ export function TableStandardToolbar({
                   key={action.label}
                   onClick={action.onClick}
                   disabled={action.disabled}
-                  className={cn(
-                    'flex items-center gap-2',
-                    action.variant === 'destructive' &&
-                      'text-destructive focus:text-destructive'
-                  )}
+                  variant={action.variant}
                 >
                   {action.icon && (
                     <span className='h-4 w-4'>{action.icon}</span>

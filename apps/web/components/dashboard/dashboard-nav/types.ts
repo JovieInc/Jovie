@@ -6,6 +6,7 @@ export interface NavItem {
   id: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   description?: string;
+  children?: NavItem[];
 }
 
 export interface DashboardNavProps {
