@@ -251,7 +251,7 @@ export function createRightMetaCellRenderer() {
       : null;
 
     return (
-      <div className='flex min-w-[180px] md:min-w-[300px] xl:min-w-[420px] items-center justify-end gap-3 text-xs text-secondary-token'>
+      <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-xs text-secondary-token'>
         <div className='min-w-0 flex-1'>
           <SmartLinkCell release={release} />
         </div>
