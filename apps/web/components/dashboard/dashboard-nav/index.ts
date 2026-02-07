@@ -4,6 +4,7 @@ export {
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
+  profileNavItem,
   secondaryNavigation,
   settingsNavigation,
 } from './config';
