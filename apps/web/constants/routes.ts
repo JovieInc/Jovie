@@ -29,6 +29,8 @@ export const APP_ROUTES = {
   SETTINGS_BRANDING: '/app/settings/branding',
   SETTINGS_AD_PIXELS: '/app/settings/ad-pixels',
   SETTINGS_BILLING: '/app/settings/billing',
+  SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
+  SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
 
   // Admin
   ADMIN: '/app/admin',
