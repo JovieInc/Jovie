@@ -4,6 +4,9 @@ import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
+import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 
@@ -20,7 +23,15 @@ export default async function AppShellLayout({
   try {
     // Parallelize auth and dashboard data fetching for better performance
     // Both share getCachedAuth() via React's cache(), so the auth call is deduplicated
-    const dashboardData = await getDashboardData();
+    const [dashboardData, auth] = await Promise.all([
+      getDashboardData(),
+      getCachedAuth(),
+    ]);
+
+    // Evaluate feature flags server-side for this user
+    const featureFlagsBootstrap = await getFeatureFlagsBootstrap(
+      auth.userId ?? null
+    );
 
     return (
       <>
@@ -28,11 +39,13 @@ export default async function AppShellLayout({
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
         <VersionUpdateBannerWrapper />
-        <DashboardDataProvider value={dashboardData}>
-          <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
-            {children}
-          </AuthShellWrapper>
-        </DashboardDataProvider>
+        <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+          <DashboardDataProvider value={dashboardData}>
+            <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
+              {children}
+            </AuthShellWrapper>
+          </DashboardDataProvider>
+        </FeatureFlagsProvider>
       </>
     );
   } catch (error) {
