@@ -42,8 +42,8 @@
   /* Secondary text - rgb(138, 143, 152) → oklch(62% 0.015 255) */
   --linear-text-secondary: oklch(62% 0.015 255);
 
-  /* Tertiary text - rgb(115, 115, 120) → oklch(55% 0.01 260) */
-  --linear-text-tertiary: oklch(55% 0.01 260);
+  /* Tertiary text - oklch(58% 0.01 260) — meets 4.5:1 WCAG AA vs footer bg */
+  --linear-text-tertiary: oklch(58% 0.01 260);
 
   /* Inverse text (on light backgrounds) - rgb(8, 9, 10) → oklch(5% 0.005 260) */
   --linear-text-inverse: oklch(5% 0.005 260);
