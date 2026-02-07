@@ -20,9 +20,6 @@ export interface RightDrawerProps
   readonly contextMenuItems?: CommonDropdownItem[];
 }
 
-const CONTEXT_MENU_CONTENT_CLASS =
-  'min-w-[10.5rem] rounded-lg p-1 shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_16px_50px_rgba(0,0,0,0.55)]';
-
 export function RightDrawer({
   isOpen,
   width,
@@ -83,8 +80,8 @@ export function RightDrawer({
       {hasContextMenu ? (
         <CommonDropdown
           variant='context'
+          size='compact'
           items={contextMenuItems}
-          contentClassName={CONTEXT_MENU_CONTENT_CLASS}
         >
           {innerContent}
         </CommonDropdown>

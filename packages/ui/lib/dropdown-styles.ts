@@ -8,13 +8,17 @@
  * - Select
  * - CommonDropdown
  *
+ * Size variants:
+ * - default: Standard menus (user menu, bulk actions, notifications)
+ *   Content padding: p-1, Item: px-2 py-1.5 text-[13px] leading-[20px]
+ * - compact: Dense menus (table actions, context menus, sidebars)
+ *   Content padding: p-0.5, Item: px-2 py-1 text-[12.5px] leading-[16px]
+ *
  * Design tokens used:
  * - Border radius: rounded-lg (8px)
- * - Content padding: p-1 (4px)
- * - Item padding: px-2 py-1.5 (8px horizontal, 6px vertical)
- * - Font size: text-[13px] (13px) - compact Geist style
- * - Background: bg-surface-2 (elevated dark)
- * - Border: near-invisible (white/[0.06] in dark)
+ * - Background: bg-surface-0 / dark:bg-surface-2 (elevated)
+ * - Border: border-subtle/60 / dark:border-white/[0.06]
+ * - Shadow: consistent across all variants
  * - Transition: duration-150 ease-out
  */
 
@@ -137,16 +141,14 @@ export const popoverContentClasses = [
 ].join(' ');
 
 /**
- * Complete Select content classes
- * Border uses design token (--color-border-default) for consistency across themes
+ * Complete Select content classes — unified with dropdown design
  */
 export const selectContentClasses = [
-  'relative z-50',
+  'relative',
+  DROPDOWN_CONTENT_BASE,
   SELECT_MAX_HEIGHT,
-  'min-w-[8rem] overflow-hidden rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-surface-0 dark:bg-surface-2 p-1 text-primary-token',
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
-  'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
   DROPDOWN_SLIDE_ANIMATIONS,
   SELECT_TRANSFORM_ORIGIN,
 ].join(' ');
@@ -189,14 +191,40 @@ export const CHECKBOX_RADIO_ITEM_BASE =
   'focus-visible:outline-none focus-visible:bg-interactive-hover';
 
 /**
- * Select item base (uses focus-visible:bg-accent for keyboard navigation)
+ * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[16px] outline-none ' +
+  'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-secondary-token ' +
+  'text-primary-token ' +
   'focus-visible:bg-interactive-hover focus-visible:text-primary-token ' +
+  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50';
+
+// ============================================================================
+// COMPACT SIZE VARIANT (table actions, context menus, sidebar menus)
+// ============================================================================
+
+/**
+ * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
+ */
+export const MENU_ITEM_COMPACT =
+  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] outline-none ' +
+  'transition-colors duration-150 ease-out ' +
+  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
+  'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
+  'focus-visible:outline-none focus-visible:bg-interactive-hover ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
+  'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
+
+/**
+ * Compact destructive variant
+ */
+export const MENU_ITEM_COMPACT_DESTRUCTIVE =
+  'text-destructive hover:text-destructive hover:bg-destructive/10 ' +
+  'data-highlighted:text-destructive data-highlighted:bg-destructive/10 ' +
+  'focus-visible:ring-destructive [&_svg]:text-destructive';
 
 // ============================================================================
 // LABEL, SEPARATOR, AND SHORTCUT STYLES
@@ -248,6 +276,40 @@ export const subMenuContentClasses = [
   DROPDOWN_SHADOW,
   DROPDOWN_TRANSITIONS,
   DROPDOWN_SLIDE_ANIMATIONS,
+].join(' ');
+
+// ============================================================================
+// COMPACT CONTENT CLASS COMPOSITIONS
+// ============================================================================
+
+/**
+ * Compact base — same surface/border/animation but tighter padding
+ */
+export const DROPDOWN_CONTENT_COMPACT_BASE =
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-surface-0 dark:bg-surface-2 p-0.5 text-primary-token';
+
+/**
+ * Complete compact DropdownMenu content classes
+ */
+export const dropdownMenuContentCompactClasses = [
+  DROPDOWN_CONTENT_COMPACT_BASE,
+  DROPDOWN_MAX_HEIGHT,
+  DROPDOWN_SHADOW,
+  DROPDOWN_TRANSITIONS,
+  DROPDOWN_SLIDE_ANIMATIONS,
+  DROPDOWN_TRANSFORM_ORIGIN,
+].join(' ');
+
+/**
+ * Complete compact ContextMenu content classes
+ */
+export const contextMenuContentCompactClasses = [
+  DROPDOWN_CONTENT_COMPACT_BASE,
+  CONTEXT_MAX_HEIGHT,
+  DROPDOWN_SHADOW,
+  DROPDOWN_TRANSITIONS,
+  DROPDOWN_SLIDE_ANIMATIONS,
+  CONTEXT_TRANSFORM_ORIGIN,
 ].join(' ');
 
 // ============================================================================
