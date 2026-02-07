@@ -7,6 +7,39 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 /**
+ * Fetch the authenticated user's profile for self-exclusion checks.
+ * Returns null if unauthenticated or profile not found.
+ */
+async function getAuthenticatedUserProfile(): Promise<{
+  profileId: string;
+  usernameNormalized: string;
+  excludeSelf: boolean;
+} | null> {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) return null;
+
+  const [row] = await db
+    .select({
+      profileId: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      settings: creatorProfiles.settings,
+    })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  if (!row) return null;
+
+  const settings = row.settings as Record<string, unknown> | null;
+  return {
+    profileId: row.profileId,
+    usernameNormalized: row.usernameNormalized,
+    excludeSelf: Boolean(settings?.exclude_self_from_analytics),
+  };
+}
+
+/**
  * Check if the current authenticated user should be excluded from analytics
  * for a given profile (identified by handle/username).
  *
@@ -22,24 +55,9 @@ export async function shouldExcludeSelfByHandle(
   handle: string
 ): Promise<boolean> {
   try {
-    const { userId: clerkUserId } = await auth();
-    if (!clerkUserId) return false;
-
-    const [row] = await db
-      .select({
-        usernameNormalized: creatorProfiles.usernameNormalized,
-        settings: creatorProfiles.settings,
-      })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (!row) return false;
-    if (row.usernameNormalized !== handle.toLowerCase()) return false;
-
-    const settings = row.settings as Record<string, unknown>;
-    return Boolean(settings?.exclude_self_from_analytics);
+    const profile = await getAuthenticatedUserProfile();
+    if (!profile?.excludeSelf) return false;
+    return profile.usernameNormalized === handle.toLowerCase();
   } catch {
     // Never block tracking on auth/DB errors
     return false;
@@ -57,24 +75,9 @@ export async function shouldExcludeSelfByProfileId(
   profileId: string
 ): Promise<boolean> {
   try {
-    const { userId: clerkUserId } = await auth();
-    if (!clerkUserId) return false;
-
-    const [row] = await db
-      .select({
-        profileId: creatorProfiles.id,
-        settings: creatorProfiles.settings,
-      })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (!row) return false;
-    if (row.profileId !== profileId) return false;
-
-    const settings = row.settings as Record<string, unknown>;
-    return Boolean(settings?.exclude_self_from_analytics);
+    const profile = await getAuthenticatedUserProfile();
+    if (!profile?.excludeSelf) return false;
+    return profile.profileId === profileId;
   } catch {
     // Never block tracking on auth/DB errors
     return false;
