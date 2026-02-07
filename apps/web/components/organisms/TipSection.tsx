@@ -54,6 +54,19 @@ export function TipSection({
   const handleVenmoPayment = (amount: number) => {
     if (!venmoLink || !onVenmoPayment) return;
 
+    // Validate Venmo URL host before opening
+    try {
+      const parsed = new URL(venmoLink);
+      if (
+        parsed.protocol !== 'https:' ||
+        (parsed.hostname !== 'venmo.com' && parsed.hostname !== 'www.venmo.com')
+      ) {
+        return;
+      }
+    } catch {
+      return;
+    }
+
     const sep = venmoLink.includes('?') ? '&' : '?';
     const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
       venmoUsername ?? ''
