@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinkActions } from '@/components/dashboard/atoms/link-actions';
 
-// Mock Tooltip components
+// Mock Tooltip and AlertDialog components
 vi.mock('@jovie/ui', () => ({
   Button: ({
     children,
@@ -21,6 +21,41 @@ vi.mock('@jovie/ui', () => ({
   ),
   TooltipContent: ({ children }: { children: React.ReactNode }) => (
     <span className='tooltip-content'>{children}</span>
+  ),
+  AlertDialog: ({
+    children,
+    open,
+  }: {
+    children: React.ReactNode;
+    open: boolean;
+  }) => (open ? <div data-testid='alert-dialog'>{children}</div> : null),
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => (
+    <h2>{children}</h2>
+  ),
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => (
+    <p>{children}</p>
+  ),
+  AlertDialogCancel: ({
+    children,
+    ...props
+  }: React.ComponentProps<'button'>) => <button {...props}>{children}</button>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+    ...props
+  }: React.ComponentProps<'button'>) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
   ),
 }));
 
@@ -60,7 +95,7 @@ describe('LinkActions Keyboard Accessibility', () => {
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('menu button opens dropdown and remove is accessible', async () => {
+  it('menu button opens dropdown and remove shows confirmation', async () => {
     const user = userEvent.setup();
     render(
       <LinkActions
@@ -79,6 +114,13 @@ describe('LinkActions Keyboard Accessibility', () => {
     expect(removeButton).toBeInTheDocument();
 
     await user.click(removeButton);
+    // Should open confirmation dialog, not call onRemove directly
+    expect(mockOnRemove).not.toHaveBeenCalled();
+    expect(screen.getByTestId('alert-dialog')).toBeInTheDocument();
+
+    // Confirm the deletion
+    const confirmButton = screen.getByRole('button', { name: /delete/i });
+    await user.click(confirmButton);
     expect(mockOnRemove).toHaveBeenCalledTimes(1);
   });
 
