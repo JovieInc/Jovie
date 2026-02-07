@@ -149,7 +149,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   });
 
   // =========================================================================
-  // PUBLIC PROFILE - Single essential test (listen mode moved to full suite)
+  // PUBLIC PROFILE - Tests main page and all subpages for both test profiles
   // =========================================================================
   test.describe('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
@@ -231,8 +231,69 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
       }
     });
 
-    // NOTE: 'listen mode displays DSP options' moved to profile.public.spec.ts (full suite only)
-    // It tests a feature detail, not a critical path for smoke testing
+    // Profile subpages — these are critical paths that must not crash.
+    // Covers both profiles to catch profile-dependent rendering bugs
+    // (e.g. QueryClient missing only when notifications CTA renders).
+    const PROFILE_SUBPAGES = [
+      { path: '/listen', name: 'listen mode' },
+      { path: '/subscribe', name: 'subscribe mode' },
+      { path: '/tip', name: 'tip mode' },
+      { path: '/tour', name: 'tour dates' },
+    ] as const;
+
+    for (const profile of Object.values(TEST_PROFILES)) {
+      for (const { path, name } of PROFILE_SUBPAGES) {
+        test(`${profile}${path} loads without errors (${name})`, async ({
+          page,
+        }, testInfo) => {
+          const { getContext, cleanup } = setupPageMonitoring(page);
+
+          try {
+            const response = await smokeNavigate(page, `/${profile}${path}`);
+            const status = response?.status() ?? 0;
+
+            // Redirects (3xx) and 200 are both acceptable — subpages redirect
+            // to the main profile with ?mode= query params
+            expect(
+              status,
+              `/${profile}${path} returned ${status} (server error)`
+            ).toBeLessThan(500);
+
+            // Wait for the redirected page to settle
+            await waitForHydration(page);
+
+            // Verify not an error page
+            const bodyText = await page
+              .locator('body')
+              .textContent()
+              .catch(() => '');
+            const lowerBody = bodyText?.toLowerCase() ?? '';
+
+            // Skip if profile not seeded
+            if (
+              lowerBody.includes('not found') ||
+              lowerBody.includes('temporarily unavailable')
+            ) {
+              test.skip(true, `Profile ${profile} not seeded in test database`);
+              return;
+            }
+
+            const hasErrorPage =
+              lowerBody.includes('application error') ||
+              lowerBody.includes('internal server error') ||
+              lowerBody.includes('unhandled runtime error');
+            expect(hasErrorPage, `/${profile}${path} shows error page`).toBe(
+              false
+            );
+
+            const context = getContext();
+            await assertNoCriticalErrors(context, testInfo);
+          } finally {
+            cleanup();
+          }
+        });
+      }
+    }
   });
 
   // =========================================================================
