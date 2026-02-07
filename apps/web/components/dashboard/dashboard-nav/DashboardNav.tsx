@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -7,6 +8,9 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
@@ -59,24 +63,37 @@ export function DashboardNav(_: DashboardNavProps) {
     [publicProfileHref]
   );
 
-  // Memoize filtered items to prevent creating new arrays on every render
-  // Note: Tour dates is now always visible (unflagged)
-  const primaryItems = useMemo(() => primaryNavigation, []);
+  // Replace "Profile" label with artist display name when available
+  const artistName = selectedProfile?.displayName;
+  const primaryItems = useMemo(() => {
+    if (!artistName) return primaryNavigation;
+    return primaryNavigation.map(item =>
+      item.id === 'profile' ? { ...item, name: artistName } : item
+    );
+  }, [artistName]);
 
   const secondaryItems = secondaryNavigation;
 
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
+  // Replace "Artist" label with artist display name in settings nav
+  const settingsItems = useMemo(() => {
+    if (!artistName) return settingsNavigation;
+    return settingsNavigation.map(item =>
+      item.id === 'artist' ? { ...item, name: artistName } : item
+    );
+  }, [artistName]);
+
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
     () =>
       isInSettings
-        ? [{ key: 'settings', items: settingsNavigation }]
+        ? [{ key: 'settings', items: settingsItems }]
         : [
             { key: 'primary', items: primaryItems },
             { key: 'secondary', items: secondaryItems },
           ],
-    [isInSettings, primaryItems, secondaryItems]
+    [isInSettings, primaryItems, secondaryItems, settingsItems]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
@@ -93,7 +110,25 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-        />
+        >
+          {item.children && item.children.length > 0 && (
+            <SidebarMenuSub>
+              {item.children.map(child => (
+                <SidebarMenuSubItem key={child.id}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={isItemActive(pathname, child)}
+                  >
+                    <Link href={child.href}>
+                      <child.icon className='size-4' aria-hidden='true' />
+                      <span>{child.name}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          )}
+        </NavMenuItem>
       );
     },
     [pathname, profileActions]

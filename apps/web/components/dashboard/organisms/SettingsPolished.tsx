@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
+import { ListenNowForm } from '@/components/dashboard/organisms/ListenNowForm';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
@@ -13,6 +14,7 @@ import { SettingsNotificationsSection } from '@/components/dashboard/organisms/S
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
+import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -150,6 +152,26 @@ export function SettingsPolished({
       description:
         'Manage your subscription, payment methods, and billing history.',
       render: () => <SettingsBillingSection />,
+    },
+    {
+      id: 'social-links',
+      title: 'Social Links',
+      description: 'Connect your social media accounts.',
+      render: () => (
+        <DashboardCard variant='settings'>
+          <SocialsForm artist={artist} />
+        </DashboardCard>
+      ),
+    },
+    {
+      id: 'music-links',
+      title: 'Music Links',
+      description: 'Add streaming platform links for your music.',
+      render: () => (
+        <DashboardCard variant='settings'>
+          <ListenNowForm artist={artist} onUpdate={a => onArtistUpdate?.(a)} />
+        </DashboardCard>
+      ),
     },
   ];
 

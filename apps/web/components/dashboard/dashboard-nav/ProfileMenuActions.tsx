@@ -1,11 +1,14 @@
 'use client';
 
-import { Copy, ExternalLink } from 'lucide-react';
+import { CommonDropdown } from '@jovie/ui';
+import { Copy, ExternalLink, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   SidebarMenuAction,
   SidebarMenuActions,
 } from '@/components/organisms/Sidebar';
 import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { copyToClipboard } from './utils';
@@ -18,11 +21,11 @@ export function ProfileMenuActions({
   publicProfileHref,
 }: ProfileMenuActionsProps) {
   const notifications = useNotifications();
+  const router = useRouter();
   const profileUrl = `${BASE_URL}${publicProfileHref}`;
 
   async function handleCopyProfileUrl() {
     const success = await copyToClipboard(profileUrl);
-    const status = success ? 'success' : 'error';
 
     if (success) {
       notifications.success('Copied to clipboard');
@@ -30,27 +33,44 @@ export function ProfileMenuActions({
       notifications.error('Failed to copy');
     }
 
-    track('profile_copy_url_click', { status, source: 'dashboard_nav' });
+    track('profile_copy_url_click', {
+      status: success ? 'success' : 'error',
+      source: 'dashboard_nav',
+    });
   }
 
   return (
     <SidebarMenuActions showOnHover>
-      <SidebarMenuAction
-        type='button'
-        aria-label='Copy public profile link'
-        onClick={handleCopyProfileUrl}
-      >
-        <Copy aria-hidden='true' className='size-4' />
-      </SidebarMenuAction>
       <SidebarMenuAction asChild>
-        <a
-          href={profileUrl}
-          target='_blank'
-          rel='noopener noreferrer'
-          aria-label='Open public profile in a new tab'
-        >
-          <ExternalLink aria-hidden='true' className='size-4' />
-        </a>
+        <CommonDropdown
+          variant='dropdown'
+          align='start'
+          side='bottom'
+          items={[
+            {
+              type: 'action',
+              id: 'copy',
+              label: 'Copy Link',
+              icon: Copy,
+              onClick: handleCopyProfileUrl,
+            },
+            {
+              type: 'action',
+              id: 'open',
+              label: 'Open Profile',
+              icon: ExternalLink,
+              onClick: () => window.open(profileUrl, '_blank'),
+            },
+            { type: 'separator', id: 'sep' },
+            {
+              type: 'action',
+              id: 'settings',
+              label: 'Settings',
+              icon: Settings,
+              onClick: () => router.push(APP_ROUTES.SETTINGS),
+            },
+          ]}
+        />
       </SidebarMenuAction>
     </SidebarMenuActions>
   );

@@ -1,15 +1,18 @@
 'use client';
 
-import { Button, TooltipShortcut } from '@jovie/ui';
 import {
-  DROPDOWN_CONTENT_BASE,
-  DROPDOWN_SHADOW,
-  DROPDOWN_SLIDE_ANIMATIONS,
-  DROPDOWN_TRANSITIONS,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
   MENU_ITEM_BASE,
-  MENU_SEPARATOR_BASE,
-} from '@jovie/ui/lib/dropdown-styles';
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+  TooltipShortcut,
+} from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, ChevronRight, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
@@ -482,9 +485,9 @@ export function ReleaseFilterDropdown({
   }, []);
   return (
     <div className='flex items-center gap-2'>
-      <DropdownMenuPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
+      <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
         <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
-          <DropdownMenuPrimitive.Trigger asChild>
+          <DropdownMenuTrigger asChild>
             <Button
               variant='ghost'
               size='sm'
@@ -496,164 +499,143 @@ export function ReleaseFilterDropdown({
               <Icon name='Filter' className='h-3.5 w-3.5' />
               Filter
             </Button>
-          </DropdownMenuPrimitive.Trigger>
+          </DropdownMenuTrigger>
         </TooltipShortcut>
 
-        <DropdownMenuPrimitive.Portal>
-          <DropdownMenuPrimitive.Content
-            align='start'
-            sideOffset={4}
-            className={cn(
-              DROPDOWN_CONTENT_BASE,
-              DROPDOWN_SHADOW,
-              DROPDOWN_TRANSITIONS,
-              DROPDOWN_SLIDE_ANIMATIONS,
-              'min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
-            )}
-            onCloseAutoFocus={e => e.preventDefault()}
-          >
-            {/* Main Menu Search */}
-            <SearchInput
-              value={mainSearch}
-              onChange={setMainSearch}
-              onClear={() => {
-                setMainSearch('');
-                mainSearchRef.current?.focus();
-              }}
-              placeholder='Search filters...'
-              inputRef={mainSearchRef}
-            />
+        <DropdownMenuContent
+          align='start'
+          sideOffset={4}
+          className='min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+          onCloseAutoFocus={e => e.preventDefault()}
+        >
+          {/* Main Menu Search */}
+          <SearchInput
+            value={mainSearch}
+            onChange={setMainSearch}
+            onClear={() => {
+              setMainSearch('');
+              mainSearchRef.current?.focus();
+            }}
+            placeholder='Search filters...'
+            inputRef={mainSearchRef}
+          />
 
-            {/* Categories List */}
-            <div className='flex-1 overflow-y-auto p-1'>
-              {filteredCategories.length === 0 ? (
-                <div className='py-6 text-center text-xs text-tertiary-token'>
-                  No filters found
-                </div>
-              ) : (
-                <>
-                  {/* Release Type Submenu */}
-                  <FilterSubmenu
-                    label='Release Type'
-                    iconName='Disc3'
-                    options={RELEASE_TYPE_OPTIONS}
-                    selectedIds={filters.releaseTypes}
-                    onToggle={handleTypeToggle}
-                    counts={counts.byType}
-                    searchPlaceholder='Search types...'
-                    isVisible={filteredCategories.some(
-                      c => c.id === 'releaseType'
-                    )}
-                  />
-
-                  {/* Popularity Submenu */}
-                  <FilterSubmenu
-                    label='Popularity'
-                    iconName='Signal'
-                    options={POPULARITY_OPTIONS}
-                    selectedIds={filters.popularity}
-                    onToggle={handlePopularityToggle}
-                    counts={counts.byPopularity}
-                    searchPlaceholder='Search popularity...'
-                    isVisible={filteredCategories.some(
-                      c => c.id === 'popularity'
-                    )}
-                  />
-
-                  {/* Label Submenu - Note: Uses VirtualizedLabelList internally */}
-                  {filteredCategories.some(c => c.id === 'label') && (
-                    <DropdownMenuPrimitive.Sub
-                      onOpenChange={open => {
-                        if (open) {
-                          setTimeout(() => labelSearchRef.current?.focus(), 50);
-                        } else {
-                          setLabelSearch('');
-                        }
-                      }}
-                    >
-                      <DropdownMenuPrimitive.SubTrigger
-                        className={cn(MENU_ITEM_BASE, 'justify-between')}
-                      >
-                        <div className='flex items-center gap-2'>
-                          <Icon
-                            name='Building2'
-                            className='h-3.5 w-3.5 text-tertiary-token'
-                          />
-                          <span>Label</span>
-                          {labelFilterCount > 0 && (
-                            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
-                              {labelFilterCount}
-                            </span>
-                          )}
-                        </div>
-                        <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
-                      </DropdownMenuPrimitive.SubTrigger>
-                      <DropdownMenuPrimitive.Portal>
-                        <DropdownMenuPrimitive.SubContent
-                          sideOffset={4}
-                          alignOffset={-4}
-                          className={cn(
-                            DROPDOWN_CONTENT_BASE,
-                            DROPDOWN_SHADOW,
-                            DROPDOWN_TRANSITIONS,
-                            DROPDOWN_SLIDE_ANIMATIONS,
-                            'min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
-                          )}
-                        >
-                          <SearchInput
-                            value={labelSearch}
-                            onChange={setLabelSearch}
-                            onClear={() => {
-                              setLabelSearch('');
-                              labelSearchRef.current?.focus();
-                            }}
-                            placeholder='Search labels...'
-                            inputRef={labelSearchRef}
-                          />
-                          <VirtualizedLabelList
-                            options={filteredLabelOptions}
-                            selectedLabels={filters.labels}
-                            onToggle={handleLabelToggle}
-                            searchInputRef={labelSearchRef}
-                            emptyMessage={
-                              counts.byLabel.length === 0
-                                ? 'No labels available'
-                                : 'No labels found'
-                            }
-                          />
-                        </DropdownMenuPrimitive.SubContent>
-                      </DropdownMenuPrimitive.Portal>
-                    </DropdownMenuPrimitive.Sub>
+          {/* Categories List */}
+          <div className='flex-1 overflow-y-auto p-1'>
+            {filteredCategories.length === 0 ? (
+              <div className='py-6 text-center text-xs text-tertiary-token'>
+                No filters found
+              </div>
+            ) : (
+              <>
+                {/* Release Type Submenu */}
+                <FilterSubmenu
+                  label='Release Type'
+                  iconName='Disc3'
+                  options={RELEASE_TYPE_OPTIONS}
+                  selectedIds={filters.releaseTypes}
+                  onToggle={handleTypeToggle}
+                  counts={counts.byType}
+                  searchPlaceholder='Search types...'
+                  isVisible={filteredCategories.some(
+                    c => c.id === 'releaseType'
                   )}
-                </>
-              )}
+                />
 
-              {/* Clear All option when filters are active */}
-              {hasAnyFilter && (
-                <>
-                  <div className={cn(MENU_SEPARATOR_BASE, 'my-1')} />
-                  <DropdownMenuPrimitive.Item
-                    className={cn(
-                      MENU_ITEM_BASE,
-                      'text-tertiary-token hover:text-primary-token'
-                    )}
-                    onSelect={() => {
-                      onFiltersChange({
-                        releaseTypes: [],
-                        popularity: [],
-                        labels: [],
-                      });
+                {/* Popularity Submenu */}
+                <FilterSubmenu
+                  label='Popularity'
+                  iconName='Signal'
+                  options={POPULARITY_OPTIONS}
+                  selectedIds={filters.popularity}
+                  onToggle={handlePopularityToggle}
+                  counts={counts.byPopularity}
+                  searchPlaceholder='Search popularity...'
+                  isVisible={filteredCategories.some(
+                    c => c.id === 'popularity'
+                  )}
+                />
+
+                {/* Label Submenu - Note: Uses VirtualizedLabelList internally */}
+                {filteredCategories.some(c => c.id === 'label') && (
+                  <DropdownMenuSub
+                    onOpenChange={open => {
+                      if (open) {
+                        setTimeout(() => labelSearchRef.current?.focus(), 50);
+                      } else {
+                        setLabelSearch('');
+                      }
                     }}
                   >
-                    <X className='h-3.5 w-3.5' />
-                    <span>Clear all filters</span>
-                  </DropdownMenuPrimitive.Item>
-                </>
-              )}
-            </div>
-          </DropdownMenuPrimitive.Content>
-        </DropdownMenuPrimitive.Portal>
-      </DropdownMenuPrimitive.Root>
+                    <DropdownMenuSubTrigger className='justify-between'>
+                      <div className='flex items-center gap-2'>
+                        <Icon
+                          name='Building2'
+                          className='h-3.5 w-3.5 text-tertiary-token'
+                        />
+                        <span>Label</span>
+                        {labelFilterCount > 0 && (
+                          <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
+                            {labelFilterCount}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      sideOffset={4}
+                      alignOffset={-4}
+                      className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+                    >
+                      <SearchInput
+                        value={labelSearch}
+                        onChange={setLabelSearch}
+                        onClear={() => {
+                          setLabelSearch('');
+                          labelSearchRef.current?.focus();
+                        }}
+                        placeholder='Search labels...'
+                        inputRef={labelSearchRef}
+                      />
+                      <VirtualizedLabelList
+                        options={filteredLabelOptions}
+                        selectedLabels={filters.labels}
+                        onToggle={handleLabelToggle}
+                        searchInputRef={labelSearchRef}
+                        emptyMessage={
+                          counts.byLabel.length === 0
+                            ? 'No labels available'
+                            : 'No labels found'
+                        }
+                      />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+              </>
+            )}
+
+            {/* Clear All option when filters are active */}
+            {hasAnyFilter && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className='text-tertiary-token hover:text-primary-token'
+                  onSelect={() => {
+                    onFiltersChange({
+                      releaseTypes: [],
+                      popularity: [],
+                      labels: [],
+                    });
+                  }}
+                >
+                  <X className='h-3.5 w-3.5' />
+                  <span>Clear all filters</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Active Filter Pills */}
       {filters.releaseTypes.length > 0 && (

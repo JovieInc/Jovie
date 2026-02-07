@@ -294,11 +294,6 @@ export function useContactsManager({
         return;
       }
 
-      const confirmed = window.confirm(
-        'Remove this contact from your profile?'
-      );
-      if (!confirmed) return;
-
       // Store backup for rollback
       const backup = contacts.find(c => c.id === contactId);
       const backupUiState = uiState[contactId];

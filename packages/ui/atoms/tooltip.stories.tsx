@@ -16,7 +16,7 @@ const meta: Meta<typeof Tooltip> = {
     docs: {
       description: {
         component:
-          'A Linear-style tooltip with always-dark appearance for consistent visibility. Features sensible delays, pointer safety, reduced motion support, and optional arrow (hidden by default).',
+          'A Linear-style tooltip with tokenized surface styling for consistent contrast. Features sensible delays, pointer safety, reduced motion support, and an optional arrow (hidden by default).',
       },
     },
   },
