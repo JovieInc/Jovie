@@ -82,14 +82,18 @@ export function useSettingsProfile({
 
   // Store artist ref for async operations
   const artistRef = useRef(artist);
-  artistRef.current = artist;
+  useEffect(() => {
+    artistRef.current = artist;
+  }, [artist]);
 
   // TanStack Query mutation for profile saves (silent, for auto-save)
   const { mutateAsync: saveProfileMutation } = useProfileSaveMutation();
 
   // Store mutation ref for use in saveFn callback
   const saveProfileMutationRef = useRef(saveProfileMutation);
-  saveProfileMutationRef.current = saveProfileMutation;
+  useEffect(() => {
+    saveProfileMutationRef.current = saveProfileMutation;
+  }, [saveProfileMutation]);
 
   // TanStack Query mutation for avatar upload
   const { mutateAsync: uploadAvatarMutation } = useUserAvatarMutation();
@@ -212,6 +216,9 @@ export function useSettingsProfile({
         if (response.warning) {
           notifications.warning(response.warning);
         }
+
+        // Refresh server-side data so the avatar persists across navigations
+        onRefresh();
       } catch (error) {
         if (onArtistUpdate) {
           onArtistUpdate({
@@ -227,7 +234,7 @@ export function useSettingsProfile({
         notifications.error(message);
       }
     },
-    [artist, notifications, onArtistUpdate, updateProfileMutation]
+    [artist, notifications, onArtistUpdate, onRefresh, updateProfileMutation]
   );
 
   const saveProfile = useCallback(
