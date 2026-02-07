@@ -221,7 +221,16 @@ const fetchProfileAndLinks = async (
 // IMPORTANT: Only cache successful (status: 'ok') results. Caching not_found/error
 // results causes stale 404s that persist for up to 1 hour when a profile becomes
 // public (e.g., after onboarding completes for a waitlist profile).
-const NOCACHE_PREFIX = '__nocache__:';
+
+/** Custom error to pass non-cacheable results without embedding PII in error message. */
+class NoCacheError extends Error {
+  readonly data: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
+  constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
+    super('NoCacheError');
+    this.name = 'NoCacheError';
+    this.data = data;
+  }
+}
 
 const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
@@ -237,9 +246,9 @@ const getCachedProfileAndLinks = async (username: string) => {
       async () => {
         const data = await fetchProfileAndLinks(username);
         // Only cache successful results to avoid stale 404s
-        // Non-ok results are passed through the sentinel error to avoid double-fetch
+        // Non-ok results are passed through NoCacheError to avoid double-fetch
         if (data.status !== 'ok') {
-          throw new Error(`${NOCACHE_PREFIX}${JSON.stringify(data)}`);
+          throw new NoCacheError(data);
         }
         return data;
       },
@@ -251,16 +260,9 @@ const getCachedProfileAndLinks = async (username: string) => {
     )();
     return result;
   } catch (error) {
-    // If the error is our sentinel for non-cacheable results, parse embedded data
-    if (error instanceof Error && error.message.startsWith(NOCACHE_PREFIX)) {
-      try {
-        return JSON.parse(
-          error.message.slice(NOCACHE_PREFIX.length)
-        ) as Awaited<ReturnType<typeof fetchProfileAndLinks>>;
-      } catch {
-        // Fallback to direct fetch if parsing fails
-        return fetchProfileAndLinks(username);
-      }
+    // If the error is our custom error for non-cacheable results, return embedded data
+    if (error instanceof NoCacheError) {
+      return error.data;
     }
     // Cache layer failure - fall back to direct fetch
     captureWarning('[profile] Cache layer failed, using direct fetch', {
