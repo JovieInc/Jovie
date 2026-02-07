@@ -353,10 +353,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
         {/* Error display */}
         {contact.error && (
-          <div className='rounded-md bg-red-50 dark:bg-red-900/20 p-3'>
-            <p className='text-xs text-red-600 dark:text-red-400'>
-              {contact.error}
-            </p>
+          <div className='rounded-md border border-error/30 bg-error-subtle p-3'>
+            <p className='text-xs text-destructive'>{contact.error}</p>
           </div>
         )}
 
