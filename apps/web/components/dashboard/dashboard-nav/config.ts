@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BarChart3,
   Bell,
   CalendarDays,
   Home,
@@ -69,6 +70,13 @@ export const primaryNavigation: NavItem[] = [
     icon: Users,
     description: 'Understand your audience demographics',
   },
+  {
+    name: 'Analytics',
+    href: APP_ROUTES.ANALYTICS,
+    id: 'analytics',
+    icon: BarChart3,
+    description: 'View your performance analytics',
+  },
 ];
 
 export const secondaryNavigation: NavItem[] = [
@@ -91,7 +99,7 @@ export const secondaryNavigation: NavItem[] = [
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
-    description: 'Messages and conversations',
+    description: 'Ask Jovie anything about your profile',
   },
 ];
 

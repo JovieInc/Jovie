@@ -25,6 +25,8 @@ export interface JovieChatProps {
   readonly conversationId?: string | null;
   /** Callback when a new conversation is created */
   readonly onConversationCreate?: (conversationId: string) => void;
+  /** Pre-fill and auto-submit a message on mount (e.g. from ?q= param) */
+  readonly initialQuery?: string;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
