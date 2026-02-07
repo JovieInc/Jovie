@@ -33,24 +33,32 @@ async function AnalyticsContent() {
   }
 }
 
-const SKELETON_CARDS = Array.from(
-  { length: 6 },
-  (_, i) => `skeleton-card-${i}`
-);
+const SKELETON_STAT_KEYS = Array.from({ length: 3 }, (_, i) => `stat-${i}`);
+const SKELETON_LIST_KEYS = Array.from({ length: 3 }, (_, i) => `list-${i}`);
 
 function AnalyticsSkeleton() {
   return (
     <div className='space-y-6'>
-      <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
-      <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
-        {SKELETON_CARDS.map(key => (
+      <div className='flex items-center justify-between'>
+        <div className='h-4 w-24 animate-pulse rounded bg-surface-1' />
+        <div className='h-8 w-32 animate-pulse rounded-full bg-surface-1' />
+      </div>
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+        {SKELETON_STAT_KEYS.map(key => (
           <div
             key={key}
-            className='h-32 animate-pulse rounded-lg bg-surface-1'
+            className='h-24 animate-pulse rounded-xl border border-subtle bg-surface-1'
           />
         ))}
       </div>
-      <div className='h-96 animate-pulse rounded-lg bg-surface-1' />
+      <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        {SKELETON_LIST_KEYS.map(key => (
+          <div
+            key={key}
+            className='h-56 animate-pulse rounded-xl border border-subtle bg-surface-1'
+          />
+        ))}
+      </div>
     </div>
   );
 }

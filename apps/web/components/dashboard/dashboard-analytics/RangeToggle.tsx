@@ -62,7 +62,7 @@ export function RangeToggle({
     <div
       role='tablist'
       aria-label='Select analytics range'
-      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5 shadow-sm'
+      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5'
     >
       {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
@@ -81,10 +81,10 @@ export function RangeToggle({
             }}
             onClick={() => onChange(opt.value)}
             onKeyDown={event => handleKeyDown(event, index)}
-            className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base ${
+            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${
               active
-                ? 'bg-surface-3 text-primary-token shadow-sm'
-                : 'text-secondary-token hover:text-primary-token hover:bg-surface-2'
+                ? 'bg-surface-3 text-primary-token'
+                : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
             }`}
           >
             {opt.label}
