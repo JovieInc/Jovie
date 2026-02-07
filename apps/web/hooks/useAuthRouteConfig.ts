@@ -49,16 +49,18 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   }, [pathname]);
 
   // Build navigation based on section
+  // Flatten children so route matching includes nested items (Analytics, Earnings)
   const navigation = useMemo(() => {
+    const flatten = (items: NavItem[]): NavItem[] =>
+      items.flatMap(item => [item, ...(item.children ?? [])]);
     switch (section) {
       case 'admin':
-        // Admin shows primary + secondary (DashboardNav handles admin group separately)
-        return [...primaryNavigation, ...secondaryNavigation];
+        return [...flatten(primaryNavigation), ...secondaryNavigation];
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
       default:
-        return [...primaryNavigation, ...secondaryNavigation];
+        return [...flatten(primaryNavigation), ...secondaryNavigation];
     }
   }, [section]);
 

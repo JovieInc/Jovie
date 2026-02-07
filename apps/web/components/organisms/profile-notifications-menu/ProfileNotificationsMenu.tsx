@@ -64,14 +64,14 @@ export function ProfileNotificationsMenu({
           }}
         >
           <div className='flex-1'>
-            <p className='text-sm font-semibold text-foreground'>
+            <p className='text-sm font-semibold text-primary-token'>
               {label}{' '}
-              <span className='text-xs font-normal text-muted-foreground'>
+              <span className='text-xs font-normal text-tertiary-token'>
                 (tap to unsubscribe)
               </span>
             </p>
             {contactValue ? (
-              <p className='break-all text-xs text-muted-foreground'>
+              <p className='break-all text-xs text-tertiary-token'>
                 {targetChannel === 'sms'
                   ? formatE164PhoneForDisplay(contactValue)
                   : contactValue}
@@ -97,12 +97,14 @@ export function ProfileNotificationsMenu({
         }}
       >
         <div className='flex-1'>
-          <p className='text-sm font-semibold text-foreground'>Add {label}</p>
-          <p className='text-xs text-muted-foreground'>
+          <p className='text-sm font-semibold text-primary-token'>
+            Add {label}
+          </p>
+          <p className='text-xs text-tertiary-token'>
             Stay in the loop via {label.toLowerCase()}.
           </p>
         </div>
-        <span aria-hidden className='text-xs text-muted-foreground'>
+        <span aria-hidden className='text-xs text-tertiary-token'>
           +
         </span>
       </DropdownMenuItem>
@@ -124,7 +126,7 @@ export function ProfileNotificationsMenu({
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
-          <DropdownMenuLabel className='text-sm font-semibold text-foreground'>
+          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
             Manage notifications
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -136,12 +138,12 @@ export function ProfileNotificationsMenu({
             className='flex items-start gap-2 cursor-default opacity-70'
           >
             <div className='flex-1'>
-              <p className='text-sm font-semibold text-foreground'>
+              <p className='text-sm font-semibold text-primary-token'>
                 Instagram DMs
               </p>
-              <p className='text-xs text-muted-foreground'>Coming soon</p>
+              <p className='text-xs text-tertiary-token'>Coming soon</p>
             </div>
-            <span aria-hidden className='text-xs text-muted-foreground'>
+            <span aria-hidden className='text-xs text-tertiary-token'>
               …
             </span>
           </DropdownMenuItem>

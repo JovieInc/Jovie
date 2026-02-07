@@ -59,7 +59,7 @@ interface TooltipContentProps
 }
 
 /**
- * Tooltip content with always-dark Linear-style appearance.
+ * Tooltip content with tokenized surface styling.
  * Includes reduced motion support and accessibility features.
  */
 const TooltipContent = React.forwardRef<
@@ -87,9 +87,9 @@ const TooltipContent = React.forwardRef<
           'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
           // Normalize height so presence of a shortcut badge doesn't shift positioning
           'min-h-[28px]',
-          // Linear-style: near-black bg, tight shadow, no visible border
+          // Tokenized surface styling to ensure Tailwind emits the tooltip background
           'max-w-xs border border-transparent',
-          'bg-[#1c1e22] dark:bg-[#1c1e22] text-[#e3e4e5] shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
+          'bg-surface-3 text-primary-token shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -115,7 +115,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-[#1c1e22]'
+            className='fill-surface-3'
             data-testid='tooltip-arrow'
           />
         )}

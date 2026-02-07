@@ -264,14 +264,19 @@ export async function importReleasesFromSpotify(
 
 /**
  * Determine release type, inferring EP from track count
+ *
+ * Spotify's API only returns 'album', 'single', or 'compilation' — there is
+ * no 'ep' value. EPs (4-6 tracks) are reported as 'single' by Spotify, so we
+ * detect them by checking the track count. When Spotify says 'album', we trust
+ * that classification regardless of track count.
  */
 function determineReleaseType(
   albumType: SpotifyAlbum['album_type'],
   totalTracks: number
 ): 'album' | 'single' | 'ep' | 'compilation' {
   const releaseType = mapSpotifyAlbumType(albumType);
-  // Spotify doesn't distinguish EPs, so we infer from track count
-  if (releaseType === 'album' && totalTracks >= 4 && totalTracks <= 6) {
+  // Spotify reports EPs as 'single' — detect them by track count (4-6 tracks)
+  if (releaseType === 'single' && totalTracks >= 4 && totalTracks <= 6) {
     return 'ep';
   }
   return releaseType;

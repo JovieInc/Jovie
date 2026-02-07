@@ -5,6 +5,7 @@ import { UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { UnifiedTable } from '@/components/organisms/table';
@@ -33,6 +34,7 @@ export const ContactsTable = memo(function ContactsTable({
 }: ContactsTableProps) {
   const [selectedContact, setSelectedContact] =
     useState<EditableContact | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const columns = useMemo(() => createContactColumns(), []);
 
@@ -101,7 +103,12 @@ export const ContactsTable = memo(function ContactsTable({
     await onSave(selectedContact);
   }, [selectedContact, onSave]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDeleteClick = useCallback(() => {
+    if (!selectedContact) return;
+    setDeleteDialogOpen(true);
+  }, [selectedContact]);
+
+  const handleDeleteConfirm = useCallback(async () => {
     if (!selectedContact) return;
     await onDelete(selectedContact);
     setSelectedContact(null);
@@ -181,7 +188,17 @@ export const ContactsTable = memo(function ContactsTable({
         onClose={handleClose}
         onUpdate={handleUpdate}
         onSave={handleSave}
-        onDelete={handleDelete}
+        onDelete={handleDeleteClick}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title='Delete contact?'
+        description='This action cannot be undone. The contact will be permanently removed from your profile.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   );

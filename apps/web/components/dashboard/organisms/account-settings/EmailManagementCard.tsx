@@ -9,11 +9,13 @@
 
 import { Button, Input } from '@jovie/ui';
 import { CheckCircle, Mail, ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
 
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { FormField } from '@/components/molecules/FormField';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
-import type { ClerkUserResource } from './types';
+import type { ClerkEmailAddressResource, ClerkUserResource } from './types';
 import { useEmailManagement } from './useEmailManagement';
 
 export interface EmailManagementCardProps {
@@ -21,6 +23,9 @@ export interface EmailManagementCardProps {
 }
 
 export function EmailManagementCard({ user }: EmailManagementCardProps) {
+  const [emailToRemove, setEmailToRemove] =
+    useState<ClerkEmailAddressResource | null>(null);
+
   // Use the extracted hook for all email management logic
   const {
     newEmail,
@@ -109,7 +114,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                       size='sm'
                       className='text-red-500 hover:text-red-600 hover:bg-red-50'
                       disabled={syncingEmailId === email.id}
-                      onClick={() => handleRemoveEmail(email)}
+                      onClick={() => setEmailToRemove(email)}
                     >
                       {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
                     </Button>
@@ -187,6 +192,20 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           </form>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(emailToRemove)}
+        onOpenChange={open => {
+          if (!open) setEmailToRemove(null);
+        }}
+        title='Remove email address?'
+        description={`This will remove ${emailToRemove?.emailAddress ?? 'this email'} from your account.`}
+        confirmLabel='Remove'
+        variant='destructive'
+        onConfirm={async () => {
+          if (emailToRemove) await handleRemoveEmail(emailToRemove);
+        }}
+      />
     </DashboardCard>
   );
 }
