@@ -65,6 +65,7 @@ function DspMatchRow({
   const isConnected =
     match.status === 'confirmed' || match.status === 'auto_confirmed';
   const isSuggested = match.status === 'suggested';
+  const confidenceLabel = getConfidenceLabel(match.confidenceScore);
 
   const { mutate: confirmMatch, isPending: isConfirming } =
     useConfirmDspMatchMutation();
@@ -114,10 +115,8 @@ function DspMatchRow({
           {isSuggested && (
             <p className='text-xs mt-0.5'>
               <span className='text-secondary-token'>Confidence: </span>
-              <span
-                className={getConfidenceLabel(match.confidenceScore).className}
-              >
-                {getConfidenceLabel(match.confidenceScore).text} (
+              <span className={confidenceLabel.className}>
+                {confidenceLabel.text} (
                 {Math.round(match.confidenceScore * 100)}%)
               </span>
             </p>
