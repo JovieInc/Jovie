@@ -18,12 +18,30 @@ import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
 import { getErrorType, getMessageText, getUserFriendlyMessage } from '../utils';
 
 interface UseJovieChatOptions {
-  readonly artistContext: ArtistContext;
+  /** Profile ID for server-side context fetching (preferred) */
+  readonly profileId?: string;
+  /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
+  readonly artistContext?: ArtistContext;
   readonly conversationId?: string | null;
   readonly onConversationCreate?: (conversationId: string) => void;
 }
 
+/**
+ * Extracts tool call data from message parts for persistence.
+ * Only includes parts that have a toolInvocation property to ensure consistent shape.
+ */
+function extractToolCalls(
+  parts: Array<{ type: string; [key: string]: unknown }>
+): Record<string, unknown>[] | undefined {
+  const toolCalls = parts
+    .filter(p => p.type === 'tool-invocation' && p.toolInvocation != null)
+    .map(p => ({ type: p.type, toolInvocation: p.toolInvocation }));
+
+  return toolCalls.length > 0 ? toolCalls : undefined;
+}
+
 export function useJovieChat({
+  profileId,
   artistContext,
   conversationId,
   onConversationCreate,
@@ -39,6 +57,7 @@ export function useJovieChat({
   const pendingMessagesRef = useRef<{
     userMessage: string;
     assistantMessage: string;
+    toolCalls?: Record<string, unknown>[];
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -53,26 +72,34 @@ export function useJovieChat({
       enabled: !!activeConversationId,
     });
 
-  // Create transport with artist context in body
+  // Create transport: prefer profileId for server-side fetching, fall back to artistContext
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
-        body: { artistContext },
+        body: profileId ? { profileId } : { artistContext },
       }),
-    [artistContext]
+    [profileId, artistContext]
   );
 
   // Convert loaded messages to the format useChat expects
   const initialMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
-    return existingConversation.messages.map(msg => ({
-      id: msg.id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      parts: [{ type: 'text' as const, text: msg.content }],
-      createdAt: new Date(msg.createdAt),
-    }));
+    return existingConversation.messages.map(
+      (msg: {
+        id: string;
+        role: string;
+        content: string;
+        toolCalls?: unknown;
+        createdAt: string;
+      }) => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        parts: [{ type: 'text' as const, text: msg.content }],
+        createdAt: new Date(msg.createdAt),
+      })
+    );
   }, [existingConversation]);
 
   const { messages, sendMessage, status, setMessages } = useChat({
@@ -132,62 +159,91 @@ export function useJovieChat({
     setActiveConversationId(conversationId ?? null);
   }, [conversationId]);
 
-  // Save messages to database when streaming completes
-  // Consolidated: first extract assistant message, then persist
+  // Save messages to database when streaming completes.
+  // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
+  // assistant message. If the assistant message is empty, leave the ref so
+  // the next render (when messages updates) will try extraction again.
   useEffect(() => {
     if (status !== 'ready') return;
-
-    // Extract assistant message from completed stream
-    if (messages.length >= 2 && pendingMessagesRef.current) {
-      const lastAssistantMessage = [...messages]
-        .reverse()
-        .find(m => m.role === 'assistant');
-
-      if (lastAssistantMessage) {
-        pendingMessagesRef.current.assistantMessage = getMessageText(
-          lastAssistantMessage.parts
-        );
-      }
+    if (!pendingMessagesRef.current) {
+      setIsSubmitting(false);
+      return;
+    }
+    if (!activeConversationId) {
+      // No conversation yet - wait for it
+      return;
     }
 
-    if (pendingMessagesRef.current && activeConversationId) {
-      const { userMessage, assistantMessage } = pendingMessagesRef.current;
+    // Extract assistant message from the completed stream
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find(m => m.role === 'assistant');
 
-      // Only save if we have both messages
-      if (userMessage && assistantMessage) {
-        addMessagesMutation.mutate(
-          {
-            conversationId: activeConversationId,
-            messages: [
-              { role: 'user', content: userMessage },
-              { role: 'assistant', content: assistantMessage },
-            ],
-          },
-          {
-            onSuccess: () => {
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.chat.conversation(activeConversationId),
-              });
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.chat.conversations(),
-              });
-            },
-            onError: err => {
-              console.error('[useJovieChat] Failed to save messages:', err);
-              setChatError({
-                type: 'server',
-                message: 'Failed to save messages. Please try again.',
-              });
-            },
-          }
-        );
-      }
-
-      pendingMessagesRef.current = null;
-      setIsSubmitting(false);
-    } else {
-      setIsSubmitting(false);
+    if (!lastAssistantMessage) {
+      // No assistant message yet - leave pending for next render
+      return;
     }
+
+    const assistantText = getMessageText(lastAssistantMessage.parts);
+    if (!assistantText) {
+      // Assistant message exists but has no text yet - leave pending
+      return;
+    }
+
+    // Extract tool calls for persistence
+    const toolCalls = extractToolCalls(
+      lastAssistantMessage.parts as Array<{
+        type: string;
+        [key: string]: unknown;
+      }>
+    );
+
+    const { userMessage } = pendingMessagesRef.current;
+
+    // Build messages to persist - user message may be empty if already persisted during conversation creation
+    const messagesToPersist: Array<{
+      role: 'user' | 'assistant';
+      content: string;
+      toolCalls?: Record<string, unknown>[];
+    }> = [];
+
+    if (userMessage) {
+      messagesToPersist.push({ role: 'user', content: userMessage });
+    }
+
+    messagesToPersist.push({
+      role: 'assistant',
+      content: assistantText,
+      ...(toolCalls ? { toolCalls } : {}),
+    });
+
+    addMessagesMutation.mutate(
+      {
+        conversationId: activeConversationId,
+        messages: messagesToPersist,
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.conversation(activeConversationId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.conversations(),
+          });
+        },
+        onError: err => {
+          console.error('[useJovieChat] Failed to save messages:', err);
+          setChatError({
+            type: 'server',
+            message: 'Failed to save messages. Please try again.',
+          });
+        },
+      }
+    );
+
+    // Successfully extracted and dispatched — clear pending
+    pendingMessagesRef.current = null;
+    setIsSubmitting(false);
   }, [
     status,
     activeConversationId,
@@ -227,9 +283,10 @@ export function useJovieChat({
           setActiveConversationId(result.conversation.id);
           onConversationCreate?.(result.conversation.id);
 
-          // Store pending message for later persistence
+          // User message already persisted via initialMessage in conversation creation.
+          // Only store pending ref to persist the assistant response.
           pendingMessagesRef.current = {
-            userMessage: trimmedText,
+            userMessage: '', // Empty - already persisted via initialMessage
             assistantMessage: '', // Will be filled when response completes
           };
         } catch (err) {
@@ -243,7 +300,7 @@ export function useJovieChat({
           return;
         }
       } else {
-        // Store pending message for persistence
+        // Store pending message for persistence (both user and assistant)
         pendingMessagesRef.current = {
           userMessage: trimmedText,
           assistantMessage: '', // Will be filled when response completes
@@ -307,11 +364,16 @@ export function useJovieChat({
     isSubmitting,
     hasMessages,
     isLoadingConversation: isLoadingConversation && !!activeConversationId,
+    status,
+    activeConversationId,
     // Refs
     inputRef,
     // Handlers
     handleSubmit,
     handleRetry,
     handleSuggestedPrompt,
+    /** Programmatic message submission (for imperative use without input state) */
+    submitMessage: doSubmit,
+    setChatError,
   };
 }

@@ -17,6 +17,7 @@ vi.mock('@/components/atoms/SocialIcon', () => {
     __esModule: true,
     SocialIcon: MockSocialIcon,
     getPlatformIcon: () => ({ hex: '000000' }),
+    getPlatformIconMetadata: () => ({ hex: '000000' }),
   } as unknown as typeof import('@/components/atoms/SocialIcon');
 });
 

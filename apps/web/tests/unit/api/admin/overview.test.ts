@@ -20,6 +20,19 @@ vi.mock('@/lib/db', () => ({
   waitlistEntries: {},
 }));
 
+vi.mock('@/lib/db/schema/waitlist', () => ({
+  waitlistEntries: {},
+}));
+
+// Mock heavy dependencies to prevent slow module resolution timeouts
+vi.mock('@/lib/redis', () => ({
+  getRedis: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 describe('GET /api/admin/overview', () => {
   beforeEach(() => {
     vi.clearAllMocks();

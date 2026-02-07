@@ -5,12 +5,12 @@
  *
  * Displays chat messages inline on the profile page, integrated with
  * the UniversalLinkInput for a unified links + chat experience.
+ *
+ * Refactored to use useJovieChat for shared persistence, error handling,
+ * and race-condition-safe message saving.
  */
 
-import { useChat } from '@ai-sdk/react';
 import { Button } from '@jovie/ui';
-import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport } from 'ai';
 import {
   AlertCircle,
   ChevronDown,
@@ -25,43 +25,22 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
-  useState,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { queryKeys } from '@/lib/queries/keys';
-import {
-  useAddMessagesMutation,
-  useCreateConversationMutation,
-} from '@/lib/queries/useChatMutations';
+import { useJovieChat } from '@/components/jovie/hooks';
+import type { ArtistContext } from '@/components/jovie/types';
+import { getMessageText } from '@/components/jovie/utils';
 import { cn } from '@/lib/utils';
 import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
 } from './ProfileEditPreviewCard';
 
-interface ArtistContext {
-  readonly displayName: string;
-  readonly username: string;
-  readonly bio: string | null;
-  readonly genres: string[];
-  readonly spotifyFollowers: number | null;
-  readonly spotifyPopularity: number | null;
-  readonly profileViews: number;
-  readonly hasSocialLinks: boolean;
-  readonly hasMusicLinks: boolean;
-  readonly tippingStats: {
-    readonly tipClicks: number;
-    readonly tipsSubmitted: number;
-    readonly totalReceivedCents: number;
-    readonly monthReceivedCents: number;
-  };
-}
-
 interface InlineChatAreaProps {
-  readonly artistContext: ArtistContext;
-  /** Profile ID for applying edits */
+  /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
+  readonly artistContext?: ArtistContext;
+  /** Profile ID for server-side context fetching and applying edits */
   readonly profileId: string;
   /** Whether the chat area is expanded */
   readonly expanded?: boolean;
@@ -74,62 +53,6 @@ export interface InlineChatAreaRef {
   submitMessage: (message: string) => void;
   /** Whether chat is currently loading/streaming */
   isLoading: boolean;
-}
-
-type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
-
-interface ChatError {
-  readonly type: ChatErrorType;
-  readonly message: string;
-  readonly retryAfter?: number;
-  readonly failedMessage?: string;
-}
-
-function getErrorType(error: Error): ChatErrorType {
-  const msg = error.message.toLowerCase();
-  if (
-    msg.includes('network') ||
-    msg.includes('fetch') ||
-    msg.includes('offline')
-  ) {
-    return 'network';
-  }
-  if (msg.includes('rate') || msg.includes('limit') || msg.includes('429')) {
-    return 'rate_limit';
-  }
-  if (msg.includes('500') || msg.includes('server')) {
-    return 'server';
-  }
-  return 'unknown';
-}
-
-function getUserFriendlyMessage(
-  type: ChatErrorType,
-  retryAfter?: number
-): string {
-  switch (type) {
-    case 'network':
-      return 'Unable to connect. Please check your internet connection.';
-    case 'rate_limit':
-      return retryAfter
-        ? `Too many requests. Please wait ${retryAfter} seconds.`
-        : 'Too many requests. Please wait a moment.';
-    case 'server':
-      return 'We encountered a temporary issue. Please try again.';
-    default:
-      return 'Something went wrong. Please try again.';
-  }
-}
-
-// Helper to extract text content from message parts
-function getMessageText(parts: Array<{ type: string; text?: string }>): string {
-  return parts
-    .filter(
-      (part): part is { type: 'text'; text: string } =>
-        part.type === 'text' && typeof part.text === 'string'
-    )
-    .map(part => part.text)
-    .join('');
 }
 
 // Type for tool invocation parts
@@ -168,58 +91,20 @@ export const InlineChatArea = forwardRef<
   InlineChatAreaProps
 >(({ artistContext, profileId, expanded = false, onExpandedChange }, ref) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastAttemptedMessageRef = useRef<string>('');
-  const [chatError, setChatError] = useState<ChatError | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeConversationId, setActiveConversationId] = useState<
-    string | null
-  >(null);
-  const pendingMessagesRef = useRef<{
-    userMessage: string;
-    assistantMessage: string;
-  } | null>(null);
-  const queryClient = useQueryClient();
 
-  // Mutations for persistence
-  const createConversationMutation = useCreateConversationMutation();
-  const addMessagesMutation = useAddMessagesMutation();
-
-  // Create transport with artist context in body
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: '/api/chat',
-        body: { artistContext },
-      }),
-    [artistContext]
-  );
-
-  const { messages, sendMessage, status } = useChat({
-    transport,
-    onError: error => {
-      const errorType = getErrorType(error);
-      let retryAfter: number | undefined;
-
-      try {
-        const errorData = JSON.parse(error.message);
-        retryAfter = errorData.retryAfter;
-      } catch {
-        // Not JSON, ignore
-      }
-
-      setChatError({
-        type: errorType,
-        message: getUserFriendlyMessage(errorType, retryAfter),
-        retryAfter,
-        failedMessage: lastAttemptedMessageRef.current,
-      });
-
-      setIsSubmitting(false);
-    },
+  // Use shared hook — handles persistence, error handling, and conversation management
+  const {
+    messages,
+    chatError,
+    isLoading,
+    isSubmitting,
+    hasMessages,
+    submitMessage,
+    handleRetry,
+  } = useJovieChat({
+    profileId,
+    artistContext,
   });
-
-  const isLoading = status === 'streaming' || status === 'submitted';
-  const hasMessages = messages.length > 0;
 
   // Auto-expand when messages arrive
   useEffect(() => {
@@ -235,125 +120,14 @@ export const InlineChatArea = forwardRef<
     }
   }, [messages, expanded]);
 
-  // Save messages to database when streaming completes
-  useEffect(() => {
-    if (
-      status === 'ready' &&
-      pendingMessagesRef.current &&
-      activeConversationId
-    ) {
-      const { userMessage, assistantMessage } = pendingMessagesRef.current;
-
-      if (userMessage && assistantMessage) {
-        addMessagesMutation.mutate(
-          {
-            conversationId: activeConversationId,
-            messages: [
-              { role: 'user', content: userMessage },
-              { role: 'assistant', content: assistantMessage },
-            ],
-          },
-          {
-            onSuccess: () => {
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.chat.conversation(activeConversationId),
-              });
-              queryClient.invalidateQueries({
-                queryKey: queryKeys.chat.conversations(),
-              });
-            },
-          }
-        );
-      }
-
-      pendingMessagesRef.current = null;
-      setIsSubmitting(false);
-    } else if (status === 'ready') {
-      setIsSubmitting(false);
-    }
-  }, [status, activeConversationId, addMessagesMutation, queryClient]);
-
-  // Track assistant response for persistence
-  useEffect(() => {
-    if (status === 'ready' && messages.length >= 2) {
-      const lastAssistantMessage = [...messages]
-        .reverse()
-        .find(m => m.role === 'assistant');
-
-      if (lastAssistantMessage && pendingMessagesRef.current) {
-        pendingMessagesRef.current.assistantMessage = getMessageText(
-          lastAssistantMessage.parts
-        );
-      }
-    }
-  }, [status, messages]);
-
-  // Core submit logic
-  const doSubmit = useCallback(
-    async (text: string) => {
-      if (!text.trim() || isLoading || isSubmitting) return;
-
-      const trimmedText = text.trim();
-      lastAttemptedMessageRef.current = trimmedText;
-
-      setChatError(null);
-      setIsSubmitting(true);
-
-      // If no active conversation, create one first
-      if (!activeConversationId) {
-        try {
-          const result = await createConversationMutation.mutateAsync({
-            initialMessage: trimmedText,
-          });
-          setActiveConversationId(result.conversation.id);
-
-          pendingMessagesRef.current = {
-            userMessage: trimmedText,
-            assistantMessage: '',
-          };
-        } catch {
-          setChatError({
-            type: 'server',
-            message: 'Failed to create conversation',
-            failedMessage: trimmedText,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-      } else {
-        pendingMessagesRef.current = {
-          userMessage: trimmedText,
-          assistantMessage: '',
-        };
-      }
-
-      sendMessage({ text: trimmedText });
-    },
-    [
-      isLoading,
-      isSubmitting,
-      sendMessage,
-      activeConversationId,
-      createConversationMutation,
-    ]
-  );
-
-  // Retry the last failed message
-  const handleRetry = useCallback(() => {
-    if (chatError?.failedMessage) {
-      setChatError(null);
-      doSubmit(chatError.failedMessage);
-    }
-  }, [chatError, doSubmit]);
-
   // Expose submitMessage method via ref
   useImperativeHandle(
     ref,
     () => ({
-      submitMessage: doSubmit,
+      submitMessage,
       isLoading: isLoading || isSubmitting,
     }),
-    [doSubmit, isLoading, isSubmitting]
+    [submitMessage, isLoading, isSubmitting]
   );
 
   // Toggle expansion

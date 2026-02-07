@@ -219,34 +219,57 @@ export function useSentryDashboardState(): {
   });
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let isChecking = false;
+
     const checkState = async (): Promise<void> => {
+      // Reentrancy guard: prevent concurrent invocations if the async import takes longer than the polling interval
+      if (isChecking) return;
+      isChecking = true;
+
       try {
         const { getUpgradeState, isUpgraded } = await import(
           '@/lib/sentry/lazy-replay'
         );
 
+        const upgradeState = getUpgradeState();
         setState({
           isFullSdkActive: isUpgraded(),
-          upgradeState: getUpgradeState(),
+          upgradeState,
         });
+
+        // Stop polling once in a terminal state (not idle, checking, or upgrading)
+        if (
+          upgradeState !== 'idle' &&
+          upgradeState !== 'checking' &&
+          upgradeState !== 'upgrading'
+        ) {
+          if (interval) clearInterval(interval);
+        }
       } catch {
         // If import fails, assume not upgraded
         setState({
           isFullSdkActive: false,
           upgradeState: 'failed',
         });
+        if (interval) clearInterval(interval);
+      } finally {
+        isChecking = false;
       }
     };
 
     if (typeof window !== 'undefined') {
-      checkState();
-
-      // Re-check periodically while upgrading
-      const interval = setInterval(() => {
+      // Assign interval first so checkState can clear it if we're already in terminal state
+      interval = setInterval(() => {
         checkState();
       }, 500);
 
-      return () => clearInterval(interval);
+      // Also run immediately
+      checkState();
+
+      return () => {
+        if (interval) clearInterval(interval);
+      };
     }
 
     return undefined;

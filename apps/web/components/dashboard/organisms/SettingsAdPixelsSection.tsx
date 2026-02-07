@@ -211,31 +211,26 @@ export function SettingsAdPixelsSection() {
       const formData = new FormData(e.currentTarget);
 
       // Only send token values if they were actually modified
-      // (not if they're still showing the placeholder)
-      const getFacebookToken = () => {
-        const value = formData.get('facebookAccessToken') as string;
-        if (!tokenModified.facebook || value === TOKEN_PLACEHOLDER) return '';
-        return value ?? '';
-      };
-      const getGoogleSecret = () => {
-        const value = formData.get('googleApiSecret') as string;
-        if (!tokenModified.google || value === TOKEN_PLACEHOLDER) return '';
-        return value ?? '';
-      };
-      const getTiktokToken = () => {
-        const value = formData.get('tiktokAccessToken') as string;
-        if (!tokenModified.tiktok || value === TOKEN_PLACEHOLDER) return '';
+      const getTokenIfModified = (
+        field: string,
+        platform: keyof typeof tokenModified
+      ): string => {
+        const value = formData.get(field) as string;
+        if (!tokenModified[platform] || value === TOKEN_PLACEHOLDER) return '';
         return value ?? '';
       };
 
       savePixels({
         facebookPixelId: (formData.get('facebookPixelId') as string) ?? '',
-        facebookAccessToken: getFacebookToken(),
+        facebookAccessToken: getTokenIfModified(
+          'facebookAccessToken',
+          'facebook'
+        ),
         googleMeasurementId:
           (formData.get('googleMeasurementId') as string) ?? '',
-        googleApiSecret: getGoogleSecret(),
+        googleApiSecret: getTokenIfModified('googleApiSecret', 'google'),
         tiktokPixelId: (formData.get('tiktokPixelId') as string) ?? '',
-        tiktokAccessToken: getTiktokToken(),
+        tiktokAccessToken: getTokenIfModified('tiktokAccessToken', 'tiktok'),
         enabled: pixelData.enabled,
       });
     },

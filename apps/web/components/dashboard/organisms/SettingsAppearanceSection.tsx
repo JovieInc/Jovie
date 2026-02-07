@@ -5,34 +5,20 @@ import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Light', description: 'Bright and clean.' },
+  { value: 'dark', label: 'Dark', description: 'Bold and focused.' },
+  { value: 'system', label: 'System', description: 'Match device settings.' },
+] as const;
+
 export function SettingsAppearanceSection() {
   const { theme, setTheme } = useTheme();
   const { updateTheme, isPending } = useThemeMutation();
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    // Update local state immediately for instant feedback
     setTheme(newTheme);
-    // Persist to server with automatic error handling and toast
     updateTheme(newTheme);
   };
-
-  const themeOptions = [
-    {
-      value: 'light',
-      label: 'Light',
-      description: 'Bright and clean.',
-    },
-    {
-      value: 'dark',
-      label: 'Dark',
-      description: 'Bold and focused.',
-    },
-    {
-      value: 'system',
-      label: 'System',
-      description: 'Match device settings.',
-    },
-  ];
 
   return (
     <div>
@@ -42,7 +28,7 @@ export function SettingsAppearanceSection() {
         </h3>
 
         <div className='grid grid-cols-3 gap-4'>
-          {themeOptions.map(option => (
+          {THEME_OPTIONS.map(option => (
             <button
               type='button'
               key={option.value}

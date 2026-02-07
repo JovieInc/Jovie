@@ -190,7 +190,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
  */
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
-  links: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
+  profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
   contacts: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-contacts')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,

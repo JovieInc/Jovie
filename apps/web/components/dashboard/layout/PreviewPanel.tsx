@@ -17,12 +17,22 @@ import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 
-const PREVIEW_PANEL_WIDTH = 360;
+export const PREVIEW_PANEL_WIDTH = 360;
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function PreviewPanel() {
   const { isOpen, close, previewData } = usePreviewPanel();
 
-  // Use BASE_URL to ensure profile links always point to the profile domain
   const profileUrl = useMemo(() => {
     if (!previewData) return '';
     return `${BASE_URL}${previewData.profilePath}`;
@@ -43,14 +53,7 @@ export function PreviewPanel() {
       const qrUrl = getQrCodeUrl(profileUrl, 512);
       const response = await fetch(qrUrl);
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${previewData.username || 'jovie'}-qr-code.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${previewData.username || 'jovie'}-qr-code.png`);
       toast.success('QR code downloaded');
     } catch {
       toast.error('Failed to download QR code');
@@ -68,15 +71,10 @@ export function PreviewPanel() {
         'END:VCARD',
       ].join('\n');
 
-      const blob = new Blob([vcard], { type: 'text/vcard' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${previewData.username || 'jovie'}.vcf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(
+        new Blob([vcard], { type: 'text/vcard' }),
+        `${previewData.username || 'jovie'}.vcf`
+      );
       toast.success('vCard downloaded');
     } catch {
       toast.error('Failed to download vCard');
@@ -200,5 +198,3 @@ export function PreviewPanel() {
     </RightDrawer>
   );
 }
-
-export { PREVIEW_PANEL_WIDTH };

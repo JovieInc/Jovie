@@ -48,6 +48,45 @@ vi.mock('@/lib/error-tracking', () => ({
   logFallback: mockLogFallback,
 }));
 
+// Mock heavy dependencies to prevent slow module resolution timeouts
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    }),
+  },
+}));
+
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: { id: 'id' },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: { userId: 'userId' },
+}));
+
+vi.mock('@/lib/notifications/providers/slack', () => ({
+  notifySlackUpgrade: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 /**
  * Create a webhook context for testing
  */

@@ -303,7 +303,7 @@ describe('SegmentControl', () => {
       );
       const root = container.firstChild;
       expect((root as HTMLElement).className).toContain('inline-flex');
-      expect((root as HTMLElement).className).toContain('rounded-full');
+      expect((root as HTMLElement).className).toContain('rounded-md');
     });
 
     it('merges custom className', () => {
@@ -341,7 +341,8 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('focus-visible:ring-2');
+      expect(tab.className).toContain('focus-visible:outline-none');
+      expect(tab.className).toContain('focus-visible:bg-interactive-hover');
     });
 
     it('applies motion-safe transition', () => {

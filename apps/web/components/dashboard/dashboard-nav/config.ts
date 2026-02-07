@@ -2,11 +2,14 @@ import {
   Banknote,
   Bell,
   CalendarDays,
+  Home,
   IdCard,
+  MessageCircle,
   Music,
   Paintbrush,
   PieChart,
   Rocket,
+  Settings,
   ShieldCheck,
   Sparkles,
   UserCircle,
@@ -18,11 +21,23 @@ import { APP_ROUTES } from '@/constants/routes';
 
 import type { NavItem } from './types';
 
+// ---------------------------------------------------------------------------
+// Shared navigation items – single source of truth for sidebar + mobile
+// ---------------------------------------------------------------------------
+
+export const dashboardHome: NavItem = {
+  name: 'Dashboard',
+  href: APP_ROUTES.DASHBOARD,
+  id: 'overview',
+  icon: Home,
+  description: 'Overview of your dashboard',
+};
+
 export const primaryNavigation: NavItem[] = [
   {
     name: 'Profile',
     href: APP_ROUTES.PROFILE,
-    id: 'links',
+    id: 'profile',
     icon: UserCircle,
     description: 'Update your profile and links',
   },
@@ -58,13 +73,34 @@ export const primaryNavigation: NavItem[] = [
 
 export const secondaryNavigation: NavItem[] = [
   {
+    name: 'Analytics',
+    href: APP_ROUTES.ANALYTICS,
+    id: 'analytics',
+    icon: PieChart,
+    description: 'View your analytics and insights',
+  },
+  {
     name: 'Earnings',
     href: APP_ROUTES.EARNINGS,
     id: 'earnings',
     icon: Banknote,
     description: 'Manage tips and monetization',
   },
+  {
+    name: 'Chat',
+    href: APP_ROUTES.CHAT,
+    id: 'chat',
+    icon: MessageCircle,
+    description: 'Messages and conversations',
+  },
 ];
+
+export const settingsNavItem: NavItem = {
+  name: 'Settings',
+  href: APP_ROUTES.SETTINGS,
+  id: 'settings',
+  icon: Settings,
+};
 
 export const settingsNavigation: NavItem[] = [
   {
@@ -141,4 +177,24 @@ export const adminNavigation: NavItem[] = [
     icon: PieChart,
     description: 'Review recent system and creator activity',
   },
+];
+
+// ---------------------------------------------------------------------------
+// Mobile bottom-bar groupings (derived from shared items above)
+// ---------------------------------------------------------------------------
+
+/** Items shown as icons in the bottom tab bar (max 4). */
+export const mobilePrimaryNavigation: NavItem[] = [
+  dashboardHome,
+  primaryNavigation[0], // Profile
+  primaryNavigation[1], // Contacts
+  primaryNavigation[4], // Audience
+];
+
+/** Items shown in the expanded "more" menu on mobile. */
+export const mobileExpandedNavigation: NavItem[] = [
+  primaryNavigation[2], // Releases
+  primaryNavigation[3], // Tour Dates
+  ...secondaryNavigation, // Analytics, Earnings, Chat
+  settingsNavItem,
 ];

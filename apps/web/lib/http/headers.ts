@@ -75,8 +75,71 @@ export const SECURITY_HEADERS = {
 // ============================================================================
 
 /**
+ * Allowed origins for authenticated API endpoints.
+ * In production, this should be restricted to your app's domains.
+ */
+const ALLOWED_ORIGINS = [
+  'https://jovie.fm',
+  'https://www.jovie.fm',
+  'https://app.jovie.fm',
+  // Preview deployments - team slug is 'jovie'
+  /^https:\/\/jovie(-git-[a-z0-9-]+-jovie)?\.vercel\.app$/,
+] as const;
+
+/**
+ * Validates if an origin is allowed.
+ */
+function isAllowedOrigin(origin: string | null): string | null {
+  if (!origin) return null;
+
+  for (const allowed of ALLOWED_ORIGINS) {
+    if (typeof allowed === 'string') {
+      if (origin === allowed) return origin;
+    } else if (allowed.test(origin)) {
+      return origin;
+    }
+  }
+
+  // In development, allow localhost origins
+  if (
+    process.env.NODE_ENV === 'development' &&
+    (origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:'))
+  ) {
+    return origin;
+  }
+
+  return null;
+}
+
+/**
+ * Creates CORS headers for authenticated endpoints.
+ * Validates the origin against allowed origins instead of using wildcard.
+ *
+ * @param requestOrigin - The Origin header from the request
+ * @param methods - Allowed HTTP methods (defaults to 'POST, OPTIONS')
+ */
+export function createAuthenticatedCorsHeaders(
+  requestOrigin: string | null,
+  methods: string = 'POST, OPTIONS'
+): Record<string, string> {
+  const validatedOrigin = isAllowedOrigin(requestOrigin);
+  if (!validatedOrigin) {
+    // Return empty object - no CORS headers means browser will block
+    return {};
+  }
+
+  return {
+    'Access-Control-Allow-Origin': validatedOrigin,
+    'Access-Control-Allow-Methods': methods,
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+/**
  * CORS headers for public API endpoints.
- * Customize the allowed origins as needed.
+ * Use createAuthenticatedCorsHeaders for authenticated endpoints.
  */
 export const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
