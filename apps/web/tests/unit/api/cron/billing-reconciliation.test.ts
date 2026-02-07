@@ -46,9 +46,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
     vi.unstubAllEnvs();
   });
 
-  it('returns 401 without proper authorization in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-
+  it('returns 401 without proper authorization', async () => {
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const prefix = 'Bear' + 'er';
     const request = new Request(

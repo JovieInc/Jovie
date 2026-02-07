@@ -210,13 +210,13 @@ test.describe('Public Profile Performance', () => {
       // Check basic meta tags
       await expect(page).toHaveTitle(/Tim/);
 
-      // Check for meta description
+      // Check for meta description (meta tags are in <head>, not visible)
       const metaDescription = page.locator('meta[name="description"]');
-      await expect(metaDescription).toBeVisible();
+      await expect(metaDescription).toHaveAttribute('content', /.+/);
 
       // Check for og:image (important for social sharing)
       const ogImage = page.locator('meta[property="og:image"]');
-      await expect(ogImage).toBeVisible();
+      await expect(ogImage).toHaveAttribute('content', /.+/);
     });
 
     test('performance budget compliance in CI environment', async ({
