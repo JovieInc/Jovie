@@ -13,7 +13,7 @@ import { SettingsBrandingSection } from '@/components/dashboard/organisms/Settin
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
-import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
+import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
@@ -81,11 +81,12 @@ export function SettingsPolished({
 
   const sections = [
     {
-      id: 'profile',
-      title: 'Profile',
-      description: 'Manage your public profile and account details.',
+      id: 'artist-profile',
+      title: 'Artist Profile',
+      description:
+        'Manage your profile details and connected streaming platforms.',
       render: () => (
-        <SettingsProfileSection
+        <SettingsArtistProfileSection
           artist={artist}
           onArtistUpdate={onArtistUpdate}
           onRefresh={() => router.refresh()}
