@@ -39,7 +39,6 @@ async function maybeGenerateTitle(
 
   try {
     const context = messages
-      .filter(m => m.content)
       .map(m => `${m.role}: ${m.content.slice(0, 200)}`)
       .join('\n');
 
