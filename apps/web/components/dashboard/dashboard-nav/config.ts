@@ -99,7 +99,7 @@ export const secondaryNavigation: NavItem[] = [
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
-    description: 'Messages and conversations',
+    description: 'Ask Jovie anything about your profile',
   },
 ];
 
