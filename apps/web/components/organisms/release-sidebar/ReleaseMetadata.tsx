@@ -117,7 +117,7 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
               <div className='flex flex-wrap gap-1'>
                 {release.genres.map((genre, index) => (
                   <Badge
-                    key={`${genre}-${index}`}
+                    key={`genre-${genre}-${index}`}
                     variant='secondary'
                     className='bg-surface-2 text-[10px] font-normal'
                   >

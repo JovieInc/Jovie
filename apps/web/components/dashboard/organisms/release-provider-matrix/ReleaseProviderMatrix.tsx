@@ -22,9 +22,9 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { cn } from '@/lib/utils';
+import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
-import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
 import {

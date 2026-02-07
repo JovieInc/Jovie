@@ -46,12 +46,15 @@ export function AccessibleStepWrapper({
       {/* Visual step indicator */}
       <div className='flex items-center justify-center gap-2 mb-4'>
         <div className='flex items-center gap-1.5' aria-hidden='true'>
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <div
-              key={i + 1}
-              className={`rounded-full transition-all duration-200 ${getStepDotStyle(i + 1, currentStep)}`}
-            />
-          ))}
+          {Array.from({ length: totalSteps }, (_, i) => {
+            const step = i + 1;
+            return (
+              <div
+                key={`step-${step}`}
+                className={`rounded-full transition-all duration-200 ${getStepDotStyle(step, currentStep)}`}
+              />
+            );
+          })}
         </div>
         <span className='text-xs text-secondary-token'>
           Step {currentStep} of {totalSteps}

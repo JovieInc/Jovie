@@ -31,13 +31,13 @@ import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
 } from '@/lib/discography/spotify-import';
-import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import type {
   ProviderKey,
   ReleaseViewModel,
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
 
