@@ -20,15 +20,18 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
 };
 
 function PopularityBar({ value }: { readonly value: number }) {
+  const clamped = Math.max(0, Math.min(100, value));
   return (
     <div className='flex items-center gap-2'>
       <div className='h-1.5 flex-1 rounded-full bg-surface-2'>
         <div
           className='h-full rounded-full bg-primary transition-all'
-          style={{ width: `${value}%` }}
+          style={{ width: `${clamped}%` }}
         />
       </div>
-      <span className='text-xs tabular-nums text-secondary-token'>{value}</span>
+      <span className='text-xs tabular-nums text-secondary-token'>
+        {clamped}
+      </span>
     </div>
   );
 }
@@ -112,9 +115,9 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
             label='Genres'
             value={
               <div className='flex flex-wrap gap-1'>
-                {release.genres.map(genre => (
+                {release.genres.map((genre, index) => (
                   <Badge
-                    key={genre}
+                    key={`${genre}-${index}`}
                     variant='secondary'
                     className='bg-surface-2 text-[10px] font-normal'
                   >
