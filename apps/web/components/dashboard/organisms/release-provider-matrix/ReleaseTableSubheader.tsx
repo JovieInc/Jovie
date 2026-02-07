@@ -163,6 +163,8 @@ function LinearStyleDisplayMenu({
   onShowTracksChange,
   groupByYear,
   onGroupByYearChange,
+  releaseView,
+  onReleaseViewChange,
   triggerClassName,
 }: {
   columnVisibility: Record<string, boolean>;
@@ -173,6 +175,8 @@ function LinearStyleDisplayMenu({
   onShowTracksChange?: (show: boolean) => void;
   groupByYear?: boolean;
   onGroupByYearChange?: (group: boolean) => void;
+  releaseView?: ReleaseView;
+  onReleaseViewChange?: (view: ReleaseView) => void;
   triggerClassName?: string;
 }) {
   return (
@@ -193,6 +197,15 @@ function LinearStyleDisplayMenu({
         </PopoverTrigger>
       </TooltipShortcut>
       <PopoverContent align='end' className='w-56 p-0'>
+        {/* Release view toggle */}
+        {onReleaseViewChange && (
+          <div className='border-b border-subtle px-3 py-2'>
+            <ReleaseViewSegmentedControl
+              value={releaseView ?? 'all'}
+              onChange={onReleaseViewChange}
+            />
+          </div>
+        )}
         {/* List options */}
         {(onShowTracksChange || onGroupByYearChange) && (
           <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
@@ -294,7 +307,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: Filter first, then release view toggle */}
+      {/* Left: Filter */}
       <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown
           filters={filters}
@@ -302,12 +315,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           counts={counts}
           buttonClassName={pillButtonClass}
         />
-        {onReleaseViewChange && (
-          <ReleaseViewSegmentedControl
-            value={releaseView}
-            onChange={onReleaseViewChange}
-          />
-        )}
       </div>
 
       {/* Right: Display + Export */}
@@ -321,6 +328,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onShowTracksChange={onShowTracksChange}
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
+          releaseView={releaseView}
+          onReleaseViewChange={onReleaseViewChange}
           triggerClassName={pillButtonClass}
         />
         <ExportCSVButton
