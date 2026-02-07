@@ -15,6 +15,7 @@ interface NavMenuItemProps {
   readonly isActive: boolean;
   readonly shortcut?: KeyboardShortcut;
   readonly actions?: ReactNode;
+  readonly children?: ReactNode;
 }
 
 /**
@@ -67,6 +68,7 @@ export function NavMenuItem({
   isActive,
   shortcut,
   actions,
+  children,
 }: NavMenuItemProps) {
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
@@ -96,6 +98,7 @@ export function NavMenuItem({
         </Link>
       </SidebarMenuButton>
       {actions}
+      {children}
     </SidebarMenuItem>
   );
 }

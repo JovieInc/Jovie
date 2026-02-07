@@ -17,9 +17,13 @@ import {
   CHECKBOX_RADIO_ITEM_BASE,
   CONTEXT_TRANSFORM_ORIGIN,
   contextMenuContentClasses,
+  contextMenuContentCompactClasses,
   DROPDOWN_TRANSFORM_ORIGIN,
   dropdownMenuContentClasses,
+  dropdownMenuContentCompactClasses,
   MENU_ITEM_BASE,
+  MENU_ITEM_COMPACT,
+  MENU_ITEM_COMPACT_DESTRUCTIVE,
   MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
@@ -76,17 +80,9 @@ function renderIcon(
  * - Select dropdowns (single-value selection)
  * - Context menus (right-click menus)
  *
- * Features:
- * - Action items with icons, badges, shortcuts
- * - Checkbox items (multi-select)
- * - Radio groups (single-select)
- * - Submenus (nested menus)
- * - Separators and labels
- * - Custom content rendering
- * - Search/filter functionality
- * - Loading states
- * - Full keyboard navigation
- * - WCAG 2.1 AA compliant
+ * Size variants:
+ * - 'default': Standard menus (user menu, bulk actions, notifications)
+ * - 'compact': Dense menus for tables, sidebars, and inline actions
  *
  * @example
  * // Simple action menu
@@ -98,10 +94,19 @@ function renderIcon(
  *     { type: 'action', id: 'delete', label: 'Delete', icon: Trash2, onClick: handleDelete, variant: 'destructive' },
  *   ]}
  * />
+ *
+ * @example
+ * // Compact table action menu
+ * <CommonDropdown
+ *   variant="dropdown"
+ *   size="compact"
+ *   items={tableActions}
+ * />
  */
 export function CommonDropdown(props: CommonDropdownProps) {
   const {
     variant = 'dropdown',
+    size = 'default',
     items,
     trigger,
     defaultTriggerType = 'button',
@@ -124,6 +129,19 @@ export function CommonDropdown(props: CommonDropdownProps) {
     disabled = false,
     children,
   } = props;
+
+  // Resolve size-dependent token classes
+  const isCompact = size === 'compact';
+  const itemBase = isCompact ? MENU_ITEM_COMPACT : MENU_ITEM_BASE;
+  const itemDestructive = isCompact
+    ? MENU_ITEM_COMPACT_DESTRUCTIVE
+    : MENU_ITEM_DESTRUCTIVE;
+  const dropdownContentBase = isCompact
+    ? dropdownMenuContentCompactClasses
+    : dropdownMenuContentClasses;
+  const contextContentBase = isCompact
+    ? contextMenuContentCompactClasses
+    : contextMenuContentClasses;
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [filteredItems, setFilteredItems] = React.useState(items);
@@ -239,7 +257,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         align={align}
         side={side}
         sideOffset={sideOffset}
-        className={cn(dropdownMenuContentClasses, contentClassName)}
+        className={cn(dropdownContentBase, contentClassName)}
       >
         {searchable && (
           <div className='relative px-2 pb-1 pt-1'>
@@ -288,7 +306,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
   function renderContextMenuContent() {
     const content = (
       <ContextMenuPrimitive.Content
-        className={cn(contextMenuContentClasses, contentClassName)}
+        className={cn(contextContentBase, contentClassName)}
       >
         {(() => {
           if (isLoading) {
@@ -411,8 +429,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
         }}
         disabled={item.disabled}
         className={cn(
-          MENU_ITEM_BASE,
-          item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE,
+          itemBase,
+          item.variant === 'destructive' && itemDestructive,
           item.className
         )}
       >
@@ -548,7 +566,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <Sub key={item.id}>
         <SubTrigger
           disabled={item.disabled}
-          className={cn(MENU_ITEM_BASE, item.className)}
+          className={cn(itemBase, item.className)}
         >
           {renderIcon(item.icon, 'h-4 w-4')}
           {item.label}

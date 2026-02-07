@@ -23,6 +23,8 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   branding: 'Branding',
   'ad-pixels': 'Ad pixels',
   billing: 'Billing',
+  'social-links': 'Social links',
+  'music-links': 'Music links',
 
   // Admin routes
   admin: 'Admin',
