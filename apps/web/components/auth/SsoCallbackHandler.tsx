@@ -1,8 +1,12 @@
 'use client';
 
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+/** Seconds before showing stall message */
+const STALL_TIMEOUT_SECONDS = 10;
 
 /**
  * Props for SsoCallbackHandler component.
@@ -12,6 +16,39 @@ interface SsoCallbackHandlerProps {
   readonly signInFallbackRedirectUrl: string;
   /** URL to redirect to after successful sign-up */
   readonly signUpFallbackRedirectUrl: string;
+}
+
+/**
+ * Loading state shown during SSO callback processing.
+ * Displays a spinner with status text, aria-busy for assistive tech,
+ * and a stall message if the callback takes too long.
+ */
+function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
+  return (
+    <div
+      className='flex flex-col items-center justify-center min-h-[200px] gap-3'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+    >
+      <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary-token' />
+      <p className='text-sm text-secondary-token'>
+        {isStalled ? 'Still signing you in…' : 'Signing you in…'}
+      </p>
+      {isStalled && (
+        <p className='text-xs text-secondary-token/70 text-center max-w-xs'>
+          This is taking longer than expected. You can{' '}
+          <Link
+            href='/signin'
+            className='text-primary-token hover:underline focus-ring-themed rounded-md'
+          >
+            try signing in again
+          </Link>
+          .
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -28,6 +65,7 @@ export function SsoCallbackHandler({
 }: Readonly<SsoCallbackHandlerProps>) {
   const router = useRouter();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
+  const [isStalled, setIsStalled] = useState(false);
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
@@ -57,20 +95,32 @@ export function SsoCallbackHandler({
     }
   }, [router, signInFallbackRedirectUrl]);
 
+  // Stall detection: if the callback hasn't resolved after a timeout, show help
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsStalled(true);
+    }, STALL_TIMEOUT_SECONDS * 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // If we're handling a hash redirect, show a loading state
   if (isHandlingHash) {
-    return (
-      <div className='flex items-center justify-center min-h-[200px]'>
-        <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary-token' />
-      </div>
-    );
+    return <SsoLoadingState isStalled={isStalled} />;
   }
 
-  // Otherwise, use Clerk's standard callback handler
+  // Clerk's callback handler processes the OAuth redirect via JS.
+  // We render our loading state visually and keep Clerk's component mounted
+  // (visually hidden but not display:none, so it can still process).
   return (
-    <AuthenticateWithRedirectCallback
-      signInFallbackRedirectUrl={signInFallbackRedirectUrl}
-      signUpFallbackRedirectUrl={signUpFallbackRedirectUrl}
-    />
+    <>
+      <SsoLoadingState isStalled={isStalled} />
+      <div className='sr-only'>
+        <AuthenticateWithRedirectCallback
+          signInFallbackRedirectUrl={signInFallbackRedirectUrl}
+          signUpFallbackRedirectUrl={signUpFallbackRedirectUrl}
+        />
+      </div>
+    </>
   );
 }
