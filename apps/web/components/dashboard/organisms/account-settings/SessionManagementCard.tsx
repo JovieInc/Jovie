@@ -10,6 +10,7 @@
 import { Button } from '@jovie/ui';
 import { WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,9 @@ export function SessionManagementCard({
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
+  const [sessionToEnd, setSessionToEnd] = useState<ClerkSessionResource | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -158,7 +162,7 @@ export function SessionManagementCard({
                       size='sm'
                       className='text-red-500 hover:text-red-600 hover:bg-red-50'
                       disabled={endingSessionId === session.id}
-                      onClick={() => handleEndSession(session)}
+                      onClick={() => setSessionToEnd(session)}
                     >
                       {endingSessionId === session.id
                         ? 'Ending…'
@@ -171,6 +175,20 @@ export function SessionManagementCard({
           </div>
         );
       })()}
+
+      <ConfirmDialog
+        open={Boolean(sessionToEnd)}
+        onOpenChange={open => {
+          if (!open) setSessionToEnd(null);
+        }}
+        title='End session?'
+        description='This will sign out the device. If you don&#39;t recognise this session, consider changing your password too.'
+        confirmLabel='End session'
+        variant='destructive'
+        onConfirm={async () => {
+          if (sessionToEnd) await handleEndSession(sessionToEnd);
+        }}
+      />
     </DashboardCard>
   );
 }

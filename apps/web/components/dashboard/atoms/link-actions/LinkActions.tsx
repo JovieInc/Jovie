@@ -1,7 +1,8 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import type { LinkActionsProps } from './types';
 import { useLinkActionsMenu } from './useLinkActionsMenu';
@@ -31,6 +32,12 @@ export const LinkActions = memo(function LinkActions({
   isOpen,
   onOpenChange,
 }: LinkActionsProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleRemoveClick = useCallback(() => {
+    setDeleteDialogOpen(true);
+  }, []);
+
   const {
     open,
     menuId,
@@ -43,7 +50,7 @@ export const LinkActions = memo(function LinkActions({
     handleKeyDown,
   } = useLinkActionsMenu({
     onToggle,
-    onRemove,
+    onRemove: handleRemoveClick,
     onEdit,
     isVisible,
     isOpen,
@@ -130,6 +137,16 @@ export const LinkActions = memo(function LinkActions({
           </div>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title='Delete link?'
+        description='This action cannot be undone. The link will be permanently removed from your profile.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={onRemove}
+      />
     </div>
   );
 });
