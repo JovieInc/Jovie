@@ -90,10 +90,10 @@ export function SettingsAppearanceSection() {
               </div>
 
               <div className='text-left'>
-                <h4 className='font-medium text-primary text-sm mb-1'>
+                <h4 className='font-medium text-primary-token text-sm mb-1'>
                   {option.label}
                 </h4>
-                <p className='text-xs text-secondary mt-1'>
+                <p className='text-xs text-secondary-token mt-1'>
                   {option.description}
                 </p>
               </div>
@@ -120,9 +120,10 @@ export function SettingsAppearanceSection() {
           ))}
         </div>
 
-        <p className='text-xs text-secondary mt-4'>
-          Choose how the interface appears. System automatically matches your
-          device settings.
+        <p className='text-xs text-secondary-token mt-4'>
+          {isPending
+            ? 'Saving…'
+            : 'Choose how the interface appears. System automatically matches your device settings.'}
         </p>
       </DashboardCard>
     </div>

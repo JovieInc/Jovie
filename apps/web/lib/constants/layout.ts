@@ -42,10 +42,10 @@ export const TABLE_MIN_WIDTHS = {
 /**
  * Release table width calculation constants
  *
- * Base width covers fixed columns: Release(220) + Released(70) + SmartLink(180) + Actions(60)
+ * Base width covers fixed columns: Checkbox(56) + Release(min 200) + Meta(min 200)
  * Provider width is added per dynamic provider column
  */
 export const RELEASE_TABLE_WIDTHS = {
-  BASE: 530, // Fixed columns total width
+  BASE: 56 + 200 + 200, // Checkbox + Release min + Meta min
   PROVIDER_COLUMN: 100, // Width per provider column
 } as const;
