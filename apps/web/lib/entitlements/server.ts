@@ -22,6 +22,7 @@ const FREE_ENTITLEMENTS: UserEntitlements = {
   canRemoveBranding: false,
   canExportContacts: false,
   canAccessAdvancedAnalytics: false,
+  canFilterSelfFromAnalytics: false,
   analyticsRetentionDays: 7,
   contactsLimit: 100,
 };
@@ -82,6 +83,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     canRemoveBranding: limits.canRemoveBranding,
     canExportContacts: limits.canExportContacts,
     canAccessAdvancedAnalytics: limits.canAccessAdvancedAnalytics,
+    canFilterSelfFromAnalytics: limits.canFilterSelfFromAnalytics,
     analyticsRetentionDays: limits.analyticsRetentionDays,
     contactsLimit: limits.contactsLimit,
   };
