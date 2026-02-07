@@ -19,7 +19,7 @@ interface ContactsTableProps {
   readonly artistName: string;
   readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
   readonly onSave: (contact: EditableContact) => Promise<void>;
-  readonly onDelete: (contact: EditableContact) => Promise<void>;
+  readonly onDelete: (contact: EditableContact) => void;
   readonly onAddContact: (role?: ContactRole) => void;
 }
 
@@ -31,10 +31,40 @@ export const ContactsTable = memo(function ContactsTable({
   onDelete,
   onAddContact,
 }: ContactsTableProps) {
-  const [selectedContact, setSelectedContact] =
-    useState<EditableContact | null>(null);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(
+    null
+  );
 
-  const columns = useMemo(() => createContactColumns(), []);
+  // Derive selectedContact from contacts array to stay in sync after saves
+  const selectedContact = useMemo(
+    () => contacts.find(c => c.id === selectedContactId) ?? null,
+    [contacts, selectedContactId]
+  );
+
+  // Track previous contacts length to detect newly added contacts
+  const prevContactsLenRef = useRef(contacts.length);
+  useEffect(() => {
+    const prevLen = prevContactsLenRef.current;
+    prevContactsLenRef.current = contacts.length;
+
+    // A new contact was added — auto-select it in the sidebar
+    if (contacts.length > prevLen && contacts.length > 0) {
+      const newest = contacts[contacts.length - 1];
+      setSelectedContactId(newest.id);
+    }
+  }, [contacts]);
+
+  const handleDeleteFromMenu = useCallback(
+    (contact: EditableContact) => {
+      onDelete(contact);
+    },
+    [onDelete]
+  );
+
+  const columns = useMemo(
+    () => createContactColumns({ onDelete: handleDeleteFromMenu }),
+    [handleDeleteFromMenu]
+  );
 
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -48,10 +78,10 @@ export const ContactsTable = memo(function ContactsTable({
   useEffect(() => {
     // Toggle function: close if open, open first contact if closed
     const toggle = () => {
-      if (selectedContact) {
-        setSelectedContact(null);
+      if (selectedContactId) {
+        setSelectedContactId(null);
       } else if (contactsRef.current.length > 0) {
-        setSelectedContact(contactsRef.current[0]);
+        setSelectedContactId(contactsRef.current[0].id);
       }
     };
 
@@ -61,7 +91,7 @@ export const ContactsTable = memo(function ContactsTable({
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
-  }, [selectedContact, contacts.length, isSidebarOpen]);
+  }, [selectedContactId, contacts.length, isSidebarOpen]);
 
   // Set header actions (drawer toggle on right)
   const { setHeaderActions } = useSetHeaderActions();
@@ -79,21 +109,19 @@ export const ContactsTable = memo(function ContactsTable({
   }, [drawerToggle]);
 
   const handleRowClick = useCallback((contact: EditableContact) => {
-    setSelectedContact(contact);
+    setSelectedContactId(contact.id);
   }, []);
 
   const handleClose = useCallback(() => {
-    setSelectedContact(null);
+    setSelectedContactId(null);
   }, []);
 
   const handleUpdate = useCallback(
     (updates: Partial<EditableContact>) => {
-      if (!selectedContact) return;
-      onUpdate(selectedContact.id, updates);
-      // Update local selected contact state
-      setSelectedContact(prev => (prev ? { ...prev, ...updates } : null));
+      if (!selectedContactId) return;
+      onUpdate(selectedContactId, updates);
     },
-    [selectedContact, onUpdate]
+    [selectedContactId, onUpdate]
   );
 
   const handleSave = useCallback(async () => {
@@ -101,19 +129,18 @@ export const ContactsTable = memo(function ContactsTable({
     await onSave(selectedContact);
   }, [selectedContact, onSave]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     if (!selectedContact) return;
-    await onDelete(selectedContact);
-    setSelectedContact(null);
+    onDelete(selectedContact);
   }, [selectedContact, onDelete]);
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      return selectedContact?.id === contact.id
+      return selectedContactId === contact.id
         ? 'bg-surface-2'
         : 'hover:bg-surface-2/50';
     },
-    [selectedContact]
+    [selectedContactId]
   );
 
   const isEmpty = contacts.length === 0;
