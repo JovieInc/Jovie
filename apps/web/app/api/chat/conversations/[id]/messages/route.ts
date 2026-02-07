@@ -1,3 +1,5 @@
+import { gateway } from '@ai-sdk/gateway';
+import { generateText } from 'ai';
 import { and, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -24,25 +26,62 @@ interface RouteParams {
 }
 
 /**
- * Auto-generate a title from the first user message if no title exists.
- * Uses a single guarded UPDATE to eliminate round-trip and prevent race conditions.
+ * Auto-generate a conversation title using a cheap AI model via the AI gateway.
+ * Falls back to truncating the first user message on failure.
+ * Uses a guarded UPDATE (isNull check) to prevent race conditions.
  */
 async function maybeGenerateTitle(
   conversationId: string,
-  messageContent: string
+  messages: z.infer<typeof messageSchema>[]
 ): Promise<void> {
-  const autoTitle = messageContent.slice(0, 50).trim();
-  if (!autoTitle) return;
-  const suffix = autoTitle.length >= 50 ? '...' : '';
-  await db
-    .update(chatConversations)
-    .set({ title: autoTitle + suffix })
-    .where(
-      and(
-        eq(chatConversations.id, conversationId),
-        isNull(chatConversations.title)
-      )
-    );
+  const userMessage = messages.find(m => m.role === 'user');
+  if (!userMessage?.content) return;
+
+  try {
+    const context = messages
+      .filter(m => m.content)
+      .map(m => `${m.role}: ${m.content.slice(0, 200)}`)
+      .join('\n');
+
+    const { text } = await generateText({
+      model: gateway('google:gemini-2.0-flash'),
+      system:
+        'Generate a short, descriptive title (2-6 words) for this conversation. Return only the title text, no quotes or extra punctuation.',
+      prompt: context,
+      maxOutputTokens: 30,
+    });
+
+    const title = text
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .slice(0, 80);
+
+    if (!title) throw new Error('Empty title generated');
+
+    await db
+      .update(chatConversations)
+      .set({ title })
+      .where(
+        and(
+          eq(chatConversations.id, conversationId),
+          isNull(chatConversations.title)
+        )
+      );
+  } catch (error) {
+    logger.error('AI title generation failed, using fallback:', error);
+    const fallback = userMessage.content.slice(0, 50).trim();
+    if (!fallback) return;
+    const suffix = fallback.length >= 50 ? '...' : '';
+    await db
+      .update(chatConversations)
+      .set({ title: fallback + suffix })
+      .where(
+        and(
+          eq(chatConversations.id, conversationId),
+          isNull(chatConversations.title)
+        )
+      );
+  }
 }
 
 /**
@@ -127,10 +166,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       .set({ updatedAt: new Date() })
       .where(eq(chatConversations.id, conversationId));
 
-    // Auto-generate title from first user message if no title exists
-    const firstUserMessage = messagesToInsert.find(m => m.role === 'user');
-    if (firstUserMessage) {
-      await maybeGenerateTitle(conversationId, firstUserMessage.content);
+    // Auto-generate title with AI (fire-and-forget to avoid blocking response)
+    const hasUserMessage = messagesToInsert.some(m => m.role === 'user');
+    if (hasUserMessage) {
+      maybeGenerateTitle(conversationId, messagesToInsert).catch(error => {
+        logger.error('Title generation error:', error);
+      });
     }
 
     return NextResponse.json(
