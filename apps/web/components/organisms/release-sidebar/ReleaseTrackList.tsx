@@ -19,7 +19,6 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tracks, setTracks] = useState<TrackViewModel[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {
@@ -29,25 +28,22 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
 
     setIsExpanded(true);
 
-    // Only fetch if not already cached (null = not fetched, [] = empty)
-    if (tracks !== null && !hasError) return;
+    // Only fetch if not already cached
+    if (tracks !== null) return;
 
     setIsLoading(true);
-    setHasError(false);
     try {
       const result = await loadTracksForRelease({
         releaseId: release.id,
         releaseSlug: release.slug,
       });
       setTracks(result);
-    } catch (error) {
-      console.error('Failed to load tracks:', error);
-      setTracks(null);
-      setHasError(true);
+    } catch {
+      setTracks([]);
     } finally {
       setIsLoading(false);
     }
-  }, [isExpanded, tracks, hasError, release.id, release.slug]);
+  }, [isExpanded, tracks, release.id, release.slug]);
 
   if (release.totalTracks === 0) return null;
 
@@ -56,8 +52,6 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
       <button
         type='button'
         onClick={() => void handleToggle()}
-        aria-expanded={isExpanded}
-        aria-controls={`release-tracklist-${release.id}`}
         className='flex w-full items-center justify-between rounded-md py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token hover:text-primary-token transition-colors'
       >
         <span>Tracklist ({release.totalTracks})</span>
@@ -69,27 +63,20 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
       </button>
 
       {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
+        <div className='space-y-0.5'>
           {isLoading && (
             <div className='flex items-center justify-center py-4'>
               <Loader2 className='h-4 w-4 animate-spin text-tertiary-token' />
             </div>
           )}
 
-          {!isLoading && hasError && (
-            <p className='py-2 text-xs text-error'>
-              Failed to load tracks. Collapse and expand to retry.
-            </p>
-          )}
-
-          {!isLoading && !hasError && tracks && tracks.length === 0 && (
+          {!isLoading && tracks && tracks.length === 0 && (
             <p className='py-2 text-xs text-tertiary-token'>
               No track data available.
             </p>
           )}
 
           {!isLoading &&
-            !hasError &&
             tracks &&
             tracks.length > 0 &&
             tracks.map(track => <TrackItem key={track.id} track={track} />)}
