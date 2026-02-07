@@ -182,7 +182,9 @@ export function SessionManagementCard({
           if (!open) setSessionToEnd(null);
         }}
         title='End session?'
-        description='This will sign out the device. If you don&#39;t recognise this session, consider changing your password too.'
+        description={
+          "This will sign out the device. If you don't recognise this session, consider changing your password too."
+        }
         confirmLabel='End session'
         variant='destructive'
         onConfirm={async () => {

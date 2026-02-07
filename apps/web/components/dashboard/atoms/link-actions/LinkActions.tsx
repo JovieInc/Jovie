@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useState } from 'react';
+import { memo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { cn } from '@/lib/utils';
@@ -34,10 +34,6 @@ export const LinkActions = memo(function LinkActions({
 }: LinkActionsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const handleRemoveClick = useCallback(() => {
-    setDeleteDialogOpen(true);
-  }, []);
-
   const {
     open,
     menuId,
@@ -50,7 +46,7 @@ export const LinkActions = memo(function LinkActions({
     handleKeyDown,
   } = useLinkActionsMenu({
     onToggle,
-    onRemove: handleRemoveClick,
+    onRemove: () => setDeleteDialogOpen(true),
     onEdit,
     isVisible,
     isOpen,
