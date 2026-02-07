@@ -1,7 +1,5 @@
 export type { AudienceActionsCellProps } from './AudienceActionsCell';
 export { AudienceActionsCell } from './AudienceActionsCell';
-export type { AudienceMobileCardProps } from './AudienceMobileCard';
-export { AudienceMobileCard } from './AudienceMobileCard';
 export type { AudienceCountryCellProps } from './AudienceCountryCell';
 export { AudienceCountryCell } from './AudienceCountryCell';
 export type { AudienceCreatedAtCellProps } from './AudienceCreatedAtCell';
@@ -12,6 +10,8 @@ export type { AudienceLastSeenCellProps } from './AudienceLastSeenCell';
 export { AudienceLastSeenCell } from './AudienceLastSeenCell';
 export type { AudienceLocationCellProps } from './AudienceLocationCell';
 export { AudienceLocationCell } from './AudienceLocationCell';
+export type { AudienceMobileCardProps } from './AudienceMobileCard';
+export { AudienceMobileCard } from './AudienceMobileCard';
 export type { AudienceRowSelectionCellProps } from './AudienceRowSelectionCell';
 export { AudienceRowSelectionCell } from './AudienceRowSelectionCell';
 export type { AudienceTypeBadgeProps } from './AudienceTypeBadge';
