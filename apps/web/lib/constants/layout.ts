@@ -46,6 +46,6 @@ export const TABLE_MIN_WIDTHS = {
  * Provider width is added per dynamic provider column
  */
 export const RELEASE_TABLE_WIDTHS = {
-  BASE: 500, // Fixed columns total minimum width
+  BASE: 56 + 200 + 200, // Checkbox + Release min + Meta min
   PROVIDER_COLUMN: 100, // Width per provider column
 } as const;
