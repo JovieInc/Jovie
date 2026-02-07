@@ -286,6 +286,13 @@ function GroupedLinksManagerInner<T extends DetectedLink = DetectedLink>({
   }
 
   // Mode 2: Sidebar Closed, No Links - input at top with empty state
+  // TODO(chat-ux): InlineChatArea is NOT rendered here, so chat messages from
+  // UniversalLinkInput silently fail (chatAreaRef.current is null). New users
+  // who type a question see nothing happen. Fix options:
+  //   A) Render InlineChatArea here so chat works from day 1
+  //   B) Route new users to the full JovieChat component (components/jovie/JovieChat.tsx)
+  //      which already has a proper ChatGPT-style empty state with suggested prompts
+  //   C) Show SuggestedPrompts in this empty state to guide users toward links AND chat
   if (!hasAnyLinks) {
     return (
       <section

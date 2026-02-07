@@ -283,6 +283,8 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
             )}
 
             {/* Compose icon - Linear-style */}
+            {/* TODO(chat-ux): aria-label says "New chat" but /app redirects to profile page.
+                Either link to a real chat page or change the label to match actual behavior. */}
             {!isInSettings && isDashboardOrAdmin && (
               <Link
                 href='/app'
