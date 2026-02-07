@@ -11,7 +11,7 @@ A polished tooltip component with Radix primitives, tokenized design, and compre
 
 ### 🎨 **Modern Design System**
 - **Tailwind v4 Tokens**: Future-proof color system with semantic tokens
-- **Dark Mode Support**: Automatic adaptation using `bg-surface-1`, `text-primary-token`
+- **Theme-aware Surfaces**: Uses `bg-surface-3` and `text-primary-token` for consistent contrast
 - **Consistent Styling**: Integrated with the app's design token system
 
 ### ♿ **Comprehensive Accessibility**
@@ -191,11 +191,11 @@ Convenience wrapper for common tooltip use cases. Requires `TooltipProvider` in 
 
 The tooltip uses Tailwind classes that adapt to light/dark themes:
 
-- **Background**: `bg-white` / `dark:bg-neutral-900`
-- **Text**: `text-neutral-900` / `dark:text-white`
-- **Border**: `border-black/10` / `dark:border-white/10`
-- **Shadow**: `shadow-lg`
-- **Arrow**: `fill-white` / `dark:fill-neutral-900`
+- **Background**: `bg-surface-3`
+- **Text**: `text-primary-token`
+- **Border**: `border-transparent`
+- **Shadow**: `shadow-[0_4px_12px_rgba(0,0,0,0.4)]`
+- **Arrow**: `fill-surface-3`
 
 ## Browser Support
 
