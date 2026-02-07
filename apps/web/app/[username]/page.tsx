@@ -376,7 +376,6 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    creatorClerkId,
     latestRelease,
   } = profileResult;
 
@@ -451,11 +450,7 @@ export default async function ArtistPage({
       {/* Prevent claim token leakage via Referer header */}
       {hasClaimToken && <meta name='referrer' content='no-referrer' />}
 
-      <ProfileViewTracker
-        handle={artist.handle}
-        artistId={artist.id}
-        ownerClerkId={creatorClerkId}
-      />
+      <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       {showClaimBanner && (
