@@ -54,17 +54,7 @@ export const ContactsTable = memo(function ContactsTable({
     }
   }, [contacts]);
 
-  const handleDeleteFromMenu = useCallback(
-    (contact: EditableContact) => {
-      onDelete(contact);
-    },
-    [onDelete]
-  );
-
-  const columns = useMemo(
-    () => createContactColumns({ onDelete: handleDeleteFromMenu }),
-    [handleDeleteFromMenu]
-  );
+  const columns = useMemo(() => createContactColumns({ onDelete }), [onDelete]);
 
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -204,7 +194,7 @@ export const ContactsTable = memo(function ContactsTable({
       {/* Right sidebar */}
       <ContactDetailSidebar
         contact={selectedContact}
-        isOpen={Boolean(selectedContact)}
+        isOpen={isSidebarOpen}
         onClose={handleClose}
         onUpdate={handleUpdate}
         onSave={handleSave}

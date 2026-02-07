@@ -23,6 +23,14 @@ interface ContactUIState {
   isNew: boolean;
 }
 
+const DEFAULT_UI_STATE: ContactUIState = {
+  isExpanded: false,
+  isSaving: false,
+  error: null,
+  customTerritory: '',
+  isNew: false,
+};
+
 export interface EditableContact extends DashboardContact {
   isExpanded?: boolean;
   isSaving?: boolean;
@@ -248,13 +256,7 @@ export function useContactsManager({
           if (isNewContact && saved.id !== contactId) {
             delete next[contactId];
           }
-          next[saved.id] = {
-            isExpanded: false,
-            isSaving: false,
-            error: null,
-            customTerritory: '',
-            isNew: false,
-          };
+          next[saved.id] = { ...DEFAULT_UI_STATE };
           return next;
         });
 
@@ -344,13 +346,7 @@ export function useContactsManager({
         setContacts(prev => [...prev, backup]);
         setUiState(prev => ({
           ...prev,
-          [contactId]: backupUiState ?? {
-            isExpanded: false,
-            isSaving: false,
-            error: null,
-            customTerritory: '',
-            isNew: false,
-          },
+          [contactId]: backupUiState ?? { ...DEFAULT_UI_STATE },
         }));
       }
       const message =
@@ -383,13 +379,7 @@ export function useContactsManager({
       // Reset UI state
       setUiState(prev => ({
         ...prev,
-        [contactId]: {
-          isExpanded: false,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
-          isNew: false,
-        },
+        [contactId]: { ...DEFAULT_UI_STATE },
       }));
     },
     [baseline]
