@@ -70,12 +70,6 @@ export function MobileNav({
               Pricing
             </Link>
           )}
-          <Link href='/signin' className='mobile-nav-link' onClick={close}>
-            Log in
-          </Link>
-          <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
-            Sign up
-          </Link>
         </div>
       </nav>
     </>

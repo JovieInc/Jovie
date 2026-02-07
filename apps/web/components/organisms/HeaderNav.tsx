@@ -79,14 +79,17 @@ export function HeaderNav({
           </div>
         )}
 
-        {/* Auth actions - desktop only */}
-        <div className='hidden md:flex items-center gap-1'>
+        {/* Spacer on mobile when nav links are hidden */}
+        {!hideNav && <div className='flex-1 md:hidden' aria-hidden='true' />}
+
+        {/* Auth actions - always visible */}
+        <div className='flex items-center gap-1'>
           <AuthActions />
         </div>
 
-        {/* Mobile menu - shown on small screens only */}
+        {/* Mobile hamburger menu - shown on small screens only */}
         {!hideNav && (
-          <div className='flex md:hidden flex-1 items-center justify-end'>
+          <div className='flex md:hidden items-center'>
             <MobileNav hidePricingLink={hidePricingLink} />
           </div>
         )}
