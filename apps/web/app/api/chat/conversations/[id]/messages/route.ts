@@ -1,7 +1,7 @@
 import { gateway } from '@ai-sdk/gateway';
 import { generateText } from 'ai';
 import { and, eq, isNull } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -48,6 +48,7 @@ async function maybeGenerateTitle(
         'Generate a short, descriptive title (2-6 words) for this conversation. Return only the title text, no quotes or extra punctuation.',
       prompt: context,
       maxOutputTokens: 30,
+      abortSignal: AbortSignal.timeout(5000),
     });
 
     const title = text
@@ -68,9 +69,10 @@ async function maybeGenerateTitle(
       );
   } catch (error) {
     logger.error('AI title generation failed, using fallback:', error);
-    const fallback = userMessage.content.slice(0, 50).trim();
-    if (!fallback) return;
-    const suffix = fallback.length >= 50 ? '...' : '';
+    const raw = userMessage.content.trim();
+    if (!raw) return;
+    const fallback = raw.slice(0, 50);
+    const suffix = raw.length > 50 ? '...' : '';
     await db
       .update(chatConversations)
       .set({ title: fallback + suffix })
@@ -165,11 +167,15 @@ export async function POST(req: Request, { params }: RouteParams) {
       .set({ updatedAt: new Date() })
       .where(eq(chatConversations.id, conversationId));
 
-    // Auto-generate title with AI (fire-and-forget to avoid blocking response)
+    // Auto-generate title with AI using after() for reliable background execution
     const hasUserMessage = messagesToInsert.some(m => m.role === 'user');
     if (hasUserMessage) {
-      maybeGenerateTitle(conversationId, messagesToInsert).catch(error => {
-        logger.error('Title generation error:', error);
+      after(async () => {
+        try {
+          await maybeGenerateTitle(conversationId, messagesToInsert);
+        } catch (error) {
+          logger.error('Title generation error:', error);
+        }
       });
     }
 
