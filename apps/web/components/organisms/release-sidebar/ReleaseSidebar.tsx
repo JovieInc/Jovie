@@ -18,7 +18,9 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
+import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
+import { ReleaseTrackList } from './ReleaseTrackList';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
@@ -149,6 +151,10 @@ export function ReleaseSidebar({
                 releaseDate={release.releaseDate}
                 smartLinkPath={release.smartLinkPath}
               />
+
+              <ReleaseMetadata release={release} />
+
+              <ReleaseTrackList release={release} />
 
               <ReleaseDspLinks
                 release={release}

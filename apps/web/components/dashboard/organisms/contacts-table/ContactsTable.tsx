@@ -5,7 +5,6 @@ import { UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { UnifiedTable } from '@/components/organisms/table';
@@ -19,8 +18,8 @@ interface ContactsTableProps {
   readonly contacts: EditableContact[];
   readonly artistName: string;
   readonly onUpdate: (id: string, updates: Partial<EditableContact>) => void;
-  readonly onSave: (contact: EditableContact) => Promise<void>;
-  readonly onDelete: (contact: EditableContact) => Promise<void>;
+  readonly onSave: (contact: EditableContact) => Promise<string | undefined>;
+  readonly onDelete: (contact: EditableContact) => void;
   readonly onAddContact: (role?: ContactRole) => void;
 }
 
@@ -32,11 +31,25 @@ export const ContactsTable = memo(function ContactsTable({
   onDelete,
   onAddContact,
 }: ContactsTableProps) {
-  const [selectedContact, setSelectedContact] =
-    useState<EditableContact | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(
+    null
+  );
 
-  const columns = useMemo(() => createContactColumns(), []);
+  // Derive selectedContact from contacts array to stay in sync after saves
+  const selectedContact = useMemo(
+    () => contacts.find(c => c.id === selectedContactId) ?? null,
+    [contacts, selectedContactId]
+  );
+
+  // Auto-select newly added contacts using the isNew flag
+  useEffect(() => {
+    const newContact = contacts.find(c => c.isNew);
+    if (newContact) {
+      setSelectedContactId(newContact.id);
+    }
+  }, [contacts]);
+
+  const columns = useMemo(() => createContactColumns({ onDelete }), [onDelete]);
 
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -50,10 +63,10 @@ export const ContactsTable = memo(function ContactsTable({
   useEffect(() => {
     // Toggle function: close if open, open first contact if closed
     const toggle = () => {
-      if (selectedContact) {
-        setSelectedContact(null);
+      if (selectedContactId) {
+        setSelectedContactId(null);
       } else if (contactsRef.current.length > 0) {
-        setSelectedContact(contactsRef.current[0]);
+        setSelectedContactId(contactsRef.current[0].id);
       }
     };
 
@@ -63,7 +76,7 @@ export const ContactsTable = memo(function ContactsTable({
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
-  }, [selectedContact, contacts.length, isSidebarOpen]);
+  }, [selectedContactId, contacts.length, isSidebarOpen]);
 
   // Set header actions (drawer toggle on right)
   const { setHeaderActions } = useSetHeaderActions();
@@ -81,46 +94,42 @@ export const ContactsTable = memo(function ContactsTable({
   }, [drawerToggle]);
 
   const handleRowClick = useCallback((contact: EditableContact) => {
-    setSelectedContact(contact);
+    setSelectedContactId(contact.id);
   }, []);
 
   const handleClose = useCallback(() => {
-    setSelectedContact(null);
+    setSelectedContactId(null);
   }, []);
 
   const handleUpdate = useCallback(
     (updates: Partial<EditableContact>) => {
-      if (!selectedContact) return;
-      onUpdate(selectedContact.id, updates);
-      // Update local selected contact state
-      setSelectedContact(prev => (prev ? { ...prev, ...updates } : null));
+      if (!selectedContactId) return;
+      onUpdate(selectedContactId, updates);
     },
-    [selectedContact, onUpdate]
+    [selectedContactId, onUpdate]
   );
 
   const handleSave = useCallback(async () => {
     if (!selectedContact) return;
-    await onSave(selectedContact);
+    const savedId = await onSave(selectedContact);
+    // Update selection if the contact ID changed (temp → persisted)
+    if (savedId && savedId !== selectedContact.id) {
+      setSelectedContactId(savedId);
+    }
   }, [selectedContact, onSave]);
 
-  const handleDeleteClick = useCallback(() => {
+  const handleDelete = useCallback(() => {
     if (!selectedContact) return;
-    setDeleteDialogOpen(true);
-  }, [selectedContact]);
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!selectedContact) return;
-    await onDelete(selectedContact);
-    setSelectedContact(null);
+    onDelete(selectedContact);
   }, [selectedContact, onDelete]);
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      return selectedContact?.id === contact.id
+      return selectedContactId === contact.id
         ? 'bg-surface-2'
         : 'hover:bg-surface-2/50';
     },
-    [selectedContact]
+    [selectedContactId]
   );
 
   const isEmpty = contacts.length === 0;
@@ -184,21 +193,11 @@ export const ContactsTable = memo(function ContactsTable({
       {/* Right sidebar */}
       <ContactDetailSidebar
         contact={selectedContact}
-        isOpen={Boolean(selectedContact)}
+        isOpen={isSidebarOpen}
         onClose={handleClose}
         onUpdate={handleUpdate}
         onSave={handleSave}
-        onDelete={handleDeleteClick}
-      />
-
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        title='Delete contact?'
-        description='This action cannot be undone. The contact will be permanently removed from your profile.'
-        confirmLabel='Delete'
-        variant='destructive'
-        onConfirm={handleDeleteConfirm}
+        onDelete={handleDelete}
       />
     </div>
   );

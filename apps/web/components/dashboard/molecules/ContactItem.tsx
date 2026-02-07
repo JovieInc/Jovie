@@ -128,6 +128,7 @@ export const ContactItem = memo(function ContactItem({
 
           <ContactItemActions
             isSaving={contact.isSaving}
+            isDeleting={contact.isDeleting}
             onSave={onSave}
             onCancel={onCancel}
             onDelete={onDelete}

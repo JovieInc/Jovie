@@ -335,9 +335,8 @@ export function ReleaseTable({
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
       header: MetaHeaderCell,
       cell: createRightMetaCellRenderer(),
-      size: 260,
-      minSize: 260,
-      maxSize: 260,
+      size: 300,
+      minSize: 200,
     });
 
     // Return all columns - TanStack Table handles visibility natively

@@ -148,10 +148,16 @@ export const settingsNavigation: NavItem[] = [
   },
   {
     name: 'Artist',
-    href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,
+    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     id: 'artist',
     icon: UserCircle,
     children: [
+      {
+        name: 'Profile & DSPs',
+        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+        id: 'artist-profile',
+        icon: UserCircle,
+      },
       {
         name: 'Social Links',
         href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,

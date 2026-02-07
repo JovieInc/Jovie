@@ -2,8 +2,12 @@
 
 import type { ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Mail, MoreHorizontal, Phone } from 'lucide-react';
+import { Copy, Mail, Phone, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  TableActionMenu,
+  type TableActionMenuItem,
+} from '@/components/atoms/table-action-menu';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import {
   getContactRoleLabel,
@@ -37,8 +41,16 @@ function handleCopyClick(e: React.MouseEvent<HTMLButtonElement>) {
   }
 }
 
+export interface ContactColumnCallbacks {
+  readonly onDelete: (contact: EditableContact) => void;
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table column defs require any for mixed accessor types
-export function createContactColumns(): ColumnDef<EditableContact, any>[] {
+type ContactColumnDef = ColumnDef<EditableContact, any>;
+
+export function createContactColumns(
+  callbacks: ContactColumnCallbacks
+): ContactColumnDef[] {
   return [
     // Role column
     contactColumnHelper.accessor('role', {
@@ -120,15 +132,50 @@ export function createContactColumns(): ColumnDef<EditableContact, any>[] {
       size: 160,
     }),
 
-    // Actions column (placeholder for menu)
+    // Actions column with dropdown menu
     contactColumnHelper.display({
       id: 'actions',
       header: '',
-      cell: () => (
-        <div className='flex justify-end'>
-          <MoreHorizontal className='h-4 w-4 text-tertiary-token' />
-        </div>
-      ),
+      cell: ({ row }) => {
+        const contact = row.original;
+        const items: TableActionMenuItem[] = [];
+
+        if (contact.email) {
+          items.push({
+            id: 'copy-email',
+            label: 'Copy email',
+            icon: Copy,
+            onClick: () => copyToClipboard(contact.email!, 'Email'),
+          });
+        }
+
+        if (contact.phone) {
+          items.push({
+            id: 'copy-phone',
+            label: 'Copy phone',
+            icon: Copy,
+            onClick: () => copyToClipboard(contact.phone!, 'Phone'),
+          });
+        }
+
+        if (items.length > 0) {
+          items.push({ id: 'separator', label: '', onClick: () => {} });
+        }
+
+        items.push({
+          id: 'delete',
+          label: 'Delete contact',
+          icon: Trash2,
+          variant: 'destructive',
+          onClick: () => callbacks.onDelete(contact),
+        });
+
+        return (
+          <div className='flex items-center justify-end'>
+            <TableActionMenu items={items} align='end' />
+          </div>
+        );
+      },
       size: 48,
     }),
   ];

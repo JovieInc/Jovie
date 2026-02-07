@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CreditCard } from 'lucide-react';
+
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -23,22 +23,25 @@ export function SettingsBillingSection() {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='text-center py-4'>
-        <CreditCard className='mx-auto h-12 w-12 text-secondary mb-4' />
-        <h3 className='text-[14px] font-medium text-primary-token mb-2'>
-          Manage your plan
-        </h3>
-        <p className='text-sm text-secondary mb-4'>
-          Update payment details, change plans, or view invoices.
-        </p>
-        <Button
-          onClick={handleBilling}
-          loading={isBillingLoading || billingLoading}
-          className={SETTINGS_BUTTON_CLASS}
-          variant='primary'
-        >
-          {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
-        </Button>
+      <div className='flex items-start justify-between gap-6'>
+        <div className='flex-1'>
+          <h3 className='text-[14px] font-medium text-primary-token'>
+            Manage your plan
+          </h3>
+          <p className='mt-1 text-[13px] text-secondary-token'>
+            Update payment details, change plans, or view invoices.
+          </p>
+        </div>
+        <div className='shrink-0'>
+          <Button
+            onClick={handleBilling}
+            loading={isBillingLoading || billingLoading}
+            className={SETTINGS_BUTTON_CLASS}
+            variant='primary'
+          >
+            {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
+          </Button>
+        </div>
       </div>
     </DashboardCard>
   );

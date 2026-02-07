@@ -10,11 +10,29 @@ import { fastRender } from '@/tests/utils/fast-render';
 const mockUsePathname = vi.fn(() => '/app/profile');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
+  useParams: () => ({}),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
 
 vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: true }),
   StatsigContext: React.createContext({ client: {} }),
+}));
+
+// Mock chat hooks used by RecentChats
+vi.mock('@/lib/queries/useChatConversationsQuery', () => ({
+  useChatConversationsQuery: () => ({ data: undefined }),
+}));
+
+vi.mock('@/lib/queries/useChatMutations', () => ({
+  useDeleteConversationMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
 // Mock @jovie/ui Tooltip components
