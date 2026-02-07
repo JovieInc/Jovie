@@ -32,6 +32,7 @@ export function SettingsNotificationsSection() {
         disabled={isPending}
         ariaLabel='Toggle marketing emails'
       />
+      {isPending && <p className='text-xs text-tertiary-token mt-2'>Saving…</p>}
     </DashboardCard>
   );
 }

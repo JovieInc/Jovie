@@ -18,6 +18,7 @@ import type {
 interface ContactUIState {
   isExpanded: boolean;
   isSaving: boolean;
+  isDeleting: boolean;
   error: string | null;
   customTerritory: string;
   isNew: boolean;
@@ -26,10 +27,20 @@ interface ContactUIState {
 export interface EditableContact extends DashboardContact {
   isExpanded?: boolean;
   isSaving?: boolean;
+  isDeleting?: boolean;
   error?: string | null;
   customTerritory?: string;
   isNew?: boolean;
 }
+
+const DEFAULT_UI_STATE: ContactUIState = {
+  isExpanded: false,
+  isSaving: false,
+  isDeleting: false,
+  error: null,
+  customTerritory: '',
+  isNew: false,
+};
 
 function makeTempId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -115,11 +126,8 @@ export function useContactsManager({
       (acc, contact) => ({
         ...acc,
         [contact.id]: {
+          ...DEFAULT_UI_STATE,
           isExpanded: initialContacts.length === 1,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
-          isNew: false,
         },
       }),
       {}
@@ -153,12 +161,20 @@ export function useContactsManager({
       const {
         isExpanded,
         isSaving,
+        isDeleting,
         error,
         customTerritory,
         isNew,
         ...domainUpdates
       } = updates;
-      const uiUpdates = { isExpanded, isSaving, error, customTerritory, isNew };
+      const uiUpdates = {
+        isExpanded,
+        isSaving,
+        isDeleting,
+        error,
+        customTerritory,
+        isNew,
+      };
 
       // Update domain state if there are domain updates
       if (Object.keys(domainUpdates).length > 0) {
@@ -178,6 +194,7 @@ export function useContactsManager({
             ...prev[id],
             ...(isExpanded !== undefined && { isExpanded }),
             ...(isSaving !== undefined && { isSaving }),
+            ...(isDeleting !== undefined && { isDeleting }),
             ...(error !== undefined && { error }),
             ...(customTerritory !== undefined && { customTerritory }),
             ...(isNew !== undefined && { isNew }),
@@ -245,13 +262,7 @@ export function useContactsManager({
           if (isNewContact && saved.id !== contactId) {
             delete next[contactId];
           }
-          next[saved.id] = {
-            isExpanded: false,
-            isSaving: false,
-            error: null,
-            customTerritory: '',
-            isNew: false,
-          };
+          next[saved.id] = { ...DEFAULT_UI_STATE };
           return next;
         });
 
@@ -299,20 +310,21 @@ export function useContactsManager({
       );
       if (!confirmed) return;
 
-      // Store backup for rollback
-      const backup = contacts.find(c => c.id === contactId);
-      const backupUiState = uiState[contactId];
-
-      // Optimistic delete - remove immediately
-      setContacts(prev => prev.filter(c => c.id !== contactId));
-      setUiState(prev => {
-        const next = { ...prev };
-        delete next[contactId];
-        return next;
-      });
+      // Show deleting state
+      setUiState(prev => ({
+        ...prev,
+        [contactId]: { ...prev[contactId], isDeleting: true, error: null },
+      }));
 
       try {
         await deleteContact(contactId, profileId);
+        // Remove after successful deletion
+        setContacts(prev => prev.filter(c => c.id !== contactId));
+        setUiState(prev => {
+          const next = { ...prev };
+          delete next[contactId];
+          return next;
+        });
         setBaseline(prev => {
           const next = { ...prev };
           delete next[contactId];
@@ -324,26 +336,16 @@ export function useContactsManager({
           role: contact.role,
         });
       } catch (error) {
-        // Rollback on error
-        if (backup) {
-          setContacts(prev => [...prev, backup]);
-          setUiState(prev => ({
-            ...prev,
-            [contactId]: backupUiState ?? {
-              isExpanded: false,
-              isSaving: false,
-              error: null,
-              customTerritory: '',
-              isNew: false,
-            },
-          }));
-        }
+        setUiState(prev => ({
+          ...prev,
+          [contactId]: { ...prev[contactId], isDeleting: false },
+        }));
         const message =
           error instanceof Error ? error.message : 'Unable to delete contact';
         toast.error(message);
       }
     },
-    [contacts, uiState, profileId, artistHandle]
+    [profileId, artistHandle]
   );
 
   const handleCancel = useCallback(
@@ -370,13 +372,7 @@ export function useContactsManager({
       // Reset UI state
       setUiState(prev => ({
         ...prev,
-        [contactId]: {
-          isExpanded: false,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
-          isNew: false,
-        },
+        [contactId]: { ...DEFAULT_UI_STATE },
       }));
     },
     [baseline]
@@ -403,10 +399,8 @@ export function useContactsManager({
       setUiState(prev => ({
         ...prev,
         [newId]: {
+          ...DEFAULT_UI_STATE,
           isExpanded: true,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
           isNew: true,
         },
       }));
