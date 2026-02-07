@@ -18,6 +18,7 @@ import type {
 interface ContactUIState {
   isExpanded: boolean;
   isSaving: boolean;
+  isDeleting: boolean;
   error: string | null;
   customTerritory: string;
   isNew: boolean;
@@ -26,6 +27,7 @@ interface ContactUIState {
 const DEFAULT_UI_STATE: ContactUIState = {
   isExpanded: false,
   isSaving: false,
+  isDeleting: false,
   error: null,
   customTerritory: '',
   isNew: false,
@@ -34,6 +36,7 @@ const DEFAULT_UI_STATE: ContactUIState = {
 export interface EditableContact extends DashboardContact {
   isExpanded?: boolean;
   isSaving?: boolean;
+  isDeleting?: boolean;
   error?: string | null;
   customTerritory?: string;
   isNew?: boolean;
@@ -126,11 +129,8 @@ export function useContactsManager({
       (acc, contact) => ({
         ...acc,
         [contact.id]: {
+          ...DEFAULT_UI_STATE,
           isExpanded: initialContacts.length === 1,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
-          isNew: false,
         },
       }),
       {}
@@ -164,12 +164,20 @@ export function useContactsManager({
       const {
         isExpanded,
         isSaving,
+        isDeleting,
         error,
         customTerritory,
         isNew,
         ...domainUpdates
       } = updates;
-      const uiUpdates = { isExpanded, isSaving, error, customTerritory, isNew };
+      const uiUpdates = {
+        isExpanded,
+        isSaving,
+        isDeleting,
+        error,
+        customTerritory,
+        isNew,
+      };
 
       // Update domain state if there are domain updates
       if (Object.keys(domainUpdates).length > 0) {
@@ -189,6 +197,7 @@ export function useContactsManager({
             ...prev[id],
             ...(isExpanded !== undefined && { isExpanded }),
             ...(isSaving !== undefined && { isSaving }),
+            ...(isDeleting !== undefined && { isDeleting }),
             ...(error !== undefined && { error }),
             ...(customTerritory !== undefined && { customTerritory }),
             ...(isNew !== undefined && { isNew }),
@@ -320,21 +329,21 @@ export function useContactsManager({
     const contactId = contact.id;
     setPendingDeleteContact(null);
 
-    // Store backup for rollback (preserve original index)
-    const backupIndex = contacts.findIndex(c => c.id === contactId);
-    const backup = backupIndex >= 0 ? contacts[backupIndex] : undefined;
-    const backupUiState = uiState[contactId];
-
-    // Optimistic delete - remove immediately
-    setContacts(prev => prev.filter(c => c.id !== contactId));
-    setUiState(prev => {
-      const next = { ...prev };
-      delete next[contactId];
-      return next;
-    });
+    // Show deleting state
+    setUiState(prev => ({
+      ...prev,
+      [contactId]: { ...prev[contactId], isDeleting: true, error: null },
+    }));
 
     try {
       await deleteContact(contactId, profileId);
+      // Remove after successful deletion
+      setContacts(prev => prev.filter(c => c.id !== contactId));
+      setUiState(prev => {
+        const next = { ...prev };
+        delete next[contactId];
+        return next;
+      });
       setBaseline(prev => {
         const next = { ...prev };
         delete next[contactId];
@@ -346,24 +355,15 @@ export function useContactsManager({
         role: contact.role,
       });
     } catch (error) {
-      // Rollback on error — restore at original index to preserve order
-      if (backup) {
-        setContacts(prev => {
-          const next = [...prev];
-          const insertAt = Math.min(backupIndex, next.length);
-          next.splice(insertAt, 0, backup);
-          return next;
-        });
-        setUiState(prev => ({
-          ...prev,
-          [contactId]: backupUiState ?? { ...DEFAULT_UI_STATE },
-        }));
-      }
+      setUiState(prev => ({
+        ...prev,
+        [contactId]: { ...prev[contactId], isDeleting: false },
+      }));
       const message =
         error instanceof Error ? error.message : 'Unable to delete contact';
       toast.error(message);
     }
-  }, [pendingDeleteContact, contacts, uiState, profileId, artistHandle]);
+  }, [pendingDeleteContact, profileId, artistHandle]);
 
   const handleCancel = useCallback(
     (contact: EditableContact) => {
@@ -416,10 +416,8 @@ export function useContactsManager({
       setUiState(prev => ({
         ...prev,
         [newId]: {
+          ...DEFAULT_UI_STATE,
           isExpanded: true,
-          isSaving: false,
-          error: null,
-          customTerritory: '',
           isNew: true,
         },
       }));

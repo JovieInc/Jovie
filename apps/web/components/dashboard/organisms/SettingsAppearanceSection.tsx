@@ -121,8 +121,9 @@ export function SettingsAppearanceSection() {
         </div>
 
         <p className='text-xs text-secondary mt-4'>
-          Choose how the interface appears. System automatically matches your
-          device settings.
+          {isPending
+            ? 'Saving…'
+            : 'Choose how the interface appears. System automatically matches your device settings.'}
         </p>
       </DashboardCard>
     </div>

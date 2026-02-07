@@ -22,6 +22,7 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
 import { ContactDetailHeader } from './ContactDetailHeader';
@@ -64,6 +65,42 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced save: coalesces rapid edits into a single save call
+  const debouncedSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      onSave();
+    }, PACER_TIMING.SAVE_DEBOUNCE_MS);
+  }, [onSave]);
+
+  // Flush any pending debounced save immediately
+  const flushSave = useCallback(() => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      onSave();
+    }
+  }, [onSave]);
+
+  // Flush pending save on close to prevent data loss
+  const handleClose = useCallback(() => {
+    flushSave();
+    onClose();
+  }, [flushSave, onClose]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
 
   // Reset editing state when contact changes
   useEffect(() => {
@@ -98,13 +135,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     // Only update if value changed
     if (trimmedValue !== currentValue) {
       onUpdate({ [editingField]: trimmedValue || null });
-      // Auto-save after field edit
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     }
 
     setEditingField(null);
     setEditValue('');
-  }, [editingField, editValue, contact, onUpdate, onSave]);
+  }, [editingField, editValue, contact, onUpdate, debouncedSave]);
 
   const cancelEditing = useCallback(() => {
     setEditingField(null);
@@ -127,17 +163,17 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const handleRoleChange = useCallback(
     (newRole: string) => {
       onUpdate({ role: newRole as ContactRole });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [onUpdate, onSave]
+    [onUpdate, debouncedSave]
   );
 
   const handlePreferredChannelChange = useCallback(
     (channel: string) => {
       onUpdate({ preferredChannel: channel as ContactChannel });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [onUpdate, onSave]
+    [onUpdate, debouncedSave]
   );
 
   const handleTerritoryToggle = useCallback(
@@ -162,9 +198,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
 
       onUpdate({ territories: newTerritories });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [contact, onUpdate, onSave]
+    [contact, onUpdate, debouncedSave]
   );
 
   if (!contact) {
@@ -245,7 +281,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         role={contact.role}
         customLabel={contact.customLabel}
         email={contact.email}
-        onClose={onClose}
+        onClose={handleClose}
         onDelete={onDelete}
       />
 
