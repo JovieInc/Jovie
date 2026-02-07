@@ -42,6 +42,15 @@ export interface EditableContact extends DashboardContact {
   isNew?: boolean;
 }
 
+const DEFAULT_UI_STATE: ContactUIState = {
+  isExpanded: false,
+  isSaving: false,
+  isDeleting: false,
+  error: null,
+  customTerritory: '',
+  isNew: false,
+};
+
 function makeTempId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
