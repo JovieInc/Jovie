@@ -47,7 +47,11 @@ export function JovieChat({
 
   // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
   useEffect(() => {
-    if (initialQuery && !initialQuerySubmitted.current && !isLoadingConversation) {
+    if (
+      initialQuery &&
+      !initialQuerySubmitted.current &&
+      !isLoadingConversation
+    ) {
       initialQuerySubmitted.current = true;
       submitMessage(initialQuery);
     }
