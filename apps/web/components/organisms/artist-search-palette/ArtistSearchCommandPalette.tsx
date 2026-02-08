@@ -194,7 +194,7 @@ export function ArtistSearchCommandPalette({
               ref={inputRef}
               placeholder={config.placeholder}
               className='flex-1 bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token'
-              onValueChange={value => search.search(value)}
+              onValueChange={(value: string) => search.search(value)}
             />
             {search.state === 'loading' && (
               <Icon
