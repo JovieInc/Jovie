@@ -67,7 +67,11 @@ export async function createOrReuseTestUserSession(page: Page, email: string) {
 }
 
 /**
- * Authenticates a user in Clerk for E2E tests.
+ * Per-test Clerk sign-in for tests that need fresh authentication.
+ *
+ * Most tests should rely on the shared storageState from auth.setup.ts instead.
+ * Use this only when a test needs to re-authenticate (e.g., after sign-out,
+ * or to sign in as a different user).
  *
  * Key requirements for Clerk testing:
  * 1. clerkSetup() must be called in global-setup.ts first

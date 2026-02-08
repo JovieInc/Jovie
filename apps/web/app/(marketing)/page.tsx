@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { ComparisonSection } from '@/components/home/comparison-visual';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
@@ -223,6 +224,9 @@ export default function HomePage() {
         color: 'var(--linear-text-primary)',
       }}
     >
+      {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
+      <AuthRedirectHandler />
+
       {/* Structured Data */}
       <script
         type='application/ld+json'

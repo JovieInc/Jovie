@@ -200,6 +200,11 @@ export function useProfileMutation(options: UseProfileMutationOptions = {}) {
       onError?.(error instanceof Error ? error : new Error('Update failed'));
     },
 
+    // Always revalidate after mutation to ensure server truth
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
+    },
+
     // Don't retry on validation errors
     retry: (failureCount, error) => {
       if (error instanceof FetchError && error.isClientError()) {
@@ -292,6 +297,12 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
 
       handleMutationError(error, 'Failed to upload avatar');
       onError?.(error instanceof Error ? error : new Error('Upload failed'));
+    },
+
+    // Always revalidate after mutation to ensure server truth
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
 
     retry: false, // Don't retry uploads
