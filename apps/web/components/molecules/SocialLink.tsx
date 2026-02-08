@@ -8,7 +8,7 @@ import {
 } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { ensureContrast, hexToRgba, isBrandDark } from '@/lib/utils/color';
+import { getContrastSafeIconColor, hexToRgba } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -30,13 +30,10 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   // Ensure brand color meets WCAG 3:1 non-text contrast against the hover
   // background. Dark brands (TikTok, X) are inverted to white in dark mode;
   // bright brands (Snapchat, Rumble) are darkened in light mode.
-  const hoverColor = useMemo(() => {
-    if (!brandHex) return undefined;
-    if (isDark && isBrandDark(brandHex)) return '#ffffff';
-    // surface-1 light = #fcfcfc, dark = #101012
-    const hoverBg = isDark ? '#101012' : '#fcfcfc';
-    return ensureContrast(brandHex, hoverBg);
-  }, [brandHex, isDark]);
+  const hoverColor = useMemo(
+    () => (brandHex ? getContrastSafeIconColor(brandHex, isDark) : undefined),
+    [brandHex, isDark]
+  );
 
   // Guard against incomplete link data
   if (!link.platform || !link.url) {

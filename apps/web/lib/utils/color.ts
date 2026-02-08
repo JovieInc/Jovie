@@ -121,16 +121,10 @@ export function getBrandIconStyles(
   brandHex: string,
   isDarkTheme: boolean
 ): { iconColor: string; iconBg: string } {
-  const brandIsDark = isBrandDark(brandHex);
-
-  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility.
-  // Otherwise ensure brand color meets WCAG 3:1 against the effective surface.
-  const iconColor =
-    isDarkTheme && brandIsDark
-      ? '#ffffff'
-      : ensureContrast(brandHex, isDarkTheme ? '#101012' : '#fcfcfc');
+  const iconColor = getContrastSafeIconColor(brandHex, isDarkTheme);
 
   // Determine background opacity based on theme and brand darkness
+  const brandIsDark = isBrandDark(brandHex);
   let iconBg: string;
   if (!isDarkTheme) {
     iconBg = `${brandHex}15`;

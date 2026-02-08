@@ -42,6 +42,18 @@ const SIZE_CLASSES = {
   lg: 'h-6 w-6',
 };
 
+/** Map DSP provider IDs to SocialIcon platform names. */
+const PROVIDER_PLATFORM_MAP: Record<DspProviderId, string> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  deezer: 'deezer',
+  youtube_music: 'youtube',
+  tidal: 'tidal',
+  soundcloud: 'soundcloud',
+  amazon_music: 'amazon',
+  musicbrainz: 'website',
+};
+
 /**
  * DspProviderIcon - Displays a DSP provider icon with optional label.
  *
@@ -65,18 +77,6 @@ export function DspProviderIcon({
     [isDark, rawColor]
   );
 
-  // Map DSP provider IDs to SocialIcon platform names
-  const platformMap: Record<DspProviderId, string> = {
-    spotify: 'spotify',
-    apple_music: 'apple_music',
-    deezer: 'deezer',
-    youtube_music: 'youtube',
-    tidal: 'tidal',
-    soundcloud: 'soundcloud',
-    amazon_music: 'amazon',
-    musicbrainz: 'website', // Fallback icon for MusicBrainz
-  };
-
   return (
     <span
       className={cn('inline-flex items-center gap-1.5', className)}
@@ -84,7 +84,7 @@ export function DspProviderIcon({
     >
       <span style={{ color }}>
         <SocialIcon
-          platform={platformMap[provider]}
+          platform={PROVIDER_PLATFORM_MAP[provider]}
           className={SIZE_CLASSES[size]}
           aria-label={label}
         />
