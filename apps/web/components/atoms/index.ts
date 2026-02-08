@@ -52,6 +52,8 @@ export * from './PlaceholderImage';
 export * from './Popover';
 // ProfileNavButton moved to molecules (uses hooks/state)
 export * from './ProgressIndicator';
+// ProviderIcon is a client component - import directly from './ProviderIcon' to avoid server/client boundary issues
+// export * from './ProviderIcon';
 // QRCode moved to molecules (uses hooks/external API)
 export * from './SectionHeading';
 export * from './Select';

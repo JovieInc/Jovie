@@ -10,12 +10,14 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Music, Plus, Trash2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
 import { useMusicLinksForm } from './useMusicLinksForm';
 
@@ -68,6 +70,8 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     error,
     success,
   } = useMusicLinksForm({ artist, onUpdate });
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === 'dark';
 
   const [searchPaletteOpen, setSearchPaletteOpen] = useState(false);
   const [searchPaletteProvider, setSearchPaletteProvider] = useState<
@@ -325,7 +329,10 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                           ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
                           : undefined,
                         color: PLATFORM_METADATA_MAP[link.platform]
-                          ? `#${PLATFORM_METADATA_MAP[link.platform].color}`
+                          ? getContrastSafeIconColor(
+                              `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                              isDarkTheme
+                            )
                           : undefined,
                       }}
                     >
