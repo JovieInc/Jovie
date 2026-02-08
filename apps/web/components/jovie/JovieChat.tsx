@@ -20,6 +20,7 @@ export function JovieChat({
   conversationId,
   onConversationCreate,
   initialQuery,
+  onTitleChange,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
@@ -33,6 +34,7 @@ export function JovieChat({
     isSubmitting,
     hasMessages,
     isLoadingConversation,
+    conversationTitle,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -44,6 +46,15 @@ export function JovieChat({
     conversationId,
     onConversationCreate,
   });
+
+  // Notify parent when the conversation title changes (e.g. after auto-generation)
+  const prevTitleRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (conversationTitle !== prevTitleRef.current) {
+      prevTitleRef.current = conversationTitle;
+      onTitleChange?.(conversationTitle);
+    }
+  }, [conversationTitle, onTitleChange]);
 
   // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
   useEffect(() => {
