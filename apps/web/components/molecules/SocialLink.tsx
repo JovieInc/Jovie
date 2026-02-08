@@ -1,14 +1,9 @@
 'use client';
 
-import { useTheme } from 'next-themes';
-import { memo, useMemo, useState } from 'react';
-import {
-  getPlatformIconMetadata,
-  SocialIcon,
-} from '@/components/atoms/SocialIcon';
+import { memo } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { ensureContrast, hexToRgba, isBrandDark } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -18,26 +13,6 @@ interface SocialLinkProps {
 }
 
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
-  // Hooks must be called unconditionally (before any early returns)
-  const [hover, setHover] = useState(false);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-  const brandHex = useMemo(
-    () => getPlatformIconMetadata(link.platform ?? '')?.hex,
-    [link.platform]
-  );
-
-  // Ensure brand color meets WCAG 3:1 non-text contrast against the hover
-  // background. Dark brands (TikTok, X) are inverted to white in dark mode;
-  // bright brands (Snapchat, Rumble) are darkened in light mode.
-  const hoverColor = useMemo(() => {
-    if (!brandHex) return undefined;
-    if (isDark && isBrandDark(brandHex)) return '#ffffff';
-    // surface-1 light = #fcfcfc, dark = #101012
-    const hoverBg = isDark ? '#101012' : '#fcfcfc';
-    return ensureContrast(brandHex, hoverBg);
-  }, [brandHex, isDark]);
-
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
     return null;
@@ -95,21 +70,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
     <a
       href={link.url}
       onClick={handleClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onFocus={() => setHover(true)}
-      onBlur={() => setHover(false)}
-      className={`group flex h-10 w-10 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 cursor-pointer border backdrop-blur-sm ${
-        hover ? 'border-default bg-surface-1' : 'border-subtle bg-surface-0/80'
-      } text-secondary-token`}
-      style={
-        hoverColor && hover
-          ? {
-              color: hoverColor,
-              boxShadow: `0 0 0 1px ${hexToRgba(brandHex!, 0.3)}, 0 4px 12px -4px ${hexToRgba(brandHex!, 0.4)}`,
-            }
-          : undefined
-      }
+      className='group flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent text-secondary-token transition-colors hover:border-subtle hover:bg-surface-2 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}
     >
