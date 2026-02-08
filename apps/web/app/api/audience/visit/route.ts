@@ -44,25 +44,25 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting
     const clientIP = extractClientIP(request.headers);
 
-    // Public rate limiting check (per-IP)
-    const rateLimitStatus = publicVisitLimiter.getStatus(clientIP);
-    if (rateLimitStatus.blocked) {
+    // Atomically check-and-decrement to avoid TOCTOU race
+    const ipRateLimitResult = await publicVisitLimiter.limit(clientIP);
+    if (!ipRateLimitResult.success) {
+      const retryAfterSeconds = Math.ceil(
+        (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
+      );
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
         {
           status: 429,
           headers: {
             ...NO_STORE_HEADERS,
-            'Retry-After': String(rateLimitStatus.retryAfterSeconds),
-            'X-RateLimit-Limit': String(rateLimitStatus.limit),
-            'X-RateLimit-Remaining': String(rateLimitStatus.remaining),
+            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
+            'X-RateLimit-Limit': String(ipRateLimitResult.limit),
+            'X-RateLimit-Remaining': String(ipRateLimitResult.remaining),
           },
         }
       );
     }
-
-    // Trigger rate limit counter increment (fire-and-forget)
-    void publicVisitLimiter.limit(clientIP);
 
     // Bot detection - silently skip recording for bots
     const botResult = detectBot(request, '/api/audience/visit');
