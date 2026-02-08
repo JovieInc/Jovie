@@ -32,6 +32,18 @@ interface ContrastViolation {
   required: number;
 }
 
+// Extend Window for our injected helpers
+declare global {
+  interface Window {
+    __parseCssColor: (
+      c: string
+    ) => { r: number; g: number; b: number; a: number } | null;
+    __getLuminance: (r: number, g: number, b: number) => number;
+    __getContrastRatio: (fg: string, bg: string) => number | null;
+    __getEffectiveBg: (el: Element) => string;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -53,8 +65,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
  */
 async function injectContrastHelpers(page: Page) {
   await page.evaluate(() => {
-    // Attach helpers to window so they persist across evaluate calls
-    (window as Record<string, unknown>).__parseCssColor = (c: string) => {
+    window.__parseCssColor = (c: string) => {
       const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
       if (!m) return null;
       return {
@@ -65,11 +76,7 @@ async function injectContrastHelpers(page: Page) {
       };
     };
 
-    (window as Record<string, unknown>).__getLuminance = (
-      r: number,
-      g: number,
-      b: number
-    ) => {
+    window.__getLuminance = (r: number, g: number, b: number) => {
       const a = [r, g, b].map(v => {
         const c = v / 255;
         return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
@@ -77,14 +84,9 @@ async function injectContrastHelpers(page: Page) {
       return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
     };
 
-    (window as Record<string, unknown>).__getContrastRatio = (
-      fg: string,
-      bg: string
-    ) => {
-      const parse = (window as Record<string, Function>).__parseCssColor;
-      const luminance = (window as Record<string, Function>).__getLuminance;
-      const fgC = parse(fg);
-      const bgC = parse(bg);
+    window.__getContrastRatio = (fg: string, bg: string) => {
+      const fgC = window.__parseCssColor(fg);
+      const bgC = window.__parseCssColor(bg);
       if (!fgC || !bgC) return null;
 
       let r1 = fgC.r;
@@ -96,14 +98,14 @@ async function injectContrastHelpers(page: Page) {
         b1 = b1 * fgC.a + bgC.b * (1 - fgC.a);
       }
 
-      const l1 = luminance(r1, g1, b1);
-      const l2 = luminance(bgC.r, bgC.g, bgC.b);
+      const l1 = window.__getLuminance(r1, g1, b1);
+      const l2 = window.__getLuminance(bgC.r, bgC.g, bgC.b);
       const lighter = Math.max(l1, l2);
       const darker = Math.min(l1, l2);
       return (lighter + 0.05) / (darker + 0.05);
     };
 
-    (window as Record<string, unknown>).__getEffectiveBg = (el: Element) => {
+    window.__getEffectiveBg = (el: Element) => {
       let current: Element | null = el;
       while (current) {
         const style = window.getComputedStyle(current);
@@ -128,22 +130,17 @@ async function auditIconContrast(
 ): Promise<ContrastViolation[]> {
   return page.evaluate(
     ({ theme, WCAG_AA }) => {
-      const w = window as Record<string, Function>;
-      const getContrastRatio = w.__getContrastRatio;
-      const getEffectiveBg = w.__getEffectiveBg;
       const violations: ContrastViolation[] = [];
 
       // Social icon links (SocialLink renders <a> with <svg>)
-      const socialLinks = document.querySelectorAll('a[aria-label*="Follow"]');
-
-      socialLinks.forEach(link => {
+      document.querySelectorAll('a[aria-label*="Follow"]').forEach(link => {
         const svg = link.querySelector('svg');
         if (!svg) return;
 
         const linkStyle = window.getComputedStyle(link);
         const fg = linkStyle.color;
-        const bg = getEffectiveBg(link) as string;
-        const ratio = getContrastRatio(fg, bg) as number | null;
+        const bg = window.__getEffectiveBg(link);
+        const ratio = window.__getContrastRatio(fg, bg);
         const label =
           link.getAttribute('aria-label') ||
           link.getAttribute('title') ||
@@ -163,7 +160,7 @@ async function auditIconContrast(
         }
       });
 
-      // DSP provider icons (DspProviderIcon renders <span style={color}><svg>)
+      // DSP provider icons
       const dspSelector = [
         'Spotify',
         'Apple Music',
@@ -176,15 +173,14 @@ async function auditIconContrast(
       ]
         .map(t => `[title="${t}"]`)
         .join(', ');
-      const dspIcons = document.querySelectorAll(dspSelector);
 
-      dspIcons.forEach(container => {
+      document.querySelectorAll(dspSelector).forEach(container => {
         const colorSpan = container.querySelector('span[style]');
         if (!colorSpan) return;
 
         const fg = window.getComputedStyle(colorSpan).color;
-        const bg = getEffectiveBg(container) as string;
-        const ratio = getContrastRatio(fg, bg) as number | null;
+        const bg = window.__getEffectiveBg(container);
+        const ratio = window.__getContrastRatio(fg, bg);
         const label = container.getAttribute('title') || 'unknown DSP';
 
         if (ratio !== null && ratio < WCAG_AA) {
@@ -228,14 +224,10 @@ async function auditHoverContrast(
 
     const violation = await link.evaluate(
       (el, { theme, WCAG_AA }) => {
-        const w = window as Record<string, Function>;
-        const getContrastRatio = w.__getContrastRatio;
-        const getEffectiveBg = w.__getEffectiveBg;
-
         const style = window.getComputedStyle(el);
         const fg = style.color;
-        const bg = getEffectiveBg(el) as string;
-        const ratio = getContrastRatio(fg, bg) as number | null;
+        const bg = window.__getEffectiveBg(el);
+        const ratio = window.__getContrastRatio(fg, bg);
         const label =
           el.getAttribute('aria-label') ||
           el.getAttribute('title') ||
