@@ -186,7 +186,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                   style={{ backgroundColor: '#FA243C15', color: '#FA243C' }}
                 >
                   <SocialIcon
-                    platform='apple_music'
+                    platform='applemusic'
                     className='h-5 w-5'
                     aria-hidden
                   />

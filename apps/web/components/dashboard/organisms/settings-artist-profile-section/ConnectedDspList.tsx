@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   ExternalLink,
@@ -10,11 +11,15 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { connectAppleMusicArtist } from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  connectAppleMusicArtist,
+  connectSpotifyArtist,
+} from '@/app/app/(shell)/dashboard/releases/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { queryKeys } from '@/lib/queries/keys';
 import {
   useConfirmDspMatchMutation,
   useRejectDspMatchMutation,
@@ -191,6 +196,7 @@ export function ConnectedDspList({
   profileId,
   spotifyId,
 }: ConnectedDspListProps) {
+  const queryClient = useQueryClient();
   const {
     data: matches,
     isLoading,
@@ -243,8 +249,17 @@ export function ConnectedDspList({
       url: string;
       imageUrl?: string;
     }) => {
-      if (paletteProvider === 'apple_music') {
-        try {
+      try {
+        if (paletteProvider === 'spotify') {
+          const result = await connectSpotifyArtist({
+            spotifyArtistId: artist.id,
+            spotifyArtistUrl: artist.url,
+            artistName: artist.name,
+          });
+          if (result.success) {
+            toast.success(result.message);
+          }
+        } else {
           const result = await connectAppleMusicArtist({
             externalArtistId: artist.id,
             externalArtistName: artist.name,
@@ -254,14 +269,20 @@ export function ConnectedDspList({
           if (result.success) {
             toast.success(result.message);
           }
-        } catch (err) {
-          toast.error(
-            err instanceof Error ? err.message : 'Failed to connect Apple Music'
-          );
         }
+
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.dspEnrichment.matches(profileId),
+        });
+      } catch (err) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : `Failed to connect ${paletteProvider === 'spotify' ? 'Spotify' : 'Apple Music'}`
+        );
       }
     },
-    [paletteProvider]
+    [paletteProvider, profileId, queryClient]
   );
 
   const confirmed =

@@ -680,6 +680,42 @@ export async function connectAppleMusicArtist(params: {
     throw new TypeError('Unauthorized');
   }
 
+  const externalArtistId = params.externalArtistId.trim();
+  const externalArtistName = params.externalArtistName.trim();
+  const externalArtistUrl = params.externalArtistUrl.trim();
+
+  if (!externalArtistId || !externalArtistName || !externalArtistUrl) {
+    throw new TypeError('Apple Music artist data is required');
+  }
+
+  let parsedArtistUrl: URL;
+  try {
+    parsedArtistUrl = new URL(externalArtistUrl);
+  } catch {
+    throw new TypeError('Invalid Apple Music artist URL');
+  }
+
+  if (
+    !['http:', 'https:'].includes(parsedArtistUrl.protocol) ||
+    !parsedArtistUrl.hostname.includes('apple.com') ||
+    !parsedArtistUrl.pathname.includes('/artist/')
+  ) {
+    throw new TypeError('Invalid Apple Music artist URL');
+  }
+
+  const externalArtistImageUrl = params.externalArtistImageUrl?.trim();
+  let sanitizedImageUrl: string | null = null;
+  if (externalArtistImageUrl) {
+    try {
+      const parsedImageUrl = new URL(externalArtistImageUrl);
+      if (['http:', 'https:'].includes(parsedImageUrl.protocol)) {
+        sanitizedImageUrl = parsedImageUrl.toString();
+      }
+    } catch {
+      sanitizedImageUrl = null;
+    }
+  }
+
   const profile = await requireProfile();
   const now = new Date();
 
@@ -688,10 +724,10 @@ export async function connectAppleMusicArtist(params: {
     .values({
       creatorProfileId: profile.id,
       providerId: 'apple_music',
-      externalArtistId: params.externalArtistId,
-      externalArtistName: params.externalArtistName,
-      externalArtistUrl: params.externalArtistUrl,
-      externalArtistImageUrl: params.externalArtistImageUrl ?? null,
+      externalArtistId,
+      externalArtistName,
+      externalArtistUrl,
+      externalArtistImageUrl: sanitizedImageUrl,
       confidenceScore: '1.0000',
       confidenceBreakdown: {
         isrcMatchScore: 0,
@@ -716,10 +752,10 @@ export async function connectAppleMusicArtist(params: {
     .onConflictDoUpdate({
       target: [dspArtistMatches.creatorProfileId, dspArtistMatches.providerId],
       set: {
-        externalArtistId: params.externalArtistId,
-        externalArtistName: params.externalArtistName,
-        externalArtistUrl: params.externalArtistUrl,
-        externalArtistImageUrl: params.externalArtistImageUrl ?? null,
+        externalArtistId,
+        externalArtistName,
+        externalArtistUrl,
+        externalArtistImageUrl: sanitizedImageUrl,
         status: 'confirmed',
         confirmedAt: now,
         confirmedBy: userId,
@@ -731,7 +767,7 @@ export async function connectAppleMusicArtist(params: {
 
   return {
     success: true,
-    message: `Connected Apple Music as ${params.externalArtistName}`,
-    artistName: params.externalArtistName,
+    message: `Connected Apple Music as ${externalArtistName}`,
+    artistName: externalArtistName,
   };
 }

@@ -28,12 +28,14 @@ const PROVIDER_CONFIG = {
   apple_music: {
     accent: '#FA243C',
     label: 'Apple Music',
-    platform: 'apple_music' as const,
+    platform: 'applemusic' as const,
     placeholder: 'Search Apple Music artists...',
     manualPlaceholder: 'https://music.apple.com/artist/...',
     urlPattern: /music\.apple\.com\/[a-z]{2}\/artist\/[^/]+\/(\d+)/,
   },
 } as const;
+
+const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 
 function formatFollowers(count: number): string {
   if (count >= 1_000_000) {
@@ -54,6 +56,24 @@ function getArtistMeta(artist: ArtistResult): string {
     parts.push(artist.genres.slice(0, 2).join(', '));
   }
   return parts.join(' · ');
+}
+
+function inferArtistNameFromUrl(
+  url: string,
+  provider: DspProvider
+): string | null {
+  if (provider !== 'apple_music') return null;
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const artistIndex = segments.findIndex(segment => segment === 'artist');
+    const nameSegment = artistIndex >= 0 ? segments[artistIndex + 1] : null;
+    if (!nameSegment) return null;
+    const decoded = decodeURIComponent(nameSegment).replace(/-/g, ' ').trim();
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    return null;
+  }
 }
 
 interface ArtistSearchCommandPaletteProps {
@@ -114,24 +134,33 @@ export function ArtistSearchCommandPalette({
 
     const match = url.match(config.urlPattern);
     if (match?.[1]) {
+      const inferredName =
+        inferArtistNameFromUrl(url, provider) ?? `${config.label} artist`;
       // Create a synthetic artist result from the URL
       const syntheticArtist: ArtistResult =
         provider === 'spotify'
           ? ({
               id: match[1],
-              name: '',
+              name: inferredName,
               url,
               popularity: 0,
             } as SpotifyArtistResult)
           : ({
               id: match[1],
-              name: '',
+              name: inferredName,
               url,
             } as AppleMusicArtistResult);
       onArtistSelect(syntheticArtist);
       onOpenChange(false);
     }
-  }, [manualUrl, config.urlPattern, provider, onArtistSelect, onOpenChange]);
+  }, [
+    manualUrl,
+    config.label,
+    config.urlPattern,
+    provider,
+    onArtistSelect,
+    onOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -179,9 +208,9 @@ export function ArtistSearchCommandPalette({
           <Command.List className='max-h-[300px] overflow-y-auto'>
             {search.state === 'loading' && search.results.length === 0 && (
               <div className='p-3 space-y-2'>
-                {Array.from({ length: 3 }, (_, i) => (
+                {SKELETON_KEYS.map(key => (
                   <div
-                    key={`skeleton-${i}`}
+                    key={key}
                     className='flex items-center gap-3 animate-pulse'
                   >
                     <div className='w-10 h-10 rounded-full bg-surface-3' />

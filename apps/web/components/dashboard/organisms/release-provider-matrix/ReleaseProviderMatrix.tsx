@@ -266,7 +266,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
           }
         >
-          <SocialIcon platform='spotify' className='h-3 w-3' />
+          <SocialIcon platform='spotify' className='h-4 w-4' />
           <span>{artistName}</span>
           {/* Status dot - visible when not hovered/syncing */}
           <span
@@ -281,7 +281,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           <Icon
             name={isSyncing ? 'Loader2' : 'RefreshCw'}
             className={cn(
-              'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
+              'absolute right-2 h-4 w-4 opacity-0 transition-opacity duration-150',
               'group-hover:opacity-100 group-focus-visible:opacity-100',
               isSyncing && 'animate-spin opacity-100'
             )}

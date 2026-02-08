@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import {
@@ -123,6 +124,14 @@ function parseLimit(
  * Returns a JSON list of Apple Music artists matching the query.
  */
 export async function GET(request: NextRequest) {
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Unauthorized', code: 'UNAUTHORIZED' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');

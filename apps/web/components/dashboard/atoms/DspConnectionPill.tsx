@@ -13,7 +13,7 @@ const PROVIDER_STYLES = {
   apple_music: {
     accent: '#FA243C',
     label: 'Apple Music',
-    platform: 'apple_music',
+    platform: 'applemusic',
   },
 } as const;
 
@@ -51,11 +51,11 @@ export function DspConnectionPill({
           color: style.accent,
         }}
       >
-        <SocialIcon platform={style.platform} className='h-3 w-3' />
+        <SocialIcon platform={style.platform} className='h-4 w-4' />
         <span className='truncate max-w-[120px]'>
           {artistName || 'Connected'}
         </span>
-        <CheckCircle2 className='h-3 w-3 shrink-0' />
+        <CheckCircle2 className='h-4 w-4 shrink-0' />
       </span>
     );
   }
@@ -77,9 +77,9 @@ export function DspConnectionPill({
         } as React.CSSProperties
       }
     >
-      <SocialIcon platform={style.platform} className='h-3 w-3' />
+      <SocialIcon platform={style.platform} className='h-4 w-4' />
       <span>Not Connected</span>
-      <Plus className='h-3 w-3 shrink-0' />
+      <Plus className='h-4 w-4 shrink-0' />
     </button>
   );
 }
