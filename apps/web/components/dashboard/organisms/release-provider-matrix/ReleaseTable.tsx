@@ -273,7 +273,7 @@ export function ReleaseTable({
 
       return items;
     },
-    [onEdit, onCopy]
+    [onEdit, onCopy, artistName]
   );
 
   // Stable callbacks for UnifiedTable props
