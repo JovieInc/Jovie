@@ -49,6 +49,9 @@ export function ReleaseLandingPage({
         day: 'numeric',
       })
     : null;
+  const clickableProviders = providers.filter(
+    (provider): provider is Provider & { url: string } => Boolean(provider.url),
+  );
 
   return (
     <div className='min-h-screen bg-black text-white'>
@@ -103,10 +106,10 @@ export function ReleaseLandingPage({
 
           {/* Streaming Platform Buttons */}
           <div className='space-y-2.5'>
-            {providers.map(provider => (
+            {clickableProviders.map(provider => (
               <a
                 key={provider.key}
-                href={provider.url ?? '#'}
+                href={provider.url}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='group flex w-full items-center gap-3 rounded-2xl bg-white/4 px-4 py-3.5 ring-1 ring-inset ring-white/8 backdrop-blur-sm transition-all hover:bg-white/8 hover:ring-white/12'
@@ -124,7 +127,7 @@ export function ReleaseLandingPage({
           </div>
 
           {/* Empty state if no providers */}
-          {providers.length === 0 && (
+          {clickableProviders.length === 0 && (
             <div className='rounded-2xl bg-white/4 p-6 text-center ring-1 ring-inset ring-white/8'>
               <Icon
                 name='Music'
