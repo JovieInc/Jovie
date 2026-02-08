@@ -34,7 +34,10 @@ export function RedesignedHero() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            Jovie is a purpose-built link in bio for artists and musicians
+            Every release starts from zero.{' '}
+            <span style={{ color: 'var(--linear-accent)' }}>
+              Not anymore.
+            </span>
           </h1>
 
           {/* Subheading - matches Linear's lead paragraph */}
@@ -49,9 +52,10 @@ export function RedesignedHero() {
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Capture every fan with AI-powered profiles. Turn casual listeners
-            into subscribers, then send them to Spotify, Apple Music, or
-            wherever they stream.
+            Jovie replaces your link in bio with an AI-powered profile that
+            captures every fan, personalizes every visit, and follows up
+            automatically — so your audience compounds and every release is
+            bigger than the last.
           </p>
 
           {/* CTAs - Linear style with primary button and secondary link */}

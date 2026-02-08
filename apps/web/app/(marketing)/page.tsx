@@ -15,9 +15,9 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
+  const title = `${APP_NAME} — The AI Growth Engine for Independent Artists`;
   const description =
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube. Free to start.';
+    'Every release starts from zero. Not anymore. Jovie replaces your link in bio with an AI-powered profile that captures every fan, personalizes every visit, and follows up automatically. Free to start.';
   const keywords = [
     'link in bio',
     'linktree alternative',
@@ -83,7 +83,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The AI Growth Engine for Independent Artists`,
           type: 'image/png',
         },
       ],
@@ -95,7 +95,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The AI Growth Engine for Independent Artists`,
           width: 1200,
           height: 630,
         },
@@ -139,7 +139,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: 'Jovie Link in Bio',
   description:
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.',
+    'Every release starts from zero. Not anymore. Jovie replaces your link in bio with an AI-powered profile that captures every fan, personalizes every visit, and follows up automatically.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -168,7 +168,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
+    'The AI growth engine for independent artists. Capture every fan, personalize every visit, follow up automatically.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -206,7 +206,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
+    'The AI growth engine for independent artists. Capture every fan, personalize every visit, follow up automatically.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
   contactPoint: {
     '@type': 'ContactPoint',
