@@ -1,5 +1,6 @@
 export {
   adminNavigation,
+  artistSettingsNavigation,
   dashboardHome,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
@@ -7,6 +8,7 @@ export {
   profileNavItem,
   secondaryNavigation,
   settingsNavigation,
+  userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';
 export type { DashboardNavProps, NavItem } from './types';

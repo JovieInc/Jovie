@@ -109,7 +109,8 @@ export const settingsNavItem: NavItem = {
   icon: Settings,
 };
 
-export const settingsNavigation: NavItem[] = [
+/** User-level settings: account, preferences, billing */
+export const userSettingsNavigation: NavItem[] = [
   {
     name: 'Account',
     href: APP_ROUTES.SETTINGS,
@@ -129,6 +130,34 @@ export const settingsNavigation: NavItem[] = [
     icon: Bell,
   },
   {
+    name: 'Billing',
+    href: APP_ROUTES.SETTINGS_BILLING,
+    id: 'billing',
+    icon: Banknote,
+  },
+];
+
+/** Artist-level settings: profile, links, branding, tracking */
+export const artistSettingsNavigation: NavItem[] = [
+  {
+    name: 'Profile',
+    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    id: 'artist-profile',
+    icon: UserCircle,
+  },
+  {
+    name: 'Social Links',
+    href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,
+    id: 'social-links',
+    icon: Link2,
+  },
+  {
+    name: 'Music Links',
+    href: APP_ROUTES.SETTINGS_MUSIC_LINKS,
+    id: 'music-links',
+    icon: Music2,
+  },
+  {
     name: 'Branding',
     href: APP_ROUTES.SETTINGS_BRANDING,
     id: 'branding',
@@ -140,38 +169,12 @@ export const settingsNavigation: NavItem[] = [
     id: 'ad-pixels',
     icon: Rocket,
   },
-  {
-    name: 'Billing',
-    href: APP_ROUTES.SETTINGS_BILLING,
-    id: 'billing',
-    icon: Banknote,
-  },
-  {
-    name: 'Artist',
-    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-    id: 'artist',
-    icon: UserCircle,
-    children: [
-      {
-        name: 'Profile & DSPs',
-        href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-        id: 'artist-profile',
-        icon: UserCircle,
-      },
-      {
-        name: 'Social Links',
-        href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,
-        id: 'social-links',
-        icon: Link2,
-      },
-      {
-        name: 'Music Links',
-        href: APP_ROUTES.SETTINGS_MUSIC_LINKS,
-        id: 'music-links',
-        icon: Music2,
-      },
-    ],
-  },
+];
+
+/** Combined settings navigation (all items flat) */
+export const settingsNavigation: NavItem[] = [
+  ...userSettingsNavigation,
+  ...artistSettingsNavigation,
 ];
 
 export const adminNavigation: NavItem[] = [
