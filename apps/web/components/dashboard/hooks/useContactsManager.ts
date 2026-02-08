@@ -24,15 +24,6 @@ interface ContactUIState {
   isNew: boolean;
 }
 
-const DEFAULT_UI_STATE: ContactUIState = {
-  isExpanded: false,
-  isSaving: false,
-  isDeleting: false,
-  error: null,
-  customTerritory: '',
-  isNew: false,
-};
-
 export interface EditableContact extends DashboardContact {
   isExpanded?: boolean;
   isSaving?: boolean;
@@ -41,6 +32,15 @@ export interface EditableContact extends DashboardContact {
   customTerritory?: string;
   isNew?: boolean;
 }
+
+const DEFAULT_UI_STATE: ContactUIState = {
+  isExpanded: false,
+  isSaving: false,
+  isDeleting: false,
+  error: null,
+  customTerritory: '',
+  isNew: false,
+};
 
 function makeTempId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
