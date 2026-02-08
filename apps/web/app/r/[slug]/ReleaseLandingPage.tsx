@@ -29,6 +29,7 @@ interface ReleaseLandingPageProps
     };
     readonly artist: {
       readonly name: string;
+      readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
     readonly providers: Provider[];
@@ -114,7 +115,16 @@ export function ReleaseLandingPage({
             <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
               {release.title}
             </h1>
-            <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
+            {artist.handle ? (
+              <Link
+                href={`/${artist.handle}`}
+                className='mt-1.5 block text-base text-white/60 transition-colors hover:text-white/80'
+              >
+                {artist.name}
+              </Link>
+            ) : (
+              <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
+            )}
             {formattedDate && (
               <p className='mt-1 text-xs text-white/40'>{formattedDate}</p>
             )}
