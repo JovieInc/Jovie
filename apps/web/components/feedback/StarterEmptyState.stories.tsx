@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Link as LinkIcon, Music } from 'lucide-react';
+import { APP_ROUTES } from '@/constants/routes';
 import { StarterEmptyState } from './StarterEmptyState';
 
 const meta: Meta<typeof StarterEmptyState> = {
@@ -61,7 +62,7 @@ export const LinksEmpty: Story = {
     icon: <LinkIcon className='h-6 w-6' />,
     primaryAction: {
       label: 'Add First Link',
-      href: '/dashboard/profile',
+      href: APP_ROUTES.DASHBOARD_PROFILE,
     },
     className: 'w-96',
   },

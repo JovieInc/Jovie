@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { ContactsManager } from '@/components/dashboard/organisms/ContactsManager';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { APP_ROUTES } from '@/constants/routes';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
@@ -25,7 +26,7 @@ export default async function ContactsPage() {
     const profileId = profile?.id;
 
     if (!profile || !profileId) {
-      redirect('/app/dashboard');
+      redirect(APP_ROUTES.DASHBOARD_OVERVIEW);
     }
 
     const artist = convertDrizzleCreatorProfileToArtist(profile);

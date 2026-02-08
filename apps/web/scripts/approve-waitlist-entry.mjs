@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 /**
  * Manually approve a waitlist entry for testing
  * This simulates what the admin approval endpoint will do in PR #3

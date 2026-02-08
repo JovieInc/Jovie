@@ -54,6 +54,7 @@ export function ContactDetailHeader({
   ];
 
   if (email) {
+    // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
     primaryActions.push({
       id: 'copy',
       label: isCopied ? 'Copied!' : 'Copy email',

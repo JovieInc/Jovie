@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { waitlistInviteStatusEnum, waitlistStatusEnum } from './enums';
+// eslint-disable-next-line import/no-cycle -- mutual reference with profiles schema
 import { creatorProfiles } from './profiles';
 
 // Waitlist entries for invite-only access

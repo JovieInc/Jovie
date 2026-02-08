@@ -112,8 +112,8 @@ export async function getPlatformIcon(
   if (!loader) return undefined;
 
   try {
-    const module = await loader();
-    return module.default;
+    const iconModule = await loader();
+    return iconModule.default;
   } catch {
     return undefined;
   }
@@ -134,8 +134,8 @@ function SocialIconInner({
     const loader = iconLoaders[platform.toLowerCase()];
     if (loader) {
       loader()
-        .then(module => {
-          setIconPath(module.default.path);
+        .then(iconModule => {
+          setIconPath(iconModule.default.path);
         })
         .catch(() => {
           setIconPath(null);

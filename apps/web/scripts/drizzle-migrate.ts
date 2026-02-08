@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 
 /**
  * Drizzle Migration Script with Branch Protection and Neon Support

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
@@ -44,8 +45,8 @@ export async function invalidateProfileCache(
   }
 
   // Invalidate dashboard pages that display profile data
-  revalidatePath('/app/dashboard');
-  revalidatePath('/app/settings');
+  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
+  revalidatePath(APP_ROUTES.SETTINGS);
 }
 
 /**
@@ -86,8 +87,8 @@ export async function invalidateSocialLinksCache(
 
   // Also invalidate dashboard where links are managed
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath('/app/dashboard');
-  revalidatePath('/app/dashboard/links');
+  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
+  revalidatePath(APP_ROUTES.DASHBOARD_LINKS);
 }
 
 /**
@@ -114,6 +115,6 @@ export async function invalidateAvatarCache(
 
   // Dashboard also shows avatar
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath('/app/dashboard');
-  revalidatePath('/app/settings');
+  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
+  revalidatePath(APP_ROUTES.SETTINGS);
 }

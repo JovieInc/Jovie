@@ -159,6 +159,7 @@ export function useProfileEditor(
   } | null>(null);
 
   // Save profile using TanStack Query mutation
+  /* eslint-disable react-hooks/preserve-manual-memoization -- intentional: specific property deps prevent unnecessary re-computation */
   const saveProfile = useCallback(
     async (data: { displayName: string; username: string }): Promise<void> => {
       if (!profileId) {
@@ -253,6 +254,7 @@ export function useProfileEditor(
       router,
     ]
   );
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   // Use Pacer's useAutoSave for debounced saving
   const autoSave = useAutoSave<{ displayName: string; username: string }>({
