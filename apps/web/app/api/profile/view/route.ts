@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { shouldExcludeSelfByHandle } from '@/lib/analytics/self-exclusion';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { publicProfileLimiter } from '@/lib/rate-limit';
 import { incrementProfileViews } from '@/lib/services/profile';
@@ -75,6 +76,14 @@ export async function POST(request: NextRequest) {
       // Silently succeed — don't reveal per-handle limiting, just skip the increment
       return NextResponse.json(
         { success: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Pro feature: exclude the artist's own visits from analytics
+    if (await shouldExcludeSelfByHandle(handle)) {
+      return NextResponse.json(
+        { success: true, filtered: true },
         { headers: NO_STORE_HEADERS }
       );
     }

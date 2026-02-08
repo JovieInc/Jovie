@@ -1,12 +1,13 @@
 'use client';
 
-import { Rocket, Sparkles } from 'lucide-react';
+import { BarChart3, Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { ListenNowForm } from '@/components/dashboard/organisms/ListenNowForm';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
+import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
@@ -176,6 +177,25 @@ export function SettingsPolished({
             'Unlock Growth Tracking',
             'Seamlessly integrate Facebook, Google, and TikTok pixels.',
             Rocket
+          )
+        ),
+    },
+    {
+      id: 'analytics',
+      title: 'Analytics',
+      description:
+        'Control how your own activity is tracked in your analytics.',
+      render: () =>
+        isPro ? (
+          <SettingsAnalyticsSection
+            artist={artist}
+            onArtistUpdate={onArtistUpdate}
+          />
+        ) : (
+          renderProUpgradeCard(
+            'Pro Analytics Filtering',
+            'Exclude your own visits from analytics to get cleaner data about your real audience.',
+            BarChart3
           )
         ),
     },

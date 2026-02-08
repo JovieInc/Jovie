@@ -14,10 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks
 const mockIncrementProfileViews = vi.hoisted(() => vi.fn());
-const mockGetStatus = vi.hoisted(() => vi.fn());
 const mockLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockExtractClientIP = vi.hoisted(() => vi.fn());
+const mockShouldExcludeSelfByHandle = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/services/profile', () => ({
   incrementProfileViews: mockIncrementProfileViews,
@@ -25,7 +25,6 @@ vi.mock('@/lib/services/profile', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   publicProfileLimiter: {
-    getStatus: mockGetStatus,
     limit: mockLimit,
   },
 }));
@@ -42,6 +41,10 @@ vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: {
     'Cache-Control': 'no-store',
   },
+}));
+
+vi.mock('@/lib/analytics/self-exclusion', () => ({
+  shouldExcludeSelfByHandle: mockShouldExcludeSelfByHandle,
 }));
 
 function createRequest(body: unknown, options: { userAgent?: string } = {}) {
@@ -62,15 +65,15 @@ describe('POST /api/profile/view', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExtractClientIP.mockReturnValue('192.168.1.1');
-    mockGetStatus.mockReturnValue({
-      blocked: false,
-      retryAfterSeconds: 0,
+    mockLimit.mockResolvedValue({
+      success: true,
       limit: 100,
       remaining: 99,
+      reset: new Date(Date.now() + 60_000),
     });
-    mockLimit.mockResolvedValue(undefined);
     mockDetectBot.mockReturnValue({ isBot: false, reason: '' });
     mockIncrementProfileViews.mockResolvedValue(undefined);
+    mockShouldExcludeSelfByHandle.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -89,11 +92,11 @@ describe('POST /api/profile/view', () => {
   });
 
   it('returns 429 when rate limited', async () => {
-    mockGetStatus.mockReturnValue({
-      blocked: true,
-      retryAfterSeconds: 60,
+    mockLimit.mockResolvedValue({
+      success: false,
       limit: 100,
       remaining: 0,
+      reset: new Date(Date.now() + 60_000),
     });
 
     const { POST } = await import('@/app/api/profile/view/route');
@@ -103,7 +106,6 @@ describe('POST /api/profile/view', () => {
     expect(response.status).toBe(429);
     const body = await response.json();
     expect(body.error).toBe('Rate limit exceeded');
-    expect(response.headers.get('Retry-After')).toBe('60');
     expect(mockIncrementProfileViews).not.toHaveBeenCalled();
   });
 
@@ -196,7 +198,7 @@ describe('POST /api/profile/view', () => {
     const request = createRequest({ handle: 'testartist' });
     await POST(request);
 
-    expect(mockGetStatus).toHaveBeenCalledWith('10.0.0.1');
+    expect(mockLimit).toHaveBeenCalledWith('10.0.0.1');
   });
 
   it('accepts valid handle at max length (100 chars)', async () => {

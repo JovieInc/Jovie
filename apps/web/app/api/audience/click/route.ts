@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   checkClickRateLimit,
   getRateLimitHeaders,
@@ -216,6 +217,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Profile is not public' },
         { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Pro feature: exclude the artist's own clicks from analytics
+    if (await shouldExcludeSelfByProfileId(profileId)) {
+      return NextResponse.json(
+        { success: true, fingerprint: 'self-filtered' },
+        { headers: NO_STORE_HEADERS }
       );
     }
 
