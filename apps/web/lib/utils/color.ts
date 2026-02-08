@@ -97,16 +97,14 @@ export function ensureContrast(
   bgHex: string,
   minRatio = 3.0
 ): string {
-  let color = brandHex.startsWith('#') ? brandHex : `#${brandHex}`;
+  const normalizedHex = brandHex.startsWith('#') ? brandHex : `#${brandHex}`;
+  let color = normalizedHex;
   let factor = 1.0;
   // Iteratively darken; 20 steps is plenty to reach black from any color
   for (let i = 0; i < 20; i++) {
     if (contrastRatio(color, bgHex) >= minRatio) return color;
     factor -= 0.05;
-    color = darkenHex(
-      brandHex.startsWith('#') ? brandHex : `#${brandHex}`,
-      factor
-    );
+    color = darkenHex(normalizedHex, factor);
   }
   return color;
 }
