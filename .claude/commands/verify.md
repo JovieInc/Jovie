@@ -163,7 +163,18 @@ const [x, setX] = useState(0);
 if (condition) setX(1); // This causes loop!
 ```
 
-## 7. Run Affected Tests
+## 7. CodeRabbit AI Review
+
+Run a CodeRabbit code review on your changes to catch issues that static analysis misses:
+
+Use the `/coderabbit:review` skill to run the review. Address any findings before proceeding:
+- **Critical/High**: Must fix before completing the task
+- **Medium**: Fix if straightforward, otherwise document why not
+- **Low/Style**: Apply if they improve the code, skip if they don't
+
+If CodeRabbit flags something you've already considered, reply explaining your reasoning rather than blindly changing the code.
+
+## 8. Run Affected Tests
 
 ```bash
 pnpm vitest --run --changed
@@ -174,7 +185,7 @@ All tests must pass. If tests fail:
 2. Fix the root cause (not the test)
 3. Re-run until green
 
-## 8. Visual Verification (for UI changes)
+## 9. Visual Verification (for UI changes)
 
 If you modified UI components:
 
@@ -185,7 +196,7 @@ If you modified UI components:
 - [ ] Test in both light and dark modes
 - [ ] Test responsive breakpoints (mobile, tablet, desktop)
 
-## 9. Security Check
+## 10. Security Check
 
 If you touched auth/payments/admin code:
 
@@ -196,14 +207,14 @@ If you touched auth/payments/admin code:
 - [ ] Secrets are not hardcoded or logged
 - [ ] CORS headers are appropriate for endpoint type
 
-## 10. Documentation Check
+## 11. Documentation Check
 
 - [ ] API changes documented in relevant files
 - [ ] Breaking changes noted in PR description
 - [ ] Complex logic has inline comments explaining "why"
 - [ ] Types are accurate and exported where needed
 
-## 11. Performance Check (for data-heavy changes)
+## 12. Performance Check (for data-heavy changes)
 
 If you modified queries or data fetching:
 
@@ -212,7 +223,7 @@ If you modified queries or data fetching:
 - [ ] Caching strategy considered (Redis or TanStack Query)
 - [ ] Loading states handle slow networks
 
-## 12. Report Results
+## 13. Report Results
 
 Create a verification summary in your response:
 
@@ -224,6 +235,7 @@ Create a verification summary in your response:
 - Server/Client Boundaries: clean
 - Database Drivers: consistent
 - Hook Usage: no issues detected
+- CodeRabbit: no critical findings
 - Tests: X/X passing
 - [Other checks that passed]
 
