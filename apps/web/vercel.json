@@ -14,6 +14,14 @@
     {
       "path": "/api/cron/billing-reconciliation",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/schedule-release-notifications",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/scan-release-links",
+      "schedule": "*/30 * * * *"
     }
   ],
   "functions": {

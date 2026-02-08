@@ -17,6 +17,7 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
+import { ReleaseEmailSettings } from './ReleaseEmailSettings';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
@@ -153,6 +154,23 @@ export function ReleaseSidebar({
               />
 
               <ReleaseMetadata release={release} />
+
+              <ReleaseEmailSettings
+                announceEmailEnabled={
+                  ((release as Record<string, unknown>)
+                    .announceEmailEnabled as boolean) ?? false
+                }
+                releaseDayEmailEnabled={
+                  ((release as Record<string, unknown>)
+                    .releaseDayEmailEnabled as boolean) ?? true
+                }
+                hasAnnouncementDate={
+                  !!(release as Record<string, unknown>).announcementDate
+                }
+                hasReleaseDate={!!release.releaseDate}
+                releaseDateLabel={release.releaseDate ?? undefined}
+                readOnly={!isEditable}
+              />
 
               <ReleaseTrackList release={release} />
 

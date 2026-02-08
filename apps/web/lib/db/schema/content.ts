@@ -59,6 +59,14 @@ export const discogReleases = pgTable(
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
       .notNull(),
+    // Announcement & notification settings
+    announcementDate: timestamp('announcement_date'),
+    announceEmailEnabled: boolean('announce_email_enabled')
+      .default(false)
+      .notNull(),
+    releaseDayEmailEnabled: boolean('release_day_email_enabled')
+      .default(true)
+      .notNull(),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -73,6 +81,9 @@ export const discogReleases = pgTable(
       .where(drizzleSql`upc IS NOT NULL`),
     releaseDateIndex: index('discog_releases_release_date_idx').on(
       table.releaseDate
+    ),
+    announcementDateIndex: index('discog_releases_announcement_date_idx').on(
+      table.announcementDate
     ),
     spotifyPopularityRange: check(
       'discog_releases_spotify_popularity_range',

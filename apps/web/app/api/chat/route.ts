@@ -300,7 +300,35 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
 
-When asked to edit a blocked field, explain that they need to visit the settings page to make that change.`;
+When asked to edit a blocked field, explain that they need to visit the settings page to make that change.
+
+## Release Management
+You can help artists add new releases to their catalog using the proposeNewRelease tool.
+
+When an artist asks to add a new release:
+1. **Interview them** — Ask about: title, type (single/EP/album), planned release date, number of tracks, label, and whether it contains explicit content.
+2. **Ask about UPC and ISRC** — "Do you have a UPC from your distributor?" and "Do you have an ISRC for the lead track?" These help match the release across streaming platforms.
+3. **Help plan the release date** — Consider industry best practices:
+   - Fridays are the standard global release day (New Music Friday)
+   - Give at least 2-4 weeks lead time for pre-save campaigns
+   - Avoid major holiday weekends when engagement drops
+   - Suggest specific dates based on the artist's timeline
+4. **Ask about the announcement date** — "When do you want to announce this? Typically artists announce 1-2 weeks before release to build hype." The announcement date is when fans can be emailed a 'coming soon' with a countdown link.
+5. **Propose the release** — Use the proposeNewRelease tool to show a preview.
+6. Only propose after you've gathered enough details. Don't ask all questions at once — have a natural conversation, 2-3 questions per message.
+
+**Fields you collect:**
+- title (required): The release title
+- releaseType (required): single, ep, album, compilation, live, mixtape, other
+- releaseDate (optional): When it will be released (ISO date string, e.g. 2025-08-15)
+- announcementDate (optional): When to announce to fans (ISO date string, before releaseDate)
+- totalTracks (optional): Number of tracks
+- label (optional): Record label name
+- isExplicit (optional): Whether it contains explicit content
+- upc (optional): Universal Product Code from distributor
+- isrc (optional): ISRC for the lead track
+- releaseDayEmailEnabled (optional): Whether to email fans on release day (default true)
+- announceEmailEnabled (optional): Whether to email fans on announcement date (default false)`;
 }
 
 /**
@@ -347,6 +375,68 @@ function createProfileEditTool(context: ArtistContext) {
           newValue,
           reason,
         },
+      };
+    },
+  });
+}
+
+/**
+ * Creates the proposeNewRelease tool for the AI to suggest creating a release.
+ * Returns a preview — actual creation requires user confirmation on the client.
+ */
+function createNewReleaseTool() {
+  const newReleaseSchema = z.object({
+    title: z.string().min(1).max(200).describe('Release title'),
+    releaseType: z
+      .enum([
+        'single',
+        'ep',
+        'album',
+        'compilation',
+        'live',
+        'mixtape',
+        'other',
+      ])
+      .describe('Type of release'),
+    releaseDate: z
+      .string()
+      .optional()
+      .describe('Release date as ISO date string (e.g. 2025-08-15)'),
+    announcementDate: z
+      .string()
+      .optional()
+      .describe('Announcement date as ISO date string (before releaseDate)'),
+    totalTracks: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe('Number of tracks'),
+    label: z.string().optional().describe('Record label name'),
+    isExplicit: z.boolean().optional().describe('Contains explicit content'),
+    upc: z
+      .string()
+      .optional()
+      .describe('Universal Product Code from distributor'),
+    isrc: z.string().optional().describe('ISRC for the lead track'),
+    releaseDayEmailEnabled: z
+      .boolean()
+      .optional()
+      .describe('Email fans on release day (default true)'),
+    announceEmailEnabled: z
+      .boolean()
+      .optional()
+      .describe('Email fans on announcement date (default false)'),
+  });
+
+  return tool({
+    description:
+      'Propose creating a new release in the artist catalog. Returns a preview for the user to confirm before it is saved. Use this after interviewing the artist about their release details.',
+    inputSchema: newReleaseSchema,
+    execute: async input => {
+      return {
+        success: true,
+        preview: { ...input },
       };
     },
   });
@@ -471,6 +561,7 @@ export async function POST(req: Request) {
       messages: validatedMessages,
       tools: {
         proposeProfileEdit: createProfileEditTool(artistContext),
+        proposeNewRelease: createNewReleaseTool(),
       },
       abortSignal: req.signal,
       onError: ({ error }) => {

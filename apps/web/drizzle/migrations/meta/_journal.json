@@ -176,6 +176,13 @@
       "when": 1770338344147,
       "tag": "0024_bizarre_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1770588491763,
+      "tag": "0025_perfect_ultragirl",
+      "breakpoints": true
     }
   ]
 }

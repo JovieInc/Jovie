@@ -385,9 +385,11 @@ export default async function ContentSmartLinkPage({
     creator
   );
 
-  // Check if release is unreleased (releaseDate > now)
+  // Determine release state: no date, unreleased (future), or released (past)
+  const hasReleaseDate = !!content.releaseDate;
   const isUnreleased =
-    content.releaseDate && new Date(content.releaseDate) > new Date();
+    hasReleaseDate && new Date(content.releaseDate!) > new Date();
+  const isReleased = hasReleaseDate && !isUnreleased;
 
   return (
     <>
@@ -421,7 +423,7 @@ export default async function ContentSmartLinkPage({
             avatarUrl: creator.avatarUrl,
           }}
         />
-      ) : (
+      ) : isReleased ? (
         <ReleaseLandingPage
           release={{
             title: content.title,
@@ -435,6 +437,21 @@ export default async function ContentSmartLinkPage({
           }}
           providers={allProviders}
           slug={`${creator.usernameNormalized}/${content.slug}`}
+        />
+      ) : (
+        /* No release date set — minimal "Coming Soon" page without countdown */
+        <UnreleasedReleaseHero
+          release={{
+            title: content.title,
+            artworkUrl: content.artworkUrl,
+            releaseDate: null as unknown as Date,
+          }}
+          artist={{
+            id: creator.id,
+            name: creator.displayName ?? creator.username,
+            handle: creator.usernameNormalized,
+            avatarUrl: creator.avatarUrl,
+          }}
         />
       )}
     </>
@@ -465,14 +482,16 @@ export async function generateMetadata({
   const contentType = content.type === 'release' ? 'album' : 'song';
   const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
-  // Check if release is unreleased
+  // Determine release state for SEO
+  const hasReleaseDate = !!content.releaseDate;
   const isUnreleased =
-    content.releaseDate && new Date(content.releaseDate) > new Date();
+    hasReleaseDate && new Date(content.releaseDate!) > new Date();
+  const isReleased = hasReleaseDate && !isUnreleased;
 
   // Build SEO-optimized title based on release status
-  const title = isUnreleased
-    ? `${content.title} by ${artistName} - Coming Soon`
-    : `${content.title} by ${artistName} - Stream Now`;
+  const title = isReleased
+    ? `${content.title} by ${artistName} - Stream Now`
+    : `${content.title} by ${artistName} - Coming Soon`;
 
   // Build rich description based on release status
   const releaseYear = content.releaseDate
@@ -490,9 +509,9 @@ export async function generateMetadata({
           .join(', ')
       : 'Spotify, Apple Music';
 
-  const description = isUnreleased
-    ? `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`
-    : `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+  const description = isReleased
+    ? `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`
+    : `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`;
 
   // Build dynamic keywords
   const keywords = [
@@ -521,10 +540,10 @@ export async function generateMetadata({
       canonical: canonicalUrl,
     },
     robots: {
-      index: true,
+      index: isReleased,
       follow: true,
       googleBot: {
-        index: true,
+        index: isReleased,
         follow: true,
         'max-video-preview': -1,
         'max-image-preview': 'large',

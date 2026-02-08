@@ -40,6 +40,9 @@ export function JovieChat({
     handleRetry,
     handleSuggestedPrompt,
     submitMessage,
+    isConfirmingRelease,
+    handleReleaseConfirm,
+    handleReleaseCancel,
   } = useJovieChat({
     profileId,
     artistContext,
@@ -98,6 +101,9 @@ export function JovieChat({
                   id={message.id}
                   role={message.role}
                   parts={message.parts}
+                  onReleaseConfirm={handleReleaseConfirm}
+                  onReleaseCancel={handleReleaseCancel}
+                  isConfirmingRelease={isConfirmingRelease}
                 />
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (

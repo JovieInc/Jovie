@@ -11,6 +11,8 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { discogReleases } from '@/lib/db/schema/content';
+import { releaseLinkScans } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
@@ -26,7 +28,9 @@ import {
   resetProviderLink as resetProviderLinkDb,
   type TrackWithProviders,
   upsertProviderLink,
+  upsertRelease,
 } from '@/lib/discography/queries';
+import { generateUniqueSlug } from '@/lib/discography/slug';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
@@ -609,4 +613,117 @@ export async function loadTracksForRelease(params: {
       params.releaseSlug
     )
   );
+}
+
+/**
+ * Create a new release from the chat interface.
+ * Generates a unique slug, sets sourceType to 'manual', and schedules a link scan.
+ */
+export async function createReleaseFromChat(input: {
+  title: string;
+  releaseType:
+    | 'single'
+    | 'ep'
+    | 'album'
+    | 'compilation'
+    | 'live'
+    | 'mixtape'
+    | 'other';
+  releaseDate?: string;
+  announcementDate?: string;
+  totalTracks?: number;
+  label?: string;
+  isExplicit?: boolean;
+  upc?: string;
+  isrc?: string;
+  releaseDayEmailEnabled?: boolean;
+  announceEmailEnabled?: boolean;
+}): Promise<{
+  success: boolean;
+  releaseId: string;
+  slug: string;
+  smartLinkPath: string;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  const slug = await generateUniqueSlug(profile.id, input.title, 'release');
+
+  // Build metadata with ISRC if provided
+  const metadata: Record<string, unknown> = {
+    createdVia: 'chat',
+    createdAt: new Date().toISOString(),
+  };
+  if (input.isrc) {
+    metadata.isrc = input.isrc;
+  }
+
+  const release = await upsertRelease({
+    creatorProfileId: profile.id,
+    title: input.title,
+    slug,
+    releaseType: input.releaseType,
+    releaseDate: input.releaseDate ? new Date(input.releaseDate) : null,
+    label: input.label ?? null,
+    upc: input.upc ?? null,
+    totalTracks: input.totalTracks ?? (input.releaseType === 'single' ? 1 : 0),
+    isExplicit: input.isExplicit ?? false,
+    sourceType: 'manual',
+    metadata,
+  });
+
+  // Set announcement date and email preferences directly
+  const now = new Date();
+  await db
+    .update(discogReleases)
+    .set({
+      announcementDate: input.announcementDate
+        ? new Date(input.announcementDate)
+        : null,
+      announceEmailEnabled: input.announceEmailEnabled ?? false,
+      releaseDayEmailEnabled: input.releaseDayEmailEnabled ?? true,
+      updatedAt: now,
+    })
+    .where(eq(discogReleases.id, release.id));
+
+  // Schedule a link scan if we have ISRC or UPC for DSP matching
+  if (input.isrc || input.upc) {
+    const releaseDate = input.releaseDate ? new Date(input.releaseDate) : null;
+    await db.insert(releaseLinkScans).values({
+      releaseId: release.id,
+      creatorProfileId: profile.id,
+      scanPhase: 'immediate',
+      nextScanAt: now, // Scan immediately
+      metadata: {
+        isrc: input.isrc ?? null,
+        upc: input.upc ?? null,
+        releaseDate: releaseDate?.toISOString() ?? null,
+      },
+    });
+  }
+
+  // Invalidate caches
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('release_created', {
+    profileId: profile.id,
+    releaseId: release.id,
+    source: 'chat',
+    releaseType: input.releaseType,
+    hasUpc: !!input.upc,
+    hasIsrc: !!input.isrc,
+    hasAnnouncementDate: !!input.announcementDate,
+  });
+
+  return {
+    success: true,
+    releaseId: release.id,
+    slug,
+    smartLinkPath: buildSmartLinkPath(profile.handle, slug),
+  };
 }

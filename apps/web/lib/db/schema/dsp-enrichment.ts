@@ -16,6 +16,7 @@ import { notificationSubscriptions } from './analytics';
 import { discogReleases } from './content';
 import {
   dspMatchStatusEnum,
+  releaseLinkScanPhaseEnum,
   releaseNotificationStatusEnum,
   releaseNotificationTypeEnum,
   socialSuggestionStatusEnum,
@@ -334,6 +335,43 @@ export const socialLinkSuggestions = pgTable(
 );
 
 // ============================================================================
+// Release Link Scans - Smart rescanning for DSP link discovery
+// ============================================================================
+
+export const releaseLinkScans = pgTable(
+  'release_link_scans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    scanPhase: releaseLinkScanPhaseEnum('scan_phase')
+      .default('immediate')
+      .notNull(),
+    nextScanAt: timestamp('next_scan_at'),
+    lastScanAt: timestamp('last_scan_at'),
+    providersFound: integer('providers_found').default(0).notNull(),
+    totalScans: integer('total_scans').default(0).notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // One scan record per release
+    releaseUnique: uniqueIndex('release_link_scans_release_unique').on(
+      table.releaseId
+    ),
+    // Index for finding scans due for processing
+    nextScanIdx: index('release_link_scans_next_scan_idx').on(table.nextScanAt),
+    // Index for finding scans by phase
+    phaseIdx: index('release_link_scans_phase_idx').on(table.scanPhase),
+  })
+);
+
+// ============================================================================
 // Schema Validations
 // ============================================================================
 
@@ -384,3 +422,6 @@ export type NewFanReleaseNotification =
 
 export type SocialLinkSuggestion = typeof socialLinkSuggestions.$inferSelect;
 export type NewSocialLinkSuggestion = typeof socialLinkSuggestions.$inferInsert;
+
+export type ReleaseLinkScan = typeof releaseLinkScans.$inferSelect;
+export type NewReleaseLinkScan = typeof releaseLinkScans.$inferInsert;

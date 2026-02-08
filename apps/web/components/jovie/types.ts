@@ -41,6 +41,10 @@ export interface ChatError {
   readonly failedMessage?: string;
 }
 
+/** Pre-filled prompt for the "Add Release" button on the releases page */
+export const NEW_RELEASE_PROMPT =
+  'I want to add a new release to my catalog. Help me set it up — ask me about the title, type, release date, and any other details you need.';
+
 /** Maximum allowed message length */
 export const MAX_MESSAGE_LENGTH = 4000;
 
@@ -200,6 +204,15 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
     label: 'Why are people clicking but not tipping?',
     prompt:
       'My tip link gets clicks but not many submissions. Why might that be, and how can I improve the conversion?',
+    accent: 'green',
+  },
+
+  // --- Releases ---
+  {
+    icon: 'Disc3',
+    label: 'Add a new release to my catalog',
+    prompt:
+      'I want to add a new release to my catalog. Help me set it up — ask me about the title, type, release date, and any other details you need.',
     accent: 'green',
   },
 

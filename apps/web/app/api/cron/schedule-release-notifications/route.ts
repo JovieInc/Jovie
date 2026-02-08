@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
@@ -13,12 +13,17 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
- * Cron job to schedule release day notifications for upcoming releases.
+ * Cron job to schedule release notifications for upcoming releases.
  *
- * This job:
- * 1. Finds releases dropping in the next 24 hours
- * 2. For each subscriber with releaseDay preference enabled
- * 3. Creates a fanReleaseNotifications entry scheduled for release time
+ * This job handles two types of notifications:
+ * 1. **Release day emails** — "Out now!" sent on release date (releaseDayEmailEnabled must be true)
+ * 2. **Announcement emails** — "Coming soon!" sent on announcement date (announceEmailEnabled must be true)
+ *
+ * For each notification type:
+ * - Finds releases with the relevant date in the next 24 hours
+ * - Respects per-release email toggles
+ * - For each subscriber with the matching preference enabled
+ * - Creates a fanReleaseNotifications entry scheduled for that time
  *
  * Schedule: Daily at 00:00 UTC (configured in vercel.json)
  */
@@ -36,7 +41,8 @@ export async function GET(request: Request) {
   const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
   try {
-    // Find releases dropping in the next 24 hours
+    // === Pass 1: Release day notifications ===
+    // Find releases dropping in the next 24 hours WITH releaseDayEmailEnabled
     const upcomingReleases = await db
       .select({
         id: discogReleases.id,
@@ -48,18 +54,37 @@ export async function GET(request: Request) {
       .where(
         and(
           gte(discogReleases.releaseDate, now),
-          lte(discogReleases.releaseDate, in24Hours)
+          lte(discogReleases.releaseDate, in24Hours),
+          eq(discogReleases.releaseDayEmailEnabled, true)
         )
       );
 
-    if (upcomingReleases.length === 0) {
+    // === Pass 2: Announcement notifications ===
+    // Find releases with announcement date in the next 24 hours WITH announceEmailEnabled
+    const upcomingAnnouncements = await db
+      .select({
+        id: discogReleases.id,
+        creatorProfileId: discogReleases.creatorProfileId,
+        title: discogReleases.title,
+        announcementDate: discogReleases.announcementDate,
+      })
+      .from(discogReleases)
+      .where(
+        and(
+          gte(discogReleases.announcementDate, now),
+          lte(discogReleases.announcementDate, in24Hours),
+          eq(discogReleases.announceEmailEnabled, true)
+        )
+      );
+
+    if (upcomingReleases.length === 0 && upcomingAnnouncements.length === 0) {
       logger.info(
-        '[schedule-release-notifications] No upcoming releases found'
+        '[schedule-release-notifications] No upcoming releases or announcements found'
       );
       return NextResponse.json(
         {
           success: true,
-          message: 'No upcoming releases in the next 24 hours',
+          message: 'No upcoming releases or announcements in the next 24 hours',
           scheduled: 0,
           timestamp: now.toISOString(),
         },
@@ -69,9 +94,12 @@ export async function GET(request: Request) {
 
     let totalScheduled = 0;
 
-    // Batch fetch all subscribers for upcoming releases (eliminates N+1 query)
+    // Batch fetch all subscribers for upcoming releases + announcements (eliminates N+1 query)
     const creatorProfileIds = [
-      ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
+      ...new Set([
+        ...upcomingReleases.map(r => r.creatorProfileId),
+        ...upcomingAnnouncements.map(r => r.creatorProfileId),
+      ]),
     ];
 
     const allSubscribers = await db
@@ -114,14 +142,14 @@ export async function GET(request: Request) {
       creatorProfileId: string;
       releaseId: string;
       notificationSubscriptionId: string;
-      notificationType: 'release_day';
+      notificationType: 'release_day' | 'preview';
       scheduledFor: Date;
       status: 'pending';
       dedupKey: string;
       metadata: { releaseTitle: string | null; channel: string };
     }> = [];
 
-    // Process each release and collect notification values
+    // Process release day notifications
     for (const release of upcomingReleases) {
       if (!release.releaseDate) continue;
 
@@ -139,6 +167,32 @@ export async function GET(request: Request) {
           notificationSubscriptionId: subscriber.id,
           notificationType: 'release_day',
           scheduledFor: release.releaseDate,
+          status: 'pending',
+          dedupKey,
+          metadata: {
+            releaseTitle: release.title,
+            channel: subscriber.channel,
+          },
+        });
+      }
+    }
+
+    // Process announcement notifications (preview type)
+    for (const release of upcomingAnnouncements) {
+      if (!release.announcementDate) continue;
+
+      const subscribers =
+        subscribersByCreator.get(release.creatorProfileId) || [];
+
+      for (const subscriber of subscribers) {
+        const dedupKey = `preview:${release.id}:${subscriber.id}`;
+
+        notificationValues.push({
+          creatorProfileId: release.creatorProfileId,
+          releaseId: release.id,
+          notificationSubscriptionId: subscriber.id,
+          notificationType: 'preview',
+          scheduledFor: release.announcementDate,
           status: 'pending',
           dedupKey,
           metadata: {
@@ -180,7 +234,7 @@ export async function GET(request: Request) {
     }
 
     logger.info(
-      `[schedule-release-notifications] Processed ${totalScheduled} notifications for ${upcomingReleases.length} releases`
+      `[schedule-release-notifications] Processed ${totalScheduled} notifications for ${upcomingReleases.length} releases and ${upcomingAnnouncements.length} announcements`
     );
 
     return NextResponse.json(
@@ -189,6 +243,7 @@ export async function GET(request: Request) {
         message: `Processed ${totalScheduled} notifications`,
         processed: totalScheduled,
         releasesFound: upcomingReleases.length,
+        announcementsFound: upcomingAnnouncements.length,
         timestamp: now.toISOString(),
       },
       { headers: NO_STORE_HEADERS }

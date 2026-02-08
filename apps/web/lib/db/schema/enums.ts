@@ -297,6 +297,15 @@ export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
   'failed',
 ]);
 
+// Release Link Scan Enums
+export const releaseLinkScanPhaseEnum = pgEnum('release_link_scan_phase', [
+  'immediate',
+  'pre_release',
+  'release_window',
+  'post_release',
+  'completed',
+]);
+
 // Chat Enums
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',

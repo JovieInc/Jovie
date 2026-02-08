@@ -15,6 +15,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { NewReleaseChatButton } from '@/components/dashboard/atoms/NewReleaseChatButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -211,7 +212,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
-  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+  const headerActions = useMemo(
+    () => (
+      <div className='flex items-center gap-1'>
+        <NewReleaseChatButton />
+        <div className='h-6 w-px bg-border' />
+        <DrawerToggleButton />
+      </div>
+    ),
+    []
+  );
 
   const spotifyBadge = useMemo(
     () => (
@@ -254,15 +264,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // Spotify pill on left side of header
     setHeaderBadge(isConnected && artistName ? spotifyBadge : null);
 
-    // Drawer toggle on right side (use memoized element to prevent infinite loops)
-    setHeaderActions(drawerToggle);
+    // Header actions on right side (use memoized element to prevent infinite loops)
+    setHeaderActions(headerActions);
 
     return () => {
       setHeaderBadge(null);
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [isConnected, artistName, spotifyBadge, drawerToggle]);
+  }, [isConnected, artistName, spotifyBadge, headerActions]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>

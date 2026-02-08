@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
+import { createReleaseFromChat } from '@/app/app/(shell)/dashboard/releases/actions';
 import { useThrottledCallback } from '@/lib/pacer';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
@@ -12,7 +12,7 @@ import {
   useAddMessagesMutation,
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
-
+import type { ReleaseProposal } from '../components/ReleaseProposalCard';
 import type { ArtistContext, ChatError } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
 import { getErrorType, getMessageText, getUserFriendlyMessage } from '../utils';
@@ -407,6 +407,60 @@ export function useJovieChat({
     inputRef.current?.focus();
   }, []);
 
+  // Release creation confirmation flow
+  const [isConfirmingRelease, setIsConfirmingRelease] = useState(false);
+
+  const handleReleaseConfirm = useCallback(
+    async (proposal: ReleaseProposal) => {
+      setIsConfirmingRelease(true);
+      try {
+        const result = await createReleaseFromChat({
+          title: proposal.title,
+          releaseType: proposal.releaseType as
+            | 'single'
+            | 'ep'
+            | 'album'
+            | 'compilation'
+            | 'live'
+            | 'mixtape'
+            | 'other',
+          releaseDate: proposal.releaseDate,
+          announcementDate: proposal.announcementDate,
+          totalTracks: proposal.totalTracks,
+          label: proposal.label,
+          isExplicit: proposal.isExplicit,
+          upc: proposal.upc,
+          isrc: proposal.isrc,
+          releaseDayEmailEnabled: proposal.releaseDayEmailEnabled,
+          announceEmailEnabled: proposal.announceEmailEnabled,
+        });
+
+        // Send a confirmation message to the chat
+        doSubmit(
+          `I confirmed the release "${proposal.title}". It has been created successfully! The smart link is at ${result.smartLinkPath}`
+        );
+
+        // Invalidate releases cache
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.releases.all,
+        });
+      } catch (err) {
+        console.error('[useJovieChat] Failed to create release:', err);
+        setChatError({
+          type: 'server',
+          message: 'Failed to create the release. Please try again.',
+        });
+      } finally {
+        setIsConfirmingRelease(false);
+      }
+    },
+    [doSubmit, queryClient, setChatError]
+  );
+
+  const handleReleaseCancel = useCallback(() => {
+    doSubmit('I decided not to create this release right now.');
+  }, [doSubmit]);
+
   return {
     // State
     input,
@@ -430,5 +484,9 @@ export function useJovieChat({
     /** Programmatic message submission (for imperative use without input state) */
     submitMessage: doSubmit,
     setChatError,
+    // Release creation
+    isConfirmingRelease,
+    handleReleaseConfirm,
+    handleReleaseCancel,
   };
 }
