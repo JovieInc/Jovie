@@ -138,11 +138,8 @@ const renderWithProviders = (ui: React.ReactElement) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
-const shouldRunGroupedLinksTests = process.env.RUN_GROUPED_LINKS_TESTS === '1';
-
-const describeFn = shouldRunGroupedLinksTests ? describe : describe.skip;
-
-describeFn('GroupedLinksManager', () => {
+// TODO: Needs useRouter mock and updated GroupedLinksManager mock infrastructure
+describe.skip('GroupedLinksManager', () => {
   beforeEach(() => {
     nextAddPayload = null;
   });

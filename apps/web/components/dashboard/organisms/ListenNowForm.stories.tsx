@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Artist } from '@/types/db';
-import { ListenNowForm } from './ListenNowForm';
+import { ListenNowForm } from './listen-now-form';
 
 // Mock artist data for stories
 const mockArtist: Artist = {

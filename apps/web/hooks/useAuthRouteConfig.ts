@@ -68,8 +68,15 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
     const parts = pathname.split('/').filter(Boolean);
 
-    // Get the last part of the path for the current page
-    const lastPart = parts[parts.length - 1];
+    // Get the last meaningful part of the path for the current page.
+    // For dynamic routes like /app/chat/[uuid], use the parent segment ("chat")
+    // instead of the UUID which isn't a meaningful label.
+    const UUID_REGEX =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let lastPart = parts[parts.length - 1];
+    if (UUID_REGEX.test(lastPart) && parts.length >= 2) {
+      lastPart = parts[parts.length - 2];
+    }
 
     // Use centralized label map with sentence case
     const label = getBreadcrumbLabel(lastPart);

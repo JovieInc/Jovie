@@ -71,6 +71,12 @@ export const ReleaseCell = memo(function ReleaseCell({
               {release.releaseType}
             </span>
           )}
+          {/* Year - mobile only (meta column is hidden on mobile) */}
+          {release.releaseDate && (
+            <span className='shrink-0 text-[10px] tabular-nums text-tertiary-token sm:hidden'>
+              {new Date(release.releaseDate).getFullYear()}
+            </span>
+          )}
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
