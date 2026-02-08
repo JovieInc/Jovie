@@ -135,6 +135,13 @@ export const queryKeys = {
       [...queryKeys.spotify.all, 'artist-search', { query, limit }] as const,
   },
 
+  // Apple Music search queries
+  appleMusic: {
+    all: ['apple-music'] as const,
+    artistSearch: (query: string, limit: number) =>
+      [...queryKeys.appleMusic.all, 'artist-search', { query, limit }] as const,
+  },
+
   // Dashboard suggestions polling
   suggestions: {
     all: ['suggestions'] as const,

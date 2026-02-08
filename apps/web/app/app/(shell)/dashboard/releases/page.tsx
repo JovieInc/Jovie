@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
 import { getDashboardData } from '../actions';
-import { checkSpotifyConnection, loadReleaseMatrix } from './actions';
+import {
+  checkAppleMusicConnection,
+  checkSpotifyConnection,
+  loadReleaseMatrix,
+} from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
 
 export const runtime = 'nodejs';
@@ -15,9 +19,10 @@ export default async function ReleasesPage() {
     redirect('/sign-in?redirect_url=/app/dashboard/releases');
   }
 
-  const [releases, spotifyStatus] = await Promise.all([
+  const [releases, spotifyStatus, appleMusicStatus] = await Promise.all([
     loadReleaseMatrix(),
     checkSpotifyConnection(),
+    checkAppleMusicConnection(),
   ]);
 
   return (
@@ -27,6 +32,8 @@ export default async function ReleasesPage() {
       primaryProviders={primaryProviderKeys}
       spotifyConnected={spotifyStatus.connected}
       spotifyArtistName={spotifyStatus.artistName}
+      appleMusicConnected={appleMusicStatus.connected}
+      appleMusicArtistName={appleMusicStatus.artistName}
     />
   );
 }

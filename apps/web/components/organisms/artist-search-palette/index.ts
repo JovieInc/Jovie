@@ -1,0 +1,1 @@
+export { ArtistSearchCommandPalette } from './ArtistSearchCommandPalette';

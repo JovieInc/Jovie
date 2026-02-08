@@ -12,10 +12,14 @@ import {
   useRef,
   useState,
 } from 'react';
+import { toast } from 'sonner';
+import { connectAppleMusicArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { useRowSelection } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -49,10 +53,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   primaryProviders,
   spotifyConnected = false,
   spotifyArtistName = null,
+  appleMusicConnected = false,
+  appleMusicArtistName = null,
 }: ReleaseProviderMatrixProps) {
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Apple Music connection state
+  const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
+  const [amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+  const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
     rows,
@@ -172,6 +183,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setArtistName(importingArtistName);
   }, []);
 
+  const handleAppleMusicConnect = useCallback(
+    async (artist: {
+      id: string;
+      name: string;
+      url: string;
+      imageUrl?: string;
+    }) => {
+      try {
+        const result = await connectAppleMusicArtist({
+          externalArtistId: artist.id,
+          externalArtistName: artist.name,
+          externalArtistUrl: artist.url,
+          externalArtistImageUrl: artist.imageUrl,
+        });
+        if (result.success) {
+          setIsAmConnected(true);
+          setAmArtistName(result.artistName);
+          toast.success(result.message);
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to connect Apple Music'
+        );
+      }
+    },
+    []
+  );
+
   // Show importing state when we're actively importing
   const showImportingState = isImporting && rows.length === 0;
   // Show empty state when not connected and no releases
@@ -206,7 +247,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [editingRelease, rows.length, closeEditor, openEditor, isSidebarOpen]);
 
-  // Set header badge (Spotify pill on left) and actions (drawer toggle on right)
+  // Set header badge (DSP pills on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
@@ -214,45 +255,68 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
 
   const spotifyBadge = useMemo(
+    () =>
+      isConnected && artistName ? (
+        <button
+          type='button'
+          onClick={handleSync}
+          disabled={isSyncing}
+          className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+          aria-label={
+            isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
+          }
+        >
+          <SocialIcon platform='spotify' className='h-3 w-3' />
+          <span>{artistName}</span>
+          {/* Status dot - visible when not hovered/syncing */}
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
+              'group-hover:opacity-0 group-focus-visible:opacity-0',
+              isSyncing && 'opacity-0'
+            )}
+            aria-hidden='true'
+          />
+          {/* Refresh icon - visible on hover or when syncing */}
+          <Icon
+            name={isSyncing ? 'Loader2' : 'RefreshCw'}
+            className={cn(
+              'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
+              'group-hover:opacity-100 group-focus-visible:opacity-100',
+              isSyncing && 'animate-spin opacity-100'
+            )}
+            aria-hidden='true'
+          />
+        </button>
+      ) : null,
+    [isConnected, artistName, handleSync, isSyncing]
+  );
+
+  const appleMusicBadge = useMemo(
     () => (
-      <button
-        type='button'
-        onClick={handleSync}
-        disabled={isSyncing}
-        className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
-        aria-label={
-          isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
-        }
-      >
-        <SocialIcon platform='spotify' className='h-3 w-3' />
-        <span>{artistName}</span>
-        {/* Status dot - visible when not hovered/syncing */}
-        <span
-          className={cn(
-            'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
-            'group-hover:opacity-0 group-focus-visible:opacity-0',
-            isSyncing && 'opacity-0'
-          )}
-          aria-hidden='true'
-        />
-        {/* Refresh icon - visible on hover or when syncing */}
-        <Icon
-          name={isSyncing ? 'Loader2' : 'RefreshCw'}
-          className={cn(
-            'absolute right-2 h-3 w-3 opacity-0 transition-opacity duration-150',
-            'group-hover:opacity-100 group-focus-visible:opacity-100',
-            isSyncing && 'animate-spin opacity-100'
-          )}
-          aria-hidden='true'
-        />
-      </button>
+      <DspConnectionPill
+        provider='apple_music'
+        connected={isAmConnected}
+        artistName={amArtistName}
+        onClick={isAmConnected ? undefined : () => setAmPaletteOpen(true)}
+      />
     ),
-    [artistName, handleSync, isSyncing]
+    [isAmConnected, amArtistName]
+  );
+
+  const headerBadges = useMemo(
+    () => (
+      <div className='flex items-center gap-2'>
+        {spotifyBadge}
+        {appleMusicBadge}
+      </div>
+    ),
+    [spotifyBadge, appleMusicBadge]
   );
 
   useEffect(() => {
-    // Spotify pill on left side of header
-    setHeaderBadge(isConnected && artistName ? spotifyBadge : null);
+    // DSP pills on left side of header
+    setHeaderBadge(headerBadges);
 
     // Drawer toggle on right side (use memoized element to prevent infinite loops)
     setHeaderActions(drawerToggle);
@@ -262,7 +326,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [isConnected, artistName, spotifyBadge, drawerToggle]);
+  }, [headerBadges, drawerToggle]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
@@ -440,6 +504,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           />
         </Suspense>
       )}
+
+      {/* Apple Music artist search command palette */}
+      <ArtistSearchCommandPalette
+        open={amPaletteOpen}
+        onOpenChange={setAmPaletteOpen}
+        provider='apple_music'
+        onArtistSelect={handleAppleMusicConnect}
+      />
     </div>
   );
 });
