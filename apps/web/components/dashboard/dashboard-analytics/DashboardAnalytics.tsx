@@ -40,7 +40,7 @@ function StatCard({
 }) {
   if (loading) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
         <LoadingSkeleton
           height='h-3'
           width='w-20'
@@ -53,7 +53,7 @@ function StatCard({
   }
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
       <p className='text-[13px] text-secondary-token'>{label}</p>
       <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
         {value}
@@ -87,7 +87,7 @@ function ListSection({
   readonly emptyMessage: string;
 }) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
       <div className='flex items-center gap-2 mb-4'>
         <Icon className='h-4 w-4 text-tertiary-token' />
         <h3 className='text-[13px] font-medium text-secondary-token'>
@@ -158,7 +158,7 @@ export function DashboardAnalytics() {
   const fmt = Intl.NumberFormat();
 
   return (
-    <div className='space-y-6'>
+    <div className='max-w-5xl space-y-6 lg:space-y-8'>
       <h1 className='sr-only'>Analytics</h1>
 
       {/* Header */}
@@ -186,10 +186,10 @@ export function DashboardAnalytics() {
         id={rangePanelId}
         role='tabpanel'
         aria-labelledby={activeRangeTabId}
-        className='space-y-4'
+        className='space-y-4 lg:space-y-6'
       >
         {/* Primary metrics — conversion funnel as stat cards */}
-        <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+        <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5'>
           <StatCard
             label='Profile Views'
             value={fmt.format(data?.profile_views ?? 0)}
@@ -222,7 +222,7 @@ export function DashboardAnalytics() {
         {!loading &&
           typeof data?.listen_clicks === 'number' &&
           typeof data?.identified_users === 'number' && (
-            <div className='grid grid-cols-2 sm:grid-cols-4 gap-4'>
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 lg:gap-5'>
               <StatCard
                 label='Capture Rate'
                 value={`${data.capture_rate ?? 0}%`}
@@ -249,7 +249,7 @@ export function DashboardAnalytics() {
         )}
 
         {/* Lists */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5'>
           <ListSection
             title='Top Cities'
             icon={MapPin}
