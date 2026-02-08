@@ -434,7 +434,6 @@ export default async function ContentSmartLinkPage({
             avatarUrl: creator.avatarUrl,
           }}
           providers={allProviders}
-          slug={`${creator.usernameNormalized}/${content.slug}`}
         />
       )}
     </>
