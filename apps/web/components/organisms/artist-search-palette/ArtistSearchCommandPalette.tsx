@@ -45,6 +45,17 @@ function formatFollowers(count: number): string {
   return `${count} followers`;
 }
 
+function getArtistMeta(artist: ArtistResult): string {
+  const parts: string[] = [];
+  if ('followers' in artist && artist.followers) {
+    parts.push(formatFollowers(artist.followers));
+  }
+  if ('genres' in artist && artist.genres && artist.genres.length > 0) {
+    parts.push(artist.genres.slice(0, 2).join(', '));
+  }
+  return parts.join(' · ');
+}
+
 interface ArtistSearchCommandPaletteProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -184,13 +195,12 @@ export function ArtistSearchCommandPalette({
             )}
 
             <Command.Empty className='py-8 text-center'>
-              {search.state === 'error' ? (
-                <div>
-                  <p className='text-sm text-error'>
-                    {search.error || 'Search failed'}
-                  </p>
-                </div>
-              ) : search.state === 'empty' ? (
+              {search.state === 'error' && (
+                <p className='text-sm text-error'>
+                  {search.error || 'Search failed'}
+                </p>
+              )}
+              {search.state === 'empty' && (
                 <div>
                   <Icon
                     name='Search'
@@ -203,7 +213,7 @@ export function ArtistSearchCommandPalette({
                     Try a different name or paste a link below
                   </p>
                 </div>
-              ) : null}
+              )}
             </Command.Empty>
 
             {search.results.length > 0 && (
@@ -243,19 +253,7 @@ export function ArtistSearchCommandPalette({
                         {artist.name}
                       </div>
                       <div className='text-xs text-tertiary-token'>
-                        {'followers' in artist &&
-                          artist.followers &&
-                          formatFollowers(artist.followers)}
-                        {'genres' in artist &&
-                          artist.genres &&
-                          artist.genres.length > 0 && (
-                            <span>
-                              {'followers' in artist && artist.followers
-                                ? ' · '
-                                : ''}
-                              {artist.genres.slice(0, 2).join(', ')}
-                            </span>
-                          )}
+                        {getArtistMeta(artist)}
                       </div>
                     </div>
 

@@ -17,7 +17,7 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 
-export interface AppleMusicArtistResult {
+interface AppleMusicArtistResult {
   id: string;
   name: string;
   url: string;
