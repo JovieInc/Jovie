@@ -22,6 +22,8 @@ export * from './billing';
 export * from './chat';
 // Content (Providers, Releases, Tracks)
 export * from './content';
+// DSP Bio Sync (Bio update pushes to DSPs)
+export * from './dsp-bio-sync';
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export * from './dsp-enrichment';
 // Email Engagement (Opens, Clicks, Drip Campaigns)
