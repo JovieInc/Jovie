@@ -41,6 +41,8 @@ export interface PlanGateEntitlements {
   canAccessAdvancedAnalytics: boolean;
   /** Pro: can export contacts */
   canExportContacts: boolean;
+  /** Pro: can access tour dates */
+  canAccessTourDates: boolean;
 }
 
 /**
@@ -62,5 +64,6 @@ export function usePlanGate(): PlanGateEntitlements {
     canFilterSelfFromAnalytics: isPro,
     canAccessAdvancedAnalytics: isPro,
     canExportContacts: isPro,
+    canAccessTourDates: isPro,
   };
 }

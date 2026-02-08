@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { CalendarDays } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -9,7 +11,10 @@ import {
   type TourDateViewModel,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { APP_ROUTES } from '@/constants/routes';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import {
   useDeleteTourDateMutation,
   useDisconnectBandsintownMutation,
@@ -31,6 +36,8 @@ export function TourDatesManager({
   initialTourDates,
   connectionStatus,
 }: Readonly<TourDatesManagerProps>) {
+  const router = useRouter();
+  const { canAccessTourDates, isLoading: planLoading } = usePlanGate();
   const [tourDates, setTourDates] =
     useState<TourDateViewModel[]>(initialTourDates);
   const [selectedTourDate, setSelectedTourDate] =
@@ -116,6 +123,23 @@ export function TourDatesManager({
   const handleApiKeySaved = useCallback(() => {
     setHasApiKey(true);
   }, []);
+
+  // Gate tour dates behind Pro plan
+  if (!planLoading && !canAccessTourDates) {
+    return (
+      <div className='flex h-full items-center justify-center p-8'>
+        <div className='w-full max-w-md'>
+          <SettingsProGateCard
+            title='Tour Dates'
+            description='Sync and manage your tour dates with Bandsintown integration. Upgrade to Pro to unlock this feature.'
+            icon={CalendarDays}
+            onUpgrade={() => router.push(APP_ROUTES.SETTINGS_BILLING)}
+            loading={false}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Show empty state if:
   // 1. No API key configured (need to set up API key first), OR

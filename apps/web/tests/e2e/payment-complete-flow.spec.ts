@@ -4,8 +4,8 @@ import { signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 
 const stripePriceId =
-  process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
-  process.env.STRIPE_PRICE_STANDARD_YEARLY;
+  process.env.STRIPE_PRICE_PRO_MONTHLY ||
+  process.env.STRIPE_PRICE_PRO_YEARLY;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -194,7 +194,7 @@ async function fetchSubscriptionBySession(
 test.describe('Billing payment flow - Stripe Checkout', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('completes Standard upgrade and reflects on dashboard', async ({
+  test('completes Pro upgrade and reflects on dashboard', async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -206,7 +206,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
 
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('button', { name: /upgrade to standard/i })
+      page.getByRole('button', { name: /upgrade to pro/i })
     ).toBeVisible({ timeout: 15_000 });
 
     const { sessionId, url } = await createCheckoutSession(page, priceId);
@@ -240,7 +240,7 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
       .toBe(true);
 
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/Standard Subscription Active/i)).toBeVisible({
+    await expect(page.getByText(/Pro Subscription Active/i)).toBeVisible({
       timeout: 10_000,
     });
 

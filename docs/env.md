@@ -79,13 +79,13 @@ The secret key for Stripe.
 
 The webhook secret for Stripe.
 
-### `STRIPE_PRICE_STANDARD_MONTHLY`
+### `STRIPE_PRICE_PRO_MONTHLY`
 
-The price ID for the Standard monthly subscription (branding removed).
+The price ID for the Pro monthly subscription ($39/mo).
 
-### `STRIPE_PRICE_STANDARD_YEARLY`
+### `STRIPE_PRICE_PRO_YEARLY`
 
-The price ID for the Standard yearly subscription (branding removed).
+The price ID for the Pro yearly subscription ($348/yr).
 
 ## Cloudinary Configuration
 

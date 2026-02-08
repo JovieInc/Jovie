@@ -14,7 +14,7 @@ export function NewUpgradeTeaser() {
             {/* Badge */}
             <div className='flex justify-center mb-6'>
               <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-secondary-token bg-surface-2 border border-subtle rounded-full'>
-                Standard
+                Pro
               </span>
             </div>
 
@@ -46,7 +46,7 @@ export function NewUpgradeTeaser() {
                 className='w-full justify-center gap-2 h-11 text-sm font-medium'
               >
                 <Link href='/billing/remove-branding'>
-                  Upgrade to Standard
+                  Upgrade to Pro
                   <ArrowRight className='h-4 w-4' />
                 </Link>
               </Button>
