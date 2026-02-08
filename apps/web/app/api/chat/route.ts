@@ -2,17 +2,26 @@ import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { type ModelMessage, streamText, tool } from 'ai';
-import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
+import {
+  getCanvasStatusFromMetadata,
+  summarizeCanvasStatus,
+} from '@/lib/services/canvas/service';
+import {
+  SPOTIFY_CANVAS_SPEC,
+  TIKTOK_PREVIEW_SPEC,
+} from '@/lib/services/canvas/specs';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 export const maxDuration = 30;
@@ -160,6 +169,49 @@ async function fetchArtistContext(
   };
 }
 
+/** Lightweight release info for chat context (avoids loading full provider data). */
+interface ReleaseContext {
+  readonly id: string;
+  readonly title: string;
+  readonly releaseType: string;
+  readonly releaseDate: string | null;
+  readonly artworkUrl: string | null;
+  readonly spotifyPopularity: number | null;
+  readonly totalTracks: number;
+  readonly canvasStatus: string;
+  readonly metadata: Record<string, unknown> | null;
+}
+
+/**
+ * Fetches release data for the chat context.
+ * Used by creative tools (canvas, social ads, related artists).
+ */
+async function fetchReleasesForChat(
+  profileId: string
+): Promise<ReleaseContext[]> {
+  const releases = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      releaseType: discogReleases.releaseType,
+      releaseDate: discogReleases.releaseDate,
+      artworkUrl: discogReleases.artworkUrl,
+      spotifyPopularity: discogReleases.spotifyPopularity,
+      totalTracks: discogReleases.totalTracks,
+      metadata: discogReleases.metadata,
+    })
+    .from(discogReleases)
+    .where(eq(discogReleases.creatorProfileId, profileId))
+    .orderBy(desc(discogReleases.releaseDate))
+    .limit(50);
+
+  return releases.map(r => ({
+    ...r,
+    releaseDate: r.releaseDate?.toISOString() ?? null,
+    canvasStatus: getCanvasStatusFromMetadata(r.metadata),
+  }));
+}
+
 /**
  * Extracts text content from a message's content field.
  * Handles both string content and array content (with text parts).
@@ -300,7 +352,32 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
 
-When asked to edit a blocked field, explain that they need to visit the settings page to make that change.`;
+When asked to edit a blocked field, explain that they need to visit the settings page to make that change.
+
+## Creative & Promotion Tools
+
+You also have tools to help with creative assets and promotion:
+
+**Spotify Canvas:**
+- Use the checkCanvasStatus tool to see which releases are missing canvas videos
+- Canvas is a 3-8 second looping video that plays behind tracks on Spotify mobile
+- You can help plan canvas generation from album artwork (AI removes text, upscales, and animates)
+- Specs: ${SPOTIFY_CANVAS_SPEC.minWidth}x${SPOTIFY_CANVAS_SPEC.minHeight}px minimum, 9:16 portrait, ${SPOTIFY_CANVAS_SPEC.minDurationSec}-${SPOTIFY_CANVAS_SPEC.maxDurationSec}s loop, H.264/MP4
+
+**Social Media Video Ads:**
+- Help artists plan video ads using their album art + song clips
+- Suggest promo text and strategy for different platforms
+- Consider QR codes linking to their Jovie page for tracking
+
+**TikTok Sound Previews:**
+- Help identify the best ${TIKTOK_PREVIEW_SPEC.durationSec}-second clip for TikTok previews
+- Consider hooks, drops, choruses, and viral moments
+- You can't listen to the audio, but you can advise based on song structure knowledge
+
+**Related Artists for Pitching:**
+- Use the suggestRelatedArtists tool to find similar artists
+- Useful for playlist pitching, ad targeting (Meta, TikTok), and collaboration
+- Base suggestions on genre, popularity tier, and audience overlap`;
 }
 
 /**
@@ -347,6 +424,307 @@ function createProfileEditTool(context: ArtistContext) {
           newValue,
           reason,
         },
+      };
+    },
+  });
+}
+
+/**
+ * Creates the checkCanvasStatus tool for querying release canvas status.
+ * Fetches release data and reports which releases need canvas videos.
+ */
+function createCheckCanvasStatusTool(profileId: string | null) {
+  return tool({
+    description:
+      "Check which of the artist's releases have Spotify Canvas videos set and which are missing them. Use this when the artist asks about canvas videos or wants to generate them.",
+    inputSchema: z.object({
+      includeAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'If true, include all releases. If false (default), only show releases missing canvas.'
+        ),
+    }),
+    execute: async ({ includeAll }) => {
+      if (!profileId) {
+        return {
+          success: false,
+          error: 'Profile ID required for release data',
+        };
+      }
+
+      const releases = await fetchReleasesForChat(profileId);
+
+      if (releases.length === 0) {
+        return {
+          success: true,
+          summary: {
+            total: 0,
+            message:
+              'No releases found. Connect your Spotify account and sync your releases first.',
+          },
+        };
+      }
+
+      const summary = summarizeCanvasStatus(
+        releases.map(r => ({
+          id: r.id,
+          title: r.title,
+          metadata: r.metadata,
+          artworkUrl: r.artworkUrl,
+        }))
+      );
+
+      const releaseList = includeAll
+        ? releases.map(r => ({
+            title: r.title,
+            releaseType: r.releaseType,
+            canvasStatus: r.canvasStatus,
+            hasArtwork: Boolean(r.artworkUrl),
+            spotifyPopularity: r.spotifyPopularity,
+          }))
+        : summary.releasesNeedingCanvas.map(r => ({
+            title: r.title,
+            hasArtwork: r.hasArtwork,
+          }));
+
+      return {
+        success: true,
+        summary: {
+          total: summary.total,
+          withCanvas: summary.withCanvas,
+          withoutCanvas: summary.withoutCanvas,
+          unknown: summary.unknown,
+        },
+        releases: releaseList,
+      };
+    },
+  });
+}
+
+/**
+ * Creates the suggestRelatedArtists tool.
+ * Uses the artist's profile data to suggest related artists for pitching and ad targeting.
+ */
+function createSuggestRelatedArtistsTool(context: ArtistContext) {
+  return tool({
+    description:
+      "Suggest related artists for playlist pitching, ad targeting, and collaboration based on the artist's genre, style, and popularity level. Returns advice on which artists to target.",
+    inputSchema: z.object({
+      purpose: z
+        .enum(['playlist_pitching', 'ad_targeting', 'collaboration', 'all'])
+        .describe('What the related artists will be used for'),
+      count: z
+        .number()
+        .int()
+        .min(3)
+        .max(15)
+        .optional()
+        .describe('Number of suggestions to return (default 5)'),
+    }),
+    execute: async ({ purpose, count: suggestionCount }) => {
+      // Provide the AI with structured context to generate recommendations
+      return {
+        success: true,
+        artistContext: {
+          name: context.displayName,
+          genres: context.genres,
+          spotifyFollowers: context.spotifyFollowers,
+          spotifyPopularity: context.spotifyPopularity,
+          purpose,
+          requestedCount: suggestionCount ?? 5,
+        },
+        instructions:
+          'Based on the artist context above, suggest related artists. Consider: genre alignment, similar popularity tier (aim slightly higher for pitching), audience overlap potential, and the specific purpose. For ad targeting, include both larger and smaller artists in the same niche. For playlist pitching, focus on artists who are on playlists the user would want to be on.',
+      };
+    },
+  });
+}
+
+/**
+ * Creates the generateCanvasPlan tool.
+ * Helps the artist plan a canvas video generation from their album artwork.
+ */
+function createGenerateCanvasPlanTool(profileId: string | null) {
+  return tool({
+    description:
+      'Generate a detailed plan for creating a Spotify Canvas video from album artwork. Includes artwork processing steps, animation style recommendations, and technical specs. Use this when an artist wants to create a canvas for a specific release.',
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .describe('The title of the release to generate canvas for'),
+      motionPreference: z
+        .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
+        .optional()
+        .describe(
+          'Preferred animation style. Default: ambient (subtle motion with color shifts)'
+        ),
+    }),
+    execute: async ({ releaseTitle, motionPreference }) => {
+      if (!profileId) {
+        return { success: false, error: 'Profile ID required' };
+      }
+
+      // Find the matching release
+      const releases = await fetchReleasesForChat(profileId);
+      const release = releases.find(
+        r => r.title.toLowerCase() === releaseTitle.toLowerCase()
+      );
+
+      if (!release) {
+        // Try partial match
+        const partialMatch = releases.find(r =>
+          r.title.toLowerCase().includes(releaseTitle.toLowerCase())
+        );
+
+        if (!partialMatch) {
+          return {
+            success: false,
+            error: `Release "${releaseTitle}" not found. Available releases: ${releases
+              .slice(0, 10)
+              .map(r => r.title)
+              .join(', ')}`,
+          };
+        }
+
+        return buildCanvasPlan(partialMatch, motionPreference);
+      }
+
+      return buildCanvasPlan(release, motionPreference);
+    },
+  });
+}
+
+function buildCanvasPlan(release: ReleaseContext, motionPreference?: string) {
+  const motion = motionPreference ?? 'ambient';
+  const hasArtwork = Boolean(release.artworkUrl);
+
+  return {
+    success: true,
+    plan: {
+      release: {
+        title: release.title,
+        type: release.releaseType,
+        hasArtwork,
+        artworkUrl: release.artworkUrl,
+        currentCanvasStatus: release.canvasStatus,
+      },
+      steps: [
+        {
+          step: 1,
+          action: 'Process Artwork',
+          description: hasArtwork
+            ? 'AI removes text/logos from album art and upscales to 1080x1920 (9:16 portrait)'
+            : 'No artwork available — upload album art first, then we can generate a canvas',
+          status: hasArtwork ? 'ready' : 'blocked',
+        },
+        {
+          step: 2,
+          action: 'Generate Video',
+          description: `Create a ${motion} animation loop (3-8 seconds) from the processed artwork`,
+          status: hasArtwork ? 'ready' : 'blocked',
+        },
+        {
+          step: 3,
+          action: 'Encode & Download',
+          description:
+            'Encode to H.264 MP4 at 30fps, ready for upload to Spotify for Artists',
+          status: hasArtwork ? 'ready' : 'blocked',
+        },
+        {
+          step: 4,
+          action: 'Upload to Spotify',
+          description:
+            'Download the video and upload it via Spotify for Artists → Music → Select track → Canvas',
+          status: 'manual',
+        },
+      ],
+      motionStyle: motion,
+      specs: {
+        resolution: '1080x1920',
+        aspectRatio: '9:16',
+        duration: '3-8 seconds (loops)',
+        format: 'MP4 (H.264)',
+        fps: 30,
+      },
+    },
+  };
+}
+
+/**
+ * Creates the createPromoStrategy tool.
+ * Generates a promotional strategy including social ads, TikTok, and canvas.
+ */
+function createPromoStrategyTool(
+  context: ArtistContext,
+  profileId: string | null
+) {
+  return tool({
+    description:
+      'Create a comprehensive promotion strategy for a release, including social media video ads, TikTok strategy, Spotify Canvas, and ad targeting recommendations. Use this when an artist asks for help promoting their music.',
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .optional()
+        .describe(
+          'Specific release to promote. If not provided, uses the latest release.'
+        ),
+      budget: z
+        .enum(['free', 'low', 'medium', 'high'])
+        .optional()
+        .describe(
+          'Budget level: free (organic only), low ($50-200), medium ($200-1000), high ($1000+)'
+        ),
+      platforms: z
+        .array(
+          z.enum(['tiktok', 'instagram', 'youtube', 'spotify', 'hulu', 'meta'])
+        )
+        .optional()
+        .describe('Target platforms for the promotion'),
+    }),
+    execute: async ({ releaseTitle, budget, platforms }) => {
+      let targetRelease: ReleaseContext | null = null;
+
+      if (profileId) {
+        const releases = await fetchReleasesForChat(profileId);
+        if (releaseTitle) {
+          targetRelease =
+            releases.find(
+              r => r.title.toLowerCase() === releaseTitle.toLowerCase()
+            ) ??
+            releases.find(r =>
+              r.title.toLowerCase().includes(releaseTitle.toLowerCase())
+            ) ??
+            null;
+        } else {
+          // Use the most recent release
+          targetRelease = releases[0] ?? null;
+        }
+      }
+
+      return {
+        success: true,
+        context: {
+          artist: {
+            name: context.displayName,
+            genres: context.genres,
+            followers: context.spotifyFollowers,
+            popularity: context.spotifyPopularity,
+          },
+          release: targetRelease
+            ? {
+                title: targetRelease.title,
+                type: targetRelease.releaseType,
+                hasArtwork: Boolean(targetRelease.artworkUrl),
+                canvasStatus: targetRelease.canvasStatus,
+                popularity: targetRelease.spotifyPopularity,
+              }
+            : null,
+          budget: budget ?? 'low',
+          platforms: platforms ?? ['tiktok', 'instagram', 'spotify'],
+        },
+        instructions:
+          'Create a specific, actionable promo strategy. Include: (1) Spotify Canvas plan if not set, (2) Social video ad concepts using album art + 30s song clip + promo text + QR code to Jovie, (3) TikTok sound strategy with best clip selection advice, (4) Related artist targeting for ads, (5) Timeline with specific daily/weekly actions. Be concrete — no vague advice.',
       };
     },
   });
@@ -463,6 +841,8 @@ export async function POST(req: Request) {
   }
 
   const systemPrompt = buildSystemPrompt(artistContext);
+  const resolvedProfileId =
+    profileId && typeof profileId === 'string' ? profileId : null;
 
   try {
     const result = streamText({
@@ -471,6 +851,13 @@ export async function POST(req: Request) {
       messages: validatedMessages,
       tools: {
         proposeProfileEdit: createProfileEditTool(artistContext),
+        checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+        suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+        generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+        createPromoStrategy: createPromoStrategyTool(
+          artistContext,
+          resolvedProfileId
+        ),
       },
       abortSignal: req.signal,
       onError: ({ error }) => {

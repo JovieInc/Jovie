@@ -218,4 +218,41 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
       'Given my stats and where my audience is, which platforms should I be most active on right now?',
     accent: 'blue',
   },
+
+  // --- Creative & Promotion ---
+  {
+    icon: 'Clapperboard',
+    label: 'Check which releases need a Spotify Canvas',
+    prompt:
+      'Check my releases and tell me which ones are missing a Spotify Canvas video. For any that are missing one, help me generate a canvas from the album art.',
+    accent: 'green',
+  },
+  {
+    icon: 'Film',
+    label: 'Create a social media video ad for my latest release',
+    prompt:
+      'Help me create a social media video ad for my latest release. I want to use 30 seconds of the song with the album art as the visual, include promo text, and generate a QR code linking to my Jovie page.',
+    accent: 'green',
+  },
+  {
+    icon: 'Scissors',
+    label: 'Find the best 15-second TikTok preview for my song',
+    prompt:
+      'Help me find the best 15-second clip from my latest song to use as the TikTok preview. What part of the track would hook listeners the fastest?',
+    accent: 'green',
+  },
+  {
+    icon: 'Radar',
+    label: 'Suggest related artists for pitching and ad targeting',
+    prompt:
+      'Based on my genre, style, and Spotify stats, suggest related artists I should use for playlist pitching and ad targeting on platforms like Spotify, Meta, and TikTok.',
+    accent: 'orange',
+  },
+  {
+    icon: 'Megaphone',
+    label: 'Build a release promo plan with AI-generated assets',
+    prompt:
+      'Help me build a full promotion plan for my next release. Include a timeline, content ideas, social media video ads, Spotify Canvas, and TikTok strategy.',
+    accent: 'orange',
+  },
 ] as const;

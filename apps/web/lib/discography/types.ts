@@ -44,6 +44,9 @@ export type ReleaseType =
   | 'mixtape'
   | 'other';
 
+/** Canvas video status for a release */
+export type CanvasStatus = 'unknown' | 'not_set' | 'generated' | 'uploaded';
+
 export interface ReleaseViewModel {
   profileId: string;
   id: string;
@@ -68,6 +71,8 @@ export interface ReleaseViewModel {
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  /** Spotify Canvas video status for this release */
+  canvasStatus?: CanvasStatus;
 }
 
 /** Track view model for display in expandable release rows */
