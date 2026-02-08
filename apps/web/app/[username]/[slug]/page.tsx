@@ -430,6 +430,7 @@ export default async function ContentSmartLinkPage({
           }}
           artist={{
             name: creator.displayName ?? creator.username,
+            handle: creator.usernameNormalized,
             avatarUrl: creator.avatarUrl,
           }}
           providers={allProviders}

@@ -29,6 +29,28 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
 }));
 
+// Mock ConfirmDialog to render a simple confirm button when open
+vi.mock('@/components/molecules/ConfirmDialog', () => ({
+  ConfirmDialog: ({
+    open,
+    onConfirm,
+    confirmLabel,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    variant?: string;
+    onConfirm: () => void;
+  }) =>
+    open ? (
+      <button type='button' data-testid='confirm-delete' onClick={onConfirm}>
+        {confirmLabel ?? 'Confirm'}
+      </button>
+    ) : null,
+}));
+
 describe('LinkActions Keyboard Accessibility', () => {
   const mockOnToggle = vi.fn();
   const mockOnRemove = vi.fn();
@@ -78,7 +100,12 @@ describe('LinkActions Keyboard Accessibility', () => {
     const removeButton = screen.getByRole('menuitem', { name: /delete/i });
     expect(removeButton).toBeInTheDocument();
 
+    // Clicking Delete opens the confirm dialog
     await user.click(removeButton);
+
+    // Confirm the deletion via the ConfirmDialog mock
+    const confirmButton = screen.getByTestId('confirm-delete');
+    await user.click(confirmButton);
     expect(mockOnRemove).toHaveBeenCalledTimes(1);
   });
 

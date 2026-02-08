@@ -244,6 +244,7 @@ export default async function ReleaseSmartLinkPage({
       }}
       artist={{
         name: creator.displayName ?? creator.username,
+        handle: creator.usernameNormalized ?? null,
         avatarUrl: creator.avatarUrl ?? null,
       }}
       providers={allProviders}
