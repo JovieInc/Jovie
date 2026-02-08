@@ -65,6 +65,13 @@ export {
   UTM_PRESET_CATEGORY_MAP,
   UTM_PRESET_MAP,
 } from './presets';
+// Share menu item generators
+export {
+  buildUTMContext,
+  getUTMShareActionMenuItems,
+  getUTMShareContextMenuItems,
+  getUTMShareDropdownItems,
+} from './share-menu-items';
 // Storage utilities
 export {
   calculateScore,

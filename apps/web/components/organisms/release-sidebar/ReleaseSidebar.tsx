@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
@@ -73,6 +74,14 @@ export function ReleaseSidebar({
     const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
     const items: CommonDropdownItem[] = [];
 
+    const utmContext = buildUTMContext({
+      smartLinkUrl,
+      releaseSlug: release.slug,
+      releaseTitle: release.title,
+      artistName,
+      releaseDate: release.releaseDate,
+    });
+
     items.push(
       {
         type: 'action',
@@ -88,6 +97,12 @@ export function ReleaseSidebar({
         icon: <ExternalLink className='h-4 w-4' />,
         onClick: () => globalThis.open(smartLinkUrl, '_blank'),
       },
+      // UTM share presets
+      ...getUTMShareDropdownItems({
+        smartLinkUrl,
+        context: utmContext,
+      }),
+      { type: 'separator', id: 'sep-actions' },
       {
         type: 'action',
         id: 'refresh',
@@ -101,7 +116,7 @@ export function ReleaseSidebar({
           }
         },
       },
-      { type: 'separator', id: 'sep-1' },
+      { type: 'separator', id: 'sep-danger' },
       {
         type: 'action',
         id: 'delete',
@@ -113,7 +128,7 @@ export function ReleaseSidebar({
     );
 
     return items;
-  }, [release, handleCopySmartLink, onRefresh]);
+  }, [release, handleCopySmartLink, onRefresh, artistName]);
 
   return (
     <RightDrawer
