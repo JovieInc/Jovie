@@ -1,8 +1,10 @@
 'use client';
 
+import { useTheme } from 'next-themes';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
+import { ensureContrast, isBrandDark } from '@/lib/utils/color';
 
 export interface DspProviderIconProps {
   readonly provider: DspProviderId;
@@ -51,8 +53,17 @@ export function DspProviderIcon({
   className,
   showLabel = false,
 }: DspProviderIconProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const label = PROVIDER_LABELS[provider];
-  const color = PROVIDER_COLORS[provider];
+  const rawColor = PROVIDER_COLORS[provider];
+  // Ensure brand color meets WCAG 3:1 non-text contrast.
+  // Dark brands (Tidal) → white in dark mode; bright brands → darkened in light mode.
+  const bgHex = isDark ? '#101012' : '#fcfcfc';
+  const color =
+    isDark && isBrandDark(rawColor)
+      ? '#ffffff'
+      : ensureContrast(rawColor, bgHex);
 
   // Map DSP provider IDs to SocialIcon platform names
   const platformMap: Record<DspProviderId, string> = {

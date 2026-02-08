@@ -44,6 +44,74 @@ export function isBrandDark(hex: string, threshold = 0.35): boolean {
 }
 
 /**
+ * Determine if a brand color is too bright for legible display on light surfaces.
+ * Bright brands (e.g., Snapchat yellow, Deezer orange) need darkened icon colors
+ * in light mode to meet WCAG 3:1 non-text contrast.
+ * @param hex - Hex color string
+ * @param bgHex - Background hex to check contrast against (default: #fcfcfc / surface-1)
+ * @param minRatio - Minimum required contrast ratio (default: 3.0 for WCAG AA non-text)
+ * @returns true if the brand color fails contrast on the given background
+ */
+export function isBrandTooLight(
+  hex: string,
+  bgHex = '#fcfcfc',
+  minRatio = 3.0
+): boolean {
+  return contrastRatio(hex, bgHex) < minRatio;
+}
+
+/**
+ * WCAG contrast ratio between two colors.
+ * @returns ratio >= 1 (1 = identical, 21 = black vs white)
+ */
+export function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = relativeLuminance(hex1);
+  const l2 = relativeLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Darken a hex color by a factor (0-1). factor=0.7 means 70% of original brightness.
+ */
+export function darkenHex(hex: string, factor: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const nr = clamp(r * factor);
+  const ng = clamp(g * factor);
+  const nb = clamp(b * factor);
+  return `#${((1 << 24) | (nr << 16) | (ng << 8) | nb).toString(16).slice(1)}`;
+}
+
+/**
+ * Return a contrast-safe version of a brand color for the given background.
+ * Progressively darkens the color until it meets the WCAG minimum ratio.
+ * @param brandHex - Brand hex color (with or without #)
+ * @param bgHex - Background hex color
+ * @param minRatio - Minimum contrast ratio (default: 3.0)
+ * @returns A hex color guaranteed to meet the contrast requirement
+ */
+export function ensureContrast(
+  brandHex: string,
+  bgHex: string,
+  minRatio = 3.0
+): string {
+  let color = brandHex.startsWith('#') ? brandHex : `#${brandHex}`;
+  let factor = 1.0;
+  // Iteratively darken; 20 steps is plenty to reach black from any color
+  for (let i = 0; i < 20; i++) {
+    if (contrastRatio(color, bgHex) >= minRatio) return color;
+    factor -= 0.05;
+    color = darkenHex(
+      brandHex.startsWith('#') ? brandHex : `#${brandHex}`,
+      factor
+    );
+  }
+  return color;
+}
+
+/**
  * Get appropriate icon color and background for a brand color.
  * Handles dark mode inversion for very dark brands.
  * @param brandHex - Brand hex color
