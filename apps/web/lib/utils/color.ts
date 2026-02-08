@@ -111,7 +111,8 @@ export function ensureContrast(
 
 /**
  * Get appropriate icon color and background for a brand color.
- * Handles dark mode inversion for very dark brands.
+ * Handles dark mode inversion for very dark brands and ensures WCAG 3:1
+ * non-text contrast for bright brands.
  * @param brandHex - Brand hex color
  * @param isDarkTheme - Whether the current theme is dark
  * @returns Object with iconColor and iconBg CSS values
@@ -122,8 +123,12 @@ export function getBrandIconStyles(
 ): { iconColor: string; iconBg: string } {
   const brandIsDark = isBrandDark(brandHex);
 
-  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility
-  const iconColor = isDarkTheme && brandIsDark ? '#ffffff' : brandHex;
+  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility.
+  // Otherwise ensure brand color meets WCAG 3:1 against the effective surface.
+  const iconColor =
+    isDarkTheme && brandIsDark
+      ? '#ffffff'
+      : ensureContrast(brandHex, isDarkTheme ? '#101012' : '#fcfcfc');
 
   // Determine background opacity based on theme and brand darkness
   let iconBg: string;
@@ -136,6 +141,32 @@ export function getBrandIconStyles(
   }
 
   return { iconColor, iconBg };
+}
+
+/**
+ * Get a contrast-safe icon color for a brand against the current theme surface.
+ * Inverts dark brands to white in dark mode; darkens bright brands in light mode.
+ * @param brandHex - Brand hex color (with or without #)
+ * @param isDarkTheme - Whether the current theme is dark
+ * @returns Hex color that meets WCAG 3:1 non-text contrast
+ */
+export function getContrastSafeIconColor(
+  brandHex: string,
+  isDarkTheme: boolean
+): string {
+  if (isDarkTheme && isBrandDark(brandHex)) return '#ffffff';
+  const bgHex = isDarkTheme ? '#101012' : '#fcfcfc';
+  return ensureContrast(brandHex, bgHex);
+}
+
+/**
+ * Choose white or dark text that meets WCAG 3:1 contrast on a brand-colored background.
+ * Uses actual contrast ratio calculation instead of luminance threshold heuristic.
+ * @param brandHex - Brand hex color used as background
+ * @returns '#ffffff' or '#0f172a'
+ */
+export function getContrastTextOnBrand(brandHex: string): string {
+  return contrastRatio('#ffffff', brandHex) >= 3 ? '#ffffff' : '#0f172a';
 }
 
 /**
