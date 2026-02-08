@@ -4,7 +4,6 @@
  * Schemas for /api/dashboard/profile routes.
  */
 
-import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
@@ -22,7 +21,7 @@ export const settingsSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    const size = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const size = new TextEncoder().encode(JSON.stringify(value)).length;
     if (size > 1024) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
