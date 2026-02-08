@@ -223,13 +223,13 @@ export const adminNavigation: NavItem[] = [
 export const mobilePrimaryNavigation: NavItem[] = [
   dashboardHome,
   primaryNavigation[0], // Profile
-  primaryNavigation[1], // Contacts
+  primaryNavigation[2], // Releases
   primaryNavigation[4], // Audience
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
-  primaryNavigation[2], // Releases
+  primaryNavigation[1], // Contacts
   primaryNavigation[3], // Tour Dates
   ...(profileNavItem.children ?? []), // Analytics, Earnings
   ...secondaryNavigation, // Chat
