@@ -5,3 +5,4 @@
  */
 
 export * from './claim-invite';
+export * from './dsp-bio-update';

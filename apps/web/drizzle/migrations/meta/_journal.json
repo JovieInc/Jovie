@@ -176,6 +176,13 @@
       "when": 1770338344147,
       "tag": "0024_bizarre_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1770497158714,
+      "tag": "0025_adorable_karnak",
+      "breakpoints": true
     }
   ]
 }
