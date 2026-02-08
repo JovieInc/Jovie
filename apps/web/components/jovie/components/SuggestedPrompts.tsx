@@ -18,7 +18,12 @@ import {
   UserSearch,
   Users,
 } from 'lucide-react';
-import { type ComponentType, type SVGProps, useCallback, useState } from 'react';
+import {
+  type ComponentType,
+  type SVGProps,
+  useCallback,
+  useState,
+} from 'react';
 
 import { cn } from '@/lib/utils';
 
