@@ -30,6 +30,7 @@ export interface SettingsUpdateInput {
       push_notifications?: boolean;
       hide_branding?: boolean;
       exclude_self_from_analytics?: boolean;
+      auto_release_day_email?: boolean;
     };
   };
 }

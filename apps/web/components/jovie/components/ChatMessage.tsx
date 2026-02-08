@@ -26,7 +26,7 @@ interface ChatMessageProps {
  */
 function extractReleaseProposal(parts: MessagePart[]): ReleaseProposal | null {
   for (const part of parts) {
-    const p = part as Record<string, unknown>;
+    const p = part as unknown as Record<string, unknown>;
     if (p.type !== 'tool-invocation') continue;
     const invocation = p.toolInvocation as Record<string, unknown> | undefined;
     if (!invocation) continue;

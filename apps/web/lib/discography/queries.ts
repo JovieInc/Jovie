@@ -178,6 +178,9 @@ export async function getLatestReleaseByUsername(
       metadata: discogReleases.metadata,
       createdAt: discogReleases.createdAt,
       updatedAt: discogReleases.updatedAt,
+      announcementDate: discogReleases.announcementDate,
+      announceEmailEnabled: discogReleases.announceEmailEnabled,
+      releaseDayEmailEnabled: discogReleases.releaseDayEmailEnabled,
     })
     .from(discogReleases)
     .innerJoin(
