@@ -82,8 +82,10 @@ export function AdminWaitlistTableUnified({
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   const handleRowSelectionChange = useCallback(
@@ -132,6 +134,7 @@ export function AdminWaitlistTableUnified({
       // Checkbox column
       columnHelper.display({
         id: 'select',
+        /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
         header: createSelectHeaderRenderer(
           headerCheckboxStateRef,
           toggleSelectAll
@@ -142,6 +145,7 @@ export function AdminWaitlistTableUnified({
           pageSize,
           toggleSelect
         ),
+        /* eslint-enable react-hooks/refs */
         size: 56, // 14 * 4 = 56px (w-14)
       }),
 

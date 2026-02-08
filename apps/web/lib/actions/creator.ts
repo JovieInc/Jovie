@@ -3,7 +3,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
-import type { CreatorProfile } from '@/lib/db/schema';
+import type { CreatorProfile } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 

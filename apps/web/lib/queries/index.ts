@@ -234,6 +234,7 @@ export {
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
+// eslint-disable-next-line import/no-cycle -- barrel re-export
 export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { APP_ROUTES } from '@/constants/routes';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -25,7 +26,7 @@ async function refreshIngest(
       success?: boolean;
       queuedCount?: number;
       error?: string;
-    }>('/app/admin/creators/bulk-refresh', {
+    }>(APP_ROUTES.ADMIN_CREATORS_BULK_REFRESH, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

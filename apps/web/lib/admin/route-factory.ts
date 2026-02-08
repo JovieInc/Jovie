@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 
@@ -72,7 +73,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
           { status: 403 }
         );
       }
-      const redirectUrl = new URL('/app/dashboard', request.url);
+      const redirectUrl = new URL(APP_ROUTES.DASHBOARD_OVERVIEW, request.url);
       return NextResponse.redirect(redirectUrl);
     }
 
@@ -93,7 +94,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         return NextResponse.json(response);
       }
 
-      const redirectUrl = new URL('/app/admin/creators', request.url);
+      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
       return NextResponse.redirect(redirectUrl);
     } catch (error) {
       // Track error in Sentry
@@ -120,7 +121,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         );
       }
 
-      const redirectUrl = new URL('/app/admin/creators', request.url);
+      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
       return NextResponse.redirect(redirectUrl);
     }
   };

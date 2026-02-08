@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 
 /**
  * Drizzle migration preflight for main/production deployments.
