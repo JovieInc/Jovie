@@ -53,7 +53,7 @@ export function getDspBioUpdateText(data: DspBioUpdateTemplateData): string {
     spotifyUrl,
   } = data;
 
-  const profileUrl = `${BASE_URL}/${username}`;
+  const profileUrl = `${BASE_URL}/${encodeURIComponent(username)}`;
 
   const identifierLines: string[] = [];
   if (externalArtistUrl) {
@@ -109,7 +109,7 @@ export function getDspBioUpdateHtml(data: DspBioUpdateTemplateData): string {
     spotifyUrl,
   } = data;
 
-  const profileUrl = `${BASE_URL}/${username}`;
+  const profileUrl = `${BASE_URL}/${encodeURIComponent(username)}`;
 
   const safeArtistName = escapeHtml(artistName);
   const safeDspName = escapeHtml(dspDisplayName);
