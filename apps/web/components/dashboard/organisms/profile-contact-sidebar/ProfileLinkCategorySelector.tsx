@@ -43,7 +43,7 @@ export function ProfileLinkCategorySelector({
     <div // NOSONAR S6819
       role='group'
       aria-label='Link categories'
-      className='relative inline-flex w-full rounded-xl border border-subtle bg-[#f7f7f7] p-1 shadow-inner'
+      className='relative inline-flex w-full rounded-xl border border-subtle bg-surface-0 p-1 shadow-inner'
     >
       {visibleCategories.map(category => {
         const isActive = selectedCategory === category.id;
@@ -59,7 +59,7 @@ export function ProfileLinkCategorySelector({
             {isActive && (
               <motion.span
                 layoutId='category-selector-active'
-                className='absolute inset-0 rounded-lg bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_1px_2px_rgba(0,0,0,0.06)]'
+                className='absolute inset-0 rounded-lg bg-surface-2 shadow-sm'
                 transition={{ type: 'tween', ease: 'easeOut', duration: 0.12 }}
               />
             )}
