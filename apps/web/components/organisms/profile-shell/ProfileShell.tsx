@@ -108,7 +108,7 @@ export function ProfileShell({
         )}
 
         <Container>
-          <div className='absolute left-4 top-4 z-10'>
+          <div className='absolute left-4 top-4 z-20'>
             <ProfileNavButton
               showBackButton={showBackButton}
               artistHandle={artist.handle}
@@ -116,7 +116,7 @@ export function ProfileShell({
             />
           </div>
 
-          <div className='absolute right-4 top-4 z-10 flex items-center gap-2'>
+          <div className='absolute right-4 top-4 z-20 flex items-center gap-2'>
             {renderNotificationControls()}
           </div>
 
