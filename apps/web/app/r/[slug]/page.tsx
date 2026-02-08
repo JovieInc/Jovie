@@ -247,7 +247,6 @@ export default async function ReleaseSmartLinkPage({
         avatarUrl: creator.avatarUrl ?? null,
       }}
       providers={allProviders}
-      slug={slug}
     />
   );
 }
