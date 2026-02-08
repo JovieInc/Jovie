@@ -15,13 +15,9 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import {
   DSP_BIO_PROVIDERS,
   getEnabledBioProviders,
@@ -75,31 +71,29 @@ export async function POST(request: Request) {
     const { profileId, providerIds, bioText } = parsed.data;
 
     // Verify user owns this profile
-    const [profile] = await db
-      .select({
-        id: creatorProfiles.id,
-        clerkId: users.clerkId,
-        bio: creatorProfiles.bio,
-      })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
-      .limit(1);
-
-    if (!profile) {
+    const ownership = await getOwnedProfile(profileId, userId);
+    if (ownership.status === 'not_found') {
       return NextResponse.json(
         { success: false, error: 'Profile not found' },
         { status: 404 }
       );
     }
 
-    if (profile.clerkId !== userId) {
+    if (ownership.status === 'forbidden') {
       return NextResponse.json(
         {
           success: false,
           error: 'You do not have permission to modify this profile',
         },
         { status: 403 }
+      );
+    }
+
+    const profile = ownership.profile;
+    if (!profile) {
+      return NextResponse.json(
+        { success: false, error: 'Profile not found' },
+        { status: 404 }
       );
     }
 

@@ -8,12 +8,9 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getOwnedProfile } from '@/lib/dsp-bio-sync/ownership';
 import { getBioSyncStatus } from '@/lib/dsp-bio-sync/service';
 import { captureError } from '@/lib/error-tracking';
 
@@ -37,21 +34,15 @@ export async function GET(request: Request) {
     }
 
     // Verify user owns this profile
-    const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
-      .limit(1);
-
-    if (!profile) {
+    const ownership = await getOwnedProfile(profileId, userId);
+    if (ownership.status === 'not_found') {
       return NextResponse.json(
         { success: false, error: 'Profile not found' },
         { status: 404 }
       );
     }
 
-    if (profile.clerkId !== userId) {
+    if (ownership.status === 'forbidden') {
       return NextResponse.json(
         {
           success: false,
