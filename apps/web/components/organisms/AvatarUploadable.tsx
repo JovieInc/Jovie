@@ -145,6 +145,8 @@ export const AvatarUploadable = React.memo(
           if (file) {
             handleFileUpload(file);
           }
+          // Reset input so the same file can be re-selected
+          event.target.value = '';
         },
         [handleFileUpload]
       );
