@@ -1,15 +1,15 @@
-import {
-  clerk,
-  clerkSetup,
-  setupClerkTestingToken,
-} from '@clerk/testing/playwright';
-import { chromium } from '@playwright/test';
+import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
-import { APP_ROUTES } from '@/constants/routes';
+import path from 'path';
 import { seedTestData } from './seed-test-data';
 
-// Load environment variables from .env.development.local
-config({ path: '.env.development.local' });
+// Load environment variables in priority order (first-loaded wins with override: false)
+const webRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(webRoot, '../..');
+
+config({ path: path.join(webRoot, '.env.development.local') }); // E2E creds
+config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
@@ -28,62 +28,20 @@ function isRealKey(key: string | undefined): key is string {
   return !SENSITIVE_PATTERNS.some(pattern => lowerKey.includes(pattern));
 }
 
-async function authenticateAndSaveSession(
-  page: import('@playwright/test').Page,
-  baseURL: string
-): Promise<void> {
-  const username = process.env.E2E_CLERK_USER_USERNAME!;
-
-  // Set up Clerk testing token BEFORE navigation
-  await setupClerkTestingToken({ page });
-
-  // Navigate to sign-in page (has ClerkProvider)
-  await page.goto(`${baseURL}${APP_ROUTES.SIGNIN}`, {
-    waitUntil: 'domcontentloaded',
-  });
-  await page.waitForTimeout(1000);
-
-  // Authenticate using email_code strategy for +clerk_test emails
-  if (username.includes('+clerk_test')) {
-    await clerk.signIn({
-      page,
-      signInParams: { strategy: 'email_code', identifier: username },
-    });
-  } else {
-    // Fallback to password for non-test emails
-    const password = process.env.E2E_CLERK_USER_PASSWORD;
-    if (!password) {
-      throw new Error('Password required for non-test emails');
-    }
-    await clerk.signIn({
-      page,
-      signInParams: {
-        strategy: 'password',
-        identifier: username,
-        password,
-      },
-    });
-  }
-
-  // Navigate to dashboard to verify authentication
-  await page.goto(`${baseURL}${APP_ROUTES.DASHBOARD}`, {
-    waitUntil: 'domcontentloaded',
-  });
-
-  // Save the authenticated session to a file
-  const storageStatePath = 'tests/.auth/user.json';
-  await page.context().storageState({ path: storageStatePath });
-  console.log(`✓ Session saved to ${storageStatePath}`);
-  console.log('  All tests will reuse this authenticated session');
-}
-
 async function globalSetup() {
   const startTime = Date.now();
   console.log('🚀 Starting E2E global setup...');
 
-  // ALWAYS set up Clerk testing token if we have real Clerk keys
-  // This must happen before any early returns, as setupClerkTestingToken()
-  // in individual tests requires clerkSetup() to have been called
+  // Diagnostic: show which env files loaded
+  console.log('  Env files loaded:');
+  console.log(
+    `    .env.development.local: ${process.env.E2E_CLERK_USER_USERNAME ? 'yes (has E2E creds)' : 'no creds found'}`
+  );
+  console.log(
+    `    .env.local: ${process.env.CLERK_SECRET_KEY ? 'yes (has Clerk keys)' : 'no Clerk keys found'}`
+  );
+
+  // Set up Clerk testing token if we have real Clerk keys
   const secretKey = process.env.CLERK_SECRET_KEY;
   const publishableKey =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
@@ -99,12 +57,11 @@ async function globalSetup() {
         publishableKey: publishableKey!,
         secretKey: secretKey!,
       });
-      // Signal to tests that clerkSetup succeeded
+      // Signal to tests and auth.setup.ts that clerkSetup succeeded
       process.env.CLERK_TESTING_SETUP_SUCCESS = 'true';
       console.log('✓ Clerk testing token set up successfully');
     } catch (error) {
       console.warn('⚠ Failed to set up Clerk testing token');
-      // Only log error details in development, not the actual error which may contain sensitive info
       if (process.env.NODE_ENV === 'development') {
         console.warn(
           'Error details:',
@@ -146,14 +103,12 @@ async function globalSetup() {
       process.env.CLERK_SECRET_KEY || 'sk_test_mock-key-for-testing',
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME || '',
     E2E_CLERK_USER_PASSWORD: process.env.E2E_CLERK_USER_PASSWORD || '',
-    // Helpful default for links and sitemap-related logic
     NEXT_PUBLIC_APP_URL:
       process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3100',
   });
 
   // Seed test database with required profiles for smoke tests
-  // Only seed if DATABASE_URL is available and not in CI with external BASE_URL
-  if (process.env.DATABASE_URL && !(isCI && process.env.BASE_URL)) {
+  if (process.env.DATABASE_URL) {
     try {
       console.log('🌱 Seeding test data...');
       await seedTestData();
@@ -161,60 +116,13 @@ async function globalSetup() {
     } catch (error) {
       console.warn('⚠ Failed to seed test data:', error);
       console.log('  Tests may fail if required profiles are missing');
-      // In CI, treat seeding failures as fatal for smoke tests
       if (isCI && isSmokeOnly) {
         console.error('❌ Seeding is required for smoke tests in CI');
         throw error;
       }
     }
-  } else if (!process.env.DATABASE_URL) {
+  } else {
     console.log('ℹ DATABASE_URL not set, skipping test data seeding');
-  }
-
-  // OPTIMIZATION: Skip browser warmup for smoke tests
-  if (isSmokeOnly) {
-    const elapsed = Date.now() - startTime;
-    console.log(
-      `⚡ Smoke test setup complete in ${elapsed}ms (skipping warmup)`
-    );
-    return;
-  }
-
-  // Start browser to warm up (non-smoke only)
-  console.log('🌐 Warming up browser...');
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-
-  // Navigate to the app to ensure it's ready
-  const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-  try {
-    // Warm up the home page
-    await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
-    console.log('✓ Home page warmup complete');
-
-    // Also warm up the dashboard route (takes ~20s on cold start)
-    console.log('🔥 Pre-warming dashboard route...');
-    await page.goto(`${baseURL}${APP_ROUTES.DASHBOARD}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
-    console.log('✓ Dashboard warmup complete');
-
-    // Authenticate once and save session (if test user is configured)
-    if (hasTestUser && hasRealClerkKeys) {
-      console.log('🔐 Authenticating E2E user and saving session...');
-      try {
-        await authenticateAndSaveSession(page, baseURL);
-      } catch (error) {
-        console.warn('⚠ Failed to authenticate and save session:', error);
-        console.log('  Tests will authenticate individually (slower)');
-      }
-    }
-  } catch (error) {
-    console.warn('⚠ Browser warmup failed (non-fatal):', error);
-  } finally {
-    await browser.close();
   }
 
   const elapsed = Date.now() - startTime;
