@@ -19,9 +19,7 @@ export function SmartLinkShell({ children }: SmartLinkShellProps) {
       </div>
 
       <main className='relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8'>
-        <div className='w-full max-w-md space-y-5'>
-          {children}
-        </div>
+        <div className='w-full max-w-md space-y-5'>{children}</div>
 
         {/* Jovie Branding */}
         <footer className='pt-6 text-center'>

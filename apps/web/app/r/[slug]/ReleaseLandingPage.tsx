@@ -33,14 +33,12 @@ interface ReleaseLandingPageProps
       readonly avatarUrl: string | null;
     };
     readonly providers: Provider[];
-    readonly slug: string;
   }> {}
 
 export function ReleaseLandingPage({
   release,
   artist,
   providers,
-  slug,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -50,7 +48,7 @@ export function ReleaseLandingPage({
       })
     : null;
   const clickableProviders = providers.filter(
-    (provider): provider is Provider & { url: string } => Boolean(provider.url),
+    (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
 
   return (
