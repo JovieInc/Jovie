@@ -32,7 +32,7 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
               Make it yours.
             </h3>
             <p className='mt-3 text-base text-secondary-token'>
-              Remove the Jovie branding for just $5. That's it.
+              Remove the Jovie branding for just $5. That&apos;s it.
             </p>
           </div>
           <div className='flex justify-end'>

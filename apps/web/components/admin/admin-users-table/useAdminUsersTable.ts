@@ -7,6 +7,7 @@ import {
   getNextUserSort,
   type UserSortableColumnKey,
 } from '@/components/admin/users-sort-config';
+import { APP_ROUTES } from '@/constants/routes';
 import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AdminUsersTableProps } from './types';
@@ -43,7 +44,7 @@ export function useAdminUsersTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pagination = useAdminTablePaginationLinks<AdminUsersSort>({
-    basePath: '/app/admin/users',
+    basePath: APP_ROUTES.ADMIN_USERS,
     page,
     pageSize,
     search,

@@ -204,6 +204,8 @@ export {
   type PixelSettingsResponse,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
+// Plan gate hook
+export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 export {
   type PricingOption,
   type PricingOptionsResponse,
@@ -232,10 +234,12 @@ export {
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
+// eslint-disable-next-line import/no-cycle -- barrel re-export
 export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,
+  useAnalyticsFilterMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,

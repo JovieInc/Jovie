@@ -67,6 +67,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
         },
         {
+          find: '@/components/organisms/AuthShellWrapper',
+          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/actions',
           replacement: require.resolve('./dashboard-actions-mock.ts'),
         },

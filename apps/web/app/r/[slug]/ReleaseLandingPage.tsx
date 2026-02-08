@@ -9,8 +9,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { DspLogo } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { ProviderKey } from '@/lib/discography/types';
 
 interface Provider {
@@ -29,40 +29,12 @@ interface ReleaseLandingPageProps
     };
     readonly artist: {
       readonly name: string;
+      readonly handle: string | null;
       readonly avatarUrl: string | null;
     };
     readonly providers: Provider[];
     readonly slug: string;
   }> {}
-
-/**
- * Map provider key to social icon platform name
- */
-function getIconPlatform(
-  providerKey: ProviderKey
-):
-  | 'spotify'
-  | 'applemusic'
-  | 'youtube'
-  | 'soundcloud'
-  | 'deezer'
-  | 'tidal'
-  | 'amazonmusic'
-  | 'bandcamp'
-  | 'beatport' {
-  const mapping: Record<ProviderKey, string> = {
-    spotify: 'spotify',
-    apple_music: 'applemusic',
-    youtube: 'youtube',
-    soundcloud: 'soundcloud',
-    deezer: 'deezer',
-    tidal: 'tidal',
-    amazon_music: 'amazonmusic',
-    bandcamp: 'bandcamp',
-    beatport: 'beatport',
-  };
-  return mapping[providerKey] as ReturnType<typeof getIconPlatform>;
-}
 
 export function ReleaseLandingPage({
   release,
@@ -114,7 +86,16 @@ export function ReleaseLandingPage({
             <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
               {release.title}
             </h1>
-            <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
+            {artist.handle ? (
+              <Link
+                href={`/${artist.handle}`}
+                className='mt-1.5 block text-base text-white/60 transition-colors hover:text-white/80'
+              >
+                {artist.name}
+              </Link>
+            ) : (
+              <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
+            )}
             {formattedDate && (
               <p className='mt-1 text-xs text-white/40'>{formattedDate}</p>
             )}
@@ -128,26 +109,10 @@ export function ReleaseLandingPage({
                 href={provider.url ?? '#'}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='group flex w-full items-center gap-3 rounded-2xl bg-white/4 px-4 py-3 ring-1 ring-inset ring-white/8 backdrop-blur-sm transition-all hover:bg-white/8 hover:ring-white/12'
+                className='group flex w-full items-center gap-3 rounded-2xl bg-white/4 px-4 py-3.5 ring-1 ring-inset ring-white/8 backdrop-blur-sm transition-all hover:bg-white/8 hover:ring-white/12'
               >
-                <span
-                  className='flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-lg'
-                  style={{
-                    background: `linear-gradient(135deg, ${provider.accent}25, ${provider.accent}10)`,
-                    boxShadow: `0 4px 12px ${provider.accent}15`,
-                    color: provider.accent,
-                  }}
-                >
-                  <SocialIcon
-                    platform={getIconPlatform(provider.key)}
-                    className='h-5 w-5'
-                  />
-                </span>
-                <span className='flex-1 text-left'>
-                  <span className='block text-[15px] font-medium text-white/90'>
-                    {provider.label}
-                  </span>
-                  <span className='block text-xs text-white/40'>Play</span>
+                <span className='flex-1'>
+                  <DspLogo provider={provider.key} height={22} />
                 </span>
                 <Icon
                   name='ChevronRight'

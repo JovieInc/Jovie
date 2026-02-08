@@ -37,6 +37,7 @@ describe('getCurrentUserEntitlements', () => {
       canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
+      canFilterSelfFromAnalytics: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
     });
@@ -65,6 +66,7 @@ describe('getCurrentUserEntitlements', () => {
       canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
+      canFilterSelfFromAnalytics: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
     });
@@ -101,6 +103,7 @@ describe('getCurrentUserEntitlements', () => {
       canRemoveBranding: false,
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
+      canFilterSelfFromAnalytics: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
     });
@@ -138,6 +141,7 @@ describe('getCurrentUserEntitlements', () => {
       canRemoveBranding: true,
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
+      canFilterSelfFromAnalytics: true,
       analyticsRetentionDays: 90,
       contactsLimit: null,
     });

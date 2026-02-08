@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { APP_ROUTES } from '@/constants/routes';
 import { LogoLink } from './LogoLink';
 
 const meta: Meta<typeof LogoLink> = {
@@ -56,7 +57,7 @@ export const ExtraLarge: Story = {
 
 export const CustomHref: Story = {
   args: {
-    href: '/app/dashboard',
+    href: APP_ROUTES.DASHBOARD_OVERVIEW,
     logoSize: 'sm',
   },
 };

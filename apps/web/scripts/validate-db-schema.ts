@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 /**
  * Database Schema Validation Script
  *

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface UsePaginationProps {
   readonly page: number;
@@ -23,8 +24,8 @@ export function usePagination({ page, pageSize, total }: UsePaginationProps) {
       params.set('pageSize', String(pageSize));
       const query = params.toString();
       return query.length > 0
-        ? `/app/admin/waitlist?${query}`
-        : '/app/admin/waitlist';
+        ? `${APP_ROUTES.ADMIN_WAITLIST}?${query}`
+        : APP_ROUTES.ADMIN_WAITLIST;
     };
 
     const prevHref = canPrev ? buildHref(page - 1) : undefined;

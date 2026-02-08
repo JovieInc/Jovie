@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 /**
  * Approve the first admin user in production
  * This script approves the first waitlist entry and grants admin privileges

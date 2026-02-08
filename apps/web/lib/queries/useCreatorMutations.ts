@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { APP_ROUTES } from '@/constants/routes';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -64,7 +65,7 @@ export function useToggleFeaturedMutation() {
       input: ToggleFeaturedInput
     ): Promise<ToggleFeaturedResponse> => {
       const payload = await fetchWithTimeout<ToggleFeaturedResponse>(
-        '/app/admin/creators/toggle-featured',
+        APP_ROUTES.ADMIN_CREATORS_TOGGLE_FEATURED,
         {
           method: 'POST',
           headers: {
@@ -111,7 +112,7 @@ export function useToggleMarketingMutation() {
       input: ToggleMarketingInput
     ): Promise<ToggleMarketingResponse> => {
       const payload = await fetchWithTimeout<ToggleMarketingResponse>(
-        '/app/admin/creators/toggle-marketing',
+        APP_ROUTES.ADMIN_CREATORS_TOGGLE_MARKETING,
         {
           method: 'POST',
           headers: {
@@ -160,7 +161,7 @@ export function useDeleteCreatorMutation() {
       input: DeleteCreatorInput
     ): Promise<DeleteCreatorResponse> => {
       const payload = await fetchWithTimeout<DeleteCreatorResponse>(
-        '/app/admin/creators/delete',
+        APP_ROUTES.ADMIN_CREATORS_DELETE,
         {
           method: 'POST',
           headers: {

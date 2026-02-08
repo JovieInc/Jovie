@@ -1,5 +1,3 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -10,7 +8,9 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/atoms/DropdownMenu';
+} from '@jovie/ui';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('DropdownMenu', () => {
   const renderBasicMenu = () => {

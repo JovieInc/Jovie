@@ -67,11 +67,11 @@ describe('POST /api/audience/visit', () => {
   });
 
   it('returns 429 when rate limited', async () => {
-    mockPublicVisitLimiterGetStatus.mockReturnValue({
-      blocked: true,
-      retryAfterSeconds: 60,
+    mockPublicVisitLimiterLimit.mockResolvedValue({
+      success: false,
       limit: 100,
       remaining: 0,
+      reset: new Date(Date.now() + 60_000),
     });
 
     const { POST } = await import('@/app/api/audience/visit/route');

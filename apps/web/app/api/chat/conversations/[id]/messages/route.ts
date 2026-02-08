@@ -104,7 +104,10 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     // Verify the conversation belongs to the user's profile
     const [conversation] = await db
-      .select({ id: chatConversations.id })
+      .select({
+        id: chatConversations.id,
+        title: chatConversations.title,
+      })
       .from(chatConversations)
       .where(
         and(
@@ -167,9 +170,12 @@ export async function POST(req: Request, { params }: RouteParams) {
       .set({ updatedAt: new Date() })
       .where(eq(chatConversations.id, conversationId));
 
-    // Auto-generate title with AI using after() for reliable background execution
+    // Auto-generate title with AI using after() for reliable background execution.
+    // Return titlePending so the client can poll for the generated title.
     const hasUserMessage = messagesToInsert.some(m => m.role === 'user');
-    if (hasUserMessage) {
+    const titlePending = hasUserMessage && !conversation.title;
+
+    if (titlePending) {
       after(async () => {
         try {
           await maybeGenerateTitle(conversationId, messagesToInsert);
@@ -180,7 +186,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
 
     return NextResponse.json(
-      { messages: insertedMessages },
+      { messages: insertedMessages, titlePending },
       { status: 201, headers: NO_CACHE_HEADERS }
     );
   } catch (error) {

@@ -64,6 +64,7 @@ export function LatestReleaseCard({
       <Link
         href={`/${artistHandle}/${release.slug}`}
         prefetch={false}
+        aria-label={`Listen to ${release.title}`}
         className='shrink-0 rounded-full bg-btn-primary px-3.5 py-1.5 text-sm font-medium text-btn-primary-foreground transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2'
       >
         Listen

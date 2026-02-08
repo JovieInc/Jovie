@@ -11,6 +11,7 @@ import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminT
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { useRowSelection } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
@@ -24,7 +25,7 @@ export function useAdminCreatorProfiles({
   total,
   search,
   sort,
-  basePath = '/app/admin/creators',
+  basePath = APP_ROUTES.ADMIN_CREATORS,
 }: Omit<AdminCreatorProfilesWithSidebarProps, 'mode'>) {
   const router = useRouter();
   const {

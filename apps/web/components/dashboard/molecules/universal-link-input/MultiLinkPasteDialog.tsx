@@ -155,7 +155,7 @@ export function MultiLinkPasteDialog({
       </DialogTitle>
 
       <DialogDescription>
-        Select which links you'd like to add to your profile.
+        Select which links you&apos;d like to add to your profile.
         {duplicateCount > 0 && (
           <span className='text-amber-600 dark:text-amber-400'>
             {' '}

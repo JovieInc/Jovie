@@ -2,13 +2,57 @@
  * Customer Sync Tests - Migration Fallback Behavior
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Ensure mocks are registered before importing the module under test
-import './customer-sync.test-utils';
+import {
+  mockBillingAuditLog,
+  mockCaptureCriticalError,
+  mockDb,
+  mockDbSelect,
+  mockUsersTable,
+} from './customer-sync.test-utils';
+
+// vi.mock calls must be in the test file itself for proper hoisting
+vi.mock('@/lib/db', () => ({ db: mockDb }));
+vi.mock('@/lib/db/client/connection', () => ({
+  db: mockDb,
+  initializeDb: vi.fn(),
+  getDb: vi.fn(),
+  getPoolMetrics: vi.fn(),
+  getPoolState: vi.fn(),
+}));
+vi.mock('@/lib/db/schema', () => ({
+  users: mockUsersTable,
+  billingAuditLog: mockBillingAuditLog,
+}));
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: mockUsersTable,
+  billingAuditLog: mockBillingAuditLog,
+}));
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
+}));
+vi.mock('server-only', () => ({}));
+vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: vi.fn() }));
+vi.mock('@/lib/auth/session', () => ({ withDbSession: vi.fn() }));
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: { customers: { retrieve: vi.fn(), update: vi.fn() } },
+  getOrCreateCustomer: vi.fn(),
+}));
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((a: unknown, b: unknown) => ({ type: 'eq', left: a, right: b })),
+  and: vi.fn((...args: unknown[]) => ({ type: 'and', conditions: args })),
+  sql: vi.fn((strings: unknown, ...values: unknown[]) => ({
+    type: 'sql',
+    strings,
+    values,
+  })),
+}));
+
 import {
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
 } from '@/lib/stripe/customer-sync';
-import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Migration Fallback', () => {
   beforeEach(() => {
