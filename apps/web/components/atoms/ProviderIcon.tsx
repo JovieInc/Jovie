@@ -34,7 +34,7 @@ export function ProviderIcon({
     <SocialIcon
       platform={PROVIDER_PLATFORM_MAP[provider]}
       className={className}
-      aria-hidden='true'
+      aria-hidden
     />
   );
 }
