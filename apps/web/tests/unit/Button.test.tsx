@@ -24,66 +24,31 @@ describe('Button', () => {
   });
 
   describe('variants', () => {
-    it('renders without variant (default)', () => {
-      render(<Button>Default</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
+    const variants = [
+      ['default', undefined],
+      ['destructive', 'destructive'],
+      ['outline', 'outline'],
+      ['secondary', 'secondary'],
+      ['ghost', 'ghost'],
+      ['link', 'link'],
+    ] as const;
 
-    it('renders destructive variant', () => {
-      render(<Button variant='destructive'>Delete</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders outline variant', () => {
-      render(<Button variant='outline'>Outline</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders secondary variant', () => {
-      render(<Button variant='secondary'>Secondary</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders ghost variant', () => {
-      render(<Button variant='ghost'>Ghost</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders link variant', () => {
-      render(<Button variant='link'>Link</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
+    variants.forEach(([label, variant]) => {
+      it(`renders ${label} variant`, () => {
+        render(<Button variant={variant as any}>{label}</Button>);
+        expect(screen.getByRole('button')).toBeInTheDocument();
+      });
     });
   });
 
   describe('sizes', () => {
-    it('renders default size', () => {
-      render(<Button size='default'>Default Size</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
+    const sizes = ['default', 'sm', 'lg', 'icon'] as const;
 
-    it('renders small size', () => {
-      render(<Button size='sm'>Small</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders large size', () => {
-      render(<Button size='lg'>Large</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
-    });
-
-    it('renders icon size', () => {
-      render(<Button size='icon'>Icon</Button>);
-      const button = screen.getByRole('button');
-      expect(button).toBeInTheDocument();
+    sizes.forEach(size => {
+      it(`renders ${size} size`, () => {
+        render(<Button size={size}>{size}</Button>);
+        expect(screen.getByRole('button')).toBeInTheDocument();
+      });
     });
   });
 
