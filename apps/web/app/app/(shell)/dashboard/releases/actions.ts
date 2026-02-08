@@ -697,7 +697,10 @@ export async function connectAppleMusicArtist(params: {
 
   if (
     !['http:', 'https:'].includes(parsedArtistUrl.protocol) ||
-    !parsedArtistUrl.hostname.includes('apple.com') ||
+    !(
+      parsedArtistUrl.hostname === 'music.apple.com' ||
+      parsedArtistUrl.hostname.endsWith('.music.apple.com')
+    ) ||
     !parsedArtistUrl.pathname.includes('/artist/')
   ) {
     throw new TypeError('Invalid Apple Music artist URL');
@@ -719,49 +722,60 @@ export async function connectAppleMusicArtist(params: {
   const profile = await requireProfile();
   const now = new Date();
 
-  await db
-    .insert(dspArtistMatches)
-    .values({
-      creatorProfileId: profile.id,
-      providerId: 'apple_music',
-      externalArtistId,
-      externalArtistName,
-      externalArtistUrl,
-      externalArtistImageUrl: sanitizedImageUrl,
-      confidenceScore: '1.0000',
-      confidenceBreakdown: {
-        isrcMatchScore: 0,
-        upcMatchScore: 0,
-        nameSimilarityScore: 1,
-        followerRatioScore: 0,
-        genreOverlapScore: 0,
-        meta: {
-          calculatedAt: now.toISOString(),
-          version: 1,
-        },
-      },
-      matchingIsrcCount: 0,
-      matchingUpcCount: 0,
-      totalTracksChecked: 0,
-      status: 'confirmed',
-      confirmedAt: now,
-      confirmedBy: userId,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [dspArtistMatches.creatorProfileId, dspArtistMatches.providerId],
-      set: {
+  try {
+    await db
+      .insert(dspArtistMatches)
+      .values({
+        creatorProfileId: profile.id,
+        providerId: 'apple_music',
         externalArtistId,
         externalArtistName,
         externalArtistUrl,
         externalArtistImageUrl: sanitizedImageUrl,
+        confidenceScore: '1.0000',
+        confidenceBreakdown: {
+          isrcMatchScore: 0,
+          upcMatchScore: 0,
+          nameSimilarityScore: 1,
+          followerRatioScore: 0,
+          genreOverlapScore: 0,
+          meta: {
+            calculatedAt: now.toISOString(),
+            version: 1,
+          },
+        },
+        matchingIsrcCount: 0,
+        matchingUpcCount: 0,
+        totalTracksChecked: 0,
         status: 'confirmed',
         confirmedAt: now,
         confirmedBy: userId,
+        createdAt: now,
         updatedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [
+          dspArtistMatches.creatorProfileId,
+          dspArtistMatches.providerId,
+        ],
+        set: {
+          externalArtistId,
+          externalArtistName,
+          externalArtistUrl,
+          externalArtistImageUrl: sanitizedImageUrl,
+          status: 'confirmed',
+          confirmedAt: now,
+          confirmedBy: userId,
+          updatedAt: now,
+        },
+      });
+  } catch {
+    return {
+      success: false,
+      message: 'Failed to save Apple Music connection. Please try again.',
+      artistName: externalArtistName,
+    };
+  }
 
   revalidatePath(APP_ROUTES.RELEASES);
 

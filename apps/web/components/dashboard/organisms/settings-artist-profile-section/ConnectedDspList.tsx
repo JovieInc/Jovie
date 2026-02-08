@@ -258,6 +258,8 @@ export function ConnectedDspList({
           });
           if (result.success) {
             toast.success(result.message);
+          } else {
+            toast.error(result.message || 'Failed to connect Spotify');
           }
         } else {
           const result = await connectAppleMusicArtist({
@@ -268,6 +270,8 @@ export function ConnectedDspList({
           });
           if (result.success) {
             toast.success(result.message);
+          } else {
+            toast.error(result.message || 'Failed to connect Apple Music');
           }
         }
 

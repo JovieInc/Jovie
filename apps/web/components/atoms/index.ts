@@ -25,6 +25,8 @@ export * from './Divider';
 export * from './DotBadge';
 export * from './DropdownMenu';
 export * from './DSPButton';
+// DspLogo is a client component - import directly from './DspLogo' to avoid server/client boundary issues
+// export * from './DspLogo';
 export * from './EmptyCell';
 // ErrorBoundary moved to organisms (uses hooks/Sentry)
 export * from './FooterLink';
