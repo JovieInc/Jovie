@@ -10,8 +10,10 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Music, Plus, Trash2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { Artist } from '@/types/db';
 import { useMusicLinksForm } from './useMusicLinksForm';
 
@@ -67,6 +69,8 @@ function PrimaryDSPCard({
 }) {
   const meta = PLATFORM_METADATA_MAP[platform];
   const brandColor = meta ? `#${meta.color}` : '#6B7280';
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <div className='rounded-lg border border-subtle bg-surface-1 p-4 transition-colors hover:border-primary/20'>
@@ -75,7 +79,7 @@ function PrimaryDSPCard({
           className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
           style={{
             backgroundColor: `${brandColor}15`,
-            color: brandColor,
+            color: getContrastSafeIconColor(brandColor, isDark),
           }}
         >
           <SocialIcon platform={platform} className='h-5 w-5' aria-hidden />
@@ -123,6 +127,8 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     error,
     success,
   } = useMusicLinksForm({ artist, onUpdate });
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === 'dark';
 
   if (initialLoading) {
     return (
@@ -272,7 +278,10 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                           ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
                           : undefined,
                         color: PLATFORM_METADATA_MAP[link.platform]
-                          ? `#${PLATFORM_METADATA_MAP[link.platform].color}`
+                          ? getContrastSafeIconColor(
+                              `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                              isDarkTheme
+                            )
                           : undefined,
                       }}
                     >

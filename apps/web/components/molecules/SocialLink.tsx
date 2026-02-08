@@ -1,5 +1,6 @@
 'use client';
 
+import { useTheme } from 'next-themes';
 import { memo, useMemo, useState } from 'react';
 import {
   getPlatformIconMetadata,
@@ -7,7 +8,7 @@ import {
 } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { hexToRgba } from '@/lib/utils/color';
+import { ensureContrast, hexToRgba, isBrandDark } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -19,10 +20,23 @@ interface SocialLinkProps {
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
   // Hooks must be called unconditionally (before any early returns)
   const [hover, setHover] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const brandHex = useMemo(
     () => getPlatformIconMetadata(link.platform ?? '')?.hex,
     [link.platform]
   );
+
+  // Ensure brand color meets WCAG 3:1 non-text contrast against the hover
+  // background. Dark brands (TikTok, X) are inverted to white in dark mode;
+  // bright brands (Snapchat, Rumble) are darkened in light mode.
+  const hoverColor = useMemo(() => {
+    if (!brandHex) return undefined;
+    if (isDark && isBrandDark(brandHex)) return '#ffffff';
+    // surface-1 light = #fcfcfc, dark = #101012
+    const hoverBg = isDark ? '#101012' : '#fcfcfc';
+    return ensureContrast(brandHex, hoverBg);
+  }, [brandHex, isDark]);
 
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
@@ -89,10 +103,10 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
         hover ? 'border-default bg-surface-1' : 'border-subtle bg-surface-0/80'
       } text-secondary-token`}
       style={
-        brandHex && hover
+        hoverColor && hover
           ? {
-              color: `#${brandHex}`,
-              boxShadow: `0 0 0 1px ${hexToRgba(brandHex, 0.3)}, 0 4px 12px -4px ${hexToRgba(brandHex, 0.4)}`,
+              color: hoverColor,
+              boxShadow: `0 0 0 1px ${hexToRgba(brandHex!, 0.3)}, 0 4px 12px -4px ${hexToRgba(brandHex!, 0.4)}`,
             }
           : undefined
       }
