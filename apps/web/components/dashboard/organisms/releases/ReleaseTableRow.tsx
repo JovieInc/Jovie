@@ -9,6 +9,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareActionMenuItems } from '@/lib/utm';
 import {
   AddProviderUrlPopover,
   NotFoundCopyButton,
@@ -88,6 +89,22 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     release.id,
   ]);
 
+  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+
+  const utmShareItems = useMemo(
+    () =>
+      getUTMShareActionMenuItems({
+        smartLinkUrl,
+        context: buildUTMContext({
+          smartLinkUrl,
+          releaseSlug: release.slug,
+          releaseTitle: release.title,
+          releaseDate: release.releaseDate,
+        }),
+      }),
+    [smartLinkUrl, release.slug, release.title, release.releaseDate]
+  );
+
   const menuItems = useMemo(
     () => [
       {
@@ -102,6 +119,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
         onClick: handleCopySmartLink,
       },
+      ...utmShareItems,
       {
         id: 'separator-1',
         label: 'separator',
@@ -119,7 +137,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         disabled: true,
       },
     ],
-    [handleEdit, handleCopySmartLink, release.id]
+    [handleEdit, handleCopySmartLink, utmShareItems, release.id]
   );
 
   const manualOverrideCount = release.providers.filter(

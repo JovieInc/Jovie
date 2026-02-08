@@ -12,6 +12,8 @@ import {
 } from '@/components/organisms/table';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
@@ -191,6 +193,16 @@ export function ReleaseTable({
             );
           },
         },
+        // UTM share presets
+        ...getUTMShareContextMenuItems({
+          smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+          context: buildUTMContext({
+            smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+            releaseSlug: release.slug,
+            releaseTitle: release.title,
+            releaseDate: release.releaseDate,
+          }),
+        }),
         { type: 'separator' },
         {
           id: 'copy-release-id',
