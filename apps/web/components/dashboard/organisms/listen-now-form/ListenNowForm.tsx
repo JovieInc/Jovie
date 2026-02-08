@@ -10,7 +10,11 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Music, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import type { Artist } from '@/types/db';
 import { useMusicLinksForm } from './useMusicLinksForm';
@@ -46,65 +50,6 @@ function getPlaceholder(platform: string): string {
 
 const LOADING_KEYS = ['dsp-skeleton-1', 'dsp-skeleton-2', 'dsp-skeleton-3'];
 
-/**
- * Primary DSP card for Spotify or Apple Music.
- * Renders a branded, prominent input with platform icon and color.
- */
-function PrimaryDSPCard({
-  platform,
-  label,
-  value,
-  placeholder,
-  onChange,
-  onBlur,
-}: {
-  platform: string;
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-  onBlur: () => void;
-}) {
-  const meta = PLATFORM_METADATA_MAP[platform];
-  const brandColor = meta ? `#${meta.color}` : '#6B7280';
-
-  return (
-    <div className='rounded-lg border border-subtle bg-surface-1 p-4 transition-colors hover:border-primary/20'>
-      <div className='flex items-center gap-3 mb-3'>
-        <div
-          className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
-          style={{
-            backgroundColor: `${brandColor}15`,
-            color: brandColor,
-          }}
-        >
-          <SocialIcon platform={platform} className='h-5 w-5' aria-hidden />
-        </div>
-        <div>
-          <h4 className='text-[14px] font-medium text-primary-token'>
-            {label}
-          </h4>
-          <p className='text-[12px] text-tertiary-token'>
-            {value ? 'Connected' : 'Not connected'}
-          </p>
-        </div>
-      </div>
-      <Input
-        type='url'
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        inputMode='url'
-        autoCapitalize='none'
-        autoCorrect='off'
-        autoComplete='off'
-        aria-label={`${label} URL`}
-      />
-    </div>
-  );
-}
-
 export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   const {
     primaryFields,
@@ -123,6 +68,40 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     error,
     success,
   } = useMusicLinksForm({ artist, onUpdate });
+
+  const [searchPaletteOpen, setSearchPaletteOpen] = useState(false);
+  const [searchPaletteProvider, setSearchPaletteProvider] = useState<
+    'spotify' | 'apple_music'
+  >('spotify');
+
+  const openSearchPalette = useCallback(
+    (provider: 'spotify' | 'apple_music') => {
+      setSearchPaletteProvider(provider);
+      setSearchPaletteOpen(true);
+    },
+    []
+  );
+
+  const handlePaletteArtistSelect = useCallback(
+    (selected: { url: string; name: string }) => {
+      if (searchPaletteProvider === 'spotify') {
+        updatePrimaryField('spotify_url', selected.url);
+        schedulePrimaryNormalize('spotify_url', selected.url);
+      } else {
+        updatePrimaryField('apple_music_url', selected.url);
+        schedulePrimaryNormalize('apple_music_url', selected.url);
+      }
+      if (selected.name) {
+        toast.success(
+          `Found ${selected.name} on ${searchPaletteProvider === 'spotify' ? 'Spotify' : 'Apple Music'}`
+        );
+      }
+    },
+    [searchPaletteProvider, updatePrimaryField, schedulePrimaryNormalize]
+  );
+
+  const spotifyConnected = !!primaryFields.spotify_url;
+  const appleMusicConnected = !!primaryFields.apple_music_url;
 
   if (initialLoading) {
     return (
@@ -155,30 +134,104 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
           </p>
         </div>
         <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
-          <PrimaryDSPCard
-            platform='spotify'
-            label='Spotify'
-            value={primaryFields.spotify_url}
-            placeholder={DSP_PLACEHOLDERS.spotify!}
-            onChange={v => {
-              updatePrimaryField('spotify_url', v);
-              schedulePrimaryNormalize('spotify_url', v);
-            }}
-            onBlur={() => handlePrimaryBlur('spotify_url')}
-          />
-          <PrimaryDSPCard
-            platform='apple_music'
-            label='Apple Music'
-            value={primaryFields.apple_music_url}
-            placeholder={DSP_PLACEHOLDERS.apple_music!}
-            onChange={v => {
-              updatePrimaryField('apple_music_url', v);
-              schedulePrimaryNormalize('apple_music_url', v);
-            }}
-            onBlur={() => handlePrimaryBlur('apple_music_url')}
-          />
+          <div className='rounded-lg border border-subtle bg-surface-1 p-4 transition-colors hover:border-primary/20'>
+            <div className='flex items-center justify-between mb-3'>
+              <div className='flex items-center gap-3'>
+                <div
+                  className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
+                  style={{ backgroundColor: '#1DB95415', color: '#1DB954' }}
+                >
+                  <SocialIcon
+                    platform='spotify'
+                    className='h-5 w-5'
+                    aria-hidden
+                  />
+                </div>
+                <h4 className='text-[14px] font-medium text-primary-token'>
+                  Spotify
+                </h4>
+              </div>
+              <DspConnectionPill
+                provider='spotify'
+                connected={spotifyConnected}
+                onClick={
+                  spotifyConnected
+                    ? undefined
+                    : () => openSearchPalette('spotify')
+                }
+              />
+            </div>
+            <Input
+              type='url'
+              value={primaryFields.spotify_url}
+              onChange={e => {
+                const v = e.target.value;
+                updatePrimaryField('spotify_url', v);
+                schedulePrimaryNormalize('spotify_url', v);
+              }}
+              onBlur={() => handlePrimaryBlur('spotify_url')}
+              placeholder={DSP_PLACEHOLDERS.spotify!}
+              inputMode='url'
+              autoCapitalize='none'
+              autoCorrect='off'
+              autoComplete='off'
+              aria-label='Spotify URL'
+            />
+          </div>
+          <div className='rounded-lg border border-subtle bg-surface-1 p-4 transition-colors hover:border-primary/20'>
+            <div className='flex items-center justify-between mb-3'>
+              <div className='flex items-center gap-3'>
+                <div
+                  className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
+                  style={{ backgroundColor: '#FA243C15', color: '#FA243C' }}
+                >
+                  <SocialIcon
+                    platform='apple_music'
+                    className='h-5 w-5'
+                    aria-hidden
+                  />
+                </div>
+                <h4 className='text-[14px] font-medium text-primary-token'>
+                  Apple Music
+                </h4>
+              </div>
+              <DspConnectionPill
+                provider='apple_music'
+                connected={appleMusicConnected}
+                onClick={
+                  appleMusicConnected
+                    ? undefined
+                    : () => openSearchPalette('apple_music')
+                }
+              />
+            </div>
+            <Input
+              type='url'
+              value={primaryFields.apple_music_url}
+              onChange={e => {
+                const v = e.target.value;
+                updatePrimaryField('apple_music_url', v);
+                schedulePrimaryNormalize('apple_music_url', v);
+              }}
+              onBlur={() => handlePrimaryBlur('apple_music_url')}
+              placeholder={DSP_PLACEHOLDERS.apple_music!}
+              inputMode='url'
+              autoCapitalize='none'
+              autoCorrect='off'
+              autoComplete='off'
+              aria-label='Apple Music URL'
+            />
+          </div>
         </div>
       </div>
+
+      {/* Artist search command palette for Spotify/Apple Music */}
+      <ArtistSearchCommandPalette
+        open={searchPaletteOpen}
+        onOpenChange={setSearchPaletteOpen}
+        provider={searchPaletteProvider}
+        onArtistSelect={handlePaletteArtistSelect}
+      />
 
       {/* YouTube */}
       <div>

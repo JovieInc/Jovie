@@ -8,8 +8,12 @@ import {
   RefreshCw,
   XCircle,
 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { connectAppleMusicArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import {
   useConfirmDspMatchMutation,
@@ -200,6 +204,11 @@ export function ConnectedDspList({
   const { mutate: triggerDiscovery, isPending: isDiscovering } =
     useTriggerDiscoveryMutation();
 
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteProvider, setPaletteProvider] = useState<
+    'spotify' | 'apple_music'
+  >('apple_music');
+
   const handleDiscover = () => {
     if (!spotifyId) {
       toast.error('A Spotify ID is required to discover DSP profiles');
@@ -219,11 +228,76 @@ export function ConnectedDspList({
     );
   };
 
+  const handleOpenPalette = useCallback(
+    (provider: 'spotify' | 'apple_music') => {
+      setPaletteProvider(provider);
+      setPaletteOpen(true);
+    },
+    []
+  );
+
+  const handlePaletteSelect = useCallback(
+    async (artist: {
+      id: string;
+      name: string;
+      url: string;
+      imageUrl?: string;
+    }) => {
+      if (paletteProvider === 'apple_music') {
+        try {
+          const result = await connectAppleMusicArtist({
+            externalArtistId: artist.id,
+            externalArtistName: artist.name,
+            externalArtistUrl: artist.url,
+            externalArtistImageUrl: artist.imageUrl,
+          });
+          if (result.success) {
+            toast.success(result.message);
+          }
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : 'Failed to connect Apple Music'
+          );
+        }
+      }
+    },
+    [paletteProvider]
+  );
+
   const confirmed =
     matches?.filter(
       m => m.status === 'confirmed' || m.status === 'auto_confirmed'
     ) ?? [];
   const suggested = matches?.filter(m => m.status === 'suggested') ?? [];
+
+  // Determine connection status for Spotify and Apple Music
+  const spotifyMatch = useMemo(
+    () =>
+      matches?.find(
+        m =>
+          m.providerId === 'spotify' &&
+          (m.status === 'confirmed' || m.status === 'auto_confirmed')
+      ),
+    [matches]
+  );
+  const appleMusicMatch = useMemo(
+    () =>
+      matches?.find(
+        m =>
+          m.providerId === 'apple_music' &&
+          (m.status === 'confirmed' || m.status === 'auto_confirmed')
+      ),
+    [matches]
+  );
+
+  // Filter out spotify/apple_music from the general confirmed/suggested lists
+  // since they now have their own prominent section
+  const otherConfirmed = confirmed.filter(
+    m => m.providerId !== 'spotify' && m.providerId !== 'apple_music'
+  );
+  const otherSuggested = suggested.filter(
+    m => m.providerId !== 'spotify' && m.providerId !== 'apple_music'
+  );
 
   if (isLoading) {
     return (
@@ -250,7 +324,8 @@ export function ConnectedDspList({
     );
   }
 
-  const hasMatches = confirmed.length > 0 || suggested.length > 0;
+  const hasOtherMatches =
+    otherConfirmed.length > 0 || otherSuggested.length > 0;
 
   return (
     <DashboardCard variant='settings'>
@@ -276,11 +351,36 @@ export function ConnectedDspList({
           )}
         </div>
 
-        {hasMatches ? (
+        {/* Primary DSP connection pills */}
+        <div className='flex flex-wrap items-center gap-2'>
+          <DspConnectionPill
+            provider='spotify'
+            connected={!!spotifyId || !!spotifyMatch}
+            artistName={spotifyMatch?.externalArtistName}
+            onClick={
+              !spotifyId && !spotifyMatch
+                ? () => handleOpenPalette('spotify')
+                : undefined
+            }
+          />
+          <DspConnectionPill
+            provider='apple_music'
+            connected={!!appleMusicMatch}
+            artistName={appleMusicMatch?.externalArtistName}
+            onClick={
+              !appleMusicMatch
+                ? () => handleOpenPalette('apple_music')
+                : undefined
+            }
+          />
+        </div>
+
+        {/* Other confirmed and suggested matches */}
+        {hasOtherMatches && (
           <div>
-            {confirmed.length > 0 && (
+            {otherConfirmed.length > 0 && (
               <div>
-                {confirmed.map(match => (
+                {otherConfirmed.map(match => (
                   <DspMatchRow
                     key={match.id}
                     match={match}
@@ -290,12 +390,12 @@ export function ConnectedDspList({
               </div>
             )}
 
-            {suggested.length > 0 && (
-              <div className={confirmed.length > 0 ? 'mt-4' : ''}>
+            {otherSuggested.length > 0 && (
+              <div className={otherConfirmed.length > 0 ? 'mt-4' : ''}>
                 <p className='text-xs font-medium text-secondary-token uppercase tracking-wide mb-2'>
                   Suggested Matches
                 </p>
-                {suggested.map(match => (
+                {otherSuggested.map(match => (
                   <DspMatchRow
                     key={match.id}
                     match={match}
@@ -305,25 +405,28 @@ export function ConnectedDspList({
               </div>
             )}
           </div>
-        ) : (
-          <div className='text-center py-6'>
-            <Music className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
-            <p className='text-sm text-secondary-token'>
-              No streaming platforms connected yet.
-            </p>
-            {spotifyId ? (
-              <p className='text-xs text-secondary-token/70 mt-1'>
-                Click &ldquo;Discover&rdquo; to find your profiles on other
-                platforms.
-              </p>
-            ) : (
-              <p className='text-xs text-secondary-token/70 mt-1'>
-                Connect a Spotify profile to enable cross-platform discovery.
-              </p>
-            )}
-          </div>
         )}
+
+        {!hasOtherMatches &&
+          !spotifyId &&
+          !spotifyMatch &&
+          !appleMusicMatch && (
+            <div className='text-center py-4'>
+              <Music className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
+              <p className='text-sm text-secondary-token'>
+                Click a pill above to connect your streaming profiles.
+              </p>
+            </div>
+          )}
       </div>
+
+      {/* Artist search command palette */}
+      <ArtistSearchCommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        provider={paletteProvider}
+        onArtistSelect={handlePaletteSelect}
+      />
     </DashboardCard>
   );
 }

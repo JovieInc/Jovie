@@ -1,6 +1,6 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
@@ -609,4 +610,128 @@ export async function loadTracksForRelease(params: {
       params.releaseSlug
     )
   );
+}
+
+/**
+ * Check Apple Music connection status for the current profile
+ */
+export async function checkAppleMusicConnection(): Promise<{
+  connected: boolean;
+  artistName: string | null;
+  artistId: string | null;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    return { connected: false, artistName: null, artistId: null };
+  }
+
+  try {
+    const profile = await requireProfile();
+
+    const [match] = await db
+      .select({
+        externalArtistName: dspArtistMatches.externalArtistName,
+        externalArtistId: dspArtistMatches.externalArtistId,
+        status: dspArtistMatches.status,
+      })
+      .from(dspArtistMatches)
+      .where(
+        and(
+          eq(dspArtistMatches.creatorProfileId, profile.id),
+          eq(dspArtistMatches.providerId, 'apple_music')
+        )
+      )
+      .limit(1);
+
+    if (!match) {
+      return { connected: false, artistName: null, artistId: null };
+    }
+
+    const isConnected =
+      match.status === 'confirmed' || match.status === 'auto_confirmed';
+
+    return {
+      connected: isConnected,
+      artistName: isConnected ? match.externalArtistName : null,
+      artistId: isConnected ? match.externalArtistId : null,
+    };
+  } catch {
+    return { connected: false, artistName: null, artistId: null };
+  }
+}
+
+/**
+ * Connect an Apple Music artist to the profile manually
+ */
+export async function connectAppleMusicArtist(params: {
+  externalArtistId: string;
+  externalArtistName: string;
+  externalArtistUrl: string;
+  externalArtistImageUrl?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  artistName: string;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  const now = new Date();
+
+  await db
+    .insert(dspArtistMatches)
+    .values({
+      creatorProfileId: profile.id,
+      providerId: 'apple_music',
+      externalArtistId: params.externalArtistId,
+      externalArtistName: params.externalArtistName,
+      externalArtistUrl: params.externalArtistUrl,
+      externalArtistImageUrl: params.externalArtistImageUrl ?? null,
+      confidenceScore: '1.0000',
+      confidenceBreakdown: {
+        isrcMatchScore: 0,
+        upcMatchScore: 0,
+        nameSimilarityScore: 1,
+        followerRatioScore: 0,
+        genreOverlapScore: 0,
+        meta: {
+          calculatedAt: now.toISOString(),
+          version: 1,
+        },
+      },
+      matchingIsrcCount: 0,
+      matchingUpcCount: 0,
+      totalTracksChecked: 0,
+      status: 'confirmed',
+      confirmedAt: now,
+      confirmedBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [dspArtistMatches.creatorProfileId, dspArtistMatches.providerId],
+      set: {
+        externalArtistId: params.externalArtistId,
+        externalArtistName: params.externalArtistName,
+        externalArtistUrl: params.externalArtistUrl,
+        externalArtistImageUrl: params.externalArtistImageUrl ?? null,
+        status: 'confirmed',
+        confirmedAt: now,
+        confirmedBy: userId,
+        updatedAt: now,
+      },
+    });
+
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return {
+    success: true,
+    message: `Connected Apple Music as ${params.externalArtistName}`,
+    artistName: params.externalArtistName,
+  };
 }
