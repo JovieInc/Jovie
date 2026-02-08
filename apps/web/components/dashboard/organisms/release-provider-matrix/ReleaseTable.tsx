@@ -200,6 +200,7 @@ export function ReleaseTable({
             smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
             releaseSlug: release.slug,
             releaseTitle: release.title,
+            artistName,
             releaseDate: release.releaseDate,
           }),
         }),

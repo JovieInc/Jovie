@@ -27,10 +27,17 @@ async function copyUTMUrl(params: {
     params: params.preset.params,
     context: params.context,
   });
-  await navigator.clipboard.writeText(result.url);
-  toast.success(`Copied with ${params.preset.label} UTM`, {
-    description: 'Link includes tracking parameters',
-  });
+  try {
+    await navigator.clipboard.writeText(result.url);
+    toast.success(`Copied with ${params.preset.label} UTM`, {
+      description: 'Link includes tracking parameters',
+    });
+  } catch (error) {
+    console.error('Failed to copy UTM link', error);
+    toast.error('Could not copy UTM link', {
+      description: 'Please try again or copy manually.',
+    });
+  }
 }
 
 /**

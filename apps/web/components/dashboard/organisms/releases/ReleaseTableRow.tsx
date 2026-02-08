@@ -99,10 +99,11 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
           smartLinkUrl,
           releaseSlug: release.slug,
           releaseTitle: release.title,
+          artistName,
           releaseDate: release.releaseDate,
         }),
       }),
-    [smartLinkUrl, release.slug, release.title, release.releaseDate]
+    [smartLinkUrl, release.slug, release.title, artistName, release.releaseDate]
   );
 
   const menuItems = useMemo(
