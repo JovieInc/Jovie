@@ -85,28 +85,27 @@ describe('useAddMessagesMutation', () => {
   });
 
   it('should add messages and return titlePending flag', async () => {
-    const response = {
-      messages: [
-        {
-          id: 'msg-1',
-          role: 'user',
-          content: 'Test',
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      titlePending: true,
-    };
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(response),
+      json: () =>
+        Promise.resolve({
+          messages: [
+            {
+              id: 'msg-1',
+              role: 'user',
+              content: 'Test',
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          titlePending: true,
+        }),
     });
 
     const { result } = renderHook(() => useAddMessagesMutation(), {
       wrapper: TestWrapper,
     });
 
-    let data: typeof response | undefined;
+    let data: { messages: unknown[]; titlePending?: boolean } | undefined;
     await act(async () => {
       data = await result.current.mutateAsync({
         conversationId: 'conv-1',
@@ -119,28 +118,27 @@ describe('useAddMessagesMutation', () => {
   });
 
   it('should return titlePending=false when title already exists', async () => {
-    const response = {
-      messages: [
-        {
-          id: 'msg-2',
-          role: 'assistant',
-          content: 'Response',
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      titlePending: false,
-    };
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve(response),
+      json: () =>
+        Promise.resolve({
+          messages: [
+            {
+              id: 'msg-2',
+              role: 'assistant',
+              content: 'Response',
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          titlePending: false,
+        }),
     });
 
     const { result } = renderHook(() => useAddMessagesMutation(), {
       wrapper: TestWrapper,
     });
 
-    let data: typeof response | undefined;
+    let data: { messages: unknown[]; titlePending?: boolean } | undefined;
     await act(async () => {
       data = await result.current.mutateAsync({
         conversationId: 'conv-1',
