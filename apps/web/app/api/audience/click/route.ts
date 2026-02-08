@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   checkClickRateLimit,
   getRateLimitHeaders,
 } from '@/lib/analytics/tracking-rate-limit';
-import { shouldExcludeSelfByProfileId } from '@/lib/analytics/self-exclusion';
 import {
   isTrackingTokenEnabled,
   validateTrackingToken,
