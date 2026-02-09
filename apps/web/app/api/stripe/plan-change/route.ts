@@ -28,6 +28,7 @@ import {
   getActiveSubscription,
   getAvailablePlanChanges,
 } from '@/lib/stripe/plan-change';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -113,6 +114,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error processing plan change', error);
+    await captureCriticalError('Stripe plan change failed', error, {
+      route: '/api/stripe/plan-change',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to process plan change' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -175,6 +180,10 @@ export async function GET() {
     );
   } catch (error) {
     logger.error('Error getting plan options', error);
+    await captureCriticalError('Failed to get plan change options', error, {
+      route: '/api/stripe/plan-change',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to get plan options' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -233,6 +242,10 @@ export async function DELETE() {
     );
   } catch (error) {
     logger.error('Error cancelling scheduled plan change', error);
+    await captureCriticalError('Failed to cancel scheduled plan change', error, {
+      route: '/api/stripe/plan-change',
+      method: 'DELETE',
+    });
     return NextResponse.json(
       { error: 'Failed to cancel scheduled change' },
       { status: 500, headers: NO_STORE_HEADERS }

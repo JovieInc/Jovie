@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for crypto operations
@@ -131,6 +132,7 @@ export async function GET(request: NextRequest) {
     logger.error('[Email Click Track] Unexpected error', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+    await captureError('Email click tracking failed', error, { route: '/api/email/track/click', method: 'GET' });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500, headers: NO_STORE_HEADERS }

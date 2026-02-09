@@ -4,6 +4,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers } from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 import { membersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -124,6 +125,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Dashboard Audience] Failed to load members', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Audience members fetch failed', error, { route: '/api/dashboard/audience/members', method: 'GET' });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

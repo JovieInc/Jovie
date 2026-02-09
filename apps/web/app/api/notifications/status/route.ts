@@ -9,6 +9,7 @@ import {
   getClientIP,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Notifications Status] Error:', error);
+    await captureError('Notification status fetch failed', error, { route: '/api/notifications/status', method: 'POST' });
     return NextResponse.json(
       {
         success: false,

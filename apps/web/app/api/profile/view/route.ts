@@ -5,6 +5,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { publicProfileLimiter } from '@/lib/rate-limit';
 import { incrementProfileViews } from '@/lib/services/profile';
 import { detectBot } from '@/lib/utils/bot-detection';
+import { captureError } from '@/lib/error-tracking';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 export const dynamic = 'force-dynamic';
@@ -91,7 +92,11 @@ export async function POST(request: NextRequest) {
     await incrementProfileViews(handle);
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
-  } catch {
+  } catch (error) {
+    await captureError('Profile view recording failed', error, {
+      route: '/api/profile/view',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to record view' },
       { status: 500, headers: NO_STORE_HEADERS }

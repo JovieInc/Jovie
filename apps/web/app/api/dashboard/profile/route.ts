@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import type { ProfileUpdateInput } from './lib';
 import {
@@ -70,6 +71,12 @@ export async function GET() {
     });
   } catch (error) {
     logger.error('Error fetching profile:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Profile fetch failed', error, {
+        route: '/api/dashboard/profile',
+        method: 'GET',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -145,6 +152,12 @@ export async function PUT(req: Request) {
     });
   } catch (error) {
     logger.error('Error updating profile:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Profile update failed', error, {
+        route: '/api/dashboard/profile',
+        method: 'PUT',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

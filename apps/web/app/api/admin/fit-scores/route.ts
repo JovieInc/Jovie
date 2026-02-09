@@ -23,6 +23,7 @@ import {
   checkAdminFitScoresRateLimit,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -102,6 +103,7 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('Admin fit scores GET failed:', error);
+    await captureError('Admin fit scores operation failed', error, { route: '/api/admin/fit-scores', method: 'GET' });
     return NextResponse.json(
       {
         error: 'Failed to fetch fit scores',
@@ -242,6 +244,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     logger.error('Admin fit scores POST failed:', error);
+    await captureError('Admin fit scores operation failed', error, { route: '/api/admin/fit-scores', method: 'POST' });
     return NextResponse.json(
       {
         error: 'Failed to process fit scores action',

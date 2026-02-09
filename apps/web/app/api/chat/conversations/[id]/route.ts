@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -98,6 +99,10 @@ export async function GET(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error fetching conversation:', error);
 
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to fetch conversation', error, { route: '/api/chat/conversations/[id]', method: 'GET' });
+    }
+
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -169,6 +174,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error updating conversation:', error);
 
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to update conversation', error, { route: '/api/chat/conversations/[id]', method: 'PATCH' });
+    }
+
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -223,6 +232,10 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     );
   } catch (error) {
     logger.error('Error deleting conversation:', error);
+
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to delete conversation', error, { route: '/api/chat/conversations/[id]', method: 'DELETE' });
+    }
 
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { profilePhotos } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -98,6 +99,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   } catch (error) {
     logger.error('Photo status check error:', error);
+    await captureError('Image status fetch failed', error, { route: '/api/images/status/[id]', method: 'GET' });
     return NextResponse.json(
       { error: 'Failed to check status' },
       { status: 500, headers: NO_STORE_HEADERS }

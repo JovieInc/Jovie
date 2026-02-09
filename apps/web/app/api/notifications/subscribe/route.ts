@@ -11,6 +11,7 @@ import {
   generalLimiter,
   getClientIP,
 } from '@/lib/rate-limit';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 // Resend + DB access requires Node runtime
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     logger.error('[Notifications Subscribe] Error:', error);
+    await captureError('Notification subscription failed', error, { route: '/api/notifications/subscribe', method: 'POST' });
     const response = NextResponse.json(
       {
         success: false,

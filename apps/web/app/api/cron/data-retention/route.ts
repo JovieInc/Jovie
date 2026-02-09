@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for cleanup
@@ -114,6 +115,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // Log full error details internally
     logger.error('[Data Retention Cron] Cleanup failed', error);
+    await captureError('Data retention cleanup cron failed', error, { route: '/api/cron/data-retention', method: 'GET' });
     // Return sanitized error to prevent information disclosure
     return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
   }

@@ -13,6 +13,7 @@ import {
 import { createCheckoutSession } from '@/lib/stripe/client';
 import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -123,6 +124,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error creating checkout session:', error);
+    await captureCriticalError('Stripe checkout session creation failed', error, {
+      route: '/api/stripe/checkout',
+      method: 'POST',
+    });
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {

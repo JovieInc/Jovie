@@ -9,6 +9,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,6 +80,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('Error in theme API:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Artist theme update failed', error, { route: '/api/artist/theme', method: 'POST' });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

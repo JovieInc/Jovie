@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { previewPlanChange } from '@/lib/stripe/plan-change';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -87,6 +88,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error previewing plan change', error);
+    await captureCriticalError('Stripe plan change preview failed', error, {
+      route: '/api/stripe/plan-change/preview',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to preview plan change' },
       { status: 500, headers: NO_STORE_HEADERS }

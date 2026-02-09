@@ -4,6 +4,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { logger } from '@/lib/utils/logger';
+import { captureError } from '@/lib/error-tracking';
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -87,6 +88,9 @@ export async function GET(request: Request) {
     }
 
     logger.error('Error fetching notification subscribers', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Audience subscribers fetch failed', error, { route: '/api/dashboard/audience/subscribers', method: 'GET' });
+    }
     return NextResponse.json(
       { error: 'Failed to load subscribers' },
       { status: 500, headers: NO_STORE_HEADERS }

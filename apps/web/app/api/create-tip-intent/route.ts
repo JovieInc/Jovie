@@ -6,6 +6,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
 import { stripe } from '@/lib/stripe/client';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   type TipIntentPayload,
@@ -126,6 +127,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     logger.error('Create tip intent error:', error);
+    await captureCriticalError('Tip payment intent creation failed', error, {
+      route: '/api/create-tip-intent',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to create tip' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -8,6 +8,7 @@ import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -169,6 +170,7 @@ export async function POST(request: Request) {
       error: errorMessage,
       raw: error,
     });
+    await captureError('Admin creator invite failed', error, { route: '/api/admin/creator-invite', method: 'POST' });
 
     return NextResponse.json(
       { error: 'Failed to create invite', details: errorMessage },

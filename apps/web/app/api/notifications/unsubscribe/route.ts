@@ -8,6 +8,7 @@ import {
   generalLimiter,
   getClientIP,
 } from '@/lib/rate-limit';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Notifications Unsubscribe] Error:', error);
+    await captureError('Notification unsubscribe failed', error, { route: '/api/notifications/unsubscribe', method: 'POST' });
     return NextResponse.json(
       {
         success: false,

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { NO_STORE_HEADERS } from '../lib';
 
@@ -199,6 +200,7 @@ export async function GET() {
       error: errorMessage,
       raw: error,
     });
+    await captureError('Admin bulk invite stats failed', error, { route: '/api/admin/creator-invite/bulk/stats', method: 'GET' });
 
     return NextResponse.json(
       { error: 'Failed to fetch campaign stats' },

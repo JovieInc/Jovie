@@ -18,6 +18,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
+import { captureError } from '@/lib/error-tracking';
 import {
   getProviderLink,
   getReleaseById,
@@ -769,7 +770,10 @@ export async function connectAppleMusicArtist(params: {
           updatedAt: now,
         },
       });
-  } catch {
+  } catch (error) {
+    await captureError('Apple Music connection save failed', error, {
+      action: 'connectAppleMusicArtist',
+    });
     return {
       success: false,
       message: 'Failed to save Apple Music connection. Please try again.',
