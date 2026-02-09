@@ -84,10 +84,10 @@ export function RecentChats() {
         router.push(APP_ROUTES.CHAT);
       }
 
-      notifications.success('Chat deleted');
+      notifications.success('Thread deleted');
     } catch (err) {
       console.error('Failed to delete conversation:', err);
-      notifications.error('Failed to delete chat');
+      notifications.error('Failed to delete thread');
     } finally {
       setDeleteTarget(null);
     }
@@ -105,12 +105,12 @@ export function RecentChats() {
 
   return (
     <>
-      <SidebarCollapsibleGroup label='Recent Chats' defaultOpen={false}>
+      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
         <SidebarMenu>
           {conversations.map(convo => {
             const href = `${APP_ROUTES.CHAT}/${convo.id}`;
             const isActive = activeConversationId === convo.id;
-            const title = convo.title || 'Untitled chat';
+            const title = convo.title || 'Untitled thread';
             const updatedAt = new Date(convo.updatedAt);
             const timeAgo = formatRelativeTime(updatedAt);
 
@@ -145,7 +145,7 @@ export function RecentChats() {
                 <SidebarMenuActions showOnHover>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuAction aria-label='Chat options'>
+                      <SidebarMenuAction aria-label='Thread options'>
                         <Ellipsis aria-hidden='true' className='size-4' />
                       </SidebarMenuAction>
                     </DropdownMenuTrigger>
@@ -174,10 +174,10 @@ export function RecentChats() {
       >
         <AlertDialogContent className='max-w-sm'>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete chat</AlertDialogTitle>
+            <AlertDialogTitle>Delete thread</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete &ldquo;
-              {deleteTarget?.title ?? 'Untitled chat'}&rdquo;. This action
+              {deleteTarget?.title ?? 'Untitled thread'}&rdquo;. This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
