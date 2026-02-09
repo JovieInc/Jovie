@@ -94,7 +94,7 @@ export const primaryNavigation: NavItem[] = [
 
 export const secondaryNavigation: NavItem[] = [
   {
-    name: 'Chat',
+    name: 'Thread',
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
