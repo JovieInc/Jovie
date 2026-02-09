@@ -525,7 +525,8 @@ export async function getAudienceServerData(params: {
       );
     } else {
       // 'all' shows all members, 'anonymous' filters to anonymous only
-      const typeFilter = view === 'anonymous' ? 'anonymous' as AudienceMemberType : undefined;
+      const typeFilter =
+        view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined;
       data = await fetchMembersData(
         tx,
         clerkUserId,

@@ -3,19 +3,27 @@
  * Defines column mapping and formatting for CSV export.
  */
 
+import { type CSVColumn, capitalize } from '@/lib/utils/csv';
 import type { AudienceMember } from '@/types';
-import { capitalize, type CSVColumn } from '@/lib/utils/csv';
 
 /**
  * CSV column configuration for audience export.
  */
 export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
-  { header: 'Name', accessor: 'displayName', formatter: v => (v as string) || 'Anonymous' },
+  {
+    header: 'Name',
+    accessor: 'displayName',
+    formatter: v => (v as string) || 'Anonymous',
+  },
   { header: 'Type', accessor: 'type', formatter: v => capitalize(v) },
   { header: 'Email', accessor: 'email', formatter: v => (v as string) || '' },
   { header: 'Phone', accessor: 'phone', formatter: v => (v as string) || '' },
   { header: 'Location', accessor: 'locationLabel' },
-  { header: 'Device', accessor: 'deviceType', formatter: v => (v as string) || '' },
+  {
+    header: 'Device',
+    accessor: 'deviceType',
+    formatter: v => (v as string) || '',
+  },
   { header: 'Visits', accessor: 'visits' },
   { header: 'Engagement Score', accessor: 'engagementScore' },
   { header: 'Intent', accessor: 'intentLevel', formatter: v => capitalize(v) },
@@ -24,7 +32,11 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
     accessor: 'tags',
     formatter: value => ((value as string[]) || []).join(', '),
   },
-  { header: 'Last Seen', accessor: 'lastSeenAt', formatter: v => (v as string) || '' },
+  {
+    header: 'Last Seen',
+    accessor: 'lastSeenAt',
+    formatter: v => (v as string) || '',
+  },
 ];
 
 /**
