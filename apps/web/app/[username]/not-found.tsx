@@ -33,6 +33,12 @@ export default function NotFound() {
             >
               Go home
             </Link>
+            <Link
+              href='/app/dashboard'
+              className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
+            >
+              Go to dashboard
+            </Link>
           </div>
         </div>
       </Container>

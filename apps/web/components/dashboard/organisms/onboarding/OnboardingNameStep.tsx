@@ -64,7 +64,7 @@ export function OnboardingNameStep({
             type='submit'
             disabled={!isValid || isTransitioning || isSubmitting}
           >
-            Continue
+            {isSubmitting ? 'Saving…' : 'Continue'}
           </AuthButton>
         </form>
       </div>

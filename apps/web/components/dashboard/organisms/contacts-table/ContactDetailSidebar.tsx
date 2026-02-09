@@ -12,6 +12,7 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
@@ -63,13 +64,35 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 }: ContactDetailSidebarProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const prevIsSavingRef = useRef(false);
 
   // Reset editing state when contact changes
   useEffect(() => {
     setEditingField(null);
     setEditValue('');
   }, [contact?.id]);
+
+  // Show "Saved" indicator when save completes
+  useEffect(() => {
+    if (prevIsSavingRef.current && !contact?.isSaving) {
+      setShowSaved(true);
+      savedTimeoutRef.current = setTimeout(() => setShowSaved(false), 2000);
+    }
+    prevIsSavingRef.current = contact?.isSaving ?? false;
+  }, [contact?.isSaving]);
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    };
+  }, []);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -78,6 +101,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       inputRef.current.select();
     }
   }, [editingField]);
+
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => onSave(), 300);
+  }, [onSave]);
 
   const startEditing = useCallback(
     (field: EditableField) => {
@@ -98,13 +126,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     // Only update if value changed
     if (trimmedValue !== currentValue) {
       onUpdate({ [editingField]: trimmedValue || null });
-      // Auto-save after field edit
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     }
 
     setEditingField(null);
     setEditValue('');
-  }, [editingField, editValue, contact, onUpdate, onSave]);
+  }, [editingField, editValue, contact, onUpdate, debouncedSave]);
 
   const cancelEditing = useCallback(() => {
     setEditingField(null);
@@ -127,17 +154,17 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const handleRoleChange = useCallback(
     (newRole: string) => {
       onUpdate({ role: newRole as ContactRole });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [onUpdate, onSave]
+    [onUpdate, debouncedSave]
   );
 
   const handlePreferredChannelChange = useCallback(
     (channel: string) => {
       onUpdate({ preferredChannel: channel as ContactChannel });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [onUpdate, onSave]
+    [onUpdate, debouncedSave]
   );
 
   const handleTerritoryToggle = useCallback(
@@ -162,9 +189,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       }
 
       onUpdate({ territories: newTerritories });
-      setTimeout(() => onSave(), 100);
+      debouncedSave();
     },
-    [contact, onUpdate, onSave]
+    [contact, onUpdate, debouncedSave]
   );
 
   if (!contact) {
@@ -246,7 +273,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         customLabel={contact.customLabel}
         email={contact.email}
         onClose={onClose}
-        onDelete={onDelete}
+        onDelete={() => setShowDeleteConfirm(true)}
       />
 
       <div className='flex-1 overflow-auto px-3 py-3 space-y-5'>
@@ -360,13 +387,28 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           </div>
         )}
 
-        {/* Saving indicator */}
+        {/* Save status indicator */}
         {contact.isSaving && (
           <div className='text-xs text-tertiary-token text-center'>
-            Saving...
+            Saving…
+          </div>
+        )}
+        {showSaved && !contact.isSaving && (
+          <div className='text-xs text-emerald-600 text-center animate-in fade-in duration-200'>
+            Saved
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title='Delete contact'
+        description='This contact will be permanently removed from your profile. This action cannot be undone.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={onDelete}
+      />
     </RightDrawer>
   );
 });

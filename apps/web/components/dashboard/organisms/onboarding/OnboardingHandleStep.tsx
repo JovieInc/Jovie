@@ -230,6 +230,7 @@ export function OnboardingHandleStep({
             type='submit'
             disabled={Boolean(ctaDisabledReason) || isTransitioning}
             variant='primary'
+            aria-describedby={ctaDisabledReason ? 'cta-hint' : undefined}
           >
             <ButtonContent
               isSubmitting={isSubmitting}
@@ -237,6 +238,17 @@ export function OnboardingHandleStep({
               isChecking={handleValidation.checking}
             />
           </AuthButton>
+          {ctaDisabledReason &&
+            !isSubmitting &&
+            !handleValidation.checking &&
+            !stateError && (
+              <p
+                id='cta-hint'
+                className='text-xs text-secondary-token text-center animate-in fade-in duration-200'
+              >
+                {ctaDisabledReason}
+              </p>
+            )}
         </form>
 
         <output className={FORM_LAYOUT.footerHint} aria-live='polite'>

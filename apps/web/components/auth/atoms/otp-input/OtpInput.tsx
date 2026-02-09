@@ -56,9 +56,9 @@ export function OtpInput({
 
   return (
     <div className='relative' ref={containerRef}>
-      {/* Progress indicator for mobile - shows how many digits entered */}
+      {/* Progress indicator - shows how many digits entered */}
       <div
-        className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5 sm:hidden'
+        className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5'
         aria-hidden='true'
       >
         {digitKeys.map((key, i) => (

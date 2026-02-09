@@ -9,7 +9,9 @@
 
 import { Button, Input } from '@jovie/ui';
 import { CheckCircle, Mail, ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
 
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { FormField } from '@/components/molecules/FormField';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
@@ -39,6 +41,12 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
     handleMakePrimary,
     handleRemoveEmail,
   } = useEmailManagement(user);
+
+  const [emailToRemove, setEmailToRemove] = useState<{
+    id: string;
+    address: string;
+    ref: Parameters<typeof handleRemoveEmail>[0];
+  } | null>(null);
 
   return (
     <DashboardCard variant='settings'>
@@ -109,7 +117,13 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                       size='sm'
                       className='text-red-500 hover:text-red-600 hover:bg-red-50'
                       disabled={syncingEmailId === email.id}
-                      onClick={() => handleRemoveEmail(email)}
+                      onClick={() =>
+                        setEmailToRemove({
+                          id: email.id,
+                          address: email.emailAddress,
+                          ref: email,
+                        })
+                      }
                     >
                       {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
                     </Button>
@@ -187,6 +201,22 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           </form>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={emailToRemove !== null}
+        onOpenChange={open => {
+          if (!open) setEmailToRemove(null);
+        }}
+        title='Remove email address'
+        description={`Are you sure you want to remove ${emailToRemove?.address ?? 'this email'}? You will no longer be able to sign in or receive notifications at this address.`}
+        confirmLabel='Remove'
+        variant='destructive'
+        onConfirm={() => {
+          if (emailToRemove) {
+            handleRemoveEmail(emailToRemove.ref);
+          }
+        }}
+      />
     </DashboardCard>
   );
 }

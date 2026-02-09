@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@jovie/ui';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 
 export interface ContactItemActionsProps {
   readonly isSaving?: boolean;
@@ -15,6 +17,8 @@ export function ContactItemActions({
   onCancel,
   onDelete,
 }: ContactItemActionsProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   return (
     <div className='flex flex-wrap gap-2 sm:gap-3'>
       <Button
@@ -37,12 +41,22 @@ export function ContactItemActions({
       <Button
         size='sm'
         variant='ghost'
-        onClick={onDelete}
+        onClick={() => setShowDeleteConfirm(true)}
         disabled={isSaving}
         className='min-h-[44px] px-4'
       >
         Delete
       </Button>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title='Delete contact'
+        description='This contact will be permanently removed from your profile. This action cannot be undone.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={onDelete}
+      />
     </div>
   );
 }

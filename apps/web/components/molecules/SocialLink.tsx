@@ -96,6 +96,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
             }
           : undefined
       }
+      rel='noopener noreferrer'
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}
     >

@@ -1,7 +1,8 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import type { LinkActionsProps } from './types';
 import { useLinkActionsMenu } from './useLinkActionsMenu';
@@ -31,6 +32,8 @@ export const LinkActions = memo(function LinkActions({
   isOpen,
   onOpenChange,
 }: LinkActionsProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const {
     open,
     menuId,
@@ -49,6 +52,15 @@ export const LinkActions = memo(function LinkActions({
     isOpen,
     onOpenChange,
   });
+
+  const handleMenuItemClick = (item: (typeof menuItems)[number]) => {
+    setOpen(false);
+    if (item.id === 'remove') {
+      setShowDeleteConfirm(true);
+    } else {
+      item.action();
+    }
+  };
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
@@ -100,15 +112,11 @@ export const LinkActions = memo(function LinkActions({
                 type='button'
                 role='menuitem'
                 aria-label={item.label}
-                onClick={() => {
-                  setOpen(false);
-                  item.action();
-                }}
+                onClick={() => handleMenuItemClick(item)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setOpen(false);
-                    item.action();
+                    handleMenuItemClick(item);
                   } else {
                     handleKeyDown(e);
                   }
@@ -130,6 +138,16 @@ export const LinkActions = memo(function LinkActions({
           </div>
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title='Delete link'
+        description='This link will be permanently removed from your profile. This action cannot be undone.'
+        confirmLabel='Delete'
+        variant='destructive'
+        onConfirm={onRemove}
+      />
     </div>
   );
 });
