@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   BellRing,
@@ -19,21 +18,21 @@ import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
-  AdminPageSizeSelect,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
+  TablePaginationFooter,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
+import { AudienceTableProvider } from './AudienceTableContext';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { downloadVCard } from './utils';
 import {
-  createLastSeenCellRenderer,
-  createMenuCellRenderer,
-  createSelectCellRenderer,
+  LastSeenCell,
+  MenuCell,
   renderActionsCell,
   renderDeviceCell,
   renderEmailCell,
@@ -41,6 +40,7 @@ import {
   renderTypeCell,
   renderUserCell,
   renderVisitsCell,
+  SelectCell,
 } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
@@ -58,6 +58,104 @@ function getSrDescription(
     ? 'Every visitor, anonymous or identified, lives in this table.'
     : 'Notification signups from your notification modal.';
 }
+
+/**
+ * Stable column definitions for members mode.
+ * Cell renderers that need dynamic state (selection, menu) read from AudienceTableContext
+ * instead of closing over values, keeping these definitions fully stable.
+ */
+const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
+  memberColumnHelper.display({
+    id: 'select',
+    header: () => null,
+    cell: SelectCell,
+    size: 100,
+  }),
+  memberColumnHelper.accessor('displayName', {
+    id: 'user',
+    header: 'User',
+    cell: renderUserCell,
+    size: 240,
+  }),
+  memberColumnHelper.accessor('type', {
+    id: 'type',
+    header: 'Type',
+    cell: renderTypeCell,
+    size: 120,
+  }),
+  memberColumnHelper.accessor('locationLabel', {
+    id: 'location',
+    header: 'Location',
+    cell: renderLocationCell,
+    size: 160,
+  }),
+  memberColumnHelper.accessor('deviceType', {
+    id: 'device',
+    header: 'Device',
+    cell: renderDeviceCell,
+    size: 140,
+  }),
+  memberColumnHelper.accessor('visits', {
+    id: 'visits',
+    header: 'Visits',
+    cell: renderVisitsCell,
+    size: 120,
+  }),
+  memberColumnHelper.accessor('latestActions', {
+    id: 'actions',
+    header: 'Actions',
+    cell: renderActionsCell,
+    size: 180,
+  }),
+  memberColumnHelper.accessor('lastSeenAt', {
+    id: 'lastSeen',
+    header: 'Last Seen',
+    cell: LastSeenCell,
+    size: 160,
+  }),
+  memberColumnHelper.display({
+    id: 'menu',
+    header: '',
+    cell: MenuCell,
+    size: 48,
+  }),
+];
+
+/**
+ * Stable column definitions for subscribers mode.
+ */
+const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
+  memberColumnHelper.display({
+    id: 'select',
+    header: () => null,
+    cell: SelectCell,
+    size: 100,
+  }),
+  memberColumnHelper.accessor('displayName', {
+    id: 'user',
+    header: 'User',
+    cell: renderUserCell,
+    size: 300,
+  }),
+  memberColumnHelper.accessor('email', {
+    id: 'email',
+    header: 'Email',
+    cell: renderEmailCell,
+    size: 240,
+  }),
+  memberColumnHelper.accessor('lastSeenAt', {
+    id: 'subscribedAt',
+    header: 'Subscribed',
+    cell: LastSeenCell,
+    size: 180,
+  }),
+  memberColumnHelper.display({
+    id: 'menu',
+    header: '',
+    cell: MenuCell,
+    size: 48,
+  }),
+];
 
 export const DashboardAudienceTableUnified = memo(
   function DashboardAudienceTableUnified({
@@ -85,7 +183,6 @@ export const DashboardAudienceTableUnified = memo(
       selectedCount,
       toggleSelect,
       totalPages,
-      paginationLabel,
       handleCopyProfileLink,
     } = useDashboardAudienceTable({
       mode,
@@ -182,157 +279,29 @@ export const DashboardAudienceTableUnified = memo(
       [setSelectedMember, profileId, handleRemoveMember]
     );
 
-    // Define columns for members mode
-    const memberColumns = useMemo<ColumnDef<AudienceMember, any>[]>(
-      () => [
-        // Selection + Row Number column
-        memberColumnHelper.display({
-          id: 'select',
-          header: () => null,
-          cell: createSelectCellRenderer(
-            page,
-            pageSize,
-            selectedIds,
-            toggleSelect
-          ),
-          size: 100,
-        }),
+    const columns = mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
 
-        // User column
-        memberColumnHelper.accessor('displayName', {
-          id: 'user',
-          header: 'User',
-          cell: renderUserCell,
-          size: 240,
-        }),
-
-        // Type column
-        memberColumnHelper.accessor('type', {
-          id: 'type',
-          header: 'Type',
-          cell: renderTypeCell,
-          size: 120,
-        }),
-
-        // Location column
-        memberColumnHelper.accessor('locationLabel', {
-          id: 'location',
-          header: 'Location',
-          cell: renderLocationCell,
-          size: 160,
-        }),
-
-        // Device column
-        memberColumnHelper.accessor('deviceType', {
-          id: 'device',
-          header: 'Device',
-          cell: renderDeviceCell,
-          size: 140,
-        }),
-
-        // Visits column
-        memberColumnHelper.accessor('visits', {
-          id: 'visits',
-          header: 'Visits',
-          cell: renderVisitsCell,
-          size: 120,
-        }),
-
-        // Actions column
-        memberColumnHelper.accessor('latestActions', {
-          id: 'actions',
-          header: 'Actions',
-          cell: renderActionsCell,
-          size: 180,
-        }),
-
-        // Last Seen column
-        memberColumnHelper.accessor('lastSeenAt', {
-          id: 'lastSeen',
-          header: 'Last Seen',
-          cell: createLastSeenCellRenderer(openMenuRowId, setOpenMenuRowId),
-          size: 160,
-        }),
-
-        // Ellipsis menu column
-        memberColumnHelper.display({
-          id: 'menu',
-          header: '',
-          cell: createMenuCellRenderer(getContextMenuItems),
-          size: 48,
-        }),
-      ],
-      [
-        page,
-        pageSize,
+    // Context value for cell renderers — avoids putting dynamic state in column defs
+    const contextValue = useMemo(
+      () => ({
         selectedIds,
         toggleSelect,
+        page,
+        pageSize,
+        openMenuRowId,
+        setOpenMenuRowId,
+        getContextMenuItems,
+      }),
+      [
+        selectedIds,
+        toggleSelect,
+        page,
+        pageSize,
         openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
       ]
     );
-
-    // Define columns for subscribers mode (simplified)
-    const subscriberColumns = useMemo<ColumnDef<AudienceMember, any>[]>(
-      () => [
-        // Selection + Row Number column
-        memberColumnHelper.display({
-          id: 'select',
-          header: () => null,
-          cell: createSelectCellRenderer(
-            page,
-            pageSize,
-            selectedIds,
-            toggleSelect
-          ),
-          size: 100,
-        }),
-
-        // User column
-        memberColumnHelper.accessor('displayName', {
-          id: 'user',
-          header: 'User',
-          cell: renderUserCell,
-          size: 300,
-        }),
-
-        // Email column
-        memberColumnHelper.accessor('email', {
-          id: 'email',
-          header: 'Email',
-          cell: renderEmailCell,
-          size: 240,
-        }),
-
-        // Subscribed At column
-        memberColumnHelper.accessor('lastSeenAt', {
-          id: 'subscribedAt',
-          header: 'Subscribed',
-          cell: createLastSeenCellRenderer(openMenuRowId, setOpenMenuRowId),
-          size: 180,
-        }),
-
-        // Ellipsis menu column
-        memberColumnHelper.display({
-          id: 'menu',
-          header: '',
-          cell: createMenuCellRenderer(getContextMenuItems),
-          size: 48,
-        }),
-      ],
-      [
-        page,
-        pageSize,
-        selectedIds,
-        toggleSelect,
-        openMenuRowId,
-        setOpenMenuRowId,
-        getContextMenuItems,
-      ]
-    );
-
-    const columns = mode === 'members' ? memberColumns : subscriberColumns;
 
     const emptyStateHeading =
       mode === 'members' ? 'Grow Your Audience' : 'Get Your First Subscriber';
@@ -373,126 +342,111 @@ export const DashboardAudienceTableUnified = memo(
     );
 
     return (
-      <div
-        className='flex h-full min-h-0 flex-row'
-        data-testid='dashboard-audience-table'
-      >
-        {/* Main table content */}
-        <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
-          <h1 className='sr-only'>
-            {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-          </h1>
-          <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
+      <AudienceTableProvider value={contextValue}>
+        <div
+          className='flex h-full min-h-0 flex-row'
+          data-testid='dashboard-audience-table'
+        >
+          {/* Main table content */}
+          <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
+            <h1 className='sr-only'>
+              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+            </h1>
+            <p className='sr-only'>
+              {getSrDescription(rows.length === 0, mode)}
+            </p>
 
-          <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-            {/* Scrollable content area */}
-            <div className='flex-1 min-h-0 overflow-auto'>
-              {rows.length === 0 ? (
-                <EmptyState
-                  icon={emptyStateIcon}
-                  heading={emptyStateHeading}
-                  description={emptyStateDescription}
-                  action={emptyStatePrimaryAction}
-                  secondaryAction={emptyStateSecondaryAction}
-                />
-              ) : (
-                <>
-                  {/* Mobile card list */}
-                  <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
-                    {rows.map(member => (
-                      <AudienceMobileCard
-                        key={member.id}
-                        member={member}
-                        mode={mode}
-                        isSelected={selectedMember?.id === member.id}
-                        onTap={setSelectedMember}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Desktop table */}
-                  <div className='hidden md:block h-full'>
-                    <UnifiedTable
-                      data={rows}
-                      columns={columns}
-                      isLoading={false}
-                      emptyState={
-                        <EmptyState
-                          icon={emptyStateIcon}
-                          heading={emptyStateHeading}
-                          description={emptyStateDescription}
-                          action={emptyStatePrimaryAction}
-                          secondaryAction={emptyStateSecondaryAction}
-                        />
-                      }
-                      getRowId={row => row.id}
-                      enableVirtualization={true}
-                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                      className='text-[13px]'
-                      getRowClassName={getRowClassName}
-                      onRowClick={row => setSelectedMember(row)}
-                      getContextMenuItems={getContextMenuItems}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Footer - shrink-0 ensures it stays anchored to bottom when drawer opens */}
-            <div className='shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-3 py-2 text-xs text-secondary-token md:px-4'>
-              <span className='tracking-wide'>{paginationLabel()}</span>
-              <div className='flex items-center gap-3'>
-                <div className='hidden md:block'>
-                  <AdminPageSizeSelect
-                    initialPageSize={pageSize}
-                    onPageSizeChange={onPageSizeChange}
+            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+              {/* Scrollable content area */}
+              <div className='flex-1 min-h-0 overflow-auto'>
+                {rows.length === 0 ? (
+                  <EmptyState
+                    icon={emptyStateIcon}
+                    heading={emptyStateHeading}
+                    description={emptyStateDescription}
+                    action={emptyStatePrimaryAction}
+                    secondaryAction={emptyStateSecondaryAction}
                   />
-                </div>
-                <div className='flex gap-2'>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    disabled={page <= 1 || total === 0}
-                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                    onClick={() => onPageChange(Math.max(1, page - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    disabled={page >= totalPages || total === 0}
-                    className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
-                    onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    {/* Mobile card list */}
+                    <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
+                      {rows.map(member => (
+                        <AudienceMobileCard
+                          key={member.id}
+                          member={member}
+                          mode={mode}
+                          isSelected={selectedMember?.id === member.id}
+                          onTap={setSelectedMember}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Desktop table */}
+                    <div className='hidden md:block h-full'>
+                      <UnifiedTable
+                        data={rows}
+                        columns={columns}
+                        isLoading={false}
+                        emptyState={
+                          <EmptyState
+                            icon={emptyStateIcon}
+                            heading={emptyStateHeading}
+                            description={emptyStateDescription}
+                            action={emptyStatePrimaryAction}
+                            secondaryAction={emptyStateSecondaryAction}
+                          />
+                        }
+                        getRowId={row => row.id}
+                        enableVirtualization={true}
+                        enableKeyboardNavigation={true}
+                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                        className='text-[13px]'
+                        getRowClassName={getRowClassName}
+                        onRowClick={row => setSelectedMember(row)}
+                        getContextMenuItems={getContextMenuItems}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Pagination footer — uses the shared component for consistency */}
+              <div className='shrink-0'>
+                <TablePaginationFooter
+                  currentPage={page}
+                  totalPages={totalPages}
+                  pageSize={pageSize}
+                  totalItems={total}
+                  onPageChange={onPageChange}
+                  onPageSizeChange={onPageSizeChange}
+                />
               </div>
             </div>
+
+            <div className='sr-only' aria-live='polite' aria-atomic='true'>
+              {total > 0 &&
+                `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
+              {selectedCount > 0 &&
+                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+            </div>
           </div>
 
-          <div className='sr-only' aria-live='polite' aria-atomic='true'>
-            {paginationLabel()}
-            {selectedCount > 0 &&
-              `${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
-          </div>
+          {/* Right sidebar - sibling in flex-row */}
+          <AudienceMemberSidebar
+            member={selectedMember}
+            isOpen={Boolean(selectedMember)}
+            onClose={() => setSelectedMember(null)}
+            contextMenuItems={
+              selectedMember
+                ? convertToCommonDropdownItems(
+                    getContextMenuItems(selectedMember)
+                  )
+                : undefined
+            }
+          />
         </div>
-
-        {/* Right sidebar - sibling in flex-row */}
-        <AudienceMemberSidebar
-          member={selectedMember}
-          isOpen={Boolean(selectedMember)}
-          onClose={() => setSelectedMember(null)}
-          contextMenuItems={
-            selectedMember
-              ? convertToCommonDropdownItems(
-                  getContextMenuItems(selectedMember)
-                )
-              : undefined
-          }
-        />
-      </div>
+      </AudienceTableProvider>
     );
   }
 );

@@ -226,6 +226,34 @@ export async function invalidateCache(key: string): Promise<void> {
 }
 
 /**
+ * Delete Redis keys in batches via pipeline to minimize HTTP round-trips.
+ * Returns the number of failed deletes.
+ */
+async function deleteKeysInBatches(
+  redis: NonNullable<ReturnType<typeof getRedis>>,
+  keys: string[]
+): Promise<number> {
+  const BATCH_SIZE = 500;
+  let failedDeletes = 0;
+  for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+    const batch = keys.slice(i, i + BATCH_SIZE);
+    const pipeline = redis.pipeline();
+    for (const key of batch) {
+      pipeline.del(key);
+    }
+    const results = await pipeline.exec();
+    // Upstash pipeline results are typed as unknown[], errors are Error instances
+    for (const result of results) {
+      if (result instanceof Error) {
+        failedDeletes++;
+        captureWarning('[db-cache] Redis pipeline DEL failed', result);
+      }
+    }
+  }
+  return failedDeletes;
+}
+
+/**
  * Scan and delete Redis keys matching a prefix.
  */
 async function invalidateRedisByPrefix(
@@ -249,22 +277,7 @@ async function invalidateRedisByPrefix(
     } while (cursor !== 0 && cursor !== '0');
 
     if (keysToDelete.length > 0) {
-      const BATCH_SIZE = 500;
-      let failedDeletes = 0;
-      for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
-        const batch = keysToDelete.slice(i, i + BATCH_SIZE);
-        const pipeline = redis.pipeline();
-        for (const key of batch) {
-          pipeline.del(key);
-        }
-        const results = await pipeline.exec();
-        for (const result of results) {
-          if (result instanceof Error) {
-            failedDeletes++;
-            captureWarning('[db-cache] Redis pipeline DEL failed', result);
-          }
-        }
-      }
+      const failedDeletes = await deleteKeysInBatches(redis, keysToDelete);
       Sentry.addBreadcrumb({
         category: 'db-cache',
         message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,

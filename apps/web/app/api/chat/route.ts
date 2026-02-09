@@ -5,6 +5,7 @@ import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { CHAT_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -164,14 +165,15 @@ async function fetchArtistContext(
 
 /**
  * Resolves artist context from profileId (server-side) or client-provided data.
- * Returns { data } on success or { error } with a NextResponse on failure.
+ * Returns { context } on success or { error } with a NextResponse on failure.
  */
 async function resolveArtistContext(
   profileId: unknown,
-  userId: string,
-  clientContext: unknown
+  artistContextInput: unknown,
+  userId: string
 ): Promise<
-  { data: ArtistContext; error?: never } | { data?: never; error: NextResponse }
+  | { context: ArtistContext; error?: never }
+  | { context?: never; error: NextResponse }
 > {
   if (profileId && typeof profileId === 'string') {
     const context = await fetchArtistContext(profileId, userId);
@@ -183,11 +185,11 @@ async function resolveArtistContext(
         ),
       };
     }
-    return { data: context };
+    return { context };
   }
 
   // Backward compatibility: accept client-provided artistContext with validation
-  const parseResult = artistContextSchema.safeParse(clientContext);
+  const parseResult = artistContextSchema.safeParse(artistContextInput);
   if (!parseResult.success) {
     return {
       error: NextResponse.json(
@@ -199,7 +201,7 @@ async function resolveArtistContext(
       ),
     };
   }
-  return { data: parseResult.data };
+  return { context: parseResult.data };
 }
 
 /**
@@ -584,13 +586,13 @@ export async function POST(req: Request) {
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
     profileId,
-    userId,
-    body.artistContext
+    body.artistContext,
+    userId
   );
   if (contextResult.error) {
     return contextResult.error;
   }
-  const artistContext = contextResult.data;
+  const artistContext = contextResult.context;
 
   const systemPrompt = buildSystemPrompt(artistContext);
 
@@ -603,7 +605,7 @@ export async function POST(req: Request) {
       profileId && typeof profileId === 'string' ? profileId : null;
 
     const result = streamText({
-      model: gateway('anthropic:claude-sonnet-4-20250514'),
+      model: gateway(CHAT_MODEL),
       system: systemPrompt,
       messages: modelMessages,
       tools: {

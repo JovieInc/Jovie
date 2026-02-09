@@ -34,6 +34,43 @@ import {
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
+function MatchDescription({
+  isSuggested,
+  syncState,
+  match,
+  linkCoverage,
+}: {
+  readonly isSuggested: boolean;
+  readonly syncState: SyncState;
+  readonly match: DspMatch;
+  readonly linkCoverage: { total: number; withAppleMusic: number };
+}) {
+  const isrcLabel = match.matchingIsrcCount === 1 ? 'match' : 'matches';
+
+  if (isSuggested) {
+    return (
+      <>
+        Found via {match.matchingIsrcCount} ISRC {isrcLabel}. Confirm to link
+        your Apple Music releases.
+      </>
+    );
+  }
+
+  return (
+    <>
+      {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
+      {match.matchingIsrcCount} ISRC {isrcLabel}
+      {linkCoverage.total > 0 && (
+        <span className='text-tertiary-token'>
+          {' '}
+          &middot; {linkCoverage.withAppleMusic}/{linkCoverage.total} releases
+          with Apple Music links
+        </span>
+      )}
+    </>
+  );
+}
+
 interface AppleMusicSyncBannerProps {
   readonly profileId: string;
   readonly spotifyConnected: boolean;
@@ -234,26 +271,12 @@ export function AppleMusicSyncBanner({
           </div>
 
           <p className='mt-0.5 text-xs text-secondary-token'>
-            {isSuggested ? (
-              <>
-                Found via {match.matchingIsrcCount} ISRC{' '}
-                {match.matchingIsrcCount === 1 ? 'match' : 'matches'}. Confirm
-                to link your Apple Music releases.
-              </>
-            ) : (
-              <>
-                {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
-                {match.matchingIsrcCount} ISRC{' '}
-                {match.matchingIsrcCount === 1 ? 'match' : 'matches'}
-                {linkCoverage.total > 0 && (
-                  <span className='text-tertiary-token'>
-                    {' '}
-                    &middot; {linkCoverage.withAppleMusic}/{linkCoverage.total}{' '}
-                    releases with Apple Music links
-                  </span>
-                )}
-              </>
-            )}
+            <MatchDescription
+              isSuggested={isSuggested}
+              syncState={syncState}
+              match={match}
+              linkCoverage={linkCoverage}
+            />
           </p>
         </div>
 

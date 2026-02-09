@@ -3,7 +3,6 @@
 import { Badge } from '@jovie/ui';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
@@ -11,13 +10,39 @@ import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import type { Release } from './types';
 
+/** Minimal track shape returned by the API route (no providers needed). */
+type SidebarTrack = Pick<
+  TrackViewModel,
+  | 'id'
+  | 'releaseId'
+  | 'title'
+  | 'trackNumber'
+  | 'discNumber'
+  | 'durationMs'
+  | 'isrc'
+  | 'isExplicit'
+>;
+
+/**
+ * Fetch tracks via the route handler instead of a server action.
+ * Server action calls trigger RSC tree reconciliation which can
+ * cause the parent drawer to unmount.
+ */
+async function fetchTracks(releaseId: string): Promise<SidebarTrack[]> {
+  const res = await fetch(
+    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`
+  );
+  if (!res.ok) throw new Error('Failed to load tracks');
+  return res.json() as Promise<SidebarTrack[]>;
+}
+
 interface ReleaseTrackListProps {
   readonly release: Release;
 }
 
 export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [tracks, setTracks] = useState<TrackViewModel[] | null>(null);
+  const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -35,10 +60,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     setIsLoading(true);
     setHasError(false);
     try {
-      const result = await loadTracksForRelease({
-        releaseId: release.id,
-        releaseSlug: release.slug,
-      });
+      const result = await fetchTracks(release.id);
       setTracks(result);
     } catch (error) {
       console.error('Failed to load tracks:', error);
@@ -47,7 +69,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isExpanded, tracks, hasError, release.id, release.slug]);
+  }, [isExpanded, tracks, hasError, release.id]);
 
   if (release.totalTracks === 0) return null;
 
@@ -60,7 +82,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token hover:text-primary-token transition-colors'
+        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token hover:text-secondary-token transition-colors'
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -101,7 +123,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
   );
 }
 
-function TrackItem({ track }: { readonly track: TrackViewModel }) {
+function TrackItem({ track }: { readonly track: SidebarTrack }) {
   const trackLabel =
     track.discNumber > 1
       ? `${track.discNumber}-${track.trackNumber}`

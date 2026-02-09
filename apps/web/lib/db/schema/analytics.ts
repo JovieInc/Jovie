@@ -167,6 +167,11 @@ export const notificationSubscriptions = pgTable(
         releasePreview: true,
         releaseDay: true,
       }),
+    // Double opt-in: null = unconfirmed (pending), non-null = confirmed
+    confirmedAt: timestamp('confirmed_at'),
+    // HMAC token hash for email verification link
+    confirmationToken: text('confirmation_token'),
+    confirmationSentAt: timestamp('confirmation_sent_at'),
     unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

@@ -65,7 +65,8 @@ export interface BioSyncResponse {
 const emailProvider = new ResendEmailProvider();
 
 /**
- * Process a single DSP provider bio sync, handling errors and tracking.
+ * Process a single DSP provider bio sync, handling both email and API methods.
+ * Catches and records failures as tracking records.
  */
 async function syncSingleProvider(params: {
   profile: typeof creatorProfiles.$inferSelect;
@@ -112,6 +113,8 @@ async function syncSingleProvider(params: {
 
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
+    const errorDetail = error instanceof Error ? error.stack : String(error);
+
     const [syncRequest] = await db
       .insert(dspBioSyncRequests)
       .values({
@@ -123,7 +126,7 @@ async function syncSingleProvider(params: {
         error: errorMessage,
         metadata: {
           bioSnapshot: bioText,
-          errorDetail: error instanceof Error ? error.stack : String(error),
+          errorDetail,
         } satisfies DspBioSyncMetadata,
       })
       .returning({ id: dspBioSyncRequests.id });
