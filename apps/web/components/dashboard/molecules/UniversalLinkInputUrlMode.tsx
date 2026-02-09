@@ -6,7 +6,7 @@ import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-import { isBrandDark } from '@/lib/utils/color';
+import { contrastRatio, isBrandDark } from '@/lib/utils/color';
 import { type DetectedLink } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputPlatformSelector } from './UniversalLinkInputPlatformSelector';
@@ -81,7 +81,9 @@ export function UniversalLinkInputUrlMode({
     : '#6b7280';
 
   const isDarkBrand = isBrandDark(brandColor);
-  const iconColor = isDarkBrand ? '#ffffff' : brandColor;
+  // Use WCAG 3:1 contrast ratio for text-on-brand-bg color selection
+  const useWhiteIcon = contrastRatio('#ffffff', brandColor) >= 3;
+  const iconColor = useWhiteIcon ? '#ffffff' : brandColor;
   const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
 
   return (

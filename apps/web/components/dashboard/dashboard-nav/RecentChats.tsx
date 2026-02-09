@@ -134,7 +134,7 @@ export function RecentChats() {
                     />
                     <span className='flex-1 truncate text-[13px]'>{title}</span>
                     <span
-                      className='shrink-0 text-[10px] tabular-nums text-sidebar-muted group-data-[collapsible=icon]:hidden'
+                      className='shrink-0 text-[10px] tabular-nums text-sidebar-muted group-data-[collapsible=icon]:hidden transition-opacity duration-150 group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0'
                       title={updatedAt.toLocaleString()}
                     >
                       {timeAgo}

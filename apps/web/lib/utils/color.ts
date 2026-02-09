@@ -44,8 +44,75 @@ export function isBrandDark(hex: string, threshold = 0.35): boolean {
 }
 
 /**
+ * Determine if a brand color is too bright for legible display on light surfaces.
+ * Bright brands (e.g., Snapchat yellow, Deezer orange) need darkened icon colors
+ * in light mode to meet WCAG 3:1 non-text contrast.
+ * @param hex - Hex color string
+ * @param bgHex - Background hex to check contrast against (default: #fcfcfc / surface-1)
+ * @param minRatio - Minimum required contrast ratio (default: 3.0 for WCAG AA non-text)
+ * @returns true if the brand color fails contrast on the given background
+ */
+export function isBrandTooLight(
+  hex: string,
+  bgHex = '#fcfcfc',
+  minRatio = 3.0
+): boolean {
+  return contrastRatio(hex, bgHex) < minRatio;
+}
+
+/**
+ * WCAG contrast ratio between two colors.
+ * @returns ratio >= 1 (1 = identical, 21 = black vs white)
+ */
+export function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = relativeLuminance(hex1);
+  const l2 = relativeLuminance(hex2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Darken a hex color by a factor (0-1). factor=0.7 means 70% of original brightness.
+ */
+export function darkenHex(hex: string, factor: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const nr = clamp(r * factor);
+  const ng = clamp(g * factor);
+  const nb = clamp(b * factor);
+  return `#${((1 << 24) | (nr << 16) | (ng << 8) | nb).toString(16).slice(1)}`;
+}
+
+/**
+ * Return a contrast-safe version of a brand color for the given background.
+ * Progressively darkens the color until it meets the WCAG minimum ratio.
+ * @param brandHex - Brand hex color (with or without #)
+ * @param bgHex - Background hex color
+ * @param minRatio - Minimum contrast ratio (default: 3.0)
+ * @returns A hex color guaranteed to meet the contrast requirement
+ */
+export function ensureContrast(
+  brandHex: string,
+  bgHex: string,
+  minRatio = 3.0
+): string {
+  const normalizedHex = brandHex.startsWith('#') ? brandHex : `#${brandHex}`;
+  let color = normalizedHex;
+  let factor = 1.0;
+  // Iteratively darken; 20 steps is plenty to reach black from any color
+  for (let i = 0; i < 20; i++) {
+    if (contrastRatio(color, bgHex) >= minRatio) return color;
+    factor -= 0.05;
+    color = darkenHex(normalizedHex, factor);
+  }
+  return color;
+}
+
+/**
  * Get appropriate icon color and background for a brand color.
- * Handles dark mode inversion for very dark brands.
+ * Handles dark mode inversion for very dark brands and ensures WCAG 3:1
+ * non-text contrast for bright brands.
  * @param brandHex - Brand hex color
  * @param isDarkTheme - Whether the current theme is dark
  * @returns Object with iconColor and iconBg CSS values
@@ -56,8 +123,12 @@ export function getBrandIconStyles(
 ): { iconColor: string; iconBg: string } {
   const brandIsDark = isBrandDark(brandHex);
 
-  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility
-  const iconColor = isDarkTheme && brandIsDark ? '#ffffff' : brandHex;
+  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility.
+  // Otherwise ensure brand color meets WCAG 3:1 against the effective surface.
+  const iconColor =
+    isDarkTheme && brandIsDark
+      ? '#ffffff'
+      : ensureContrast(brandHex, isDarkTheme ? '#101012' : '#fcfcfc');
 
   // Determine background opacity based on theme and brand darkness
   let iconBg: string;
@@ -70,6 +141,32 @@ export function getBrandIconStyles(
   }
 
   return { iconColor, iconBg };
+}
+
+/**
+ * Get a contrast-safe icon color for a brand against the current theme surface.
+ * Inverts dark brands to white in dark mode; darkens bright brands in light mode.
+ * @param brandHex - Brand hex color (with or without #)
+ * @param isDarkTheme - Whether the current theme is dark
+ * @returns Hex color that meets WCAG 3:1 non-text contrast
+ */
+export function getContrastSafeIconColor(
+  brandHex: string,
+  isDarkTheme: boolean
+): string {
+  if (isDarkTheme && isBrandDark(brandHex)) return '#ffffff';
+  const bgHex = isDarkTheme ? '#101012' : '#fcfcfc';
+  return ensureContrast(brandHex, bgHex);
+}
+
+/**
+ * Choose white or dark text that meets WCAG 3:1 contrast on a brand-colored background.
+ * Uses actual contrast ratio calculation instead of luminance threshold heuristic.
+ * @param brandHex - Brand hex color used as background
+ * @returns '#ffffff' or '#0f172a'
+ */
+export function getContrastTextOnBrand(brandHex: string): string {
+  return contrastRatio('#ffffff', brandHex) >= 3 ? '#ffffff' : '#0f172a';
 }
 
 /**

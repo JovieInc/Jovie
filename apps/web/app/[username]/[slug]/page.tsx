@@ -9,6 +9,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
@@ -53,11 +54,7 @@ function generateMusicStructuredData(
   }
 ) {
   const artistName = creator.displayName ?? creator.username;
-  // Guard against undefined title - use slug as fallback for valid URL
-  const titleSlug = (content.title ?? content.slug)
-    .toLowerCase()
-    .replaceAll(/\s+/g, '-');
-  const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${titleSlug}`;
+  const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
   const artistUrl = `${BASE_URL}/${creator.usernameNormalized}`;
 
   // Build sameAs array from provider links
@@ -69,6 +66,7 @@ function generateMusicStructuredData(
   const musicSchema = {
     '@context': 'https://schema.org',
     '@type': schemaType,
+    '@id': `${contentUrl}#${content.type}`,
     name: content.title,
     url: contentUrl,
     ...(content.artworkUrl && { image: content.artworkUrl }),
@@ -77,6 +75,7 @@ function generateMusicStructuredData(
     }),
     byArtist: {
       '@type': 'MusicGroup',
+      '@id': `${artistUrl}#musicgroup`,
       name: artistName,
       url: artistUrl,
     },
@@ -137,8 +136,11 @@ interface ContentData {
 
 /**
  * Fetch creator by normalized username.
+ * Uses unstable_cache for cross-request caching with targeted invalidation.
+ * Wrapped in React.cache() for per-request deduplication between
+ * generateMetadata and page render (same pattern as profile pages).
  */
-const getCreatorByUsername = cache(async (usernameNormalized: string) => {
+const fetchCreatorByUsername = async (usernameNormalized: string) => {
   const [creator] = await db
     .select({
       id: creatorProfiles.id,
@@ -152,88 +154,125 @@ const getCreatorByUsername = cache(async (usernameNormalized: string) => {
     .limit(1);
 
   return creator ?? null;
+};
+
+const getCreatorByUsername = cache(async (usernameNormalized: string) => {
+  // Skip Next.js cache in test/development (match profile page behavior)
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
+    return fetchCreatorByUsername(usernameNormalized);
+  }
+
+  return unstable_cache(
+    () => fetchCreatorByUsername(usernameNormalized),
+    [`smartlink-creator-${usernameNormalized}`],
+    {
+      tags: [
+        'smartlink-creator',
+        `smartlink-creator:${usernameNormalized}`,
+        `public-profile:${usernameNormalized}`,
+      ],
+      revalidate: 3600, // 1 hour, matches profile page TTL
+    }
+  )();
 });
+
+/**
+ * Serialized content data for JSON-safe caching.
+ * Dates are stored as ISO strings and rehydrated on read.
+ */
+interface CachedContentData {
+  type: ContentType;
+  id: string;
+  title: string;
+  slug: string;
+  artworkUrl: string | null;
+  releaseDate: string | null;
+  providerLinks: Array<{ providerId: string; url: string }>;
+}
 
 /**
  * Fetch content (release or track) by creator and slug.
  */
-const getContentBySlug = cache(
-  async (
-    creatorProfileId: string,
-    slug: string
-  ): Promise<Omit<ContentData, 'creator'> | null> => {
-    // Try release first
-    const [release] = await db
+const fetchContentBySlug = async (
+  creatorProfileId: string,
+  slug: string
+): Promise<CachedContentData | null> => {
+  // Try release first
+  const [release] = await db
+    .select({
+      id: discogReleases.id,
+      title: discogReleases.title,
+      slug: discogReleases.slug,
+      artworkUrl: discogReleases.artworkUrl,
+      releaseDate: discogReleases.releaseDate,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        eq(discogReleases.slug, slug)
+      )
+    )
+    .limit(1);
+
+  if (release) {
+    const links = await db
       .select({
-        id: discogReleases.id,
-        title: discogReleases.title,
-        slug: discogReleases.slug,
-        artworkUrl: discogReleases.artworkUrl,
-        releaseDate: discogReleases.releaseDate,
+        providerId: providerLinks.providerId,
+        url: providerLinks.url,
       })
-      .from(discogReleases)
+      .from(providerLinks)
       .where(
         and(
-          eq(discogReleases.creatorProfileId, creatorProfileId),
-          eq(discogReleases.slug, slug)
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, release.id)
         )
+      );
+
+    return {
+      type: 'release',
+      id: release.id,
+      title: release.title,
+      slug: release.slug,
+      artworkUrl: release.artworkUrl,
+      releaseDate: release.releaseDate?.toISOString() ?? null,
+      providerLinks: links,
+    };
+  }
+
+  // Try track
+  const [track] = await db
+    .select({
+      id: discogTracks.id,
+      title: discogTracks.title,
+      slug: discogTracks.slug,
+      releaseId: discogTracks.releaseId,
+    })
+    .from(discogTracks)
+    .where(
+      and(
+        eq(discogTracks.creatorProfileId, creatorProfileId),
+        eq(discogTracks.slug, slug)
       )
-      .limit(1);
+    )
+    .limit(1);
 
-    if (release) {
-      const links = await db
-        .select({
-          providerId: providerLinks.providerId,
-          url: providerLinks.url,
-        })
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release'),
-            eq(providerLinks.releaseId, release.id)
-          )
-        );
-
-      return {
-        type: 'release',
-        id: release.id,
-        title: release.title,
-        slug: release.slug,
-        artworkUrl: release.artworkUrl,
-        releaseDate: release.releaseDate,
-        providerLinks: links,
-      };
-    }
-
-    // Try track
-    const [track] = await db
-      .select({
-        id: discogTracks.id,
-        title: discogTracks.title,
-        slug: discogTracks.slug,
-        releaseId: discogTracks.releaseId,
-      })
-      .from(discogTracks)
-      .where(
-        and(
-          eq(discogTracks.creatorProfileId, creatorProfileId),
-          eq(discogTracks.slug, slug)
-        )
-      )
-      .limit(1);
-
-    if (track) {
-      // Get release for artwork
-      const [releaseData] = await db
+  if (track) {
+    // Get release for artwork and provider links in parallel
+    const [releaseData, links] = await Promise.all([
+      db
         .select({
           artworkUrl: discogReleases.artworkUrl,
           releaseDate: discogReleases.releaseDate,
         })
         .from(discogReleases)
         .where(eq(discogReleases.id, track.releaseId))
-        .limit(1);
-
-      const links = await db
+        .limit(1)
+        .then(rows => rows[0]),
+      db
         .select({
           providerId: providerLinks.providerId,
           url: providerLinks.url,
@@ -244,20 +283,63 @@ const getContentBySlug = cache(
             eq(providerLinks.ownerType, 'track'),
             eq(providerLinks.trackId, track.id)
           )
-        );
+        ),
+    ]);
 
-      return {
-        type: 'track',
-        id: track.id,
-        title: track.title,
-        slug: track.slug,
-        artworkUrl: releaseData?.artworkUrl ?? null,
-        releaseDate: releaseData?.releaseDate ?? null,
-        providerLinks: links,
-      };
+    return {
+      type: 'track',
+      id: track.id,
+      title: track.title,
+      slug: track.slug,
+      artworkUrl: releaseData?.artworkUrl ?? null,
+      releaseDate: releaseData?.releaseDate?.toISOString() ?? null,
+      providerLinks: links,
+    };
+  }
+
+  return null;
+};
+
+/**
+ * Rehydrate cached content data — converts ISO date strings back to Date objects.
+ */
+function rehydrateContent(
+  cached: CachedContentData
+): Omit<ContentData, 'creator'> {
+  return {
+    ...cached,
+    releaseDate: cached.releaseDate ? new Date(cached.releaseDate) : null,
+  };
+}
+
+const getContentBySlug = cache(
+  async (
+    creatorProfileId: string,
+    slug: string
+  ): Promise<Omit<ContentData, 'creator'> | null> => {
+    // Skip Next.js cache in test/development
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.NODE_ENV === 'development'
+    ) {
+      const result = await fetchContentBySlug(creatorProfileId, slug);
+      return result ? rehydrateContent(result) : null;
     }
 
-    return null;
+    const cached = await unstable_cache(
+      () => fetchContentBySlug(creatorProfileId, slug),
+      [`smartlink-content-${creatorProfileId}-${slug}`],
+      {
+        tags: [
+          'smartlink-content',
+          `smartlink-content:${creatorProfileId}`,
+          `smartlink-content:${creatorProfileId}:${slug}`,
+        ],
+        revalidate: 300, // 5 minutes, matches ISR
+      }
+    )();
+
+    return cached ? rehydrateContent(cached) : null;
   }
 );
 
@@ -434,7 +516,6 @@ export default async function ContentSmartLinkPage({
             avatarUrl: creator.avatarUrl,
           }}
           providers={allProviders}
-          slug={`${creator.usernameNormalized}/${content.slug}`}
         />
       )}
     </>
