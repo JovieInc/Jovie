@@ -13,7 +13,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   audience: 'Audience',
   earnings: 'Earnings',
   analytics: 'Analytics',
-  chat: 'Chat',
+  chat: 'New thread',
   'tour-dates': 'Tour dates',
 
   // Settings routes
