@@ -122,6 +122,7 @@ export interface NotificationSubscribeResponse {
   message: string;
   emailDispatched: boolean;
   durationMs: number;
+  pendingConfirmation?: boolean;
 }
 
 export interface NotificationUnsubscribeResponse {
