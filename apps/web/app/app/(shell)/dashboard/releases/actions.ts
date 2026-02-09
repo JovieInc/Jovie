@@ -337,6 +337,37 @@ export async function resetProviderOverride(params: {
 }
 
 /**
+ * Refresh a single release from the database.
+ * Re-fetches the release data (including provider links) without hitting Spotify API.
+ */
+export async function refreshRelease(params: {
+  releaseId: string;
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  const release = await getReleaseById(params.releaseId);
+  if (!release || release.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const providerLabels = buildProviderLabels();
+
+  return mapReleaseToViewModel(
+    release,
+    providerLabels,
+    profile.id,
+    profile.handle
+  );
+}
+
+/**
  * Sync releases from Spotify
  */
 export async function syncFromSpotify(): Promise<{

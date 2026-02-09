@@ -66,6 +66,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     closeEditor,
     handleCopy,
     handleSync,
+    handleRefreshRelease,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
@@ -422,7 +423,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <Suspense
           fallback={
             <div
-              className='h-full animate-pulse bg-surface-1'
+              className='h-full animate-pulse bg-surface-2'
               style={{ width: SIDEBAR_WIDTH }}
             />
           }
@@ -434,7 +435,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             providerConfig={providerConfig}
             artistName={artistName}
             onClose={closeEditor}
-            onRefresh={handleSync}
+            onRefresh={editingRelease ? () => handleRefreshRelease(editingRelease.id) : undefined}
             onAddDspLink={handleAddUrl}
             isSaving={isSaving}
           />

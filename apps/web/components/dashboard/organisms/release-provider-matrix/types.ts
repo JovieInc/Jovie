@@ -48,6 +48,7 @@ export interface UseReleaseProviderMatrixReturn {
   handleSave: (provider: ProviderKey) => void;
   handleReset: (provider: ProviderKey) => void;
   handleSync: () => void;
+  handleRefreshRelease: (releaseId: string) => void;
   handleAddUrl: (
     releaseId: string,
     provider: ProviderKey,
