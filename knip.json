@@ -1,5 +1,18 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "exclude": [
+    "files",
+    "exports",
+    "types",
+    "nsExports",
+    "nsTypes",
+    "enumMembers",
+    "classMembers",
+    "duplicates",
+    "unlisted",
+    "binaries",
+    "unresolved"
+  ],
   "workspaces": {
     ".": {},
     "apps/web": {
@@ -13,7 +26,8 @@
         ".next/**",
         "drizzle/migrations/**",
         "drizzle.config.ts",
-        ".storybook/**"
+        ".storybook/**",
+        "lib/db/schema/**"
       ],
       "ignoreDependencies": [
         "@tailwindcss/forms",
@@ -25,7 +39,42 @@
         "ignore-loader",
         "@fontsource-variable/inter",
         "geist",
-        "drizzle-kit"
+        "drizzle-kit",
+        "tw-animate-css",
+        "@clerk/backend",
+        "@clerk/dev-cli",
+        "@eslint/eslintrc",
+        "@eslint/js",
+        "@typescript-eslint/eslint-plugin",
+        "axe-core",
+        "axe-playwright",
+        "eslint-plugin-storybook",
+        "shadcn",
+        "hono",
+        "@clerk/elements",
+        "@hookform/resolvers",
+        "@radix-ui/react-alert-dialog",
+        "@radix-ui/react-avatar",
+        "@radix-ui/react-checkbox",
+        "@radix-ui/react-dropdown-menu",
+        "@radix-ui/react-label",
+        "@radix-ui/react-popover",
+        "@radix-ui/react-radio-group",
+        "@radix-ui/react-select",
+        "@radix-ui/react-switch",
+        "@radix-ui/react-tabs",
+        "@radix-ui/react-toggle",
+        "@radix-ui/react-toggle-group",
+        "@radix-ui/react-tooltip",
+        "@statsig/react-bindings",
+        "@statsig/session-replay",
+        "@stripe/stripe-js",
+        "@vercel/edge-config",
+        "flags",
+        "react-hook-form",
+        "@types/dompurify",
+        "@types/uuid",
+        "uuid"
       ],
       "playwright": {
         "config": [
@@ -63,7 +112,7 @@
       "entry": ["next.config.{js,ts}"],
       "project": ["**/*.{ts,tsx,js,jsx}"],
       "ignore": [".next/**"],
-      "ignoreDependencies": ["@fontsource-variable/inter"],
+      "ignoreDependencies": ["@fontsource-variable/inter", "tailwindcss"],
       "next": {
         "entry": ["next.config.{js,ts}"]
       }

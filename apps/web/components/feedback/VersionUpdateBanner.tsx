@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 
 interface VersionUpdateBannerProps {
+  readonly version?: string;
   readonly onReload: () => void;
   readonly onDismiss: () => void;
 }
@@ -14,6 +15,7 @@ interface VersionUpdateBannerProps {
  * prompting the user to reload the window.
  */
 export function VersionUpdateBanner({
+  version,
   onReload,
   onDismiss,
 }: VersionUpdateBannerProps) {
@@ -28,7 +30,7 @@ export function VersionUpdateBanner({
 
           <div className='min-w-0 flex-1'>
             <p className='text-sm font-semibold text-primary-token'>
-              New version available
+              New version available{version ? ` (v${version})` : ''}
             </p>
             <p className='mt-1 text-sm text-secondary-token'>
               An improved version of Jovie is available. Please reload this

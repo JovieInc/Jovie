@@ -6,8 +6,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export function GET() {
+  const version = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
+  const environment = process.env.VERCEL_ENV;
+
   try {
-    // Read buildId from .next/BUILD_ID
     const buildId = readFileSync(
       join(process.cwd(), '.next/BUILD_ID'),
       'utf-8'
@@ -15,16 +17,17 @@ export function GET() {
 
     return NextResponse.json({
       buildId,
+      version,
       deployedAt: process.env.VERCEL_DEPLOYMENT_TIME || Date.now(),
       commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
-      environment: process.env.VERCEL_ENV,
+      environment,
     });
   } catch {
-    // Fallback if BUILD_ID not available (file may not exist in development)
     return NextResponse.json({
       buildId: 'unknown',
+      version,
       deployedAt: Date.now(),
-      environment: process.env.VERCEL_ENV,
+      environment,
     });
   }
 }
