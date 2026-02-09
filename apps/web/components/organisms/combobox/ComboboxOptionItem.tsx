@@ -3,22 +3,14 @@
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 import type { ComboboxOption } from './types';
 
 interface ComboboxOptionItemProps {
   readonly option: ComboboxOption;
   readonly index: number;
-}
-
-function getOptionInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 /** Option image with loading shimmer and error fallback */
@@ -32,6 +24,11 @@ function OptionImage({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+  }, [imageUrl]);
+
   if (!imageUrl || hasError) {
     return (
       <div
@@ -39,7 +36,7 @@ function OptionImage({
         aria-hidden='true'
       >
         <span className='text-[10px] font-medium text-secondary-token select-none leading-none'>
-          {getOptionInitials(name)}
+          {getInitials(name)}
         </span>
       </div>
     );

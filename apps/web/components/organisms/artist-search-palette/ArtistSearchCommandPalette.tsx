@@ -12,6 +12,7 @@ import { useAppleMusicArtistSearchQuery } from '@/lib/queries/useAppleMusicArtis
 import type { SpotifyArtistResult } from '@/lib/queries/useArtistSearchQuery';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 
 type DspProvider = 'spotify' | 'apple_music';
 type ArtistResult = SpotifyArtistResult | AppleMusicArtistResult;
@@ -41,15 +42,6 @@ const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 const SKELETON_NAME_WIDTHS = ['w-28', 'w-36', 'w-24'] as const;
 const SKELETON_META_WIDTHS = ['w-20', 'w-16', 'w-24'] as const;
 
-function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 /** Module-scoped component: artist avatar with loading shimmer, error fallback, and placeholder */
 function ArtistResultImage({
   imageUrl,
@@ -62,6 +54,11 @@ function ArtistResultImage({
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+  }, [imageUrl]);
 
   if (!imageUrl || hasError) {
     return (
