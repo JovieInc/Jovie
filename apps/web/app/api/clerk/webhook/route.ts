@@ -4,6 +4,7 @@ import { Webhook } from 'svix';
 import { getClerkHandler } from '@/lib/auth/clerk-webhook/registry';
 import type { ClerkWebhookEvent } from '@/lib/auth/clerk-webhook/types';
 import { env } from '@/lib/env-server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 
@@ -114,6 +115,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Webhook processing error:', error);
+    await captureCriticalError('Clerk webhook processing failed', error, {
+      route: '/api/clerk/webhook',
+      method: 'POST',
+    });
     return NextResponse.json(
       {
         error: 'Internal server error',

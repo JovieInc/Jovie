@@ -38,6 +38,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
@@ -800,7 +801,10 @@ export async function connectAppleMusicArtist(params: {
           updatedAt: now,
         },
       });
-  } catch {
+  } catch (error) {
+    await captureError('Apple Music connection save failed', error, {
+      action: 'connectAppleMusicArtist',
+    });
     return {
       success: false,
       message: 'Failed to save Apple Music connection. Please try again.',

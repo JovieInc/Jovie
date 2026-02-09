@@ -12,6 +12,7 @@ import {
 import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
@@ -347,6 +348,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('[Audience Click] Error', error);
+    await captureError('Audience click tracking failed', error, {
+      route: '/api/audience/click',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Unable to record click' },
       { status: 500, headers: NO_STORE_HEADERS }

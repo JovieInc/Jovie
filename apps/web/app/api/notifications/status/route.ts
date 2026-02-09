@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   buildInvalidRequestResponse,
   getNotificationStatusDomain,
@@ -58,6 +59,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Notifications Status] Error:', error);
+    await captureError('Notification status fetch failed', error, {
+      route: '/api/notifications/status',
+      method: 'POST',
+    });
     return NextResponse.json(
       {
         success: false,
