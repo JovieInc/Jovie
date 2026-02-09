@@ -126,22 +126,15 @@ export function CommonDropdown(props: CommonDropdownProps) {
   } = props;
 
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [filteredItems, setFilteredItems] = React.useState(items);
 
-  // Search functionality
-  React.useEffect(() => {
-    if (!searchable) {
-      setFilteredItems(items);
-      return;
-    }
-
-    if (!searchQuery.trim()) {
-      setFilteredItems(items);
-      return;
+  // Derive filtered items synchronously to avoid stale state when the menu opens
+  const filteredItems = React.useMemo(() => {
+    if (!searchable || !searchQuery.trim()) {
+      return items;
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = items.filter(item => {
+    return items.filter(item => {
       if (isLabel(item) || isSeparator(item) || isCustomItem(item)) return true;
 
       if (isActionItem(item)) {
@@ -164,10 +157,14 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
       return false;
     });
+  }, [searchQuery, items, searchable]);
 
-    setFilteredItems(filtered);
-    onSearch?.(searchQuery);
-  }, [searchQuery, items, searchable, onSearch]);
+  // Notify parent of search query changes
+  React.useEffect(() => {
+    if (searchable && searchQuery) {
+      onSearch?.(searchQuery);
+    }
+  }, [searchQuery, searchable, onSearch]);
 
   // Render context menu variant
   if (variant === 'context') {

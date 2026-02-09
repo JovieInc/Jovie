@@ -103,8 +103,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         onClick: handleCopySmartLink,
       },
       {
-        id: 'separator-1',
-        label: 'separator',
+        id: 'separator',
+        label: '',
         onClick: () => {},
       },
       {
