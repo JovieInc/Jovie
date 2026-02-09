@@ -1,6 +1,6 @@
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { handleActivationKeyDown } from './keyboard';
+import { handleActivationKeyDown, isFormElement } from './keyboard';
 
 describe('handleActivationKeyDown', () => {
   const createEvent = (
@@ -99,5 +99,47 @@ describe('handleActivationKeyDown', () => {
 
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe('isFormElement', () => {
+  it('returns true for INPUT elements', () => {
+    const input = document.createElement('input');
+    expect(isFormElement(input)).toBe(true);
+  });
+
+  it('returns true for TEXTAREA elements', () => {
+    const textarea = document.createElement('textarea');
+    expect(isFormElement(textarea)).toBe(true);
+  });
+
+  it('returns true for SELECT elements', () => {
+    const select = document.createElement('select');
+    expect(isFormElement(select)).toBe(true);
+  });
+
+  it('returns true for contentEditable elements', () => {
+    const div = document.createElement('div');
+    div.contentEditable = 'true';
+    expect(isFormElement(div)).toBe(true);
+  });
+
+  it('returns false for regular div', () => {
+    const div = document.createElement('div');
+    expect(isFormElement(div)).toBe(false);
+  });
+
+  it('returns false for button elements', () => {
+    const button = document.createElement('button');
+    expect(isFormElement(button)).toBe(false);
+  });
+
+  it('returns false for null', () => {
+    expect(isFormElement(null)).toBe(false);
+  });
+
+  it('returns false for non-HTMLElement EventTarget', () => {
+    const target = new EventTarget();
+    expect(isFormElement(target)).toBe(false);
   });
 });
