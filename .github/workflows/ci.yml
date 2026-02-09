@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, 'codegen-bot/**']
+    branches: [main, 'codegen-bot/**', 'claude/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -234,7 +234,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck --filter=@jovie/web
+        run: pnpm turbo typecheck
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
