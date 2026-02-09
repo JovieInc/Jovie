@@ -80,27 +80,13 @@ export function DashboardNav(_: DashboardNavProps) {
   // Settings nav: "General" (user) and artist name (or "Artist") groups
   const artistSettingsLabel = artistName || 'Artist';
 
-  // Memoize nav sections to prevent creating new objects on every render
+  // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(
-    () =>
-      isInSettings
-        ? [
-            {
-              key: 'settings-general',
-              label: 'General',
-              items: userSettingsNavigation,
-            },
-            {
-              key: 'settings-artist',
-              label: artistSettingsLabel,
-              items: artistSettingsNavigation,
-            },
-          ]
-        : [
-            { key: 'primary', items: primaryItems },
-            { key: 'secondary', items: secondaryItems },
-          ],
-    [isInSettings, primaryItems, secondaryItems, artistSettingsLabel]
+    () => [
+      { key: 'primary', items: primaryItems },
+      { key: 'secondary', items: secondaryItems },
+    ],
+    [primaryItems, secondaryItems]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
@@ -153,24 +139,30 @@ export function DashboardNav(_: DashboardNavProps) {
 
   return (
     <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
-      <SidebarGroup className='mb-1'>
-        <SidebarGroupContent className='space-y-0'>
-          {navSections.map((section, index) => (
-            <div key={section.key} data-nav-section>
-              {/* Section divider for visual separation (except for first section) */}
-              {index > 0 && (
-                <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
-              )}
-              {'label' in section && section.label && (
-                <p className='px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-item-icon group-data-[collapsible=icon]:hidden'>
-                  {section.label}
-                </p>
-              )}
-              {renderSection(section.items)}
-            </div>
-          ))}
-        </SidebarGroupContent>
-      </SidebarGroup>
+      {isInSettings ? (
+        <>
+          <SidebarCollapsibleGroup label='General' defaultOpen>
+            {renderSection(userSettingsNavigation)}
+          </SidebarCollapsibleGroup>
+          <SidebarCollapsibleGroup label={artistSettingsLabel} defaultOpen>
+            {renderSection(artistSettingsNavigation)}
+          </SidebarCollapsibleGroup>
+        </>
+      ) : (
+        <SidebarGroup className='mb-1'>
+          <SidebarGroupContent className='space-y-0'>
+            {navSections.map((section, index) => (
+              <div key={section.key} data-nav-section>
+                {/* Section divider for visual separation (except for first section) */}
+                {index > 0 && (
+                  <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
+                )}
+                {renderSection(section.items)}
+              </div>
+            ))}
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
 
       {!isInSettings && (
         <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50'>
