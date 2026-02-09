@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { UnreleasedReleaseHero } from '@/components/release/UnreleasedReleaseHero';
+import { ReleaseLandingPage } from '../../../app/r/[slug]/ReleaseLandingPage';
 
 type LinkProps = {
   readonly href: string;
@@ -82,7 +82,6 @@ describe('release artist links', () => {
             url: 'https://open.spotify.com',
           },
         ]}
-        slug='test-release'
       />
     );
 
@@ -104,7 +103,6 @@ describe('release artist links', () => {
           avatarUrl: null,
         }}
         providers={[]}
-        slug='test-release'
       />
     );
 
