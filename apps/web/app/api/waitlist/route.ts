@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, type TransactionType } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
@@ -185,7 +185,7 @@ function safeRandomHandle(): string {
  * Ported from approve/route.ts for profile auto-creation on signup
  */
 async function findAvailableHandle(
-  dbOrTx: TransactionType | typeof db,
+  dbOrTx: DbOrTransaction,
   base: string
 ): Promise<string> {
   const normalizedBase = normalizeUsername(base).slice(0, 30);

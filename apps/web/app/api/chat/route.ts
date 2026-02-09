@@ -97,7 +97,7 @@ async function fetchArtistContext(
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (!result || result.userClerkId !== clerkUserId) {
+  if (result?.userClerkId !== clerkUserId) {
     return null;
   }
 
@@ -164,8 +164,8 @@ async function fetchArtistContext(
 }
 
 /**
- * Resolves artist context from either a profileId (server-side fetch)
- * or a client-provided artistContext object (backward compatibility).
+ * Resolves artist context from profileId (server-side) or client-provided data.
+ * Returns { context } on success or { error } with a NextResponse on failure.
  */
 async function resolveArtistContext(
   profileId: unknown,
@@ -188,6 +188,7 @@ async function resolveArtistContext(
     return { context };
   }
 
+  // Backward compatibility: accept client-provided artistContext with validation
   const parseResult = artistContextSchema.safeParse(artistContextInput);
   if (!parseResult.success) {
     return {
@@ -453,7 +454,7 @@ function createReleaseTool(resolvedProfileId: string) {
         let parsedDate: Date | null = null;
         if (releaseDate) {
           parsedDate = new Date(releaseDate);
-          if (isNaN(parsedDate.getTime())) {
+          if (Number.isNaN(parsedDate.getTime())) {
             return {
               success: false,
               error: 'Invalid date. Please use YYYY-MM-DD format.',
@@ -583,13 +584,15 @@ export async function POST(req: Request) {
   const uiMessages = messages as UIMessage[];
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
-  const artistContextResult = await resolveArtistContext(
+  const contextResult = await resolveArtistContext(
     profileId,
     body.artistContext,
     userId
   );
-  if (artistContextResult.error) return artistContextResult.error;
-  const artistContext = artistContextResult.context;
+  if (contextResult.error) {
+    return contextResult.error;
+  }
+  const artistContext = contextResult.context;
 
   const systemPrompt = buildSystemPrompt(artistContext);
 

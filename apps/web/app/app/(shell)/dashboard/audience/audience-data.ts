@@ -208,12 +208,12 @@ const DEFAULT_MEMBER_PARAMS = {
   direction: 'desc' as const,
 };
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
 /**
  * Parse and validate member query parameters
  */
-function parseMemberQueryParams(
-  searchParams: Record<string, string | string[] | undefined>
-) {
+function parseMemberQueryParams(searchParams: SearchParams) {
   const parsed = memberQuerySchema.safeParse({
     page: searchParams.page,
     pageSize: searchParams.pageSize,

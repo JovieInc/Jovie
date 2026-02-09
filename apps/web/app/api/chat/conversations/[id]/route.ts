@@ -37,7 +37,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
     const limit = Math.min(
-      Math.max(parseInt(limitParam ?? '100', 10) || 100, 1),
+      Math.max(Number.parseInt(limitParam ?? '100', 10) || 100, 1),
       200
     );
     const before = url.searchParams.get('before');
@@ -65,7 +65,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     const conditions = [eq(chatMessages.conversationId, id)];
     if (before) {
       const beforeDate = new Date(before);
-      if (isNaN(beforeDate.getTime())) {
+      if (Number.isNaN(beforeDate.getTime())) {
         return NextResponse.json(
           { error: 'Invalid "before" cursor' },
           { status: 400, headers: NO_STORE_HEADERS }

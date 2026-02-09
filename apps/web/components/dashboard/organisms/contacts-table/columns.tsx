@@ -145,7 +145,7 @@ export function createContactColumns(
             id: 'copy-email',
             label: 'Copy email',
             icon: Copy,
-            onClick: () => copyToClipboard(contact.email!, 'Email'),
+            onClick: () => copyToClipboard(contact.email!, 'Email'), // NOSONAR - narrowed by `if` guard above
           });
         }
 
@@ -154,7 +154,7 @@ export function createContactColumns(
             id: 'copy-phone',
             label: 'Copy phone',
             icon: Copy,
-            onClick: () => copyToClipboard(contact.phone!, 'Phone'),
+            onClick: () => copyToClipboard(contact.phone!, 'Phone'), // NOSONAR - narrowed by `if` guard above
           });
         }
 

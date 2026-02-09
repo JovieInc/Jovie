@@ -21,7 +21,7 @@ interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
-  readonly artistContext?: ArtistContext;
+  readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
   readonly onConversationCreate?: (conversationId: string) => void;
 }
@@ -326,8 +326,14 @@ export function useJovieChat({
       setChatError(null);
       setIsSubmitting(true);
 
-      // If no active conversation, create one first
-      if (!activeConversationId) {
+      if (activeConversationId) {
+        // Store pending message for persistence (both user and assistant)
+        pendingMessagesRef.current = {
+          userMessage: trimmedText,
+          assistantMessage: '', // Will be filled when response completes
+        };
+      } else {
+        // No active conversation, create one first
         try {
           const result = await createConversationMutation.mutateAsync({
             initialMessage: trimmedText,
@@ -351,12 +357,6 @@ export function useJovieChat({
           setIsSubmitting(false);
           return;
         }
-      } else {
-        // Store pending message for persistence (both user and assistant)
-        pendingMessagesRef.current = {
-          userMessage: trimmedText,
-          assistantMessage: '', // Will be filled when response completes
-        };
       }
 
       sendMessage({ text: trimmedText });
