@@ -15,6 +15,7 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 import {
+  buildCanvasMetadata,
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
@@ -360,6 +361,8 @@ You also have tools to help with creative assets and promotion:
 
 **Spotify Canvas:**
 - Use the checkCanvasStatus tool to see which releases are missing canvas videos
+- All releases default to "not set" since Spotify has no public API for canvas detection
+- If the artist says they already have a canvas for a release, use markCanvasUploaded to update the status
 - Canvas is a 3-8 second looping video that plays behind tracks on Spotify mobile
 - You can help plan canvas generation from album artwork (AI removes text, upscales, and animates)
 - Specs: ${SPOTIFY_CANVAS_SPEC.minWidth}x${SPOTIFY_CANVAS_SPEC.minHeight}px minimum, 9:16 portrait, ${SPOTIFY_CANVAS_SPEC.minDurationSec}-${SPOTIFY_CANVAS_SPEC.maxDurationSec}s loop, H.264/MP4
@@ -494,7 +497,6 @@ function createCheckCanvasStatusTool(profileId: string | null) {
           total: summary.total,
           withCanvas: summary.withCanvas,
           withoutCanvas: summary.withoutCanvas,
-          unknown: summary.unknown,
         },
         releases: releaseList,
       };
@@ -731,6 +733,69 @@ function createPromoStrategyTool(
 }
 
 /**
+ * Creates the markCanvasUploaded tool.
+ * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
+ * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
+ */
+function createMarkCanvasUploadedTool(profileId: string | null) {
+  return tool({
+    description:
+      "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
+    inputSchema: z.object({
+      releaseTitle: z
+        .string()
+        .describe('The title of the release that has a canvas uploaded'),
+    }),
+    execute: async ({ releaseTitle }) => {
+      if (!profileId) {
+        return { success: false, error: 'Profile ID required' };
+      }
+
+      const releases = await fetchReleasesForChat(profileId);
+      const release =
+        releases.find(
+          r => r.title.toLowerCase() === releaseTitle.toLowerCase()
+        ) ??
+        releases.find(r =>
+          r.title.toLowerCase().includes(releaseTitle.toLowerCase())
+        );
+
+      if (!release) {
+        return {
+          success: false,
+          error: `Release "${releaseTitle}" not found. Available releases: ${releases
+            .slice(0, 10)
+            .map(r => r.title)
+            .join(', ')}`,
+        };
+      }
+
+      // Update the release metadata with canvas status
+      await db
+        .update(discogReleases)
+        .set({
+          metadata: {
+            ...(release.metadata ?? {}),
+            ...buildCanvasMetadata('uploaded'),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(discogReleases.id, release.id));
+
+      return {
+        success: true,
+        release: {
+          title: release.title,
+          previousStatus: release.canvasStatus,
+          newStatus: 'uploaded',
+        },
+        message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
+      };
+    },
+  });
+}
+
+/**
  * OPTIONS - CORS preflight handler
  */
 export async function OPTIONS() {
@@ -858,6 +923,7 @@ export async function POST(req: Request) {
           artistContext,
           resolvedProfileId
         ),
+        markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
       },
       abortSignal: req.signal,
       onError: ({ error }) => {

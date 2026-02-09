@@ -46,12 +46,12 @@ const activeJobs = new Map<string, CanvasGenerationJob>();
 export function getCanvasStatusFromMetadata(
   metadata: Record<string, unknown> | null
 ): CanvasStatus {
-  if (!metadata) return 'unknown';
+  if (!metadata) return 'not_set';
   const status = metadata.canvasStatus;
-  if (status === 'not_set' || status === 'generated' || status === 'uploaded') {
+  if (status === 'generated' || status === 'uploaded') {
     return status;
   }
-  return 'unknown';
+  return 'not_set';
 }
 
 /**
@@ -264,7 +264,6 @@ export function summarizeCanvasStatus(
   total: number;
   withCanvas: number;
   withoutCanvas: number;
-  unknown: number;
   releasesNeedingCanvas: Array<{
     id: string;
     title: string;
@@ -273,7 +272,6 @@ export function summarizeCanvasStatus(
 } {
   let withCanvas = 0;
   let withoutCanvas = 0;
-  let unknown = 0;
   const releasesNeedingCanvas: Array<{
     id: string;
     title: string;
@@ -282,27 +280,15 @@ export function summarizeCanvasStatus(
 
   for (const release of releases) {
     const status = getCanvasStatusFromMetadata(release.metadata);
-    switch (status) {
-      case 'uploaded':
-      case 'generated':
-        withCanvas++;
-        break;
-      case 'not_set':
-        withoutCanvas++;
-        releasesNeedingCanvas.push({
-          id: release.id,
-          title: release.title,
-          hasArtwork: Boolean(release.artworkUrl),
-        });
-        break;
-      default:
-        unknown++;
-        releasesNeedingCanvas.push({
-          id: release.id,
-          title: release.title,
-          hasArtwork: Boolean(release.artworkUrl),
-        });
-        break;
+    if (status === 'uploaded' || status === 'generated') {
+      withCanvas++;
+    } else {
+      withoutCanvas++;
+      releasesNeedingCanvas.push({
+        id: release.id,
+        title: release.title,
+        hasArtwork: Boolean(release.artworkUrl),
+      });
     }
   }
 
@@ -310,7 +296,6 @@ export function summarizeCanvasStatus(
     total: releases.length,
     withCanvas,
     withoutCanvas,
-    unknown,
     releasesNeedingCanvas,
   };
 }

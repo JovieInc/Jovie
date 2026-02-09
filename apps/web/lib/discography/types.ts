@@ -45,7 +45,7 @@ export type ReleaseType =
   | 'other';
 
 /** Canvas video status for a release */
-export type CanvasStatus = 'unknown' | 'not_set' | 'generated' | 'uploaded';
+export type CanvasStatus = 'not_set' | 'generated' | 'uploaded';
 
 export interface ReleaseViewModel {
   profileId: string;

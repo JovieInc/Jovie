@@ -50,7 +50,7 @@ export type CanvasGenerationStatus =
   | 'failed';
 
 /** Canvas status stored in release metadata JSONB */
-export type CanvasStatus = 'unknown' | 'not_set' | 'generated' | 'uploaded';
+export type CanvasStatus = 'not_set' | 'generated' | 'uploaded';
 
 /** Input for generating a canvas video from album artwork */
 export interface CanvasGenerationInput {
