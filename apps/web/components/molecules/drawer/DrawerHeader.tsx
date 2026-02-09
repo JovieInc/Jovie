@@ -1,8 +1,9 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { useIsMobile } from '@/hooks/useMobile';
 import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderProps {
@@ -18,17 +19,34 @@ export function DrawerHeader({
   actions,
   className,
 }: DrawerHeaderProps) {
+  const isMobile = useIsMobile();
+
   return (
     <div
       className={cn(
-        'flex h-12 items-center justify-between px-4 shrink-0 border-b border-subtle',
+        'flex h-12 items-center px-4 shrink-0 border-b border-subtle',
+        isMobile ? 'gap-2' : 'justify-between',
         className
       )}
     >
-      <h2 className='text-[13px] font-medium text-primary-token'>{title}</h2>
+      {isMobile && onClose && (
+        <DashboardHeaderActionButton
+          ariaLabel='Go back'
+          onClick={onClose}
+          icon={<ArrowLeft aria-hidden='true' />}
+        />
+      )}
+      <h2
+        className={cn(
+          'text-[13px] font-medium text-primary-token',
+          isMobile && 'flex-1 text-center truncate'
+        )}
+      >
+        {title}
+      </h2>
       <div className='flex items-center gap-1'>
         {actions}
-        {onClose && (
+        {!isMobile && onClose && (
           <DashboardHeaderActionButton
             ariaLabel={`Close ${title.toLowerCase()}`}
             onClick={onClose}
