@@ -3,11 +3,9 @@
 import React from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
-import type { AudienceMember } from '@/types';
-import { AudienceTypeBadge } from './AudienceTypeBadge';
+import type { AudienceIntentLevel, AudienceMember } from '@/types';
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
@@ -16,11 +14,17 @@ export interface AudienceMobileCardProps {
   readonly onTap: (member: AudienceMember) => void;
 }
 
+const INTENT_STYLES: Record<AudienceIntentLevel, string> = {
+  high: 'text-primary-token',
+  medium: 'text-secondary-token',
+  low: 'text-tertiary-token',
+};
+
 /**
- * AudienceMobileCard - Compact card view for audience members on mobile.
+ * AudienceMobileCard - Clean, Apple-esque card for audience members on mobile.
  *
+ * Uses avatar anchoring, clear typographic hierarchy, and inline metadata.
  * Memoized to prevent unnecessary re-renders in the mobile list.
- * Each card shows key info and taps to open the member detail sidebar.
  */
 export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   member,
@@ -30,123 +34,111 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 }: AudienceMobileCardProps) {
   const displayName = member.displayName || 'Visitor';
 
-  let secondaryLabel: string | null = null;
-  if (member.type === 'email') {
-    secondaryLabel = member.email;
-  } else if (member.type === 'sms') {
-    secondaryLabel = member.phone;
-  }
-
   return (
     <button
       type='button'
       className={cn(
-        'w-full text-left bg-surface-0 border border-subtle rounded-xl p-4 transition-colors',
-        isSelected
-          ? 'bg-surface-2/70 border-accent/40'
-          : 'active:bg-surface-2/50'
+        'w-full text-left flex items-start gap-3 px-4 py-3.5 transition-colors duration-150',
+        isSelected ? 'bg-surface-2/70' : 'active:bg-surface-2/40'
       )}
       onClick={() => onTap(member)}
       aria-label={`View details for ${displayName}`}
     >
-      {/* Header: Name + Type badge */}
-      <div className='flex items-start justify-between gap-3'>
-        <div className='flex-1 min-w-0'>
+      {/* Avatar circle */}
+      <div
+        className='flex-shrink-0 size-9 rounded-full bg-surface-2 flex items-center justify-center mt-0.5'
+        aria-hidden='true'
+      >
+        <Icon name='User' className='size-4 text-tertiary-token' />
+      </div>
+
+      {/* Content */}
+      <div className='flex-1 min-w-0'>
+        {/* Row 1: Name + Time */}
+        <div className='flex items-baseline justify-between gap-2'>
           <TruncatedText
             lines={1}
-            className='font-medium text-sm text-primary-token'
+            className='font-semibold text-[15px] leading-tight text-primary-token'
           >
             {displayName}
           </TruncatedText>
-          {secondaryLabel && (
-            <TruncatedText
-              lines={1}
-              className='text-xs text-secondary-token mt-0.5'
-            >
-              {secondaryLabel}
-            </TruncatedText>
+          {mode === 'members' && member.lastSeenAt && (
+            <span className='flex-shrink-0 text-xs text-tertiary-token tabular-nums'>
+              {formatTimeAgo(member.lastSeenAt)}
+            </span>
           )}
         </div>
-        <AudienceTypeBadge type={member.type} className='flex-shrink-0' />
+
+        {mode === 'members' ? (
+          <MemberDetails member={member} />
+        ) : (
+          <SubscriberDetails member={member} />
+        )}
       </div>
 
-      {mode === 'members' ? (
-        <MemberMetadata member={member} />
-      ) : (
-        <SubscriberMetadata member={member} />
-      )}
+      {/* Chevron */}
+      <div className='flex-shrink-0 self-center'>
+        <Icon
+          name='ChevronRight'
+          className='size-4 text-quaternary-token'
+          aria-hidden='true'
+        />
+      </div>
     </button>
   );
 });
 
-/** Compact metadata row for members mode */
-function MemberMetadata({ member }: { readonly member: AudienceMember }) {
+/** Subtitle lines for members mode */
+function MemberDetails({ member }: { readonly member: AudienceMember }) {
   return (
-    <div className='flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-secondary-token'>
+    <div className='mt-0.5 space-y-0.5'>
       {/* Location */}
       {member.locationLabel && (
-        <span className='inline-flex items-center gap-1'>
-          <Icon
-            name='MapPin'
-            className='h-3 w-3 text-tertiary-token'
-            aria-hidden='true'
-          />
-          <TruncatedText lines={1} className='max-w-[120px]'>
-            {member.locationLabel}
-          </TruncatedText>
-        </span>
+        <p className='text-[13px] leading-snug text-secondary-token truncate'>
+          {member.locationLabel}
+        </p>
       )}
 
-      {/* Visits + Intent */}
-      <span className='inline-flex items-center gap-1'>
-        <Icon
-          name='Eye'
-          className='h-3 w-3 text-tertiary-token'
-          aria-hidden='true'
-        />
-        <span className='font-medium'>{member.visits}</span>
-        <AudienceIntentBadge intentLevel={member.intentLevel} />
-      </span>
-
-      {/* Last Seen */}
-      {member.lastSeenAt && (
-        <span className='inline-flex items-center gap-1'>
-          <Icon
-            name='Clock'
-            className='h-3 w-3 text-tertiary-token'
-            aria-hidden='true'
-          />
-          {formatTimeAgo(member.lastSeenAt)}
+      {/* Inline metadata: type · visits · intent */}
+      <p className='text-xs text-tertiary-token flex items-center gap-1'>
+        <span className='capitalize'>{member.type}</span>
+        <DotSeparator />
+        <span className='tabular-nums'>
+          {member.visits} {member.visits === 1 ? 'visit' : 'visits'}
         </span>
+        <DotSeparator />
+        <span className={cn('font-medium', INTENT_STYLES[member.intentLevel])}>
+          {member.intentLevel.charAt(0).toUpperCase() +
+            member.intentLevel.slice(1)}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/** Subtitle lines for subscribers mode */
+function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
+  return (
+    <div className='mt-0.5 space-y-0.5'>
+      {member.email && (
+        <p className='text-[13px] leading-snug text-secondary-token truncate'>
+          {member.email}
+        </p>
+      )}
+      {member.lastSeenAt && (
+        <p className='text-xs text-tertiary-token'>
+          Subscribed {formatTimeAgo(member.lastSeenAt)}
+        </p>
       )}
     </div>
   );
 }
 
-/** Compact metadata row for subscribers mode */
-function SubscriberMetadata({ member }: { readonly member: AudienceMember }) {
+/** Tiny dot separator for inline metadata */
+function DotSeparator() {
   return (
-    <div className='flex items-center gap-x-4 mt-3 text-xs text-secondary-token'>
-      {member.email && (
-        <span className='inline-flex items-center gap-1 min-w-0'>
-          <Icon
-            name='Mail'
-            className='h-3 w-3 text-tertiary-token flex-shrink-0'
-            aria-hidden='true'
-          />
-          <TruncatedText lines={1}>{member.email}</TruncatedText>
-        </span>
-      )}
-      {member.lastSeenAt && (
-        <span className='inline-flex items-center gap-1 flex-shrink-0'>
-          <Icon
-            name='Calendar'
-            className='h-3 w-3 text-tertiary-token'
-            aria-hidden='true'
-          />
-          {formatTimeAgo(member.lastSeenAt)}
-        </span>
-      )}
-    </div>
+    <span className='text-quaternary-token select-none' aria-hidden='true'>
+      ·
+    </span>
   );
 }

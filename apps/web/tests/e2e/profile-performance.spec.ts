@@ -66,7 +66,21 @@ function logPerformanceSummary(
 }
 
 test.describe('Public Profile Performance @nightly', () => {
+  // Performance budgets are only meaningful against production builds.
+  // In dev mode Turbopack adds significant overhead that makes timing
+  // assertions unreliable. Skip the entire suite unless running in CI
+  // against a preview / production build.
+  const isDevMode = !process.env.CI;
+
   test('profile page meets performance budgets', async ({ page }, testInfo) => {
+    if (isDevMode) {
+      test.skip(
+        true,
+        'Performance budgets are unreliable in dev mode (Turbopack overhead)'
+      );
+      return;
+    }
+
     const { cleanup } = setupPageMonitoring(page);
 
     try {
@@ -100,6 +114,14 @@ test.describe('Public Profile Performance @nightly', () => {
   test('profile page Web Vitals are healthy across multiple loads', async ({
     page,
   }, testInfo) => {
+    if (isDevMode) {
+      test.skip(
+        true,
+        'Web Vitals assertions are unreliable in dev mode (Turbopack overhead)'
+      );
+      return;
+    }
+
     const { cleanup } = setupPageMonitoring(page);
 
     try {
