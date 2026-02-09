@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
 
+// Read version from canonical source (version.json at monorepo root)
+const { version: APP_VERSION } = require('../../version.json');
+
 // Bundle analyzer for performance optimization
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
@@ -277,6 +280,13 @@ const nextConfig = {
         destination: '/app/dashboard/analytics',
       },
     ];
+  },
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
+      0,
+      7
+    ),
   },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
