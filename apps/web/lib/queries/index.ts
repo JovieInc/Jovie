@@ -116,6 +116,10 @@ export {
   usePortalMutation,
 } from './useBillingMutations';
 export {
+  type BillingHistoryEntry,
+  useBillingHistoryQuery,
+} from './useBillingHistoryQuery';
+export {
   type BillingStatusData,
   useBillingStatusQuery,
   useIsPro,
