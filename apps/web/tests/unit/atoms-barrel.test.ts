@@ -18,14 +18,16 @@ describe('atoms barrel exports', () => {
       .sort();
 
     const indexContent = readFileSync(path.join(atomsDir, 'index.ts'), 'utf8');
-    const exportRegex = /export \* from '\.\/([^']+)';/g;
-    const exported: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = exportRegex.exec(indexContent)) !== null) {
-      exported.push(match[1]);
+    // Match active exports and commented-out exclusions (client components)
+    const accounted: string[] = [];
+    for (const line of indexContent.split('\n')) {
+      const active = line.match(/^export \* from '\.\/([^']+)';/);
+      const excluded = line.match(/^\/\/\s*export \* from '\.\/([^']+)';/);
+      if (active) accounted.push(active[1]);
+      else if (excluded) accounted.push(excluded[1]);
     }
-    exported.sort();
+    accounted.sort();
 
-    expect(exported).toEqual(expected);
+    expect(accounted).toEqual(expected);
   });
 });

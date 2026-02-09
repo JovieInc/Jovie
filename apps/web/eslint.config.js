@@ -36,6 +36,9 @@ const baseConfig = {
   },
   settings: {
     ...(nextBase.settings || {}),
+    next: {
+      rootDir: ['apps/web'],
+    },
     'import/resolver': {
       typescript: {},
     },

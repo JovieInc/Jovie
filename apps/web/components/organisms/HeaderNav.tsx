@@ -82,8 +82,8 @@ export function HeaderNav({
         {/* Spacer on mobile when nav links are hidden */}
         {!hideNav && <div className='flex-1 md:hidden' aria-hidden='true' />}
 
-        {/* Auth actions - always visible */}
-        <div className='flex items-center gap-1'>
+        {/* Auth actions - hidden on mobile, shown in MobileNav instead */}
+        <div className='hidden md:flex items-center gap-1'>
           <AuthActions />
         </div>
 

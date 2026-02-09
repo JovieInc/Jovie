@@ -1,7 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
-import { UnreleasedReleaseHero } from '@/components/release/UnreleasedReleaseHero';
 
 type LinkProps = {
   readonly href: string;
@@ -30,35 +28,34 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/profile/artist-notifications-cta', () => ({
-  ArtistNotificationsCTA: () => <div data-testid='artist-cta' />,
+  ArtistNotificationsCTA: () => null,
 }));
 
-vi.mock(
-  '@/components/organisms/hooks/useProfileNotificationsController',
-  () => ({
-    useProfileNotificationsController: () => ({
-      channel: 'email',
-      hasStoredContacts: false,
-      hydrationStatus: 'hydrated',
-      openSubscription: vi.fn(),
-      registerInputFocus: vi.fn(),
-      setChannel: vi.fn(),
-      setState: vi.fn(),
-      setSubscribedChannels: vi.fn(),
-      setSubscriptionDetails: vi.fn(),
-      state: 'idle',
-      subscribedChannels: {},
-      subscriptionDetails: {},
-    }),
-  })
+// Mock heavy sub-trees to prevent module resolution hangs
+vi.mock('@/components/release/ReleaseCountdown', () => ({
+  ReleaseCountdown: () => null,
+}));
+
+vi.mock('@/components/release/ReleaseNotificationsProvider', () => ({
+  ReleaseNotificationsProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
+}));
+
+vi.mock('@/components/atoms/Icon', () => ({
+  Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
+}));
+
+vi.mock('@/components/atoms/DspLogo', () => ({
+  DspLogo: () => <span data-testid='dsp-logo' />,
+}));
+
+// Lazy-import after mocks are set up
+const { ReleaseLandingPage } = await import(
+  '../../../app/r/[slug]/ReleaseLandingPage'
 );
-
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({
-    success: vi.fn(),
-    error: vi.fn(),
-  }),
-}));
+const { UnreleasedReleaseHero } = await import(
+  '@/components/release/UnreleasedReleaseHero'
+);
 
 describe('release artist links', () => {
   it('renders artist name as link on release landing page when handle exists', () => {
@@ -82,7 +79,6 @@ describe('release artist links', () => {
             url: 'https://open.spotify.com',
           },
         ]}
-        slug='test-release'
       />
     );
 
@@ -104,7 +100,6 @@ describe('release artist links', () => {
           avatarUrl: null,
         }}
         providers={[]}
-        slug='test-release'
       />
     );
 

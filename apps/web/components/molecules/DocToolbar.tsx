@@ -35,7 +35,7 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
   return (
     <div
       data-doc-toolbar
-      className='inline-flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-black/30 dark:shadow-none'
+      className='inline-flex items-center overflow-hidden rounded-lg border border-subtle bg-white shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:bg-black/30 dark:shadow-none'
     >
       <Button
         type='button'

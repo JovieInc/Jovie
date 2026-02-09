@@ -7,8 +7,8 @@ interface Props {
 }
 
 export const metadata = {
-  title: 'Chat',
-  description: 'Chat with Jovie AI',
+  title: 'Thread',
+  description: 'Thread with Jovie AI',
 };
 
 export default async function ChatConversationPage({ params }: Props) {
