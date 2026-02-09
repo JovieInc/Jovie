@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         title: discogReleases.title,
         artworkUrl: discogReleases.artworkUrl,
         creatorProfileId: discogReleases.creatorProfileId,
+        metadata: discogReleases.metadata,
       })
       .from(discogReleases)
       .where(eq(discogReleases.id, releaseId))
@@ -142,19 +143,11 @@ export async function POST(req: Request) {
     });
 
     // Update release metadata to track canvas generation
-    const existingMetadata = (
-      await db
-        .select({ metadata: discogReleases.metadata })
-        .from(discogReleases)
-        .where(eq(discogReleases.id, releaseId))
-        .limit(1)
-    )[0]?.metadata;
-
     await db
       .update(discogReleases)
       .set({
         metadata: {
-          ...(existingMetadata ?? {}),
+          ...(release.metadata ?? {}),
           ...buildCanvasMetadata('not_set'),
           canvasJobId: job.id,
         },

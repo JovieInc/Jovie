@@ -184,6 +184,30 @@ interface ReleaseContext {
 }
 
 /**
+ * Find a release by title (exact match first, then partial).
+ * Returns null if no match found.
+ */
+function findReleaseByTitle(
+  releases: ReleaseContext[],
+  title: string
+): ReleaseContext | null {
+  const lower = title.toLowerCase();
+  return (
+    releases.find(r => r.title.toLowerCase() === lower) ??
+    releases.find(r => r.title.toLowerCase().includes(lower)) ??
+    null
+  );
+}
+
+/** Format available release titles for error messages. */
+function formatAvailableReleases(releases: ReleaseContext[]): string {
+  return releases
+    .slice(0, 10)
+    .map(r => r.title)
+    .join(', ');
+}
+
+/**
  * Fetches release data for the chat context.
  * Used by creative tools (canvas, social ads, related artists).
  */
@@ -567,29 +591,14 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
         return { success: false, error: 'Profile ID required' };
       }
 
-      // Find the matching release
       const releases = await fetchReleasesForChat(profileId);
-      const release = releases.find(
-        r => r.title.toLowerCase() === releaseTitle.toLowerCase()
-      );
+      const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
-        // Try partial match
-        const partialMatch = releases.find(r =>
-          r.title.toLowerCase().includes(releaseTitle.toLowerCase())
-        );
-
-        if (!partialMatch) {
-          return {
-            success: false,
-            error: `Release "${releaseTitle}" not found. Available releases: ${releases
-              .slice(0, 10)
-              .map(r => r.title)
-              .join(', ')}`,
-          };
-        }
-
-        return buildCanvasPlan(partialMatch, motionPreference);
+        return {
+          success: false,
+          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
+        };
       }
 
       return buildCanvasPlan(release, motionPreference);
@@ -689,19 +698,9 @@ function createPromoStrategyTool(
 
       if (profileId) {
         const releases = await fetchReleasesForChat(profileId);
-        if (releaseTitle) {
-          targetRelease =
-            releases.find(
-              r => r.title.toLowerCase() === releaseTitle.toLowerCase()
-            ) ??
-            releases.find(r =>
-              r.title.toLowerCase().includes(releaseTitle.toLowerCase())
-            ) ??
-            null;
-        } else {
-          // Use the most recent release
-          targetRelease = releases[0] ?? null;
-        }
+        targetRelease = releaseTitle
+          ? findReleaseByTitle(releases, releaseTitle)
+          : (releases[0] ?? null);
       }
 
       return {
@@ -752,21 +751,12 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
       }
 
       const releases = await fetchReleasesForChat(profileId);
-      const release =
-        releases.find(
-          r => r.title.toLowerCase() === releaseTitle.toLowerCase()
-        ) ??
-        releases.find(r =>
-          r.title.toLowerCase().includes(releaseTitle.toLowerCase())
-        );
+      const release = findReleaseByTitle(releases, releaseTitle);
 
       if (!release) {
         return {
           success: false,
-          error: `Release "${releaseTitle}" not found. Available releases: ${releases
-            .slice(0, 10)
-            .map(r => r.title)
-            .join(', ')}`,
+          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
         };
       }
 
