@@ -52,23 +52,17 @@ function pruneFallbackCache(now: number): void {
 
 /**
  * Query the database for admin role status.
- * Extracted for reuse in both Redis and memory cache paths.
+ * Throws on DB errors so callers can avoid caching failure results.
  * @internal
  */
 async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
-  try {
-    const [user] = await db
-      .select({ isAdmin: users.isAdmin })
-      .from(users)
-      .where(eq(users.clerkId, userId))
-      .limit(1);
+  const [user] = await db
+    .select({ isAdmin: users.isAdmin })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
 
-    return user?.isAdmin ?? false;
-  } catch (error) {
-    captureError('[admin/roles] Failed to check admin status', error);
-    // Fail closed - deny access on error
-    return false;
-  }
+  return user?.isAdmin ?? false;
 }
 
 /**
@@ -99,14 +93,21 @@ export const isAdmin = cache(async function isAdmin(
       }
 
       // Cache miss - query database
-      const isUserAdmin = await queryAdminRoleFromDB(userId);
+      try {
+        const isUserAdmin = await queryAdminRoleFromDB(userId);
 
-      // Store in Redis with TTL
-      await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
-        ex: REDIS_CACHE_TTL_SECONDS,
-      });
+        // Only cache definitive DB results — never cache failure fallbacks
+        await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
+          ex: REDIS_CACHE_TTL_SECONDS,
+        });
 
-      return isUserAdmin;
+        return isUserAdmin;
+      } catch (dbError) {
+        captureError('[admin/roles] DB query failed, denying access', dbError);
+        // Fail closed but do NOT write to Redis — avoids poisoning
+        // the cache with a false negative for 60 seconds
+        return false;
+      }
     } catch (error) {
       captureWarning(
         '[admin/roles] Redis cache failed, falling back to memory',
@@ -126,19 +127,25 @@ export const isAdmin = cache(async function isAdmin(
     return memCached.isAdmin;
   }
 
-  // Query database
-  const isUserAdmin = await queryAdminRoleFromDB(userId);
+  // Query database — only cache on success
+  try {
+    const isUserAdmin = await queryAdminRoleFromDB(userId);
 
-  // Prune cache before adding new entry to prevent memory leaks
-  pruneFallbackCache(now);
+    // Prune cache before adding new entry to prevent memory leaks
+    pruneFallbackCache(now);
 
-  // Store in memory cache
-  fallbackCache.set(userId, {
-    isAdmin: isUserAdmin,
-    expiresAt: now + MEMORY_CACHE_TTL_MS,
-  });
+    // Store in memory cache
+    fallbackCache.set(userId, {
+      isAdmin: isUserAdmin,
+      expiresAt: now + MEMORY_CACHE_TTL_MS,
+    });
 
-  return isUserAdmin;
+    return isUserAdmin;
+  } catch (error) {
+    captureError('[admin/roles] DB query failed, denying access', error);
+    // Fail closed but do NOT write to memory cache
+    return false;
+  }
 });
 
 /**

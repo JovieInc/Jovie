@@ -178,7 +178,7 @@ describe('Admin Roles', () => {
 
       expect(result).toBe(false); // Fail closed
       expect(mockCaptureError).toHaveBeenCalledWith(
-        '[admin/roles] Failed to check admin status',
+        '[admin/roles] DB query failed, denying access',
         expect.any(Error)
       );
     });
