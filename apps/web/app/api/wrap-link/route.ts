@@ -156,7 +156,11 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    let body: { shortId?: string; titleAlias?: string; expiresAt?: string | null };
+    let body: {
+      shortId?: string;
+      titleAlias?: string;
+      expiresAt?: string | null;
+    };
     try {
       body = await request.json();
     } catch {

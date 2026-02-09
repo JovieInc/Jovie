@@ -14,14 +14,7 @@ import {
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -293,9 +286,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
       {/* Features Overview */}
       <div className='rounded-lg border border-border bg-muted/30 p-6'>
         <h3 className='mb-4 text-lg font-medium text-foreground'>
-          {billingInfo?.isPro
-            ? 'Your Current Features'
-            : 'Standard Features'}
+          {billingInfo?.isPro ? 'Your Current Features' : 'Standard Features'}
         </h3>
         <ul className='space-y-2 text-sm text-muted-foreground'>
           <li className='flex items-center'>

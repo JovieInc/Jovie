@@ -28,7 +28,10 @@ export async function POST() {
     // Get user's billing information
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
-      logger.error('Failed to get user billing info for cancellation:', billingResult.error);
+      logger.error(
+        'Failed to get user billing info for cancellation:',
+        billingResult.error
+      );
       return NextResponse.json(
         { error: 'Failed to retrieve billing information' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -46,7 +49,8 @@ export async function POST() {
     }
 
     // Cancel the subscription via Stripe
-    const cancelledSubscription = await cancelSubscription(stripeSubscriptionId);
+    const cancelledSubscription =
+      await cancelSubscription(stripeSubscriptionId);
 
     logger.info('Subscription cancelled in-app', {
       userId,

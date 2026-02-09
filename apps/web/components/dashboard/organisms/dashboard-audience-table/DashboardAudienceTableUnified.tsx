@@ -2,7 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { BellRing, Copy, Download, Eye, Phone, UserMinus, Users } from 'lucide-react';
+import {
+  BellRing,
+  Copy,
+  Download,
+  Eye,
+  Phone,
+  UserMinus,
+  Users,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { memo, useMemo } from 'react';

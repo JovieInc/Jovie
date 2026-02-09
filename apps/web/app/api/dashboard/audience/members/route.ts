@@ -155,7 +155,10 @@ export async function DELETE(request: NextRequest) {
     return await withDbSessionTx(async (tx, clerkUserId) => {
       const parsedBody = await parseJsonBody<z.infer<typeof deleteSchema>>(
         request,
-        { route: 'DELETE /api/dashboard/audience/members', headers: NO_STORE_HEADERS }
+        {
+          route: 'DELETE /api/dashboard/audience/members',
+          headers: NO_STORE_HEADERS,
+        }
       );
 
       if (!parsedBody.ok) {
