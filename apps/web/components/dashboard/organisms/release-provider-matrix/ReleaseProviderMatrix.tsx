@@ -537,7 +537,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             providerConfig={providerConfig}
             artistName={artistName}
             onClose={closeEditor}
-            onRefresh={editingRelease ? () => handleRefreshRelease(editingRelease.id) : undefined}
+            onRefresh={
+              editingRelease
+                ? () => handleRefreshRelease(editingRelease.id)
+                : undefined
+            }
             onAddDspLink={handleAddUrl}
             isSaving={isSaving}
           />
