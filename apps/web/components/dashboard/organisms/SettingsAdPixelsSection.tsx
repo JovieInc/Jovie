@@ -241,15 +241,10 @@ export function SettingsAdPixelsSection() {
     <form onSubmit={handlePixelSubmit} className='space-y-6'>
       <DashboardCard variant='settings'>
         <div className='flex items-center justify-between mb-6'>
-          <div>
-            <h3 className='text-[14px] font-medium text-primary-token'>
-              Server-Side Pixel Tracking
-            </h3>
-            <p className='text-sm text-secondary-token mt-1'>
-              Track conversions via server-side APIs for better accuracy and
-              privacy.
-            </p>
-          </div>
+          <p className='text-sm text-secondary-token'>
+            Track conversions via server-side APIs for better accuracy and
+            privacy.
+          </p>
           <div className='flex items-center gap-2'>
             <span className='text-sm text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}

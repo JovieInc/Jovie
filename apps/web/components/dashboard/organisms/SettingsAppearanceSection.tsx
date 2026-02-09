@@ -21,12 +21,7 @@ export function SettingsAppearanceSection() {
   };
 
   return (
-    <div>
       <DashboardCard variant='settings' className='space-y-4'>
-        <h3 className='text-[14px] font-medium text-primary-token mb-4'>
-          Interface Theme
-        </h3>
-
         <div className='grid grid-cols-3 gap-4'>
           {THEME_OPTIONS.map(option => (
             <button
@@ -126,6 +121,5 @@ export function SettingsAppearanceSection() {
             : 'Choose how the interface appears. System automatically matches your device settings.'}
         </p>
       </DashboardCard>
-    </div>
   );
 }

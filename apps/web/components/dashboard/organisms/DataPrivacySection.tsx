@@ -48,13 +48,13 @@ export function DataPrivacySection() {
 
   return (
     <div className='space-y-4'>
-      {/* Data Export */}
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
+      <DashboardCard variant='settings' className='divide-y divide-subtle'>
+        {/* Data Export */}
+        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4'>
           <div className='min-w-0'>
-            <h3 className='text-[14px] font-medium text-primary-token'>
+            <p className='text-[14px] font-medium text-primary-token'>
               Export Your Data
-            </h3>
+            </p>
             <p className='text-[13px] text-secondary-token mt-1'>
               Download a copy of all your data including profile information,
               links, contacts, and settings.
@@ -70,15 +70,13 @@ export function DataPrivacySection() {
             {exportMutation.isPending ? 'Exporting...' : 'Export Data'}
           </Button>
         </div>
-      </DashboardCard>
 
-      {/* Account Deletion */}
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
+        {/* Account Deletion */}
+        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4'>
           <div className='min-w-0'>
-            <h3 className='text-[14px] font-medium text-primary-token'>
+            <p className='text-[14px] font-medium text-primary-token'>
               Delete Account
-            </h3>
+            </p>
             <p className='text-[13px] text-secondary-token mt-1'>
               Permanently delete your account and all associated data. This
               action cannot be undone.
