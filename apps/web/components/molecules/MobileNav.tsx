@@ -9,8 +9,10 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export function MobileNav({
   hidePricingLink = false,
+  hideNav = false,
 }: {
   readonly hidePricingLink?: boolean;
+  readonly hideNav?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -81,7 +83,7 @@ export function MobileNav({
         aria-hidden={!isOpen}
       >
         <div className='mobile-nav-links'>
-          {!hidePricingLink && (
+          {!hideNav && !hidePricingLink && (
             <Link href='/pricing' className='mobile-nav-link' onClick={close}>
               Pricing
             </Link>

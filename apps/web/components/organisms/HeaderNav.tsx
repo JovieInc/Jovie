@@ -88,11 +88,9 @@ export function HeaderNav({
         </div>
 
         {/* Mobile hamburger menu - shown on small screens only */}
-        {!hideNav && (
-          <div className='flex md:hidden items-center'>
-            <MobileNav hidePricingLink={hidePricingLink} />
-          </div>
-        )}
+        <div className='flex md:hidden items-center'>
+          <MobileNav hidePricingLink={hidePricingLink} hideNav={hideNav} />
+        </div>
       </nav>
     </header>
   );
