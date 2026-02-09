@@ -619,16 +619,14 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      images: content.artworkUrl
-        ? [
-            {
-              url: content.artworkUrl,
-              width: 640,
-              height: 640,
-              alt: `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: content.artworkUrl || `${BASE_URL}/og/default.png`,
+          width: content.artworkUrl ? 640 : 1200,
+          height: content.artworkUrl ? 640 : 630,
+          alt: `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
@@ -636,14 +634,12 @@ export async function generateMetadata({
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
-      images: content.artworkUrl
-        ? [
-            {
-              url: content.artworkUrl,
-              alt: `${content.title} artwork`,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: content.artworkUrl || `${BASE_URL}/og/default.png`,
+          alt: `${content.title} artwork`,
+        },
+      ],
     },
     other: {
       'music:musician': artistName,

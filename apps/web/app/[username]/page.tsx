@@ -524,13 +524,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // Build rich description with bio and genre information
   const bioSnippet = profile.bio
-    ? profile.bio.slice(0, 120).trim()
+    ? profile.bio.slice(0, 155).trim()
     : `Discover ${artistName}'s music`;
   const genreText =
     genres && genres.length > 0
       ? `. ${genres.slice(0, 3).join(', ')} artist`
       : '';
-  const description = `${bioSnippet}${profile.bio && profile.bio.length > 120 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
+  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
 
   // Build dynamic keywords based on artist data
   const baseKeywords = [
@@ -574,16 +574,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: profileUrl,
       siteName: 'Jovie',
       locale: 'en_US',
-      images: profile.avatar_url
-        ? [
-            {
-              url: profile.avatar_url,
-              width: 400,
-              height: 400,
-              alt: `${artistName} profile picture`,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
+          width: profile.avatar_url ? 400 : 1200,
+          height: profile.avatar_url ? 400 : 630,
+          alt: `${artistName} profile picture`,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
@@ -591,14 +589,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
-      images: profile.avatar_url
-        ? [
-            {
-              url: profile.avatar_url,
-              alt: `${artistName} profile picture`,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
+          alt: `${artistName} profile picture`,
+        },
+      ],
     },
     other: {
       'music:musician': artistName,
