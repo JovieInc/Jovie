@@ -92,6 +92,7 @@ export async function GET(request: Request) {
             creatorProfileIds
           ),
           drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+          drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
           drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
         )
       );

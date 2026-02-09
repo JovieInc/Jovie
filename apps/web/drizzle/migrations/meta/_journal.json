@@ -183,6 +183,13 @@
       "when": 1770497158714,
       "tag": "0025_adorable_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1770681600000,
+      "tag": "0026_add_subscription_email_verification",
+      "breakpoints": true
     }
   ]
 }

@@ -207,6 +207,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
       and(
         drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
       )
     );
