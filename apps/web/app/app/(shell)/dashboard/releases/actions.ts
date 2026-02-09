@@ -38,6 +38,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
@@ -335,6 +336,37 @@ export async function resetProviderOverride(params: {
       error instanceof Error ? error.message : 'Failed to reset provider link';
     throw new Error(message);
   }
+}
+
+/**
+ * Refresh a single release from the database.
+ * Re-fetches the release data (including provider links) without hitting Spotify API.
+ */
+export async function refreshRelease(params: {
+  releaseId: string;
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  const release = await getReleaseById(params.releaseId);
+  if (!release || release.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const providerLabels = buildProviderLabels();
+
+  return mapReleaseToViewModel(
+    release,
+    providerLabels,
+    profile.id,
+    profile.handle
+  );
 }
 
 /**
@@ -769,7 +801,10 @@ export async function connectAppleMusicArtist(params: {
           updatedAt: now,
         },
       });
-  } catch {
+  } catch (error) {
+    await captureError('Apple Music connection save failed', error, {
+      action: 'connectAppleMusicArtist',
+    });
     return {
       success: false,
       message: 'Failed to save Apple Music connection. Please try again.',

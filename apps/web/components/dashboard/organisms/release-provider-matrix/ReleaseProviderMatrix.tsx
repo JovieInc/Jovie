@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Copy } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   lazy,
   memo,
@@ -21,6 +22,7 @@ import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPil
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { useRowSelection } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -56,6 +58,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicConnected = false,
   appleMusicArtistName = null,
 }: ReleaseProviderMatrixProps) {
+  const router = useRouter();
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(false);
@@ -77,6 +80,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     closeEditor,
     handleCopy,
     handleSync,
+    handleRefreshRelease,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
@@ -213,6 +217,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     []
   );
 
+  const handleNewRelease = useCallback(() => {
+    const prompt =
+      "I'd like to add a new release to my discography. Help me set it up.";
+    const encoded = encodeURIComponent(prompt);
+    router.push(`${APP_ROUTES.CHAT}?q=${encoded}`);
+  }, [router]);
+
   // Show importing state when we're actively importing
   const showImportingState = isImporting && rows.length === 0;
   // Show empty state when not connected and no releases
@@ -252,7 +263,23 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
-  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+  const headerActions = useMemo(
+    () => (
+      <div className='flex items-center gap-1'>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={handleNewRelease}
+          className='h-8 gap-1.5 border-none text-secondary-token hover:text-primary-token'
+        >
+          <Icon name='Plus' className='h-4 w-4' />
+          <span className='hidden sm:inline'>New Release</span>
+        </Button>
+        <DrawerToggleButton />
+      </div>
+    ),
+    [handleNewRelease]
+  );
 
   const spotifyBadge = useMemo(
     () =>
@@ -318,15 +345,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // DSP pills on left side of header
     setHeaderBadge(headerBadges);
 
-    // Drawer toggle on right side (use memoized element to prevent infinite loops)
-    setHeaderActions(drawerToggle);
+    // New Release button + drawer toggle on right side (use memoized element to prevent infinite loops)
+    setHeaderActions(headerActions);
 
     return () => {
       setHeaderBadge(null);
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [headerBadges, drawerToggle]);
+  }, [headerBadges, headerActions]);
 
   return (
     <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
@@ -429,27 +456,39 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   No releases yet
                 </h3>
                 <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                  Sync your releases from Spotify to start generating smart
-                  links for your releases.
+                  Sync your releases from Spotify or create one manually to
+                  start generating smart links.
                 </p>
-                <Button
-                  variant='primary'
-                  size='sm'
-                  disabled={isSyncing}
-                  onClick={handleSync}
-                  className='mt-4 inline-flex items-center gap-2'
-                  data-testid='sync-spotify-empty-state'
-                >
-                  <Icon
-                    name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                    className={cn(
-                      'h-4 w-4',
-                      isSyncing && 'animate-spin motion-reduce:animate-none'
-                    )}
-                    aria-hidden='true'
-                  />
-                  {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                </Button>
+                <div className='mt-4 flex items-center gap-3'>
+                  <Button
+                    variant='primary'
+                    size='sm'
+                    disabled={isSyncing}
+                    onClick={handleSync}
+                    className='inline-flex items-center gap-2'
+                    data-testid='sync-spotify-empty-state'
+                  >
+                    <Icon
+                      name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                      className={cn(
+                        'h-4 w-4',
+                        isSyncing && 'animate-spin motion-reduce:animate-none'
+                      )}
+                      aria-hidden='true'
+                    />
+                    {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                  </Button>
+                  <Button
+                    variant='secondary'
+                    size='sm'
+                    onClick={handleNewRelease}
+                    className='inline-flex items-center gap-2'
+                    data-testid='create-release-empty-state'
+                  >
+                    <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
+                    Create Release
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -486,7 +525,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <Suspense
           fallback={
             <div
-              className='h-full animate-pulse bg-surface-1'
+              className='h-full animate-pulse bg-surface-2'
               style={{ width: SIDEBAR_WIDTH }}
             />
           }
@@ -498,7 +537,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             providerConfig={providerConfig}
             artistName={artistName}
             onClose={closeEditor}
-            onRefresh={handleSync}
+            onRefresh={
+              editingRelease
+                ? () => handleRefreshRelease(editingRelease.id)
+                : undefined
+            }
             onAddDspLink={handleAddUrl}
             isSaving={isSaving}
           />

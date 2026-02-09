@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { createRateLimitHeaders, paymentIntentLimiter } from '@/lib/rate-limit';
@@ -126,6 +127,10 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     logger.error('Create tip intent error:', error);
+    await captureCriticalError('Tip payment intent creation failed', error, {
+      route: '/api/create-tip-intent',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to create tip' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -6,6 +6,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
+import { captureCriticalError } from '@/lib/error-tracking';
 import {
   checkExistingPlanSubscription,
   getCheckoutErrorResponse,
@@ -123,6 +124,14 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error creating checkout session:', error);
+    await captureCriticalError(
+      'Stripe checkout session creation failed',
+      error,
+      {
+        route: '/api/stripe/checkout',
+        method: 'POST',
+      }
+    );
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {

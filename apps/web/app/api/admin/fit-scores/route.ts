@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { db } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   calculateMissingFitScores,
   enrichMissingSpotifyData,
@@ -102,6 +103,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('Admin fit scores GET failed:', error);
+    await captureError('Admin fit scores operation failed', error, {
+      route: '/api/admin/fit-scores',
+      method: 'GET',
+    });
     return NextResponse.json(
       {
         error: 'Failed to fetch fit scores',
@@ -242,6 +247,10 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     logger.error('Admin fit scores POST failed:', error);
+    await captureError('Admin fit scores operation failed', error, {
+      route: '/api/admin/fit-scores',
+      method: 'POST',
+    });
     return NextResponse.json(
       {
         error: 'Failed to process fit scores action',

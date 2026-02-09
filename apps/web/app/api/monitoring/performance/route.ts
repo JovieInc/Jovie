@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -43,6 +44,10 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
     );
   } catch (error) {
     logger.error('Error fetching performance metrics:', error);
+    await captureError('Performance monitoring failed', error, {
+      route: '/api/monitoring/performance',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to fetch performance metrics' },
       { status: 500, headers: NO_STORE_HEADERS }
