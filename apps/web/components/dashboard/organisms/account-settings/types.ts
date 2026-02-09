@@ -44,6 +44,11 @@ export interface ClerkUserResource {
   reload: () => Promise<void>;
 }
 
+/**
+ * Subset of Clerk's ExternalAccountResource type.
+ * Only includes properties used by ConnectedAccountsCard for display and disconnect functionality.
+ * For the full API, see: https://clerk.com/docs/references/javascript/external-account
+ */
 export interface ClerkExternalAccountResource {
   id: string;
   provider: string;
@@ -52,7 +57,7 @@ export interface ClerkExternalAccountResource {
   lastName?: string | null;
   username?: string | null;
   imageUrl?: string;
-  verification?: { status?: string } | null;
+  verification?: ClerkEmailVerification | null;
   destroy: () => Promise<void>;
 }
 
