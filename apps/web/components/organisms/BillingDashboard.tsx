@@ -353,31 +353,27 @@ export const BillingDashboard = memo(function BillingDashboard() {
         ) : historyQuery.data?.entries &&
           historyQuery.data.entries.length > 0 ? (
           <div className='space-y-3'>
-            {historyQuery.data.entries.map(
-              (entry: BillingHistoryEntry) => (
-                <div
-                  key={entry.id}
-                  className='flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0'
-                >
-                  <div className='flex items-start gap-3'>
-                    <Clock className='mt-0.5 h-4 w-4 shrink-0 text-muted-foreground' />
-                    <div>
-                      <p className='text-sm font-medium text-foreground'>
-                        {formatEventType(entry.eventType)}
-                      </p>
-                      <p className='text-xs text-muted-foreground'>
-                        {entry.source === 'webhook'
-                          ? 'Via Stripe'
-                          : entry.source}
-                      </p>
-                    </div>
+            {historyQuery.data.entries.map((entry: BillingHistoryEntry) => (
+              <div
+                key={entry.id}
+                className='flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0'
+              >
+                <div className='flex items-start gap-3'>
+                  <Clock className='mt-0.5 h-4 w-4 shrink-0 text-muted-foreground' />
+                  <div>
+                    <p className='text-sm font-medium text-foreground'>
+                      {formatEventType(entry.eventType)}
+                    </p>
+                    <p className='text-xs text-muted-foreground'>
+                      {entry.source === 'webhook' ? 'Via Stripe' : entry.source}
+                    </p>
                   </div>
-                  <p className='shrink-0 text-xs text-muted-foreground'>
-                    {formatDate(entry.createdAt)}
-                  </p>
                 </div>
-              )
-            )}
+                <p className='shrink-0 text-xs text-muted-foreground'>
+                  {formatDate(entry.createdAt)}
+                </p>
+              </div>
+            ))}
           </div>
         ) : (
           <p className='text-sm text-muted-foreground'>

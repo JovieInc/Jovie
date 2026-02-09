@@ -107,6 +107,10 @@ export {
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
 export {
+  type BillingHistoryEntry,
+  useBillingHistoryQuery,
+} from './useBillingHistoryQuery';
+export {
   type CancelSubscriptionResponse,
   type CheckoutInput,
   type CheckoutResponse,
@@ -115,10 +119,6 @@ export {
   useCheckoutMutation,
   usePortalMutation,
 } from './useBillingMutations';
-export {
-  type BillingHistoryEntry,
-  useBillingHistoryQuery,
-} from './useBillingHistoryQuery';
 export {
   type BillingStatusData,
   useBillingStatusQuery,

@@ -6,8 +6,10 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
-import { getBillingAuditLog } from '@/lib/stripe/customer-sync';
+import {
+  getBillingAuditLog,
+  getUserBillingInfo,
+} from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -31,20 +33,14 @@ export async function GET() {
     // Get the internal user ID from billing info
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
-      return NextResponse.json(
-        { entries: [] },
-        { headers: CACHE_HEADERS }
-      );
+      return NextResponse.json({ entries: [] }, { headers: CACHE_HEADERS });
     }
 
     const { userId } = billingResult.data;
     const auditResult = await getBillingAuditLog(userId, 50);
 
     if (!auditResult.success || !auditResult.data) {
-      return NextResponse.json(
-        { entries: [] },
-        { headers: CACHE_HEADERS }
-      );
+      return NextResponse.json({ entries: [] }, { headers: CACHE_HEADERS });
     }
 
     return NextResponse.json(
