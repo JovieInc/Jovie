@@ -71,6 +71,7 @@ function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
 }
 
 // Route groups for path categorization
+// All routes use /app/* prefix (single-domain architecture)
 const DASHBOARD_ROUTES = [
   '/app/profile',
   '/app/contacts',
@@ -376,11 +377,16 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     }
 
     // Route based on user state
+    // Note: /app/* routes are excluded from waitlist/onboarding rewrites because
+    // they have their own auth handling in their layouts. Rewriting /app/* to
+    // /waitlist during RSC navigation causes layout hierarchy mismatches that
+    // manifest as "page not found" errors on the client.
     if (userState) {
       if (
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
-        !pathname.startsWith('/api/')
+        !pathname.startsWith('/api/') &&
+        !pathname.startsWith('/app/')
       ) {
         res = NextResponse.rewrite(new URL('/waitlist', req.url), {
           request: { headers: requestHeaders },
@@ -388,7 +394,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
-        !pathname.startsWith('/api/')
+        !pathname.startsWith('/api/') &&
+        !pathname.startsWith('/app/')
       ) {
         const onboardingJustCompleted =
           req.cookies.get('jovie_onboarding_complete')?.value === '1';
