@@ -72,6 +72,11 @@ export {
 } from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
+// Account mutations (GDPR)
+export {
+  useDeleteAccountMutation,
+  useExportDataMutation,
+} from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
 // Admin social links query

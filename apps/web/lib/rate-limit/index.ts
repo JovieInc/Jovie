@@ -36,12 +36,16 @@ export type { RateLimiterName } from './config';
 export { parseWindowToMs, RATE_LIMITERS } from './config';
 // Pre-configured Limiter Instances
 export {
+  accountDeleteLimiter,
+  accountExportLimiter,
   adminCreatorIngestLimiter,
   adminFitScoresLimiter,
   adminImpersonateLimiter,
   aiChatLimiter,
   apiLimiter,
   avatarUploadLimiter,
+  checkAccountDeleteRateLimit,
+  checkAccountExportRateLimit,
   checkAdminCreatorIngestRateLimit,
   checkAdminFitScoresRateLimit,
   checkAiChatRateLimit,

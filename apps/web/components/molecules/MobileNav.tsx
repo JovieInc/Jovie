@@ -1,9 +1,11 @@
 'use client';
 
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { UserButton } from '@/components/organisms/user-button';
 
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -64,14 +66,12 @@ export function MobileNav({
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className='mobile-nav-overlay'
-          onClick={close}
-          aria-hidden='true'
-        />
-      )}
+      {/* Overlay - always mounted for smooth transition */}
+      <div
+        className={`mobile-nav-overlay ${isOpen ? 'mobile-nav-overlay--visible' : ''}`}
+        onClick={close}
+        aria-hidden='true'
+      />
 
       {/* Panel */}
       <nav
@@ -100,6 +100,21 @@ export function MobileNav({
           >
             Sign up
           </Link>
+        </div>
+
+        {/* Auth actions - visible in mobile menu */}
+        <div className='mobile-nav-auth'>
+          <SignedOut>
+            <Link href='/signin' className='mobile-nav-link' onClick={close}>
+              Log in
+            </Link>
+            <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
+              Sign up
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
       </nav>
     </>
