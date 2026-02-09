@@ -37,6 +37,73 @@ const PROVIDER_CONFIG = {
 
 const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'] as const;
 
+// Widths vary per skeleton row for a more natural loading appearance
+const SKELETON_NAME_WIDTHS = ['w-28', 'w-36', 'w-24'] as const;
+const SKELETON_META_WIDTHS = ['w-20', 'w-16', 'w-24'] as const;
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Module-scoped component: artist avatar with loading shimmer, error fallback, and placeholder */
+function ArtistResultImage({
+  imageUrl,
+  name,
+  platform,
+}: {
+  readonly imageUrl?: string;
+  readonly name: string;
+  readonly platform: 'spotify' | 'applemusic';
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (!imageUrl || hasError) {
+    return (
+      <div className='w-10 h-10 rounded-full bg-surface-2 overflow-hidden shrink-0 flex items-center justify-center'>
+        {hasError && imageUrl ? (
+          <span className='text-xs font-medium text-secondary-token select-none leading-none'>
+            {getInitials(name)}
+          </span>
+        ) : (
+          <SocialIcon
+            platform={platform}
+            className='w-5 h-5 text-tertiary-token'
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
+      <Image
+        src={imageUrl}
+        alt={name}
+        fill
+        sizes='40px'
+        className={cn(
+          'object-cover transition-opacity duration-200',
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        )}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+      />
+      {!isLoaded && (
+        <div
+          className='absolute inset-0 rounded-full skeleton'
+          aria-hidden='true'
+        />
+      )}
+    </div>
+  );
+}
+
 function formatFollowers(count: number): string {
   if (count >= 1_000_000) {
     return `${(count / 1_000_000).toFixed(1)}M followers`;
@@ -207,16 +274,27 @@ export function ArtistSearchCommandPalette({
           {/* Results */}
           <Command.List className='max-h-[300px] overflow-y-auto'>
             {search.state === 'loading' && search.results.length === 0 && (
-              <div className='p-3 space-y-2'>
-                {SKELETON_KEYS.map(key => (
-                  <div
-                    key={key}
-                    className='flex items-center gap-3 animate-pulse'
-                  >
-                    <div className='w-10 h-10 rounded-full bg-surface-3' />
-                    <div className='flex-1 space-y-1'>
-                      <div className='h-4 w-32 bg-surface-3 rounded' />
-                      <div className='h-3 w-20 bg-surface-3 rounded' />
+              <div
+                className='p-3 space-y-2'
+                role='status'
+                aria-label='Loading search results'
+              >
+                {SKELETON_KEYS.map((key, index) => (
+                  <div key={key} className='flex items-center gap-3 px-4 py-2.5'>
+                    <div className='w-10 h-10 rounded-full skeleton shrink-0' />
+                    <div className='flex-1 space-y-1.5'>
+                      <div
+                        className={cn(
+                          'h-4 rounded skeleton',
+                          SKELETON_NAME_WIDTHS[index]
+                        )}
+                      />
+                      <div
+                        className={cn(
+                          'h-3 rounded skeleton',
+                          SKELETON_META_WIDTHS[index]
+                        )}
+                      />
                     </div>
                   </div>
                 ))}
@@ -257,25 +335,11 @@ export function ArtistSearchCommandPalette({
                       'data-[selected=true]:bg-surface-2 hover:bg-surface-2/50'
                     )}
                   >
-                    <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
-                      {artist.imageUrl ? (
-                        <Image
-                          src={artist.imageUrl}
-                          alt={artist.name}
-                          fill
-                          sizes='40px'
-                          className='object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <div className='w-full h-full flex items-center justify-center'>
-                          <SocialIcon
-                            platform={config.platform}
-                            className='w-5 h-5 text-tertiary-token'
-                          />
-                        </div>
-                      )}
-                    </div>
+                    <ArtistResultImage
+                      imageUrl={artist.imageUrl}
+                      name={artist.name}
+                      platform={config.platform}
+                    />
 
                     <div className='flex-1 min-w-0'>
                       <div className='font-medium text-sm text-primary-token truncate'>

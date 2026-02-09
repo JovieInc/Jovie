@@ -3,11 +3,73 @@
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import Image from 'next/image';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { ComboboxOption } from './types';
 
 interface ComboboxOptionItemProps {
   readonly option: ComboboxOption;
   readonly index: number;
+}
+
+function getOptionInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Option image with loading shimmer and error fallback */
+function OptionImage({
+  imageUrl,
+  name,
+}: {
+  readonly imageUrl?: string;
+  readonly name: string;
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (!imageUrl || hasError) {
+    return (
+      <div
+        className='h-8 w-8 rounded-full bg-surface-2 flex-shrink-0 flex items-center justify-center'
+        aria-hidden='true'
+      >
+        <span className='text-[10px] font-medium text-secondary-token select-none leading-none'>
+          {getOptionInitials(name)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className='h-8 w-8 rounded-full overflow-hidden flex-shrink-0 relative bg-surface-3'>
+      <Image
+        src={imageUrl}
+        alt=''
+        width={32}
+        height={32}
+        sizes='32px'
+        className={cn(
+          'h-8 w-8 rounded-full object-cover transition-opacity duration-200',
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        )}
+        loading='lazy'
+        aria-hidden='true'
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+      />
+      {!isLoaded && (
+        <div
+          className='absolute inset-0 rounded-full skeleton'
+          aria-hidden='true'
+        />
+      )}
+    </div>
+  );
 }
 
 export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
@@ -17,7 +79,9 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
         clsx(
           'relative cursor-pointer select-none px-4 py-3 transition-colors',
           'focus-visible:outline-none',
-          active ? 'bg-indigo-600 text-white' : 'text-gray-900 hover:bg-gray-50'
+          active
+            ? 'bg-indigo-600 text-white'
+            : 'text-gray-900 hover:bg-gray-50'
         )
       }
       value={option}
@@ -26,23 +90,7 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
     >
       {({ active, selected }) => (
         <div className='flex items-center space-x-3'>
-          {option.imageUrl ? (
-            <Image
-              src={option.imageUrl}
-              alt=''
-              width={32}
-              height={32}
-              sizes='32px'
-              className='h-8 w-8 rounded-full object-cover flex-shrink-0'
-              loading='lazy'
-              aria-hidden='true'
-            />
-          ) : (
-            <div
-              className='h-8 w-8 rounded-full bg-gray-200 flex-shrink-0'
-              aria-hidden='true'
-            />
-          )}
+          <OptionImage imageUrl={option.imageUrl} name={option.name} />
           <span
             className={clsx(
               'truncate text-sm',
