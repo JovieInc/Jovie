@@ -17,6 +17,7 @@ export const WAITLIST_STORAGE_KEYS = {
   socialPlatform: 'waitlist_social_platform',
   primarySocialUrl: 'waitlist_primary_social_url',
   spotifyUrl: 'waitlist_spotify_url',
+  spotifyArtistName: 'waitlist_spotify_artist_name',
   heardAbout: 'waitlist_heard_about',
   submitted: 'waitlist_submitted',
   userId: 'waitlist_user_id',

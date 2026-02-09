@@ -65,6 +65,78 @@ export interface BioSyncResponse {
 const emailProvider = new ResendEmailProvider();
 
 /**
+ * Process a single DSP provider sync, handling both email and API methods.
+ * Catches and records failures as tracking records.
+ */
+async function processSingleProvider(params: {
+  profile: typeof creatorProfiles.$inferSelect;
+  providerId: string;
+  provider: DspBioProvider;
+  match: typeof dspArtistMatches.$inferSelect | undefined;
+  bioText: string;
+  creatorProfileId: string;
+}): Promise<BioSyncResult | null> {
+  const { profile, providerId, provider, match, bioText, creatorProfileId } =
+    params;
+
+  try {
+    if (provider.method === 'email') {
+      return await syncBioViaEmail({
+        profile,
+        providerId,
+        provider,
+        match,
+        bioText,
+      });
+    }
+    if (provider.method === 'api') {
+      return await syncBioViaApi({
+        profile,
+        providerId,
+        provider,
+        match,
+        bioText,
+      });
+    }
+    return null;
+  } catch (error) {
+    await captureError(
+      `[dsp-bio-sync] Failed to sync bio to ${providerId}`,
+      error,
+      { creatorProfileId, providerId }
+    );
+
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const errorDetail = error instanceof Error ? error.stack : String(error);
+
+    const [syncRequest] = await db
+      .insert(dspBioSyncRequests)
+      .values({
+        creatorProfileId,
+        providerId,
+        method: provider.method,
+        status: 'failed',
+        bioText,
+        error: errorMessage,
+        metadata: {
+          bioSnapshot: bioText,
+          errorDetail,
+        } satisfies DspBioSyncMetadata,
+      })
+      .returning({ id: dspBioSyncRequests.id });
+
+    return {
+      providerId,
+      method: provider.method,
+      status: 'failed',
+      syncRequestId: syncRequest.id,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
  * Sync an artist's bio to one or more DSPs.
  *
  * For each targeted DSP:
@@ -130,59 +202,15 @@ export async function syncBioToDsps(
 
   for (const [providerId, provider] of targetProviders) {
     const match = matchesByProvider.get(providerId);
-
-    try {
-      if (provider.method === 'email') {
-        const result = await syncBioViaEmail({
-          profile,
-          providerId,
-          provider,
-          match,
-          bioText,
-        });
-        results.push(result);
-      } else if (provider.method === 'api') {
-        const result = await syncBioViaApi({
-          profile,
-          providerId,
-          provider,
-          match,
-          bioText,
-        });
-        results.push(result);
-      }
-    } catch (error) {
-      await captureError(
-        `[dsp-bio-sync] Failed to sync bio to ${providerId}`,
-        error,
-        { creatorProfileId, providerId }
-      );
-
-      // Create a failed tracking record
-      const [syncRequest] = await db
-        .insert(dspBioSyncRequests)
-        .values({
-          creatorProfileId,
-          providerId,
-          method: provider.method,
-          status: 'failed',
-          bioText,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          metadata: {
-            bioSnapshot: bioText,
-            errorDetail: error instanceof Error ? error.stack : String(error),
-          } satisfies DspBioSyncMetadata,
-        })
-        .returning({ id: dspBioSyncRequests.id });
-
-      results.push({
-        providerId,
-        method: provider.method,
-        status: 'failed',
-        syncRequestId: syncRequest.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    const result = await processSingleProvider({
+      profile,
+      providerId,
+      provider,
+      match,
+      bioText,
+      creatorProfileId,
+    });
+    if (result) results.push(result);
   }
 
   const sentCount = results.filter(r => r.status === 'sent').length;

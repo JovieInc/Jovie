@@ -205,6 +205,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           setIsAmConnected(true);
           setAmArtistName(result.artistName);
           toast.success(result.message);
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         toast.error(

@@ -3,6 +3,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardAudienceTable } from '@/components/dashboard/organisms/dashboard-audience-table';
 import type { AudienceMember } from '@/types';
 
+// Mock next/navigation (useRouter is used in DashboardAudienceTableUnified)
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/app/dashboard/audience',
+}));
+
 // Mock the useTableMeta hook
 vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   useTableMeta: () => ({
@@ -117,6 +131,7 @@ const MOCK_DATA_MEDIUM = generateMockAudienceMembers(50);
 
 const defaultProps = {
   mode: 'members' as const,
+  view: 'all' as const,
   total: 0,
   page: 1,
   pageSize: 50,
@@ -125,6 +140,8 @@ const defaultProps = {
   onPageChange: vi.fn(),
   onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
+  onViewChange: vi.fn(),
+  subscriberCount: 0,
 };
 
 describe('DashboardAudienceTable - Virtualization', () => {
