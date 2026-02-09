@@ -10,7 +10,10 @@ export function AuthActions() {
   return (
     <div className='flex items-center gap-1'>
       {isAuthed ? (
-        <Link href={APP_ROUTES.DASHBOARD} className='btn-linear-signup focus-ring-themed'>
+        <Link
+          href={APP_ROUTES.DASHBOARD}
+          className='btn-linear-signup focus-ring-themed'
+        >
           Open App
         </Link>
       ) : (
@@ -20,7 +23,10 @@ export function AuthActions() {
             Log in
           </Link>
           {/* Signup - Linear exact specs via CSS class */}
-          <Link href='/waitlist' className='btn-linear-signup focus-ring-themed'>
+          <Link
+            href='/waitlist'
+            className='btn-linear-signup focus-ring-themed'
+          >
             Sign up
           </Link>
         </>

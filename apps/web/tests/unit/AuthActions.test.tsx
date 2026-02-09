@@ -7,7 +7,6 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
   useIsAuthenticated: vi.fn(() => false),
 }));
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 const { useIsAuthenticated } = await import('@/hooks/useIsAuthenticated');
 const mockUseIsAuthenticated = vi.mocked(useIsAuthenticated);
 
@@ -18,7 +17,9 @@ describe('AuthActions', () => {
 
     expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sign up/i })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /open app/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /open app/i })
+    ).not.toBeInTheDocument();
   });
 
   it('renders Open App link when authenticated', () => {
@@ -28,8 +29,12 @@ describe('AuthActions', () => {
     const openAppLink = screen.getByRole('link', { name: /open app/i });
     expect(openAppLink).toBeInTheDocument();
     expect(openAppLink).toHaveAttribute('href', '/app');
-    expect(screen.queryByRole('link', { name: /log in/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /sign up/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /log in/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /sign up/i })
+    ).not.toBeInTheDocument();
   });
 
   it('wraps links in a flex container', () => {
