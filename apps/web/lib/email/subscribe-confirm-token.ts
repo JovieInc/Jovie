@@ -18,8 +18,10 @@ function getConfirmSecret(): string | null {
   if (!apiKey) {
     return null;
   }
-  return createHmac('sha256', 'subscribe-confirm-secret')
-    .update(apiKey)
+  // Use API key as HMAC key (its intended role) with a domain-specific message
+  // for key derivation. This avoids CodeQL flagging the key as a "password."
+  return createHmac('sha256', apiKey)
+    .update('jovie:subscribe-confirm-token-secret')
     .digest('hex')
     .slice(0, 32);
 }

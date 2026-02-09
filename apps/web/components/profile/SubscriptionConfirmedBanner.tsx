@@ -13,7 +13,7 @@ export function SubscriptionConfirmedBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get('subscribed') === 'confirmed') {
+    if (searchParams?.get('subscribed') === 'confirmed') {
       setVisible(true);
       const timer = window.setTimeout(() => setVisible(false), 8000);
       return () => window.clearTimeout(timer);
