@@ -16,8 +16,14 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
 // Use the same HTTP driver as the app for consistency
-const { users, creatorProfiles, socialLinks, discogReleases, providerLinks } =
-  schema;
+const {
+  users,
+  creatorProfiles,
+  socialLinks,
+  discogReleases,
+  discogTracks,
+  providerLinks,
+} = schema;
 
 interface TestProfile {
   username: string;
@@ -46,31 +52,241 @@ const TEST_PROFILES: TestProfile[] = [
   },
 ];
 
-// Sample release data for E2E tests
-const TEST_RELEASES = [
+/** Track template for seeding */
+interface TestTrack {
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber: number;
+  durationMs: number;
+  isrc?: string;
+  isExplicit?: boolean;
+}
+
+/** Release template for seeding */
+interface TestRelease {
+  title: string;
+  slug: string;
+  releaseType: 'single' | 'album' | 'ep' | 'compilation';
+  releaseDate: Date;
+  artworkUrl: string;
+  spotifyUrl: string;
+  totalTracks: number;
+  upc?: string;
+  label?: string;
+  tracks?: TestTrack[];
+}
+
+/** Generate track titles for large albums */
+function generateTrackTitle(index: number): string {
+  const adjectives = [
+    'Electric',
+    'Fading',
+    'Golden',
+    'Hidden',
+    'Infinite',
+    'Lucid',
+    'Midnight',
+    'Neon',
+    'Phantom',
+    'Quiet',
+    'Rising',
+    'Silver',
+    'Twilight',
+    'Ultraviolet',
+    'Velvet',
+    'Wandering',
+    'Xenon',
+    'Yearning',
+    'Azure',
+    'Burning',
+    'Crystal',
+    'Drifting',
+    'Eternal',
+    'Frozen',
+  ];
+  const nouns = [
+    'Skyline',
+    'Echoes',
+    'Horizon',
+    'Waves',
+    'Dream',
+    'Light',
+    'Shadow',
+    'Pulse',
+    'Signal',
+    'Storm',
+    'Vision',
+    'Flame',
+    'Rain',
+    'Coast',
+    'Bridge',
+    'Mirror',
+    'River',
+    'Garden',
+    'Ocean',
+    'Forest',
+    'Mountain',
+    'Desert',
+    'Valley',
+    'Dawn',
+  ];
+  const adj = adjectives[index % adjectives.length];
+  const noun = nouns[index % nouns.length];
+  // Add a number suffix for uniqueness in large sets
+  return index < 24
+    ? `${adj} ${noun}`
+    : `${adj} ${noun} ${Math.floor(index / 24) + 1}`;
+}
+
+/** Generate slug from title */
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
+/** Generate a fake ISRC */
+function generateIsrc(index: number): string {
+  return `USAT2${String(index).padStart(7, '0')}`;
+}
+
+/** Generate tracks for a release */
+function generateTracks(
+  count: number,
+  discCount = 1,
+  options?: { explicitRate?: number }
+): TestTrack[] {
+  const explicitRate = options?.explicitRate ?? 0.1;
+  const tracksPerDisc = Math.ceil(count / discCount);
+  const tracks: TestTrack[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const discNumber = Math.floor(i / tracksPerDisc) + 1;
+    const trackNumber = (i % tracksPerDisc) + 1;
+    const title = generateTrackTitle(i);
+    tracks.push({
+      title,
+      slug: slugify(title),
+      trackNumber,
+      discNumber,
+      durationMs: 120000 + Math.floor(Math.random() * 240000), // 2-6 min
+      isrc: generateIsrc(i + 100),
+      isExplicit: Math.random() < explicitRate,
+    });
+  }
+  return tracks;
+}
+
+// Sample release data for E2E tests — covers various edge cases
+const TEST_RELEASES: TestRelease[] = [
+  // Single (1 track)
   {
     title: 'Neon Skyline',
     slug: 'neon-skyline',
-    releaseType: 'single' as const,
+    releaseType: 'single',
     releaseDate: new Date('2024-01-15'),
     artworkUrl:
       'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
     spotifyUrl: 'https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv',
+    totalTracks: 1,
+    upc: '191061000001',
+    label: 'Neon Records',
+    tracks: [
+      {
+        title: 'Neon Skyline',
+        slug: 'neon-skyline',
+        trackNumber: 1,
+        discNumber: 1,
+        durationMs: 214000,
+        isrc: 'USAT20000001',
+      },
+    ],
   },
+  // Standard album (10 tracks)
   {
     title: 'Midnight Drive',
     slug: 'midnight-drive',
-    releaseType: 'album' as const,
+    releaseType: 'album',
     releaseDate: new Date('2023-11-20'),
     artworkUrl:
       'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
     spotifyUrl: 'https://open.spotify.com/album/6JJh8nj3ZPYoEXZwLhRJ7U',
+    totalTracks: 10,
+    upc: '191061000002',
+    label: 'Midnight Music',
+    tracks: generateTracks(10),
+  },
+  // EP (5 tracks)
+  {
+    title: 'Fading Signals',
+    slug: 'fading-signals',
+    releaseType: 'ep',
+    releaseDate: new Date('2024-03-01'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    spotifyUrl: 'https://open.spotify.com/album/3LH4d3cOWNNsVw41Gqt2xx',
+    totalTracks: 5,
+    upc: '191061000003',
+    tracks: generateTracks(5),
+  },
+  // Large album (55 tracks, 3 discs) — tests pagination & multi-disc display
+  {
+    title: 'The Complete Sessions',
+    slug: 'the-complete-sessions',
+    releaseType: 'album',
+    releaseDate: new Date('2022-06-15'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    spotifyUrl: 'https://open.spotify.com/album/9XX4d3cOWNNsVw41Gqt2yy',
+    totalTracks: 55,
+    upc: '191061000004',
+    label: 'Anthology Records',
+    tracks: generateTracks(55, 3),
+  },
+  // Compilation (20 tracks, various artists)
+  {
+    title: 'Best of 2023',
+    slug: 'best-of-2023',
+    releaseType: 'compilation',
+    releaseDate: new Date('2023-12-31'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02ff9ca10b55ce82ae553c8228',
+    spotifyUrl: 'https://open.spotify.com/album/7ZZ4d3cOWNNsVw41Gqt2zz',
+    totalTracks: 20,
+    upc: '191061000005',
+    label: 'Various Artists',
+    tracks: generateTracks(20, 1, { explicitRate: 0.3 }),
+  },
+  // Single with explicit content
+  {
+    title: 'Raw Energy',
+    slug: 'raw-energy',
+    releaseType: 'single',
+    releaseDate: new Date('2024-06-01'),
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d00001e02e8b066f70c206551210d902b',
+    spotifyUrl: 'https://open.spotify.com/album/1AA4d3cOWNNsVw41Gqt2ww',
+    totalTracks: 1,
+    tracks: [
+      {
+        title: 'Raw Energy',
+        slug: 'raw-energy',
+        trackNumber: 1,
+        discNumber: 1,
+        durationMs: 198000,
+        isrc: 'USAT20000099',
+        isExplicit: true,
+      },
+    ],
   },
 ];
 
 /**
- * Seeds releases and provider links for a creator profile.
+ * Seeds releases, tracks, and provider links for a creator profile.
  * Handles partial seed states by creating missing releases and provider links.
+ * Includes edge cases: large albums (55 tracks), multi-disc, EPs, compilations.
  */
 async function seedReleasesForProfile(
   db: ReturnType<typeof drizzle>,
@@ -103,13 +319,17 @@ async function seedReleasesForProfile(
           releaseType: release.releaseType,
           releaseDate: release.releaseDate,
           artworkUrl: release.artworkUrl,
-          totalTracks: release.releaseType === 'album' ? 10 : 1,
+          totalTracks: release.totalTracks,
+          upc: release.upc,
+          label: release.label,
           sourceType: 'manual',
         })
         .returning({ id: discogReleases.id });
 
       releaseId = createdRelease.id;
-      console.log(`    ✓ Created release: ${release.title}`);
+      console.log(
+        `    ✓ Created release: ${release.title} (${release.releaseType}, ${release.totalTracks} tracks)`
+      );
     } else {
       console.log(`    ✓ Release exists: ${release.title}`);
     }
@@ -127,10 +347,54 @@ async function seedReleasesForProfile(
       })
       .onConflictDoNothing();
 
+    // Seed tracks if provided
+    if (release.tracks && release.tracks.length > 0) {
+      await seedTracksForRelease(db, releaseId, profileId, release.tracks);
+    }
+
     console.log(`    ✓ Ensured Spotify link for ${release.title}`);
   }
 
   console.log('    ✓ Releases seeding complete');
+}
+
+/**
+ * Seeds tracks for a release. Idempotent — skips if tracks already exist.
+ */
+async function seedTracksForRelease(
+  db: ReturnType<typeof drizzle>,
+  releaseId: string,
+  profileId: string,
+  tracks: TestTrack[]
+) {
+  // Check if tracks already exist for this release
+  const existingTracks = await db
+    .select({ id: discogTracks.id })
+    .from(discogTracks)
+    .where(eq(discogTracks.releaseId, releaseId))
+    .limit(1);
+
+  if (existingTracks.length > 0) {
+    console.log(`      ✓ Tracks already exist (${tracks.length} expected)`);
+    return;
+  }
+
+  // Insert all tracks in a single batch for efficiency
+  const trackValues = tracks.map(track => ({
+    releaseId,
+    creatorProfileId: profileId,
+    title: track.title,
+    slug: track.slug,
+    trackNumber: track.trackNumber,
+    discNumber: track.discNumber,
+    durationMs: track.durationMs,
+    isrc: track.isrc ?? null,
+    isExplicit: track.isExplicit ?? false,
+    sourceType: 'manual' as const,
+  }));
+
+  await db.insert(discogTracks).values(trackValues).onConflictDoNothing();
+  console.log(`      ✓ Seeded ${tracks.length} tracks`);
 }
 
 export async function seedTestData() {
