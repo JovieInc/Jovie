@@ -164,7 +164,7 @@ describe('RecentChats', () => {
     fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
-      expect(getByText('Delete chat')).toBeDefined();
+      expect(getByText('Delete thread')).toBeDefined();
       // Chat title appears both in sidebar and dialog description
       expect(getAllByText(/Test Chat One/).length).toBeGreaterThanOrEqual(2);
     });
@@ -192,7 +192,7 @@ describe('RecentChats', () => {
     });
 
     await waitFor(() => {
-      expect(mockSuccess).toHaveBeenCalledWith('Chat deleted');
+      expect(mockSuccess).toHaveBeenCalledWith('Thread deleted');
     });
   });
 
@@ -231,7 +231,7 @@ describe('RecentChats', () => {
     });
 
     await waitFor(() => {
-      expect(mockError).toHaveBeenCalledWith('Failed to delete chat');
+      expect(mockError).toHaveBeenCalledWith('Failed to delete thread');
     });
   });
 });
