@@ -1,7 +1,7 @@
 import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { type ModelMessage, streamText, tool } from 'ai';
+import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -161,48 +161,46 @@ async function fetchArtistContext(
 }
 
 /**
- * Extracts text content from a message's content field.
- * Handles both string content and array content (with text parts).
+ * Extracts text content from a UIMessage's parts array.
  */
-function extractMessageText(content: unknown): string {
-  if (typeof content === 'string') {
-    return content;
-  }
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (p): p is { type: 'text'; text: string } =>
-          p.type === 'text' && typeof p.text === 'string'
-      )
-      .map(p => p.text)
-      .join('');
-  }
-  return '';
+function extractUIMessageText(
+  parts: Array<{ type: string; text?: string }>
+): string {
+  return parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('');
 }
 
 /**
- * Validates a single message object.
+ * Validates a single UIMessage object.
+ * AI SDK v6 UIMessages have { id, role, parts } instead of { role, content }.
  * Returns an error message string if invalid, null if valid.
  */
 function validateMessage(message: unknown): string | null {
-  if (
-    typeof message !== 'object' ||
-    message === null ||
-    !('role' in message) ||
-    !('content' in message)
-  ) {
+  if (typeof message !== 'object' || message === null || !('role' in message)) {
     return 'Invalid message format';
   }
 
-  const { role, content } = message as { role: unknown; content: unknown };
+  const msg = message as Record<string, unknown>;
 
-  if (role !== 'user' && role !== 'assistant') {
+  if (msg.role !== 'user' && msg.role !== 'assistant') {
     return 'Invalid message role';
   }
 
+  // UIMessages must have a parts array
+  if (!('parts' in msg) || !Array.isArray(msg.parts)) {
+    return 'Invalid message format';
+  }
+
   // Validate content length for user messages
-  if (role === 'user') {
-    const contentStr = extractMessageText(content);
+  if (msg.role === 'user') {
+    const contentStr = extractUIMessageText(
+      msg.parts as Array<{ type: string; text?: string }>
+    );
     if (contentStr.length > MAX_MESSAGE_LENGTH) {
       return `Message too long. Maximum is ${MAX_MESSAGE_LENGTH} characters`;
     }
@@ -212,7 +210,7 @@ function validateMessage(message: unknown): string | null {
 }
 
 /**
- * Validates the messages array.
+ * Validates the messages array (UIMessage format).
  * Returns an error message string if invalid, null if valid.
  */
 function validateMessagesArray(messages: unknown): string | null {
@@ -433,8 +431,8 @@ export async function POST(req: Request) {
     );
   }
 
-  // After validation, we know messages is a valid ModelMessage array
-  const validatedMessages = messages as ModelMessage[];
+  // After validation, we know messages is a valid UIMessage array
+  const uiMessages = messages as UIMessage[];
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   let artistContext: ArtistContext;
@@ -465,10 +463,13 @@ export async function POST(req: Request) {
   const systemPrompt = buildSystemPrompt(artistContext);
 
   try {
+    // Convert UIMessages (from the client) to ModelMessages (for streamText)
+    const modelMessages = await convertToModelMessages(uiMessages);
+
     const result = streamText({
       model: gateway('anthropic:claude-sonnet-4-20250514'),
       system: systemPrompt,
-      messages: validatedMessages,
+      messages: modelMessages,
       tools: {
         proposeProfileEdit: createProfileEditTool(artistContext),
       },
@@ -478,7 +479,7 @@ export async function POST(req: Request) {
           tags: { feature: 'ai-chat', errorType: 'streaming' },
           extra: {
             userId,
-            messageCount: validatedMessages.length,
+            messageCount: uiMessages.length,
           },
         });
       },
@@ -490,7 +491,7 @@ export async function POST(req: Request) {
       tags: { feature: 'ai-chat' },
       extra: {
         userId,
-        messageCount: validatedMessages.length,
+        messageCount: uiMessages.length,
       },
     });
 
