@@ -27,6 +27,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
+import { AudienceTableSubheader } from './AudienceTableSubheader';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { downloadVCard } from './utils';
@@ -62,6 +63,7 @@ function getSrDescription(
 export const DashboardAudienceTableUnified = memo(
   function DashboardAudienceTableUnified({
     mode,
+    view,
     rows,
     total,
     page,
@@ -71,8 +73,10 @@ export const DashboardAudienceTableUnified = memo(
     onPageChange,
     onPageSizeChange,
     onSortChange,
+    onViewChange,
     profileUrl,
     profileId,
+    subscriberCount,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -384,9 +388,19 @@ export const DashboardAudienceTableUnified = memo(
           </h1>
           <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
 
+          {/* Subheader with view filter tabs and export */}
+          <AudienceTableSubheader
+            view={view}
+            onViewChange={onViewChange}
+            rows={rows}
+            selectedIds={selectedIds}
+            subscriberCount={subscriberCount}
+            total={total}
+          />
+
           <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
             {/* Scrollable content area */}
-            <div className='flex-1 min-h-0 overflow-auto'>
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden'>
               {rows.length === 0 ? (
                 <EmptyState
                   icon={emptyStateIcon}
