@@ -11,6 +11,7 @@ import { useSession, useUser } from '@clerk/nextjs';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
+import { ConnectedAccountsCard } from './ConnectedAccountsCard';
 import { EmailManagementCard } from './EmailManagementCard';
 import { SessionManagementCard } from './SessionManagementCard';
 import type { ClerkUserResource } from './types';
@@ -37,6 +38,7 @@ export function AccountSettingsSection() {
   return (
     <div className='space-y-6' data-testid='account-settings-section'>
       <EmailManagementCard user={typedUser} />
+      <ConnectedAccountsCard user={typedUser} />
       <SessionManagementCard
         user={typedUser}
         activeSessionId={activeSession?.id}
