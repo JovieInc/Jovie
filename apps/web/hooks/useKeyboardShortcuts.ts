@@ -74,39 +74,3 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
     return () => globalThis.removeEventListener('keydown', handler);
   }, []);
 }
-
-/**
- * Global shortcuts that should work across all sections
- * These will be registered at the AuthShell level
- */
-export const createGlobalShortcuts = (
-  toggleSidebar: () => void,
-  closeDrawer: () => void,
-  openShortcutsHelp: () => void
-): ShortcutConfig[] => [
-  {
-    key: 'Meta+B',
-    description: 'Toggle sidebar',
-    handler: toggleSidebar,
-  },
-  {
-    key: 'Ctrl+B',
-    description: 'Toggle sidebar',
-    handler: toggleSidebar,
-  },
-  {
-    key: 'Escape',
-    description: 'Close drawer/modal',
-    handler: closeDrawer,
-  },
-  {
-    key: 'Meta+/',
-    description: 'Show keyboard shortcuts',
-    handler: openShortcutsHelp,
-  },
-  {
-    key: 'Ctrl+/',
-    description: 'Show keyboard shortcuts',
-    handler: openShortcutsHelp,
-  },
-];
