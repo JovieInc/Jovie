@@ -57,6 +57,7 @@ export interface SanitizedEvent {
   title: string | null;
   startDate: Date;
   startTime: string | null;
+  timezone: string | null;
   venueName: string;
   city: string;
   region: string | null;
