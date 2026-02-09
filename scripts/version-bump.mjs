@@ -19,7 +19,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,12 +33,10 @@ const [curYear, curMonth, curPatch] = current.split('.').map(Number);
 // --- 2. Compute next calver ---
 const now = new Date();
 const yy = now.getFullYear() % 100; // 2026 → 26
-const mm = now.getMonth() + 1;       // 1-12
+const mm = now.getMonth() + 1; // 1-12
 
 const isSameMonth = yy === curYear && mm === curMonth;
-const next = isSameMonth
-  ? `${yy}.${mm}.${curPatch + 1}`
-  : `${yy}.${mm}.0`;
+const next = isSameMonth ? `${yy}.${mm}.${curPatch + 1}` : `${yy}.${mm}.0`;
 
 // --- 3. Write version.json ---
 writeFileSync(versionFile, JSON.stringify({ version: next }, null, 2) + '\n');

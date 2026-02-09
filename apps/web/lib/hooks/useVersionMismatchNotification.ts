@@ -34,7 +34,9 @@ export function useVersionMismatchNotification() {
       // sessionStorage not available (SSR or private browsing)
     }
 
-    const title = version ? `Version ${version} is available` : 'A new version is available';
+    const title = version
+      ? `Version ${version} is available`
+      : 'A new version is available';
     toast.info(title, {
       id: TOAST_ID,
       duration: Infinity,

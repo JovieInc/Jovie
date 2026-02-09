@@ -76,6 +76,10 @@ export function VersionUpdateBannerWrapper() {
   }
 
   return (
-    <VersionUpdateBanner version={newVersion} onReload={handleReload} onDismiss={handleDismiss} />
+    <VersionUpdateBanner
+      version={newVersion}
+      onReload={handleReload}
+      onDismiss={handleDismiss}
+    />
   );
 }

@@ -283,7 +283,10 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
-    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7),
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(
+      0,
+      7
+    ),
   },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
