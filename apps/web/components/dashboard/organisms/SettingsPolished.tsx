@@ -14,6 +14,7 @@ import { SettingsBrandingSection } from '@/components/dashboard/organisms/Settin
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
+import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
@@ -107,6 +108,13 @@ export function SettingsPolished({
       description:
         'Manage your subscription, payment methods, and billing history.',
       render: () => <SettingsBillingSection />,
+    },
+    {
+      id: 'data-privacy',
+      title: 'Data & Privacy',
+      description:
+        'Export your data or delete your account.',
+      render: () => <DataPrivacySection />,
     },
   ];
 
