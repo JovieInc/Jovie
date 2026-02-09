@@ -163,6 +163,46 @@ async function fetchArtistContext(
 }
 
 /**
+ * Resolves artist context from either a profileId (server-side fetch)
+ * or a client-provided artistContext object (backward compatibility).
+ */
+async function resolveArtistContext(
+  profileId: unknown,
+  artistContextInput: unknown,
+  userId: string
+): Promise<
+  | { context: ArtistContext; error?: never }
+  | { context?: never; error: NextResponse }
+> {
+  if (profileId && typeof profileId === 'string') {
+    const context = await fetchArtistContext(profileId, userId);
+    if (!context) {
+      return {
+        error: NextResponse.json(
+          { error: 'Profile not found or unauthorized' },
+          { status: 404, headers: CORS_HEADERS }
+        ),
+      };
+    }
+    return { context };
+  }
+
+  const parseResult = artistContextSchema.safeParse(artistContextInput);
+  if (!parseResult.success) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Invalid artistContext format',
+          details: parseResult.error.flatten().fieldErrors,
+        },
+        { status: 400, headers: CORS_HEADERS }
+      ),
+    };
+  }
+  return { context: parseResult.data };
+}
+
+/**
  * Extracts text content from a UIMessage's parts array.
  */
 function extractUIMessageText(
@@ -542,30 +582,13 @@ export async function POST(req: Request) {
   const uiMessages = messages as UIMessage[];
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
-  let artistContext: ArtistContext;
-  if (profileId && typeof profileId === 'string') {
-    const context = await fetchArtistContext(profileId, userId);
-    if (!context) {
-      return NextResponse.json(
-        { error: 'Profile not found or unauthorized' },
-        { status: 404, headers: CORS_HEADERS }
-      );
-    }
-    artistContext = context;
-  } else {
-    // Backward compatibility: accept client-provided artistContext with validation
-    const parseResult = artistContextSchema.safeParse(body.artistContext);
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: 'Invalid artistContext format',
-          details: parseResult.error.flatten().fieldErrors,
-        },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-    artistContext = parseResult.data;
-  }
+  const artistContextResult = await resolveArtistContext(
+    profileId,
+    body.artistContext,
+    userId
+  );
+  if (artistContextResult.error) return artistContextResult.error;
+  const artistContext = artistContextResult.context;
 
   const systemPrompt = buildSystemPrompt(artistContext);
 
