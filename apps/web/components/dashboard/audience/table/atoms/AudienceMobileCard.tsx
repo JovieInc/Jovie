@@ -39,9 +39,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       type='button'
       className={cn(
         'w-full text-left flex items-start gap-3 px-4 py-3.5 transition-colors duration-150',
-        isSelected
-          ? 'bg-surface-2/70'
-          : 'active:bg-surface-2/40'
+        isSelected ? 'bg-surface-2/70' : 'active:bg-surface-2/40'
       )}
       onClick={() => onTap(member)}
       aria-label={`View details for ${displayName}`}
@@ -51,10 +49,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         className='flex-shrink-0 size-9 rounded-full bg-surface-2 flex items-center justify-center mt-0.5'
         aria-hidden='true'
       >
-        <Icon
-          name='User'
-          className='size-4 text-tertiary-token'
-        />
+        <Icon name='User' className='size-4 text-tertiary-token' />
       </div>
 
       {/* Content */}
@@ -107,11 +102,11 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
       {/* Inline metadata: type · visits · intent */}
       <p className='text-xs text-tertiary-token flex items-center gap-1'>
         <span className='capitalize'>{member.type}</span>
-        <Separator />
+        <DotSeparator />
         <span className='tabular-nums'>
           {member.visits} {member.visits === 1 ? 'visit' : 'visits'}
         </span>
-        <Separator />
+        <DotSeparator />
         <span className={cn('font-medium', INTENT_STYLES[member.intentLevel])}>
           {member.intentLevel.charAt(0).toUpperCase() +
             member.intentLevel.slice(1)}
@@ -140,7 +135,7 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
 }
 
 /** Tiny dot separator for inline metadata */
-function Separator() {
+function DotSeparator() {
   return (
     <span className='text-quaternary-token select-none' aria-hidden='true'>
       ·
