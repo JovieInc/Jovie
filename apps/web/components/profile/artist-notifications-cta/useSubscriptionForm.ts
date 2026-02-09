@@ -197,7 +197,7 @@ export function useSubscriptionForm({
         throw new Error('Please enter a valid phone number');
       }
 
-      await subscribeMutation.mutateAsync({
+      const response = await subscribeMutation.mutateAsync({
         artistId: artist.id,
         channel,
         email: channel === 'email' ? trimmedEmail : undefined,
@@ -210,17 +210,26 @@ export function useSubscriptionForm({
         channel,
         source: 'profile_inline',
         handle: artist.handle,
+        pending_confirmation: response.pendingConfirmation ?? false,
       });
 
-      setSubscribedChannels(prev => ({ ...prev, [channel]: true }));
+      if (response.pendingConfirmation) {
+        // Double opt-in: show pending confirmation state
+        setNotificationsState('pending_confirmation');
+        showSuccess('Check your email to confirm your subscription');
+      } else {
+        // Single opt-in: immediate success
+        setSubscribedChannels(prev => ({ ...prev, [channel]: true }));
 
-      setSubscriptionDetails(prev => ({
-        ...prev,
-        [channel]: channel === 'sms' ? (phoneE164 ?? '') : (trimmedEmail ?? ''),
-      }));
+        setSubscriptionDetails(prev => ({
+          ...prev,
+          [channel]:
+            channel === 'sms' ? (phoneE164 ?? '') : (trimmedEmail ?? ''),
+        }));
 
-      setNotificationsState('success');
-      showSuccess(getNotificationSubscribeSuccessMessage(channel));
+        setNotificationsState('success');
+        showSuccess(getNotificationSubscribeSuccessMessage(channel));
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;

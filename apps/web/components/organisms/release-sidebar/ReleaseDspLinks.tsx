@@ -88,7 +88,7 @@ export function ReleaseDspLinks({
   return (
     <div className='space-y-3'>
       <div className='flex items-center justify-between'>
-        <span className='text-xs font-medium text-secondary-token'>
+        <span className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
           DSP Links
         </span>
         {isEditable && availableProviders.length > 0 && (

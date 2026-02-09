@@ -126,8 +126,8 @@ export function ReleaseSidebarHeader({
   }
 
   return (
-    <div className='flex items-center justify-between px-3 py-2'>
-      <p className='text-xs font-medium text-sidebar-foreground truncate'>
+    <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+      <p className='text-xs font-medium text-secondary-token truncate'>
         {hasRelease ? 'Release details' : 'No release selected'}
       </p>
       <DrawerHeaderActions
