@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @jovie/no-manual-db-pooling -- standalone script */
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 import ws from 'ws';

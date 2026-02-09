@@ -34,6 +34,7 @@ interface AddMessagesInput {
 
 interface AddMessagesResponse {
   messages: ChatMessage[];
+  titlePending?: boolean;
 }
 
 interface UpdateConversationInput {

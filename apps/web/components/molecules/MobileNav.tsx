@@ -7,23 +7,22 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserButton } from '@/components/organisms/user-button';
 
+import { APP_ROUTES } from '@/constants/routes';
+
 export function MobileNav({
   hidePricingLink = false,
 }: {
   readonly hidePricingLink?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const prevPathname = useRef(pathname);
 
   const close = useCallback(() => setIsOpen(false), []);
 
-  // Close on route change
+  // Close menu on route changes
   useEffect(() => {
-    if (prevPathname.current !== pathname) {
-      close();
-      prevPathname.current = pathname;
-    }
+    close();
   }, [pathname, close]);
 
   // Prevent body scroll when menu is open
@@ -41,7 +40,10 @@ export function MobileNav({
   // Close on Escape key
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') {
+        close();
+        toggleRef.current?.focus();
+      }
     }
     if (isOpen) {
       document.addEventListener('keydown', onKeyDown);
@@ -52,12 +54,14 @@ export function MobileNav({
   return (
     <>
       <button
+        ref={toggleRef}
         type='button'
         onClick={() => setIsOpen(prev => !prev)}
         className='mobile-nav-toggle focus-ring-themed'
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isOpen}
         aria-controls='mobile-nav-panel'
+        style={{ position: 'relative', zIndex: 100 }}
       >
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -74,6 +78,7 @@ export function MobileNav({
         id='mobile-nav-panel'
         className={`mobile-nav-panel ${isOpen ? 'mobile-nav-panel--open' : ''}`}
         aria-label='Mobile navigation'
+        aria-hidden={!isOpen}
       >
         <div className='mobile-nav-links'>
           {!hidePricingLink && (
@@ -81,6 +86,20 @@ export function MobileNav({
               Pricing
             </Link>
           )}
+          <Link
+            href={APP_ROUTES.SIGNIN}
+            className='mobile-nav-link'
+            onClick={close}
+          >
+            Log in
+          </Link>
+          <Link
+            href={APP_ROUTES.WAITLIST}
+            className='mobile-nav-cta'
+            onClick={close}
+          >
+            Sign up
+          </Link>
         </div>
 
         {/* Auth actions - visible in mobile menu */}

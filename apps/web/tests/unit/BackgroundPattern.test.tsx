@@ -60,9 +60,9 @@ describe('BackgroundPattern', () => {
       const pattern = container.querySelector('div');
 
       expect(pattern?.className).toContain('bg-gradient-to-br');
-      expect(pattern?.className).toContain('from-purple-50');
-      expect(pattern?.className).toContain('via-pink-50');
-      expect(pattern?.className).toContain('to-orange-50');
+      expect(pattern?.className).toContain('from-surface-0');
+      expect(pattern?.className).toContain('via-surface-1');
+      expect(pattern?.className).toContain('to-surface-0');
     });
   });
 
@@ -85,9 +85,9 @@ describe('BackgroundPattern', () => {
       const { container } = render(<BackgroundPattern variant='gradient' />);
       const pattern = container.querySelector('div');
 
-      expect(pattern?.className).toContain('dark:from-gray-900');
-      expect(pattern?.className).toContain('dark:via-purple-900/20');
-      expect(pattern?.className).toContain('dark:to-gray-900');
+      expect(pattern?.className).toContain('dark:from-base');
+      expect(pattern?.className).toContain('dark:via-surface-1');
+      expect(pattern?.className).toContain('dark:to-base');
     });
   });
 
@@ -127,7 +127,7 @@ describe('BackgroundPattern', () => {
     it('has gradient pattern definition', () => {
       expect(BACKGROUND_PATTERNS.gradient).toBeDefined();
       expect(BACKGROUND_PATTERNS.gradient).toContain('bg-gradient-to-br');
-      expect(BACKGROUND_PATTERNS.gradient).toContain('from-purple-50');
+      expect(BACKGROUND_PATTERNS.gradient).toContain('from-surface-0');
     });
 
     it('grid pattern has dark mode variant', () => {
@@ -139,7 +139,7 @@ describe('BackgroundPattern', () => {
     });
 
     it('gradient pattern has dark mode variant', () => {
-      expect(BACKGROUND_PATTERNS.gradient).toContain('dark:from-gray-900');
+      expect(BACKGROUND_PATTERNS.gradient).toContain('dark:from-base');
     });
   });
 
@@ -255,9 +255,9 @@ describe('BackgroundPattern', () => {
 
     it('gradient pattern has correct color stops', () => {
       const gradientPattern = BACKGROUND_PATTERNS.gradient;
-      expect(gradientPattern).toContain('from-purple-50');
-      expect(gradientPattern).toContain('via-pink-50');
-      expect(gradientPattern).toContain('to-orange-50');
+      expect(gradientPattern).toContain('from-surface-0');
+      expect(gradientPattern).toContain('via-surface-1');
+      expect(gradientPattern).toContain('to-surface-0');
     });
 
     it('grid pattern uses rgba with low opacity', () => {

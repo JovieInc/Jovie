@@ -38,7 +38,7 @@ export function Section({
       className={cn(
         'relative',
         paddingVariants[padding],
-        withBorder && 'border-t border-gray-200 dark:border-white/10',
+        withBorder && 'border-t border-subtle',
         className
       )}
       {...props}

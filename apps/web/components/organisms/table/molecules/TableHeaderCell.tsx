@@ -43,12 +43,16 @@ export function TableHeaderCell<TData>({
     ariaSort = 'none';
   }
 
+  const metaClassName = (
+    header.column.columnDef.meta as { className?: string } | undefined
+  )?.className;
+
   return (
     <th
       key={header.id}
       scope='col'
       aria-sort={ariaSort}
-      className={cn(stickyHeaderClass)}
+      className={cn(stickyHeaderClass, metaClassName)}
       style={{
         width: header.getSize() === 150 ? undefined : header.getSize(),
       }}

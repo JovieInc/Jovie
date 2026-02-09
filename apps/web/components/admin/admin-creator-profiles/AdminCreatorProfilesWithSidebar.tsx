@@ -19,6 +19,7 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useRowSelection } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -64,7 +65,7 @@ export function AdminCreatorProfilesWithSidebar({
   search,
   sort,
   mode = 'admin',
-  basePath = '/app/admin/creators',
+  basePath = APP_ROUTES.ADMIN_CREATORS,
 }: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const router = useRouter();
   const notifications = useNotifications();
@@ -393,7 +394,7 @@ export function AdminCreatorProfilesWithSidebar({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex bg-surface-2 border-subtle'
+        className='bg-surface-2 border-subtle'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <Suspense

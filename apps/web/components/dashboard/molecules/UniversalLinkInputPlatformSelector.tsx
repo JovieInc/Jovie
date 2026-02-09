@@ -11,7 +11,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
-import { isBrandDark } from '@/lib/utils/color';
+import { getContrastTextOnBrand } from '@/lib/utils/color';
 
 import {
   ARTIST_SEARCH_PLATFORMS,
@@ -41,9 +41,8 @@ export function UniversalLinkInputPlatformSelector({
   const currentIconHex = currentIconMeta?.hex
     ? `#${currentIconMeta.hex}`
     : '#6b7280';
-  const isDarkBrand = isBrandDark(currentIconHex);
   const selectorIconBg = currentIconHex;
-  const selectorIconColor = isDarkBrand ? '#ffffff' : '#0f172a';
+  const selectorIconColor = getContrastTextOnBrand(currentIconHex);
 
   return (
     <DropdownMenu>
@@ -83,7 +82,6 @@ export function UniversalLinkInputPlatformSelector({
         {ARTIST_SEARCH_PLATFORMS.map(platform => {
           const meta = getPlatformIconMetadata(platform.icon);
           const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
-          const darkBrand = isBrandDark(hex);
 
           return (
             <DropdownMenuItem
@@ -95,7 +93,7 @@ export function UniversalLinkInputPlatformSelector({
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'
                 style={{
                   backgroundColor: hex,
-                  color: darkBrand ? '#ffffff' : 'var(--background)',
+                  color: getContrastTextOnBrand(hex),
                 }}
               >
                 <SocialIcon
@@ -114,7 +112,6 @@ export function UniversalLinkInputPlatformSelector({
         {PLATFORM_OPTIONS.map(platform => {
           const meta = getPlatformIconMetadata(platform.icon);
           const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
-          const darkBrand = isBrandDark(hex);
           return (
             <DropdownMenuItem
               key={platform.id}
@@ -125,7 +122,7 @@ export function UniversalLinkInputPlatformSelector({
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'
                 style={{
                   backgroundColor: hex,
-                  color: darkBrand ? '#ffffff' : 'var(--background)',
+                  color: getContrastTextOnBrand(hex),
                 }}
               >
                 <SocialIcon

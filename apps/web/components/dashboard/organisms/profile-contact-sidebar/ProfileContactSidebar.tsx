@@ -19,6 +19,7 @@ export function ProfileContactSidebar() {
     useState<CategoryOption>('social');
 
   // Calculate category counts for the selector
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- intentional: optional chaining dep
   const categoryCounts = useMemo(() => {
     if (!previewData?.links) return undefined;
     return getCategoryCounts(previewData.links);

@@ -21,28 +21,23 @@ test.describe('Homepage', () => {
   test('displays the main hero section', async ({ page }) => {
     // Check main headline
     await expect(page.locator('h1')).toContainText(
-      'The link in bio your music deserves'
+      'Jovie is a purpose-built link in bio for artists and musicians'
     );
 
     // Check lead text
     await expect(
-      page.getByText(
-        'Capture every fan with an AI-powered profile that updates itself.'
-      )
+      page.getByText(/Capture every fan with AI-powered profiles/i)
     ).toBeVisible();
-
-    // Check supporting text
-    await expect(page.getByText('Free to start. Zero setup.')).toBeVisible();
   });
 
   test('displays the hero CTA buttons', async ({ page }) => {
-    // Check "Request early access" button in hero (not header)
+    // Check "Get started" button in hero
     const heroSection = page.locator('main section').first();
-    const earlyAccessButton = heroSection.getByRole('link', {
-      name: /Request early access/i,
+    const getStartedButton = heroSection.getByRole('link', {
+      name: /Get started/i,
     });
-    await expect(earlyAccessButton).toBeVisible();
-    await expect(earlyAccessButton).toHaveAttribute('href', '/waitlist');
+    await expect(getStartedButton).toBeVisible();
+    await expect(getStartedButton).toHaveAttribute('href', '/waitlist');
 
     // Check "See how it works" button
     const howItWorksButton = heroSection.getByRole('link', {
@@ -114,17 +109,17 @@ test.describe('Homepage', () => {
 
     // Check that main content is visible
     await expect(page.locator('h1')).toContainText(
-      'The link in bio your music deserves',
+      'Jovie is a purpose-built link in bio',
       {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       }
     );
 
     // Check that CTAs are visible
-    const earlyAccessButton = page.getByRole('link', {
-      name: /Request early access/i,
+    const getStartedButton = page.getByRole('link', {
+      name: /Get started/i,
     });
-    await expect(earlyAccessButton).toBeVisible({
+    await expect(getStartedButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
@@ -133,15 +128,15 @@ test.describe('Homepage', () => {
     // Check for proper heading structure
     const headings = page.locator('h1, h2, h3');
     await expect(headings.first()).toContainText(
-      'The link in bio your music deserves'
+      'Jovie is a purpose-built link in bio'
     );
 
     // Check for proper link labels in hero
     const heroSection = page.locator('main section').first();
-    const earlyAccessLink = heroSection.getByRole('link', {
-      name: /Request early access/i,
+    const getStartedLink = heroSection.getByRole('link', {
+      name: /Get started/i,
     });
-    await expect(earlyAccessLink).toBeVisible();
+    await expect(getStartedLink).toBeVisible();
 
     // Check for proper image alt texts (logo in header should exist)
     const headerLogo = page.locator('header img, header svg').first();

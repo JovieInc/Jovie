@@ -1,9 +1,10 @@
 'use client';
 
-import { Check, Copy, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useIsMobile } from '@/hooks/useMobile';
 import { getContactRoleLabel } from '@/lib/contacts/constants';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ContactRole } from '@/types/contacts';
@@ -23,6 +24,7 @@ export function ContactDetailHeader({
   onClose,
   onDelete,
 }: ContactDetailHeaderProps) {
+  const isMobile = useIsMobile();
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,13 +49,14 @@ export function ContactDetailHeader({
   const primaryActions: DrawerHeaderAction[] = [
     {
       id: 'close',
-      label: 'Close',
-      icon: X,
+      label: isMobile ? 'Go back' : 'Close',
+      icon: isMobile ? ArrowLeft : X,
       onClick: onClose,
     },
   ];
 
   if (email) {
+    // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
     primaryActions.push({
       id: 'copy',
       label: isCopied ? 'Copied!' : 'Copy email',

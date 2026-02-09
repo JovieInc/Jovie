@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 
 /**
  * Configuration for creating an admin route handler
@@ -66,13 +67,24 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
     // Check admin authorization
     const entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAdmin) {
+      captureWarning(
+        `[admin/route-factory] Admin auth denied for ${config.actionName}`,
+        {
+          route: config.errorContext.route,
+          action: config.errorContext.action,
+          userId: entitlements.userId,
+          email: entitlements.email,
+          isAuthenticated: entitlements.isAuthenticated,
+        }
+      );
+
       if (wantsJson) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized - admin access required' },
           { status: 403 }
         );
       }
-      const redirectUrl = new URL('/app/dashboard', request.url);
+      const redirectUrl = new URL(APP_ROUTES.DASHBOARD_OVERVIEW, request.url);
       return NextResponse.redirect(redirectUrl);
     }
 
@@ -93,7 +105,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         return NextResponse.json(response);
       }
 
-      const redirectUrl = new URL('/app/admin/creators', request.url);
+      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
       return NextResponse.redirect(redirectUrl);
     } catch (error) {
       // Track error in Sentry
@@ -120,7 +132,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
         );
       }
 
-      const redirectUrl = new URL('/app/admin/creators', request.url);
+      const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);
       return NextResponse.redirect(redirectUrl);
     }
   };

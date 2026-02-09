@@ -136,6 +136,7 @@ export interface Artist {
   theme?: Record<string, unknown>;
   settings?: {
     hide_branding?: boolean;
+    exclude_self_from_analytics?: boolean;
   };
   spotify_url?: string;
   apple_music_url?: string;

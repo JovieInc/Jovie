@@ -67,7 +67,11 @@ export async function createOrReuseTestUserSession(page: Page, email: string) {
 }
 
 /**
- * Authenticates a user in Clerk for E2E tests.
+ * Per-test Clerk sign-in for tests that need fresh authentication.
+ *
+ * Most tests should rely on the shared storageState from auth.setup.ts instead.
+ * Use this only when a test needs to re-authenticate (e.g., after sign-out,
+ * or to sign in as a different user).
  *
  * Key requirements for Clerk testing:
  * 1. clerkSetup() must be called in global-setup.ts first
@@ -148,27 +152,36 @@ export async function signInUser(
       );
     }
   } catch (error) {
-    // Check if Clerk JS even loaded
-    const clerkLoaded = await page
-      .evaluate(() => {
-        return typeof (window as { Clerk?: unknown }).Clerk !== 'undefined';
-      })
-      .catch(() => false);
+    const msg = error instanceof Error ? error.message : String(error);
 
-    if (!clerkLoaded) {
-      throw new ClerkTestError(
-        'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
-        'CLERK_NOT_READY'
-      );
+    // Handle "already signed in" — testing token may auto-authenticate
+    if (msg.includes('already signed in')) {
+      console.log('  Already signed in via testing token, continuing...');
+      // Continue to verification below
+    } else {
+      // Check if Clerk JS even loaded
+      const clerkLoaded = await page
+        .evaluate(() => {
+          return typeof (window as { Clerk?: unknown }).Clerk !== 'undefined';
+        })
+        .catch(() => false);
+
+      if (!clerkLoaded) {
+        throw new ClerkTestError(
+          'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
+          'CLERK_NOT_READY'
+        );
+      }
+
+      // Re-throw the original error if Clerk was loaded but signIn failed
+      throw error;
     }
-
-    // Re-throw the original error if Clerk was loaded but signIn failed
-    throw error;
   }
 
-  // After sign-in, navigate to the profile page to verify authentication
+  // After sign-in, navigate to the dashboard profile page to verify authentication
   // The signin page doesn't automatically redirect in test mode
-  await page.goto(APP_ROUTES.PROFILE, {
+  // Use DASHBOARD_PROFILE (which exists) instead of PROFILE (which 404s)
+  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
     waitUntil: 'domcontentloaded',
     timeout: 90000, // Turbopack cold compilation can take 60+ seconds
   });

@@ -17,9 +17,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
+  artistSettingsNavigation,
   primaryNavigation,
   secondaryNavigation,
-  settingsNavigation,
+  userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
@@ -76,24 +77,30 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
-  // Replace "Artist" label with artist display name in settings nav
-  const settingsItems = useMemo(() => {
-    if (!artistName) return settingsNavigation;
-    return settingsNavigation.map(item =>
-      item.id === 'artist' ? { ...item, name: artistName } : item
-    );
-  }, [artistName]);
+  // Settings nav: "General" (user) and artist name (or "Artist") groups
+  const artistSettingsLabel = artistName || 'Artist';
 
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
     () =>
       isInSettings
-        ? [{ key: 'settings', items: settingsItems }]
+        ? [
+            {
+              key: 'settings-general',
+              label: 'General',
+              items: userSettingsNavigation,
+            },
+            {
+              key: 'settings-artist',
+              label: artistSettingsLabel,
+              items: artistSettingsNavigation,
+            },
+          ]
         : [
             { key: 'primary', items: primaryItems },
             { key: 'secondary', items: secondaryItems },
           ],
-    [isInSettings, primaryItems, secondaryItems, settingsItems]
+    [isInSettings, primaryItems, secondaryItems, artistSettingsLabel]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
@@ -153,6 +160,11 @@ export function DashboardNav(_: DashboardNavProps) {
               {/* Section divider for visual separation (except for first section) */}
               {index > 0 && (
                 <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
+              )}
+              {'label' in section && section.label && (
+                <p className='px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-item-icon group-data-[collapsible=icon]:hidden'>
+                  {section.label}
+                </p>
               )}
               {renderSection(section.items)}
             </div>

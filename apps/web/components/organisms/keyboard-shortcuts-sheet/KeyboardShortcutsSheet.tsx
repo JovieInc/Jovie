@@ -241,7 +241,7 @@ export function KeyboardShortcutsSheet() {
             <div className='flex flex-col items-center justify-center py-12 text-center'>
               <Search className='h-8 w-8 text-tertiary-token mb-3' />
               <p className='text-sm text-tertiary-token'>
-                No shortcuts found for "{searchQuery}"
+                No shortcuts found for &quot;{searchQuery}&quot;
               </p>
             </div>
           )}

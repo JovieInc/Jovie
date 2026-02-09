@@ -4,6 +4,7 @@
  * Resolves user state based on creator profile status.
  */
 
+// eslint-disable-next-line import/no-cycle -- mutual dependency with gate.ts for auth state
 import { UserState } from './gate';
 
 /**

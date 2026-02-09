@@ -28,7 +28,7 @@ import {
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-import { isBrandDark } from '@/lib/utils/color';
+import { getContrastTextOnBrand } from '@/lib/utils/color';
 import {
   canonicalIdentity,
   type DetectedLink,
@@ -112,7 +112,6 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
   const handle = identity.startsWith('@') ? identity : undefined;
   const iconMeta = getPlatformIconMetadata(link.platform.icon);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-  const isDark = isBrandDark(brandColor);
 
   const menuItems: LinkItemMenuItem[] = [
     {
@@ -170,7 +169,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-lg'
         style={{
           backgroundColor: brandColor,
-          color: isDark ? '#ffffff' : '#0f172a',
+          color: getContrastTextOnBrand(brandColor),
         }}
       >
         <SocialIcon
@@ -214,6 +213,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             modal
             initialFocus={firstItemRef}
           >
+            {/* eslint-disable react-hooks/refs -- floating-ui ref callback is intentional */}
             <div
               ref={floatingRefs.setFloating}
               tabIndex={-1}
@@ -247,6 +247,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                 </button>
               ))}
             </div>
+            {/* eslint-enable react-hooks/refs */}
           </FloatingFocusManager>
         </FloatingPortal>
       )}

@@ -108,12 +108,15 @@ export function useStableSelectionRefs({
   // Refs to prevent callback recreation on selection change
   // These refs are updated immediately so they always have current values
   const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
 
   const rowIdsRef = useRef(rowIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   rowIdsRef.current = rowIds;
 
   const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   // Stable callback that reads from refs - never changes reference

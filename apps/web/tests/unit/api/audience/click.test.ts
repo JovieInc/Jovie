@@ -143,11 +143,11 @@ describe('POST /api/audience/click', () => {
   });
 
   it('returns 429 when rate limited', async () => {
-    mockPublicClickLimiterGetStatus.mockReturnValue({
-      blocked: true,
-      retryAfterSeconds: 60,
+    mockPublicClickLimiterLimit.mockResolvedValue({
+      success: false,
       limit: 100,
       remaining: 0,
+      reset: new Date(Date.now() + 60_000),
     });
 
     const { POST } = await import('@/app/api/audience/click/route');

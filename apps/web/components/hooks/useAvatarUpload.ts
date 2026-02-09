@@ -161,6 +161,7 @@ export function useAvatarUpload({
         });
       }, 300);
 
+      let didError = false;
       try {
         const imageUrl = await onUpload(file);
         setUploadStatus('success');
@@ -170,6 +171,7 @@ export function useAvatarUpload({
         track('avatar_upload_success', { file_size: file.size });
         resetStatus(2000);
       } catch (error) {
+        didError = true;
         // Handle structured error responses
         const errorData = error as {
           message?: string;
@@ -199,7 +201,7 @@ export function useAvatarUpload({
         clearProgressInterval();
         setIsUploading(false);
         // If we errored, keep progress at 100 for the ring state; otherwise reset when status reset runs
-        if (uploadStatus !== 'error') {
+        if (!didError) {
           setUploadProgress(0);
         }
       }
@@ -215,7 +217,6 @@ export function useAvatarUpload({
       onUpload,
       resetStatus,
       setPreviewFromFile,
-      uploadStatus,
     ]
   );
 

@@ -4,7 +4,7 @@ import { DashboardAudienceTable } from '@/components/dashboard/organisms/dashboa
 import type { AudienceMember } from '@/types';
 
 // Mock the useTableMeta hook
-vi.mock('@/app/app/(shell)/dashboard/DashboardLayoutClient', () => ({
+vi.mock('@/components/organisms/AuthShellWrapper', () => ({
   useTableMeta: () => ({
     tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
     setTableMeta: vi.fn(),

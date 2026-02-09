@@ -25,6 +25,8 @@ export * from './Divider';
 export * from './DotBadge';
 export * from './DropdownMenu';
 export * from './DSPButton';
+// DspLogo is a client component - import directly from './DspLogo' to avoid server/client boundary issues
+// export * from './DspLogo';
 export * from './EmptyCell';
 // ErrorBoundary moved to organisms (uses hooks/Sentry)
 export * from './FooterLink';
@@ -50,6 +52,8 @@ export * from './PlaceholderImage';
 export * from './Popover';
 // ProfileNavButton moved to molecules (uses hooks/state)
 export * from './ProgressIndicator';
+// ProviderIcon is a client component - import directly from './ProviderIcon' to avoid server/client boundary issues
+// export * from './ProviderIcon';
 // QRCode moved to molecules (uses hooks/external API)
 export * from './SectionHeading';
 export * from './Select';

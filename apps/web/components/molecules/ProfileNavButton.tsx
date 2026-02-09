@@ -14,6 +14,8 @@ import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
@@ -42,6 +44,7 @@ export function ProfileNavButton({
   loading = false,
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
+  const { isSignedIn } = useAuthSafe();
 
   const profileUrl = `${BASE_URL}/${artistHandle}`;
 
@@ -81,6 +84,12 @@ export function ProfileNavButton({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align='start' sideOffset={8}>
+          {isSignedIn && (
+            <DropdownMenuItem asChild>
+              <Link href={APP_ROUTES.DASHBOARD}>Dashboard</Link>
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem
             onSelect={() => {
               try {

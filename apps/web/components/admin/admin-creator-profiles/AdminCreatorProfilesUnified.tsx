@@ -14,6 +14,7 @@ import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -68,7 +69,7 @@ export function AdminCreatorProfilesUnified({
   search,
   sort,
   mode = 'admin',
-  basePath = '/app/admin/creators',
+  basePath = APP_ROUTES.ADMIN_CREATORS,
 }: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const router = useRouter();
   const { profiles, toggleVerification } =
@@ -138,8 +139,10 @@ export function AdminCreatorProfilesUnified({
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   const confirmBulkDelete = useCallback((count: number) => {
@@ -269,6 +272,7 @@ export function AdminCreatorProfilesUnified({
 
   // Define columns using factory function
   // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
+  /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
   const columns = useMemo(
     () =>
       createCreatorProfileColumns({
@@ -280,6 +284,7 @@ export function AdminCreatorProfilesUnified({
         toggleSelect,
         getContextMenuItems,
       }),
+    /* eslint-enable react-hooks/refs */
     [
       page,
       pageSize,
@@ -293,6 +298,7 @@ export function AdminCreatorProfilesUnified({
 
   // Ref for selectedId to prevent callback recreation
   const selectedIdRef = useRef(selectedId);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdRef.current = selectedId;
 
   // Get row className based on selection state - uses unified tokens
@@ -390,7 +396,7 @@ export function AdminCreatorProfilesUnified({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex'
+        className=''
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar

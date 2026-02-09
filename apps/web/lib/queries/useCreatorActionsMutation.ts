@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { APP_ROUTES } from '@/constants/routes';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -68,7 +69,7 @@ async function toggleFeatured(
   input: ToggleFeaturedInput
 ): Promise<ToggleFeaturedResponse> {
   const payload = await postJSON<{ isFeatured?: boolean }>(
-    '/app/admin/creators/toggle-featured',
+    APP_ROUTES.ADMIN_CREATORS_TOGGLE_FEATURED,
     input,
     'Failed to update featured status'
   );
@@ -79,7 +80,7 @@ async function toggleMarketing(
   input: ToggleMarketingInput
 ): Promise<ToggleMarketingResponse> {
   const payload = await postJSON<{ marketingOptOut?: boolean }>(
-    '/app/admin/creators/toggle-marketing',
+    APP_ROUTES.ADMIN_CREATORS_TOGGLE_MARKETING,
     input,
     'Failed to update marketing preferences'
   );
@@ -90,7 +91,7 @@ async function deleteCreator(
   input: DeleteCreatorInput
 ): Promise<CreatorActionResponse> {
   await postJSON(
-    '/app/admin/creators/delete',
+    APP_ROUTES.ADMIN_CREATORS_DELETE,
     input,
     'Failed to delete creator/user'
   );
