@@ -361,10 +361,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Version label */}
+        {/* Version + build label */}
         <div className='px-3 pb-2 pt-1 group-data-[collapsible=icon]:hidden'>
           <span className='text-[11px] text-sidebar-muted select-none'>
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+            {process.env.NEXT_PUBLIC_BUILD_SHA ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})` : ''}
           </span>
         </div>
 
