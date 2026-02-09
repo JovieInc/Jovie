@@ -59,7 +59,7 @@ export function SidebarLinkRow({
         <span className='shrink-0 w-5 flex items-center justify-center'>
           {icon}
         </span>
-        <span className='text-sm text-sidebar-foreground truncate'>
+        <span className='text-xs text-secondary-token truncate'>
           {label}
         </span>
         {badge && (

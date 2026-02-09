@@ -63,11 +63,11 @@ export function ReleaseArtwork({
         </div>
       )}
       <div className='min-w-0 flex-1'>
-        <TruncatedText lines={1} className='text-sm font-medium'>
+        <TruncatedText lines={1} className='text-sm font-medium text-primary-token'>
           {title || 'Untitled'}
         </TruncatedText>
         {artistName && (
-          <TruncatedText lines={1} className='text-xs text-sidebar-muted'>
+          <TruncatedText lines={1} className='text-xs text-tertiary-token'>
             {artistName}
           </TruncatedText>
         )}

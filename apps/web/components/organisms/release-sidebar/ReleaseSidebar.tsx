@@ -133,30 +133,39 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
-        <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
+        <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
           {release ? (
             <>
-              <ReleaseArtwork
-                artworkUrl={release.artworkUrl}
-                title={release.title}
-                artistName={artistName}
-                canUploadArtwork={canUploadArtwork}
-                onArtworkUpload={
-                  canUploadArtwork ? handleArtworkUpload : undefined
-                }
-              />
+              <div className='pb-5'>
+                <ReleaseArtwork
+                  artworkUrl={release.artworkUrl}
+                  title={release.title}
+                  artistName={artistName}
+                  canUploadArtwork={canUploadArtwork}
+                  onArtworkUpload={
+                    canUploadArtwork ? handleArtworkUpload : undefined
+                  }
+                />
+              </div>
 
-              <ReleaseFields
-                title={release.title}
-                releaseDate={release.releaseDate}
-                smartLinkPath={release.smartLinkPath}
-              />
+              <div className='py-5'>
+                <ReleaseFields
+                  title={release.title}
+                  releaseDate={release.releaseDate}
+                  smartLinkPath={release.smartLinkPath}
+                />
+              </div>
 
-              <ReleaseMetadata release={release} />
+              <div className='py-5'>
+                <ReleaseMetadata release={release} />
+              </div>
 
-              <ReleaseTrackList release={release} />
+              <div className='py-5'>
+                <ReleaseTrackList release={release} />
+              </div>
 
-              <ReleaseDspLinks
+              <div className='pt-5'>
+                <ReleaseDspLinks
                 release={release}
                 providerConfig={providerConfig}
                 isEditable={isEditable}
@@ -172,6 +181,7 @@ export function ReleaseSidebar({
                 onRemoveLink={handleRemoveLink}
                 onNewLinkKeyDown={handleNewLinkKeyDown}
               />
+              </div>
 
               {isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>
