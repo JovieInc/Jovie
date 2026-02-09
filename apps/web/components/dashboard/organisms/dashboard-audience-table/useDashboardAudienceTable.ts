@@ -1,6 +1,5 @@
 'use client';
 
-import { useVirtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
@@ -14,8 +13,6 @@ import type {
 import { copyTextToClipboard } from './utils';
 
 export interface UseDashboardAudienceTableReturn {
-  tableContainerRef: React.RefObject<HTMLDivElement | null>;
-  headerElevated: boolean;
   openMenuRowId: string | null;
   setOpenMenuRowId: (id: string | null) => void;
   selectedMember: AudienceRow | null;
@@ -27,10 +24,8 @@ export interface UseDashboardAudienceTableReturn {
   toggleSelect: (id: string) => void;
   toggleSelectAll: () => void;
   clearSelection: () => void;
-  rowVirtualizer: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>;
   totalPages: number;
   bulkActions: BulkAction[];
-  paginationLabel: () => string;
   handleCopyProfileLink: () => Promise<void>;
 }
 
@@ -49,8 +44,6 @@ export function useDashboardAudienceTable({
 >): UseDashboardAudienceTableReturn {
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
-  const tableContainerRef = React.useRef<HTMLDivElement>(null);
-  const [headerElevated, setHeaderElevated] = React.useState(false);
   const [openMenuRowId, setOpenMenuRowId] = React.useState<string | null>(null);
   const [selectedMember, setSelectedMember] =
     React.useState<AudienceRow | null>(null);
@@ -68,19 +61,6 @@ export function useDashboardAudienceTable({
     toggleSelectAll,
     clearSelection,
   } = useRowSelection(rowIds);
-
-  React.useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      setHeaderElevated(container.scrollTop > 0);
-    };
-
-    handleScroll();
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
 
   React.useEffect(() => {
     clearSelection();
@@ -105,13 +85,6 @@ export function useDashboardAudienceTable({
   }, [rows, selectedMember, setTableMeta]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 60,
-    overscan: 5,
-  });
 
   const selectedRows = React.useMemo(
     () => rows.filter(row => selectedIds.has(row.id)),
@@ -191,18 +164,6 @@ export function useDashboardAudienceTable({
     [copySelectedEmails, copySelectedPhones, clearSelection, selectedCount]
   );
 
-  const paginationLabel = React.useCallback(() => {
-    if (total === 0) {
-      return mode === 'members'
-        ? 'No audience yet. Share your profile to invite visitors.'
-        : 'No signups yet. Invite fans to tap the bell.';
-    }
-
-    const start = (page - 1) * pageSize + 1;
-    const end = Math.min(page * pageSize, total);
-    return `Showing ${start}–${end} of ${total} readers`;
-  }, [mode, page, pageSize, total]);
-
   const handleCopyProfileLink = React.useCallback(async () => {
     if (!profileUrl) return;
     try {
@@ -231,8 +192,6 @@ export function useDashboardAudienceTable({
   }, []);
 
   return {
-    tableContainerRef,
-    headerElevated,
     openMenuRowId,
     setOpenMenuRowId,
     selectedMember,
@@ -244,10 +203,8 @@ export function useDashboardAudienceTable({
     toggleSelect,
     toggleSelectAll,
     clearSelection,
-    rowVirtualizer,
     totalPages,
     bulkActions,
-    paginationLabel,
     handleCopyProfileLink,
   };
 }
