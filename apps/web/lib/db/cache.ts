@@ -168,7 +168,7 @@ export async function cacheQuery<T>(
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
     const memoryResult = memoryCache.get(cacheKey) as CacheSentinel<T> | null;
-    if (memoryResult !== null && memoryResult.__sentinel) {
+    if (memoryResult?.__sentinel) {
       return memoryResult.value;
     }
   }
@@ -176,7 +176,7 @@ export async function cacheQuery<T>(
   // Layer 2: Try Redis if enabled
   if (useRedis) {
     const redisResult = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
-    if (redisResult !== null && redisResult.__sentinel) {
+    if (redisResult?.__sentinel) {
       // Populate memory cache from Redis hit
       if (!skipMemoryCache) {
         memoryCache.set(cacheKey, redisResult, ttlMs);
@@ -226,6 +226,57 @@ export async function invalidateCache(key: string): Promise<void> {
 }
 
 /**
+ * Scan and delete Redis keys matching a prefix.
+ */
+async function invalidateRedisByPrefix(
+  fullPrefix: string,
+  prefix: string
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    const keysToDelete: string[] = [];
+    let cursor: string | number = 0;
+
+    do {
+      const result: [string | number, string[]] = await redis.scan(cursor, {
+        match: `${fullPrefix}*`,
+        count: 100,
+      });
+      cursor = result[0];
+      keysToDelete.push(...result[1]);
+    } while (cursor !== 0 && cursor !== '0');
+
+    if (keysToDelete.length > 0) {
+      const BATCH_SIZE = 500;
+      let failedDeletes = 0;
+      for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
+        const batch = keysToDelete.slice(i, i + BATCH_SIZE);
+        const pipeline = redis.pipeline();
+        for (const key of batch) {
+          pipeline.del(key);
+        }
+        const results = await pipeline.exec();
+        for (const result of results) {
+          if (result instanceof Error) {
+            failedDeletes++;
+            captureWarning('[db-cache] Redis pipeline DEL failed', result);
+          }
+        }
+      }
+      Sentry.addBreadcrumb({
+        category: 'db-cache',
+        message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
+        level: 'info',
+      });
+    }
+  } catch (error) {
+    captureWarning('[db-cache] Redis prefix invalidation failed', error);
+  }
+}
+
+/**
  * Invalidate all cached queries matching a prefix.
  * Useful for invalidating related caches (e.g., all profile caches for a user).
  *
@@ -247,51 +298,7 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
   }
 
   // Invalidate Redis cache using SCAN to find matching keys
-  const redis = getRedis();
-  if (!redis) return;
-
-  try {
-    const keysToDelete: string[] = [];
-    let cursor: string | number = 0;
-
-    do {
-      const result: [string | number, string[]] = await redis.scan(cursor, {
-        match: `${fullPrefix}*`,
-        count: 100,
-      });
-      cursor = result[0];
-      keysToDelete.push(...result[1]);
-    } while (cursor !== 0 && cursor !== '0');
-
-    if (keysToDelete.length > 0) {
-      // Batch deletes via pipeline to minimize HTTP round-trips
-      const BATCH_SIZE = 500;
-      let failedDeletes = 0;
-      for (let i = 0; i < keysToDelete.length; i += BATCH_SIZE) {
-        const batch = keysToDelete.slice(i, i + BATCH_SIZE);
-        const pipeline = redis.pipeline();
-        for (const key of batch) {
-          pipeline.del(key);
-        }
-        const results = await pipeline.exec();
-        // Check for individual command failures in the pipeline
-        // Upstash pipeline results are typed as unknown[], errors are Error instances
-        for (const result of results) {
-          if (result instanceof Error) {
-            failedDeletes++;
-            captureWarning('[db-cache] Redis pipeline DEL failed', result);
-          }
-        }
-      }
-      Sentry.addBreadcrumb({
-        category: 'db-cache',
-        message: `Invalidated ${keysToDelete.length - failedDeletes}/${keysToDelete.length} Redis cache entries for prefix "${prefix}"`,
-        level: 'info',
-      });
-    }
-  } catch (error) {
-    captureWarning('[db-cache] Redis prefix invalidation failed', error);
-  }
+  await invalidateRedisByPrefix(fullPrefix, prefix);
 }
 
 /**

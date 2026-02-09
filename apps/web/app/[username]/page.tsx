@@ -407,9 +407,7 @@ export default async function ArtistPage({
     artist.name
   );
 
-  const subtitle =
-    PAGE_SUBTITLES[mode as keyof typeof PAGE_SUBTITLES] ??
-    PAGE_SUBTITLES.profile;
+  const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
 
   // Show tip button only in profile/default mode and when artist has venmo
   const hasVenmoLink = links.some(link => link.platform === 'venmo');

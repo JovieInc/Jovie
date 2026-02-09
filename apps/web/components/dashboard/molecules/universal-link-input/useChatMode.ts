@@ -19,7 +19,7 @@ export type InputMode = 'url' | 'platform' | 'chat';
 const MIN_CHAT_LENGTH = 3;
 
 /** Question words that strongly indicate chat intent */
-const QUESTION_STARTERS = [
+const QUESTION_STARTERS = new Set([
   'what',
   'how',
   'why',
@@ -41,10 +41,10 @@ const QUESTION_STARTERS = [
   'show',
   'explain',
   'describe',
-];
+]);
 
 /** Action words that indicate profile editing intent (still chat mode) */
-const ACTION_STARTERS = [
+const ACTION_STARTERS = new Set([
   'update',
   'change',
   'set',
@@ -54,7 +54,7 @@ const ACTION_STARTERS = [
   'add',
   'remove',
   'delete',
-];
+]);
 
 /**
  * Check if input starts with a question or action word
@@ -63,7 +63,7 @@ function startsWithChatIntent(input: string): boolean {
   const normalized = normalizeQuery(input);
   const firstWord = normalized.split(' ')[0];
   return (
-    QUESTION_STARTERS.includes(firstWord) || ACTION_STARTERS.includes(firstWord)
+    QUESTION_STARTERS.has(firstWord) || ACTION_STARTERS.has(firstWord)
   );
 }
 

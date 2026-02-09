@@ -172,7 +172,7 @@ export const DashboardAudienceTableUnified = memo(
             label: 'Unsubscribe',
             icon: <UserMinus className='h-3.5 w-3.5' />,
             onClick: () => {
-              void handleRemoveMember(member);
+              handleRemoveMember(member).catch(() => {});
             },
             disabled: !profileId,
             destructive: true,

@@ -54,7 +54,7 @@ async function maybeGenerateTitle(
 
     const title = text
       .trim()
-      .replace(/^["']|["']$/g, '')
+      .replaceAll(/^["']|["']$/g, '')
       .slice(0, 80);
 
     if (!title) throw new Error('Empty title generated');

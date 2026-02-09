@@ -1,13 +1,18 @@
 import 'server-only';
 import Statsig from 'statsig-node';
 import { env } from '@/lib/env-server';
-import {
+
+export {
   FEATURE_FLAG_KEYS,
   type FeatureFlagKey,
   type FeatureFlagsBootstrap,
 } from './shared';
 
-export { FEATURE_FLAG_KEYS, type FeatureFlagKey, type FeatureFlagsBootstrap };
+import {
+  FEATURE_FLAG_KEYS,
+  type FeatureFlagKey,
+  type FeatureFlagsBootstrap,
+} from './shared';
 
 let statsigInitialized = false;
 

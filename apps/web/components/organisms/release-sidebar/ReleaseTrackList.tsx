@@ -55,7 +55,9 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     <DrawerSection>
       <button
         type='button'
-        onClick={() => void handleToggle()}
+        onClick={() => {
+          handleToggle().catch(() => {});
+        }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
         className='flex w-full items-center justify-between rounded-md py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token hover:text-primary-token transition-colors'
@@ -82,7 +84,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
             </p>
           )}
 
-          {!isLoading && !hasError && tracks && tracks.length === 0 && (
+          {!isLoading && !hasError && tracks?.length === 0 && (
             <p className='py-2 text-xs text-tertiary-token'>
               No track data available.
             </p>

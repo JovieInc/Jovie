@@ -33,7 +33,7 @@ export function SettingsAppearanceSection() {
               type='button'
               key={option.value}
               onClick={() =>
-                handleThemeChange(option.value as 'light' | 'dark' | 'system')
+                handleThemeChange(option.value)
               }
               disabled={isPending}
               className={cn(

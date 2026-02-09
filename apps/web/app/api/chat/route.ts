@@ -96,7 +96,7 @@ async function fetchArtistContext(
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
 
-  if (!result || result.userClerkId !== clerkUserId) {
+  if (result?.userClerkId !== clerkUserId) {
     return null;
   }
 
@@ -160,6 +160,46 @@ async function fetchArtistContext(
       monthReceivedCents: Number(tipTotals?.monthReceived ?? 0),
     },
   };
+}
+
+/**
+ * Resolves artist context from profileId (server-side) or client-provided data.
+ * Returns { data } on success or { error } with a NextResponse on failure.
+ */
+async function resolveArtistContext(
+  profileId: unknown,
+  userId: string,
+  clientContext: unknown
+): Promise<
+  { data: ArtistContext; error?: never } | { data?: never; error: NextResponse }
+> {
+  if (profileId && typeof profileId === 'string') {
+    const context = await fetchArtistContext(profileId, userId);
+    if (!context) {
+      return {
+        error: NextResponse.json(
+          { error: 'Profile not found or unauthorized' },
+          { status: 404, headers: CORS_HEADERS }
+        ),
+      };
+    }
+    return { data: context };
+  }
+
+  // Backward compatibility: accept client-provided artistContext with validation
+  const parseResult = artistContextSchema.safeParse(clientContext);
+  if (!parseResult.success) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Invalid artistContext format',
+          details: parseResult.error.flatten().fieldErrors,
+        },
+        { status: 400, headers: CORS_HEADERS }
+      ),
+    };
+  }
+  return { data: parseResult.data };
 }
 
 /**
@@ -412,7 +452,7 @@ function createReleaseTool(resolvedProfileId: string) {
         let parsedDate: Date | null = null;
         if (releaseDate) {
           parsedDate = new Date(releaseDate);
-          if (isNaN(parsedDate.getTime())) {
+          if (Number.isNaN(parsedDate.getTime())) {
             return {
               success: false,
               error: 'Invalid date. Please use YYYY-MM-DD format.',
@@ -542,30 +582,15 @@ export async function POST(req: Request) {
   const uiMessages = messages as UIMessage[];
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
-  let artistContext: ArtistContext;
-  if (profileId && typeof profileId === 'string') {
-    const context = await fetchArtistContext(profileId, userId);
-    if (!context) {
-      return NextResponse.json(
-        { error: 'Profile not found or unauthorized' },
-        { status: 404, headers: CORS_HEADERS }
-      );
-    }
-    artistContext = context;
-  } else {
-    // Backward compatibility: accept client-provided artistContext with validation
-    const parseResult = artistContextSchema.safeParse(body.artistContext);
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: 'Invalid artistContext format',
-          details: parseResult.error.flatten().fieldErrors,
-        },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-    artistContext = parseResult.data;
+  const contextResult = await resolveArtistContext(
+    profileId,
+    userId,
+    body.artistContext
+  );
+  if (contextResult.error) {
+    return contextResult.error;
   }
+  const artistContext = contextResult.data;
 
   const systemPrompt = buildSystemPrompt(artistContext);
 
