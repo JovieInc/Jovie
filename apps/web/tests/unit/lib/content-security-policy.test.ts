@@ -17,6 +17,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
+  it('excludes unsafe-eval in production', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+  });
+
   it('includes unsafe-eval in development', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

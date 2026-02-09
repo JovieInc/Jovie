@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
 import { KEYBOARD_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { isFormElement } from '@/lib/utils/keyboard';
 
 /**
  * Configuration for sequential shortcuts hook
@@ -49,15 +50,8 @@ export function useSequentialShortcuts({
     (event: KeyboardEvent) => {
       if (!enabled) return;
 
-      // Ignore if typing in an input, textarea, or contenteditable
-      const target = event.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
+      // Ignore if typing in a form element
+      if (isFormElement(event.target)) return;
 
       const key = event.key.toLowerCase();
 

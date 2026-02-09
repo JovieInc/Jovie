@@ -234,7 +234,7 @@ export function LiquidGlassMenu({
         {/* Backdrop */}
         <div
           className={cn(
-            'fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity duration-300',
+            'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm transition-opacity duration-300',
             isExpanded ? 'opacity-100' : 'opacity-0'
           )}
           onClick={closeMenu}
@@ -244,7 +244,7 @@ export function LiquidGlassMenu({
         {/* Expanded menu */}
         <div
           className={cn(
-            'relative mx-4 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
+            'relative z-50 mx-4 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
             isExpanded ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
           )}
           style={{
@@ -294,7 +294,7 @@ export function LiquidGlassMenu({
       {/* Bottom tab bar */}
       <nav
         aria-label='Dashboard tabs'
-        className='relative'
+        className='relative z-50'
         style={{
           background: 'var(--liquid-glass-bg-solid)',
           boxShadow: isExpanded ? 'none' : 'var(--liquid-glass-shadow)',

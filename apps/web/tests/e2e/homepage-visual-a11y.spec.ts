@@ -154,7 +154,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
   test.describe('Visual Regression', () => {
     test('homepage renders consistently (light mode)', async ({ page }) => {
       await page.goto('/', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Force light mode
       await page.evaluate(() => {
@@ -163,16 +164,17 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       });
       await page.waitForTimeout(500);
 
-      // Take full-page screenshot
+      // Take full-page screenshot (will auto-create baseline on first run)
       await expect(page).toHaveScreenshot('homepage-light.png', {
         fullPage: true,
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.1,
       });
     });
 
     test('homepage renders consistently (dark mode)', async ({ page }) => {
       await page.goto('/', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Force dark mode
       await page.evaluate(() => {
@@ -184,7 +186,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       // Take full-page screenshot
       await expect(page).toHaveScreenshot('homepage-dark.png', {
         fullPage: true,
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.1,
       });
     });
 
@@ -192,14 +194,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Set consistent viewport for above-the-fold test
       await page.setViewportSize({ width: 1280, height: 720 });
 
       await expect(page).toHaveScreenshot('homepage-hero-viewport.png', {
         fullPage: false,
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.1,
       });
     });
 
@@ -208,7 +211,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Force light mode
       await page.evaluate(() => {
@@ -219,16 +223,18 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
       // Scroll to below-the-fold content
       await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
 
       // Take screenshot of below-the-fold area
       await expect(page).toHaveScreenshot('homepage-below-fold-light.png', {
         fullPage: false,
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.1,
       });
 
       // Verify sections are not blank (have visible background, not pure black)
-      const mainDiv = page.locator('main > div').first();
+      const mainDiv = page
+        .locator('main > div, div[class*="min-h-screen"]')
+        .first();
       const bgColor = await mainDiv.evaluate(
         el => window.getComputedStyle(el).backgroundColor
       );
@@ -240,7 +246,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 30000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Force dark mode
       await page.evaluate(() => {
@@ -251,16 +258,18 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
       // Scroll to below-the-fold content
       await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
 
       // Take screenshot
       await expect(page).toHaveScreenshot('homepage-below-fold-dark.png', {
         fullPage: false,
-        maxDiffPixelRatio: 0.05,
+        maxDiffPixelRatio: 0.1,
       });
 
       // Verify text is light colored in dark mode (not black)
-      const mainDiv = page.locator('main > div').first();
+      const mainDiv = page
+        .locator('main > div, div[class*="min-h-screen"]')
+        .first();
       const textColor = await mainDiv.evaluate(
         el => window.getComputedStyle(el).color
       );

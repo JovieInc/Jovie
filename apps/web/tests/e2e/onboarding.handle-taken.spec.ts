@@ -65,6 +65,23 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await page.goto(runWithRealAPI ? '/onboarding' : '/', {
       waitUntil: 'domcontentloaded',
     });
+
+    // The handle claim form is behind a feature flag (CLAIM_HANDLE).
+    // In mocked mode, skip tests if the form isn't on the homepage.
+    if (!runWithRealAPI) {
+      const handleInput = page.getByLabel(
+        /choose your handle|enter your desired handle/i
+      );
+      const isFormVisible = await handleInput
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+      if (!isFormVisible) {
+        console.log(
+          '⚠ Handle claim form not rendered on homepage (feature flag off) — skipping'
+        );
+        test.skip();
+      }
+    }
   });
 
   test('entering a taken handle shows error and disables submit button', async ({

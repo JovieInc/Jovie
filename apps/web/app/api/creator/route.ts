@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { logger } from '@/lib/utils/logger';
 
@@ -84,6 +85,10 @@ export async function GET(
     );
   } catch (error) {
     logger.error('Error fetching creator profile:', error);
+    await captureError('Creator profile fetch failed', error, {
+      route: '/api/creator',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500, headers: NO_STORE_HEADERS }

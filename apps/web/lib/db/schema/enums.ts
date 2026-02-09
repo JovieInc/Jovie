@@ -297,6 +297,21 @@ export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
   'failed',
 ]);
 
+// DSP Bio Sync Enums
+export const dspBioSyncMethodEnum = pgEnum('dsp_bio_sync_method', [
+  'api',
+  'email',
+]);
+
+export const dspBioSyncStatusEnum = pgEnum('dsp_bio_sync_status', [
+  'pending',
+  'sending',
+  'sent',
+  'delivered',
+  'failed',
+  'unsupported',
+]);
+
 // Chat Enums
 export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',

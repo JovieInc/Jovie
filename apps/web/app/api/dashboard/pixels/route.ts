@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { encryptPII } from '@/lib/utils/pii-encryption';
@@ -112,6 +113,12 @@ export async function GET() {
     });
   } catch (error) {
     logger.error('[Pixels GET] Error fetching pixel settings:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Pixel management failed', error, {
+        route: '/api/dashboard/pixels',
+        method: 'GET',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -247,6 +254,12 @@ export async function PUT(req: Request) {
     });
   } catch (error) {
     logger.error('[Pixels PUT] Error updating pixel settings:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Pixel management failed', error, {
+        route: '/api/dashboard/pixels',
+        method: 'PUT',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -255,6 +268,61 @@ export async function PUT(req: Request) {
     }
     return NextResponse.json(
       { error: 'Failed to update pixel settings' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * DELETE /api/dashboard/pixels
+ *
+ * Delete all pixel settings for the authenticated user's profile.
+ * Removes the entire creatorPixels row, clearing all pixel IDs and tokens.
+ */
+export async function DELETE() {
+  try {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      // Get user's profile
+      const [userProfile] = await tx
+        .select({
+          profileId: creatorProfiles.id,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!userProfile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Delete pixel config for this profile
+      await tx
+        .delete(creatorPixels)
+        .where(eq(creatorPixels.profileId, userProfile.profileId));
+
+      logger.info('[Pixels DELETE] Pixel settings cleared', {
+        profileId: userProfile.profileId,
+      });
+
+      return NextResponse.json(
+        { success: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    });
+  } catch (error) {
+    logger.error('[Pixels DELETE] Error deleting pixel settings:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Failed to delete pixel settings' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

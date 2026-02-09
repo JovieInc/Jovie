@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
@@ -59,6 +60,11 @@ export async function GET(request: Request) {
 
     logger.error('[process-campaigns] Failed', {
       error: error instanceof Error ? error.message : 'Unknown error',
+      duration,
+    });
+    await captureError('Campaign processing cron failed', error, {
+      route: '/api/cron/process-campaigns',
+      method: 'GET',
       duration,
     });
 

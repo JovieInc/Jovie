@@ -20,6 +20,7 @@ import {
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -475,6 +476,10 @@ export async function GET(request: Request) {
   } catch (error) {
     logger.error('[Campaign Stats] Failed to fetch stats', {
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    await captureError('Admin campaign stats failed', error, {
+      route: '/api/admin/campaigns/stats',
+      method: 'GET',
     });
 
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dashboardIdempotencyKeys } from '@/lib/db/schema/links';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -55,6 +56,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('[cleanup-idempotency-keys] Cleanup failed:', error);
+    await captureError('Idempotency key cleanup cron failed', error, {
+      route: '/api/cron/cleanup-idempotency-keys',
+      method: 'GET',
+    });
     return NextResponse.json(
       {
         success: false,

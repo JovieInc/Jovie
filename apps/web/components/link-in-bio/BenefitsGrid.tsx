@@ -74,7 +74,7 @@ export function BenefitsGrid() {
             return (
               <div key={benefit.title} className='relative group'>
                 <div className='absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500' />
-                <div className='relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 h-full'>
+                <div className='relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-default hover:border-strong transition-all duration-300 rounded-2xl p-8 h-full'>
                   {/* Emoji and title */}
                   <div className='flex items-start gap-4 mb-6'>
                     {/* Emoji needs role="img" for screen reader accessibility */}

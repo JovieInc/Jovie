@@ -1,8 +1,8 @@
 import { ChatPageClient } from './ChatPageClient';
 
 export const metadata = {
-  title: 'Chat',
-  description: 'Chat with Jovie AI',
+  title: 'New Thread',
+  description: 'Start a new thread with Jovie AI',
 };
 
 export default function ChatPage() {
