@@ -64,7 +64,7 @@ export function TipSelector({
         ))}
       </div>
 
-      <hr className='mt-3 pt-3 border-t border-black/5 dark:border-white/10' />
+      <hr className='mt-3 pt-3 border-t border-subtle' />
 
       <Button
         onClick={handleContinue}

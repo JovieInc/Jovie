@@ -8,6 +8,7 @@ import React, { useEffect } from 'react';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
+import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -27,19 +28,10 @@ function ThemeKeyboardShortcut() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      // Ignore if event already handled or modifier keys pressed
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key.toLowerCase() !== 't') return;
-
-      // Ignore if user is typing in a text input
-      const target = event.target;
-      if (target instanceof HTMLElement) {
-        const tagName = target.tagName.toLowerCase();
-        const isTextInput =
-          tagName === 'input' || tagName === 'textarea' || tagName === 'select';
-        if (isTextInput || target.isContentEditable) return;
-      }
+      if (isFormElement(event.target)) return;
 
       event.preventDefault();
       setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');

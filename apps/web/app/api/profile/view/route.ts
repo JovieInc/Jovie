@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { shouldExcludeSelfByHandle } from '@/lib/analytics/self-exclusion';
+import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { publicProfileLimiter } from '@/lib/rate-limit';
 import { incrementProfileViews } from '@/lib/services/profile';
@@ -91,7 +92,11 @@ export async function POST(request: NextRequest) {
     await incrementProfileViews(handle);
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
-  } catch {
+  } catch (error) {
+    await captureError('Profile view recording failed', error, {
+      route: '/api/profile/view',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to record view' },
       { status: 500, headers: NO_STORE_HEADERS }

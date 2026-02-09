@@ -35,23 +35,22 @@ await db.execute(drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`);
 
 ---
 
-## Finding 3: Unbounded chat messages query — no LIMIT (High — Performance)
+## ~~Finding 3: Unbounded chat messages query — no LIMIT~~ (RESOLVED)
 
-**File:** `apps/web/app/api/chat/conversations/[id]/route.ts:55-65`
+**File:** `apps/web/app/api/chat/conversations/[id]/route.ts:85-88`
+
+**Status:** Fixed. The query now uses cursor-based pagination with `.limit(limit + 1)` and returns a `hasMore` flag for the client. Verified 2026-02-09.
 
 ```ts
-const messages = await db
-  .select({ id, role, content, toolCalls, createdAt })
-  .from(chatMessages)
-  .where(eq(chatMessages.conversationId, id))
-  .orderBy(asc(chatMessages.createdAt));
+.orderBy(desc(chatMessages.createdAt))
+.limit(limit + 1);
+const hasMore = rows.length > limit;
+if (hasMore) rows.pop();
 ```
-
-No `.limit()` clause. A long conversation with hundreds or thousands of messages loads the entire history into memory. With `toolCalls` (JSONB blobs), this can produce multi-megabyte payloads, causing memory pressure and slow responses. This is a user-facing endpoint vulnerable to organic growth.
 
 ---
 
-## Finding 4: Middleware DB query on every authenticated page navigation (High — Performance)
+## Finding 4: Middleware DB query on every authenticated page navigation (High — Performance) — MITIGATED
 
 **File:** `apps/web/proxy.ts:340-349` → `lib/auth/proxy-state.ts:240-280`
 
@@ -61,21 +60,24 @@ if (needsUserState) {
 }
 ```
 
-`needsUserState` is true for every authenticated non-API request. `getUserState` hits Redis first, then falls back to a Postgres JOIN query with a 5-second timeout. Redis cache TTL is only 30 seconds for transitional users, meaning a DB round-trip from middleware every 30 seconds. During Neon cold starts, the 5-second timeout means pages can hang for 5 seconds before fallback.
+**Update (2026-02-09):** `getUserState` uses a 3-layer caching strategy that mitigates the concern:
+1. **In-memory cache** — 5-10s TTL, serves most requests without any I/O
+2. **Redis cache** — 2-5 minute TTL (not 30s as originally reported), avoids DB in cross-instance scenarios
+3. **DB fallback** — only hit when both memory and Redis miss
+
+The Redis TTL for transitional users is **2 minutes** (120s), not 30s. Most requests are served from the in-memory layer. The Neon cold-start concern remains valid but is mitigated by the multi-layer cache.
 
 ---
 
-## Finding 5: Non-atomic job dedup — SELECT-then-INSERT race condition (High — Stability)
+## Finding 5: Non-atomic job dedup — SELECT-then-INSERT race condition (High — Stability) — MITIGATED
 
 **File:** `apps/web/lib/ingestion/jobs.ts` (repeated ~7 times, e.g., lines 57-94)
 
-```ts
-const existing = await db.select({ id }).from(ingestionJobs).where(...).limit(1);
-if (existing.length > 0) return existing[0].id;
-const [inserted] = await db.insert(ingestionJobs).values({...}).returning({ id });
-```
+**Update (2026-02-09):** The code already includes race condition mitigation:
+1. `INSERT ... ON CONFLICT DO NOTHING` via `onConflictDoNothing({ target: ingestionJobs.dedupKey })` — prevents actual duplicate rows
+2. Fallback SELECT after a conflict — retrieves the winner's ID
 
-Two concurrent calls with the same dedup key can both see no existing row and both insert, creating duplicate jobs. Since the Neon HTTP driver doesn't support transactions, an `INSERT ... ON CONFLICT DO NOTHING` with a unique constraint on `(jobType, dedupKey)` is the correct fix.
+The SELECT-then-INSERT pattern is still used for the fast path (skip the INSERT entirely if job already exists), but the `onConflictDoNothing` ensures correctness under concurrency. No duplicate jobs are created. Could be simplified to INSERT-first but the current approach is functionally correct.
 
 ---
 
@@ -128,20 +130,20 @@ Legitimate `null` results (e.g., "user not found") are treated as cache misses a
 
 ---
 
-## Finding 9: No rate limiting on expensive endpoints (High — Stability)
+## ~~Finding 9: No rate limiting on expensive endpoints~~ (RESOLVED)
 
-Multiple endpoints with expensive operations have no rate limiting:
+**Update (2026-02-09):** All four endpoints now have proper rate limiting with 429 responses and `Retry-After` headers:
 
-- **`api/dsp/discover/route.ts:38`** — Each call enqueues external API discovery jobs (Spotify, Apple Music, Deezer). Spam-clickable.
-- **`api/admin/fit-scores/route.ts:171`** — `recalculate_all` can process 500 profiles with Spotify enrichment.
-- **`api/chat/conversations/route.ts:71`** — No rate limit on conversation creation.
-- **`api/admin/creator-ingest/route.ts:252`** — Fetches external Linktree/Laylo profiles.
+- **`api/dsp/discover/route.ts`** — `checkDspDiscoveryRateLimit(userId)` with rate limit headers
+- **`api/admin/fit-scores/route.ts`** — `checkAdminFitScoresRateLimit(adminUserId)`
+- **`api/chat/conversations/route.ts`** — `checkAiChatRateLimit(userId)` (also applies to chat route)
+- **`api/admin/creator-ingest/route.ts`** — `checkAdminCreatorIngestRateLimit(adminUserId)`
 
-A user rapidly clicking "discover" floods the job queue. Admin endpoints without rate limits are vulnerable to accidental or malicious overload.
+All verified 2026-02-09.
 
 ---
 
-## Finding 10: Sequential Stripe API calls that should be parallelized (High — Performance)
+## Finding 10: Sequential Stripe API calls that should be parallelized (High — Performance) — PARTIALLY RESOLVED
 
 **File:** `apps/web/app/api/stripe/plan-change/route.ts:126-175`
 
@@ -151,7 +153,10 @@ const planOptions = await getAvailablePlanChanges(customerResult.customerId);
 const subscription = await getActiveSubscription(customerResult.customerId);
 ```
 
-Three sequential Stripe API calls with no timeout. `getAvailablePlanChanges` and `getActiveSubscription` are independent and could be parallelized with `Promise.all`. Same issue in `api/admin/overview/route.ts:41-43` where `getStripeMrr()` and `getWaitlistCount()` run sequentially.
+**Update (2026-02-09):**
+- `ensureStripeCustomer()` must run first (the other calls depend on `customerId`), so the POST handler is sequential by necessity.
+- The GET handler already uses `Promise.all()` for parallel fetches.
+- `api/admin/overview/route.ts` — `getStripeMrr()` and `getWaitlistCount()` already run in parallel via `Promise.all()`. Verified 2026-02-09.
 
 ---
 
@@ -200,15 +205,11 @@ The spread `...fetchOptions` creates a new object reference each render. It's in
 
 ---
 
-## Finding 14: Spotify token fetch has no timeout (Medium — Stability)
+## ~~Finding 14: Spotify token fetch has no timeout~~ (RESOLVED)
 
-**File:** `apps/web/lib/dsp-enrichment/providers/spotify.ts:115-124`
+**File:** `apps/web/lib/spotify/client.ts`
 
-```ts
-const response = await fetch('https://accounts.spotify.com/api/token', { ... });
-```
-
-Actual Spotify API requests have a 10-second timeout via `AbortController`, but the token acquisition request has none. If `accounts.spotify.com` is slow or unreachable, this hangs indefinitely, blocking all downstream Spotify operations.
+**Update (2026-02-09):** The Spotify token fetch now uses `AbortSignal.timeout(SPOTIFY_DEFAULT_TIMEOUT_MS)`. All Spotify API requests (including token acquisition) have proper timeouts via `createAbortWithTimeout()`. Verified 2026-02-09.
 
 ---
 
@@ -226,19 +227,26 @@ Auth check only runs in production. In staging/preview, anyone can trigger campa
 
 ---
 
-## Finding 16: `useKeyboardShortcuts` re-subscribes global listener on every render (Medium — Performance)
+## ~~Finding 16: `useKeyboardShortcuts` re-subscribes global listener on every render~~ (RESOLVED)
 
-**File:** `apps/web/hooks/useKeyboardShortcuts.ts:41-67`
+**File:** `apps/web/hooks/useKeyboardShortcuts.ts:41-75`
+
+**Update (2026-02-09):** The hook now uses the ref pattern correctly:
+1. `shortcutsRef` stores the current shortcuts array (updated via effect on each render)
+2. The event listener effect uses `[]` empty deps — listener attached **once** and never resubscribed
+3. The handler reads from `shortcutsRef.current` to always have latest shortcuts
 
 ```ts
+const shortcutsRef = useRef(shortcuts);
+useEffect(() => { shortcutsRef.current = shortcuts; });  // Sync ref
 useEffect(() => {
-  const handler = (e: KeyboardEvent) => { ... };
+  const handler = (e: KeyboardEvent) => { /* reads shortcutsRef.current */ };
   globalThis.addEventListener('keydown', handler);
   return () => globalThis.removeEventListener('keydown', handler);
-}, [shortcuts]); // shortcuts is inline array = new ref every render
+}, []);  // Empty deps — attached once
 ```
 
-Callers pass inline arrays, so `shortcuts` reference changes every render. The effect unsubscribes and resubscribes the global `keydown` listener on every render cycle. Should use a ref for the shortcuts and keep the effect dependency-free.
+Verified 2026-02-09.
 
 ---
 
@@ -254,77 +262,62 @@ Polls every 500ms indefinitely with no condition to stop once upgrade completes 
 
 ---
 
-## Finding 18: Analytics CTE materializes entire unbounded event history (Medium — Performance)
+## Finding 18: Analytics CTE materializes entire unbounded event history (Medium — Performance) — PARTIALLY VALID
 
 **File:** `apps/web/lib/db/queries/analytics.ts:108-113`
 
-```sql
-with base_events as (
-  select * from click_events
-  where creator_profile_id = $1
-    and (is_bot = false or is_bot is null)
-)
-```
+**Update (2026-02-09):** The CTE structure is intentional:
+- `base_events` is unwindowed **by design** — it provides all-time total counts (a dashboard feature)
+- `ranged_events` and `recent_events` CTEs **do** have proper time filters (`created_at >= startDate`)
+- The query uses explicit column selection, NOT `SELECT *` — only needed columns are fetched
 
-The `base_events` CTE selects every non-bot click event for a profile with no LIMIT or time filter. For high-traffic profiles, this materializes millions of rows. `SELECT *` fetches all columns (including `metadata` JSONB, `userAgent`, `ipAddress`) when only a few are needed downstream. The `top_links` sub-CTE groups on full history rather than the selected date range.
+The `base_events` CTE could still benefit from a time floor for very old profiles with millions of events, but the current architecture is intentional for all-time stats. The `SELECT *` and missing-time-filter claims were inaccurate.
 
 ---
 
-## Finding 19: DSP matches query has no LIMIT (Medium — Performance)
+## ~~Finding 19: DSP matches query has no LIMIT~~ (RESOLVED)
 
 **File:** `apps/web/app/api/dsp/matches/route.ts:82-101`
 
-```ts
-const matches = await db
-  .select({ id, providerId, ... /* 10+ columns */ })
-  .from(dspArtistMatches)
-  .where(and(...conditions))
-  .orderBy(dspArtistMatches.createdAt);
-```
-
-No `.limit()` clause. If a profile accumulates many match records from repeated discovery runs across multiple providers, this returns all of them unbounded. Should have pagination or a reasonable limit.
+**Update (2026-02-09):** The query now has `limit(MAX_MATCHES)` with `MAX_MATCHES = 200`. It also uses explicit column selection (not `SELECT *`). Verified 2026-02-09.
 
 ---
 
-## Finding 20: Sequential notification processing in cron (one await per notification) (Medium — Performance)
+## ~~Finding 20: Sequential notification processing in cron~~ (RESOLVED)
 
-**File:** `apps/web/app/api/cron/send-release-notifications/route.ts:669-680`
+**File:** `apps/web/app/api/cron/send-release-notifications/route.ts`
 
-```ts
-for (const notification of pendingNotifications) {
-  const result = await processNotificationWithBatchedData(
-    { now, notification }, releasesMap, creatorsMap, subscribersMap, linksMap
-  );
-  if (result === 'sent') totalSent++;
-  if (result === 'failed') totalFailed++;
-}
-```
+**Update (2026-02-09):** The cron now uses parallel batch processing:
+- `CONCURRENCY_BATCH_SIZE = 10` — processes 10 notifications concurrently per batch
+- `MAX_NOTIFICATIONS_PER_RUN = 100` — caps total per invocation
+- Uses `Promise.allSettled()` for concurrent processing within each batch
+- Pre-fetches related data (releases, creators, subscribers, links) in bulk maps to avoid N+1 queries
 
-Each notification processed sequentially (one await per iteration), involving a `claimNotification` DB write, `updateNotificationStatus` DB write, and `sendNotification` external API call. With 100 notifications (BATCH_SIZE), this runs serially. Should use controlled-concurrency batches (like the ingestion scheduler already does with `MAX_CONCURRENT_JOBS = 3`).
+Verified 2026-02-09.
 
 ---
 
 ## Summary
 
-| #  | Finding | Severity | Category |
-|----|---------|----------|----------|
-| 1  | `withTransaction` doesn't create transactions | Critical | Correctness |
-| 2  | `SET LOCAL` session vars are no-ops | Critical | Security |
-| 3  | Unbounded chat messages query | High | Performance |
-| 4  | Middleware DB query on every auth page load | High | Performance |
-| 5  | Non-atomic job dedup race condition | High | Stability |
-| 6  | `batchUpdateInTransaction` is not transactional | High | Correctness |
-| 7  | Cache prefix invalidation skips Redis | High | Staleness |
-| 8  | Null results never cached (stampede) | High | Performance |
-| 9  | No rate limiting on expensive endpoints | High | Stability |
-| 10 | Sequential Stripe calls (should be parallel) | High | Performance |
-| 11 | HeaderActionsProvider cascading re-renders | High | Performance |
-| 12 | Audience table columns recreated on every click | High | Performance |
-| 13 | `useDedupedFetchAll` infinite re-fetch risk | Medium | Stability |
-| 14 | Spotify token fetch has no timeout | Medium | Stability |
-| 15 | Cron auth bypass in non-production | Medium | Security |
-| 16 | `useKeyboardShortcuts` re-subscribes every render | Medium | Performance |
-| 17 | SentryDashboardProvider polls forever at 500ms | Medium | Performance |
-| 18 | Analytics CTE materializes unbounded history | Medium | Performance |
-| 19 | DSP matches query has no LIMIT | Medium | Performance |
-| 20 | Sequential notification cron processing | Medium | Performance |
+| #  | Finding | Severity | Category | Status |
+|----|---------|----------|----------|--------|
+| 1  | `withTransaction` doesn't create transactions | Critical | Correctness | Open |
+| 2  | `SET LOCAL` session vars are no-ops | Critical | Security | Open |
+| 3  | ~~Unbounded chat messages query~~ | ~~High~~ | ~~Performance~~ | **RESOLVED** — has cursor pagination with LIMIT |
+| 4  | Middleware DB query on every auth page load | High | Performance | **MITIGATED** — 3-layer cache (memory/Redis/DB) |
+| 5  | Non-atomic job dedup race condition | High | Stability | **MITIGATED** — `onConflictDoNothing` + fallback |
+| 6  | `batchUpdateInTransaction` is not transactional | High | Correctness | Open |
+| 7  | Cache prefix invalidation skips Redis | High | Staleness | Open |
+| 8  | Null results never cached (stampede) | High | Performance | Open |
+| 9  | ~~No rate limiting on expensive endpoints~~ | ~~High~~ | ~~Stability~~ | **RESOLVED** — all 4 endpoints rate-limited |
+| 10 | Sequential Stripe calls (should be parallel) | High | Performance | **PARTIALLY RESOLVED** — GET parallel, POST sequential by necessity |
+| 11 | HeaderActionsProvider cascading re-renders | High | Performance | Open |
+| 12 | Audience table columns recreated on every click | High | Performance | Open |
+| 13 | `useDedupedFetchAll` infinite re-fetch risk | Medium | Stability | Open |
+| 14 | ~~Spotify token fetch has no timeout~~ | ~~Medium~~ | ~~Stability~~ | **RESOLVED** — has `AbortSignal.timeout()` |
+| 15 | Cron auth bypass in non-production | Medium | Security | Open |
+| 16 | ~~`useKeyboardShortcuts` re-subscribes every render~~ | ~~Medium~~ | ~~Performance~~ | **RESOLVED** — uses ref pattern + empty deps |
+| 17 | SentryDashboardProvider polls forever at 500ms | Medium | Performance | Open |
+| 18 | Analytics CTE materializes unbounded history | Medium | Performance | **PARTIALLY VALID** — intentional for all-time stats |
+| 19 | ~~DSP matches query has no LIMIT~~ | ~~Medium~~ | ~~Performance~~ | **RESOLVED** — `limit(200)` |
+| 20 | ~~Sequential notification cron processing~~ | ~~Medium~~ | ~~Performance~~ | **RESOLVED** — parallel batches of 10 |

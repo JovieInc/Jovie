@@ -181,7 +181,7 @@
   /* Dark mode surfaces - progressively lighter (Linear-style contrast) */
   /* prettier-ignore */ --color-bg-base: #090909; /* sidebar & page bg */
   /* prettier-ignore */ --color-bg-surface-0: #090909; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #101012; /* main content — Linear exact: lch(4.8 0.7 272) */
+  /* prettier-ignore */ --color-bg-surface-1: #141416; /* main content — elevated for card definition */
   /* prettier-ignore */ --color-bg-surface-2: #1b1d21; /* contact sidebar/drawer */
   /* prettier-ignore */ --color-bg-surface-3: #21242a; /* Modals, tooltips */
 
@@ -192,10 +192,10 @@
   --color-text-quaternary-token: oklch(47% 0.005 272);
   --color-text-disabled-token: oklch(35% 0.005 272);
 
-  /* Border system - white-based for dark mode (Linear-subtle) */
-  --color-border-subtle: oklch(22% 0.014 272);
-  --color-border-default: oklch(27% 0.014 272);
-  --color-border-strong: oklch(30% 0.014 272);
+  /* Border system - semi-transparent white for dark mode (Linear-style) */
+  --color-border-subtle: oklch(100% 0 0 / 6%);
+  --color-border-default: oklch(100% 0 0 / 10%);
+  --color-border-strong: oklch(100% 0 0 / 16%);
 
   /* Accent - slightly brighter in dark mode */
   --color-accent: oklch(65% var(--theme-accent-chroma) var(--theme-accent-hue));

@@ -1,8 +1,11 @@
-import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers } from '@/lib/db/schema/analytics';
+import { captureError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { membersQuerySchema } from '@/lib/validation/schemas';
 
@@ -124,6 +127,12 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Dashboard Audience] Failed to load members', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Audience members fetch failed', error, {
+        route: '/api/dashboard/audience/members',
+        method: 'GET',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -132,6 +141,94 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(
       { error: 'Unable to load audience members' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+const deleteSchema = z.object({
+  memberId: z.string().uuid(),
+  profileId: z.string().uuid(),
+});
+
+/**
+ * DELETE /api/dashboard/audience/members
+ *
+ * Remove an audience member (unsubscribe/delete) from the creator's audience.
+ * Verifies ownership before deletion.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      const parsedBody = await parseJsonBody<z.infer<typeof deleteSchema>>(
+        request,
+        {
+          route: 'DELETE /api/dashboard/audience/members',
+          headers: NO_STORE_HEADERS,
+        }
+      );
+
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+
+      const validation = deleteSchema.safeParse(parsedBody.data);
+      if (!validation.success) {
+        return NextResponse.json(
+          { error: 'Invalid input', details: validation.error.flatten() },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const { memberId, profileId } = validation.data;
+
+      // Verify user owns the profile
+      const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Delete the member, scoped to the profile for security
+      const deleted = await tx
+        .delete(audienceMembers)
+        .where(
+          and(
+            eq(audienceMembers.id, memberId),
+            eq(audienceMembers.creatorProfileId, profileId)
+          )
+        )
+        .returning({ id: audienceMembers.id });
+
+      if (deleted.length === 0) {
+        return NextResponse.json(
+          { error: 'Member not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      logger.info('[Dashboard Audience] Member removed', {
+        memberId,
+        profileId,
+      });
+
+      return NextResponse.json(
+        { success: true },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    });
+  } catch (error) {
+    logger.error('[Dashboard Audience] Failed to remove member', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Unable to remove audience member' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

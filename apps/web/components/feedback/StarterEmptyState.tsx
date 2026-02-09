@@ -41,7 +41,7 @@ export function StarterEmptyState({
     const variantClasses =
       variant === 'primary'
         ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-        : 'border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 focus-visible:ring-zinc-900 dark:border-zinc-700';
+        : 'border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 focus-visible:ring-zinc-900';
     const classes = cn(baseClasses, variantClasses);
 
     if (action.href) {
@@ -90,7 +90,7 @@ export function StarterEmptyState({
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}
       className={cn(
-        'rounded-2xl border border-dashed border-subtle bg-surface-1 p-6 shadow-sm dark:border-zinc-800',
+        'rounded-2xl border border-dashed border-subtle bg-surface-1 p-6 shadow-sm',
         className
       )}
     >

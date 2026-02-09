@@ -2,7 +2,16 @@
 
 import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { BellRing, Copy, Download, Eye, Phone, Users } from 'lucide-react';
+import {
+  BellRing,
+  Copy,
+  Download,
+  Eye,
+  Phone,
+  UserMinus,
+  Users,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -63,7 +72,9 @@ export const DashboardAudienceTableUnified = memo(
     onPageSizeChange,
     onSortChange,
     profileUrl,
+    profileId,
   }: DashboardAudienceTableProps) {
+    const router = useRouter();
     const {
       openMenuRowId,
       setOpenMenuRowId,
@@ -86,6 +97,30 @@ export const DashboardAudienceTableUnified = memo(
       direction,
       profileUrl,
     });
+
+    const handleRemoveMember = React.useCallback(
+      async (member: AudienceMember) => {
+        if (!profileId) return;
+        try {
+          const res = await fetch('/api/dashboard/audience/members', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: member.id, profileId }),
+          });
+          if (!res.ok) {
+            throw new Error('Failed to remove member');
+          }
+          toast.success('Member removed');
+          if (selectedMember?.id === member.id) {
+            setSelectedMember(null);
+          }
+          router.refresh();
+        } catch {
+          toast.error('Failed to remove member');
+        }
+      },
+      [profileId, selectedMember, setSelectedMember, router]
+    );
 
     // Context menu items for right-click
     const getContextMenuItems = React.useCallback(
@@ -131,9 +166,20 @@ export const DashboardAudienceTableUnified = memo(
               toast.success('Contact exported as vCard');
             },
           },
+          { type: 'separator' as const },
+          {
+            id: 'remove-member',
+            label: 'Unsubscribe',
+            icon: <UserMinus className='h-3.5 w-3.5' />,
+            onClick: () => {
+              void handleRemoveMember(member);
+            },
+            disabled: !profileId,
+            destructive: true,
+          },
         ];
       },
-      [setSelectedMember]
+      [setSelectedMember, profileId, handleRemoveMember]
     );
 
     // Define columns for members mode
@@ -352,7 +398,7 @@ export const DashboardAudienceTableUnified = memo(
               ) : (
                 <>
                   {/* Mobile card list */}
-                  <div className='flex flex-col gap-2 p-3 md:hidden'>
+                  <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
                     {rows.map(member => (
                       <AudienceMobileCard
                         key={member.id}

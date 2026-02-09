@@ -357,6 +357,28 @@ export const RATE_LIMITERS = {
     prefix: 'bandsintown:sync',
     analytics: true,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Account Operations (GDPR)
+  // ---------------------------------------------------------------------------
+
+  /** Account deletion: 3 attempts per day per user - CRITICAL destructive operation */
+  accountDelete: {
+    name: 'Account Delete',
+    limit: 3,
+    window: '1 d',
+    prefix: 'account:delete',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Account data export: 5 exports per hour per user - protects against abuse */
+  accountExport: {
+    name: 'Account Export',
+    limit: 5,
+    window: '1 h',
+    prefix: 'account:export',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

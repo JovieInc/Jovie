@@ -6,6 +6,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -79,6 +80,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('Error in theme API:', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Artist theme update failed', error, {
+        route: '/api/artist/theme',
+        method: 'POST',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

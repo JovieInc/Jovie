@@ -18,7 +18,7 @@ export function PreFooterCTA() {
         <div className='mx-auto max-w-4xl text-center'>
           {/* Badge with glass morphism effect */}
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-gray-200/50 dark:border-white/20 backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-all duration-300 hover:bg-gray-200/80 dark:hover:bg-white/20 hover:scale-105'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-subtle backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-all duration-300 hover:bg-gray-200/80 dark:hover:bg-white/20 hover:scale-105'>
               <svg
                 className='w-4 h-4 text-blue-600 dark:text-blue-400'
                 fill='none'
@@ -96,7 +96,7 @@ export function PreFooterCTA() {
           </div>
 
           {/* Social proof with enhanced styling */}
-          <div className='mt-10 p-4 rounded-2xl bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm border border-gray-200/50 dark:border-white/10 transition-all duration-300'>
+          <div className='mt-10 p-4 rounded-2xl bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm border border-subtle transition-all duration-300'>
             <p className='text-sm text-gray-600 dark:text-gray-400 font-medium'>
               Join{' '}
               <span className='text-blue-600 dark:text-blue-400 font-semibold'>

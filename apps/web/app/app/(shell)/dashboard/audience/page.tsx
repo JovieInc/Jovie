@@ -71,6 +71,7 @@ async function AudienceContent({
         sort={audienceData.sort}
         direction={audienceData.direction}
         profileUrl={profileUrl}
+        profileId={artist?.id ?? undefined}
       />
     );
   } catch (error) {

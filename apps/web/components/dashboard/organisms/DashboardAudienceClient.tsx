@@ -54,6 +54,7 @@ export interface DashboardAudienceClientProps {
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
+  readonly profileId?: string;
 }
 
 /**
@@ -76,6 +77,7 @@ export function DashboardAudienceClient({
   sort,
   direction,
   profileUrl,
+  profileId,
 }: Readonly<DashboardAudienceClientProps>) {
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
@@ -129,6 +131,7 @@ export function DashboardAudienceClient({
           onPageSizeChange={handlePageSizeChange}
           onSortChange={handleSortChange}
           profileUrl={profileUrl}
+          profileId={profileId}
         />
       </div>
     </QueryErrorBoundary>
