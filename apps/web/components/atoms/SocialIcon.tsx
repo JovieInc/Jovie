@@ -55,6 +55,9 @@ const iconLoaders: Record<string, () => Promise<{ default: SimpleIcon }>> = {
   rumble: () => import('simple-icons').then(m => ({ default: m.siRumble })),
   twitch: () => import('simple-icons').then(m => ({ default: m.siTwitch })),
   tidal: () => import('simple-icons').then(m => ({ default: m.siTidal })),
+  beatport: () => import('simple-icons').then(m => ({ default: m.siBeatport })),
+  musicbrainz: () =>
+    import('simple-icons').then(m => ({ default: m.siMusicbrainz })),
 };
 
 // Icon metadata map for synchronous access to hex colors
@@ -93,6 +96,8 @@ const iconMetadata: Record<string, { hex: string }> = {
   rumble: { hex: '85C742' },
   twitch: { hex: '9146FF' },
   tidal: { hex: '000000' },
+  beatport: { hex: 'A3E422' },
+  musicbrainz: { hex: 'BA478F' },
 };
 
 /**

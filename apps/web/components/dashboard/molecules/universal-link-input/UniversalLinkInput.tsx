@@ -24,7 +24,7 @@ import {
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
-import { isBrandDark } from '@/lib/utils/color';
+import { getContrastTextOnBrand } from '@/lib/utils/color';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputArtistSearchMode } from '../artist-search-mode';
@@ -96,7 +96,6 @@ function PlatformSuggestionItem({
 }) {
   const iconMeta = getPlatformIconMetadata(option.icon);
   const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-  const isDark = isBrandDark(iconHex);
 
   return (
     <button
@@ -116,7 +115,7 @@ function PlatformSuggestionItem({
           className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-md'
           style={{
             backgroundColor: iconHex,
-            color: isDark ? '#ffffff' : '#0f172a',
+            color: getContrastTextOnBrand(iconHex),
           }}
         >
           <SocialIcon

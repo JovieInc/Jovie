@@ -27,6 +27,8 @@ export interface JovieChatProps {
   readonly onConversationCreate?: (conversationId: string) => void;
   /** Pre-fill and auto-submit a message on mount (e.g. from ?q= param) */
   readonly initialQuery?: string;
+  /** Callback when the conversation title changes (e.g. after auto-generation) */
+  readonly onTitleChange?: (title: string | null) => void;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';

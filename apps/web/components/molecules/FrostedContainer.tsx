@@ -18,11 +18,11 @@ export function FrostedContainer({
 }: FrostedContainerProps) {
   const variants = {
     default:
-      'bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-3xl shadow-xl shadow-black/5',
+      'bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-3xl shadow-xl shadow-black/5',
     glass:
       'bg-white/40 dark:bg-white/5 backdrop-blur-md ring-1 ring-black/5 dark:ring-white/10 rounded-xl shadow-sm',
     solid:
-      'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg',
+      'bg-white dark:bg-gray-900 border border-default rounded-xl shadow-lg',
   };
 
   return (

@@ -57,6 +57,8 @@ vi.mock('@/components/atoms/SocialIcon', () => ({
 // Mock color utils
 vi.mock('@/lib/utils/color', () => ({
   isBrandDark: () => false,
+  contrastRatio: () => 10,
+  getContrastTextOnBrand: () => '#0f172a',
 }));
 
 describe('UniversalLinkInput Keyboard Accessibility', () => {
