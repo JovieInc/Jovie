@@ -7,6 +7,7 @@ import { queryKeys } from './keys';
 
 export interface BuildInfo {
   buildId: string;
+  version: string;
   deployedAt: number;
   commitSha?: string;
   environment?: string;
@@ -15,6 +16,7 @@ export interface BuildInfo {
 export interface VersionMismatchInfo {
   previousBuildId: string;
   currentBuildId: string;
+  newVersion?: string;
   commitSha?: string;
   environment?: string;
 }
@@ -132,6 +134,7 @@ export function useVersionMonitor(
       const info: VersionMismatchInfo = {
         previousBuildId: initialBuildId.current,
         currentBuildId: buildInfo.buildId,
+        newVersion: buildInfo.version,
         commitSha: buildInfo.commitSha,
         environment: buildInfo.environment,
       };

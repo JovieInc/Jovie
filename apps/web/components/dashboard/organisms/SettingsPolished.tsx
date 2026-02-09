@@ -145,7 +145,7 @@ export function SettingsPolished({
     {
       id: 'music-links',
       title: 'Music Links',
-      description: 'Add streaming platform links for your music.',
+      description: 'Manage your streaming platform profiles and links.',
       render: () => (
         <DashboardCard variant='settings'>
           <ListenNowForm artist={artist} onUpdate={a => onArtistUpdate?.(a)} />

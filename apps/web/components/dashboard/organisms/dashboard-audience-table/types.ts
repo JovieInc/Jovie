@@ -17,6 +17,7 @@ export interface DashboardAudienceTableProps {
   readonly onPageSizeChange: (pageSize: number) => void;
   readonly onSortChange: (sort: string) => void;
   readonly profileUrl?: string;
+  readonly profileId?: string;
 }
 
 export interface BulkAction {

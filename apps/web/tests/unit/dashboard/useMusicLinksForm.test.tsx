@@ -20,6 +20,10 @@ vi.mock('@/lib/queries', () => ({
   useProfileMutation: (...args: unknown[]) => mockUseProfileMutation(...args),
 }));
 
+vi.mock('@/lib/queries/useDspMatchesQuery', () => ({
+  useDspMatchesQuery: () => ({ data: [], isLoading: false }),
+}));
+
 vi.mock('@/lib/utils/platform-detection', () => ({
   normalizeUrl: (url: string) => url,
 }));
