@@ -29,6 +29,7 @@ export interface SettingsUpdateInput {
       email_notifications?: boolean;
       push_notifications?: boolean;
       hide_branding?: boolean;
+      exclude_self_from_analytics?: boolean;
     };
   };
 }
@@ -89,6 +90,10 @@ export function useUpdateSettingsMutation() {
         handleMutationSuccess('Theme preference saved');
       } else if (variables.updates.settings?.hide_branding !== undefined) {
         handleMutationSuccess('Branding settings saved');
+      } else if (
+        variables.updates.settings?.exclude_self_from_analytics !== undefined
+      ) {
+        handleMutationSuccess('Analytics filter saved');
       } else if (variables.updates.settings) {
         handleMutationSuccess('Settings saved');
       } else {
@@ -107,6 +112,10 @@ export function useUpdateSettingsMutation() {
         handleMutationError(error, 'Failed to save theme preference');
       } else if (variables.updates.settings?.hide_branding !== undefined) {
         handleMutationError(error, 'Failed to save branding settings');
+      } else if (
+        variables.updates.settings?.exclude_self_from_analytics !== undefined
+      ) {
+        handleMutationError(error, 'Failed to save analytics filter');
       } else if (variables.updates.settings) {
         handleMutationError(error, 'Failed to save settings');
       } else {
@@ -184,6 +193,36 @@ export function useBrandingSettingsMutation() {
     updateBrandingAsync: (hideBranding: boolean) => {
       return mutation.mutateAsync({
         updates: { settings: { hide_branding: hideBranding } },
+      });
+    },
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+  };
+}
+
+/**
+ * Convenience hook for analytics self-exclusion settings.
+ *
+ * @example
+ * ```tsx
+ * const { updateAnalyticsFilterAsync, isPending } = useAnalyticsFilterMutation();
+ * await updateAnalyticsFilterAsync(true); // Exclude self from analytics
+ * ```
+ */
+export function useAnalyticsFilterMutation() {
+  const mutation = useUpdateSettingsMutation();
+
+  return {
+    updateAnalyticsFilter: (excludeSelf: boolean) => {
+      mutation.mutate({
+        updates: { settings: { exclude_self_from_analytics: excludeSelf } },
+      });
+    },
+    /** Async variant for use with try/catch rollback patterns */
+    updateAnalyticsFilterAsync: (excludeSelf: boolean) => {
+      return mutation.mutateAsync({
+        updates: { settings: { exclude_self_from_analytics: excludeSelf } },
       });
     },
     isPending: mutation.isPending,

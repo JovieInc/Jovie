@@ -19,8 +19,11 @@ export function JovieChat({
   artistContext,
   conversationId,
   onConversationCreate,
+  initialQuery,
+  onTitleChange,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialQuerySubmitted = useRef(false);
 
   const {
     input,
@@ -31,16 +34,39 @@ export function JovieChat({
     isSubmitting,
     hasMessages,
     isLoadingConversation,
+    conversationTitle,
     inputRef,
     handleSubmit,
     handleRetry,
     handleSuggestedPrompt,
+    submitMessage,
   } = useJovieChat({
     profileId,
     artistContext,
     conversationId,
     onConversationCreate,
   });
+
+  // Notify parent when the conversation title changes (e.g. after auto-generation)
+  const prevTitleRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (conversationTitle !== prevTitleRef.current) {
+      prevTitleRef.current = conversationTitle;
+      onTitleChange?.(conversationTitle);
+    }
+  }, [conversationTitle, onTitleChange]);
+
+  // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
+  useEffect(() => {
+    if (
+      initialQuery &&
+      !initialQuerySubmitted.current &&
+      !isLoadingConversation
+    ) {
+      initialQuerySubmitted.current = true;
+      submitMessage(initialQuery);
+    }
+  }, [initialQuery, isLoadingConversation, submitMessage]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -122,9 +148,9 @@ export function JovieChat({
           </div>
         </>
       ) : (
-        // Empty state - centered content
-        <div className='flex flex-1 flex-col items-center justify-center px-4'>
-          <div className='w-full max-w-2xl space-y-8'>
+        // Empty state - suggestions above input, pushed to bottom
+        <div className='flex flex-1 flex-col justify-end px-4 pb-6'>
+          <div className='mx-auto w-full max-w-2xl space-y-4'>
             {/* Error display */}
             {chatError && (
               <ErrorDisplay
@@ -135,7 +161,10 @@ export function JovieChat({
               />
             )}
 
-            {/* Input */}
+            {/* Suggested prompts above input */}
+            <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+
+            {/* Input at bottom */}
             <ChatInput
               ref={inputRef}
               value={input}
@@ -144,9 +173,6 @@ export function JovieChat({
               isLoading={isLoading}
               isSubmitting={isSubmitting}
             />
-
-            {/* Suggested prompts */}
-            <SuggestedPrompts onSelect={handleSuggestedPrompt} />
           </div>
         </div>
       )}

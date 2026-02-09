@@ -32,9 +32,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={cn(
-          'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
+          'block w-full rounded-md border border-default bg-white px-3 py-2 text-sm',
           'focus-visible:border-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-500',
-          'dark:border-gray-600 dark:bg-gray-800 dark:text-gray-50',
+          'dark:bg-gray-800 dark:text-gray-50',
           'disabled:opacity-50 disabled:cursor-not-allowed',
           error &&
             'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500',

@@ -122,6 +122,9 @@ export const ServerEnvSchema = z.object({
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
 
+  // Statsig server-side (feature flags)
+  STATSIG_SERVER_SECRET: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -196,6 +199,7 @@ export const ENV_KEYS = [
   'ENABLE_IMPERSONATION',
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
+  'STATSIG_SERVER_SECRET',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',

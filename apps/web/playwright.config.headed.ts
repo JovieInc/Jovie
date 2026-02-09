@@ -9,10 +9,18 @@ export default defineConfig({
     headless: false,
     trace: 'on-first-retry',
     video: 'retain-on-failure',
+    storageState: 'tests/.auth/user.json',
   },
   projects: [
     {
+      name: 'auth-setup',
+      testMatch: /auth\.setup\.ts/,
+      // biome-ignore lint/suspicious/noExplicitAny: Playwright requires this pattern for setup projects
+      use: { storageState: undefined as any, headless: true },
+    },
+    {
       name: 'chromium',
+      dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],

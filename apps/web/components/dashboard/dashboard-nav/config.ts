@@ -1,11 +1,14 @@
 import {
   Banknote,
+  BarChart3,
   Bell,
   CalendarDays,
   Home,
   IdCard,
+  Link2,
   MessageCircle,
   Music,
+  Music2,
   Paintbrush,
   PieChart,
   Rocket,
@@ -33,14 +36,32 @@ export const dashboardHome: NavItem = {
   description: 'Overview of your dashboard',
 };
 
+export const profileNavItem: NavItem = {
+  name: 'Profile',
+  href: APP_ROUTES.PROFILE,
+  id: 'profile',
+  icon: UserCircle,
+  description: 'Update your profile and links',
+  children: [
+    {
+      name: 'Analytics',
+      href: APP_ROUTES.ANALYTICS,
+      id: 'analytics',
+      icon: BarChart3,
+      description: 'View your performance analytics',
+    },
+    {
+      name: 'Earnings',
+      href: APP_ROUTES.EARNINGS,
+      id: 'earnings',
+      icon: Banknote,
+      description: 'Manage tips and monetization',
+    },
+  ],
+};
+
 export const primaryNavigation: NavItem[] = [
-  {
-    name: 'Profile',
-    href: APP_ROUTES.PROFILE,
-    id: 'profile',
-    icon: UserCircle,
-    description: 'Update your profile and links',
-  },
+  profileNavItem,
   {
     name: 'Contacts',
     href: APP_ROUTES.CONTACTS,
@@ -73,25 +94,11 @@ export const primaryNavigation: NavItem[] = [
 
 export const secondaryNavigation: NavItem[] = [
   {
-    name: 'Analytics',
-    href: APP_ROUTES.ANALYTICS,
-    id: 'analytics',
-    icon: PieChart,
-    description: 'View your analytics and insights',
-  },
-  {
-    name: 'Earnings',
-    href: APP_ROUTES.EARNINGS,
-    id: 'earnings',
-    icon: Banknote,
-    description: 'Manage tips and monetization',
-  },
-  {
     name: 'Chat',
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
-    description: 'Messages and conversations',
+    description: 'Ask Jovie anything about your profile',
   },
 ];
 
@@ -102,7 +109,8 @@ export const settingsNavItem: NavItem = {
   icon: Settings,
 };
 
-export const settingsNavigation: NavItem[] = [
+/** User-level settings: account, preferences, billing */
+export const userSettingsNavigation: NavItem[] = [
   {
     name: 'Account',
     href: APP_ROUTES.SETTINGS,
@@ -122,6 +130,34 @@ export const settingsNavigation: NavItem[] = [
     icon: Bell,
   },
   {
+    name: 'Billing',
+    href: APP_ROUTES.SETTINGS_BILLING,
+    id: 'billing',
+    icon: Banknote,
+  },
+];
+
+/** Artist-level settings: profile, links, branding, tracking */
+export const artistSettingsNavigation: NavItem[] = [
+  {
+    name: 'Profile',
+    href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    id: 'artist-profile',
+    icon: UserCircle,
+  },
+  {
+    name: 'Social Links',
+    href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,
+    id: 'social-links',
+    icon: Link2,
+  },
+  {
+    name: 'Music Links',
+    href: APP_ROUTES.SETTINGS_MUSIC_LINKS,
+    id: 'music-links',
+    icon: Music2,
+  },
+  {
     name: 'Branding',
     href: APP_ROUTES.SETTINGS_BRANDING,
     id: 'branding',
@@ -133,12 +169,12 @@ export const settingsNavigation: NavItem[] = [
     id: 'ad-pixels',
     icon: Rocket,
   },
-  {
-    name: 'Billing',
-    href: APP_ROUTES.SETTINGS_BILLING,
-    id: 'billing',
-    icon: Banknote,
-  },
+];
+
+/** Combined settings navigation (all items flat) */
+export const settingsNavigation: NavItem[] = [
+  ...userSettingsNavigation,
+  ...artistSettingsNavigation,
 ];
 
 export const adminNavigation: NavItem[] = [
@@ -187,14 +223,15 @@ export const adminNavigation: NavItem[] = [
 export const mobilePrimaryNavigation: NavItem[] = [
   dashboardHome,
   primaryNavigation[0], // Profile
-  primaryNavigation[1], // Contacts
+  primaryNavigation[2], // Releases
   primaryNavigation[4], // Audience
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
-  primaryNavigation[2], // Releases
+  primaryNavigation[1], // Contacts
   primaryNavigation[3], // Tour Dates
-  ...secondaryNavigation, // Analytics, Earnings, Chat
+  ...(profileNavItem.children ?? []), // Analytics, Earnings
+  ...secondaryNavigation, // Chat
   settingsNavItem,
 ];

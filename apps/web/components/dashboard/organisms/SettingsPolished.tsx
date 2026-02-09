@@ -1,18 +1,21 @@
 'use client';
 
-import { Rocket, Sparkles } from 'lucide-react';
+import { BarChart3, Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
+import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
+import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
-import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
+import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
+import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -77,19 +80,8 @@ export function SettingsPolished({
     />
   );
 
-  const sections = [
-    {
-      id: 'profile',
-      title: 'Profile',
-      description: 'Manage your public profile and account details.',
-      render: () => (
-        <SettingsProfileSection
-          artist={artist}
-          onArtistUpdate={onArtistUpdate}
-          onRefresh={() => router.refresh()}
-        />
-      ),
-    },
+  // -- General (user-level) settings --
+  const userSections = [
     {
       id: 'account',
       title: 'Account',
@@ -108,6 +100,50 @@ export function SettingsPolished({
       title: 'Notifications',
       description: 'Manage your email preferences and communication settings.',
       render: () => <SettingsNotificationsSection />,
+    },
+    {
+      id: 'billing',
+      title: 'Billing & Subscription',
+      description:
+        'Manage your subscription, payment methods, and billing history.',
+      render: () => <SettingsBillingSection />,
+    },
+  ];
+
+  // -- Artist-level settings --
+  const artistSections = [
+    {
+      id: 'artist-profile',
+      title: 'Artist Profile',
+      description:
+        'Manage your profile details and connected streaming platforms.',
+      render: () => (
+        <SettingsArtistProfileSection
+          artist={artist}
+          onArtistUpdate={onArtistUpdate}
+          onRefresh={() => router.refresh()}
+        />
+      ),
+    },
+    {
+      id: 'social-links',
+      title: 'Social Links',
+      description: 'Connect your social media accounts.',
+      render: () => (
+        <DashboardCard variant='settings'>
+          <SocialsForm artist={artist} />
+        </DashboardCard>
+      ),
+    },
+    {
+      id: 'music-links',
+      title: 'Music Links',
+      description: 'Add streaming platform links for your music.',
+      render: () => (
+        <DashboardCard variant='settings'>
+          <ListenNowForm artist={artist} onUpdate={a => onArtistUpdate?.(a)} />
+        </DashboardCard>
+      ),
     },
     {
       id: 'branding',
@@ -145,30 +181,82 @@ export function SettingsPolished({
         ),
     },
     {
-      id: 'billing',
-      title: 'Billing & Subscription',
+      id: 'analytics',
+      title: 'Analytics',
       description:
-        'Manage your subscription, payment methods, and billing history.',
-      render: () => <SettingsBillingSection />,
+        'Control how your own activity is tracked in your analytics.',
+      render: () =>
+        isPro ? (
+          <SettingsAnalyticsSection
+            artist={artist}
+            onArtistUpdate={onArtistUpdate}
+          />
+        ) : (
+          renderProUpgradeCard(
+            'Pro Analytics Filtering',
+            'Exclude your own visits from analytics to get cleaner data about your real audience.',
+            BarChart3
+          )
+        ),
     },
   ];
 
-  const visibleSections = focusSection
-    ? sections.filter(section => section.id === focusSection)
-    : sections;
+  const allSections = [...userSections, ...artistSections];
 
-  return (
-    <div className='space-y-6 pb-6' data-testid='settings-polished'>
-      {visibleSections.map(section => (
+  // When focusing a single section, show just that section
+  if (focusSection) {
+    const section = allSections.find(s => s.id === focusSection);
+    if (!section) return null;
+
+    return (
+      <div className='space-y-6 pb-6' data-testid='settings-polished'>
         <SettingsSection
-          key={section.id}
           id={section.id}
           title={section.title}
           description={section.description}
         >
           {section.render()}
         </SettingsSection>
-      ))}
+      </div>
+    );
+  }
+
+  // Full settings view with group headers
+  return (
+    <div className='space-y-6 pb-6' data-testid='settings-polished'>
+      {/* General settings */}
+      <div className='space-y-6'>
+        <h2 className='text-[11px] font-medium uppercase tracking-wider text-tertiary-token'>
+          General
+        </h2>
+        {userSections.map(section => (
+          <SettingsSection
+            key={section.id}
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+        ))}
+      </div>
+
+      {/* Artist settings */}
+      <div className='space-y-6 pt-4 border-t border-subtle'>
+        <h2 className='text-[11px] font-medium uppercase tracking-wider text-tertiary-token'>
+          Artist
+        </h2>
+        {artistSections.map(section => (
+          <SettingsSection
+            key={section.id}
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+        ))}
+      </div>
     </div>
   );
 }

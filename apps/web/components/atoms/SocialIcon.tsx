@@ -55,6 +55,9 @@ const iconLoaders: Record<string, () => Promise<{ default: SimpleIcon }>> = {
   rumble: () => import('simple-icons').then(m => ({ default: m.siRumble })),
   twitch: () => import('simple-icons').then(m => ({ default: m.siTwitch })),
   tidal: () => import('simple-icons').then(m => ({ default: m.siTidal })),
+  beatport: () => import('simple-icons').then(m => ({ default: m.siBeatport })),
+  musicbrainz: () =>
+    import('simple-icons').then(m => ({ default: m.siMusicbrainz })),
 };
 
 // Icon metadata map for synchronous access to hex colors
@@ -93,6 +96,8 @@ const iconMetadata: Record<string, { hex: string }> = {
   rumble: { hex: '85C742' },
   twitch: { hex: '9146FF' },
   tidal: { hex: '000000' },
+  beatport: { hex: 'A3E422' },
+  musicbrainz: { hex: 'BA478F' },
 };
 
 /**
@@ -112,8 +117,8 @@ export async function getPlatformIcon(
   if (!loader) return undefined;
 
   try {
-    const module = await loader();
-    return module.default;
+    const iconModule = await loader();
+    return iconModule.default;
   } catch {
     return undefined;
   }
@@ -134,8 +139,8 @@ function SocialIconInner({
     const loader = iconLoaders[platform.toLowerCase()];
     if (loader) {
       loader()
-        .then(module => {
-          setIconPath(module.default.path);
+        .then(iconModule => {
+          setIconPath(iconModule.default.path);
         })
         .catch(() => {
           setIconPath(null);

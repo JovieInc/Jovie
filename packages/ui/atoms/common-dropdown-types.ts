@@ -10,6 +10,13 @@ import type { ReactNode } from 'react';
 export type CommonDropdownVariant = 'dropdown' | 'select' | 'context';
 
 /**
+ * Size variants for dropdown menus
+ * - 'default': Standard size (user menu, bulk actions, notifications)
+ * - 'compact': Dense size for tables, sidebars, and inline actions
+ */
+export type CommonDropdownSize = 'default' | 'compact';
+
+/**
  * Item types within the dropdown
  */
 export type CommonDropdownItemType =
@@ -134,6 +141,13 @@ export interface CommonDropdownProps {
    * Dropdown variant - controls behavior and rendering
    */
   readonly variant?: CommonDropdownVariant;
+
+  /**
+   * Size variant - controls density of menu content
+   * - 'default': Standard padding/font for primary menus
+   * - 'compact': Tighter padding/font for table actions and sidebars
+   */
+  readonly size?: CommonDropdownSize;
 
   /**
    * Items to render in the dropdown

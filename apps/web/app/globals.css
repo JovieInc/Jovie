@@ -551,6 +551,119 @@ body {
     }
   }
 
+  /* Mobile Nav Toggle Button */
+  .mobile-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--linear-text-primary);
+    background: transparent;
+    border: none;
+    border-radius: var(--linear-radius-sm);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--linear-duration-fast) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-bg-hover);
+    }
+  }
+
+  /* Mobile Nav Overlay */
+  .mobile-nav-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+    background: oklch(0 0 0 / 0.5);
+    animation: mobile-nav-fade-in 200ms ease forwards;
+  }
+
+  /* Mobile Nav Panel */
+  .mobile-nav-panel {
+    position: fixed;
+    top: var(--linear-header-height);
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background-color: var(--linear-bg-header);
+    border-bottom: 1px solid var(--linear-border-subtle);
+    padding: var(--linear-space-4) var(--linear-container-padding);
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .mobile-nav-panel--open {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Mobile Nav Links Container */
+  .mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--linear-space-1);
+  }
+
+  /* Mobile Nav Link */
+  .mobile-nav-link {
+    display: flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 var(--linear-space-3);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    color: var(--linear-text-secondary);
+    border-radius: var(--linear-radius-sm);
+    transition:
+      color var(--linear-duration-fast) var(--linear-ease),
+      background var(--linear-duration-fast) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-bg-hover);
+      color: var(--linear-text-primary);
+    }
+  }
+
+  /* Mobile Nav CTA (Sign up) */
+  .mobile-nav-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    margin-top: var(--linear-space-2);
+    font-size: var(--linear-caption-size);
+    font-weight: var(--linear-font-weight-medium);
+    color: var(--linear-btn-primary-fg);
+    background-color: var(--linear-btn-primary-bg);
+    border: 1px solid var(--linear-btn-primary-border);
+    border-radius: var(--linear-radius-sm);
+    box-shadow: var(--linear-shadow-button);
+    transition:
+      background-color var(--linear-duration-normal) var(--linear-ease),
+      opacity var(--linear-duration-normal) var(--linear-ease);
+
+    &:hover {
+      background-color: var(--linear-btn-primary-hover);
+    }
+  }
+
+  @keyframes mobile-nav-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   /* Linear Button - Primary CTA styling using tokens */
   .btn-linear-primary {
     display: inline-flex;

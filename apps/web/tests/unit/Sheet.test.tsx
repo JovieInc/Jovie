@@ -1,5 +1,3 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
 import {
   Sheet,
   SheetClose,
@@ -12,7 +10,9 @@ import {
   SheetPortal,
   SheetTitle,
   SheetTrigger,
-} from '@/components/atoms/Sheet';
+} from '@jovie/ui';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('Sheet', () => {
   describe('exports', () => {

@@ -8,8 +8,9 @@
  */
 
 import { Button } from '@jovie/ui';
-import { WifiOff } from 'lucide-react';
+
 import { useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,9 @@ export function SessionManagementCard({
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
+  const [sessionToEnd, setSessionToEnd] = useState<ClerkSessionResource | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -82,11 +86,10 @@ export function SessionManagementCard({
     <DashboardCard variant='settings'>
       <div className='flex items-start justify-between gap-6'>
         <div className='flex-1'>
-          <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-            <WifiOff className='h-5 w-5 text-accent' />
+          <h3 className='text-[14px] font-medium text-primary-token'>
             Active sessions
           </h3>
-          <p className='mt-1 text-sm text-secondary max-w-lg'>
+          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
             Keep an eye on the devices signed in to your account. End sessions
             you no longer recognise.
           </p>
@@ -158,7 +161,7 @@ export function SessionManagementCard({
                       size='sm'
                       className='text-red-500 hover:text-red-600 hover:bg-red-50'
                       disabled={endingSessionId === session.id}
-                      onClick={() => handleEndSession(session)}
+                      onClick={() => setSessionToEnd(session)}
                     >
                       {endingSessionId === session.id
                         ? 'Ending…'
@@ -171,6 +174,20 @@ export function SessionManagementCard({
           </div>
         );
       })()}
+
+      <ConfirmDialog
+        open={Boolean(sessionToEnd)}
+        onOpenChange={open => {
+          if (!open) setSessionToEnd(null);
+        }}
+        title='End session?'
+        description='This will sign out the device. If you don&#39;t recognise this session, consider changing your password too.'
+        confirmLabel='End session'
+        variant='destructive'
+        onConfirm={async () => {
+          if (sessionToEnd) await handleEndSession(sessionToEnd);
+        }}
+      />
     </DashboardCard>
   );
 }

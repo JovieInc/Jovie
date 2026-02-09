@@ -81,6 +81,13 @@ export {
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
 export {
+  type AppleMusicArtistResult,
+  type AppleMusicSearchState,
+  type UseAppleMusicArtistSearchQueryOptions,
+  type UseAppleMusicArtistSearchQueryReturn,
+  useAppleMusicArtistSearchQuery,
+} from './useAppleMusicArtistSearchQuery';
+export {
   type ArtistSearchState,
   type SpotifyArtistResult,
   type UseArtistSearchQueryOptions,
@@ -204,6 +211,8 @@ export {
   type PixelSettingsResponse,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
+// Plan gate hook
+export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 export {
   type PricingOption,
   type PricingOptionsResponse,
@@ -236,6 +245,7 @@ export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,
+  useAnalyticsFilterMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,

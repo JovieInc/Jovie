@@ -72,6 +72,7 @@ export function useSortingManager({
 
   // Ref to track current sorting for debouncer (avoids stale closure)
   const sortingRef = useRef(sorting);
+  // eslint-disable-next-line react-hooks/refs -- stable ref for debouncer callback
   sortingRef.current = sorting;
 
   // Ref to store debouncer execute function - prevents callback recreation
@@ -95,6 +96,7 @@ export function useSortingManager({
   });
 
   // Keep ref updated with latest debouncer function
+  // eslint-disable-next-line react-hooks/refs -- stable ref for debouncer callback
   sortingDebouncerRef.current = sortingDebouncer.maybeExecute;
 
   const isLargeDataset = rowCount > LARGE_DATASET_THRESHOLD;

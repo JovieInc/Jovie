@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -7,15 +8,19 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import {
   adminNavigation,
+  artistSettingsNavigation,
   primaryNavigation,
   secondaryNavigation,
-  settingsNavigation,
+  userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
@@ -59,24 +64,43 @@ export function DashboardNav(_: DashboardNavProps) {
     [publicProfileHref]
   );
 
-  // Memoize filtered items to prevent creating new arrays on every render
-  // Note: Tour dates is now always visible (unflagged)
-  const primaryItems = useMemo(() => primaryNavigation, []);
+  // Replace "Profile" label with artist display name when available
+  const artistName = selectedProfile?.displayName;
+  const primaryItems = useMemo(() => {
+    if (!artistName) return primaryNavigation;
+    return primaryNavigation.map(item =>
+      item.id === 'profile' ? { ...item, name: artistName } : item
+    );
+  }, [artistName]);
 
   const secondaryItems = secondaryNavigation;
 
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
+  // Settings nav: "General" (user) and artist name (or "Artist") groups
+  const artistSettingsLabel = artistName || 'Artist';
+
   // Memoize nav sections to prevent creating new objects on every render
   const navSections = useMemo(
     () =>
       isInSettings
-        ? [{ key: 'settings', items: settingsNavigation }]
+        ? [
+            {
+              key: 'settings-general',
+              label: 'General',
+              items: userSettingsNavigation,
+            },
+            {
+              key: 'settings-artist',
+              label: artistSettingsLabel,
+              items: artistSettingsNavigation,
+            },
+          ]
         : [
             { key: 'primary', items: primaryItems },
             { key: 'secondary', items: secondaryItems },
           ],
-    [isInSettings, primaryItems, secondaryItems]
+    [isInSettings, primaryItems, secondaryItems, artistSettingsLabel]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
@@ -93,7 +117,25 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-        />
+        >
+          {item.children && item.children.length > 0 && (
+            <SidebarMenuSub>
+              {item.children.map(child => (
+                <SidebarMenuSubItem key={child.id}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={isItemActive(pathname, child)}
+                  >
+                    <Link href={child.href}>
+                      <child.icon className='size-4' aria-hidden='true' />
+                      <span>{child.name}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          )}
+        </NavMenuItem>
       );
     },
     [pathname, profileActions]
@@ -118,6 +160,11 @@ export function DashboardNav(_: DashboardNavProps) {
               {/* Section divider for visual separation (except for first section) */}
               {index > 0 && (
                 <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
+              )}
+              {'label' in section && section.label && (
+                <p className='px-3 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-item-icon group-data-[collapsible=icon]:hidden'>
+                  {section.label}
+                </p>
               )}
               {renderSection(section.items)}
             </div>

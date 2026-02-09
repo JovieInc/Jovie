@@ -34,6 +34,7 @@ export const PLAN_LIMITS = {
     canExportContacts: false,
     canRemoveBranding: false,
     canAccessAdvancedAnalytics: false,
+    canFilterSelfFromAnalytics: false,
   },
   pro: {
     analyticsRetentionDays: 90,
@@ -41,6 +42,7 @@ export const PLAN_LIMITS = {
     canExportContacts: true,
     canRemoveBranding: true,
     canAccessAdvancedAnalytics: true,
+    canFilterSelfFromAnalytics: true,
   },
   growth: {
     analyticsRetentionDays: 365,
@@ -48,6 +50,7 @@ export const PLAN_LIMITS = {
     canExportContacts: true,
     canRemoveBranding: true,
     canAccessAdvancedAnalytics: true,
+    canFilterSelfFromAnalytics: true,
   },
 } as const;
 

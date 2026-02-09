@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation';
 
-// eslint-disable-next-line @jovie/no-hardcoded-routes -- Legacy dashboard path for redirect
-const PROFILE_ROUTE = '/app/dashboard/profile';
+const CHAT_ROUTE = '/app/chat';
 
-// Chat is now integrated into the profile page
+// Legacy /app/dashboard/chat path redirects to the new chat page
 export default function OldChatPage() {
-  redirect(PROFILE_ROUTE);
+  redirect(CHAT_ROUTE);
 }

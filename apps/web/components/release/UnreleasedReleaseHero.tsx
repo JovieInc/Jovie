@@ -93,7 +93,12 @@ export function UnreleasedReleaseHero({
               <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
                 {release.title}
               </h1>
-              <p className='mt-1.5 text-base text-white/60'>{artist.name}</p>
+              <Link
+                href={`/${artist.handle}`}
+                className='mt-1.5 block text-base text-white/60 transition-colors hover:text-white/80'
+              >
+                {artist.name}
+              </Link>
             </div>
 
             {/* Countdown Timer */}

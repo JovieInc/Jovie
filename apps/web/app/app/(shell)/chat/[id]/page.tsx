@@ -1,10 +1,17 @@
-import { redirect } from 'next/navigation';
+import { ChatPageClient } from '../ChatPageClient';
 
-// eslint-disable-next-line @jovie/no-hardcoded-routes -- Legacy dashboard path for redirect
-const PROFILE_ROUTE = '/app/dashboard/profile';
+interface Props {
+  readonly params: Promise<{
+    readonly id: string;
+  }>;
+}
 
-// Chat is now integrated into the profile page
-// Conversation history is loaded inline
-export default function ChatConversationPage() {
-  redirect(PROFILE_ROUTE);
+export const metadata = {
+  title: 'Chat',
+  description: 'Chat with Jovie AI',
+};
+
+export default async function ChatConversationPage({ params }: Props) {
+  const { id } = await params;
+  return <ChatPageClient conversationId={id} />;
 }

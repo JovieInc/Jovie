@@ -72,22 +72,22 @@ function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
 
 // Route groups for path categorization
 const DASHBOARD_ROUTES = [
-  '/profile',
-  '/contacts',
-  '/releases',
-  '/tour-dates',
-  '/audience',
-  '/earnings',
-  '/links',
-  '/chat',
-  '/analytics',
+  '/app/profile',
+  '/app/contacts',
+  '/app/releases',
+  '/app/tour-dates',
+  '/app/audience',
+  '/app/earnings',
+  '/app/links',
+  '/app/chat',
+  '/app/analytics',
 ] as const;
 
 const SETTINGS_ROUTES = [
-  '/settings',
-  '/admin',
-  '/billing',
-  '/account',
+  '/app/settings',
+  '/app/admin',
+  '/app/billing',
+  '/app/account',
 ] as const;
 
 /**

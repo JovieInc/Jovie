@@ -1,6 +1,6 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
@@ -37,6 +38,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';
 
@@ -375,6 +377,13 @@ export async function syncFromSpotify(): Promise<{
       source: 'spotify',
     });
 
+    // Re-trigger DSP artist discovery on resync to pick up new ISRCs
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profile.id,
+      spotifyArtistId: profile.spotifyId,
+      targetProviders: ['apple_music'],
+    });
+
     return {
       success: true,
       message: `Successfully synced ${result.imported} releases from Spotify.`,
@@ -495,6 +504,14 @@ export async function connectSpotifyArtist(params: {
       isInitialConnect: true,
     });
 
+    // Auto-trigger DSP artist discovery (Apple Music matching via ISRCs)
+    // Fire-and-forget: don't block the response on discovery
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profile.id,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: ['apple_music'],
+    });
+
     return {
       success: true,
       message: `Connected and synced ${result.imported} releases from Spotify.`,
@@ -593,4 +610,178 @@ export async function loadTracksForRelease(params: {
       params.releaseSlug
     )
   );
+}
+
+/**
+ * Check Apple Music connection status for the current profile
+ */
+export async function checkAppleMusicConnection(): Promise<{
+  connected: boolean;
+  artistName: string | null;
+  artistId: string | null;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    return { connected: false, artistName: null, artistId: null };
+  }
+
+  try {
+    const profile = await requireProfile();
+
+    const [match] = await db
+      .select({
+        externalArtistName: dspArtistMatches.externalArtistName,
+        externalArtistId: dspArtistMatches.externalArtistId,
+        status: dspArtistMatches.status,
+      })
+      .from(dspArtistMatches)
+      .where(
+        and(
+          eq(dspArtistMatches.creatorProfileId, profile.id),
+          eq(dspArtistMatches.providerId, 'apple_music')
+        )
+      )
+      .limit(1);
+
+    if (!match) {
+      return { connected: false, artistName: null, artistId: null };
+    }
+
+    const isConnected =
+      match.status === 'confirmed' || match.status === 'auto_confirmed';
+
+    return {
+      connected: isConnected,
+      artistName: isConnected ? match.externalArtistName : null,
+      artistId: isConnected ? match.externalArtistId : null,
+    };
+  } catch {
+    return { connected: false, artistName: null, artistId: null };
+  }
+}
+
+/**
+ * Connect an Apple Music artist to the profile manually
+ */
+export async function connectAppleMusicArtist(params: {
+  externalArtistId: string;
+  externalArtistName: string;
+  externalArtistUrl: string;
+  externalArtistImageUrl?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  artistName: string;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const externalArtistId = params.externalArtistId.trim();
+  const externalArtistName = params.externalArtistName.trim();
+  const externalArtistUrl = params.externalArtistUrl.trim();
+
+  if (!externalArtistId || !externalArtistName || !externalArtistUrl) {
+    throw new TypeError('Apple Music artist data is required');
+  }
+
+  let parsedArtistUrl: URL;
+  try {
+    parsedArtistUrl = new URL(externalArtistUrl);
+  } catch {
+    throw new TypeError('Invalid Apple Music artist URL');
+  }
+
+  if (
+    !['http:', 'https:'].includes(parsedArtistUrl.protocol) ||
+    !(
+      parsedArtistUrl.hostname === 'music.apple.com' ||
+      parsedArtistUrl.hostname.endsWith('.music.apple.com')
+    ) ||
+    !parsedArtistUrl.pathname.includes('/artist/')
+  ) {
+    throw new TypeError('Invalid Apple Music artist URL');
+  }
+
+  const externalArtistImageUrl = params.externalArtistImageUrl?.trim();
+  let sanitizedImageUrl: string | null = null;
+  if (externalArtistImageUrl) {
+    try {
+      const parsedImageUrl = new URL(externalArtistImageUrl);
+      if (['http:', 'https:'].includes(parsedImageUrl.protocol)) {
+        sanitizedImageUrl = parsedImageUrl.toString();
+      }
+    } catch {
+      sanitizedImageUrl = null;
+    }
+  }
+
+  const profile = await requireProfile();
+  const now = new Date();
+
+  try {
+    await db
+      .insert(dspArtistMatches)
+      .values({
+        creatorProfileId: profile.id,
+        providerId: 'apple_music',
+        externalArtistId,
+        externalArtistName,
+        externalArtistUrl,
+        externalArtistImageUrl: sanitizedImageUrl,
+        confidenceScore: '1.0000',
+        confidenceBreakdown: {
+          isrcMatchScore: 0,
+          upcMatchScore: 0,
+          nameSimilarityScore: 1,
+          followerRatioScore: 0,
+          genreOverlapScore: 0,
+          meta: {
+            calculatedAt: now.toISOString(),
+            version: 1,
+          },
+        },
+        matchingIsrcCount: 0,
+        matchingUpcCount: 0,
+        totalTracksChecked: 0,
+        status: 'confirmed',
+        confirmedAt: now,
+        confirmedBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [
+          dspArtistMatches.creatorProfileId,
+          dspArtistMatches.providerId,
+        ],
+        set: {
+          externalArtistId,
+          externalArtistName,
+          externalArtistUrl,
+          externalArtistImageUrl: sanitizedImageUrl,
+          status: 'confirmed',
+          confirmedAt: now,
+          confirmedBy: userId,
+          updatedAt: now,
+        },
+      });
+  } catch {
+    return {
+      success: false,
+      message: 'Failed to save Apple Music connection. Please try again.',
+      artistName: externalArtistName,
+    };
+  }
+
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return {
+    success: true,
+    message: `Connected Apple Music as ${externalArtistName}`,
+    artistName: externalArtistName,
+  };
 }

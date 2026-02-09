@@ -1,13 +1,11 @@
 'use client';
 
 import {
-  DROPDOWN_CONTENT_BASE,
-  DROPDOWN_SHADOW,
-  DROPDOWN_SLIDE_ANIMATIONS,
-  DROPDOWN_TRANSITIONS,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   MENU_ITEM_BASE,
-} from '@jovie/ui/lib/dropdown-styles';
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+} from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -77,7 +75,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-surface-2 dark:hover:bg-surface-3'
+            className='absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-interactive-hover'
           >
             <Icon name='X' className='h-3 w-3 text-tertiary-token' />
           </button>
@@ -228,19 +226,9 @@ export function FilterSubmenu<T extends string = string>({
   // Don't render if not visible (filtered out by main search)
   if (!isVisible) return null;
 
-  const submenuContentClass = cn(
-    DROPDOWN_CONTENT_BASE,
-    DROPDOWN_SHADOW,
-    DROPDOWN_TRANSITIONS,
-    DROPDOWN_SLIDE_ANIMATIONS,
-    'min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
-  );
-
   return (
-    <DropdownMenuPrimitive.Sub onOpenChange={handleOpenChange}>
-      <DropdownMenuPrimitive.SubTrigger
-        className={cn(MENU_ITEM_BASE, 'justify-between')}
-      >
+    <DropdownMenuSub onOpenChange={handleOpenChange}>
+      <DropdownMenuSubTrigger className='justify-between'>
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
@@ -254,53 +242,51 @@ export function FilterSubmenu<T extends string = string>({
           )}
         </div>
         <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
-      </DropdownMenuPrimitive.SubTrigger>
+      </DropdownMenuSubTrigger>
 
-      <DropdownMenuPrimitive.Portal>
-        <DropdownMenuPrimitive.SubContent
-          sideOffset={4}
-          alignOffset={-4}
-          className={submenuContentClass}
-        >
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            onClear={() => {
-              setSearch('');
-              searchRef.current?.focus();
-            }}
-            placeholder={searchPlaceholder}
-            inputRef={searchRef}
-          />
+      <DropdownMenuSubContent
+        sideOffset={4}
+        alignOffset={-4}
+        className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+      >
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          onClear={() => {
+            setSearch('');
+            searchRef.current?.focus();
+          }}
+          placeholder={searchPlaceholder}
+          inputRef={searchRef}
+        />
 
-          <div className='flex-1 overflow-y-auto p-1'>
-            {filteredOptions.length === 0 ? (
-              <div className='py-6 text-center text-xs text-tertiary-token'>
-                No options found
-              </div>
-            ) : (
-              filteredOptions.map(opt => (
-                <SubmenuCheckboxItem
-                  key={opt.id}
-                  label={opt.label}
-                  icon={
-                    opt.iconName ? (
-                      <Icon
-                        name={opt.iconName as 'Disc3'}
-                        className='h-3.5 w-3.5'
-                      />
-                    ) : undefined
-                  }
-                  count={counts[opt.id] || 0}
-                  checked={selectedIds.includes(opt.id)}
-                  onCheckedChange={() => onToggle(opt.id)}
-                  searchInputRef={searchRef}
-                />
-              ))
-            )}
-          </div>
-        </DropdownMenuPrimitive.SubContent>
-      </DropdownMenuPrimitive.Portal>
-    </DropdownMenuPrimitive.Sub>
+        <div className='flex-1 overflow-y-auto p-1'>
+          {filteredOptions.length === 0 ? (
+            <div className='py-6 text-center text-xs text-tertiary-token'>
+              No options found
+            </div>
+          ) : (
+            filteredOptions.map(opt => (
+              <SubmenuCheckboxItem
+                key={opt.id}
+                label={opt.label}
+                icon={
+                  opt.iconName ? (
+                    <Icon
+                      name={opt.iconName as 'Disc3'}
+                      className='h-3.5 w-3.5'
+                    />
+                  ) : undefined
+                }
+                count={counts[opt.id] || 0}
+                checked={selectedIds.includes(opt.id)}
+                onCheckedChange={() => onToggle(opt.id)}
+                searchInputRef={searchRef}
+              />
+            ))
+          )}
+        </div>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

@@ -1,16 +1,15 @@
 'use client';
 
-import { AlertCircle, Bell, Mail, Phone } from 'lucide-react';
-import Link from 'next/link';
-import type { CSSProperties } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
-
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/atoms/Tooltip';
+} from '@jovie/ui';
+import { AlertCircle, Bell, Mail, Phone } from 'lucide-react';
+import Link from 'next/link';
+import type { CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 /** Prevents synthetic font weight rendering for better typography */
 const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };

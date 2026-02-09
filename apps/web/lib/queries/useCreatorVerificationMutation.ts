@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { APP_ROUTES } from '@/constants/routes';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -26,7 +27,7 @@ async function toggleVerification(
       success?: boolean;
       isVerified?: boolean;
       error?: string;
-    }>('/app/admin/creators/toggle-verify', {
+    }>(APP_ROUTES.ADMIN_CREATORS_TOGGLE_VERIFY, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

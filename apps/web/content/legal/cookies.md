@@ -1,4 +1,4 @@
-# Cookie Policy
+## Cookie Policy
 
 _Last updated: January 2025_
 

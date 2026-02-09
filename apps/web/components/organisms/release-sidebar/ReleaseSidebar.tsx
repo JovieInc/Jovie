@@ -15,15 +15,15 @@ import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
+import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
+import { ReleaseTrackList } from './ReleaseTrackList';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
-
-const CONTEXT_MENU_ITEM_CLASS =
-  'rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] [&_svg]:text-tertiary-token hover:[&_svg]:text-secondary-token data-[highlighted]:[&_svg]:text-secondary-token focus-visible:[&_svg]:text-secondary-token';
 
 export function ReleaseSidebar({
   release,
@@ -74,6 +74,14 @@ export function ReleaseSidebar({
     const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
     const items: CommonDropdownItem[] = [];
 
+    const utmContext = buildUTMContext({
+      smartLinkUrl,
+      releaseSlug: release.slug,
+      releaseTitle: release.title,
+      artistName,
+      releaseDate: release.releaseDate,
+    });
+
     items.push(
       {
         type: 'action',
@@ -81,7 +89,6 @@ export function ReleaseSidebar({
         label: 'Copy smart link',
         icon: <Copy className='h-4 w-4' />,
         onClick: () => void handleCopySmartLink(),
-        className: CONTEXT_MENU_ITEM_CLASS,
       },
       {
         type: 'action',
@@ -89,8 +96,13 @@ export function ReleaseSidebar({
         label: 'Open release',
         icon: <ExternalLink className='h-4 w-4' />,
         onClick: () => globalThis.open(smartLinkUrl, '_blank'),
-        className: CONTEXT_MENU_ITEM_CLASS,
       },
+      // UTM share presets
+      ...getUTMShareDropdownItems({
+        smartLinkUrl,
+        context: utmContext,
+      }),
+      { type: 'separator', id: 'sep-actions' },
       {
         type: 'action',
         id: 'refresh',
@@ -103,9 +115,8 @@ export function ReleaseSidebar({
             globalThis.location.reload();
           }
         },
-        className: CONTEXT_MENU_ITEM_CLASS,
       },
-      { type: 'separator', id: 'sep-1', className: '-mx-0.5 my-1' },
+      { type: 'separator', id: 'sep-danger' },
       {
         type: 'action',
         id: 'delete',
@@ -113,12 +124,11 @@ export function ReleaseSidebar({
         icon: <Trash2 className='h-4 w-4' />,
         onClick: () => toast.info('Delete not implemented'),
         variant: 'destructive',
-        className: CONTEXT_MENU_ITEM_CLASS,
       }
     );
 
     return items;
-  }, [release, handleCopySmartLink, onRefresh]);
+  }, [release, handleCopySmartLink, onRefresh, artistName]);
 
   return (
     <RightDrawer
@@ -156,6 +166,10 @@ export function ReleaseSidebar({
                 releaseDate={release.releaseDate}
                 smartLinkPath={release.smartLinkPath}
               />
+
+              <ReleaseMetadata release={release} />
+
+              <ReleaseTrackList release={release} />
 
               <ReleaseDspLinks
                 release={release}

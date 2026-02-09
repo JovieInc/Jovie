@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
+import { MobileNav } from '@/components/molecules/MobileNav';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -65,11 +66,11 @@ export function HeaderNav({
           <LogoLink logoSize={logoSize} variant={logoVariant} />
         </div>
 
-        {/* Center nav links - flex-1 to take remaining space */}
+        {/* Center nav links - desktop only */}
         {hideNav ? (
           <div className='flex-1' aria-hidden='true' />
         ) : (
-          <div className='flex-1 flex items-center justify-center'>
+          <div className='flex-1 hidden md:flex items-center justify-center'>
             {hidePricingLink ? null : (
               <Link href='/pricing' className={navLinkClass}>
                 Pricing
@@ -78,10 +79,20 @@ export function HeaderNav({
           </div>
         )}
 
-        {/* Auth actions - right aligned */}
-        <div className='flex items-center gap-1'>
+        {/* Spacer on mobile when nav links are hidden */}
+        {!hideNav && <div className='flex-1 md:hidden' aria-hidden='true' />}
+
+        {/* Auth actions - hidden on mobile, visible on md+ */}
+        <div className='hidden md:flex items-center gap-1'>
           <AuthActions />
         </div>
+
+        {/* Mobile hamburger menu - shown on small screens only */}
+        {!hideNav && (
+          <div className='flex md:hidden items-center'>
+            <MobileNav hidePricingLink={hidePricingLink} />
+          </div>
+        )}
       </nav>
     </header>
   );

@@ -3,6 +3,7 @@
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { APP_ROUTES } from '@/constants/routes';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
@@ -132,9 +133,9 @@ export function useUserButton({
   } else if (artist?.handle) {
     profileUrl = `/${artist.handle}`;
   } else {
-    profileUrl = '/app/settings';
+    profileUrl = APP_ROUTES.SETTINGS;
   }
-  const settingsUrl = settingsHref ?? '/app/settings';
+  const settingsUrl = settingsHref ?? APP_ROUTES.SETTINGS;
 
   const jovieUsername =
     user?.username || artist?.handle || contactEmail?.split('@')[0] || null;

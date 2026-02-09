@@ -16,6 +16,7 @@ import {
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -73,8 +74,10 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   // Context menu items for right-click AND actions button
@@ -169,15 +172,18 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Create memoized cell renderers using refs to avoid column recreation on selection change
   const SelectHeader = useMemo(
+    // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
     () => createSelectHeaderRenderer(headerCheckboxStateRef, toggleSelectAll),
     [toggleSelectAll]
   );
 
+  /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
   const SelectCell = useMemo(
     () =>
       createSelectCellRenderer(selectedIdsRef, page, pageSize, toggleSelect),
     [page, pageSize, toggleSelect]
   );
+  /* eslint-enable react-hooks/refs */
 
   const ActionsCell = useMemo(
     () => createActionsCellRenderer(getContextMenuItems),
@@ -265,7 +271,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               </div>
               <div className='flex items-center gap-2'>
                 <form
-                  action='/app/admin/users'
+                  action={APP_ROUTES.ADMIN_USERS}
                   method='get'
                   className='relative isolate flex items-center gap-2'
                 >

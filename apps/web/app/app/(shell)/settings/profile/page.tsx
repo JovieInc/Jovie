@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../../dashboard/actions';
 
@@ -17,5 +18,5 @@ export default async function SettingsProfilePage() {
     redirect('/onboarding');
   }
 
-  redirect('/app/settings');
+  redirect(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
 }

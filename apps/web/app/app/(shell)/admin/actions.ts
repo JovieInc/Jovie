@@ -4,11 +4,12 @@ import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
@@ -54,13 +55,15 @@ function validateAvatarUrl(url: string): string {
 }
 
 async function requireAdmin(): Promise<void> {
-  const entitlements = await getCurrentUserEntitlements();
+  const { userId } = await getCachedAuth();
 
-  if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
-    console.warn('Admin access denied', {
-      email: entitlements.email ?? null,
-      reason: 'not_admin_or_not_authenticated',
-    });
+  if (!userId) {
+    throw new AdminUnauthorizedError();
+  }
+
+  const adminStatus = await checkAdminRole(userId);
+
+  if (!adminStatus) {
     throw new AdminUnauthorizedError();
   }
 }

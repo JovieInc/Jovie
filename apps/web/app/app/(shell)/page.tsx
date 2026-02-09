@@ -1,14 +1,12 @@
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
 export const metadata = {
   title: 'Dashboard',
-  description: 'Manage your Jovie profile',
+  description: 'Chat with Jovie AI',
 };
 
-// eslint-disable-next-line @jovie/no-hardcoded-routes -- Legacy dashboard path for redirect
-const PROFILE_ROUTE = '/app/dashboard/profile';
-
-// Redirect to profile page - the new default home
+// Chat-first experience: new sessions start on the chat page
 export default function AppRootPage() {
-  redirect(PROFILE_ROUTE);
+  redirect(APP_ROUTES.CHAT);
 }

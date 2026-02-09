@@ -298,6 +298,7 @@ export interface UserEntitlements {
   canRemoveBranding: boolean;
   canExportContacts: boolean;
   canAccessAdvancedAnalytics: boolean;
+  canFilterSelfFromAnalytics: boolean;
   // Limits
   analyticsRetentionDays: number;
   contactsLimit: number | null; // null = unlimited
