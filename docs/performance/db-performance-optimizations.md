@@ -56,29 +56,32 @@ per request. Rollups reduce repeated scans and heavy group-by work.
 **Update strategy:** hourly or near-real-time jobs; replace dashboard queries to
 read rollups first, falling back to raw tables only when needed.
 
-### 3) Add missing indexes aligned with query patterns
+### 3) Add missing indexes aligned with query patterns — MOSTLY DONE
 **Goal:** support the current query shapes without relying on full scans.
 
-**Click events**
-- `click_events.created_at` has no standalone index; retention and admin series
-  delete/scan by time.
-- Add a partial index or BRIN on `created_at`.
-- Add a partial index for bot-filtered analytics:
-  `(creator_profile_id, created_at DESC) WHERE is_bot = false`
-- Consider an expression index for tip source analytics:
-  `(creator_profile_id, link_type, (metadata->>'source'))`
+> **Update (2026-02-09):** Most recommended indexes have been implemented in the
+> Drizzle schema. The following status reflects verified schema definitions.
 
-**Audience members**
-- Add `(creator_profile_id, last_seen_at DESC)` for activity feeds and default
-  sort in `audience-data.ts`.
-- Add `(creator_profile_id, updated_at DESC)` for dashboard analytics.
-- Add a partial retention index:
-  `WHERE type = 'anonymous' AND email IS NULL AND phone IS NULL`
+**Click events** (all addressed)
+- ~~`click_events.created_at` has no standalone index~~ — **DONE**: `createdAtIdx` on `(created_at)`
+- ~~Add a partial index for bot-filtered analytics~~ — **DONE**: `nonBotClicksIdx` partial index on `(creator_profile_id, created_at) WHERE is_bot = false OR is_bot IS NULL`
+- ~~Expression index for tip source~~ — **DONE**: added via dashboard migration 0020
+- Additional indexes: `creatorProfileIsBotCreatedAtIdx` on `(creator_profile_id, is_bot, created_at)`, `linkTypeAnalyticsIndex` on `(creator_profile_id, link_type, created_at)`
 
-**Notification subscriptions**
-- Add `(creator_profile_id, created_at DESC)` for activity feed and paging.
+**Audience members** (all addressed)
+- ~~Add `(creator_profile_id, last_seen_at DESC)`~~ — **DONE**: `creatorProfileLastSeenIdx`
+- ~~Add `(creator_profile_id, updated_at DESC)`~~ — **DONE**: `creatorProfileUpdatedIdx`
+- ~~Add a partial retention index~~ — **DONE**: `retentionIdx` on `(last_seen_at) WHERE type = 'anonymous' AND email IS NULL AND phone IS NULL`
+- Additional indexes: `fingerprintLookupIdx`, `emailLookupIdx` (partial indexes for dashboard subquery optimization)
 
-**Schema hygiene**
+**Notification subscriptions** (addressed)
+- ~~Add `(creator_profile_id, created_at DESC)`~~ — **DONE**: `creatorProfileCreatedAtIdx`
+
+**Other tables verified (2026-02-09):**
+- `creator_contacts`: `profileActiveIdx` compound on `(creator_profile_id, is_active, sort_order, created_at)`
+- `social_accounts`: `profilePlatformStatusIdx` compound on `(creator_profile_id, platform, status)`
+
+**Schema hygiene** (remaining)
 - Make `click_events.is_bot` NOT NULL default `false` (backfill existing NULLs)
   to avoid `is_bot = false OR is_bot IS NULL` filters and improve index usage.
 
@@ -104,10 +107,10 @@ update, increasing bloat and write latency.
 - Add an admin-only "EXPLAIN samples" endpoint for heavy queries.
 
 ## Quick Wins (1-2 days)
-1. Add indexes for `audience_members` and `notification_subscriptions`.
-2. Add BRIN or partial index on `click_events.created_at` for retention.
+1. ~~Add indexes for `audience_members` and `notification_subscriptions`.~~ **DONE**
+2. ~~Add BRIN or partial index on `click_events.created_at` for retention.~~ **DONE**
 3. Make `click_events.is_bot` NOT NULL and add a partial index for
-   non-bot analytics.
+   non-bot analytics. (partial index done; NOT NULL backfill remaining)
 
 ## Larger Schema Changes (prelaunch-friendly)
 1. Partition event tables by month and update retention to drop partitions.
