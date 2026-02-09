@@ -40,7 +40,12 @@ export function useDashboardAudienceTable({
   profileUrl,
 }: Omit<
   DashboardAudienceTableProps,
-  'onPageChange' | 'onPageSizeChange' | 'onSortChange'
+  | 'onPageChange'
+  | 'onPageSizeChange'
+  | 'onSortChange'
+  | 'onViewChange'
+  | 'view'
+  | 'subscriberCount'
 >): UseDashboardAudienceTableReturn {
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();

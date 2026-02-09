@@ -115,6 +115,22 @@ export const releaseSearchParams = createSearchParamsCache({
 // ============================================================================
 
 /**
+ * Valid view filters for the audience table.
+ * - 'all': All audience members (visitors + identified)
+ * - 'subscribers': Notification subscribers only
+ * - 'anonymous': Anonymous visitors only
+ */
+export const audienceViews = ['all', 'subscribers', 'anonymous'] as const;
+
+export type AudienceView = (typeof audienceViews)[number];
+
+/**
+ * Parser for audience view filter.
+ */
+export const audienceViewParser =
+  parseAsStringLiteral(audienceViews).withDefault('all');
+
+/**
  * Valid sort fields for the audience table.
  */
 export const audienceSortFields = [
@@ -142,7 +158,7 @@ export const audienceSortParser =
  * ```tsx
  * // In a server component
  * export default async function AudiencePage({ searchParams }) {
- *   const { page, pageSize, sort, direction } = await audienceSearchParams.parse(searchParams);
+ *   const { page, pageSize, sort, direction, view } = await audienceSearchParams.parse(searchParams);
  *   // Use type-safe params
  * }
  * ```
@@ -152,6 +168,7 @@ export const audienceSearchParams = createSearchParamsCache({
   pageSize: pageSizeParser,
   sort: audienceSortParser,
   direction: sortDirectionParser,
+  view: audienceViewParser,
 });
 
 // ============================================================================

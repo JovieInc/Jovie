@@ -20,16 +20,20 @@ import type {
 
 export type AudienceMode = 'members' | 'subscribers';
 
+export type AudienceView = 'all' | 'subscribers' | 'anonymous';
+
 export type AudienceServerRow = AudienceMember;
 
 export interface AudienceServerData {
   mode: AudienceMode;
+  view: AudienceView;
   rows: AudienceServerRow[];
   total: number;
   page: number;
   pageSize: number;
   sort: string;
   direction: 'asc' | 'desc';
+  subscriberCount: number;
 }
 
 /**
@@ -257,8 +261,9 @@ async function fetchMembersData(
   selectedProfileId: string,
   searchParams: Record<string, string | string[] | undefined>,
   includeDetails: boolean,
-  memberId: string | undefined
-): Promise<AudienceServerData> {
+  memberId: string | undefined,
+  typeFilter?: AudienceMemberType
+): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
@@ -266,10 +271,14 @@ async function fetchMembersData(
 
   const ownershipFilter = buildOwnershipFilter(clerkUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
+  const typeCondition = typeFilter
+    ? eq(audienceMembers.type, typeFilter)
+    : drizzleSql<boolean>`true`;
   const whereClause = and(
     ownershipFilter,
     eq(audienceMembers.creatorProfileId, selectedProfileId),
-    memberIdFilter
+    memberIdFilter,
+    typeCondition
   );
 
   const baseQuery = tx
@@ -318,7 +327,7 @@ async function fetchSubscribersData(
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: Record<string, string | string[] | undefined>
-): Promise<AudienceServerData> {
+): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
   const parsed = subscriberQuerySchema.safeParse({
     page: searchParams.page,
     pageSize: searchParams.pageSize,
@@ -427,12 +436,45 @@ async function fetchSubscribersData(
   };
 }
 
+/**
+ * Count total subscribers for a profile (lightweight query for UI state)
+ */
+async function countSubscribers(
+  tx: DbSessionTx,
+  clerkUserId: string | null,
+  selectedProfileId: string
+): Promise<number> {
+  const ownershipFilter = clerkUserId
+    ? eq(users.clerkId, clerkUserId)
+    : drizzleSql<boolean>`true`;
+
+  const [{ total }] = await tx
+    .select({
+      total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
+    })
+    .from(notificationSubscriptions)
+    .innerJoin(
+      creatorProfiles,
+      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
+    )
+    .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .where(
+      and(
+        ownershipFilter,
+        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
+      )
+    );
+
+  return Number(total ?? 0);
+}
+
 export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
   searchParams: Record<string, string | string[] | undefined>;
   includeDetails?: boolean;
   memberId?: string;
+  view?: AudienceView;
 }): Promise<AudienceServerData> {
   noStore();
 
@@ -442,46 +484,65 @@ export async function getAudienceServerData(params: {
     searchParams,
     includeDetails = false,
     memberId,
+    view = 'all',
   } = params;
-  const modeParamRaw = searchParams.mode;
-  const modeParam = Array.isArray(modeParamRaw)
-    ? modeParamRaw[0]
-    : modeParamRaw;
-  const mode: AudienceMode =
-    modeParam === 'subscribers' ? 'subscribers' : 'members';
+
+  // Map view to internal mode
+  const mode: AudienceMode = view === 'subscribers' ? 'subscribers' : 'members';
 
   if (!selectedProfileId) {
     return {
       mode,
+      view,
       rows: [],
       total: 0,
       page: 1,
       pageSize: 10,
       sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
       direction: 'desc',
+      subscriberCount: 0,
     };
   }
 
   // All audience reads now go through authenticated RLS-protected sessions
   // RLS bypass capability has been removed for security hardening
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    if (mode === 'members') {
-      return fetchMembersData(
+    // Always count subscribers for the export button state
+    const subscriberCount = await countSubscribers(
+      tx,
+      clerkUserId,
+      selectedProfileId
+    );
+
+    let data: Omit<AudienceServerData, 'view' | 'subscriberCount'>;
+
+    if (mode === 'subscribers') {
+      data = await fetchSubscribersData(
+        tx,
+        clerkUserId,
+        selectedProfileId,
+        searchParams
+      );
+    } else {
+      // 'all' shows all members, 'anonymous' filters to anonymous only
+      const typeFilter =
+        view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined;
+      data = await fetchMembersData(
         tx,
         clerkUserId,
         selectedProfileId,
         searchParams,
         includeDetails,
-        memberId
+        memberId,
+        typeFilter
       );
     }
 
-    return fetchSubscribersData(
-      tx,
-      clerkUserId,
-      selectedProfileId,
-      searchParams
-    );
+    return {
+      ...data,
+      view,
+      subscriberCount,
+    };
   });
 }
 
