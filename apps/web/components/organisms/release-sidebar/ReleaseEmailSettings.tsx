@@ -42,7 +42,7 @@ export function ReleaseEmailSettings({
         />
         <div className='flex-1'>
           <div className='flex items-center gap-1.5 text-sm font-medium text-primary-token'>
-            <Megaphone className='h-3.5 w-3.5 text-tertiary-token' />
+            <Megaphone className='h-4 w-4 text-tertiary-token' />
             Announcement email
           </div>
           <p className='text-xs text-tertiary-token'>
@@ -64,7 +64,7 @@ export function ReleaseEmailSettings({
         />
         <div className='flex-1'>
           <div className='flex items-center gap-1.5 text-sm font-medium text-primary-token'>
-            <Mail className='h-3.5 w-3.5 text-tertiary-token' />
+            <Mail className='h-4 w-4 text-tertiary-token' />
             Release day email
           </div>
           <p className='text-xs text-tertiary-token'>

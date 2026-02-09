@@ -22,6 +22,28 @@ interface ChatMessageProps {
 }
 
 /**
+ * Type guard to validate a release proposal has required fields.
+ */
+function isValidReleaseProposal(obj: unknown): obj is ReleaseProposal {
+  if (!obj || typeof obj !== 'object') return false;
+  const proposal = obj as Record<string, unknown>;
+  return (
+    typeof proposal.title === 'string' &&
+    proposal.title.length > 0 &&
+    typeof proposal.releaseType === 'string' &&
+    [
+      'single',
+      'ep',
+      'album',
+      'compilation',
+      'live',
+      'mixtape',
+      'other',
+    ].includes(proposal.releaseType)
+  );
+}
+
+/**
  * Extract proposeNewRelease tool invocation result from message parts.
  */
 function extractReleaseProposal(parts: MessagePart[]): ReleaseProposal | null {
@@ -33,7 +55,9 @@ function extractReleaseProposal(parts: MessagePart[]): ReleaseProposal | null {
     if (toolInvocation.state !== 'result') continue;
     const result = toolInvocation.result;
     if (!result?.success || !result.preview) continue;
-    return result.preview as ReleaseProposal;
+    // Validate the proposal shape before returning
+    if (!isValidReleaseProposal(result.preview)) continue;
+    return result.preview;
   }
   return null;
 }

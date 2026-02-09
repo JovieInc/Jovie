@@ -156,15 +156,32 @@ export function useThemeMutation() {
  * const { updateNotifications, isPending } = useNotificationSettingsMutation();
  * updateNotifications({ marketing_emails: false });
  * ```
+ *
+ * @example
+ * ```tsx
+ * // With rollback on error
+ * const { updateNotifications } = useNotificationSettingsMutation();
+ * const previousValue = enabled;
+ * setEnabled(newValue);
+ * updateNotifications({ marketing_emails: newValue }, {
+ *   onError: () => setEnabled(previousValue),
+ * });
+ * ```
  */
 export function useNotificationSettingsMutation() {
   const mutation = useUpdateSettingsMutation();
 
   return {
     updateNotifications: (
-      settings: SettingsUpdateInput['updates']['settings']
+      settings: SettingsUpdateInput['updates']['settings'],
+      options?: { onError?: () => void }
     ) => {
-      mutation.mutate({ updates: { settings } });
+      mutation.mutate(
+        { updates: { settings } },
+        {
+          onError: options?.onError,
+        }
+      );
     },
     isPending: mutation.isPending,
     isError: mutation.isError,

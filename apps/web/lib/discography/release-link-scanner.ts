@@ -4,17 +4,22 @@
  * Smart rescanning logic for DSP link discovery.
  * Increases scan frequency around release dates (like feature.fm/linkfire).
  *
- * Scan schedule per release:
+ * Scan schedule for releases with a date:
  *   On creation       → immediate scan
- *   7 days before     → daily
- *   3 days before     → every 6 hours
+ *   7+ days before    → daily
+ *   3-7 days before   → daily
+ *   0-3 days before   → every 6 hours
  *   Release day       → every 2 hours
  *   Days 1-3 post     → every 6 hours
  *   Days 4-14 post    → daily
  *   After 14 days     → completed (stop scanning)
+ *
+ * For releases without a date:
+ *   Scans daily until MAX_SCANS (~100) is reached or
+ *   MIN_PROVIDERS_FOR_COMPLETE (5) providers are found.
  */
 
-import { and, eq, lte, ne } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { releaseLinkScans } from '@/lib/db/schema/dsp-enrichment';
@@ -60,7 +65,8 @@ function calculateNextScanTime(
   if (phase === 'completed') return null;
 
   if (!releaseDate) {
-    // No release date: scan daily for up to 14 days
+    // No release date: scan daily until MAX_SCANS is reached
+    // (typically ~100 scans, enforced in processReleaseLinkScans)
     return new Date(now.getTime() + 24 * 60 * 60 * 1000);
   }
 
@@ -112,7 +118,7 @@ export async function processReleaseLinkScans(): Promise<{
   let completed = 0;
   let errors = 0;
 
-  // Find all scans that are due
+  // Find all scans that are due (including those with NULL nextScanAt)
   const dueScans = await db
     .select({
       scan: releaseLinkScans,
@@ -125,7 +131,10 @@ export async function processReleaseLinkScans(): Promise<{
     )
     .where(
       and(
-        lte(releaseLinkScans.nextScanAt, now),
+        or(
+          isNull(releaseLinkScans.nextScanAt),
+          lte(releaseLinkScans.nextScanAt, now)
+        ),
         ne(releaseLinkScans.scanPhase, 'completed')
       )
     )

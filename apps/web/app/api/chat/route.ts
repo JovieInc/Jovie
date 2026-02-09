@@ -380,54 +380,72 @@ function createProfileEditTool(context: ArtistContext) {
   });
 }
 
+/** ISO date format regex (YYYY-MM-DD) */
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Creates the proposeNewRelease tool for the AI to suggest creating a release.
  * Returns a preview — actual creation requires user confirmation on the client.
  */
 function createNewReleaseTool() {
-  const newReleaseSchema = z.object({
-    title: z.string().min(1).max(200).describe('Release title'),
-    releaseType: z
-      .enum([
-        'single',
-        'ep',
-        'album',
-        'compilation',
-        'live',
-        'mixtape',
-        'other',
-      ])
-      .describe('Type of release'),
-    releaseDate: z
-      .string()
-      .optional()
-      .describe('Release date as ISO date string (e.g. 2025-08-15)'),
-    announcementDate: z
-      .string()
-      .optional()
-      .describe('Announcement date as ISO date string (before releaseDate)'),
-    totalTracks: z
-      .number()
-      .int()
-      .min(1)
-      .optional()
-      .describe('Number of tracks'),
-    label: z.string().optional().describe('Record label name'),
-    isExplicit: z.boolean().optional().describe('Contains explicit content'),
-    upc: z
-      .string()
-      .optional()
-      .describe('Universal Product Code from distributor'),
-    isrc: z.string().optional().describe('ISRC for the lead track'),
-    releaseDayEmailEnabled: z
-      .boolean()
-      .optional()
-      .describe('Email fans on release day (default true)'),
-    announceEmailEnabled: z
-      .boolean()
-      .optional()
-      .describe('Email fans on announcement date (default false)'),
-  });
+  const isoDateString = z
+    .string()
+    .regex(ISO_DATE_REGEX, 'Date must be in YYYY-MM-DD format');
+
+  const newReleaseSchema = z
+    .object({
+      title: z.string().min(1).max(200).describe('Release title'),
+      releaseType: z
+        .enum([
+          'single',
+          'ep',
+          'album',
+          'compilation',
+          'live',
+          'mixtape',
+          'other',
+        ])
+        .describe('Type of release'),
+      releaseDate: isoDateString
+        .optional()
+        .describe('Release date as ISO date string (e.g. 2025-08-15)'),
+      announcementDate: isoDateString
+        .optional()
+        .describe('Announcement date as ISO date string (before releaseDate)'),
+      totalTracks: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Number of tracks'),
+      label: z.string().optional().describe('Record label name'),
+      isExplicit: z.boolean().optional().describe('Contains explicit content'),
+      upc: z
+        .string()
+        .optional()
+        .describe('Universal Product Code from distributor'),
+      isrc: z.string().optional().describe('ISRC for the lead track'),
+      releaseDayEmailEnabled: z
+        .boolean()
+        .optional()
+        .describe('Email fans on release day (default true)'),
+      announceEmailEnabled: z
+        .boolean()
+        .optional()
+        .describe('Email fans on announcement date (default false)'),
+    })
+    .refine(
+      data => {
+        if (data.announcementDate && data.releaseDate) {
+          return data.announcementDate <= data.releaseDate;
+        }
+        return true;
+      },
+      {
+        path: ['announcementDate'],
+        message: 'Announcement date must be on or before release date',
+      }
+    );
 
   return tool({
     description:

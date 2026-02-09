@@ -12,21 +12,37 @@ export function SettingsNotificationsSection() {
 
   const handleMarketingToggle = useCallback(
     (enabled: boolean) => {
+      const previousValue = marketingEmails;
       // Optimistically update local state
       setMarketingEmails(enabled);
 
-      // Persist to server with automatic error handling and toast
-      updateNotifications({ marketing_emails: enabled });
+      // Persist to server with rollback on error
+      updateNotifications(
+        { marketing_emails: enabled },
+        {
+          onError: () => {
+            setMarketingEmails(previousValue);
+          },
+        }
+      );
     },
-    [updateNotifications]
+    [updateNotifications, marketingEmails]
   );
 
   const handleReleaseDayEmailToggle = useCallback(
     (enabled: boolean) => {
+      const previousValue = autoReleaseDayEmail;
       setAutoReleaseDayEmail(enabled);
-      updateNotifications({ auto_release_day_email: enabled });
+      updateNotifications(
+        { auto_release_day_email: enabled },
+        {
+          onError: () => {
+            setAutoReleaseDayEmail(previousValue);
+          },
+        }
+      );
     },
-    [updateNotifications]
+    [updateNotifications, autoReleaseDayEmail]
   );
 
   return (

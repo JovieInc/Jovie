@@ -216,8 +216,7 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Disc3',
     label: 'Add a new release to my catalog',
-    prompt:
-      'I want to add a new release to my catalog. Help me set it up — ask me about the title, type, release date, and any other details you need.',
+    prompt: NEW_RELEASE_PROMPT,
     accent: 'green',
   },
 

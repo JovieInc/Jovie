@@ -619,6 +619,32 @@ export async function loadTracksForRelease(params: {
   );
 }
 
+/** Allowed release types for validation */
+const ALLOWED_RELEASE_TYPES = new Set([
+  'single',
+  'ep',
+  'album',
+  'compilation',
+  'live',
+  'mixtape',
+  'other',
+] as const);
+
+/** ISO date format regex (YYYY-MM-DD) */
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parse and validate an ISO date string.
+ * Returns null for invalid or missing dates.
+ */
+function parseValidDate(dateStr: string | undefined): Date | null {
+  if (!dateStr) return null;
+  if (!ISO_DATE_REGEX.test(dateStr)) return null;
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
 /**
  * Create a new release from the chat interface.
  * Generates a unique slug, sets sourceType to 'manual', and schedules a link scan.
@@ -654,6 +680,36 @@ export async function createReleaseFromChat(input: {
     throw new TypeError('Unauthorized');
   }
 
+  // Validate required fields
+  if (!input.title?.trim()) {
+    throw new TypeError('Title is required');
+  }
+
+  if (!ALLOWED_RELEASE_TYPES.has(input.releaseType)) {
+    throw new TypeError('Invalid release type');
+  }
+
+  // Validate and parse dates
+  const parsedReleaseDate = parseValidDate(input.releaseDate);
+  const parsedAnnouncementDate = parseValidDate(input.announcementDate);
+
+  // Validate date ordering if both are provided
+  if (
+    parsedAnnouncementDate &&
+    parsedReleaseDate &&
+    parsedAnnouncementDate > parsedReleaseDate
+  ) {
+    throw new TypeError('Announcement date must be on or before release date');
+  }
+
+  // Validate totalTracks if provided
+  if (
+    input.totalTracks !== undefined &&
+    (!Number.isInteger(input.totalTracks) || input.totalTracks < 0)
+  ) {
+    throw new TypeError('Total tracks must be a non-negative integer');
+  }
+
   const profile = await requireProfile();
   const slug = await generateUniqueSlug(profile.id, input.title, 'release');
 
@@ -671,7 +727,7 @@ export async function createReleaseFromChat(input: {
     title: input.title,
     slug,
     releaseType: input.releaseType,
-    releaseDate: input.releaseDate ? new Date(input.releaseDate) : null,
+    releaseDate: parsedReleaseDate,
     label: input.label ?? null,
     upc: input.upc ?? null,
     totalTracks: input.totalTracks ?? (input.releaseType === 'single' ? 1 : 0),
@@ -685,9 +741,7 @@ export async function createReleaseFromChat(input: {
   await db
     .update(discogReleases)
     .set({
-      announcementDate: input.announcementDate
-        ? new Date(input.announcementDate)
-        : null,
+      announcementDate: parsedAnnouncementDate,
       announceEmailEnabled: input.announceEmailEnabled ?? false,
       releaseDayEmailEnabled: input.releaseDayEmailEnabled ?? true,
       updatedAt: now,
@@ -696,18 +750,32 @@ export async function createReleaseFromChat(input: {
 
   // Schedule a link scan if we have ISRC or UPC for DSP matching
   if (input.isrc || input.upc) {
-    const releaseDate = input.releaseDate ? new Date(input.releaseDate) : null;
-    await db.insert(releaseLinkScans).values({
-      releaseId: release.id,
-      creatorProfileId: profile.id,
-      scanPhase: 'immediate',
-      nextScanAt: now, // Scan immediately
-      metadata: {
-        isrc: input.isrc ?? null,
-        upc: input.upc ?? null,
-        releaseDate: releaseDate?.toISOString() ?? null,
-      },
-    });
+    await db
+      .insert(releaseLinkScans)
+      .values({
+        releaseId: release.id,
+        creatorProfileId: profile.id,
+        scanPhase: 'immediate',
+        nextScanAt: now, // Scan immediately
+        metadata: {
+          isrc: input.isrc ?? null,
+          upc: input.upc ?? null,
+          releaseDate: parsedReleaseDate?.toISOString() ?? null,
+        },
+      })
+      .onConflictDoUpdate({
+        target: releaseLinkScans.releaseId,
+        set: {
+          nextScanAt: now,
+          scanPhase: 'immediate',
+          metadata: {
+            isrc: input.isrc ?? null,
+            upc: input.upc ?? null,
+            releaseDate: parsedReleaseDate?.toISOString() ?? null,
+          },
+          updatedAt: now,
+        },
+      });
   }
 
   // Invalidate caches
