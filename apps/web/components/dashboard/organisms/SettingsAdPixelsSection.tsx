@@ -18,7 +18,6 @@ const INPUT_CLASS =
 
 interface PlatformSectionProps {
   readonly platform: string;
-  readonly platformKey: PixelPlatform;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
   readonly pixelIdName: string;
@@ -38,7 +37,6 @@ interface PlatformSectionProps {
 
 function PlatformSection({
   platform,
-  platformKey,
   pixelIdLabel,
   pixelIdPlaceholder,
   pixelIdName,
@@ -327,7 +325,6 @@ export function SettingsAdPixelsSection() {
         <div className='space-y-4'>
           <PlatformSection
             platform='Facebook Conversions API'
-            platformKey='facebook'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
             pixelIdName='facebookPixelId'
@@ -351,7 +348,6 @@ export function SettingsAdPixelsSection() {
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
-            platformKey='google'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
             pixelIdName='googleMeasurementId'
@@ -373,7 +369,6 @@ export function SettingsAdPixelsSection() {
 
           <PlatformSection
             platform='TikTok Events API'
-            platformKey='tiktok'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
             pixelIdName='tiktokPixelId'
