@@ -8,6 +8,7 @@ import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
@@ -95,6 +96,10 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Admin creator social links error:', error);
+    await captureError('Admin social links update failed', error, {
+      route: '/api/admin/creator-social-links',
+      method: 'GET',
+    });
     return NextResponse.json(
       { success: false, error: 'Failed to load social links' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -261,6 +266,10 @@ export async function PUT(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Admin creator social links PUT error:', error);
+    await captureError('Admin social links update failed', error, {
+      route: '/api/admin/creator-social-links',
+      method: 'PUT',
+    });
     return NextResponse.json(
       { success: false, error: 'Failed to save social links' },
       { status: 500, headers: NO_STORE_HEADERS }

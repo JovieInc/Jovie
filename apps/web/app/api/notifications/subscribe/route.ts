@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSecureEnv } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   AUDIENCE_COOKIE_NAME,
@@ -81,6 +82,10 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     logger.error('[Notifications Subscribe] Error:', error);
+    await captureError('Notification subscription failed', error, {
+      route: '/api/notifications/subscribe',
+      method: 'POST',
+    });
     const response = NextResponse.json(
       {
         success: false,

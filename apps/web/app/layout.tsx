@@ -1,5 +1,4 @@
 import * as Sentry from '@sentry/nextjs';
-import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import Script from 'next/script';
@@ -139,12 +138,19 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const shouldInjectToolbar = env.NODE_ENV === 'development';
+  // Dynamic import gated on process.env.NODE_ENV so webpack eliminates the
+  // toolbar code from production bundles entirely. The static import that was
+  // here previously forced the @vercel/toolbar client runtime (which uses
+  // eval()) into every build, violating Content Security Policy.
+  const VercelToolbar =
+    process.env.NODE_ENV === 'development'
+      ? (await import('@vercel/toolbar/next')).VercelToolbar
+      : null;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const headContent = (
@@ -266,7 +272,7 @@ export default function RootLayout({
         <CoreProviders>{children}</CoreProviders>
 
         <CookieBannerSection />
-        {shouldInjectToolbar && <VercelToolbar />}
+        {VercelToolbar && <VercelToolbar />}
       </body>
     </html>
   );

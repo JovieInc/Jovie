@@ -9,6 +9,7 @@ import {
   clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   formatLocationString,
@@ -266,6 +267,12 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Dashboard Activity] Error loading recent actions', error);
+    if (!(error instanceof Error && error.message === 'Unauthorized')) {
+      await captureError('Recent activity fetch failed', error, {
+        route: '/api/dashboard/activity/recent',
+        method: 'GET',
+      });
+    }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },

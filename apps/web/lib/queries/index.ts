@@ -244,6 +244,7 @@ export {
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
 export {
+  useRefreshReleaseMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,

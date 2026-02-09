@@ -6,7 +6,7 @@ import { db, type TransactionType } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
-import { sanitizeErrorResponse } from '@/lib/error-tracking';
+import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -576,6 +576,10 @@ export async function POST(request: Request) {
     return successResponse({ status: 'new' });
   } catch (error) {
     logger.error('Waitlist API error', error);
+    await captureError('Waitlist signup failed', error, {
+      route: '/api/waitlist',
+      method: 'POST',
+    });
     return buildPostErrorResponse(error, isDev);
   }
 }

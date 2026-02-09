@@ -417,8 +417,11 @@ const nextConfig = {
   },
 };
 
-// Enable Vercel Toolbar in Next.js (local/dev)
-const enableVercelToolbar = !process.env.NEXT_DISABLE_TOOLBAR;
+// Enable Vercel Toolbar in Next.js (local/dev only)
+// The toolbar plugin must NOT run in production builds because it injects
+// client-side code that uses eval(), violating Content Security Policy.
+const enableVercelToolbar =
+  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;

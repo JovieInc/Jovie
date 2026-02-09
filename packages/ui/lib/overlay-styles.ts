@@ -24,16 +24,19 @@ export const overlayClassName = `${overlayStyles.base} ${overlayStyles.animation
  * Used for centered modal dialogs.
  */
 export const centeredContentStyles = {
-  position: 'fixed left-1/2 top-1/2 z-50 translate-x-[-50%] translate-y-[-50%]',
+  // Use CSS translate property directly (not Tailwind's CSS-variable-based
+  // translate utilities) to avoid a Chrome bug where translate with CSS vars
+  // fails to composite: https://github.com/shadcn-ui/ui/issues/7507
+  position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
   layout: 'grid w-full max-w-lg gap-4',
   surface: 'border border-subtle bg-surface-2 p-6 text-primary-token shadow-lg',
+  // fade + zoom only; slide animations conflict with the translate centering
+  // because tw-animate-css slide uses transform: translate3d() in keyframes
   animation:
     'duration-200 ' +
     'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
     'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
-    'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ' +
-    'data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] ' +
-    'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
+    'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
   rounded: 'rounded-xl sm:rounded-2xl',
   // Motion-reduced fallback
   reducedMotion: 'motion-reduce:animate-none motion-reduce:transition-opacity',
