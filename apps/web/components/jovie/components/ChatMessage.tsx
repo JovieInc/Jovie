@@ -26,13 +26,12 @@ interface ChatMessageProps {
  */
 function extractReleaseProposal(parts: MessagePart[]): ReleaseProposal | null {
   for (const part of parts) {
-    const p = part as unknown as Record<string, unknown>;
-    if (p.type !== 'tool-invocation') continue;
-    const invocation = p.toolInvocation as Record<string, unknown> | undefined;
-    if (!invocation) continue;
-    if (invocation.toolName !== 'proposeNewRelease') continue;
-    if (invocation.state !== 'result') continue;
-    const result = invocation.result as Record<string, unknown> | undefined;
+    if (part.type !== 'tool-invocation') continue;
+    const { toolInvocation } = part;
+    if (!toolInvocation) continue;
+    if (toolInvocation.toolName !== 'proposeNewRelease') continue;
+    if (toolInvocation.state !== 'result') continue;
+    const result = toolInvocation.result;
     if (!result?.success || !result.preview) continue;
     return result.preview as ReleaseProposal;
   }

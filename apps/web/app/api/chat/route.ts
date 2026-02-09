@@ -436,7 +436,7 @@ function createNewReleaseTool() {
     execute: async input => {
       return {
         success: true,
-        preview: { ...input },
+        preview: input,
       };
     },
   });

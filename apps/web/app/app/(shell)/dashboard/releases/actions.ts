@@ -160,6 +160,10 @@ function mapReleaseToViewModel(
     totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
     primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
     genres: extractGenres(release.metadata),
+    // Announcement & notification settings
+    announcementDate: release.announcementDate?.toISOString() ?? null,
+    announceEmailEnabled: release.announceEmailEnabled,
+    releaseDayEmailEnabled: release.releaseDayEmailEnabled,
   };
 }
 

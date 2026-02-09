@@ -67,13 +67,8 @@ function calculateNextScanTime(
   const msUntilRelease = releaseDate.getTime() - now.getTime();
   const daysUntilRelease = msUntilRelease / (1000 * 60 * 60 * 24);
 
-  if (daysUntilRelease > 7) {
-    // More than 7 days out: scan daily
-    return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  }
-
   if (daysUntilRelease > 3) {
-    // 3-7 days out: scan daily
+    // 3+ days before release: scan daily
     return new Date(now.getTime() + 24 * 60 * 60 * 1000);
   }
 

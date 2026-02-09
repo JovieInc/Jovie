@@ -68,6 +68,10 @@ export interface ReleaseViewModel {
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  // Announcement & notification settings
+  announcementDate?: string | null;
+  announceEmailEnabled?: boolean;
+  releaseDayEmailEnabled?: boolean;
 }
 
 /** Track view model for display in expandable release rows */

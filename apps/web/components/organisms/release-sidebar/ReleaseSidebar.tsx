@@ -156,18 +156,9 @@ export function ReleaseSidebar({
               <ReleaseMetadata release={release} />
 
               <ReleaseEmailSettings
-                announceEmailEnabled={
-                  ((release as unknown as Record<string, unknown>)
-                    .announceEmailEnabled as boolean) ?? false
-                }
-                releaseDayEmailEnabled={
-                  ((release as unknown as Record<string, unknown>)
-                    .releaseDayEmailEnabled as boolean) ?? true
-                }
-                hasAnnouncementDate={
-                  !!(release as unknown as Record<string, unknown>)
-                    .announcementDate
-                }
+                announceEmailEnabled={release.announceEmailEnabled ?? false}
+                releaseDayEmailEnabled={release.releaseDayEmailEnabled ?? true}
+                hasAnnouncementDate={!!release.announcementDate}
                 hasReleaseDate={!!release.releaseDate}
                 releaseDateLabel={release.releaseDate ?? undefined}
                 readOnly={!isEditable}
