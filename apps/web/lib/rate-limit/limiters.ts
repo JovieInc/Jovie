@@ -476,6 +476,54 @@ export async function checkAdminCreatorIngestRateLimit(
   );
 }
 
+// ============================================================================
+// Account Operations (GDPR)
+// ============================================================================
+
+/**
+ * Rate limiter for account deletion
+ * CRITICAL: 3 attempts per day per user - destructive operation
+ */
+export const accountDeleteLimiter = createRateLimiter(
+  RATE_LIMITERS.accountDelete
+);
+
+/**
+ * Rate limiter for account data export
+ * Limit: 5 exports per hour per user - protects against abuse
+ */
+export const accountExportLimiter = createRateLimiter(
+  RATE_LIMITERS.accountExport
+);
+
+/**
+ * Check account deletion rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAccountDeleteRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    accountDeleteLimiter,
+    userId,
+    'Too many deletion attempts. Please try again later.'
+  );
+}
+
+/**
+ * Check account export rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAccountExportRateLimit(
+  userId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    accountExportLimiter,
+    userId,
+    'Too many export requests. Please try again later.'
+  );
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -506,5 +554,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
+    accountDelete: accountDeleteLimiter,
+    accountExport: accountExportLimiter,
   };
 }
