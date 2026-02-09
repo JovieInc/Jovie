@@ -9,6 +9,8 @@ export interface ReleaseProviderMatrixProps {
   readonly primaryProviders: ProviderKey[];
   readonly spotifyConnected?: boolean;
   readonly spotifyArtistName?: string | null;
+  readonly appleMusicConnected?: boolean;
+  readonly appleMusicArtistName?: string | null;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

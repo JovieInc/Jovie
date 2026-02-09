@@ -2,16 +2,19 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import type { AvailableDSP } from '@/lib/dsp';
 import {
   type ProfileNextAction,
   resolveProfileNextAction,
 } from '@/lib/profile-next-action';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import { ListenDrawer } from './ListenDrawer';
 
 const ArtistNotificationsCTA = dynamic(
   () =>
@@ -53,6 +56,9 @@ type ProfilePrimaryCTAProps = {
   readonly spotifyPreferred?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly showCapture?: boolean;
+  /** Pre-computed merged DSPs for the mobile listen drawer */
+  readonly mergedDSPs?: AvailableDSP[];
+  readonly enableDynamicEngagement?: boolean;
 };
 
 const ctaLinkClass =
@@ -64,7 +70,11 @@ export function ProfilePrimaryCTA({
   spotifyPreferred: spotifyPreferredProp,
   autoOpenCapture = true,
   showCapture = true,
+  mergedDSPs,
+  enableDynamicEngagement = false,
 }: ProfilePrimaryCTAProps) {
+  const isMobile = useBreakpointDown('md');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   // Read spotify preference from client-side cookie (or use prop as fallback)
   const spotifyPreferredFromCookie = useSpotifyPreferred();
   const spotifyPreferred = spotifyPreferredProp ?? spotifyPreferredFromCookie;
@@ -154,6 +164,32 @@ export function ProfilePrimaryCTA({
     );
   }
 
+  // Mobile: open bottom drawer instead of navigating
+  if (isMobile && mergedDSPs && mergedDSPs.length > 0) {
+    return (
+      <div className='space-y-4'>
+        <div className='flex justify-center'>
+          <button
+            type='button'
+            onClick={() => setDrawerOpen(true)}
+            className={cn(ctaLinkClass, 'max-w-sm')}
+            aria-label='Open music streaming links'
+          >
+            Listen now
+          </button>
+        </div>
+        <ListenDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          artist={artist}
+          dsps={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+        />
+      </div>
+    );
+  }
+
+  // Desktop: navigate to listen page
   return (
     <div className='space-y-4'>
       <div className='flex justify-center'>

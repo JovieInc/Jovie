@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -11,6 +12,7 @@ import {
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { CategoryOption } from './ProfileLinkCategorySelector';
 
 export interface ProfileLinkListProps {
@@ -94,6 +96,8 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   // Get platform brand color
   const iconMeta = getPlatformIconMetadata(link.platform);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <div
@@ -106,7 +110,11 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
       <div className='flex items-center gap-3 min-w-0'>
         <span
           className='shrink-0'
-          style={brandColor ? { color: brandColor } : undefined}
+          style={
+            brandColor
+              ? { color: getContrastSafeIconColor(brandColor, isDark) }
+              : undefined
+          }
         >
           <SocialIcon platform={link.platform} className='h-4 w-4' />
         </span>

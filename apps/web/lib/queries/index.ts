@@ -81,6 +81,13 @@ export {
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
 export {
+  type AppleMusicArtistResult,
+  type AppleMusicSearchState,
+  type UseAppleMusicArtistSearchQueryOptions,
+  type UseAppleMusicArtistSearchQueryReturn,
+  useAppleMusicArtistSearchQuery,
+} from './useAppleMusicArtistSearchQuery';
+export {
   type ArtistSearchState,
   type SpotifyArtistResult,
   type UseArtistSearchQueryOptions,
@@ -235,7 +242,6 @@ export {
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
-// eslint-disable-next-line import/no-cycle -- barrel re-export
 export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {

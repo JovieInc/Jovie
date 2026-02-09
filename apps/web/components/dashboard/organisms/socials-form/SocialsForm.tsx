@@ -12,9 +12,11 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { Plus, Share2, Trash2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
 
@@ -87,6 +89,8 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     handleUrlBlur,
     addSocialLink,
   } = useSocialsForm({ artistId: artist.id });
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   if (loading) {
     return (
@@ -143,7 +147,10 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                         ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
                         : undefined,
                       color: PLATFORM_METADATA_MAP[link.platform]
-                        ? `#${PLATFORM_METADATA_MAP[link.platform].color}`
+                        ? getContrastSafeIconColor(
+                            `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                            isDark
+                          )
                         : undefined,
                     }}
                   >

@@ -396,7 +396,7 @@ export function AdminCreatorProfilesUnified({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex'
+        className=''
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar

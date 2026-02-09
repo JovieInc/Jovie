@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { cn } from '@/lib/utils';
-import { isBrandDark } from '@/lib/utils/color';
+import { getContrastTextOnBrand } from '@/lib/utils/color';
 
 import type { ExtractedLinkInfo } from './useMultiLinkPaste';
 
@@ -76,7 +76,6 @@ function LinkItem({
 
   const iconMeta = getPlatformIconMetadata(platform.icon);
   const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-  const isDark = isBrandDark(iconHex);
 
   const isDisabled = isDuplicate;
   const isChecked = isSelected && !isDuplicate;
@@ -106,7 +105,7 @@ function LinkItem({
         className='flex h-6 w-6 shrink-0 items-center justify-center rounded'
         style={{
           backgroundColor: iconHex,
-          color: isDark ? '#ffffff' : '#0f172a',
+          color: getContrastTextOnBrand(iconHex),
         }}
       >
         <SocialIcon platform={platform.icon} className='h-3.5 w-3.5' />
