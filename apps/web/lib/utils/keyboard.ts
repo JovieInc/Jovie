@@ -7,12 +7,16 @@ import type React from 'react';
 export function isFormElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    tag === 'SELECT' ||
-    target.isContentEditable
-  );
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  // Walk up DOM tree to check for contentEditable (handles inheritance)
+  let el: HTMLElement | null = target;
+  while (el) {
+    const ce = el.contentEditable;
+    if (ce === 'true' || ce === 'plaintext-only') return true;
+    if (ce === 'false') return false;
+    el = el.parentElement;
+  }
+  return false;
 }
 
 /**
