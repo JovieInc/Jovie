@@ -576,7 +576,10 @@ export async function POST(request: Request) {
     return successResponse({ status: 'new' });
   } catch (error) {
     logger.error('Waitlist API error', error);
-    await captureError('Waitlist signup failed', error, { route: '/api/waitlist', method: 'POST' });
+    await captureError('Waitlist signup failed', error, {
+      route: '/api/waitlist',
+      method: 'POST',
+    });
     return buildPostErrorResponse(error, isDev);
   }
 }

@@ -7,9 +7,9 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
-import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -82,10 +82,14 @@ export async function POST() {
     );
   } catch (error) {
     logger.error('Error creating billing portal session:', error);
-    await captureCriticalError('Stripe billing portal session creation failed', error, {
-      route: '/api/stripe/portal',
-      method: 'POST',
-    });
+    await captureCriticalError(
+      'Stripe billing portal session creation failed',
+      error,
+      {
+        route: '/api/stripe/portal',
+        method: 'POST',
+      }
+    );
 
     // Return appropriate error based on the error type
     if (error instanceof Error) {

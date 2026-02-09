@@ -5,9 +5,9 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache } from '@/lib/cache';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { buildSeoFilename } from '@/lib/images/config';
 import { avatarUploadLimiter } from '@/lib/rate-limit';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   AVIF_MIME_TYPE,
@@ -228,7 +228,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('Avatar upload error:', error);
-    await captureError('Avatar upload failed', error, { route: '/api/images/upload', method: 'POST' });
+    await captureError('Avatar upload failed', error, {
+      route: '/api/images/upload',
+      method: 'POST',
+    });
 
     if (error instanceof Error && error.message === 'Unauthorized') {
       return errorResponse(

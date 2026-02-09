@@ -61,7 +61,10 @@ export async function GET(req: Request) {
     logger.error('Error listing conversations:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to list conversations', error, { route: '/api/chat/conversations', method: 'GET' });
+      await captureError('Failed to list conversations', error, {
+        route: '/api/chat/conversations',
+        method: 'GET',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {
@@ -157,7 +160,10 @@ export async function POST(req: Request) {
     logger.error('Error creating conversation:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to create conversation', error, { route: '/api/chat/conversations', method: 'POST' });
+      await captureError('Failed to create conversation', error, {
+        route: '/api/chat/conversations',
+        method: 'POST',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {

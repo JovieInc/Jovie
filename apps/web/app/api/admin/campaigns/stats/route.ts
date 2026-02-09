@@ -477,7 +477,10 @@ export async function GET(request: Request) {
     logger.error('[Campaign Stats] Failed to fetch stats', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    await captureError('Admin campaign stats failed', error, { route: '/api/admin/campaigns/stats', method: 'GET' });
+    await captureError('Admin campaign stats failed', error, {
+      route: '/api/admin/campaigns/stats',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to fetch campaign stats' },

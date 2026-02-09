@@ -5,8 +5,8 @@ import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { env } from '@/lib/env-server';
-import { logger } from '@/lib/utils/logger';
 import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -196,7 +196,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('[schedule-release-notifications] Scheduling failed:', error);
-    await captureError('Release notification scheduling cron failed', error, { route: '/api/cron/schedule-release-notifications', method: 'GET' });
+    await captureError('Release notification scheduling cron failed', error, {
+      route: '/api/cron/schedule-release-notifications',
+      method: 'GET',
+    });
     return NextResponse.json(
       {
         success: false,

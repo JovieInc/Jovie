@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
 import {
@@ -34,7 +35,6 @@ import {
   checkAdminCreatorIngestRateLimit,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
@@ -348,7 +348,10 @@ export async function POST(request: Request) {
       raw: error,
       route: 'creator-ingest',
     });
-    await captureError('Admin creator ingest failed', error, { route: '/api/admin/creator-ingest', method: 'POST' });
+    await captureError('Admin creator ingest failed', error, {
+      route: '/api/admin/creator-ingest',
+      method: 'POST',
+    });
 
     // Check for unique constraint violation (race condition fallback)
     if (

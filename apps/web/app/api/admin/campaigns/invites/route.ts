@@ -279,7 +279,10 @@ export async function GET(request: NextRequest) {
     logger.error('[Campaign Invites] Failed to fetch invites', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    await captureError('Admin campaign invites failed', error, { route: '/api/admin/campaigns/invites', method: 'GET' });
+    await captureError('Admin campaign invites failed', error, {
+      route: '/api/admin/campaigns/invites',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to fetch invites' },

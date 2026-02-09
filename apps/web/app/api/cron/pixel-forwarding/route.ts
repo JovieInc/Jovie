@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -55,7 +55,10 @@ export async function GET(request: Request) {
     const duration = Date.now() - startTime;
 
     logger.error('[pixel-forwarding] Processing failed:', error);
-    await captureError('Pixel forwarding cron failed', error, { route: '/api/cron/pixel-forwarding', method: 'GET' });
+    await captureError('Pixel forwarding cron failed', error, {
+      route: '/api/cron/pixel-forwarding',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       {

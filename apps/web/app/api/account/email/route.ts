@@ -5,8 +5,8 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
-import { parseJsonBody } from '@/lib/http/parse-json';
 import { captureError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 

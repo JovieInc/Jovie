@@ -99,7 +99,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   } catch (error) {
     logger.error('Photo status check error:', error);
-    await captureError('Image status fetch failed', error, { route: '/api/images/status/[id]', method: 'GET' });
+    await captureError('Image status fetch failed', error, {
+      route: '/api/images/status/[id]',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to check status' },
       { status: 500, headers: NO_STORE_HEADERS }

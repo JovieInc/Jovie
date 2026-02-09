@@ -44,7 +44,10 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
     );
   } catch (error) {
     logger.error('Error fetching performance metrics:', error);
-    await captureError('Performance monitoring failed', error, { route: '/api/monitoring/performance', method: 'GET' });
+    await captureError('Performance monitoring failed', error, {
+      route: '/api/monitoring/performance',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to fetch performance metrics' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -20,7 +20,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-
+import { captureCriticalError } from '@/lib/error-tracking';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import {
   cancelScheduledPlanChange,
@@ -28,7 +28,6 @@ import {
   getActiveSubscription,
   getAvailablePlanChanges,
 } from '@/lib/stripe/plan-change';
-import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -242,10 +241,14 @@ export async function DELETE() {
     );
   } catch (error) {
     logger.error('Error cancelling scheduled plan change', error);
-    await captureCriticalError('Failed to cancel scheduled plan change', error, {
-      route: '/api/stripe/plan-change',
-      method: 'DELETE',
-    });
+    await captureCriticalError(
+      'Failed to cancel scheduled plan change',
+      error,
+      {
+        route: '/api/stripe/plan-change',
+        method: 'DELETE',
+      }
+    );
     return NextResponse.json(
       { error: 'Failed to cancel scheduled change' },
       { status: 500, headers: NO_STORE_HEADERS }

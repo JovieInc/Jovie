@@ -11,12 +11,12 @@ import {
 import { db } from '@/lib/db';
 import { audienceMembers } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicVisitLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 import { visitSchema } from '@/lib/validation/schemas';
 import {
   createFingerprint,
@@ -251,7 +251,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('[Audience Visit] Error', error);
-    await captureError('Audience visit tracking failed', error, { route: '/api/audience/visit', method: 'POST' });
+    await captureError('Audience visit tracking failed', error, {
+      route: '/api/audience/visit',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Unable to record visit' },
       { status: 500, headers: NO_STORE_HEADERS }

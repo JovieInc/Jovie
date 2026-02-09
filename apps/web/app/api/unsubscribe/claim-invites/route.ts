@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUnsubscribeToken } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '@/lib/email/utils';
-import { addSuppression } from '@/lib/notifications/suppression';
 import { captureError } from '@/lib/error-tracking';
+import { addSuppression } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -148,7 +148,10 @@ export async function POST(request: NextRequest) {
     logger.error('Error processing unsubscribe request', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    await captureError('Unsubscribe claim invites failed', error, { route: '/api/unsubscribe/claim-invites', method: 'POST' });
+    await captureError('Unsubscribe claim invites failed', error, {
+      route: '/api/unsubscribe/claim-invites',
+      method: 'POST',
+    });
 
     return new NextResponse(
       renderHtmlPage({

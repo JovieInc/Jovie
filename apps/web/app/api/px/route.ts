@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
 
@@ -150,7 +150,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[Pixel] Error recording event', error);
-    await captureError('Pixel tracking failed', error, { route: '/api/px', method: 'POST' });
+    await captureError('Pixel tracking failed', error, {
+      route: '/api/px',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to record event' },
       { status: 500, headers: NO_STORE_HEADERS }

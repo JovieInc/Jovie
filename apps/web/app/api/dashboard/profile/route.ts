@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
-import { parseJsonBody } from '@/lib/http/parse-json';
 import { captureError } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import type { ProfileUpdateInput } from './lib';
 import {

@@ -2,11 +2,11 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { ingestionRerunSchema } from '@/lib/validation/schemas';
@@ -99,7 +99,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     logger.error('Failed to rerun ingestion job', error);
-    await captureError('Admin creator re-ingest failed', error, { route: '/api/admin/creator-ingest/rerun', method: 'POST' });
+    await captureError('Admin creator re-ingest failed', error, {
+      route: '/api/admin/creator-ingest/rerun',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to queue ingestion job' },
       { status: 500, headers: NO_STORE_HEADERS }

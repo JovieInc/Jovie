@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
@@ -9,7 +10,6 @@ import {
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -108,7 +108,10 @@ export async function POST(request: NextRequest) {
           ? { message: error.message, stack: error.stack }
           : String(error),
     });
-    await captureError('Ingestion job processing failed', error, { route: '/api/ingestion/jobs', method: 'POST' });
+    await captureError('Ingestion job processing failed', error, {
+      route: '/api/ingestion/jobs',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Failed to process ingestion jobs' },
       { status: 500, headers: NO_STORE_HEADERS }

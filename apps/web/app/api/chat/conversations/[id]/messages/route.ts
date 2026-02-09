@@ -6,9 +6,9 @@ import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import { captureError } from '@/lib/error-tracking';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -194,7 +194,10 @@ export async function POST(req: Request, { params }: RouteParams) {
     logger.error('Error adding message:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Chat messages fetch failed', error, { route: '/api/chat/conversations/[id]/messages', method: 'POST' });
+      await captureError('Chat messages fetch failed', error, {
+        route: '/api/chat/conversations/[id]/messages',
+        method: 'POST',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {

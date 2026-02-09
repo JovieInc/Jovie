@@ -100,7 +100,10 @@ export async function GET(req: Request, { params }: RouteParams) {
     logger.error('Error fetching conversation:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to fetch conversation', error, { route: '/api/chat/conversations/[id]', method: 'GET' });
+      await captureError('Failed to fetch conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'GET',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {
@@ -175,7 +178,10 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     logger.error('Error updating conversation:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to update conversation', error, { route: '/api/chat/conversations/[id]', method: 'PATCH' });
+      await captureError('Failed to update conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'PATCH',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {
@@ -234,7 +240,10 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     logger.error('Error deleting conversation:', error);
 
     if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to delete conversation', error, { route: '/api/chat/conversations/[id]', method: 'DELETE' });
+      await captureError('Failed to delete conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'DELETE',
+      });
     }
 
     if (error instanceof TypeError && error.message === 'User not found') {

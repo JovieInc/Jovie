@@ -18,7 +18,6 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
-import { captureError } from '@/lib/error-tracking';
 import {
   getProviderLink,
   getReleaseById,
@@ -39,6 +38,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getDashboardData } from '../actions';

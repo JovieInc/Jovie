@@ -11,10 +11,9 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-
+import { captureCriticalError } from '@/lib/error-tracking';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { previewPlanChange } from '@/lib/stripe/plan-change';
-import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';

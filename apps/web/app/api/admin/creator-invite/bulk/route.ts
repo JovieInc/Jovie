@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { creatorClaimInvites } from '@/lib/db/schema/profiles';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   bulkInviteSchema,
@@ -240,7 +240,10 @@ export async function POST(request: Request) {
       error: errorMessage,
       raw: error,
     });
-    await captureError('Admin bulk invite failed', error, { route: '/api/admin/creator-invite/bulk', method: 'POST' });
+    await captureError('Admin bulk invite failed', error, {
+      route: '/api/admin/creator-invite/bulk',
+      method: 'POST',
+    });
 
     return NextResponse.json(
       { error: 'Failed to create bulk invites', details: errorMessage },
@@ -307,7 +310,10 @@ export async function GET(request: Request) {
       error: errorMessage,
       raw: error,
     });
-    await captureError('Admin bulk invite failed', error, { route: '/api/admin/creator-invite/bulk', method: 'GET' });
+    await captureError('Admin bulk invite failed', error, {
+      route: '/api/admin/creator-invite/bulk',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to fetch eligible profiles' },

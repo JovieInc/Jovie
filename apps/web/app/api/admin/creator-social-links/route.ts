@@ -96,7 +96,10 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Admin creator social links error:', error);
-    await captureError('Admin social links update failed', error, { route: '/api/admin/creator-social-links', method: 'GET' });
+    await captureError('Admin social links update failed', error, {
+      route: '/api/admin/creator-social-links',
+      method: 'GET',
+    });
     return NextResponse.json(
       { success: false, error: 'Failed to load social links' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -263,7 +266,10 @@ export async function PUT(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Admin creator social links PUT error:', error);
-    await captureError('Admin social links update failed', error, { route: '/api/admin/creator-social-links', method: 'PUT' });
+    await captureError('Admin social links update failed', error, {
+      route: '/api/admin/creator-social-links',
+      method: 'PUT',
+    });
     return NextResponse.json(
       { success: false, error: 'Failed to save social links' },
       { status: 500, headers: NO_STORE_HEADERS }

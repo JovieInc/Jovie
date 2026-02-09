@@ -4,8 +4,8 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getAvailablePricing } from '@/lib/stripe/config';
 import { captureError } from '@/lib/error-tracking';
+import { getAvailablePricing } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';

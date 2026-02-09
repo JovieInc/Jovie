@@ -5,9 +5,9 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
-import { captureError } from '@/lib/error-tracking';
 import { encryptPII } from '@/lib/utils/pii-encryption';
 
 export const runtime = 'nodejs';
@@ -114,7 +114,10 @@ export async function GET() {
   } catch (error) {
     logger.error('[Pixels GET] Error fetching pixel settings:', error);
     if (!(error instanceof Error && error.message === 'Unauthorized')) {
-      await captureError('Pixel management failed', error, { route: '/api/dashboard/pixels', method: 'GET' });
+      await captureError('Pixel management failed', error, {
+        route: '/api/dashboard/pixels',
+        method: 'GET',
+      });
     }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
@@ -252,7 +255,10 @@ export async function PUT(req: Request) {
   } catch (error) {
     logger.error('[Pixels PUT] Error updating pixel settings:', error);
     if (!(error instanceof Error && error.message === 'Unauthorized')) {
-      await captureError('Pixel management failed', error, { route: '/api/dashboard/pixels', method: 'PUT' });
+      await captureError('Pixel management failed', error, {
+        route: '/api/dashboard/pixels',
+        method: 'PUT',
+      });
     }
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(

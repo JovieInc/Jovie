@@ -9,8 +9,8 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
-import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { captureError } from '@/lib/error-tracking';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for crypto operations
@@ -103,7 +103,10 @@ export async function GET(request: NextRequest) {
     logger.error('[Email Open Track] Unexpected error', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    await captureError('Email open tracking failed', error, { route: '/api/email/track/open', method: 'GET' });
+    await captureError('Email open tracking failed', error, {
+      route: '/api/email/track/open',
+      method: 'GET',
+    });
     return gifResponse();
   }
 }

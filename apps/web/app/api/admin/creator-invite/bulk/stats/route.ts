@@ -200,7 +200,10 @@ export async function GET() {
       error: errorMessage,
       raw: error,
     });
-    await captureError('Admin bulk invite stats failed', error, { route: '/api/admin/creator-invite/bulk/stats', method: 'GET' });
+    await captureError('Admin bulk invite stats failed', error, {
+      route: '/api/admin/creator-invite/bulk/stats',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to fetch campaign stats' },
