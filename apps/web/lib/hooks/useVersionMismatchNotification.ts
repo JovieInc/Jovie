@@ -24,7 +24,7 @@ const NOTIFICATION_DELAY_MS = 10_000; // 10 seconds delay before showing
 export function useVersionMismatchNotification() {
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showNotification = useCallback(() => {
+  const showNotification = useCallback((version?: string) => {
     // Check if user previously dismissed this session
     try {
       if (sessionStorage.getItem(DISMISSAL_KEY)) {
@@ -34,7 +34,8 @@ export function useVersionMismatchNotification() {
       // sessionStorage not available (SSR or private browsing)
     }
 
-    toast.info('A new version is available', {
+    const title = version ? `Version ${version} is available` : 'A new version is available';
+    toast.info(title, {
       id: TOAST_ID,
       duration: Infinity,
       description: 'Refresh to get the latest features and fixes.',
@@ -55,7 +56,7 @@ export function useVersionMismatchNotification() {
   }, []);
 
   const handleVersionMismatch = useCallback(
-    (_info: VersionMismatchInfo) => {
+    (info: VersionMismatchInfo) => {
       // Clear any pending timeout
       if (notificationTimeoutRef.current) {
         clearTimeout(notificationTimeoutRef.current);
@@ -63,7 +64,7 @@ export function useVersionMismatchNotification() {
 
       // Delay notification to avoid jarring immediate display
       notificationTimeoutRef.current = setTimeout(() => {
-        showNotification();
+        showNotification(info.newVersion);
       }, NOTIFICATION_DELAY_MS);
     },
     [showNotification]

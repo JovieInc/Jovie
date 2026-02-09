@@ -57,7 +57,10 @@
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
     "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
-    "knip": "knip"
+    "knip": "knip",
+    "version:patch": "node scripts/version-bump.mjs patch",
+    "version:minor": "node scripts/version-bump.mjs minor",
+    "version:major": "node scripts/version-bump.mjs major"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",

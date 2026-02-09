@@ -20,9 +20,10 @@ const NOTIFICATION_DELAY_MS = 10_000; // 10 seconds delay before showing
  */
 export function VersionUpdateBannerWrapper() {
   const [showBanner, setShowBanner] = useState(false);
+  const [newVersion, setNewVersion] = useState<string | undefined>();
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleVersionMismatch = useCallback((_info: VersionMismatchInfo) => {
+  const handleVersionMismatch = useCallback((info: VersionMismatchInfo) => {
     // Check if user previously dismissed this session
     try {
       if (sessionStorage.getItem(DISMISSAL_KEY)) {
@@ -39,6 +40,7 @@ export function VersionUpdateBannerWrapper() {
 
     // Delay notification to avoid jarring immediate display
     notificationTimeoutRef.current = setTimeout(() => {
+      setNewVersion(info.newVersion);
       setShowBanner(true);
     }, NOTIFICATION_DELAY_MS);
   }, []);
@@ -74,6 +76,6 @@ export function VersionUpdateBannerWrapper() {
   }
 
   return (
-    <VersionUpdateBanner onReload={handleReload} onDismiss={handleDismiss} />
+    <VersionUpdateBanner version={newVersion} onReload={handleReload} onDismiss={handleDismiss} />
   );
 }

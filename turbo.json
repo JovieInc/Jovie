@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local", ".nvmrc", "pnpm-lock.yaml"],
+  "globalDependencies": ["**/.env.*local", ".nvmrc", "pnpm-lock.yaml", "version.json"],
   "ui": "tui",
   "daemon": true,
   "remoteCache": {
