@@ -122,8 +122,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
       },
       ...utmShareItems,
       {
-        id: 'separator-1',
-        label: 'separator',
+        id: 'separator',
+        label: '',
         onClick: () => {},
       },
       {
