@@ -224,7 +224,7 @@
     "danger": "^13.0.4",
     "drizzle-kit": "^0.31.8",
     "drizzle-zod": "^0.8.3",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.1.6",
     "eslint-plugin-storybook": "^10.1.4",
     "glob": "^11.0.3",
