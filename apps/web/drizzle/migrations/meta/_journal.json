@@ -183,6 +183,13 @@
       "when": 1770497158714,
       "tag": "0025_adorable_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1770671504667,
+      "tag": "0026_small_tombstone",
+      "breakpoints": true
     }
   ]
 }

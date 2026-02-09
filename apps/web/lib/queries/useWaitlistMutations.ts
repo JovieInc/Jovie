@@ -25,6 +25,7 @@ export interface WaitlistSubmitInput {
   primaryGoal: string;
   primarySocialUrl: string;
   spotifyUrl: string | null;
+  spotifyArtistName: string | null;
   heardAbout: string | null;
   selectedPlan: string | null;
 }

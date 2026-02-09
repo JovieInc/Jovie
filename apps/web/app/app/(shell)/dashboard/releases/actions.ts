@@ -781,7 +781,7 @@ export async function connectAppleMusicArtist(params: {
         totalTracksChecked: 0,
         status: 'confirmed',
         confirmedAt: now,
-        confirmedBy: userId,
+        confirmedBy: profile.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -797,7 +797,7 @@ export async function connectAppleMusicArtist(params: {
           externalArtistImageUrl: sanitizedImageUrl,
           status: 'confirmed',
           confirmedAt: now,
-          confirmedBy: userId,
+          confirmedBy: profile.id,
           updatedAt: now,
         },
       });

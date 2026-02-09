@@ -158,6 +158,8 @@ export const waitlistRequestSchema = z.object({
   primarySocialUrl: httpUrlSchema,
   /** Optional Spotify profile URL */
   spotifyUrl: httpUrlSchema.optional().nullable(),
+  /** Optional Spotify artist display name (from search selection) */
+  spotifyArtistName: z.string().trim().max(200).optional().nullable(),
   /** How the user heard about us (max 280 chars) */
   heardAbout: z.string().trim().max(280).optional().nullable(),
   /** Selected pricing plan interest */

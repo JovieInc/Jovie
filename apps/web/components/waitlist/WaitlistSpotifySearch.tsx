@@ -24,6 +24,7 @@ import type { FormErrors } from './types';
 interface WaitlistSpotifySearchProps {
   readonly spotifyUrl: string;
   readonly onUrlChange: (url: string) => void;
+  readonly onArtistNameChange: (name: string | null) => void;
   readonly fieldErrors: FormErrors;
   readonly isSubmitting: boolean;
   readonly isHydrating: boolean;
@@ -42,6 +43,7 @@ function formatFollowers(count: number | undefined): string {
 export function WaitlistSpotifySearch({
   spotifyUrl,
   onUrlChange,
+  onArtistNameChange,
   fieldErrors,
   isSubmitting,
   isHydrating,
@@ -103,13 +105,14 @@ export function WaitlistSpotifySearch({
     (artist: SpotifyArtistResult) => {
       onUrlChange(artist.url);
       setSelectedArtistName(artist.name);
+      onArtistNameChange(artist.name);
       setSearchQuery('');
       setShowResults(false);
       setActiveIndex(-1);
       clear();
       setMode('url');
     },
-    [onUrlChange, clear]
+    [onUrlChange, onArtistNameChange, clear]
   );
 
   const handleManualAddClick = useCallback(() => {
@@ -126,8 +129,9 @@ export function WaitlistSpotifySearch({
     setMode('search');
     onUrlChange('');
     setSelectedArtistName(null);
+    onArtistNameChange(null);
     setTimeout(() => inputRef.current?.focus(), 0);
-  }, [onUrlChange]);
+  }, [onUrlChange, onArtistNameChange]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -183,8 +187,9 @@ export function WaitlistSpotifySearch({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onUrlChange(e.target.value);
       setSelectedArtistName(null);
+      onArtistNameChange(null);
     },
-    [onUrlChange]
+    [onUrlChange, onArtistNameChange]
   );
 
   // Determine if dropdown should show
