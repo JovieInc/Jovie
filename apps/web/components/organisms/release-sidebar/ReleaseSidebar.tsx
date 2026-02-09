@@ -166,21 +166,21 @@ export function ReleaseSidebar({
 
               <div className='pt-5'>
                 <ReleaseDspLinks
-                release={release}
-                providerConfig={providerConfig}
-                isEditable={isEditable}
-                isAddingLink={isAddingLink}
-                newLinkUrl={newLinkUrl}
-                selectedProvider={selectedProvider}
-                isAddingDspLink={isAddingDspLink}
-                isRemovingDspLink={isRemovingDspLink}
-                onSetIsAddingLink={setIsAddingLink}
-                onSetNewLinkUrl={setNewLinkUrl}
-                onSetSelectedProvider={setSelectedProvider}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                onNewLinkKeyDown={handleNewLinkKeyDown}
-              />
+                  release={release}
+                  providerConfig={providerConfig}
+                  isEditable={isEditable}
+                  isAddingLink={isAddingLink}
+                  newLinkUrl={newLinkUrl}
+                  selectedProvider={selectedProvider}
+                  isAddingDspLink={isAddingDspLink}
+                  isRemovingDspLink={isRemovingDspLink}
+                  onSetIsAddingLink={setIsAddingLink}
+                  onSetNewLinkUrl={setNewLinkUrl}
+                  onSetSelectedProvider={setSelectedProvider}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                  onNewLinkKeyDown={handleNewLinkKeyDown}
+                />
               </div>
 
               {isEditable && onSave && (

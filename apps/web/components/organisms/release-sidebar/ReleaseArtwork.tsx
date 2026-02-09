@@ -63,7 +63,10 @@ export function ReleaseArtwork({
         </div>
       )}
       <div className='min-w-0 flex-1'>
-        <TruncatedText lines={1} className='text-sm font-medium text-primary-token'>
+        <TruncatedText
+          lines={1}
+          className='text-sm font-medium text-primary-token'
+        >
           {title || 'Untitled'}
         </TruncatedText>
         {artistName && (
