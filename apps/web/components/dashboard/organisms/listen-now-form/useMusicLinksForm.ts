@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ALL_PLATFORMS } from '@/constants/platforms';
 import { useProfileMutation } from '@/lib/queries';
 import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
 } from '@/lib/queries/useDashboardSocialLinksQuery';
+import { useDspMatchesQuery } from '@/lib/queries/useDspMatchesQuery';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { Artist, CreatorProfile } from '@/types/db';
 import { convertCreatorProfileToArtist } from '@/types/db';
@@ -23,6 +24,13 @@ export interface AdditionalDSPLink {
   id: string;
   platform: string;
   url: string;
+}
+
+/** Connected artist info from a confirmed DSP match. */
+export interface ConnectedDspInfo {
+  artistName: string;
+  artistImageUrl: string | null;
+  externalUrl: string | null;
 }
 
 /** Music platform IDs from the platform registry. */
@@ -47,6 +55,8 @@ export interface UseMusicLinksFormReturn {
   primaryFields: PrimaryDSPFields;
   /** Additional music DSP links. */
   additionalLinks: AdditionalDSPLink[];
+  /** Connected artist info keyed by provider ID (spotify, apple_music, etc.) */
+  connectedDspInfo: Record<string, ConnectedDspInfo>;
   /** Update a primary DSP field. */
   updatePrimaryField: (key: keyof PrimaryDSPFields, value: string) => void;
   /** Schedule URL normalization for a primary field. */
@@ -104,6 +114,29 @@ export function useMusicLinksForm({
   // Fetch existing social links to extract music DSPs
   const { data: fetchedLinks, isLoading: isFetchingLinks } =
     useDashboardSocialLinksQuery(artist.id);
+
+  // Fetch DSP matches for connected artist info
+  const { data: dspMatches } = useDspMatchesQuery({
+    profileId: artist.id,
+    status: 'all',
+    enabled: !!artist.id,
+  });
+
+  // Build connected DSP info from confirmed matches
+  const connectedDspInfo = useMemo(() => {
+    const info: Record<string, ConnectedDspInfo> = {};
+    if (!dspMatches) return info;
+    for (const match of dspMatches) {
+      if (match.status === 'confirmed' || match.status === 'auto_confirmed') {
+        info[match.providerId] = {
+          artistName: match.externalArtistName,
+          artistImageUrl: match.externalArtistImageUrl,
+          externalUrl: match.externalArtistUrl,
+        };
+      }
+    }
+    return info;
+  }, [dspMatches]);
 
   // Profile mutation for primary DSPs
   const { mutate: updateProfile, isPending: isProfileSaving } =
@@ -310,6 +343,7 @@ export function useMusicLinksForm({
   return {
     primaryFields,
     additionalLinks,
+    connectedDspInfo,
     updatePrimaryField,
     schedulePrimaryNormalize,
     handlePrimaryBlur,

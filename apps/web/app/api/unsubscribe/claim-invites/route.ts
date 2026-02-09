@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUnsubscribeToken } from '@/lib/email/unsubscribe-token';
 import { escapeHtml } from '@/lib/email/utils';
+import { captureError } from '@/lib/error-tracking';
 import { addSuppression } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
@@ -146,6 +147,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error('Error processing unsubscribe request', {
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    await captureError('Unsubscribe claim invites failed', error, {
+      route: '/api/unsubscribe/claim-invites',
+      method: 'POST',
     });
 
     return new NextResponse(

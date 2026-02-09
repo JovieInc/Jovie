@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { getAvailablePricing } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 
@@ -28,6 +29,10 @@ export async function GET() {
     });
   } catch (error) {
     logger.error('Error getting pricing options:', error);
+    await captureError('Failed to get pricing options', error, {
+      route: '/api/stripe/pricing-options',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to get pricing options' },
       { status: 500 }

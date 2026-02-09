@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -57,6 +58,10 @@ export async function GET() {
     return NextResponse.json(body, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('Error in admin overview API:', error);
+    await captureError('Admin overview fetch failed', error, {
+      route: '/api/admin/overview',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to load admin overview' },
       { status: 500, headers: NO_STORE_HEADERS }

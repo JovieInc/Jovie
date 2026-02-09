@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   buildInvalidRequestResponse,
   unsubscribeFromNotificationsDomain,
@@ -62,6 +63,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     logger.error('[Notifications Unsubscribe] Error:', error);
+    await captureError('Notification unsubscribe failed', error, {
+      route: '/api/notifications/unsubscribe',
+      method: 'POST',
+    });
     return NextResponse.json(
       {
         success: false,

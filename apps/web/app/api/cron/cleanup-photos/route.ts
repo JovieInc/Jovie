@@ -2,6 +2,7 @@ import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { profilePhotos } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   buildCleanupDetails,
@@ -115,6 +116,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('[cleanup-photos] Cleanup failed:', error);
+    await captureError('Photo cleanup cron failed', error, {
+      route: '/api/cron/cleanup-photos',
+      method: 'GET',
+    });
     return NextResponse.json(
       {
         success: false,
