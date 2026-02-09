@@ -36,7 +36,7 @@ export function ReleaseFields({
           title ? (
             <TruncatedText
               lines={2}
-              className='font-medium min-h-10'
+              className='font-medium text-primary-token min-h-10'
               tooltipSide='bottom'
             >
               {title}
@@ -61,7 +61,7 @@ export function ReleaseFields({
 
       {/* Smart link field with copy functionality */}
       <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-        <Label className='text-xs text-secondary-token'>Smart link</Label>
+        <Label className='text-xs text-tertiary-token'>Smart link</Label>
         <CopyLinkInput url={smartLinkUrl} size='sm' />
       </div>
     </div>

@@ -221,6 +221,7 @@ function buildWaitlistUpdateValues(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }) {
@@ -232,6 +233,7 @@ function buildWaitlistUpdateValues(params: {
     primarySocialUrlNormalized: params.normalizedUrl,
     spotifyUrl: params.spotifyUrl ?? null,
     spotifyUrlNormalized: params.spotifyUrlNormalized,
+    spotifyArtistName: params.spotifyArtistName,
     heardAbout: params.sanitizedHeardAbout,
     selectedPlan: params.selectedPlan ?? null,
     updatedAt: new Date(),
@@ -272,6 +274,7 @@ async function handleExistingEntry(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }): Promise<NextResponse> {
@@ -306,6 +309,7 @@ async function createNewWaitlistEntry(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }): Promise<void> {
@@ -320,6 +324,7 @@ async function createNewWaitlistEntry(params: {
     normalizedUrl,
     spotifyUrl,
     spotifyUrlNormalized,
+    spotifyArtistName,
     sanitizedHeardAbout,
     selectedPlan,
   } = params;
@@ -333,6 +338,7 @@ async function createNewWaitlistEntry(params: {
     primarySocialUrlNormalized: normalizedUrl,
     spotifyUrl: spotifyUrl ?? null,
     spotifyUrlNormalized,
+    spotifyArtistName,
     heardAbout: sanitizedHeardAbout,
     selectedPlan: selectedPlan ?? null,
     status: 'new' as const,
@@ -516,10 +522,12 @@ export async function POST(request: Request) {
       primaryGoal,
       primarySocialUrl,
       spotifyUrl,
+      spotifyArtistName,
       heardAbout,
       selectedPlan,
     } = parseResult.data;
     const sanitizedHeardAbout = heardAbout?.trim() || null;
+    const sanitizedSpotifyArtistName = spotifyArtistName?.trim() || null;
 
     // Detect platform and normalize primary social URL
     const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
@@ -547,6 +555,7 @@ export async function POST(request: Request) {
         normalizedUrl,
         spotifyUrl,
         spotifyUrlNormalized,
+        spotifyArtistName: sanitizedSpotifyArtistName,
         sanitizedHeardAbout,
         selectedPlan,
       });
@@ -564,6 +573,7 @@ export async function POST(request: Request) {
       normalizedUrl,
       spotifyUrl,
       spotifyUrlNormalized,
+      spotifyArtistName: sanitizedSpotifyArtistName,
       sanitizedHeardAbout,
       selectedPlan,
     });
