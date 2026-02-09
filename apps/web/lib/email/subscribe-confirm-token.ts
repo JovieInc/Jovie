@@ -5,7 +5,7 @@
  * Uses the same cryptographic pattern as unsubscribe tokens.
  */
 
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { APP_URL } from '@/constants/app';
 import { env } from '@/lib/env-server';
 
@@ -18,8 +18,8 @@ function getConfirmSecret(): string | null {
   if (!apiKey) {
     return null;
   }
-  return createHash('sha256')
-    .update(`subscribe-confirm:${apiKey}`)
+  return createHmac('sha256', 'subscribe-confirm-secret')
+    .update(apiKey)
     .digest('hex')
     .slice(0, 32);
 }
