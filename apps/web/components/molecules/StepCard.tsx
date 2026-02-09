@@ -24,7 +24,7 @@ export interface StepCardProps {
 }
 
 export const cardBaseClasses =
-  'relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl p-8 transition-all duration-300';
+  'relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-default rounded-2xl p-8 transition-all duration-300';
 
 export const glowEffectClasses =
   'absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 transition-opacity duration-500 group-hover:opacity-100';
@@ -60,7 +60,7 @@ export function StepCard({
         <div
           className={cn(
             cardBaseClasses,
-            interactive && 'hover:border-gray-300 dark:hover:border-white/20'
+            interactive && 'hover:border-strong'
           )}
         >
           <div className='text-center'>

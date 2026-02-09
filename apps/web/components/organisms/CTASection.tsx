@@ -20,7 +20,7 @@ export function CTASection({
 }: CTASectionProps) {
   const variantClasses = {
     primary:
-      'border-t border-white/10 dark:border-white/10 bg-white dark:bg-black',
+      'border-t border-subtle bg-white dark:bg-black',
     secondary: 'bg-zinc-900 text-white',
   };
 
