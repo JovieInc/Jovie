@@ -89,21 +89,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify ownership
+    // Verify the authenticated user owns this release's profile
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
         displayName: creatorProfiles.displayName,
-        userId: creatorProfiles.userId,
+        clerkId: users.clerkId,
       })
       .from(creatorProfiles)
-      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorProfiles.id, release.creatorProfileId))
       .limit(1);
 
-    if (!profile) {
+    if (!profile || profile.clerkId !== userId) {
       return NextResponse.json(
-        { error: 'Profile not found' },
+        { error: 'Release not found' },
         { status: 404, headers: CORS_HEADERS }
       );
     }
