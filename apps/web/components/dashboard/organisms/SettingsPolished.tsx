@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
+import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
@@ -14,7 +15,6 @@ import { SettingsBrandingSection } from '@/components/dashboard/organisms/Settin
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
-import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
@@ -112,8 +112,7 @@ export function SettingsPolished({
     {
       id: 'data-privacy',
       title: 'Data & Privacy',
-      description:
-        'Export your data or delete your account.',
+      description: 'Export your data or delete your account.',
       render: () => <DataPrivacySection />,
     },
   ];

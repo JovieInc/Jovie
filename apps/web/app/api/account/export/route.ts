@@ -8,6 +8,10 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  checkAccountExportRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +27,21 @@ export async function GET() {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  // Rate limiting - prevent abuse of data export endpoint
+  const rateLimitResult = await checkAccountExportRateLimit(clerkUserId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: rateLimitResult.reason ?? 'Rate limit exceeded' },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      }
     );
   }
 
@@ -54,7 +73,7 @@ export async function GET() {
         .where(eq(creatorProfiles.userId, user.id)),
     ]);
 
-    // Fetch related data for each profile
+    // Fetch related data for each profile (full export for GDPR compliance)
     const profileData = await Promise.all(
       profiles.map(async profile => {
         const [profileLinks, profileContacts] = await Promise.all([
@@ -67,6 +86,7 @@ export async function GET() {
               displayText: socialLinks.displayText,
               state: socialLinks.state,
               createdAt: socialLinks.createdAt,
+              updatedAt: socialLinks.updatedAt,
             })
             .from(socialLinks)
             .where(eq(socialLinks.creatorProfileId, profile.id)),
@@ -74,11 +94,17 @@ export async function GET() {
             .select({
               id: creatorContacts.id,
               role: creatorContacts.role,
+              customLabel: creatorContacts.customLabel,
               personName: creatorContacts.personName,
               companyName: creatorContacts.companyName,
+              territories: creatorContacts.territories,
               email: creatorContacts.email,
               phone: creatorContacts.phone,
+              preferredChannel: creatorContacts.preferredChannel,
+              isActive: creatorContacts.isActive,
+              sortOrder: creatorContacts.sortOrder,
               createdAt: creatorContacts.createdAt,
+              updatedAt: creatorContacts.updatedAt,
             })
             .from(creatorContacts)
             .where(eq(creatorContacts.creatorProfileId, profile.id)),
@@ -92,10 +118,14 @@ export async function GET() {
           bio: profile.bio,
           avatarUrl: profile.avatarUrl,
           isPublic: profile.isPublic,
+          isVerified: profile.isVerified,
           genres: profile.genres,
           spotifyUrl: profile.spotifyUrl,
           appleMusicUrl: profile.appleMusicUrl,
           youtubeUrl: profile.youtubeUrl,
+          settings: profile.settings,
+          theme: profile.theme,
+          notificationPreferences: profile.notificationPreferences,
           createdAt: profile.createdAt,
           updatedAt: profile.updatedAt,
           links: profileLinks,
@@ -119,6 +149,7 @@ export async function GET() {
         ? {
             themeMode: settings[0].themeMode,
             sidebarCollapsed: settings[0].sidebarCollapsed,
+            updatedAt: settings[0].updatedAt,
           }
         : null,
       profiles: profileData,

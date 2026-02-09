@@ -1,8 +1,5 @@
 'use client';
 
-import { Download, Trash2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -14,6 +11,9 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
+import { Download, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import {
   useDeleteAccountMutation,
@@ -96,7 +96,13 @@ export function DataPrivacySection() {
       </DashboardCard>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={open => {
+          setDeleteDialogOpen(open);
+          if (!open) setConfirmText('');
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your account?</AlertDialogTitle>

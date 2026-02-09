@@ -8,6 +8,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  checkAccountDeleteRateLimit,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -29,6 +33,21 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  // Rate limiting - prevent abuse of destructive endpoint
+  const rateLimitResult = await checkAccountDeleteRateLimit(clerkUserId);
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: rateLimitResult.reason ?? 'Rate limit exceeded' },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      }
     );
   }
 
@@ -73,12 +92,16 @@ export async function POST(request: Request) {
 
     const now = new Date();
 
-    // Soft-delete: anonymize personal data and mark as deleted
+    // Soft-delete: anonymize all personal data and mark as deleted
+    // GDPR requires removal of all PII - we retain only structural fields
     await db
       .update(users)
       .set({
         name: null,
         email: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        waitlistEntryId: null,
         deletedAt: now,
         userStatus: 'banned',
         updatedAt: now,
@@ -86,9 +109,7 @@ export async function POST(request: Request) {
       .where(eq(users.id, user.id));
 
     // Delete creator profiles (cascades to links, contacts, analytics)
-    await db
-      .delete(creatorProfiles)
-      .where(eq(creatorProfiles.userId, user.id));
+    await db.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
 
     // Delete the Clerk user (signs out all sessions)
     try {
