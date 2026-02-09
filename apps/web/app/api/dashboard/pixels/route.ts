@@ -259,3 +259,58 @@ export async function PUT(req: Request) {
     );
   }
 }
+
+/**
+ * DELETE /api/dashboard/pixels
+ *
+ * Delete all pixel settings for the authenticated user's profile.
+ * Removes the entire creatorPixels row, clearing all pixel IDs and tokens.
+ */
+export async function DELETE() {
+  try {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      // Get user's profile
+      const [userProfile] = await tx
+        .select({
+          profileId: creatorProfiles.id,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!userProfile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Delete pixel config for this profile
+      await tx
+        .delete(creatorPixels)
+        .where(eq(creatorPixels.profileId, userProfile.profileId));
+
+      logger.info('[Pixels DELETE] Pixel settings cleared', {
+        profileId: userProfile.profileId,
+      });
+
+      return NextResponse.json(
+        { success: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    });
+  } catch (error) {
+    logger.error('[Pixels DELETE] Error deleting pixel settings:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Failed to delete pixel settings' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { createMutationFn } from './fetch';
+import { createMutationFn, fetchWithTimeout } from './fetch';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 export interface PixelSettingsInput {
@@ -51,6 +51,34 @@ export function usePixelSettingsMutation() {
     },
     onError: error => {
       handleMutationError(error, 'Failed to save pixels');
+    },
+  });
+}
+
+/**
+ * Delete all pixel settings for the current user's profile.
+ */
+async function deletePixelSettings(): Promise<PixelSettingsResponse> {
+  return fetchWithTimeout<PixelSettingsResponse>('/api/dashboard/pixels', {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * TanStack Query mutation hook for deleting (clearing) all ad pixel settings.
+ *
+ * @example
+ * const { mutate: clearPixels, isPending } = usePixelSettingsDeleteMutation();
+ * clearPixels();
+ */
+export function usePixelSettingsDeleteMutation() {
+  return useMutation({
+    mutationFn: deletePixelSettings,
+    onSuccess: () => {
+      handleMutationSuccess('Pixel settings cleared');
+    },
+    onError: error => {
+      handleMutationError(error, 'Failed to clear pixel settings');
     },
   });
 }
