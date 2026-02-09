@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
-import { ListenNowForm } from '@/components/dashboard/organisms/ListenNowForm';
+import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';

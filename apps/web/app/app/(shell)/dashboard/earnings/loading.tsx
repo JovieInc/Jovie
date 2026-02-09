@@ -1,74 +1,70 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
-const EARNINGS_LOADING_STAT_KEYS = Array.from(
-  { length: 3 },
-  (_, i) => `earnings-stat-${i + 1}`
-);
-const EARNINGS_LOADING_TX_KEYS = Array.from(
-  { length: 4 },
-  (_, i) => `earnings-tx-${i + 1}`
-);
+const STAT_KEYS = ['stat-1', 'stat-2', 'stat-3'] as const;
 
 export default function EarningsLoading() {
   return (
-    <div className='flex h-full min-h-0 flex-col'>
+    <div className='flex flex-col gap-6 pb-6'>
       {/* Header */}
-      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
-        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
-          <div className='space-y-2'>
-            <LoadingSkeleton height='h-6' width='w-32' rounded='md' />
-            <LoadingSkeleton height='h-4' width='w-64' rounded='md' />
-          </div>
-        </div>
+      <div className='space-y-1'>
+        <LoadingSkeleton height='h-6' width='w-28' rounded='md' />
+        <LoadingSkeleton height='h-4' width='w-56' rounded='md' />
       </div>
 
-      {/* Content area */}
-      <div className='flex-1 min-h-0 overflow-auto'>
-        <div className='px-4 py-6 sm:px-6'>
-          {/* Stats cards */}
-          <div className='grid gap-4 sm:grid-cols-3'>
-            {EARNINGS_LOADING_STAT_KEYS.map(key => (
-              <div
-                key={key}
-                className='rounded-lg border border-subtle bg-surface-1 p-4 shadow-sm'
-              >
-                <LoadingSkeleton height='h-4' width='w-24' rounded='md' />
-                <LoadingSkeleton
-                  height='h-8'
-                  width='w-32'
-                  rounded='md'
-                  className='mt-2'
-                />
-              </div>
-            ))}
-          </div>
+      {/* Section label */}
+      <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
 
-          {/* Chart area */}
-          <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-            <LoadingSkeleton height='h-5' width='w-40' rounded='md' />
-            <LoadingSkeleton
-              height='h-48'
-              width='w-full'
-              rounded='lg'
-              className='mt-4'
-            />
+      {/* Stat cards — 2 cols mobile, 3 cols sm+ */}
+      <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+        {STAT_KEYS.map(key => (
+          <div
+            key={key}
+            className='space-y-2 rounded-xl border border-subtle bg-surface-1 p-4'
+          >
+            <div className='flex items-center gap-2'>
+              <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+              <LoadingSkeleton height='h-3' width='w-16' rounded='sm' />
+            </div>
+            <LoadingSkeleton height='h-7' width='w-20' rounded='md' />
+            <LoadingSkeleton height='h-3' width='w-28' rounded='sm' />
           </div>
+        ))}
+      </div>
 
-          {/* Transactions list */}
-          <div className='mt-6 space-y-3'>
-            <LoadingSkeleton height='h-5' width='w-32' rounded='md' />
-            {EARNINGS_LOADING_TX_KEYS.map(key => (
-              <div
-                key={key}
-                className='flex items-center justify-between rounded-lg border border-subtle bg-surface-1 p-4 shadow-sm'
-              >
-                <div className='space-y-1'>
-                  <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
-                  <LoadingSkeleton height='h-3' width='w-24' rounded='md' />
-                </div>
-                <LoadingSkeleton height='h-5' width='w-16' rounded='md' />
-              </div>
-            ))}
+      {/* Share section label */}
+      <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />
+
+      {/* Sharing tools — stacked mobile, 2 cols sm+ */}
+      <div className='grid gap-4 sm:grid-cols-2'>
+        {/* Tip link card */}
+        <div className='space-y-3 rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+          <div className='flex items-center gap-2'>
+            <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+            <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
+          </div>
+          <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
+            <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
+            <LoadingSkeleton height='h-7' width='w-14' rounded='md' />
+          </div>
+          <LoadingSkeleton height='h-3' width='w-48' rounded='sm' />
+        </div>
+
+        {/* QR code card */}
+        <div className='space-y-4 rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+          <div className='flex items-center gap-2'>
+            <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
+            <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
+          </div>
+          <div className='flex flex-col items-center gap-4'>
+            <div className='w-full rounded-xl bg-surface-0 p-4 sm:p-6'>
+              <LoadingSkeleton
+                height='h-40'
+                width='w-40'
+                rounded='lg'
+                className='mx-auto'
+              />
+            </div>
+            <LoadingSkeleton height='h-8' width='w-28' rounded='md' />
           </div>
         </div>
       </div>

@@ -121,18 +121,25 @@ function VirtualizedTableRowComponent<TData>({
           : undefined
       }
     >
-      {row.getVisibleCells().map(cell => (
-        <td
-          key={cell.id}
-          className={presets.tableCell}
-          style={{
-            width:
-              cell.column.getSize() === 150 ? undefined : cell.column.getSize(),
-          }}
-        >
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </td>
-      ))}
+      {row.getVisibleCells().map(cell => {
+        const metaClassName = (
+          cell.column.columnDef.meta as { className?: string } | undefined
+        )?.className;
+        return (
+          <td
+            key={cell.id}
+            className={cn(presets.tableCell, metaClassName)}
+            style={{
+              width:
+                cell.column.getSize() === 150
+                  ? undefined
+                  : cell.column.getSize(),
+            }}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </td>
+        );
+      })}
     </tr>
   );
 }

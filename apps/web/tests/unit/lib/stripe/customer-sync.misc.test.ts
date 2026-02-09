@@ -3,13 +3,58 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  mockBillingAuditLog,
+  mockCaptureCriticalError,
+  mockDb,
+  mockDbSelect,
+  mockUsersTable,
+} from './customer-sync.test-utils';
+
+// vi.mock calls must be in the test file itself for proper hoisting
+vi.mock('@/lib/db', () => ({ db: mockDb }));
+vi.mock('@/lib/db/client/connection', () => ({
+  db: mockDb,
+  initializeDb: vi.fn(),
+  getDb: vi.fn(),
+  getPoolMetrics: vi.fn(),
+  getPoolState: vi.fn(),
+}));
+vi.mock('@/lib/db/schema', () => ({
+  users: mockUsersTable,
+  billingAuditLog: mockBillingAuditLog,
+}));
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: mockUsersTable,
+  billingAuditLog: mockBillingAuditLog,
+}));
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCriticalError,
+  captureWarning: vi.fn(),
+}));
+vi.mock('server-only', () => ({}));
+vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: vi.fn() }));
+vi.mock('@/lib/auth/session', () => ({ withDbSession: vi.fn() }));
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: { customers: { retrieve: vi.fn(), update: vi.fn() } },
+  getOrCreateCustomer: vi.fn(),
+}));
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((a: unknown, b: unknown) => ({ type: 'eq', left: a, right: b })),
+  and: vi.fn((...args: unknown[]) => ({ type: 'and', conditions: args })),
+  sql: vi.fn((strings: unknown, ...values: unknown[]) => ({
+    type: 'sql',
+    strings,
+    values,
+  })),
+}));
+
+import {
   BILLING_FIELDS_CUSTOMER,
   BILLING_FIELDS_FULL,
   BILLING_FIELDS_STATUS,
   fetchUserBillingData,
 } from '@/lib/stripe/customer-sync';
-// Ensure mocks are registered before importing the module under test
-import { mockDbSelect } from './customer-sync.test-utils';
 
 describe('fetchUserBillingData - Edge Cases', () => {
   beforeEach(() => {
@@ -133,7 +178,7 @@ describe('fetchUserBillingData - Edge Cases', () => {
 });
 
 describe('field selection constants', () => {
-  it('BILLING_FIELDS_FULL contains all 9 fields', () => {
+  it('BILLING_FIELDS_FULL contains all fields', () => {
     expect(BILLING_FIELDS_FULL).toContain('id');
     expect(BILLING_FIELDS_FULL).toContain('email');
     expect(BILLING_FIELDS_FULL).toContain('isAdmin');
@@ -146,7 +191,7 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_FULL).toHaveLength(9);
   });
 
-  it('BILLING_FIELDS_STATUS contains 7 fields without email/isAdmin', () => {
+  it('BILLING_FIELDS_STATUS contains fields without email/isAdmin', () => {
     expect(BILLING_FIELDS_STATUS).toContain('id');
     expect(BILLING_FIELDS_STATUS).toContain('isPro');
     expect(BILLING_FIELDS_STATUS).toContain('plan');
