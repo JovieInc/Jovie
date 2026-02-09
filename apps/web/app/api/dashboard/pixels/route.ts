@@ -9,6 +9,9 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { encryptPII } from '@/lib/utils/pii-encryption';
 
+const VALID_PLATFORMS = ['facebook', 'google', 'tiktok'] as const;
+type PixelPlatform = (typeof VALID_PLATFORMS)[number];
+
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -255,6 +258,131 @@ export async function PUT(req: Request) {
     }
     return NextResponse.json(
       { error: 'Failed to update pixel settings' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * Platform-specific field nullification maps.
+ * Used by DELETE to clear credentials for a single platform.
+ */
+const PLATFORM_CLEAR_FIELDS: Record<
+  PixelPlatform,
+  Record<string, null | boolean>
+> = {
+  facebook: {
+    facebookPixelId: null,
+    facebookAccessToken: null,
+    facebookEnabled: false,
+  },
+  google: {
+    googleMeasurementId: null,
+    googleApiSecret: null,
+    googleEnabled: false,
+  },
+  tiktok: {
+    tiktokPixelId: null,
+    tiktokAccessToken: null,
+    tiktokEnabled: false,
+  },
+};
+
+/**
+ * DELETE /api/dashboard/pixels
+ *
+ * Delete pixel configuration for the authenticated user's profile.
+ * Accepts an optional `platform` query parameter (facebook | google | tiktok)
+ * to clear only that platform's credentials. Without it, deletes the entire row.
+ */
+export async function DELETE(req: Request) {
+  try {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      const url = new URL(req.url);
+      const platform = url.searchParams.get('platform') as string | null;
+
+      // Validate platform parameter if provided
+      if (platform && !VALID_PLATFORMS.includes(platform as PixelPlatform)) {
+        return NextResponse.json(
+          {
+            error: 'Invalid platform',
+            details: `Must be one of: ${VALID_PLATFORMS.join(', ')}`,
+          },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Get user's profile
+      const [userProfile] = await tx
+        .select({
+          profileId: creatorProfiles.id,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!userProfile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      // Find existing config
+      const [existingConfig] = await tx
+        .select({ id: creatorPixels.id })
+        .from(creatorPixels)
+        .where(eq(creatorPixels.profileId, userProfile.profileId))
+        .limit(1);
+
+      if (!existingConfig) {
+        return NextResponse.json(
+          { error: 'No pixel configuration found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (platform) {
+        // Clear specific platform credentials
+        await tx
+          .update(creatorPixels)
+          .set({
+            ...PLATFORM_CLEAR_FIELDS[platform as PixelPlatform],
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorPixels.id, existingConfig.id));
+
+        logger.info('[Pixels DELETE] Platform credentials cleared', {
+          profileId: userProfile.profileId,
+          platform,
+        });
+      } else {
+        // Delete entire pixel config row
+        await tx
+          .delete(creatorPixels)
+          .where(eq(creatorPixels.id, existingConfig.id));
+
+        logger.info('[Pixels DELETE] All pixel settings deleted', {
+          profileId: userProfile.profileId,
+        });
+      }
+
+      return NextResponse.json(
+        { success: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    });
+  } catch (error) {
+    logger.error('[Pixels DELETE] Error deleting pixel settings:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Failed to delete pixel settings' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

@@ -207,8 +207,11 @@ export {
 } from './useNotificationStatusQuery';
 // Pixel settings mutation
 export {
+  type PixelDeleteInput,
+  type PixelPlatform,
   type PixelSettingsInput,
   type PixelSettingsResponse,
+  usePixelDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
 // Plan gate hook

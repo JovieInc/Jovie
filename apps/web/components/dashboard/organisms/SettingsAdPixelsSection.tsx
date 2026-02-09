@@ -2,10 +2,14 @@
 
 import { Button, Input, Switch } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { usePixelSettingsMutation } from '@/lib/queries';
+import {
+  type PixelPlatform,
+  usePixelDeleteMutation,
+  usePixelSettingsMutation,
+} from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
@@ -14,6 +18,7 @@ const INPUT_CLASS =
 
 interface PlatformSectionProps {
   readonly platform: string;
+  readonly platformKey: PixelPlatform;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
   readonly pixelIdName: string;
@@ -24,12 +29,16 @@ interface PlatformSectionProps {
   readonly tokenValue: string;
   readonly helpUrl: string;
   readonly helpText: string;
+  readonly hasConfig: boolean;
+  readonly isClearing: boolean;
   readonly onPixelIdChange: (value: string) => void;
   readonly onTokenChange: (value: string) => void;
+  readonly onClear: () => void;
 }
 
 function PlatformSection({
   platform,
+  platformKey,
   pixelIdLabel,
   pixelIdPlaceholder,
   pixelIdName,
@@ -40,8 +49,11 @@ function PlatformSection({
   tokenValue,
   helpUrl,
   helpText,
+  hasConfig,
+  isClearing,
   onPixelIdChange,
   onTokenChange,
+  onClear,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
 
@@ -49,15 +61,31 @@ function PlatformSection({
     <div className='space-y-4 p-4 bg-surface-0 rounded-lg border border-subtle'>
       <div className='flex items-center justify-between'>
         <h4 className='text-sm font-medium text-primary'>{platform}</h4>
-        <a
-          href={helpUrl}
-          target='_blank'
-          rel='noopener noreferrer'
-          className='text-xs text-interactive hover:text-interactive/80 flex items-center gap-1'
-        >
-          {helpText}
-          <ExternalLink className='h-4 w-4' />
-        </a>
+        <div className='flex items-center gap-3'>
+          {hasConfig && (
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={onClear}
+              disabled={isClearing}
+              className='text-xs text-destructive hover:text-destructive/80 gap-1'
+              aria-label={`Clear ${platform} credentials`}
+            >
+              <Trash2 className='h-3.5 w-3.5' />
+              Clear
+            </Button>
+          )}
+          <a
+            href={helpUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-xs text-interactive hover:text-interactive/80 flex items-center gap-1'
+          >
+            {helpText}
+            <ExternalLink className='h-4 w-4' />
+          </a>
+        </div>
       </div>
 
       <div className='grid gap-4 sm:grid-cols-2'>
@@ -135,9 +163,36 @@ interface PixelSettingsResponse {
   };
 }
 
+/**
+ * Determine whether a platform has any credentials configured
+ * (pixel ID or access token present).
+ */
+function hasPlatformConfig(
+  platform: PixelPlatform,
+  settings: PixelSettingsResponse | undefined
+): boolean {
+  if (!settings) return false;
+  switch (platform) {
+    case 'facebook':
+      return !!(settings.pixels.facebookPixelId || settings.hasTokens.facebook);
+    case 'google':
+      return !!(
+        settings.pixels.googleMeasurementId || settings.hasTokens.google
+      );
+    case 'tiktok':
+      return !!(settings.pixels.tiktokPixelId || settings.hasTokens.tiktok);
+  }
+}
+
 export function SettingsAdPixelsSection() {
   const { mutate: savePixels, isPending: isPixelSaving } =
     usePixelSettingsMutation();
+
+  const {
+    mutate: deletePixel,
+    isPending: isDeleting,
+    variables: deleteVars,
+  } = usePixelDeleteMutation();
 
   // Fetch existing pixel settings on mount
   const { data: existingSettings } = useQuery<PixelSettingsResponse>({
@@ -204,6 +259,13 @@ export function SettingsAdPixelsSection() {
     }
   };
 
+  const handleClearPlatform = useCallback(
+    (platform: PixelPlatform) => {
+      deletePixel({ platform });
+    },
+    [deletePixel]
+  );
+
   const handlePixelSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -265,6 +327,7 @@ export function SettingsAdPixelsSection() {
         <div className='space-y-4'>
           <PlatformSection
             platform='Facebook Conversions API'
+            platformKey='facebook'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
             pixelIdName='facebookPixelId'
@@ -275,16 +338,20 @@ export function SettingsAdPixelsSection() {
             tokenValue={pixelData.facebookAccessToken}
             helpUrl='https://www.facebook.com/business/help/952192354843755'
             helpText='Get credentials'
+            hasConfig={hasPlatformConfig('facebook', existingSettings)}
+            isClearing={isDeleting && deleteVars?.platform === 'facebook'}
             onPixelIdChange={value =>
               handleInputChange('facebookPixelId', value)
             }
             onTokenChange={value =>
               handleInputChange('facebookAccessToken', value)
             }
+            onClear={() => handleClearPlatform('facebook')}
           />
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
+            platformKey='google'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
             pixelIdName='googleMeasurementId'
@@ -295,14 +362,18 @@ export function SettingsAdPixelsSection() {
             tokenValue={pixelData.googleApiSecret}
             helpUrl='https://developers.google.com/analytics/devguides/collection/protocol/ga4'
             helpText='Get credentials'
+            hasConfig={hasPlatformConfig('google', existingSettings)}
+            isClearing={isDeleting && deleteVars?.platform === 'google'}
             onPixelIdChange={value =>
               handleInputChange('googleMeasurementId', value)
             }
             onTokenChange={value => handleInputChange('googleApiSecret', value)}
+            onClear={() => handleClearPlatform('google')}
           />
 
           <PlatformSection
             platform='TikTok Events API'
+            platformKey='tiktok'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
             pixelIdName='tiktokPixelId'
@@ -313,10 +384,13 @@ export function SettingsAdPixelsSection() {
             tokenValue={pixelData.tiktokAccessToken}
             helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
             helpText='Get credentials'
+            hasConfig={hasPlatformConfig('tiktok', existingSettings)}
+            isClearing={isDeleting && deleteVars?.platform === 'tiktok'}
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)
             }
+            onClear={() => handleClearPlatform('tiktok')}
           />
         </div>
 
