@@ -352,7 +352,7 @@ export const DashboardAudienceTableUnified = memo(
               ) : (
                 <>
                   {/* Mobile card list */}
-                  <div className='flex flex-col gap-2 p-3 md:hidden'>
+                  <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
                     {rows.map(member => (
                       <AudienceMobileCard
                         key={member.id}

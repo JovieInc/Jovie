@@ -572,13 +572,23 @@ body {
     }
   }
 
-  /* Mobile Nav Overlay */
+  /* Mobile Nav Overlay - always mounted, visibility controlled via class */
   .mobile-nav-overlay {
     position: fixed;
-    inset: 0;
+    top: var(--linear-header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 99;
     background: oklch(0 0 0 / 0.5);
-    animation: mobile-nav-fade-in 200ms ease forwards;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+
+  .mobile-nav-overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   /* Mobile Nav Panel */
@@ -612,6 +622,16 @@ body {
     gap: var(--linear-space-1);
   }
 
+  /* Mobile Nav Auth Section */
+  .mobile-nav-auth {
+    display: flex;
+    flex-direction: column;
+    gap: var(--linear-space-1);
+    margin-top: var(--linear-space-3);
+    padding-top: var(--linear-space-3);
+    border-top: 1px solid var(--linear-border-subtle);
+  }
+
   /* Mobile Nav Link */
   .mobile-nav-link {
     display: flex;
@@ -638,7 +658,6 @@ body {
     align-items: center;
     justify-content: center;
     height: 44px;
-    margin-top: var(--linear-space-2);
     font-size: var(--linear-caption-size);
     font-weight: var(--linear-font-weight-medium);
     color: var(--linear-btn-primary-fg);
@@ -655,12 +674,14 @@ body {
     }
   }
 
-  @keyframes mobile-nav-fade-in {
-    from {
-      opacity: 0;
+  /* Reduced motion: disable animations for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-nav-overlay {
+      transition: none;
     }
-    to {
-      opacity: 1;
+
+    .mobile-nav-panel {
+      transition: none;
     }
   }
 
