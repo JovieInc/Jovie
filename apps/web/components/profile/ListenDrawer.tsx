@@ -24,7 +24,7 @@ export function ListenDrawer({
 }: ListenDrawerProps) {
   const historyPushedRef = useRef(false);
 
-  // Fire synthetic pageview when drawer opens for analytics parity
+  // Fire synthetic analytics event when drawer opens for funnel parity
   useEffect(() => {
     if (!open) return;
 
@@ -38,7 +38,7 @@ export function ListenDrawer({
       historyPushedRef.current = true;
     }
 
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       if (historyPushedRef.current) {
         historyPushedRef.current = false;
         onOpenChange(false);
@@ -71,18 +71,32 @@ export function ListenDrawer({
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/40' />
+        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
         <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl bg-base'
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t'
+          style={{
+            backgroundColor: 'var(--liquid-glass-bg)',
+            backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
+            WebkitBackdropFilter: `blur(var(--liquid-glass-blur-intense))`,
+            borderColor: 'var(--liquid-glass-border)',
+            boxShadow: 'var(--liquid-glass-shadow-elevated)',
+          }}
           aria-describedby={undefined}
         >
-          <div className='mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-surface-3' />
+          {/* Specular highlight gradient — top edge light refraction */}
+          <div
+            className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-2xl'
+            style={{ background: 'var(--liquid-glass-highlight)' }}
+          />
 
-          <Drawer.Title className='px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
+          {/* Drag handle */}
+          <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+
+          <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
             Listen on
           </Drawer.Title>
 
-          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
+          <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
             <div className='flex justify-center'>
               <StaticListenInterface
                 artist={artist}
