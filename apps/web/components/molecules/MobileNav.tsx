@@ -2,7 +2,8 @@
 
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function MobileNav({
   hidePricingLink = false,
@@ -10,8 +11,18 @@ export function MobileNav({
   readonly hidePricingLink?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const prevPathname = useRef(pathname);
 
   const close = useCallback(() => setIsOpen(false), []);
+
+  // Close on route change
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      close();
+      prevPathname.current = pathname;
+    }
+  }, [pathname, close]);
 
   // Prevent body scroll when menu is open
   useEffect(() => {
@@ -49,14 +60,12 @@ export function MobileNav({
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className='mobile-nav-overlay'
-          onClick={close}
-          aria-hidden='true'
-        />
-      )}
+      {/* Overlay - always mounted for smooth transition */}
+      <div
+        className={`mobile-nav-overlay ${isOpen ? 'mobile-nav-overlay--visible' : ''}`}
+        onClick={close}
+        aria-hidden='true'
+      />
 
       {/* Panel */}
       <nav
@@ -70,6 +79,16 @@ export function MobileNav({
               Pricing
             </Link>
           )}
+        </div>
+
+        {/* Auth actions - visible in mobile menu */}
+        <div className='mobile-nav-auth'>
+          <Link href='/signin' className='mobile-nav-link' onClick={close}>
+            Log in
+          </Link>
+          <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
+            Sign up
+          </Link>
         </div>
       </nav>
     </>
