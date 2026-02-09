@@ -73,7 +73,7 @@ export function ErrorDialog({
             the last action or close this dialog to continue where you left off.
           </p>
 
-          <div className='mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 space-y-2'>
+          <div className='mt-4 pt-4 border-t border-subtle space-y-2'>
             {error?.digest && (
               <p className='text-xs text-zinc-500 dark:text-zinc-400'>
                 Error ID: {error.digest}
@@ -111,7 +111,7 @@ export function ErrorDialog({
             <button
               type='button'
               onClick={onSecondaryAction ?? onClose}
-              className='inline-flex items-center justify-center rounded-md border border-subtle px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800'
+              className='inline-flex items-center justify-center rounded-md border border-subtle px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800'
             >
               {secondaryActionLabel}
             </button>
