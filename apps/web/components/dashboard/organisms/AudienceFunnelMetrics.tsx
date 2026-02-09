@@ -18,7 +18,12 @@ function FunnelStep({
   if (loading) {
     return (
       <div className='flex-1 min-w-0'>
-        <LoadingSkeleton height='h-3' width='w-16' rounded='sm' className='mb-2' />
+        <LoadingSkeleton
+          height='h-3'
+          width='w-16'
+          rounded='sm'
+          className='mb-2'
+        />
         <LoadingSkeleton height='h-6' width='w-12' rounded='sm' />
       </div>
     );
