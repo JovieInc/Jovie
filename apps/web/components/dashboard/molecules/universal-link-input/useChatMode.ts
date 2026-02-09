@@ -62,9 +62,7 @@ const ACTION_STARTERS = new Set([
 function startsWithChatIntent(input: string): boolean {
   const normalized = normalizeQuery(input);
   const firstWord = normalized.split(' ')[0];
-  return (
-    QUESTION_STARTERS.has(firstWord) || ACTION_STARTERS.has(firstWord)
-  );
+  return QUESTION_STARTERS.has(firstWord) || ACTION_STARTERS.has(firstWord);
 }
 
 /**
