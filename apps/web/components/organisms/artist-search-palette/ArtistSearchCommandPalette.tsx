@@ -274,13 +274,15 @@ export function ArtistSearchCommandPalette({
           {/* Results */}
           <Command.List className='max-h-[300px] overflow-y-auto'>
             {search.state === 'loading' && search.results.length === 0 && (
-              <div
-                className='p-3 space-y-2'
-                role='status'
+              <output
+                className='block p-3 space-y-2'
                 aria-label='Loading search results'
               >
                 {SKELETON_KEYS.map((key, index) => (
-                  <div key={key} className='flex items-center gap-3 px-4 py-2.5'>
+                  <div
+                    key={key}
+                    className='flex items-center gap-3 px-4 py-2.5'
+                  >
                     <div className='w-10 h-10 rounded-full skeleton shrink-0' />
                     <div className='flex-1 space-y-1.5'>
                       <div
@@ -298,7 +300,7 @@ export function ArtistSearchCommandPalette({
                     </div>
                   </div>
                 ))}
-              </div>
+              </output>
             )}
 
             <Command.Empty className='py-8 text-center'>
