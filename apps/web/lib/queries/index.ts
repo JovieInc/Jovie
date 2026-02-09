@@ -107,9 +107,11 @@ export {
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
 export {
+  type CancelSubscriptionResponse,
   type CheckoutInput,
   type CheckoutResponse,
   type PortalResponse,
+  useCancelSubscriptionMutation,
   useCheckoutMutation,
   usePortalMutation,
 } from './useBillingMutations';
@@ -214,6 +216,7 @@ export {
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
+  usePixelSettingsDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
 // Plan gate hook
