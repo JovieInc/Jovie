@@ -9,7 +9,7 @@
 
 import { Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -57,9 +57,10 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
     () => user.externalAccounts ?? []
   );
 
-  if (accounts.length === 0) {
-    return null;
-  }
+  // Sync accounts state when user.externalAccounts changes
+  useEffect(() => {
+    setAccounts(user.externalAccounts ?? []);
+  }, [user.externalAccounts]);
 
   const handleDisconnect = async (account: ClerkExternalAccountResource) => {
     setDisconnectingId(account.id);
@@ -76,6 +77,10 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
       setDisconnectingId(null);
     }
   };
+
+  if (accounts.length === 0) {
+    return null;
+  }
 
   return (
     <DashboardCard variant='settings'>
