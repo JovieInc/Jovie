@@ -1,16 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
@@ -43,6 +40,8 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
+  const { toggle: toggleProfileDrawer, isOpen: isProfileDrawerOpen } =
+    usePreviewPanelState();
 
   // Debug: track isAdmin changes in development
   useEffect(() => {
@@ -106,9 +105,11 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
-      const isActive = isItemActive(pathname, item);
+      const isProfileItem = item.id === 'profile';
+      const isActive = isProfileItem
+        ? isProfileDrawerOpen
+        : isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
-      const isProfileItem = item.href === APP_ROUTES.PROFILE;
 
       return (
         <NavMenuItem
@@ -117,28 +118,11 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-        >
-          {item.children && item.children.length > 0 && (
-            <SidebarMenuSub>
-              {item.children.map(child => (
-                <SidebarMenuSubItem key={child.id}>
-                  <SidebarMenuSubButton
-                    asChild
-                    isActive={isItemActive(pathname, child)}
-                  >
-                    <Link href={child.href}>
-                      <child.icon className='size-4' aria-hidden='true' />
-                      <span>{child.name}</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-              ))}
-            </SidebarMenuSub>
-          )}
-        </NavMenuItem>
+          onClick={isProfileItem ? toggleProfileDrawer : undefined}
+        />
       );
     },
-    [pathname, profileActions]
+    [pathname, profileActions, toggleProfileDrawer, isProfileDrawerOpen]
   );
 
   // Memoize renderSection to prevent creating new functions on every render

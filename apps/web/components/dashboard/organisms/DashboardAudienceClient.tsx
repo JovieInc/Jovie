@@ -12,6 +12,7 @@ import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFal
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
+import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
 import type { AudienceView } from './dashboard-audience-table/types';
 
 const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
@@ -146,6 +147,9 @@ export function DashboardAudienceClient({
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
       <div data-testid='dashboard-audience-client'>
+        <div className='px-4 pt-4 sm:px-6 sm:pt-5'>
+          <AudienceFunnelMetrics />
+        </div>
         <DashboardAudienceTable
           mode={mode}
           view={view}
