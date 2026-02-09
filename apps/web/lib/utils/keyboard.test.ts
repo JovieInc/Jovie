@@ -124,6 +124,22 @@ describe('isFormElement', () => {
     expect(isFormElement(div)).toBe(true);
   });
 
+  it('returns true for descendants of contentEditable containers', () => {
+    const container = document.createElement('div');
+    container.contentEditable = 'true';
+    const child = document.createElement('span');
+    container.appendChild(child);
+    document.body.appendChild(container);
+    expect(isFormElement(child)).toBe(true);
+    document.body.removeChild(container);
+  });
+
+  it('returns true for contentEditable="plaintext-only"', () => {
+    const div = document.createElement('div');
+    div.contentEditable = 'plaintext-only';
+    expect(isFormElement(div)).toBe(true);
+  });
+
   it('returns false for regular div', () => {
     const div = document.createElement('div');
     expect(isFormElement(div)).toBe(false);

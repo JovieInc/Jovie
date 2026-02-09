@@ -194,7 +194,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'T',
     category: 'actions',
     icon: Sun,
-    shortcutKey: 'T',
+    shortcutKey: 't',
   },
   {
     id: 'sign-out',

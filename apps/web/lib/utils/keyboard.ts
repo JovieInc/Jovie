@@ -11,7 +11,7 @@ export function isFormElement(target: EventTarget | null): boolean {
     tag === 'INPUT' ||
     tag === 'TEXTAREA' ||
     tag === 'SELECT' ||
-    target.contentEditable === 'true'
+    target.isContentEditable
   );
 }
 
