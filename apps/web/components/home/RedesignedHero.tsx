@@ -34,9 +34,9 @@ export function RedesignedHero() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            Every release starts from zero.{' '}
+            Your music finally has{' '}
             <span style={{ color: 'var(--linear-accent)' }}>
-              Not anymore.
+              a marketing team.
             </span>
           </h1>
 
@@ -52,10 +52,9 @@ export function RedesignedHero() {
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Jovie replaces your link in bio with an AI-powered profile that
-            captures every fan, personalizes every visit, and follows up
-            automatically — so your audience compounds and every release is
-            bigger than the last.
+            Jovie is an AI engine that captures every fan who touches your
+            link in bio, learns what makes them click, and follows up while
+            you sleep. You make the music. Jovie builds the audience.
           </p>
 
           {/* CTAs - Linear style with primary button and secondary link */}

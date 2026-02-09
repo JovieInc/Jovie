@@ -17,7 +17,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The AI Growth Engine for Independent Artists`;
   const description =
-    'Every release starts from zero. Not anymore. Jovie replaces your link in bio with an AI-powered profile that captures every fan, personalizes every visit, and follows up automatically. Free to start.';
+    'Your music finally has a marketing team. Jovie is an AI engine that captures every fan, learns what makes them click, and follows up automatically. Free to start.';
   const keywords = [
     'link in bio',
     'linktree alternative',
@@ -139,7 +139,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: 'Jovie Link in Bio',
   description:
-    'Every release starts from zero. Not anymore. Jovie replaces your link in bio with an AI-powered profile that captures every fan, personalizes every visit, and follows up automatically.',
+    'Your music finally has a marketing team. Jovie captures every fan, learns what makes them click, and follows up automatically.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
