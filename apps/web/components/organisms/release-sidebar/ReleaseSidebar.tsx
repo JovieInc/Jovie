@@ -10,10 +10,11 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import type { TrackViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
@@ -22,6 +23,7 @@ import { ReleaseFields } from './ReleaseFields';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseTrackList } from './ReleaseTrackList';
+import { TrackDetailPanel } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
@@ -67,6 +69,19 @@ export function ReleaseSidebar({
     onAddDspLink,
     onRemoveDspLink,
   });
+
+  // Track detail panel state
+  const [selectedTrack, setSelectedTrack] = useState<TrackViewModel | null>(
+    null
+  );
+
+  const handleTrackClick = useCallback((track: TrackViewModel) => {
+    setSelectedTrack(track);
+  }, []);
+
+  const handleBackToRelease = useCallback(() => {
+    setSelectedTrack(null);
+  }, []);
 
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
@@ -149,7 +164,13 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-          {release ? (
+          {selectedTrack && release ? (
+            <TrackDetailPanel
+              track={selectedTrack}
+              releaseTitle={release.title}
+              onBack={handleBackToRelease}
+            />
+          ) : release ? (
             <>
               <ReleaseArtwork
                 artworkUrl={release.artworkUrl}
@@ -169,7 +190,10 @@ export function ReleaseSidebar({
 
               <ReleaseMetadata release={release} />
 
-              <ReleaseTrackList release={release} />
+              <ReleaseTrackList
+                release={release}
+                onTrackClick={handleTrackClick}
+              />
 
               <ReleaseDspLinks
                 release={release}

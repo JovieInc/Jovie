@@ -1,14 +1,11 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   type ContextMenuItemType,
-  type HeaderBulkAction,
   UnifiedTable,
-  useRowSelection,
-  useStableSelectionRefs,
 } from '@/components/organisms/table';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -20,10 +17,7 @@ import { useSortingManager } from './hooks/useSortingManager';
 import {
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
-  createReleaseHeaderRenderer,
   createRightMetaCellRenderer,
-  createSelectCellRenderer,
-  createSelectHeaderRenderer,
 } from './utils/column-renderers';
 
 interface ProviderConfig {
@@ -47,14 +41,6 @@ interface ReleaseTableProps {
     url: string
   ) => Promise<void>;
   readonly isAddingUrl?: boolean;
-  /** Selected release IDs (controlled from parent) */
-  readonly selectedIds?: Set<string>;
-  /** Callback when selection changes */
-  readonly onSelectionChange?: (selectedIds: Set<string>) => void;
-  /** Bulk actions shown in header when items selected */
-  readonly bulkActions?: HeaderBulkAction[];
-  /** Callback to clear selection */
-  readonly onClearSelection?: () => void;
   /** Column visibility state from preferences */
   readonly columnVisibility?: Record<string, boolean>;
   /** Row height from density preference */
@@ -91,10 +77,6 @@ export function ReleaseTable({
   onEdit,
   onAddUrl,
   isAddingUrl,
-  selectedIds: externalSelectedIds,
-  onSelectionChange,
-  bulkActions = [],
-  onClearSelection,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
   onFocusedRowChange,
@@ -112,60 +94,6 @@ export function ReleaseTable({
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
-
-  // Row selection - use external selection if provided, otherwise internal
-  const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
-  const rowIdSet = useMemo(() => new Set(rowIds), [rowIds]);
-  const internalSelection = useRowSelection(rowIds);
-
-  const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
-
-  // Compute header checkbox state
-  const headerCheckboxState = useMemo(() => {
-    if (externalSelectedIds === undefined) {
-      return internalSelection.headerCheckboxState;
-    }
-
-    let visibleCount = 0;
-    for (const id of selectedIds) {
-      if (rowIdSet.has(id)) visibleCount++;
-    }
-
-    if (visibleCount === 0) return false;
-    if (visibleCount === rowIds.length) return true;
-    return 'indeterminate';
-  }, [
-    externalSelectedIds,
-    internalSelection.headerCheckboxState,
-    selectedIds,
-    rowIdSet,
-    rowIds.length,
-  ]);
-
-  // Use stable selection refs to prevent column recreation loops
-  const {
-    selectedIdsRef,
-    headerCheckboxStateRef,
-    toggleSelect,
-    toggleSelectAll,
-  } = useStableSelectionRefs({
-    selectedIds,
-    rowIds,
-    headerCheckboxState,
-    onSelectionChange,
-    internalToggleSelect: internalSelection.toggleSelect,
-    internalToggleSelectAll: internalSelection.toggleSelectAll,
-  });
-
-  // Refs for bulk actions header
-  const selectedCountRef = useRef(selectedIds.size);
-  const bulkActionsRef = useRef(bulkActions);
-
-  // Update refs in effect rather than during render
-  useEffect(() => {
-    selectedCountRef.current = selectedIds.size;
-    bulkActionsRef.current = bulkActions;
-  }, [selectedIds.size, bulkActions]);
 
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
@@ -280,18 +208,14 @@ export function ReleaseTable({
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
-      const isSelected = selectedIdsRef.current?.has(row.id);
       const isRowExpanded = showTracks && isExpanded(row.id);
 
-      if (isSelected) {
-        return 'bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-primary/8 dark:hover:bg-primary/15';
-      }
       if (isRowExpanded) {
         return 'bg-surface-2/30 hover:bg-surface-2/50';
       }
       return 'hover:bg-surface-2/50';
     },
-    [selectedIdsRef, showTracks, isExpanded]
+    [showTracks, isExpanded]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -307,27 +231,11 @@ export function ReleaseTable({
     [releases, onFocusedRowChange]
   );
 
-  // Build column definitions (dynamic columns only)
-  /* eslint-disable react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render */
+  // Build column definitions
   const columns = useMemo(() => {
-    const checkboxColumn = columnHelper.display({
-      id: 'select',
-      header: createSelectHeaderRenderer(
-        headerCheckboxStateRef,
-        toggleSelectAll
-      ),
-      cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
-      size: 56,
-      meta: { className: 'hidden sm:table-cell' },
-    });
-
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
-      header: createReleaseHeaderRenderer(
-        selectedCountRef,
-        bulkActionsRef,
-        onClearSelection
-      ),
+      header: () => <span>Release</span>,
       cell: showTracks
         ? createExpandableReleaseCellRenderer(
             artistName,
@@ -351,31 +259,14 @@ export function ReleaseTable({
       meta: { className: 'hidden sm:table-cell' },
     });
 
-    // Return all columns - TanStack Table handles visibility natively
-    // Right meta packs smart link + popularity + year; header is sr-only for a11y.
-    // Note: releaseType, availability, and ISRC columns moved to ReleaseSidebar drawer only
-    // UPC column removed per design request.
-    return [checkboxColumn, releaseColumn, rightMetaColumn];
-  }, [
-    artistName,
-    onClearSelection,
-    headerCheckboxStateRef,
-    selectedIdsRef,
-    toggleSelect,
-    toggleSelectAll,
-    showTracks,
-    isExpanded,
-    isLoadingTracks,
-    toggleExpansion,
-  ]);
-  /* eslint-enable react-hooks/refs */
+    return [releaseColumn, rightMetaColumn];
+  }, [artistName, showTracks, isExpanded, isLoadingTracks, toggleExpansion]);
 
-  // Transform columnVisibility to TanStack format (always show select and release)
+  // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
     if (!columnVisibility) return undefined;
     return {
       ...columnVisibility,
-      select: true,
       release: true,
     };
   }, [columnVisibility]);

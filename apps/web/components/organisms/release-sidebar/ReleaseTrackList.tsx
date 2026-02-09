@@ -1,21 +1,44 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Link2,
+  Loader2,
+  MoreHorizontal,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
 import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
 
 interface ReleaseTrackListProps {
   readonly release: Release;
+  readonly onTrackClick?: (track: TrackViewModel) => void;
 }
 
-export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
+export function ReleaseTrackList({
+  release,
+  onTrackClick,
+}: ReleaseTrackListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [tracks, setTracks] = useState<TrackViewModel[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,18 +115,45 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
             !hasError &&
             tracks &&
             tracks.length > 0 &&
-            tracks.map(track => <TrackItem key={track.id} track={track} />)}
+            tracks.map(track => (
+              <TrackItem key={track.id} track={track} onClick={onTrackClick} />
+            ))}
         </div>
       )}
     </DrawerSection>
   );
 }
 
-function TrackItem({ track }: { readonly track: TrackViewModel }) {
+function TrackItem({
+  track,
+  onClick,
+}: {
+  readonly track: TrackViewModel;
+  readonly onClick?: (track: TrackViewModel) => void;
+}) {
   const trackLabel =
     track.discNumber > 1
       ? `${track.discNumber}-${track.trackNumber}`
       : String(track.trackNumber);
+
+  const handleClick = useCallback(() => {
+    onClick?.(track);
+  }, [onClick, track]);
+
+  const handleCopyIsrc = useCallback(() => {
+    if (track.isrc) {
+      navigator.clipboard.writeText(track.isrc);
+      toast.success('ISRC copied');
+    }
+  }, [track.isrc]);
+
+  const handleCopySmartLink = useCallback(() => {
+    const smartLinkUrl = `${getBaseUrl()}${track.smartLinkPath}`;
+    navigator.clipboard.writeText(smartLinkUrl);
+    toast.success('Smart link copied');
+  }, [track.smartLinkPath]);
+
+  const streamingProviders = track.providers.filter(p => p.url);
 
   return (
     <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-surface-2/50 transition-colors'>
@@ -112,12 +162,16 @@ function TrackItem({ track }: { readonly track: TrackViewModel }) {
         {trackLabel}.
       </span>
 
-      {/* Track details */}
-      <div className='min-w-0 flex-1'>
+      {/* Track details - clickable */}
+      <button
+        type='button'
+        onClick={handleClick}
+        className='min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+      >
         <div className='flex items-center gap-1.5'>
           <TruncatedText
             lines={1}
-            className='text-xs text-primary-token'
+            className='text-xs text-primary-token hover:underline'
             tooltipSide='top'
           >
             {track.title}
@@ -144,16 +198,97 @@ function TrackItem({ track }: { readonly track: TrackViewModel }) {
               {track.durationMs != null && (
                 <span className='text-tertiary-token/50'>|</span>
               )}
-              <CopyableMonospaceCell
-                value={track.isrc}
-                label='ISRC'
-                maxWidth={110}
-                className='!text-[11px] !text-tertiary-token hover:!text-secondary-token'
-              />
+              <span className='font-mono text-[10px]'>{track.isrc}</span>
             </>
           )}
         </div>
-      </div>
+      </button>
+
+      {/* Actions menu */}
+      <TrackActionsMenu
+        track={track}
+        streamingProviders={streamingProviders}
+        onCopyIsrc={handleCopyIsrc}
+        onCopySmartLink={handleCopySmartLink}
+      />
     </div>
+  );
+}
+
+/** Provider label mapping for streaming platform names */
+const PROVIDER_LABELS: Record<string, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube: 'YouTube Music',
+  soundcloud: 'SoundCloud',
+  deezer: 'Deezer',
+  tidal: 'Tidal',
+  amazon_music: 'Amazon Music',
+  bandcamp: 'Bandcamp',
+  beatport: 'Beatport',
+};
+
+function TrackActionsMenu({
+  track,
+  streamingProviders,
+  onCopyIsrc,
+  onCopySmartLink,
+}: {
+  readonly track: TrackViewModel;
+  readonly streamingProviders: TrackViewModel['providers'];
+  readonly onCopyIsrc: () => void;
+  readonly onCopySmartLink: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          className='shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          aria-label={`Actions for ${track.title}`}
+        >
+          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' className='w-48'>
+        {track.isrc && (
+          <DropdownMenuItem onClick={onCopyIsrc}>
+            <Copy className='mr-2 h-3.5 w-3.5' />
+            Copy ISRC
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={onCopySmartLink}>
+          <Link2 className='mr-2 h-3.5 w-3.5' />
+          Copy smart link
+        </DropdownMenuItem>
+        {streamingProviders.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <ExternalLink className='mr-2 h-3.5 w-3.5' />
+                Open on platform
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {streamingProviders.map(provider => (
+                  <DropdownMenuItem
+                    key={provider.key}
+                    onClick={() =>
+                      globalThis.open(
+                        provider.url,
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                  >
+                    {PROVIDER_LABELS[provider.key] ?? provider.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

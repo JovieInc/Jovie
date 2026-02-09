@@ -543,6 +543,8 @@ function mapTrackToViewModel(
     id: track.id,
     releaseId: track.releaseId,
     title: track.title,
+    slug: track.slug,
+    smartLinkPath: buildSmartLinkPath(profileHandle, releaseSlug),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
