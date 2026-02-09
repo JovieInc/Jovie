@@ -401,9 +401,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                     <div
                       className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
                       style={{
-                        backgroundColor: meta
-                          ? `#${meta.color}12`
-                          : undefined,
+                        backgroundColor: meta ? `#${meta.color}12` : undefined,
                         color: meta
                           ? getContrastSafeIconColor(
                               `#${meta.color}`,

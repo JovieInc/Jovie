@@ -7,10 +7,7 @@ import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
 } from '@/lib/queries/useDashboardSocialLinksQuery';
-import {
-  type DspMatch,
-  useDspMatchesQuery,
-} from '@/lib/queries/useDspMatchesQuery';
+import { useDspMatchesQuery } from '@/lib/queries/useDspMatchesQuery';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { Artist, CreatorProfile } from '@/types/db';
 import { convertCreatorProfileToArtist } from '@/types/db';
