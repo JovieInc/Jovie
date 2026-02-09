@@ -389,6 +389,7 @@ function createReleaseTool(resolvedProfileId: string) {
       .describe('The type of release'),
     releaseDate: z
       .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
       .optional()
       .describe(
         'Release date in ISO 8601 format (YYYY-MM-DD). Use the date the music was or will be released.'
@@ -407,6 +408,18 @@ function createReleaseTool(resolvedProfileId: string) {
     inputSchema: createReleaseSchema,
     execute: async ({ title, releaseType, releaseDate, label, upc }) => {
       try {
+        // Validate date if provided
+        let parsedDate: Date | null = null;
+        if (releaseDate) {
+          parsedDate = new Date(releaseDate);
+          if (isNaN(parsedDate.getTime())) {
+            return {
+              success: false,
+              error: 'Invalid date. Please use YYYY-MM-DD format.',
+            };
+          }
+        }
+
         const slug = await generateUniqueSlug(
           resolvedProfileId,
           title,
@@ -418,7 +431,7 @@ function createReleaseTool(resolvedProfileId: string) {
           title,
           slug,
           releaseType,
-          releaseDate: releaseDate ? new Date(releaseDate) : null,
+          releaseDate: parsedDate,
           label: label ?? null,
           upc: upc ?? null,
           sourceType: 'manual',
