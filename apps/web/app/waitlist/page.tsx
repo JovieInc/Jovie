@@ -48,6 +48,9 @@ export default function WaitlistPage() {
     useState<SocialPlatform>('instagram');
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
   const [spotifyUrl, setSpotifyUrl] = useState('');
+  const [spotifyArtistName, setSpotifyArtistName] = useState<string | null>(
+    null
+  );
   const [heardAbout, setHeardAbout] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -144,6 +147,13 @@ export default function WaitlistPage() {
         setSpotifyUrl(storedSpotifyUrl);
       }
 
+      const storedSpotifyArtistName = globalThis.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.spotifyArtistName
+      );
+      if (storedSpotifyArtistName) {
+        setSpotifyArtistName(storedSpotifyArtistName);
+      }
+
       const storedHeardAbout = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.heardAbout
       );
@@ -174,6 +184,7 @@ export default function WaitlistPage() {
     persist(WAITLIST_STORAGE_KEYS.socialPlatform, socialPlatform);
     persist(WAITLIST_STORAGE_KEYS.primarySocialUrl, primarySocialUrl || null);
     persist(WAITLIST_STORAGE_KEYS.spotifyUrl, spotifyUrl || null);
+    persist(WAITLIST_STORAGE_KEYS.spotifyArtistName, spotifyArtistName);
     persist(WAITLIST_STORAGE_KEYS.heardAbout, heardAbout || null);
   }, [
     step,
@@ -181,6 +192,7 @@ export default function WaitlistPage() {
     socialPlatform,
     primarySocialUrl,
     spotifyUrl,
+    spotifyArtistName,
     heardAbout,
   ]);
 
@@ -386,6 +398,7 @@ export default function WaitlistPage() {
         primaryGoal: primaryGoal!,
         primarySocialUrl: resolvedPrimarySocialUrl,
         spotifyUrl: normalizedSpotifyUrl,
+        spotifyArtistName: spotifyArtistName || null,
         heardAbout: sanitizedHeardAbout,
         selectedPlan,
       },
@@ -496,6 +509,7 @@ export default function WaitlistPage() {
               isSubmitting={isSubmitting}
               isHydrating={isHydrating}
               onSpotifyUrlChange={setSpotifyUrl}
+              onSpotifyArtistNameChange={setSpotifyArtistName}
               onHeardAboutChange={setHeardAbout}
               setSpotifyUrlInputRef={el => {
                 spotifyUrlInputRef.current = el;
