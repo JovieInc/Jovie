@@ -11,6 +11,8 @@ import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import { upsertRelease } from '@/lib/discography/queries';
+import { generateUniqueSlug } from '@/lib/discography/slug';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
@@ -298,7 +300,24 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
 
-When asked to edit a blocked field, explain that they need to visit the settings page to make that change.`;
+When asked to edit a blocked field, explain that they need to visit the settings page to make that change.
+
+## Release Creation
+You can create new releases using the createRelease tool. This is useful for artists who:
+- Are not on Spotify and need to manually add their discography
+- Want to set up smart links for an upcoming release before it's live on streaming platforms
+- Have releases on platforms that aren't synced automatically
+
+When an artist asks to create a release, gather at minimum:
+- **Title** (required)
+- **Release type** (single, ep, album, compilation, live, mixtape, or other)
+
+Optional fields you can ask about:
+- **Release date** (when it was or will be released)
+- **Label** (record label name)
+- **UPC** (barcode, most artists won't know this)
+
+After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.`;
 }
 
 /**
@@ -346,6 +365,81 @@ function createProfileEditTool(context: ArtistContext) {
           reason,
         },
       };
+    },
+  });
+}
+
+/**
+ * Creates the createRelease tool for the AI to add new releases to the artist's discography.
+ * This tool directly creates the release in the database and returns the result.
+ */
+function createReleaseTool(resolvedProfileId: string) {
+  const createReleaseSchema = z.object({
+    title: z.string().min(1).max(200).describe('The title of the release'),
+    releaseType: z
+      .enum([
+        'single',
+        'ep',
+        'album',
+        'compilation',
+        'live',
+        'mixtape',
+        'other',
+      ])
+      .describe('The type of release'),
+    releaseDate: z
+      .string()
+      .optional()
+      .describe(
+        'Release date in ISO 8601 format (YYYY-MM-DD). Use the date the music was or will be released.'
+      ),
+    label: z.string().max(200).optional().describe('Record label name, if any'),
+    upc: z
+      .string()
+      .max(20)
+      .optional()
+      .describe('UPC/EAN barcode for the release, if known'),
+  });
+
+  return tool({
+    description:
+      "Create a new release in the artist's discography. Use this when the artist wants to add a release that isn't synced from Spotify — for example, a new single, EP, or album they want to set up smart links for. Ask for the title and release type at minimum before calling this tool.",
+    inputSchema: createReleaseSchema,
+    execute: async ({ title, releaseType, releaseDate, label, upc }) => {
+      try {
+        const slug = await generateUniqueSlug(
+          resolvedProfileId,
+          title,
+          'release'
+        );
+
+        const release = await upsertRelease({
+          creatorProfileId: resolvedProfileId,
+          title,
+          slug,
+          releaseType,
+          releaseDate: releaseDate ? new Date(releaseDate) : null,
+          label: label ?? null,
+          upc: upc ?? null,
+          sourceType: 'manual',
+        });
+
+        return {
+          success: true,
+          release: {
+            id: release.id,
+            title: release.title,
+            slug: release.slug,
+            releaseType: release.releaseType,
+            releaseDate: release.releaseDate?.toISOString() ?? null,
+            label: release.label,
+          },
+        };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to create release';
+        return { success: false, error: message };
+      }
     },
   });
 }
@@ -466,12 +560,20 @@ export async function POST(req: Request) {
     // Convert UIMessages (from the client) to ModelMessages (for streamText)
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    // Build tools: always include profile edit, conditionally include release creation
+    const resolvedProfileId =
+      profileId && typeof profileId === 'string' ? profileId : null;
+
     const result = streamText({
       model: gateway('anthropic:claude-sonnet-4-20250514'),
       system: systemPrompt,
       messages: modelMessages,
       tools: {
         proposeProfileEdit: createProfileEditTool(artistContext),
+        // Only enable release creation when we have a verified profileId
+        ...(resolvedProfileId
+          ? { createRelease: createReleaseTool(resolvedProfileId) }
+          : {}),
       },
       abortSignal: req.signal,
       onError: ({ error }) => {
