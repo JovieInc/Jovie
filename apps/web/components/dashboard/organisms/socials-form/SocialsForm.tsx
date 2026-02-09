@@ -5,13 +5,18 @@ import {
   Input,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { Share2 } from 'lucide-react';
-import { FormField } from '@/components/molecules/FormField';
+import { Plus, Share2, Trash2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
 
@@ -20,6 +25,56 @@ const SOCIALS_FORM_LOADING_KEYS = [
   'socials-form-loading-2',
   'socials-form-loading-3',
 ];
+
+/** Platforms available in the social links selector, grouped by category. */
+const SOCIAL_PLATFORM_GROUPS = [
+  {
+    label: 'Social Media',
+    platforms: ALL_PLATFORMS.filter(p => p.category === 'social'),
+  },
+  {
+    label: 'Creator Platforms',
+    platforms: ALL_PLATFORMS.filter(p => p.category === 'creator'),
+  },
+  {
+    label: 'Messaging',
+    platforms: ALL_PLATFORMS.filter(p => p.category === 'messaging'),
+  },
+  {
+    label: 'Professional',
+    platforms: ALL_PLATFORMS.filter(p => p.category === 'professional'),
+  },
+] as const;
+
+/** Smart placeholder text per platform. */
+const PLATFORM_PLACEHOLDERS: Record<string, string> = {
+  instagram: 'https://instagram.com/yourhandle',
+  twitter: 'https://x.com/yourhandle',
+  x: 'https://x.com/yourhandle',
+  tiktok: 'https://tiktok.com/@yourhandle',
+  youtube: 'https://youtube.com/@yourchannel',
+  facebook: 'https://facebook.com/yourpage',
+  linkedin: 'https://linkedin.com/in/yourprofile',
+  snapchat: 'https://snapchat.com/add/yourusername',
+  pinterest: 'https://pinterest.com/yourprofile',
+  reddit: 'https://reddit.com/u/yourusername',
+  twitch: 'https://twitch.tv/yourchannel',
+  discord: 'https://discord.gg/yourinvite',
+  patreon: 'https://patreon.com/yourpage',
+  telegram: 'https://t.me/yourhandle',
+  whatsapp: 'https://wa.me/yournumber',
+  website: 'https://yourwebsite.com',
+  blog: 'https://yourblog.com',
+  email: 'mailto:you@example.com',
+};
+
+function getPlaceholder(platform: string): string {
+  return PLATFORM_PLACEHOLDERS[platform] || 'https://...';
+}
+
+function getPlatformLabel(platform: string): string {
+  return PLATFORM_METADATA_MAP[platform]?.name || platform;
+}
 
 export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   const {
@@ -34,14 +89,16 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     handleUrlBlur,
     addSocialLink,
   } = useSocialsForm({ artistId: artist.id });
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   if (loading) {
     return (
-      <div className='space-y-4'>
+      <div className='space-y-3'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div
             key={key}
-            className='h-16 bg-surface-2 rounded-lg animate-pulse motion-reduce:animate-none'
+            className='h-[72px] bg-surface-2 rounded-lg animate-pulse motion-reduce:animate-none'
           />
         ))}
       </div>
@@ -49,19 +106,17 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   }
 
   return (
-    <div className='space-y-4' data-testid='socials-form'>
+    <div className='space-y-5' data-testid='socials-form'>
+      {/* Header */}
       <div className='flex items-center justify-between'>
-        <h3 className='text-[14px] font-medium text-primary-token'>
-          Social Media Links
-        </h3>
-        <Button
-          type='button'
-          variant='secondary'
-          onClick={addSocialLink}
-          className='text-sm whitespace-nowrap'
-        >
-          Add Link
-        </Button>
+        <div>
+          <h3 className='text-[14px] font-medium text-primary-token'>
+            Social Media Links
+          </h3>
+          <p className='text-[13px] text-secondary mt-0.5'>
+            Add your social profiles so fans can find you everywhere.
+          </p>
+        </div>
       </div>
 
       {socialLinks.length === 0 ? (
@@ -75,71 +130,117 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
           }}
         />
       ) : (
-        <div className='space-y-4'>
+        <form onSubmit={handleSubmit} className='space-y-3'>
           {socialLinks.map((link, index) => (
             <div
-              key={link.id}
-              className='flex items-center space-x-3 p-4 border border-subtle rounded-lg'
+              key={link.id || `new-${index}`}
+              className='group relative rounded-lg border border-subtle bg-surface-1 p-3 transition-colors hover:border-primary/20'
             >
-              <FormField label='Platform' className='w-32'>
-                <Select
-                  value={link.platform}
-                  onValueChange={value =>
-                    updateSocialLink(index, 'platform', value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder='Select platform' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='instagram'>Instagram</SelectItem>
-                    <SelectItem value='twitter'>Twitter</SelectItem>
-                    <SelectItem value='tiktok'>TikTok</SelectItem>
-                    <SelectItem value='youtube'>YouTube</SelectItem>
-                    <SelectItem value='facebook'>Facebook</SelectItem>
-                    <SelectItem value='linkedin'>LinkedIn</SelectItem>
-                    <SelectItem value='website'>Website</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormField>
+              {/* Mobile: stacked, Desktop: row */}
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+                {/* Platform selector with icon */}
+                <div className='flex items-center gap-2 sm:w-[180px] shrink-0'>
+                  <div
+                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
+                    style={{
+                      backgroundColor: PLATFORM_METADATA_MAP[link.platform]
+                        ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
+                        : undefined,
+                      color: PLATFORM_METADATA_MAP[link.platform]
+                        ? getContrastSafeIconColor(
+                            `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                            isDark
+                          )
+                        : undefined,
+                    }}
+                  >
+                    <SocialIcon
+                      platform={link.platform}
+                      className='h-4 w-4'
+                      aria-hidden
+                    />
+                  </div>
+                  <Select
+                    value={link.platform}
+                    onValueChange={value =>
+                      updateSocialLink(index, 'platform', value)
+                    }
+                  >
+                    <SelectTrigger className='flex-1 sm:w-[140px]'>
+                      <SelectValue placeholder='Platform' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOCIAL_PLATFORM_GROUPS.map(group => (
+                        <SelectGroup key={group.label}>
+                          <SelectLabel>{group.label}</SelectLabel>
+                          {group.platforms.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <Input
-                type='url'
-                value={link.url}
-                onChange={e => {
-                  const v = e.target.value;
-                  updateSocialLink(index, 'url', v);
-                  scheduleNormalize(index, v);
-                }}
-                onBlur={() => handleUrlBlur(index)}
-                placeholder='https://...'
-                inputMode='url'
-                autoCapitalize='none'
-                autoCorrect='off'
-                autoComplete='off'
-                className='flex-1'
-              />
+                {/* URL input */}
+                <div className='flex flex-1 items-center gap-2'>
+                  <Input
+                    type='url'
+                    value={link.url}
+                    onChange={e => {
+                      const v = e.target.value;
+                      updateSocialLink(index, 'url', v);
+                      scheduleNormalize(index, v);
+                    }}
+                    onBlur={() => handleUrlBlur(index)}
+                    placeholder={getPlaceholder(link.platform)}
+                    inputMode='url'
+                    autoCapitalize='none'
+                    autoCorrect='off'
+                    autoComplete='off'
+                    className='flex-1'
+                    aria-label={`${getPlatformLabel(link.platform)} URL`}
+                  />
 
-              <Button
-                type='button'
-                variant='secondary'
-                onClick={() => removeSocialLink(index)}
-                className='text-error hover:opacity-80'
-              >
-                Remove
-              </Button>
+                  {/* Remove button */}
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => removeSocialLink(index)}
+                    className='shrink-0 text-tertiary-token hover:text-error transition-colors'
+                    aria-label={`Remove ${getPlatformLabel(link.platform)}`}
+                  >
+                    <Trash2 className='h-4 w-4' />
+                  </Button>
+                </div>
+              </div>
             </div>
           ))}
 
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            variant='primary'
-            className='w-full'
-          >
-            {loading ? 'Saving...' : 'Save Social Links'}
-          </Button>
-        </div>
+          {/* Add + Save row */}
+          <div className='flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between'>
+            <Button
+              type='button'
+              variant='outline'
+              size='sm'
+              onClick={addSocialLink}
+              className='gap-1.5'
+            >
+              <Plus className='h-3.5 w-3.5' />
+              Add Link
+            </Button>
+            <Button
+              type='submit'
+              variant='primary'
+              className='w-full sm:w-auto'
+            >
+              Save Social Links
+            </Button>
+          </div>
+        </form>
       )}
 
       {error && (

@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect } from 'react';
+import { isFormElement } from '@/lib/utils/keyboard';
 
 export interface UseSidebarStateOptions {
   /** Whether the sidebar is open */
@@ -30,19 +31,9 @@ export function useSidebarState({
     if (!isOpen || !closeOnEscape || !onClose) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        // Don't close if focus is in a form element
-        const target = event.target as HTMLElement;
-        const isFormElement =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable;
-
-        if (!isFormElement) {
-          event.preventDefault();
-          onClose();
-        }
+      if (event.key === 'Escape' && !isFormElement(event.target)) {
+        event.preventDefault();
+        onClose();
       }
     };
 

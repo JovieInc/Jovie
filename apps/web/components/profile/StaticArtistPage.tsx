@@ -79,13 +79,14 @@ interface StaticArtistPageProps {
   readonly latestRelease?: DiscogRelease | null;
 }
 
-function renderContent(
-  mode: string,
+/**
+ * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
+ * Artist DSPs take priority (listed first).
+ */
+function getMergedDSPs(
   artist: Artist,
-  socialLinks: LegacySocialLink[],
-  primaryAction: PrimaryAction,
-  enableDynamicEngagement: boolean
-) {
+  socialLinks: LegacySocialLink[]
+): AvailableDSP[] {
   const socialDSPs: AvailableDSP[] = (() => {
     const mapped = socialLinks
       .filter(link => link.url)
@@ -117,14 +118,21 @@ function renderContent(
   })();
 
   const artistDSPs = getAvailableDSPs(artist);
-  const mergedDSPs = (() => {
-    const byKey = new Map<string, AvailableDSP>();
-    [...artistDSPs, ...socialDSPs].forEach(dsp => {
-      if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
-    });
-    return Array.from(byKey.values());
-  })();
+  const byKey = new Map<string, AvailableDSP>();
+  [...artistDSPs, ...socialDSPs].forEach(dsp => {
+    if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
+  });
+  return Array.from(byKey.values());
+}
 
+function renderContent(
+  mode: string,
+  artist: Artist,
+  socialLinks: LegacySocialLink[],
+  mergedDSPs: AvailableDSP[],
+  primaryAction: PrimaryAction,
+  enableDynamicEngagement: boolean
+) {
   switch (mode) {
     case 'listen':
       return (
@@ -203,6 +211,7 @@ export function StaticArtistPage({
   latestRelease,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
+  const mergedDSPs = getMergedDSPs(artist, socialLinks);
 
   return (
     <div className='w-full'>
@@ -230,6 +239,8 @@ export function StaticArtistPage({
                 <ProfilePrimaryCTA
                   artist={artist}
                   socialLinks={socialLinks}
+                  mergedDSPs={mergedDSPs}
+                  enableDynamicEngagement={enableDynamicEngagement}
                   autoOpenCapture={resolvedAutoOpenCapture}
                   showCapture
                 />
@@ -240,6 +251,7 @@ export function StaticArtistPage({
               mode,
               artist,
               socialLinks,
+              mergedDSPs,
               primaryAction,
               enableDynamicEngagement
             )

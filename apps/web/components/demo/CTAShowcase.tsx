@@ -17,7 +17,7 @@ export function CTAShowcase() {
   };
 
   return (
-    <section className='py-20 border-t border-gray-200 dark:border-white/5'>
+    <section className='py-20 border-t border-subtle'>
       <div className='mx-auto max-w-5xl px-6'>
         <h2 className='text-2xl font-semibold mb-6'>Apple-Level CTA Buttons</h2>
         <p className='text-gray-600 dark:text-white/70 mb-8'>

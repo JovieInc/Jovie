@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 
 /**
  * Configuration for creating an admin route handler
@@ -67,6 +67,17 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
     // Check admin authorization
     const entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAdmin) {
+      captureWarning(
+        `[admin/route-factory] Admin auth denied for ${config.actionName}`,
+        {
+          route: config.errorContext.route,
+          action: config.errorContext.action,
+          userId: entitlements.userId,
+          email: entitlements.email,
+          isAuthenticated: entitlements.isAuthenticated,
+        }
+      );
+
       if (wantsJson) {
         return NextResponse.json(
           { success: false, error: 'Unauthorized - admin access required' },

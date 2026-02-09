@@ -15,6 +15,8 @@ interface ConversationWithMessages {
 interface ConversationOptions {
   conversationId: string | null;
   enabled?: boolean;
+  /** Poll interval in ms. Use to poll for title generation. Pass false to disable. */
+  refetchInterval?: number | false;
 }
 
 async function fetchConversation(
@@ -30,6 +32,8 @@ async function fetchConversation(
 /**
  * Query hook for fetching a single conversation with all its messages.
  *
+ * Supports `refetchInterval` for polling during title generation.
+ *
  * @example
  * ```tsx
  * const { data, isLoading } = useChatConversationQuery({
@@ -40,6 +44,7 @@ async function fetchConversation(
 export function useChatConversationQuery({
   conversationId,
   enabled = true,
+  refetchInterval = false,
 }: ConversationOptions) {
   return useQuery({
     queryKey: queryKeys.chat.conversation(conversationId ?? ''),
@@ -47,5 +52,6 @@ export function useChatConversationQuery({
     enabled: enabled && !!conversationId,
     staleTime: 10_000, // 10 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval,
   });
 }
