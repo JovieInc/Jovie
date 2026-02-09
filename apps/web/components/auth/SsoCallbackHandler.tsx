@@ -60,14 +60,13 @@ export function SsoCallbackHandler({
   // If we're handling a hash redirect, show a loading state
   if (isHandlingHash) {
     return (
-      <div
+      <output
         className='flex flex-col items-center justify-center min-h-[200px] gap-3'
         aria-busy='true'
-        role='status'
       >
         <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary-token' />
         <p className='text-sm text-secondary-token'>Signing you in…</p>
-      </div>
+      </output>
     );
   }
 

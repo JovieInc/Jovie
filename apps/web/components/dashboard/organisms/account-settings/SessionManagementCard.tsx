@@ -186,9 +186,10 @@ export function SessionManagementCard({
         confirmLabel='End session'
         variant='destructive'
         onConfirm={() => {
-          if (sessionToEnd) {
-            void handleEndSession(sessionToEnd);
-          }
+          if (!sessionToEnd) return;
+          const session = sessionToEnd;
+          setSessionToEnd(null);
+          void handleEndSession(session);
         }}
       />
     </DashboardCard>

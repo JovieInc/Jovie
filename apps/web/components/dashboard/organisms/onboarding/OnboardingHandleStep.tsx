@@ -230,7 +230,14 @@ export function OnboardingHandleStep({
             type='submit'
             disabled={Boolean(ctaDisabledReason) || isTransitioning}
             variant='primary'
-            aria-describedby={ctaDisabledReason ? 'cta-hint' : undefined}
+            aria-describedby={
+              ctaDisabledReason &&
+              !isSubmitting &&
+              !handleValidation.checking &&
+              !stateError
+                ? 'cta-hint'
+                : undefined
+            }
           >
             <ButtonContent
               isSubmitting={isSubmitting}

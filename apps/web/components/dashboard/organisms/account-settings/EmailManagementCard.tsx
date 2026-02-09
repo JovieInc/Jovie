@@ -212,9 +212,10 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
         confirmLabel='Remove'
         variant='destructive'
         onConfirm={() => {
-          if (emailToRemove) {
-            handleRemoveEmail(emailToRemove.ref);
-          }
+          if (!emailToRemove) return;
+          const { ref } = emailToRemove;
+          setEmailToRemove(null);
+          void handleRemoveEmail(ref);
         }}
       />
     </DashboardCard>

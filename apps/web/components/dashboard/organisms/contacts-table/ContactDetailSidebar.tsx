@@ -67,8 +67,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIsSavingRef = useRef(false);
 
   // Reset editing state when contact changes
@@ -80,11 +80,20 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   // Show "Saved" indicator when save completes
   useEffect(() => {
     if (prevIsSavingRef.current && !contact?.isSaving) {
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
       setShowSaved(true);
       savedTimeoutRef.current = setTimeout(() => setShowSaved(false), 2000);
     }
     prevIsSavingRef.current = contact?.isSaving ?? false;
   }, [contact?.isSaving]);
+
+  // Cancel pending debounce and reset saved state on contact switch
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+    setShowSaved(false);
+    prevIsSavingRef.current = contact?.isSaving ?? false;
+  }, [contact?.id, contact?.isSaving]);
 
   // Clean up timeouts on unmount
   useEffect(() => {
@@ -389,9 +398,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
         {/* Save status indicator */}
         {contact.isSaving && (
-          <div className='text-xs text-tertiary-token text-center'>
-            Saving…
-          </div>
+          <div className='text-xs text-tertiary-token text-center'>Saving…</div>
         )}
         {showSaved && !contact.isSaving && (
           <div className='text-xs text-emerald-600 text-center animate-in fade-in duration-200'>
