@@ -51,16 +51,16 @@ export function ComparisonSection() {
       </div>
 
       <div className='mx-auto max-w-5xl'>
-        <div className='bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden'>
+        <div className='bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-subtle rounded-2xl overflow-hidden'>
           {/* Header */}
           <div className='grid grid-cols-3 gap-0 bg-gray-100/80 dark:bg-white/10'>
             <div className='p-6 font-semibold text-gray-900 dark:text-white'>
               Feature
             </div>
-            <div className='p-6 font-semibold text-gray-600 dark:text-gray-300 border-l border-gray-200 dark:border-white/10'>
+            <div className='p-6 font-semibold text-gray-600 dark:text-gray-300 border-l border-gray-200 dark:border-subtle'>
               Linktree
             </div>
-            <div className='p-6 font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text border-l border-gray-200 dark:border-white/10'>
+            <div className='p-6 font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text border-l border-gray-200 dark:border-subtle'>
               Jovie
             </div>
           </div>
@@ -72,16 +72,16 @@ export function ComparisonSection() {
               className={`grid grid-cols-3 gap-0 ${
                 index === comparisons.length - 1
                   ? ''
-                  : 'border-b border-gray-200 dark:border-white/10'
+                  : 'border-b border-gray-200 dark:border-subtle'
               }`}
             >
               <div className='p-6 font-medium text-gray-900 dark:text-white'>
                 {comparison.category}
               </div>
-              <div className='p-6 text-gray-600 dark:text-gray-300 border-l border-gray-200 dark:border-white/10'>
+              <div className='p-6 text-gray-600 dark:text-gray-300 border-l border-gray-200 dark:border-subtle'>
                 {comparison.linktree}
               </div>
-              <div className='p-6 text-gray-900 dark:text-white font-medium border-l border-gray-200 dark:border-white/10 bg-gradient-to-r from-blue-500/5 to-purple-500/5'>
+              <div className='p-6 text-gray-900 dark:text-white font-medium border-l border-gray-200 dark:border-subtle bg-gradient-to-r from-blue-500/5 to-purple-500/5'>
                 {comparison.jovie}
               </div>
             </div>

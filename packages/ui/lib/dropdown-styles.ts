@@ -17,7 +17,7 @@
  * Design tokens used:
  * - Border radius: rounded-lg (8px)
  * - Background: bg-surface-0 / dark:bg-surface-2 (elevated)
- * - Border: border-subtle/60 / dark:border-white/[0.06]
+ * - Border: border-subtle (uses design token for both modes)
  * - Shadow: consistent across all variants
  * - Transition: duration-150 ease-out
  */
@@ -50,7 +50,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses design token (--color-border-default) for consistency across themes
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-surface-0 dark:bg-surface-2 p-1 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-0 dark:bg-surface-2 p-1 text-primary-token';
 
 /**
  * Shadow effect for elevated appearance
@@ -286,7 +286,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle/60 dark:border-white/[0.06] bg-surface-0 dark:bg-surface-2 p-0.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-0 dark:bg-surface-2 p-0.5 text-primary-token';
 
 /**
  * Complete compact DropdownMenu content classes
