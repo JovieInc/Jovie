@@ -1,9 +1,11 @@
 'use client';
 
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { UserButton } from '@/components/organisms/user-button';
 
 export function MobileNav({
   hidePricingLink = false,
@@ -83,12 +85,17 @@ export function MobileNav({
 
         {/* Auth actions - visible in mobile menu */}
         <div className='mobile-nav-auth'>
-          <Link href='/signin' className='mobile-nav-link' onClick={close}>
-            Log in
-          </Link>
-          <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
-            Sign up
-          </Link>
+          <SignedOut>
+            <Link href='/signin' className='mobile-nav-link' onClick={close}>
+              Log in
+            </Link>
+            <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
+              Sign up
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
         </div>
       </nav>
     </>
