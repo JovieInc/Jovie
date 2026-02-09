@@ -6,10 +6,19 @@
  * Header section of the contact sidebar with action buttons
  */
 
-import { Check, Copy, ExternalLink, IdCard, RefreshCw, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  IdCard,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useIsMobile } from '@/hooks/useMobile';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { Contact } from './types';
@@ -29,6 +38,7 @@ export function ContactSidebarHeader({
   onRefresh,
   onCopyProfileUrl,
 }: ContactSidebarHeaderProps) {
+  const isMobile = useIsMobile();
   const notifications = useNotifications();
   const showActions = hasContact && contact?.username;
   const [isCopied, setIsCopied] = useState(false);
@@ -72,12 +82,12 @@ export function ContactSidebarHeader({
   const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
 
-  // Close is always primary
+  // Close is always primary (ArrowLeft on mobile, X on desktop)
   if (onClose) {
     primaryActions.push({
       id: 'close',
-      label: 'Close contact sidebar',
-      icon: X,
+      label: isMobile ? 'Go back' : 'Close contact sidebar',
+      icon: isMobile ? ArrowLeft : X,
       onClick: onClose,
     });
   }
