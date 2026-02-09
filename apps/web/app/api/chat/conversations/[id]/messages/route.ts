@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionContext } from '@/lib/auth/session';
+import { TITLE_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
@@ -44,7 +45,7 @@ async function maybeGenerateTitle(
       .join('\n');
 
     const { text } = await generateText({
-      model: gateway('google:gemini-2.0-flash'),
+      model: gateway(TITLE_MODEL),
       system:
         'Generate a short, descriptive title (2-6 words) for this conversation. Return only the title text, no quotes or extra punctuation.',
       prompt: context,

@@ -5,6 +5,7 @@ import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { CHAT_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -578,7 +579,7 @@ export async function POST(req: Request) {
       profileId && typeof profileId === 'string' ? profileId : null;
 
     const result = streamText({
-      model: gateway('anthropic:claude-sonnet-4-20250514'),
+      model: gateway(CHAT_MODEL),
       system: systemPrompt,
       messages: modelMessages,
       tools: {
