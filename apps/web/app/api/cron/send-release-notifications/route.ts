@@ -47,6 +47,27 @@ interface ProcessingContext {
 
 type ProcessResult = 'sent' | 'failed' | 'skipped';
 
+/** Count settled promise results by outcome category. */
+function countSettledResults(results: PromiseSettledResult<ProcessResult>[]): {
+  sent: number;
+  failed: number;
+  skipped: number;
+} {
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      if (result.value === 'sent') sent++;
+      else if (result.value === 'failed') failed++;
+      else if (result.value === 'skipped') skipped++;
+    } else {
+      failed++;
+    }
+  }
+  return { sent, failed, skipped };
+}
+
 // Type aliases for batch-fetched data to simplify function signatures
 type BatchRelease = {
   id: string;
@@ -207,6 +228,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
       and(
         drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
       )
     );
@@ -541,15 +563,10 @@ export async function GET(request: Request) {
         )
       );
 
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          if (result.value === 'sent') totalSent++;
-          else if (result.value === 'failed') totalFailed++;
-          else if (result.value === 'skipped') totalSkipped++;
-        } else {
-          totalFailed++;
-        }
-      }
+      const counts = countSettledResults(results);
+      totalSent += counts.sent;
+      totalFailed += counts.failed;
+      totalSkipped += counts.skipped;
     }
 
     logger.info(

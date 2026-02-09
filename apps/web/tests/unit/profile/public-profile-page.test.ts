@@ -434,14 +434,14 @@ describe('Public Profile Page Logic', () => {
       expect(title).toBe('Test Artist - Music & Links');
     });
 
-    it('truncates bio to 120 chars in description', () => {
+    it('truncates bio to 155 chars in description', () => {
       const longBio =
-        'An amazing artist making great music. This bio is intentionally written to be longer than 120 characters for truncation testing purposes.';
-      const bioSnippet = longBio.slice(0, 120).trim();
-      const description = `${bioSnippet}${longBio.length > 120 ? '...' : ''}. rock, indie, alternative artist. Stream on Spotify, Apple Music & more.`;
+        'An amazing artist making great music. This bio is intentionally written to be longer than 155 characters for truncation testing purposes. Extra text here to exceed the limit easily.';
+      const bioSnippet = longBio.slice(0, 155).trim();
+      const description = `${bioSnippet}${longBio.length > 155 ? '...' : ''}. rock, indie, alternative artist. Stream on Spotify, Apple Music & more.`;
 
       expect(description).toContain('...');
-      expect(bioSnippet.length).toBeLessThanOrEqual(120);
+      expect(bioSnippet.length).toBeLessThanOrEqual(155);
     });
 
     it('uses display_name in metadata, falls back to username', () => {
@@ -481,25 +481,26 @@ describe('Public Profile Page Logic', () => {
       expect(profileUrl).toBe('https://jov.ie/testartist');
     });
 
-    it('includes og:image only when avatar_url exists', () => {
-      const withAvatar = mockProfile.avatar_url
-        ? [
-            {
-              url: mockProfile.avatar_url,
-              width: 400,
-              height: 400,
-              alt: `Test Artist profile picture`,
-            },
-          ]
-        : undefined;
-      expect(withAvatar).toBeDefined();
-      expect(withAvatar?.[0].url).toBe('https://example.com/avatar.jpg');
+    it('includes og:image with avatar or fallback default', () => {
+      const avatarUrl = mockProfile.avatar_url;
+      const ogImage = {
+        url: avatarUrl || `${BASE_URL}/og/default.png`,
+        width: avatarUrl ? 400 : 1200,
+        height: avatarUrl ? 400 : 630,
+        alt: `Test Artist profile picture`,
+      };
+      expect(ogImage.url).toBe('https://example.com/avatar.jpg');
+      expect(ogImage.width).toBe(400);
 
       const nullAvatar: string | null = null;
-      const withoutAvatar = nullAvatar
-        ? [{ url: '', width: 400, height: 400, alt: '' }]
-        : undefined;
-      expect(withoutAvatar).toBeUndefined();
+      const fallbackImage = {
+        url: nullAvatar || `${BASE_URL}/og/default.png`,
+        width: nullAvatar ? 400 : 1200,
+        height: nullAvatar ? 400 : 630,
+        alt: `Test Artist profile picture`,
+      };
+      expect(fallbackImage.url).toBe(`${BASE_URL}/og/default.png`);
+      expect(fallbackImage.width).toBe(1200);
     });
 
     it('sets robots to index and follow for public profiles', () => {
