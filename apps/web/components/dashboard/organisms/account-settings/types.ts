@@ -35,12 +35,30 @@ export interface ClerkSessionResource {
 export interface ClerkUserResource {
   primaryEmailAddressId: string | null;
   emailAddresses: ClerkEmailAddressResource[];
+  externalAccounts: ClerkExternalAccountResource[];
   getSessions: () => Promise<ClerkSessionResource[]>;
   createEmailAddress: (args: {
     email: string;
   }) => Promise<ClerkEmailAddressResource>;
   update: (args: { primaryEmailAddressId: string }) => Promise<unknown>;
   reload: () => Promise<void>;
+}
+
+/**
+ * Subset of Clerk's ExternalAccountResource type.
+ * Only includes properties used by ConnectedAccountsCard for display and disconnect functionality.
+ * For the full API, see: https://clerk.com/docs/references/javascript/external-account
+ */
+export interface ClerkExternalAccountResource {
+  id: string;
+  provider: string;
+  emailAddress?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  username?: string | null;
+  imageUrl?: string;
+  verification?: ClerkEmailVerification | null;
+  destroy: () => Promise<void>;
 }
 
 export type EmailStatus = 'idle' | 'sending' | 'code' | 'verifying';
