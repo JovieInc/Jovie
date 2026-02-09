@@ -82,7 +82,6 @@ describe('release artist links', () => {
             url: 'https://open.spotify.com',
           },
         ]}
-        slug='test-release'
       />
     );
 
@@ -104,7 +103,6 @@ describe('release artist links', () => {
           avatarUrl: null,
         }}
         providers={[]}
-        slug='test-release'
       />
     );
 
