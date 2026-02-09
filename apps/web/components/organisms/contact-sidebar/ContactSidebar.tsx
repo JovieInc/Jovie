@@ -1,16 +1,9 @@
 'use client';
 
-/**
- * ContactSidebar Component
- *
- * A sidebar component for displaying and editing contact details,
- * including avatar, name, username, and social links.
- */
-
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
-import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { Copy, ExternalLink, RefreshCw, Share2, Trash2, User } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { RightDrawer } from '@/components/organisms/RightDrawer';
@@ -24,8 +17,17 @@ import { ContactAvatar } from './ContactAvatar';
 import { ContactFields } from './ContactFields';
 import { ContactSidebarHeader } from './ContactSidebarHeader';
 import { ContactSocialLinks } from './ContactSocialLinks';
+import { ContactWebsite } from './ContactWebsite';
+import { DrawerNav, type DrawerNavItem } from './DrawerNav';
 import type { ContactSidebarProps } from './types';
 import { useContactSidebar } from './useContactSidebar';
+
+type DrawerTab = 'details' | 'social';
+
+const NAV_ITEMS: readonly DrawerNavItem<DrawerTab>[] = [
+  { value: 'details', label: 'Details', icon: <User className='size-4' /> },
+  { value: 'social', label: 'Social', icon: <Share2 className='size-4' /> },
+];
 
 export const ContactSidebar = memo(function ContactSidebar({
   contact,
@@ -38,12 +40,13 @@ export const ContactSidebar = memo(function ContactSidebar({
   isSaving,
   onAvatarUpload,
 }: ContactSidebarProps) {
+  const [activeTab, setActiveTab] = useState<DrawerTab>('details');
+
   const {
     isAddingLink,
     setIsAddingLink,
     newLinkUrl,
     setNewLinkUrl,
-    isEditable,
     hasContact,
     fullName,
     canUploadAvatar,
@@ -51,6 +54,7 @@ export const ContactSidebar = memo(function ContactSidebar({
     handleCopyProfileUrl,
     handleNameChange,
     handleUsernameChange,
+    handleWebsiteChange,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,
@@ -121,41 +125,58 @@ export const ContactSidebar = memo(function ContactSidebar({
         onCopyProfileUrl={handleCopyProfileUrl}
       />
 
-      <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-        {contact ? (
-          <>
-            <ContactAvatar
-              avatarUrl={contact.avatarUrl ?? null}
-              fullName={fullName}
-              username={contact.username}
-              isVerified={contact.isVerified}
-              canUploadAvatar={canUploadAvatar}
-              onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
-            />
+      {contact ? (
+        <>
+          <DrawerNav
+            items={NAV_ITEMS}
+            value={activeTab}
+            onValueChange={setActiveTab}
+          />
 
-            <ContactFields
-              firstName={contact.firstName}
-              lastName={contact.lastName}
-              username={contact.username}
-              isEditable={isEditable}
-              onNameChange={handleNameChange}
-              onUsernameChange={handleUsernameChange}
-            />
+          <div className='flex-1 space-y-4 overflow-auto px-4 py-3'>
+            {activeTab === 'details' && (
+              <>
+                <ContactAvatar
+                  avatarUrl={contact.avatarUrl ?? null}
+                  fullName={fullName}
+                  username={contact.username}
+                  isVerified={contact.isVerified}
+                  canUploadAvatar={canUploadAvatar}
+                  onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
+                />
 
-            <ContactSocialLinks
-              contact={contact}
-              fullName={fullName}
-              isEditable={isEditable}
-              isAddingLink={isAddingLink}
-              newLinkUrl={newLinkUrl}
-              onSetIsAddingLink={setIsAddingLink}
-              onSetNewLinkUrl={setNewLinkUrl}
-              onAddLink={handleAddLink}
-              onRemoveLink={handleRemoveLink}
-              onNewLinkKeyDown={handleNewLinkKeyDown}
-            />
+                <ContactFields
+                  firstName={contact.firstName}
+                  lastName={contact.lastName}
+                  username={contact.username}
+                  onNameChange={handleNameChange}
+                  onUsernameChange={handleUsernameChange}
+                />
+              </>
+            )}
 
-            {isEditable && onSave && contact && (
+            {activeTab === 'social' && (
+              <>
+                <ContactWebsite
+                  website={contact.website}
+                  onWebsiteChange={handleWebsiteChange}
+                />
+
+                <ContactSocialLinks
+                  contact={contact}
+                  fullName={fullName}
+                  isAddingLink={isAddingLink}
+                  newLinkUrl={newLinkUrl}
+                  onSetIsAddingLink={setIsAddingLink}
+                  onSetNewLinkUrl={setNewLinkUrl}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                  onNewLinkKeyDown={handleNewLinkKeyDown}
+                />
+              </>
+            )}
+
+            {onSave && contact && (
               <div className='pt-2 flex justify-end'>
                 <Button
                   type='button'
@@ -164,17 +185,19 @@ export const ContactSidebar = memo(function ContactSidebar({
                   onClick={() => onSave(contact)}
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Saving…' : 'Save changes'}
+                  {isSaving ? 'Saving\u2026' : 'Save changes'}
                 </Button>
               </div>
             )}
-          </>
-        ) : (
+          </div>
+        </>
+      ) : (
+        <div className='flex-1 overflow-auto px-4 py-4'>
           <p className='text-xs text-sidebar-muted'>
             Select a row in the table and press Space to view contact details.
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </RightDrawer>
   );
 });
