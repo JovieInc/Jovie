@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Home,
   IdCard,
+  Lightbulb,
   Link2,
   MessageCircle,
   Music,
@@ -89,6 +90,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
+  },
+  {
+    name: 'Insights',
+    href: APP_ROUTES.INSIGHTS,
+    id: 'insights',
+    icon: Lightbulb,
+    description: 'AI-powered analytics insights and recommendations',
   },
 ];
 
