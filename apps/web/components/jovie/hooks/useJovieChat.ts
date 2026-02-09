@@ -102,7 +102,7 @@ export function useJovieChat({
     [profileId, artistContext]
   );
 
-  // Convert loaded messages to the format useChat expects
+  // Convert loaded messages to the UIMessage format useChat expects
   const initialMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
     return existingConversation.messages.map(
@@ -115,7 +115,6 @@ export function useJovieChat({
       }) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        content: msg.content,
         parts: [{ type: 'text' as const, text: msg.content }],
         createdAt: new Date(msg.createdAt),
       })

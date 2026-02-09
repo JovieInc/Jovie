@@ -123,7 +123,7 @@ export const HeroSection = memo(function HeroSection({
               )}
 
               {/* Content card */}
-              <div className='relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 dark:border-white/10 shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 p-8'>
+              <div className='relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 p-8'>
                 {children}
               </div>
             </div>

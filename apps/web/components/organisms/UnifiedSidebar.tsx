@@ -181,7 +181,7 @@ function FloatingSidebar({
           {isDashboardOrAdmin && (
             <Link
               href={APP_ROUTES.CHAT}
-              aria-label='New chat'
+              aria-label='New thread'
               className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent'
             >
               <SquarePen className='h-4 w-4' />
@@ -282,11 +282,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               />
             )}
 
-            {/* Compose icon - Linear-style: starts a new chat */}
+            {/* Compose icon - Linear-style: starts a new thread */}
             {!isInSettings && isDashboardOrAdmin && (
               <Link
                 href={APP_ROUTES.CHAT}
-                aria-label='New chat'
+                aria-label='New thread'
                 className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
               >
                 <SquarePen className='h-4 w-4' />

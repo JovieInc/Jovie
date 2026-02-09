@@ -3,11 +3,70 @@
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/utils/initials';
 import type { ComboboxOption } from './types';
 
 interface ComboboxOptionItemProps {
   readonly option: ComboboxOption;
   readonly index: number;
+}
+
+/** Option image with loading shimmer and error fallback */
+function OptionImage({
+  imageUrl,
+  name,
+}: {
+  readonly imageUrl?: string;
+  readonly name: string;
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+  }, [imageUrl]);
+
+  if (!imageUrl || hasError) {
+    return (
+      <div
+        className='h-8 w-8 rounded-full bg-surface-2 flex-shrink-0 flex items-center justify-center'
+        aria-hidden='true'
+      >
+        <span className='text-[10px] font-medium text-secondary-token select-none leading-none'>
+          {getInitials(name)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className='h-8 w-8 rounded-full overflow-hidden flex-shrink-0 relative bg-surface-3'>
+      <Image
+        src={imageUrl}
+        alt=''
+        width={32}
+        height={32}
+        sizes='32px'
+        className={cn(
+          'h-8 w-8 rounded-full object-cover transition-opacity duration-200',
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        )}
+        loading='lazy'
+        aria-hidden='true'
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+      />
+      {!isLoaded && (
+        <div
+          className='absolute inset-0 rounded-full skeleton'
+          aria-hidden='true'
+        />
+      )}
+    </div>
+  );
 }
 
 export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
@@ -26,23 +85,7 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
     >
       {({ active, selected }) => (
         <div className='flex items-center space-x-3'>
-          {option.imageUrl ? (
-            <Image
-              src={option.imageUrl}
-              alt=''
-              width={32}
-              height={32}
-              sizes='32px'
-              className='h-8 w-8 rounded-full object-cover flex-shrink-0'
-              loading='lazy'
-              aria-hidden='true'
-            />
-          ) : (
-            <div
-              className='h-8 w-8 rounded-full bg-gray-200 flex-shrink-0'
-              aria-hidden='true'
-            />
-          )}
+          <OptionImage imageUrl={option.imageUrl} name={option.name} />
           <span
             className={clsx(
               'truncate text-sm',
