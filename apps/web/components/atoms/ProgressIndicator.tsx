@@ -99,7 +99,7 @@ export function ProgressIndicator({
                     return `${baseClasses} bg-green-500 border-green-500 text-white`;
                   if (isCurrent)
                     return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
-                  return `${baseClasses} bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400`;
+                  return `${baseClasses} bg-white dark:bg-gray-800 border-default text-gray-500 dark:text-gray-400`;
                 })()}
               >
                 {isCompleted ? (
