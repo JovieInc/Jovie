@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  refreshRelease,
   resetProviderOverride,
   saveProviderOverride,
   syncFromSpotify,
@@ -187,6 +188,29 @@ export function useSyncReleasesFromSpotifyMutation(profileId: string) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.releases.matrix(profileId),
         });
+      }
+    },
+  });
+}
+
+/**
+ * Mutation to refresh a single release from the database.
+ * Updates only the specific release in the matrix cache without refetching all releases.
+ */
+export function useRefreshReleaseMutation(profileId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: refreshRelease,
+    onSuccess: async updated => {
+      // Update just this release in the matrix cache
+      const current = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+      if (current) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          current.map(r => (r.id === updated.id ? updated : r))
+        );
       }
     },
   });

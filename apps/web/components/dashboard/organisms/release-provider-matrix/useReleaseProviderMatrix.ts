@@ -6,6 +6,7 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import {
+  useRefreshReleaseMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,
@@ -50,6 +51,7 @@ export function useReleaseProviderMatrix({
   const saveProviderMutation = useSaveProviderOverrideMutation();
   const resetProviderMutation = useResetProviderOverrideMutation();
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
+  const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
 
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
@@ -247,6 +249,31 @@ export function useReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
   }, [syncMutation.mutate]);
 
+  // Refresh a single release from the database (no Spotify sync)
+  const handleRefreshRelease = useCallback(
+    (releaseId: string) => {
+      refreshReleaseMutation.mutate(
+        { releaseId },
+        {
+          onSuccess: updated => {
+            updateRow(updated);
+            toast.success('Release refreshed');
+          },
+          onError: error => {
+            captureError('Failed to refresh release', error, {
+              context: 'release-mutation',
+              releaseId,
+              action: 'refresh-release',
+            });
+            toast.error('Failed to refresh release');
+          },
+        }
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+    [refreshReleaseMutation.mutate]
+  );
+
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
     (count, release) =>
@@ -274,6 +301,7 @@ export function useReleaseProviderMatrix({
     handleSave,
     handleReset,
     handleSync,
+    handleRefreshRelease,
     handleAddUrl,
     setDrafts,
   };
