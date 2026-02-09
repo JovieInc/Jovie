@@ -210,6 +210,21 @@ const fetchProfileAndLinks = async (
         created_at: toISOStringSafe(link.createdAt),
       })) ?? [];
 
+    // If the artist has a venmoHandle on their profile but no venmo social link,
+    // inject a synthetic venmo link so tipping works on the public profile page
+    const hasVenmoSocialLink = links.some(l => l.platform === 'venmo');
+    if (!hasVenmoSocialLink && result.venmoHandle) {
+      const handle = result.venmoHandle.replace(/^@/, '');
+      links.push({
+        id: `venmo-${result.id}`,
+        artist_id: result.id,
+        platform: 'venmo',
+        url: `https://venmo.com/${encodeURIComponent(handle)}`,
+        clicks: 0,
+        created_at: toISOStringSafe(result.createdAt),
+      });
+    }
+
     const contacts: DbCreatorContact[] = result.contacts ?? [];
 
     // Latest release is now fetched in parallel with profile data
