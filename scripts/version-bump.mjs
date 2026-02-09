@@ -35,14 +35,10 @@ const now = new Date();
 const yy = now.getFullYear() % 100; // 2026 → 26
 const mm = now.getMonth() + 1;       // 1-12
 
-let next;
-if (yy === curYear && mm === curMonth) {
-  // Same month → increment patch
-  next = `${yy}.${mm}.${curPatch + 1}`;
-} else {
-  // New month (or year) → reset patch to 0
-  next = `${yy}.${mm}.0`;
-}
+const isSameMonth = yy === curYear && mm === curMonth;
+const next = isSameMonth
+  ? `${yy}.${mm}.${curPatch + 1}`
+  : `${yy}.${mm}.0`;
 
 // --- 3. Write version.json ---
 writeFileSync(versionFile, JSON.stringify({ version: next }, null, 2) + '\n');
