@@ -19,6 +19,7 @@ import {
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { type TourDate, tourDates } from '@/lib/db/schema/tour';
+import { captureError } from '@/lib/error-tracking';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
@@ -343,7 +344,10 @@ export async function saveBandsintownApiKey(params: {
       success: true,
       message: 'API key saved successfully.',
     };
-  } catch {
+  } catch (error) {
+    await captureError('Bandsintown API key save failed', error, {
+      action: 'saveBandsintownApiKey',
+    });
     return {
       success: false,
       message: 'Unable to save API key right now. Please try again.',
@@ -386,7 +390,10 @@ export async function removeBandsintownApiKey(): Promise<{
     revalidatePath(APP_ROUTES.TOUR_DATES);
 
     return { success: true };
-  } catch {
+  } catch (error) {
+    await captureError('Bandsintown API key removal failed', error, {
+      action: 'removeBandsintownApiKey',
+    });
     return {
       success: false,
       message: 'Unable to remove API key right now. Please try again.',
@@ -736,7 +743,10 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
     revalidatePath(APP_ROUTES.TOUR_DATES);
 
     return { success: true };
-  } catch {
+  } catch (error) {
+    await captureError('Bandsintown disconnect failed', error, {
+      action: 'disconnectBandsintown',
+    });
     return { success: false };
   }
 }

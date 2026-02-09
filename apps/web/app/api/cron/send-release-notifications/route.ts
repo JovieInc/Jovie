@@ -7,6 +7,7 @@ import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
@@ -564,6 +565,10 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     logger.error('[send-release-notifications] Processing failed:', error);
+    await captureError('Release notification sending cron failed', error, {
+      route: '/api/cron/send-release-notifications',
+      method: 'GET',
+    });
     return createErrorResponse(error);
   }
 }

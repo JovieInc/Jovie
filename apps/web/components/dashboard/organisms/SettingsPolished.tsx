@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
-import { ListenNowForm } from '@/components/dashboard/organisms/ListenNowForm';
+import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
+import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
@@ -108,6 +109,12 @@ export function SettingsPolished({
         'Manage your subscription, payment methods, and billing history.',
       render: () => <SettingsBillingSection />,
     },
+    {
+      id: 'data-privacy',
+      title: 'Data & Privacy',
+      description: 'Export your data or delete your account.',
+      render: () => <DataPrivacySection />,
+    },
   ];
 
   // -- Artist-level settings --
@@ -138,7 +145,7 @@ export function SettingsPolished({
     {
       id: 'music-links',
       title: 'Music Links',
-      description: 'Add streaming platform links for your music.',
+      description: 'Manage your streaming platform profiles and links.',
       render: () => (
         <DashboardCard variant='settings'>
           <ListenNowForm artist={artist} onUpdate={a => onArtistUpdate?.(a)} />

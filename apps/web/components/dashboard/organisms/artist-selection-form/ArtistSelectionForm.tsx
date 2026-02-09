@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { CheckCircle2, X } from 'lucide-react';
+import Image from 'next/image';
 import { Combobox } from '@/components/organisms/Combobox';
 import { Container } from '@/components/site/Container';
 import { ThemeToggle } from '@/components/site/theme-toggle';
@@ -88,9 +90,50 @@ export function ArtistSelectionForm() {
                     label='Artist Profile'
                     isLoading={isLoading}
                     error={searchError}
+                    showCta={false}
                     className='w-full'
                   />
                 </div>
+
+                {selectedArtist && (
+                  <div className='flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-3'>
+                    {selectedArtist.imageUrl ? (
+                      <Image
+                        src={selectedArtist.imageUrl}
+                        alt=''
+                        width={48}
+                        height={48}
+                        className='h-12 w-12 rounded-full object-cover flex-shrink-0'
+                        aria-hidden='true'
+                      />
+                    ) : (
+                      <div
+                        className='h-12 w-12 rounded-full bg-surface-2 flex-shrink-0'
+                        aria-hidden='true'
+                      />
+                    )}
+                    <div className='flex-1 min-w-0'>
+                      <p className='text-sm font-medium text-primary-token truncate'>
+                        {selectedArtist.name}
+                      </p>
+                      <p className='text-xs text-green-600 dark:text-green-400 flex items-center gap-1'>
+                        <CheckCircle2
+                          className='h-3.5 w-3.5'
+                          aria-hidden='true'
+                        />
+                        Artist selected
+                      </p>
+                    </div>
+                    <button
+                      type='button'
+                      onClick={() => handleArtistSelect(null)}
+                      className='flex-shrink-0 rounded-md p-1 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+                      aria-label={`Remove ${selectedArtist.name}`}
+                    >
+                      <X className='h-4 w-4' />
+                    </button>
+                  </div>
+                )}
 
                 <div className='flex flex-col space-y-3'>
                   <Button

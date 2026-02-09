@@ -6,9 +6,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+}
+
+/**
+ * Header badge that displays the conversation title as a subtle breadcrumb suffix.
+ * Rendered inside the DashboardHeader via HeaderActionsContext.
+ */
+function ChatTitleBadge({ title }: { readonly title: string }) {
+  return (
+    <span className='flex items-center gap-1.5 text-[13px] text-tertiary-token'>
+      <span aria-hidden='true'>/</span>
+      <span className='max-w-[200px] truncate'>{title}</span>
+    </span>
+  );
 }
 
 export function ChatPageClient({ conversationId }: ChatPageClientProps) {
@@ -16,6 +30,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
+  const { setHeaderBadge } = useSetHeaderActions();
 
   const handleConversationCreate = useCallback(
     (newConversationId: string) => {
@@ -25,6 +40,23 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
     },
     [router]
   );
+
+  // Update the header badge when the conversation title changes
+  const handleTitleChange = useCallback(
+    (title: string | null) => {
+      if (title) {
+        setHeaderBadge(<ChatTitleBadge title={title} />);
+      } else {
+        setHeaderBadge(null);
+      }
+    },
+    [setHeaderBadge]
+  );
+
+  // Clean up header badge when leaving the chat page
+  useEffect(() => {
+    return () => setHeaderBadge(null);
+  }, [setHeaderBadge]);
 
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.
@@ -53,6 +85,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       profileId={selectedProfile.id}
       conversationId={conversationId}
       onConversationCreate={handleConversationCreate}
+      onTitleChange={handleTitleChange}
       initialQuery={initialQuery ?? undefined}
     />
   );

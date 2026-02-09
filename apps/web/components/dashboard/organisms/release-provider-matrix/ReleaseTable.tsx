@@ -10,11 +10,10 @@ import {
   useRowSelection,
   useStableSelectionRefs,
 } from '@/components/organisms/table';
-import {
-  RELEASE_TABLE_WIDTHS,
-  TABLE_ROW_HEIGHTS,
-} from '@/lib/constants/layout';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
@@ -194,6 +193,17 @@ export function ReleaseTable({
             );
           },
         },
+        // UTM share presets
+        ...getUTMShareContextMenuItems({
+          smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+          context: buildUTMContext({
+            smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+            releaseSlug: release.slug,
+            releaseTitle: release.title,
+            artistName,
+            releaseDate: release.releaseDate,
+          }),
+        }),
         { type: 'separator' },
         {
           id: 'copy-release-id',
@@ -263,7 +273,7 @@ export function ReleaseTable({
 
       return items;
     },
-    [onEdit, onCopy]
+    [onEdit, onCopy, artistName]
   );
 
   // Stable callbacks for UnifiedTable props
@@ -308,6 +318,7 @@ export function ReleaseTable({
       ),
       cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
       size: 56,
+      meta: { className: 'hidden sm:table-cell' },
     });
 
     const releaseColumn = columnHelper.accessor('title', {
@@ -337,6 +348,7 @@ export function ReleaseTable({
       cell: createRightMetaCellRenderer(),
       size: 300,
       minSize: 200,
+      meta: { className: 'hidden sm:table-cell' },
     });
 
     // Return all columns - TanStack Table handles visibility natively
@@ -368,7 +380,8 @@ export function ReleaseTable({
     };
   }, [columnVisibility]);
 
-  const minWidth = `${RELEASE_TABLE_WIDTHS.BASE + RELEASE_TABLE_WIDTHS.PROVIDER_COLUMN}px`;
+  // No fixed minWidth - on mobile, hidden columns allow the table to fit naturally
+  const minWidth = '0';
 
   // Check if any rows are expanded (affects virtualization)
   const hasExpandedRows = useMemo(() => {

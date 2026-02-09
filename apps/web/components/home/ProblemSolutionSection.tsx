@@ -12,11 +12,11 @@ export function ProblemSolutionSection() {
     <section
       id='problem'
       aria-labelledby='problem-solution-heading'
-      className='relative border-t border-gray-200 dark:border-white/10'
+      className='relative border-t border-subtle'
     >
       <div className='mx-auto max-w-5xl px-4 py-14 md:py-18 text-center'>
         {/* Unified badge with Linear-inspired styling */}
-        <div className='inline-flex items-center rounded-full bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white/80 backdrop-blur-sm border border-gray-200 dark:border-white/10'>
+        <div className='inline-flex items-center rounded-full bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white/80 backdrop-blur-sm border border-subtle'>
           <div className='flex h-2 w-2 items-center justify-center mr-2'>
             <div className='h-1.5 w-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse motion-reduce:animate-none' />
           </div>

@@ -131,3 +131,57 @@ export function usePortalMutation() {
     },
   });
 }
+
+/**
+ * Response from the cancel subscription API.
+ */
+export interface CancelSubscriptionResponse {
+  success: boolean;
+  status?: string;
+}
+
+/**
+ * Cancel subscription via POST.
+ */
+async function cancelSubscriptionRequest(): Promise<CancelSubscriptionResponse> {
+  return fetchWithTimeout<CancelSubscriptionResponse>('/api/stripe/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/**
+ * Hook for cancelling a subscription in-app.
+ *
+ * Invalidates billing queries on success so the UI updates immediately.
+ *
+ * @example
+ * ```tsx
+ * const { mutate: cancelSub, isPending } = useCancelSubscriptionMutation();
+ *
+ * const handleCancel = () => {
+ *   cancelSub(undefined, {
+ *     onSuccess: () => {
+ *       track('subscription_cancelled');
+ *     },
+ *   });
+ * };
+ * ```
+ */
+export function useCancelSubscriptionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: cancelSubscriptionRequest,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.billing.all,
+      });
+    },
+
+    onError: error => {
+      handleMutationError(error, 'Failed to cancel subscription');
+    },
+  });
+}

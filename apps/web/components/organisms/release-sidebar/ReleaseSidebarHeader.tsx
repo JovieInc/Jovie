@@ -6,10 +6,19 @@
  * Header section of the release sidebar with action buttons
  */
 
-import { Check, Copy, ExternalLink, Hash, RefreshCw, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  Hash,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useIsMobile } from '@/hooks/useMobile';
 
 import type { Release } from './types';
 
@@ -28,6 +37,7 @@ export function ReleaseSidebarHeader({
   onRefresh,
   onCopySmartLink,
 }: ReleaseSidebarHeaderProps) {
+  const isMobile = useIsMobile();
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,12 +61,12 @@ export function ReleaseSidebarHeader({
   const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
 
-  // Close is always primary
+  // Close is always primary (ArrowLeft on mobile, X on desktop)
   if (onClose) {
     primaryActions.push({
       id: 'close',
-      label: 'Close release sidebar',
-      icon: X,
+      label: isMobile ? 'Go back' : 'Close release sidebar',
+      icon: isMobile ? ArrowLeft : X,
       onClick: onClose,
     });
   }
@@ -104,9 +114,13 @@ export function ReleaseSidebarHeader({
       label: 'Copy release ID',
       icon: Hash,
       onClick: () => {
-        navigator.clipboard.writeText(release?.id ?? '').catch(() => {
-          // Silently fail - clipboard may not be available
-        });
+        try {
+          navigator.clipboard.writeText(release?.id ?? '').catch(() => {
+            // Silently fail - clipboard may not be available
+          });
+        } catch {
+          // Silently fail - navigator.clipboard may be undefined in insecure contexts
+        }
       },
     });
   }

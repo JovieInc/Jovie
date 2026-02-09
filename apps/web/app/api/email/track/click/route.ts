@@ -9,6 +9,7 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
+import { captureError } from '@/lib/error-tracking';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 
@@ -130,6 +131,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('[Email Click Track] Unexpected error', {
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    await captureError('Email click tracking failed', error, {
+      route: '/api/email/track/click',
+      method: 'GET',
     });
     return NextResponse.json(
       { error: 'Internal server error' },

@@ -6,13 +6,22 @@
  * Header section of the profile sidebar with action buttons
  */
 
-import { Check, Contact, Copy, ExternalLink, QrCode, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  Contact,
+  Copy,
+  ExternalLink,
+  QrCode,
+  X,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
+import { useIsMobile } from '@/hooks/useMobile';
 
 interface ProfileSidebarHeaderProps {
   readonly username: string;
@@ -42,6 +51,7 @@ export function ProfileSidebarHeader({
   profilePath,
   onClose,
 }: ProfileSidebarHeaderProps) {
+  const isMobile = useIsMobile();
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,8 +105,8 @@ export function ProfileSidebarHeader({
   const primaryActions: DrawerHeaderAction[] = [
     {
       id: 'close',
-      label: 'Close profile sidebar',
-      icon: X,
+      label: isMobile ? 'Go back' : 'Close profile sidebar',
+      icon: isMobile ? ArrowLeft : X,
       onClick: onClose,
     },
     {

@@ -298,6 +298,7 @@ describe('LatestReleaseCard', () => {
     creatorProfileId: 'profile-123',
     title: 'Midnight Dreams',
     releaseType: 'album',
+    slug: 'midnight-dreams',
     artworkUrl: 'https://example.com/artwork.jpg',
     releaseDate: new Date('2024-06-15'),
     spotifyUrl: null,
@@ -416,7 +417,7 @@ describe('LatestReleaseCard', () => {
     expect(screen.getByTestId('music-icon')).toBeDefined();
   });
 
-  it('listen button links to /{handle}/listen', async () => {
+  it('listen button links to /{handle}/{slug}', async () => {
     const { LatestReleaseCard } = await import(
       '@/components/profile/LatestReleaseCard'
     );
@@ -428,6 +429,8 @@ describe('LatestReleaseCard', () => {
     );
 
     const listenLink = screen.getByText('Listen').closest('a');
-    expect(listenLink?.getAttribute('href')).toBe('/testartist/listen');
+    expect(listenLink?.getAttribute('href')).toBe(
+      '/testartist/midnight-dreams'
+    );
   });
 });

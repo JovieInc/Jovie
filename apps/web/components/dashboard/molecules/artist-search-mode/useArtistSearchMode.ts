@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIconMetadata } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
-import { isBrandDark } from '@/lib/utils/color';
+import { contrastRatio, isBrandDark } from '@/lib/utils/color';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { ARTIST_SEARCH_PLATFORMS } from '../universalLinkInput.constants';
 import type { ArtistSearchModeProps } from './types';
@@ -79,7 +79,9 @@ export function useArtistSearchMode({
   );
   const brandHex = platformIcon?.hex ? `#${platformIcon.hex}` : '#1DB954';
   const iconIsDark = isBrandDark(brandHex);
-  const iconColor = iconIsDark ? '#ffffff' : brandHex;
+  // Use WCAG 3:1 contrast ratio for text-on-brand-bg color selection
+  const useWhiteIcon = contrastRatio('#ffffff', brandHex) >= 3;
+  const iconColor = useWhiteIcon ? '#ffffff' : brandHex;
   const iconBg = iconIsDark ? 'rgba(255,255,255,0.08)' : `${brandHex}15`;
 
   useEffect(() => {

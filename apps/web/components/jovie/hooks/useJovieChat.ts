@@ -40,6 +40,12 @@ function extractToolCalls(
   return toolCalls.length > 0 ? toolCalls : undefined;
 }
 
+/** Interval (ms) to poll for auto-generated title after first message. */
+const TITLE_POLL_INTERVAL_MS = 2_000;
+
+/** Max duration (ms) to keep polling before giving up. */
+const TITLE_POLL_MAX_DURATION_MS = 15_000;
+
 export function useJovieChat({
   profileId,
   artistContext,
@@ -61,15 +67,29 @@ export function useJovieChat({
   } | null>(null);
   const queryClient = useQueryClient();
 
+  // Track whether we're waiting for title generation from the server.
+  // Set to a timestamp when title generation is initiated, cleared when title arrives.
+  const [titlePollingSince, setTitlePollingSince] = useState<number | null>(
+    null
+  );
+
   // Mutations for persistence
   const createConversationMutation = useCreateConversationMutation();
   const addMessagesMutation = useAddMessagesMutation();
 
-  // Load existing conversation if conversationId is provided
+  // Determine whether to poll: only while we're actively waiting for a title
+  // and haven't exceeded the max poll duration.
+  const shouldPollForTitle =
+    titlePollingSince !== null &&
+    Date.now() - titlePollingSince < TITLE_POLL_MAX_DURATION_MS;
+
+  // Load existing conversation if conversationId is provided.
+  // When title is pending, enable refetchInterval to poll for the generated title.
   const { data: existingConversation, isLoading: isLoadingConversation } =
     useChatConversationQuery({
       conversationId: activeConversationId,
       enabled: !!activeConversationId,
+      refetchInterval: shouldPollForTitle ? TITLE_POLL_INTERVAL_MS : false,
     });
 
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
@@ -82,7 +102,7 @@ export function useJovieChat({
     [profileId, artistContext]
   );
 
-  // Convert loaded messages to the format useChat expects
+  // Convert loaded messages to the UIMessage format useChat expects
   const initialMessages = useMemo(() => {
     if (!existingConversation?.messages) return undefined;
     return existingConversation.messages.map(
@@ -95,7 +115,6 @@ export function useJovieChat({
       }) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        content: msg.content,
         parts: [{ type: 'text' as const, text: msg.content }],
         createdAt: new Date(msg.createdAt),
       })
@@ -146,6 +165,33 @@ export function useJovieChat({
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  // Derive the conversation title from the query data
+  const conversationTitle = existingConversation?.conversation?.title ?? null;
+
+  // Stop polling once the title is present (or after timeout, handled by shouldPollForTitle)
+  useEffect(() => {
+    if (titlePollingSince !== null && conversationTitle) {
+      setTitlePollingSince(null);
+      // Also invalidate the conversations list so the sidebar picks up the new title
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.conversations(),
+      });
+    }
+  }, [conversationTitle, titlePollingSince, queryClient]);
+
+  // Safety: stop polling after max duration via a timeout
+  useEffect(() => {
+    if (titlePollingSince === null) return;
+    const remaining =
+      TITLE_POLL_MAX_DURATION_MS - (Date.now() - titlePollingSince);
+    if (remaining <= 0) {
+      setTitlePollingSince(null);
+      return;
+    }
+    const timer = setTimeout(() => setTitlePollingSince(null), remaining);
+    return () => clearTimeout(timer);
+  }, [titlePollingSince]);
 
   // Clear error when user starts typing
   useEffect(() => {
@@ -223,13 +269,19 @@ export function useJovieChat({
         messages: messagesToPersist,
       },
       {
-        onSuccess: () => {
+        onSuccess: data => {
           queryClient.invalidateQueries({
             queryKey: queryKeys.chat.conversation(activeConversationId),
           });
           queryClient.invalidateQueries({
             queryKey: queryKeys.chat.conversations(),
           });
+
+          // If the server indicated title generation was kicked off,
+          // start polling so the title auto-updates in sidebar + header.
+          if (data?.titlePending) {
+            setTitlePollingSince(Date.now());
+          }
         },
         onError: err => {
           console.error('[useJovieChat] Failed to save messages:', err);
@@ -366,6 +418,8 @@ export function useJovieChat({
     isLoadingConversation: isLoadingConversation && !!activeConversationId,
     status,
     activeConversationId,
+    /** Auto-generated or user-set conversation title (null if not yet generated) */
+    conversationTitle,
     // Refs
     inputRef,
     // Handlers
