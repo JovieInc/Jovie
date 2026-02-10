@@ -329,7 +329,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'location',
         header: 'Location',
-        cell: ({ row }) => <LocationCellRenderer row={row} />,
+        cell: ({ row }) => <LocationCellRenderer row={row} />, // NOSONAR - TanStack Table render prop
         size: 180,
       }),
 
@@ -366,7 +366,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => <ActionsCellRenderer row={row} onEdit={onEdit} />,
+        cell: ({ row }) => <ActionsCellRenderer row={row} onEdit={onEdit} />, // NOSONAR - TanStack Table render prop
         size: 80,
       }),
     ];
