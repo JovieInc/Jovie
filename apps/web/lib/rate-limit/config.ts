@@ -53,6 +53,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Artwork upload: 5 uploads per minute per user */
+  artworkUpload: {
+    name: 'Artwork Upload',
+    limit: 5,
+    window: '1 m',
+    prefix: 'artwork_upload',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** General API: 100 requests per minute per IP */
   api: {
     name: 'API',

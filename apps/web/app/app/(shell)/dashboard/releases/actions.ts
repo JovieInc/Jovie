@@ -824,3 +824,104 @@ export async function connectAppleMusicArtist(params: {
     artistName: externalArtistName,
   };
 }
+
+/**
+ * Upload release artwork via the artwork upload API.
+ * Returns the new artwork URL after processing and storage.
+ */
+export async function uploadReleaseArtwork(
+  releaseId: string,
+  file: File
+): Promise<{ artworkUrl: string; sizes: Record<string, string> }> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Verify the release belongs to the user
+  const release = await getReleaseById(releaseId);
+  if (!release || release.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  // Build FormData and call the artwork upload API
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { publicEnv } = await import('@/lib/env-public');
+  const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL;
+  const response = await fetch(
+    `${baseUrl}/api/images/artwork/upload?releaseId=${encodeURIComponent(releaseId)}`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: 'Upload failed' }));
+    throw new Error(error.message ?? 'Failed to upload artwork');
+  }
+
+  const result = await response.json();
+
+  // Invalidate cache
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return {
+    artworkUrl: result.artworkUrl,
+    sizes: result.sizes,
+  };
+}
+
+/**
+ * Update the "allow artwork downloads" setting for a creator profile.
+ * Stored in the profile's settings JSONB field.
+ */
+export async function updateAllowArtworkDownloads(
+  allowDownloads: boolean
+): Promise<void> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  try {
+    const [currentProfile] = await db
+      .select({ settings: creatorProfiles.settings })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id))
+      .limit(1);
+
+    const currentSettings = (currentProfile?.settings ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...currentSettings,
+          allowArtworkDownloads: allowDownloads,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    throw new Error('Failed to update artwork download setting', {
+      cause: error,
+    });
+  }
+
+  revalidatePath(APP_ROUTES.RELEASES);
+}

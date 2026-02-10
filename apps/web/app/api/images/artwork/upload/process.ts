@@ -1,0 +1,74 @@
+/**
+ * Artwork Image Processing
+ *
+ * Processes uploaded artwork into multiple sizes for download options.
+ */
+
+import { fileToBuffer, getSharp } from '../../upload/lib/image-processing';
+
+const ARTWORK_MAX_DIMENSION = 3000;
+const ARTWORK_DOWNLOAD_SIZES = [1000, 500, 250] as const;
+const AVIF_QUALITY = 80; // Higher quality than avatars for artwork
+const AVIF_EFFORT = 4;
+
+export async function processArtworkToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  const sharp = await getSharp();
+  const inputBuffer = await fileToBuffer(file);
+  const baseImage = sharp(inputBuffer, { failOnError: false })
+    .rotate()
+    .withMetadata({ orientation: undefined });
+
+  const metadata = await baseImage.metadata();
+  const originalWidth = metadata.width ?? ARTWORK_MAX_DIMENSION;
+  const originalHeight = metadata.height ?? ARTWORK_MAX_DIMENSION;
+
+  const results: Record<string, Buffer> = {};
+
+  // Original size (capped at 3000px, no upscaling)
+  const maxDim = Math.max(originalWidth, originalHeight);
+  const originalResize =
+    maxDim > ARTWORK_MAX_DIMENSION ? ARTWORK_MAX_DIMENSION : undefined;
+
+  let originalPipeline = baseImage.clone();
+  if (originalResize) {
+    originalPipeline = originalPipeline.resize({
+      width: originalResize,
+      height: originalResize,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+  const { data: originalData } = await originalPipeline
+    .toColourspace('srgb')
+    .avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT })
+    .toBuffer({ resolveWithObject: true });
+
+  results.original = originalData;
+
+  // Generate each download size (square crop, no upscaling)
+  for (const size of ARTWORK_DOWNLOAD_SIZES) {
+    // Skip if original is smaller than this size
+    if (originalWidth < size && originalHeight < size) {
+      continue;
+    }
+
+    const { data } = await baseImage
+      .clone()
+      .resize({
+        width: size,
+        height: size,
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT })
+      .toBuffer({ resolveWithObject: true });
+
+    results[String(size)] = data;
+  }
+
+  return results;
+}
