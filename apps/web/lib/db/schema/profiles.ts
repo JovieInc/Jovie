@@ -66,6 +66,8 @@ export interface FitScoreBreakdown {
   multiDspPresence?: number;
   /** Has contact email available - max 5 points */
   hasContactEmail?: number;
+  /** Has paid verification on social platforms (Twitter/X, Instagram, Facebook, Threads) - max 10 points */
+  paidVerification?: number;
   /** Metadata about the scoring */
   meta?: {
     calculatedAt: string;
@@ -75,6 +77,7 @@ export interface FitScoreBreakdown {
     latestReleaseDate?: string;
     alternativeDspPlatforms?: string[];
     dspPlatformCount?: number;
+    paidVerificationPlatforms?: string[];
   };
 }
 
