@@ -103,10 +103,11 @@ export const toolbarSlideAnimation = {
 export function prefersReducedMotion(): boolean {
   if (
     typeof globalThis.window === 'undefined' ||
-    typeof globalThis.matchMedia !== 'function'
+    typeof globalThis.window.matchMedia !== 'function'
   )
     return false;
-  return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return globalThis.window.matchMedia('(prefers-reduced-motion: reduce)')
+    .matches;
 }
 
 // Helper: Apply animation only if motion is enabled

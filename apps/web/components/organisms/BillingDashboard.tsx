@@ -351,7 +351,13 @@ export const BillingDashboard = memo(function BillingDashboard() {
             <div className='h-10 rounded bg-muted'></div>
           </div>
         )}
+        {!historyQuery.isLoading && historyQuery.error && (
+          <p className='text-sm text-muted-foreground'>
+            Unable to load billing history.
+          </p>
+        )}
         {!historyQuery.isLoading &&
+          !historyQuery.error &&
           historyQuery.data?.entries &&
           historyQuery.data.entries.length > 0 && (
             <div className='space-y-3'>
@@ -381,6 +387,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
             </div>
           )}
         {!historyQuery.isLoading &&
+          !historyQuery.error &&
           (!historyQuery.data?.entries ||
             historyQuery.data.entries.length === 0) && (
             <p className='text-sm text-muted-foreground'>
