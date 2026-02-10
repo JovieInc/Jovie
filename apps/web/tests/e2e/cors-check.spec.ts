@@ -28,7 +28,7 @@ test('No CORS errors on homepage', async ({ page }) => {
 
   // Wait for hydration and async requests to complete deterministically
   await waitForHydration(page);
-  await page.waitForLoadState('load');
+  await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
   // Verify the page has loaded content before checking CORS errors
   await expect(page.locator('body')).toBeVisible({

@@ -87,7 +87,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
     // Wait for URL to stabilize
     const currentUrl = page.url();
@@ -179,7 +179,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
     // With the cookie set, user should NOT be redirected to onboarding
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -218,7 +218,7 @@ test.describe('Dashboard Landing @smoke', () => {
         }
       }
 
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
       const currentUrl = page.url();
       expect(

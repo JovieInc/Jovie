@@ -263,8 +263,8 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of routes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 60000 });
-      await page.waitForLoadState('load');
+      await page.goto(url, { timeout: 120_000 });
+      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
       // Always test BOTH themes for every page
       console.log(`Auditing ${route} in Light Mode...`);

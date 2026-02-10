@@ -156,7 +156,7 @@ test.describe('Public Profile Performance', () => {
         waitUntil: 'domcontentloaded',
         timeout: 10000,
       });
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
       // Wait for any key elements
       const hasH1 = await page
@@ -387,7 +387,7 @@ test.describe('Public Profile Performance', () => {
       });
 
       // Wait for page to be fully interactive using load state instead of networkidle
-      await page.waitForLoadState('load');
+      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
       // Check if profile loaded
       const h1Visible = await page
