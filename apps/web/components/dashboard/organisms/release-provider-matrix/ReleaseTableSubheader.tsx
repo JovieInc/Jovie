@@ -37,7 +37,7 @@ export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
 };
 
 /** Release view filter type */
-export type ReleaseView = 'all' | 'singles' | 'albums';
+export type ReleaseView = 'tracks' | 'releases';
 
 interface ReleaseTableSubheaderProps {
   /** All releases for export */
@@ -59,10 +59,6 @@ interface ReleaseTableSubheaderProps {
   readonly filters: ReleaseFilters;
   /** Callback when filters change */
   readonly onFiltersChange: (filters: ReleaseFilters) => void;
-  /** Whether to show expandable track rows */
-  readonly showTracks?: boolean;
-  /** Callback when showTracks changes */
-  readonly onShowTracksChange?: (show: boolean) => void;
   /** Whether to group releases by year */
   readonly groupByYear?: boolean;
   /** Callback when groupByYear changes */
@@ -75,9 +71,8 @@ interface ReleaseTableSubheaderProps {
 
 /** Options for release view segmented control */
 const RELEASE_VIEW_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'singles', label: 'Singles' },
-  { value: 'albums', label: 'Albums' },
+  { value: 'tracks', label: 'Tracks' },
+  { value: 'releases', label: 'Releases' },
 ] as const;
 
 /** Segmented control for release type filter */
@@ -159,8 +154,6 @@ function LinearStyleDisplayMenu({
   onColumnVisibilityChange,
   availableColumns,
   onResetToDefaults,
-  showTracks,
-  onShowTracksChange,
   groupByYear,
   onGroupByYearChange,
   releaseView,
@@ -171,8 +164,6 @@ function LinearStyleDisplayMenu({
   onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
   availableColumns: readonly { id: string; label: string }[];
   onResetToDefaults?: () => void;
-  showTracks?: boolean;
-  onShowTracksChange?: (show: boolean) => void;
   groupByYear?: boolean;
   onGroupByYearChange?: (group: boolean) => void;
   releaseView?: ReleaseView;
@@ -201,24 +192,17 @@ function LinearStyleDisplayMenu({
         {onReleaseViewChange && (
           <div className='border-b border-subtle px-3 py-2'>
             <ReleaseViewSegmentedControl
-              value={releaseView ?? 'all'}
+              value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
             />
           </div>
         )}
         {/* List options */}
-        {(onShowTracksChange || onGroupByYearChange) && (
+        {onGroupByYearChange && (
           <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
             <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
               List options
             </p>
-            {onShowTracksChange && (
-              <ToggleSwitch
-                label='Show tracks'
-                checked={showTracks ?? false}
-                onToggle={() => onShowTracksChange(!showTracks)}
-              />
-            )}
             {onGroupByYearChange && (
               <ToggleSwitch
                 label='Group by year'
@@ -292,11 +276,9 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onResetToDefaults,
   filters,
   onFiltersChange,
-  showTracks,
-  onShowTracksChange,
   groupByYear,
   onGroupByYearChange,
-  releaseView = 'all',
+  releaseView = 'releases',
   onReleaseViewChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
@@ -324,8 +306,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onColumnVisibilityChange={onColumnVisibilityChange}
           availableColumns={availableColumns}
           onResetToDefaults={onResetToDefaults}
-          showTracks={showTracks}
-          onShowTracksChange={onShowTracksChange}
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
@@ -336,7 +316,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           getData={() => getReleasesForExport(releases, selectedIds)}
           columns={RELEASES_CSV_COLUMNS}
           filename='releases'
-          label={selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'}
+          label='Export'
           variant='ghost'
           size='sm'
           className={pillButtonClass}

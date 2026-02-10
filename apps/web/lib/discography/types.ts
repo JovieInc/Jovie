@@ -80,6 +80,8 @@ export interface TrackViewModel {
   id: string;
   releaseId: string;
   title: string;
+  slug: string;
+  smartLinkPath: string;
   trackNumber: number;
   discNumber: number;
   durationMs: number | null;
