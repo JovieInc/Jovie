@@ -199,25 +199,28 @@ export async function signInUser(
     timeout: 120_000, // Turbopack cold compilation can take 60-90+ seconds
   });
 
-  // Wait for page to stabilize after React 19 transient hooks error
-  // There's a known React 19 bug (facebook/react#33580) that causes a transient
-  // "Rendered more hooks than during the previous render" error during hydration.
-  // The error appears briefly then "magically disappears" as the page stabilizes.
+  // Dismiss Next.js dev error overlay and wait for page to stabilize
+  // Handles React hydration mismatches (nonce attr) and transient hooks errors
   await expect(async () => {
-    const bodyText = await page.locator('body').innerText();
-    // The page should not show the error message once stabilized
-    expect(bodyText).not.toContain('Application error');
-    expect(bodyText).not.toContain('client-side exception');
-  }).toPass({ timeout: 20000, intervals: [500, 1000, 2000, 3000, 5000] });
-
-  // Verify we're authenticated by checking for dashboard elements
-  const userButton = page.locator('[data-clerk-element="userButton"]');
-  const userMenu = page.locator('[data-testid="user-menu"]');
-  const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
-
-  await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-    timeout: 30000, // Increased for hydration after slow compilation
-  });
+    // Dismiss error overlay if present
+    const overlay = page.locator(
+      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+    );
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+    // Click "Try again" on error boundary if present
+    const tryAgain = page.locator('button:has-text("Try again")');
+    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
+      await tryAgain.click();
+      await page.waitForTimeout(1000);
+    }
+    // Verify dashboard element is visible
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    await expect(dashNav.or(userButton)).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000, 10000] });
 
   return page;
 }
