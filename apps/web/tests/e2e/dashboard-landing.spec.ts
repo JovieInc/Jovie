@@ -42,6 +42,9 @@ async function hasPageContent(
  */
 
 test.describe('Dashboard Landing @smoke', () => {
+  // Dashboard pages need Turbopack cold compile (30-55s) + Clerk JS load
+  test.setTimeout(180_000);
+
   // The actual dashboard page (legacy /app/dashboard redirects to /)
   const DASHBOARD_PAGE = '/app/dashboard/profile';
 
@@ -112,10 +115,11 @@ test.describe('Dashboard Landing @smoke', () => {
     });
 
     await page.goto(DASHBOARD_PAGE, {
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    // Best-effort wait for full load — may exceed timeout on Turbopack cold compile
+    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
     // Verify onboarding page was never loaded
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -130,10 +134,10 @@ test.describe('Dashboard Landing @smoke', () => {
 
   test('dashboard content is visible after navigation', async ({ page }) => {
     await page.goto(DASHBOARD_PAGE, {
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
     // Wait for any loading states to complete
     await page.waitForLoadState('networkidle').catch(() => {

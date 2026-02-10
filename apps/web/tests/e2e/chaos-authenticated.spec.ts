@@ -68,7 +68,14 @@ function hasClerkCredentials(): boolean {
   const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
   const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
 
-  return username.length > 0 && password.length > 0 && clerkSetupSuccess;
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = username.includes('+clerk_test');
+
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail) &&
+    clerkSetupSuccess
+  );
 }
 
 /**
@@ -78,7 +85,13 @@ function getAdminCredentials(): { username: string; password: string } {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
 
-  if (adminUsername.length > 0 && adminPassword.length > 0) {
+  // Allow passwordless auth for Clerk test emails
+  const isClerkTestEmail = adminUsername.includes('+clerk_test');
+
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail)
+  ) {
     return { username: adminUsername, password: adminPassword };
   }
 

@@ -53,7 +53,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all critical sections render with content (not blank)', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       // Wait for client-side hydration
       await page.waitForTimeout(2000);
@@ -134,7 +134,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('hero heading (h1) has meaningful text', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
       const h1 = page.locator('h1').first();
@@ -153,7 +153,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Visual Regression', () => {
     test('homepage renders consistently (light mode)', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
@@ -172,7 +172,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage renders consistently (dark mode)', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
@@ -193,7 +193,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('hero section renders consistently above the fold', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
@@ -210,7 +210,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (light mode)', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
@@ -245,7 +245,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (dark mode)', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
 
@@ -280,7 +280,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Accessibility', () => {
     test('homepage has no WCAG 2.1 AA violations', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       const results = await new AxeBuilder({ page })
@@ -309,7 +309,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('homepage has no critical a11y issues in dark mode', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       // Force dark mode
@@ -341,7 +341,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections meet contrast requirements', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       // Scroll to ensure all sections are loaded
@@ -372,7 +372,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage has proper heading hierarchy', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
       // Check for exactly one h1
@@ -410,7 +410,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all interactive elements are keyboard accessible', async ({
       page,
     }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       // Find all buttons and links
@@ -445,7 +445,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('images have alt text', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       const images = await page.locator('img:visible').all();
@@ -475,7 +475,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Theme Switching', () => {
     test('theme switches correctly without layout shift', async ({ page }) => {
-      await page.goto('/', { timeout: 30000 });
+      await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('networkidle');
 
       // Get initial layout measurements

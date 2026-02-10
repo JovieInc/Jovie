@@ -327,8 +327,8 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of authRoutes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 60000 });
-      await page.waitForLoadState('load');
+      await page.goto(url, { timeout: 120_000 });
+      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
 
       // Check if we got redirected to signin (auth failed)
       if (page.url().includes('/signin')) {

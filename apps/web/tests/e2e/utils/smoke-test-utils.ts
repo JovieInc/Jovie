@@ -502,8 +502,11 @@ export async function waitForHydration(
 ): Promise<void> {
   const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
 
-  // Wait for load state
-  await page.waitForLoadState('load', { timeout });
+  // Wait for DOM to be ready (required)
+  await page.waitForLoadState('domcontentloaded', { timeout });
+
+  // Best-effort wait for full load (Turbopack compilation can exceed timeout after redirects)
+  await page.waitForLoadState('load', { timeout }).catch(() => {});
 
   // Check for React hydration completion by waiting for __NEXT_DATA__ to be processed
   await page

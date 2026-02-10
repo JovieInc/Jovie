@@ -125,8 +125,14 @@ export async function signInUser(
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
   await page.goto('/signin', { waitUntil: 'domcontentloaded' });
 
-  // Wait briefly for the page to settle and Clerk JS to start loading
-  await page.waitForTimeout(1000);
+  // Wait for Clerk JS to load from CDN before calling clerk.signIn()
+  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
+  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
+  await page
+    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
+    .catch(() => {
+      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
+    });
 
   try {
     // Use the official Clerk testing helper
@@ -183,7 +189,7 @@ export async function signInUser(
   // Use DASHBOARD_PROFILE (which exists) instead of PROFILE (which 404s)
   await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
     waitUntil: 'domcontentloaded',
-    timeout: 90000, // Turbopack cold compilation can take 60+ seconds
+    timeout: 120_000, // Turbopack cold compilation can take 60-90+ seconds
   });
 
   // Wait for page to stabilize after React 19 transient hooks error
