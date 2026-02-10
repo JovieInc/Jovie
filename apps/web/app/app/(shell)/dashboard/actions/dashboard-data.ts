@@ -41,11 +41,11 @@ const { logger } = Sentry;
 /**
  * Executes a query with RLS session setup.
  * This ensures session variables are set on the same connection as the query execution.
- * 
+ *
  * With the Neon HTTP driver, each db.execute() can hit a different connection.
  * To ensure RLS session variables (app.user_id, app.clerk_user_id) are available
  * to the query, we set them immediately before executing the query.
- * 
+ *
  * @param clerkUserId - The Clerk user ID for session setup
  * @param queryFn - The query function to execute
  * @param context - Description for error messages
@@ -296,7 +296,10 @@ async function fetchChromeDataWithSession(
                 return { hasLinks: false, hasMusicLinks: false };
               }
               Sentry.captureException(error, {
-                tags: { query: 'social_links_count', context: 'dashboard_data' },
+                tags: {
+                  query: 'social_links_count',
+                  context: 'dashboard_data',
+                },
               });
               throw error;
             }),
