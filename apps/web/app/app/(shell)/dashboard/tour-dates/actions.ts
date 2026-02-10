@@ -22,6 +22,7 @@ import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
 
@@ -39,6 +40,7 @@ export interface TourDateViewModel {
   title: string | null;
   startDate: string;
   startTime: string | null;
+  timezone: string | null;
   venueName: string;
   city: string;
   region: string | null;
@@ -96,8 +98,9 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     externalId: tourDate.externalId,
     provider: tourDate.provider,
     title: tourDate.title,
-    startDate: tourDate.startDate.toISOString(),
+    startDate: toISOStringSafe(tourDate.startDate),
     startTime: tourDate.startTime,
+    timezone: tourDate.timezone,
     venueName: tourDate.venueName,
     city: tourDate.city,
     region: tourDate.region,
@@ -106,9 +109,11 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     longitude: tourDate.longitude,
     ticketUrl: tourDate.ticketUrl,
     ticketStatus: tourDate.ticketStatus,
-    lastSyncedAt: tourDate.lastSyncedAt?.toISOString() ?? null,
-    createdAt: tourDate.createdAt.toISOString(),
-    updatedAt: tourDate.updatedAt.toISOString(),
+    lastSyncedAt: tourDate.lastSyncedAt
+      ? toISOStringSafe(tourDate.lastSyncedAt)
+      : null,
+    createdAt: toISOStringSafe(tourDate.createdAt),
+    updatedAt: toISOStringSafe(tourDate.updatedAt),
   };
 }
 
@@ -146,6 +151,7 @@ async function upsertBandsintownEvents(
     title: event.title,
     startDate: event.startDate,
     startTime: event.startTime,
+    timezone: event.timezone,
     venueName: event.venueName,
     city: event.city,
     region: event.region,
@@ -167,6 +173,7 @@ async function upsertBandsintownEvents(
         title: drizzleSql`excluded.title`,
         startDate: drizzleSql`excluded.start_date`,
         startTime: drizzleSql`excluded.start_time`,
+        timezone: drizzleSql`excluded.timezone`,
         venueName: drizzleSql`excluded.venue_name`,
         city: drizzleSql`excluded.city`,
         region: drizzleSql`excluded.region`,
@@ -542,6 +549,7 @@ export async function createTourDate(params: {
   title?: string;
   startDate: string;
   startTime?: string;
+  timezone?: string;
   venueName: string;
   city: string;
   region?: string;
@@ -575,6 +583,7 @@ export async function createTourDate(params: {
       title: params.title ?? null,
       startDate: parsedStartDate,
       startTime: params.startTime ?? null,
+      timezone: params.timezone ?? null,
       venueName: params.venueName,
       city: params.city,
       region: params.region ?? null,
@@ -605,6 +614,7 @@ export async function updateTourDate(params: {
   title?: string | null;
   startDate?: string;
   startTime?: string | null;
+  timezone?: string | null;
   venueName?: string;
   city?: string;
   region?: string | null;
@@ -647,6 +657,7 @@ export async function updateTourDate(params: {
     updateData.startDate = parsedStartDate;
   }
   if (params.startTime !== undefined) updateData.startTime = params.startTime;
+  if (params.timezone !== undefined) updateData.timezone = params.timezone;
   if (params.venueName !== undefined) updateData.venueName = params.venueName;
   if (params.city !== undefined) updateData.city = params.city;
   if (params.region !== undefined) updateData.region = params.region;

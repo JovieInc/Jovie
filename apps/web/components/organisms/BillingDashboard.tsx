@@ -13,7 +13,7 @@ import {
   Button,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
@@ -21,11 +21,37 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  type BillingHistoryEntry,
   queryKeys,
+  useBillingHistoryQuery,
   useBillingStatusQuery,
   useCancelSubscriptionMutation,
   usePricingOptionsQuery,
 } from '@/lib/queries';
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  'subscription.created': 'Subscription started',
+  'subscription.updated': 'Subscription updated',
+  'subscription.deleted': 'Subscription cancelled',
+  'checkout.session.completed': 'Payment completed',
+  'payment_intent.succeeded': 'Payment succeeded',
+  'payment_intent.payment_failed': 'Payment failed',
+  reconciliation: 'Billing reconciled',
+};
+
+function formatEventType(eventType: string): string {
+  return EVENT_TYPE_LABELS[eventType] ?? eventType.replace(/[._]/g, ' ');
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 export const BillingDashboard = memo(function BillingDashboard() {
   const { error: notifyError, success: notifySuccess } = useNotifications();
@@ -35,6 +61,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
 
   const billingQuery = useBillingStatusQuery();
   const pricingQuery = usePricingOptionsQuery();
+  const historyQuery = useBillingHistoryQuery();
   const cancelMutation = useCancelSubscriptionMutation();
 
   const isLoading = billingQuery.isLoading || pricingQuery.isLoading;
@@ -142,7 +169,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
             <p className='text-sm text-muted-foreground'>
               {billingInfo?.isPro
                 ? 'Branding is removed from your profile'
-                : 'Upgrade to Standard to remove branding'}
+                : 'Upgrade to Pro to remove branding'}
             </p>
             {billingInfo?.stripeSubscriptionId && (
               <p className='mt-1 text-xs text-muted-foreground'>
@@ -272,7 +299,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
           ) : (
             <div>
               <h4 className='mb-2 text-sm font-medium text-foreground'>
-                Upgrade to Standard
+                Upgrade to Pro
               </h4>
               <p className='mb-3 text-sm text-muted-foreground'>
                 Remove Jovie branding from your profile
@@ -310,6 +337,49 @@ export const BillingDashboard = memo(function BillingDashboard() {
             Filter your own visits from analytics
           </li>
         </ul>
+      </div>
+
+      {/* Billing History */}
+      <div className='rounded-lg border border-border bg-muted/30 p-6'>
+        <h3 className='mb-4 text-lg font-medium text-foreground'>
+          Billing History
+        </h3>
+        {historyQuery.isLoading ? (
+          <div className='animate-pulse motion-reduce:animate-none space-y-3'>
+            <div className='h-10 rounded bg-muted'></div>
+            <div className='h-10 rounded bg-muted'></div>
+            <div className='h-10 rounded bg-muted'></div>
+          </div>
+        ) : historyQuery.data?.entries &&
+          historyQuery.data.entries.length > 0 ? (
+          <div className='space-y-3'>
+            {historyQuery.data.entries.map((entry: BillingHistoryEntry) => (
+              <div
+                key={entry.id}
+                className='flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0'
+              >
+                <div className='flex items-start gap-3'>
+                  <Clock className='mt-0.5 h-4 w-4 shrink-0 text-muted-foreground' />
+                  <div>
+                    <p className='text-sm font-medium text-foreground'>
+                      {formatEventType(entry.eventType)}
+                    </p>
+                    <p className='text-xs text-muted-foreground'>
+                      {entry.source === 'webhook' ? 'Via Stripe' : entry.source}
+                    </p>
+                  </div>
+                </div>
+                <p className='shrink-0 text-xs text-muted-foreground'>
+                  {formatDate(entry.createdAt)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className='text-sm text-muted-foreground'>
+            No billing history yet.
+          </p>
+        )}
       </div>
     </div>
   );

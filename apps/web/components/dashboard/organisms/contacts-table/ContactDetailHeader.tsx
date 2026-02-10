@@ -1,10 +1,10 @@
 'use client';
 
-import { ArrowLeft, Check, Copy, Trash2, X } from 'lucide-react';
+import { Check, Copy, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { useIsMobile } from '@/hooks/useMobile';
 import { getContactRoleLabel } from '@/lib/contacts/constants';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ContactRole } from '@/types/contacts';
@@ -24,7 +24,6 @@ export function ContactDetailHeader({
   onClose,
   onDelete,
 }: ContactDetailHeaderProps) {
-  const isMobile = useIsMobile();
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,14 +45,7 @@ export function ContactDetailHeader({
 
   const roleLabel = getContactRoleLabel(role, customLabel);
 
-  const primaryActions: DrawerHeaderAction[] = [
-    {
-      id: 'close',
-      label: isMobile ? 'Go back' : 'Close',
-      icon: isMobile ? ArrowLeft : X,
-      onClick: onClose,
-    },
-  ];
+  const primaryActions: DrawerHeaderAction[] = [];
 
   if (email) {
     // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
@@ -76,15 +68,20 @@ export function ContactDetailHeader({
     },
   ];
 
+  const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
+
   return (
-    <div className='flex items-center justify-between px-3 py-2'>
-      <p className='text-xs font-medium text-sidebar-foreground truncate'>
-        {roleLabel}
-      </p>
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-      />
-    </div>
+    <DrawerHeader
+      title={roleLabel}
+      onClose={onClose}
+      actions={
+        hasActions ? (
+          <DrawerHeaderActions
+            primaryActions={primaryActions}
+            overflowActions={overflowActions}
+          />
+        ) : undefined
+      }
+    />
   );
 }

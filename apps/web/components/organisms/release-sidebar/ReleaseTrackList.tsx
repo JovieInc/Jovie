@@ -1,23 +1,75 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Link2,
+  Loader2,
+  MoreHorizontal,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
+import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
+
+/** Track shape returned by the API route for sidebar tracklist + actions. */
+type SidebarTrack = Pick<
+  TrackViewModel,
+  | 'id'
+  | 'releaseId'
+  | 'title'
+  | 'slug'
+  | 'smartLinkPath'
+  | 'trackNumber'
+  | 'discNumber'
+  | 'durationMs'
+  | 'isrc'
+  | 'isExplicit'
+  | 'providers'
+>;
+
+/**
+ * Fetch tracks via the route handler instead of a server action.
+ * Server action calls trigger RSC tree reconciliation which can
+ * cause the parent drawer to unmount.
+ */
+async function fetchTracks(releaseId: string): Promise<SidebarTrack[]> {
+  const res = await fetch(
+    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`
+  );
+  if (!res.ok) throw new Error('Failed to load tracks');
+  return res.json() as Promise<SidebarTrack[]>;
+}
 
 interface ReleaseTrackListProps {
   readonly release: Release;
+  readonly onTrackClick?: (track: SidebarTrack) => void;
 }
 
-export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
+export function ReleaseTrackList({
+  release,
+  onTrackClick,
+}: ReleaseTrackListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [tracks, setTracks] = useState<TrackViewModel[] | null>(null);
+  const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -35,10 +87,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     setIsLoading(true);
     setHasError(false);
     try {
-      const result = await loadTracksForRelease({
-        releaseId: release.id,
-        releaseSlug: release.slug,
-      });
+      const result = await fetchTracks(release.id);
       setTracks(result);
     } catch (error) {
       console.error('Failed to load tracks:', error);
@@ -47,7 +96,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isExpanded, tracks, hasError, release.id, release.slug]);
+  }, [isExpanded, tracks, hasError, release.id]);
 
   if (release.totalTracks === 0) return null;
 
@@ -55,10 +104,12 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
     <DrawerSection>
       <button
         type='button'
-        onClick={() => void handleToggle()}
+        onClick={() => {
+          handleToggle().catch(() => {});
+        }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token hover:text-primary-token transition-colors'
+        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token hover:text-secondary-token transition-colors'
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -82,7 +133,7 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
             </p>
           )}
 
-          {!isLoading && !hasError && tracks && tracks.length === 0 && (
+          {!isLoading && !hasError && tracks?.length === 0 && (
             <p className='py-2 text-xs text-tertiary-token'>
               No track data available.
             </p>
@@ -92,18 +143,49 @@ export function ReleaseTrackList({ release }: ReleaseTrackListProps) {
             !hasError &&
             tracks &&
             tracks.length > 0 &&
-            tracks.map(track => <TrackItem key={track.id} track={track} />)}
+            tracks.map(track => (
+              <TrackItem key={track.id} track={track} onClick={onTrackClick} />
+            ))}
         </div>
       )}
     </DrawerSection>
   );
 }
 
-function TrackItem({ track }: { readonly track: TrackViewModel }) {
+function TrackItem({
+  track,
+  onClick,
+}: {
+  readonly track: SidebarTrack;
+  readonly onClick?: (track: SidebarTrack) => void;
+}) {
   const trackLabel =
     track.discNumber > 1
       ? `${track.discNumber}-${track.trackNumber}`
       : String(track.trackNumber);
+
+  const handleClick = useCallback(() => {
+    onClick?.(track);
+  }, [onClick, track]);
+
+  const handleCopyIsrc = useCallback(() => {
+    if (track.isrc) {
+      navigator.clipboard.writeText(track.isrc).then(
+        () => toast.success('ISRC copied'),
+        () => toast.error('Failed to copy ISRC')
+      );
+    }
+  }, [track.isrc]);
+
+  const handleCopySmartLink = useCallback(() => {
+    const smartLinkUrl = `${getBaseUrl()}${track.smartLinkPath}`;
+    navigator.clipboard.writeText(smartLinkUrl).then(
+      () => toast.success('Smart link copied'),
+      () => toast.error('Failed to copy link')
+    );
+  }, [track.smartLinkPath]);
+
+  const streamingProviders = track.providers.filter(p => p.url);
 
   return (
     <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-surface-2/50 transition-colors'>
@@ -112,12 +194,16 @@ function TrackItem({ track }: { readonly track: TrackViewModel }) {
         {trackLabel}.
       </span>
 
-      {/* Track details */}
-      <div className='min-w-0 flex-1'>
+      {/* Track details - clickable */}
+      <button
+        type='button'
+        onClick={handleClick}
+        className='min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+      >
         <div className='flex items-center gap-1.5'>
           <TruncatedText
             lines={1}
-            className='text-xs text-primary-token'
+            className='text-xs text-primary-token hover:underline'
             tooltipSide='top'
           >
             {track.title}
@@ -144,16 +230,86 @@ function TrackItem({ track }: { readonly track: TrackViewModel }) {
               {track.durationMs != null && (
                 <span className='text-tertiary-token/50'>|</span>
               )}
-              <CopyableMonospaceCell
-                value={track.isrc}
-                label='ISRC'
-                maxWidth={110}
-                className='!text-[11px] !text-tertiary-token hover:!text-secondary-token'
-              />
+              <span className='font-mono text-[10px]'>{track.isrc}</span>
             </>
           )}
         </div>
-      </div>
+      </button>
+
+      {/* Actions menu */}
+      <TrackActionsMenu
+        track={track}
+        streamingProviders={streamingProviders}
+        onCopyIsrc={handleCopyIsrc}
+        onCopySmartLink={handleCopySmartLink}
+      />
     </div>
+  );
+}
+
+// Shared provider labels — single source of truth
+
+function TrackActionsMenu({
+  track,
+  streamingProviders,
+  onCopyIsrc,
+  onCopySmartLink,
+}: {
+  readonly track: SidebarTrack;
+  readonly streamingProviders: SidebarTrack['providers'];
+  readonly onCopyIsrc: () => void;
+  readonly onCopySmartLink: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          className='shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          aria-label={`Actions for ${track.title}`}
+        >
+          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' className='w-48'>
+        {track.isrc && (
+          <DropdownMenuItem onClick={onCopyIsrc}>
+            <Copy className='mr-2 h-3.5 w-3.5' />
+            Copy ISRC
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={onCopySmartLink}>
+          <Link2 className='mr-2 h-3.5 w-3.5' />
+          Copy smart link
+        </DropdownMenuItem>
+        {streamingProviders.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <ExternalLink className='mr-2 h-3.5 w-3.5' />
+                Open on platform
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {streamingProviders.map(provider => (
+                  <DropdownMenuItem
+                    key={provider.key}
+                    onClick={() =>
+                      globalThis.open(
+                        provider.url,
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                  >
+                    {PROVIDER_LABELS[provider.key] ?? provider.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -16,6 +16,8 @@ interface NavMenuItemProps {
   readonly shortcut?: KeyboardShortcut;
   readonly actions?: ReactNode;
   readonly children?: ReactNode;
+  /** When provided, renders a button instead of a link */
+  readonly onClick?: () => void;
 }
 
 /**
@@ -69,6 +71,7 @@ export function NavMenuItem({
   shortcut,
   actions,
   children,
+  onClick,
 }: NavMenuItemProps) {
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
@@ -77,25 +80,42 @@ export function NavMenuItem({
     [item.name, shortcut]
   );
 
+  const innerContent = (
+    <>
+      {/* Fixed-width icon container for consistent alignment */}
+      <span
+        data-sidebar-icon
+        className='flex size-4 shrink-0 items-center justify-center'
+      >
+        <item.icon className='size-4' aria-hidden='true' />
+      </span>
+      <span className='truncate group-data-[collapsible=icon]:hidden'>
+        {item.name}
+      </span>
+    </>
+  );
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-        <Link
-          href={item.href}
-          aria-current={isActive ? 'page' : undefined}
-          className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
-        >
-          {/* Fixed-width icon container for consistent alignment */}
-          <span
-            data-sidebar-icon
-            className='flex size-4 shrink-0 items-center justify-center'
+        {onClick ? (
+          <button
+            type='button'
+            onClick={onClick}
+            aria-pressed={isActive}
+            className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
           >
-            <item.icon className='size-4' aria-hidden='true' />
-          </span>
-          <span className='truncate group-data-[collapsible=icon]:hidden'>
-            {item.name}
-          </span>
-        </Link>
+            {innerContent}
+          </button>
+        ) : (
+          <Link
+            href={item.href}
+            aria-current={isActive ? 'page' : undefined}
+            className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
+          >
+            {innerContent}
+          </Link>
+        )}
       </SidebarMenuButton>
       {actions}
       {children}

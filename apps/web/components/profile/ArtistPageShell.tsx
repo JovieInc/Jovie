@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/profile-shell';
 import type { PublicContact } from '@/types/contacts';

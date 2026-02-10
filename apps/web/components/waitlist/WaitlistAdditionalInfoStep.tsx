@@ -11,6 +11,7 @@ interface WaitlistAdditionalInfoStepProps {
   readonly isSubmitting: boolean;
   readonly isHydrating: boolean;
   readonly onSpotifyUrlChange: (value: string) => void;
+  readonly onSpotifyArtistNameChange: (name: string | null) => void;
   readonly onHeardAboutChange: (value: string) => void;
   readonly setSpotifyUrlInputRef: (el: HTMLInputElement | null) => void;
 }
@@ -22,6 +23,7 @@ export function WaitlistAdditionalInfoStep({
   isSubmitting,
   isHydrating,
   onSpotifyUrlChange,
+  onSpotifyArtistNameChange,
   onHeardAboutChange,
   setSpotifyUrlInputRef,
 }: WaitlistAdditionalInfoStepProps) {
@@ -30,6 +32,7 @@ export function WaitlistAdditionalInfoStep({
       <WaitlistSpotifySearch
         spotifyUrl={spotifyUrl}
         onUrlChange={onSpotifyUrlChange}
+        onArtistNameChange={onSpotifyArtistNameChange}
         fieldErrors={fieldErrors}
         isSubmitting={isSubmitting}
         isHydrating={isHydrating}

@@ -47,6 +47,27 @@ interface ProcessingContext {
 
 type ProcessResult = 'sent' | 'failed' | 'skipped';
 
+/** Count settled promise results by outcome category. */
+function countSettledResults(results: PromiseSettledResult<ProcessResult>[]): {
+  sent: number;
+  failed: number;
+  skipped: number;
+} {
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      if (result.value === 'sent') sent++;
+      else if (result.value === 'failed') failed++;
+      else if (result.value === 'skipped') skipped++;
+    } else {
+      failed++;
+    }
+  }
+  return { sent, failed, skipped };
+}
+
 // Type aliases for batch-fetched data to simplify function signatures
 type BatchRelease = {
   id: string;
@@ -207,6 +228,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
       and(
         drizzleSql`${notificationSubscriptions.id} = ANY(${subscriptionIds})`,
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
       )
     );
@@ -461,6 +483,48 @@ function createErrorResponse(error: unknown): NextResponse {
 }
 
 /**
+ * Process notifications in parallel batches and return totals.
+ */
+async function processNotificationBatches(
+  pendingNotifications: PendingNotification[],
+  now: Date,
+  releasesMap: Map<string, BatchRelease>,
+  creatorsMap: Map<string, BatchCreator>,
+  subscribersMap: Map<string, BatchSubscriber>,
+  linksMap: Map<string, Array<{ providerId: string; url: string }>>
+): Promise<{ totalSent: number; totalFailed: number; totalSkipped: number }> {
+  let totalSent = 0;
+  let totalFailed = 0;
+  let totalSkipped = 0;
+
+  for (
+    let i = 0;
+    i < pendingNotifications.length;
+    i += CONCURRENCY_BATCH_SIZE
+  ) {
+    const batch = pendingNotifications.slice(i, i + CONCURRENCY_BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(notification =>
+        processNotificationWithBatchedData(
+          { now, notification },
+          releasesMap,
+          creatorsMap,
+          subscribersMap,
+          linksMap
+        )
+      )
+    );
+
+    const counts = countSettledResults(results);
+    totalSent += counts.sent;
+    totalFailed += counts.failed;
+    totalSkipped += counts.skipped;
+  }
+
+  return { totalSent, totalFailed, totalSkipped };
+}
+
+/**
  * Cron job to send pending release day notifications.
  *
  * This job:
@@ -519,38 +583,15 @@ export async function GET(request: Request) {
       ]);
 
     // Process notifications in parallel batches
-    let totalSent = 0;
-    let totalFailed = 0;
-    let totalSkipped = 0;
-
-    for (
-      let i = 0;
-      i < pendingNotifications.length;
-      i += CONCURRENCY_BATCH_SIZE
-    ) {
-      const batch = pendingNotifications.slice(i, i + CONCURRENCY_BATCH_SIZE);
-      const results = await Promise.allSettled(
-        batch.map(notification =>
-          processNotificationWithBatchedData(
-            { now, notification },
-            releasesMap,
-            creatorsMap,
-            subscribersMap,
-            linksMap
-          )
-        )
-      );
-
-      for (const result of results) {
-        if (result.status === 'fulfilled') {
-          if (result.value === 'sent') totalSent++;
-          else if (result.value === 'failed') totalFailed++;
-          else if (result.value === 'skipped') totalSkipped++;
-        } else {
-          totalFailed++;
-        }
-      }
-    }
+    const totals = await processNotificationBatches(
+      pendingNotifications,
+      now,
+      releasesMap,
+      creatorsMap,
+      subscribersMap,
+      linksMap
+    );
+    const { totalSent, totalFailed, totalSkipped } = totals;
 
     logger.info(
       `[send-release-notifications] Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`

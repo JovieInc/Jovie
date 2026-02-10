@@ -16,7 +16,7 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({
   className,
-  children = 'Upgrade to Standard',
+  children = 'Upgrade to Pro',
   variant = 'primary',
   size = 'md',
   priceId,

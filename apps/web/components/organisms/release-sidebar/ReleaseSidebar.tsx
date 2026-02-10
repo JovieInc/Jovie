@@ -10,7 +10,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -22,6 +22,7 @@ import { ReleaseFields } from './ReleaseFields';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseTrackList } from './ReleaseTrackList';
+import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
@@ -67,6 +68,19 @@ export function ReleaseSidebar({
     onAddDspLink,
     onRemoveDspLink,
   });
+
+  // Track detail panel state — track shape comes from the sidebar route handler
+  const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
+    null
+  );
+
+  const handleTrackClick = useCallback((track: TrackForDetail) => {
+    setSelectedTrack(track);
+  }, []);
+
+  const handleBackToRelease = useCallback(() => {
+    setSelectedTrack(null);
+  }, []);
 
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
@@ -137,7 +151,6 @@ export function ReleaseSidebar({
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
-      className='bg-surface-2'
     >
       <div data-testid='release-sidebar' className='flex h-full flex-col'>
         <ReleaseSidebarHeader
@@ -148,45 +161,64 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
-        <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
-          {release ? (
+        <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
+          {selectedTrack && release ? (
+            <TrackDetailPanel
+              track={selectedTrack}
+              releaseTitle={release.title}
+              onBack={handleBackToRelease}
+            />
+          ) : release ? (
             <>
-              <ReleaseArtwork
-                artworkUrl={release.artworkUrl}
-                title={release.title}
-                artistName={artistName}
-                canUploadArtwork={canUploadArtwork}
-                onArtworkUpload={
-                  canUploadArtwork ? handleArtworkUpload : undefined
-                }
-              />
+              <div className='pb-5'>
+                <ReleaseArtwork
+                  artworkUrl={release.artworkUrl}
+                  title={release.title}
+                  artistName={artistName}
+                  canUploadArtwork={canUploadArtwork}
+                  onArtworkUpload={
+                    canUploadArtwork ? handleArtworkUpload : undefined
+                  }
+                />
+              </div>
 
-              <ReleaseFields
-                title={release.title}
-                releaseDate={release.releaseDate}
-                smartLinkPath={release.smartLinkPath}
-              />
+              <div className='py-5'>
+                <ReleaseFields
+                  title={release.title}
+                  releaseDate={release.releaseDate}
+                  smartLinkPath={release.smartLinkPath}
+                />
+              </div>
 
-              <ReleaseMetadata release={release} />
+              <div className='py-5'>
+                <ReleaseMetadata release={release} />
+              </div>
 
-              <ReleaseTrackList release={release} />
+              <div className='py-5'>
+                <ReleaseTrackList
+                  release={release}
+                  onTrackClick={handleTrackClick}
+                />
+              </div>
 
-              <ReleaseDspLinks
-                release={release}
-                providerConfig={providerConfig}
-                isEditable={isEditable}
-                isAddingLink={isAddingLink}
-                newLinkUrl={newLinkUrl}
-                selectedProvider={selectedProvider}
-                isAddingDspLink={isAddingDspLink}
-                isRemovingDspLink={isRemovingDspLink}
-                onSetIsAddingLink={setIsAddingLink}
-                onSetNewLinkUrl={setNewLinkUrl}
-                onSetSelectedProvider={setSelectedProvider}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                onNewLinkKeyDown={handleNewLinkKeyDown}
-              />
+              <div className='pt-5'>
+                <ReleaseDspLinks
+                  release={release}
+                  providerConfig={providerConfig}
+                  isEditable={isEditable}
+                  isAddingLink={isAddingLink}
+                  newLinkUrl={newLinkUrl}
+                  selectedProvider={selectedProvider}
+                  isAddingDspLink={isAddingDspLink}
+                  isRemovingDspLink={isRemovingDspLink}
+                  onSetIsAddingLink={setIsAddingLink}
+                  onSetNewLinkUrl={setNewLinkUrl}
+                  onSetSelectedProvider={setSelectedProvider}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                  onNewLinkKeyDown={handleNewLinkKeyDown}
+                />
+              </div>
 
               {isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>

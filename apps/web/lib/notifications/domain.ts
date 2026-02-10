@@ -8,6 +8,10 @@ import {
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  buildSubscribeConfirmUrl,
+  generateSubscribeConfirmToken,
+} from '@/lib/email/subscribe-confirm-token';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
@@ -209,6 +213,7 @@ interface ArtistProfileResult {
     username: string | null;
     creatorIsPro: boolean;
     creatorClerkId: string | null;
+    settings: Record<string, unknown> | null;
   };
   dynamicEnabled: boolean;
 }
@@ -225,6 +230,7 @@ async function fetchArtistProfile(
       id: creatorProfiles.id,
       displayName: creatorProfiles.displayName,
       username: creatorProfiles.username,
+      settings: creatorProfiles.settings,
       creatorIsPro: users.isPro,
       creatorClerkId: users.clerkId,
     })
@@ -257,6 +263,7 @@ async function fetchArtistProfile(
       username: artistProfile.username,
       creatorIsPro,
       creatorClerkId,
+      settings: artistProfile.settings,
     },
     dynamicEnabled,
   };
@@ -269,7 +276,7 @@ function isArtistProfileResult(
 }
 
 /**
- * Sends subscription confirmation email.
+ * Sends subscription confirmation email (for single opt-in / post-confirmation).
  */
 async function sendSubscriptionConfirmationEmail(
   artist_id: string,
@@ -304,6 +311,108 @@ async function sendSubscriptionConfirmationEmail(
       email: normalizedEmail,
       creatorProfileId: artist_id,
     }
+  );
+}
+
+/**
+ * Sends double opt-in verification email with confirmation link.
+ */
+async function sendSubscriptionVerificationEmail(
+  subscriptionId: string,
+  artist_id: string,
+  normalizedEmail: string,
+  artistProfile: { displayName: string | null; username: string | null }
+): Promise<Awaited<ReturnType<typeof sendNotification>>> {
+  const artistName =
+    artistProfile.displayName || artistProfile.username || 'this artist';
+  const confirmUrl = buildSubscribeConfirmUrl(subscriptionId, normalizedEmail);
+  const dedupKey = `notification_verify:${artist_id}:${normalizedEmail}`;
+
+  const confirmLink = confirmUrl ?? '#';
+
+  return sendNotification(
+    {
+      id: dedupKey,
+      dedupKey,
+      category: 'transactional',
+      subject: `Confirm your subscription to ${artistName} on Jovie`,
+      text: `Please confirm your subscription to ${artistName} on Jovie.\n\nClick here to confirm: ${confirmLink}\n\nIf you didn't request this, you can safely ignore this email.`,
+      html: `
+        <p>Please confirm your subscription to <strong>${artistName}</strong> on Jovie.</p>
+        <p>Click the button below to start receiving updates when ${artistName} drops new music.</p>
+        <p style="margin:24px 0;">
+          <a href="${confirmLink}" style="padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Confirm subscription</a>
+        </p>
+        <p style="font-size:14px;color:#555;">If you didn't request this, you can safely ignore this email. You won't receive any notifications unless you confirm.</p>
+      `,
+      channels: ['email'],
+      respectUserPreferences: false,
+      dismissible: false,
+    },
+    {
+      email: normalizedEmail,
+      creatorProfileId: artist_id,
+    }
+  );
+}
+
+/**
+ * Check if creator has double opt-in enabled.
+ * Defaults to true when the setting is not explicitly set.
+ */
+function isDoubleOptInEnabled(
+  settings: Record<string, unknown> | null
+): boolean {
+  if (!settings) return true;
+  const value = settings.require_double_opt_in;
+  if (typeof value === 'boolean') return value;
+  return true; // default: on
+}
+
+/**
+ * Generates and stores a double opt-in confirmation token for a subscription.
+ */
+async function handleDoubleOptInToken(
+  doubleOptIn: boolean,
+  subscriptionId: string | undefined,
+  normalizedEmail: string | null
+): Promise<void> {
+  if (!doubleOptIn || !subscriptionId || !normalizedEmail) return;
+  const token = generateSubscribeConfirmToken(subscriptionId, normalizedEmail);
+  if (!token) return;
+  await db
+    .update(notificationSubscriptions)
+    .set({
+      confirmationToken: token,
+      confirmationSentAt: new Date(),
+    })
+    .where(eq(notificationSubscriptions.id, subscriptionId));
+}
+
+/**
+ * Dispatches the appropriate subscription email based on opt-in type.
+ */
+async function dispatchSubscriptionEmail(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  subscriptionId: string | undefined,
+  doubleOptIn: boolean,
+  artist_id: string,
+  artistProfile: { displayName: string | null; username: string | null }
+): Promise<Awaited<ReturnType<typeof sendNotification>> | null> {
+  if (channel !== 'email' || !normalizedEmail || !subscriptionId) return null;
+  if (doubleOptIn) {
+    return sendSubscriptionVerificationEmail(
+      subscriptionId,
+      artist_id,
+      normalizedEmail,
+      artistProfile
+    );
+  }
+  return sendSubscriptionConfirmationEmail(
+    artist_id,
+    normalizedEmail,
+    artistProfile
   );
 }
 
@@ -387,6 +496,12 @@ export const subscribeToNotificationsDomain = async (
             notificationSubscriptions.phone,
           ];
 
+    // Determine double opt-in requirement
+    const doubleOptIn =
+      channel === 'email' &&
+      normalizedEmail &&
+      isDoubleOptInEnabled(artistProfile.settings);
+
     const [insertedSubscription] = await db
       .insert(notificationSubscriptions)
       .values({
@@ -398,11 +513,20 @@ export const subscribeToNotificationsDomain = async (
         city: cityValue,
         ipAddress,
         source,
+        // If double opt-in: leave confirmedAt null (pending). Otherwise: confirm immediately.
+        confirmedAt: doubleOptIn ? null : new Date(),
       })
       .onConflictDoNothing({ target: conflictTarget })
       .returning({
         id: notificationSubscriptions.id,
       });
+
+    // Generate and store confirmation token for double opt-in
+    await handleDoubleOptInToken(
+      !!doubleOptIn,
+      insertedSubscription?.id,
+      normalizedEmail
+    );
 
     await trackSubscribeSuccess({
       artist_id,
@@ -420,21 +544,20 @@ export const subscribeToNotificationsDomain = async (
       await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
     }
 
-    let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
-      null;
-
-    if (channel === 'email' && normalizedEmail && insertedSubscription?.id) {
-      dispatchResult = await sendSubscriptionConfirmationEmail(
-        artist_id,
-        normalizedEmail,
-        artistProfile
-      );
-    }
+    const dispatchResult = await dispatchSubscriptionEmail(
+      channel,
+      normalizedEmail,
+      insertedSubscription?.id,
+      !!doubleOptIn,
+      artist_id,
+      artistProfile
+    );
 
     return buildSubscribeSuccessResponse(
       dynamicEnabled,
       dispatchResult?.delivered.includes('email') ?? false,
-      Math.round(Date.now() - runtimeStart)
+      Math.round(Date.now() - runtimeStart),
+      !!doubleOptIn
     );
   } catch (error) {
     await trackServerError('subscribe', error);

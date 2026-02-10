@@ -125,6 +125,7 @@ function sanitizeEvent(event: BandsintownEvent): SanitizedEvent | null {
     title: event.title || null,
     startDate,
     startTime,
+    timezone: null, // Bandsintown datetime lacks timezone; can be set via manual override
     venueName: event.venue?.name ?? 'TBA',
     city: event.venue?.city ?? 'TBA',
     region: event.venue?.region || null,

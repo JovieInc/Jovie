@@ -102,11 +102,21 @@ export function setInternalDb(db: DbType): void {
   _db = db;
 }
 
-// Export a getter function that initializes the connection on first access
+// Export a getter function that initializes the connection on first access.
+// The Proxy also guards against .transaction() which is unsupported by neon-http.
 export const db = new Proxy({} as DbType, {
   get(target, prop) {
     if (!_db) {
       _db = initializeDb();
+    }
+    if (prop === 'transaction') {
+      return () => {
+        throw new Error(
+          'db.transaction() is not supported with the Neon HTTP driver. ' +
+            'Use individual queries or batch operations instead. ' +
+            'See lib/auth/session.ts for the recommended pattern.'
+        );
+      };
     }
     return Reflect.get(_db, prop);
   },

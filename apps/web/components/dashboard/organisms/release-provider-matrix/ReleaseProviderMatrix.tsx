@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -21,7 +20,6 @@ import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleBut
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
-import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -36,6 +34,7 @@ import { ReleaseTable } from './ReleaseTable';
 import {
   DEFAULT_RELEASE_FILTERS,
   type ReleaseFilters,
+  type ReleaseTab,
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
@@ -91,8 +90,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     availableColumns,
     onColumnVisibilityChange,
     resetToDefaults,
-    showTracks,
-    onShowTracksChange,
     groupByYear,
     onGroupByYearChange,
   } = useReleaseTablePreferences();
@@ -102,21 +99,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
-  // Release view filter state (All / Singles / Albums)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('all');
+  // Release view filter state (Tracks / Releases)
+  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
+
+  // Data tab state (Catalog / Links / Details)
+  const [releaseTab, setReleaseTab] = useState<ReleaseTab>('catalog');
+
+  // Derive showTracks from releaseView toggle
+  const showTracksFromView = releaseView === 'tracks';
 
   // Apply filters to rows
   const filteredRows = useMemo(() => {
     return rows.filter(release => {
-      // Quick filter by release view (Singles/Albums toggle)
-      if (releaseView === 'singles' && release.releaseType !== 'single') {
-        return false;
-      }
-      // Albums includes: album, ep, compilation (everything that's not a single)
-      if (releaseView === 'albums' && release.releaseType === 'single') {
-        return false;
-      }
-
       // Filter by release type (from advanced filters)
       const matchesType =
         filters.releaseTypes.length === 0 ||
@@ -138,39 +132,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
       return true;
     });
-  }, [rows, filters, releaseView]);
+  }, [rows, filters]);
 
-  // Row selection - use filtered rows
-  const rowIds = useMemo(() => filteredRows.map(r => r.id), [filteredRows]);
-  const { selectedIds, clearSelection, setSelection } = useRowSelection(rowIds);
-
-  // Bulk actions
-  const bulkActions = useMemo(() => {
-    const selectedReleases = rows.filter(r => selectedIds.has(r.id));
-
-    return [
-      {
-        label: 'Copy Smart Links',
-        icon: <Copy className='h-4 w-4' />,
-        onClick: () => {
-          const links = selectedReleases
-            .map(r => `${globalThis.location.origin}${r.smartLinkPath}`)
-            .join('\n');
-          navigator.clipboard.writeText(links);
-          clearSelection();
-        },
-      },
-      {
-        label: 'Copy Titles',
-        icon: <Copy className='h-4 w-4' />,
-        onClick: () => {
-          const titles = selectedReleases.map(r => r.title).join('\n');
-          navigator.clipboard.writeText(titles);
-          clearSelection();
-        },
-      },
-    ];
-  }, [rows, selectedIds, clearSelection]);
+  // Empty selection for subheader export (simplified - no bulk selection)
+  const selectedIds = useMemo(() => new Set<string>(), []);
 
   const handleArtistConnected = useCallback(
     (newReleases: ReleaseViewModel[], newArtistName: string) => {
@@ -205,6 +170,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           setIsAmConnected(true);
           setAmArtistName(result.artistName);
           toast.success(result.message);
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         toast.error(
@@ -372,12 +339,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
-              showTracks={showTracks}
-              onShowTracksChange={onShowTracksChange}
               groupByYear={groupByYear}
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
+              releaseTab={releaseTab}
+              onReleaseTabChange={setReleaseTab}
             />
           )}
 
@@ -430,14 +397,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onEdit={openEditor}
                   onAddUrl={handleAddUrl}
                   isAddingUrl={isSaving}
-                  selectedIds={selectedIds}
-                  onSelectionChange={setSelection}
-                  bulkActions={bulkActions}
-                  onClearSelection={clearSelection}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
-                  showTracks={showTracks}
+                  showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  activeTab={releaseTab}
                 />
               </QueryErrorBoundary>
             )}

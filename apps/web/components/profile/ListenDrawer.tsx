@@ -34,7 +34,7 @@ export function ListenDrawer({
 
     // Push history state so hardware back button closes the drawer
     if (!historyPushedRef.current) {
-      window.history.pushState({ listenDrawer: true }, '');
+      globalThis.history.pushState({ listenDrawer: true }, '');
       historyPushedRef.current = true;
     }
 
@@ -45,8 +45,8 @@ export function ListenDrawer({
       }
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
   }, [open, artist.handle, onOpenChange]);
 
   // Clean up history entry when drawer is closed by swipe/overlay tap
@@ -54,7 +54,7 @@ export function ListenDrawer({
     (isOpen: boolean) => {
       if (!isOpen && historyPushedRef.current) {
         historyPushedRef.current = false;
-        window.history.back();
+        globalThis.history.back();
       }
       onOpenChange(isOpen);
     },

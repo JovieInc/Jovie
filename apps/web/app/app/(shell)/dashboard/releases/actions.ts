@@ -41,6 +41,7 @@ import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -158,6 +159,7 @@ function mapReleaseToViewModel(
     totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
     primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
     genres: extractGenres(release.metadata),
+    canvasStatus: getCanvasStatusFromMetadata(release.metadata),
   };
 }
 
@@ -355,7 +357,7 @@ export async function refreshRelease(params: {
   const profile = await requireProfile();
 
   const release = await getReleaseById(params.releaseId);
-  if (!release || release.creatorProfileId !== profile.id) {
+  if (release?.creatorProfileId !== profile.id) {
     throw new TypeError('Release not found');
   }
 
@@ -575,6 +577,8 @@ function mapTrackToViewModel(
     id: track.id,
     releaseId: track.releaseId,
     title: track.title,
+    slug: track.slug,
+    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -600,7 +604,7 @@ function mapTrackToViewModel(
           source,
           updatedAt,
           path: url
-            ? buildSmartLinkPath(profileHandle, releaseSlug, providerKey)
+            ? buildSmartLinkPath(profileHandle, track.slug, providerKey)
             : '',
           isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
         };
@@ -781,7 +785,7 @@ export async function connectAppleMusicArtist(params: {
         totalTracksChecked: 0,
         status: 'confirmed',
         confirmedAt: now,
-        confirmedBy: userId,
+        confirmedBy: profile.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -797,7 +801,7 @@ export async function connectAppleMusicArtist(params: {
           externalArtistImageUrl: sanitizedImageUrl,
           status: 'confirmed',
           confirmedAt: now,
-          confirmedBy: userId,
+          confirmedBy: profile.id,
           updatedAt: now,
         },
       });

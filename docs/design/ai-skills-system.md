@@ -437,7 +437,7 @@ const tools = await resolveSkills(ctx, {
 });
 
 const result = streamText({
-  model: gateway('anthropic:claude-sonnet-4-20250514'),
+  model: gateway('anthropic/claude-sonnet-4-20250514'),
   system: buildSystemPrompt(ctx.artist, tools),
   messages: validatedMessages,
   tools,

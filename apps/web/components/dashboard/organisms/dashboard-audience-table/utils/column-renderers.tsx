@@ -1,3 +1,5 @@
+'use client';
+
 import type { CellContext } from '@tanstack/react-table';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -10,11 +12,9 @@ import {
   AudienceUserCell,
   AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
-import {
-  type ContextMenuItemType,
-  convertContextMenuItems,
-} from '@/components/organisms/table';
+import { convertContextMenuItems } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
+import { useAudienceTableContext } from '../AudienceTableContext';
 
 /**
  * Renders the user cell with display name, type, email, and phone
@@ -95,64 +95,53 @@ export function renderEmailCell({
 }
 
 /**
- * Creates a cell renderer for the selection column
+ * Selection cell that reads dynamic state from context.
+ * Avoids closing over selectedIds/page/pageSize which would destabilize column defs.
  */
-export function createSelectCellRenderer(
-  page: number,
-  pageSize: number,
-  selectedIds: Set<string>,
-  onToggleSelect: (id: string) => void
-) {
-  return function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
-    const rowNumber = (page - 1) * pageSize + row.index + 1;
-    return (
-      <AudienceRowSelectionCell
-        rowNumber={rowNumber}
-        isChecked={selectedIds.has(row.original.id)}
-        displayName={row.original.displayName}
-        onToggle={() => onToggleSelect(row.original.id)}
-      />
-    );
-  };
+export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
+  const { selectedIds, toggleSelect, page, pageSize } =
+    useAudienceTableContext();
+  const rowNumber = (page - 1) * pageSize + row.index + 1;
+  return (
+    <AudienceRowSelectionCell
+      rowNumber={rowNumber}
+      isChecked={selectedIds.has(row.original.id)}
+      displayName={row.original.displayName}
+      onToggle={() => toggleSelect(row.original.id)}
+    />
+  );
 }
 
 /**
- * Creates a cell renderer for the lastSeen/subscribedAt column
+ * Last-seen cell that reads menu open state from context.
+ * Avoids closing over openMenuRowId which would destabilize column defs.
  */
-export function createLastSeenCellRenderer(
-  openMenuRowId: string | null,
-  setOpenMenuRowId: (id: string | null) => void
-) {
-  return function LastSeenCell({
-    row,
-  }: CellContext<AudienceMember, string | null>) {
-    return (
-      <AudienceLastSeenCell
-        row={row.original}
-        lastSeenAt={row.original.lastSeenAt}
-        isMenuOpen={openMenuRowId === row.original.id}
-        onMenuOpenChange={open =>
-          setOpenMenuRowId(open ? row.original.id : null)
-        }
-      />
-    );
-  };
+export function LastSeenCell({
+  row,
+}: CellContext<AudienceMember, string | null>) {
+  const { openMenuRowId, setOpenMenuRowId } = useAudienceTableContext();
+  return (
+    <AudienceLastSeenCell
+      row={row.original}
+      lastSeenAt={row.original.lastSeenAt}
+      isMenuOpen={openMenuRowId === row.original.id}
+      onMenuOpenChange={open => setOpenMenuRowId(open ? row.original.id : null)}
+    />
+  );
 }
 
 /**
- * Creates a cell renderer for the menu/actions column
+ * Menu cell that reads context menu items from context.
+ * Avoids closing over getContextMenuItems which would destabilize column defs.
  */
-export function createMenuCellRenderer(
-  getContextMenuItems: (member: AudienceMember) => ContextMenuItemType[]
-) {
-  return function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
-    const contextMenuItems = getContextMenuItems(row.original);
-    const actionMenuItems = convertContextMenuItems(contextMenuItems);
+export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
+  const { getContextMenuItems } = useAudienceTableContext();
+  const contextMenuItems = getContextMenuItems(row.original);
+  const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
-    return (
-      <div className='flex items-center justify-end'>
-        <TableActionMenu items={actionMenuItems} align='end' />
-      </div>
-    );
-  };
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={actionMenuItems} align='end' />
+    </div>
+  );
 }

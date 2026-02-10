@@ -63,10 +63,10 @@ function getConfidenceLabel(score: number): {
 function DspMatchRow({
   match,
   profileId,
-}: {
+}: Readonly<{
   match: DspMatch;
   profileId: string;
-}) {
+}>) {
   const display = DSP_DISPLAY[match.providerId] ?? {
     label: match.providerId,
     color: 'text-primary-token',
@@ -279,10 +279,12 @@ export function ConnectedDspList({
           queryKey: queryKeys.dspEnrichment.matches(profileId),
         });
       } catch (err) {
+        const providerName =
+          paletteProvider === 'spotify' ? 'Spotify' : 'Apple Music';
         toast.error(
           err instanceof Error
             ? err.message
-            : `Failed to connect ${paletteProvider === 'spotify' ? 'Spotify' : 'Apple Music'}`
+            : `Failed to connect ${providerName}`
         );
       }
     },
@@ -393,9 +395,9 @@ export function ConnectedDspList({
             connected={!!appleMusicMatch}
             artistName={appleMusicMatch?.externalArtistName}
             onClick={
-              !appleMusicMatch
-                ? () => handleOpenPalette('apple_music')
-                : undefined
+              appleMusicMatch
+                ? undefined
+                : () => handleOpenPalette('apple_music')
             }
           />
         </div>

@@ -17,7 +17,7 @@ import type { JovieChatProps } from './types';
 
 export function JovieChat({
   profileId,
-  artistContext,
+  artistContext, // NOSONAR - intentional backward compatibility for deprecated prop
   conversationId,
   onConversationCreate,
   initialQuery,

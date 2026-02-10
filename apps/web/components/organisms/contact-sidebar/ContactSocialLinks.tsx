@@ -1,11 +1,5 @@
 'use client';
 
-/**
- * ContactSocialLinks Component
- *
- * Social links section with add/remove functionality
- */
-
 import { Button, Input, Label } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import React, { memo } from 'react';
@@ -25,7 +19,6 @@ import {
 interface ContactSocialLinksProps {
   readonly contact: Contact;
   readonly fullName: string;
-  readonly isEditable: boolean;
   readonly isAddingLink: boolean;
   readonly newLinkUrl: string;
   readonly onSetIsAddingLink: (value: boolean) => void;
@@ -35,14 +28,12 @@ interface ContactSocialLinksProps {
   readonly onNewLinkKeyDown: (
     event: React.KeyboardEvent<HTMLInputElement>
   ) => void;
-  /** Index of the link currently being removed (for loading state) */
   readonly removingLinkIndex?: number | null;
 }
 
 export const ContactSocialLinks = memo(function ContactSocialLinks({
   contact,
   fullName,
-  isEditable,
   isAddingLink,
   newLinkUrl,
   onSetIsAddingLink,
@@ -58,24 +49,21 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
     <div className='space-y-2 p-3'>
       <div className='flex items-center justify-between'>
         <Label className='text-xs text-sidebar-muted'>Social links</Label>
-        {isEditable && (
-          <button
-            type='button'
-            className='p-1 rounded hover:bg-sidebar-accent transition-colors'
-            aria-label='Add social link'
-            onClick={() => {
-              onSetIsAddingLink(true);
-            }}
-          >
-            <Plus className='h-4 w-4' />
-          </button>
-        )}
+        <button
+          type='button'
+          className='p-1 rounded hover:bg-sidebar-accent transition-colors'
+          aria-label='Add social link'
+          onClick={() => {
+            onSetIsAddingLink(true);
+          }}
+        >
+          <Plus className='h-4 w-4' />
+        </button>
       </div>
 
       {hasNoLinks && (
         <p className='text-xs text-sidebar-muted'>
-          No social links yet.{' '}
-          {isEditable ? 'Use the + button to add one.' : ''}
+          No social links yet. Use the + button to add one.
         </p>
       )}
 
@@ -98,7 +86,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
                 icon={<SocialIcon platform={platformId} className='h-4 w-4' />}
                 label={displayUsername || platformId}
                 url={link.url}
-                isEditable={isEditable}
+                isEditable
                 isRemoving={removingLinkIndex === index}
                 onRemove={() => onRemoveLink(index)}
                 testId={`contact-social-link-${platformId}-${index}`}
@@ -108,7 +96,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
         </div>
       )}
 
-      {isEditable && isAddingLink && (
+      {isAddingLink && (
         <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border p-3'>
           <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
             <Label className='text-xs text-sidebar-muted'>URL</Label>

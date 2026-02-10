@@ -34,6 +34,43 @@ import {
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
+function MatchDescription({
+  isSuggested,
+  syncState,
+  match,
+  linkCoverage,
+}: {
+  readonly isSuggested: boolean;
+  readonly syncState: SyncState;
+  readonly match: DspMatch;
+  readonly linkCoverage: { total: number; withAppleMusic: number };
+}) {
+  const isrcLabel = match.matchingIsrcCount === 1 ? 'match' : 'matches';
+
+  if (isSuggested) {
+    return (
+      <>
+        Found via {match.matchingIsrcCount} ISRC {isrcLabel}. Confirm to link
+        your Apple Music releases.
+      </>
+    );
+  }
+
+  return (
+    <>
+      {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
+      {match.matchingIsrcCount} ISRC {isrcLabel}
+      {linkCoverage.total > 0 && (
+        <span className='text-tertiary-token'>
+          {' '}
+          &middot; {linkCoverage.withAppleMusic}/{linkCoverage.total} releases
+          with Apple Music links
+        </span>
+      )}
+    </>
+  );
+}
+
 interface AppleMusicSyncBannerProps {
   readonly profileId: string;
   readonly spotifyConnected: boolean;
@@ -48,6 +85,25 @@ type SyncState =
   | 'auto_confirmed'
   | 'confirmed'
   | 'no_match';
+
+function determineSyncState(
+  spotifyConnected: boolean,
+  releasesCount: number,
+  isLoading: boolean,
+  appleMusicMatch: DspMatch | null,
+  withAppleMusic: number
+): SyncState {
+  if (!spotifyConnected || releasesCount === 0) return 'hidden';
+  if (isLoading) return 'loading';
+  if (!appleMusicMatch) {
+    return withAppleMusic > 0 ? 'hidden' : 'no_match';
+  }
+  if (appleMusicMatch.status === 'suggested') return 'suggested';
+  if (appleMusicMatch.status === 'auto_confirmed') return 'auto_confirmed';
+  if (appleMusicMatch.status === 'confirmed') return 'confirmed';
+  if (appleMusicMatch.status === 'rejected') return 'hidden';
+  return 'hidden';
+}
 
 export function AppleMusicSyncBanner({
   profileId,
@@ -84,26 +140,23 @@ export function AppleMusicSyncBanner({
   }, [releases]);
 
   // Determine sync state
-  const syncState: SyncState = useMemo(() => {
-    if (!spotifyConnected || releases.length === 0) return 'hidden';
-    if (isLoading) return 'loading';
-    if (!appleMusicMatch) {
-      // Only show "no match" if we have releases but no Apple Music match yet
-      // and data has loaded (not just empty because query hasn't run)
-      return linkCoverage.withAppleMusic > 0 ? 'hidden' : 'no_match';
-    }
-    if (appleMusicMatch.status === 'suggested') return 'suggested';
-    if (appleMusicMatch.status === 'auto_confirmed') return 'auto_confirmed';
-    if (appleMusicMatch.status === 'confirmed') return 'confirmed';
-    if (appleMusicMatch.status === 'rejected') return 'hidden';
-    return 'hidden';
-  }, [
-    spotifyConnected,
-    releases.length,
-    isLoading,
-    appleMusicMatch,
-    linkCoverage.withAppleMusic,
-  ]);
+  const syncState: SyncState = useMemo(
+    () =>
+      determineSyncState(
+        spotifyConnected,
+        releases.length,
+        isLoading,
+        appleMusicMatch,
+        linkCoverage.withAppleMusic
+      ),
+    [
+      spotifyConnected,
+      releases.length,
+      isLoading,
+      appleMusicMatch,
+      linkCoverage.withAppleMusic,
+    ]
+  );
 
   if (syncState === 'hidden') return null;
 
@@ -218,26 +271,12 @@ export function AppleMusicSyncBanner({
           </div>
 
           <p className='mt-0.5 text-xs text-secondary-token'>
-            {isSuggested ? (
-              <>
-                Found via {match.matchingIsrcCount} ISRC{' '}
-                {match.matchingIsrcCount === 1 ? 'match' : 'matches'}. Confirm
-                to link your Apple Music releases.
-              </>
-            ) : (
-              <>
-                {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
-                {match.matchingIsrcCount} ISRC{' '}
-                {match.matchingIsrcCount === 1 ? 'match' : 'matches'}
-                {linkCoverage.total > 0 && (
-                  <span className='text-tertiary-token'>
-                    {' '}
-                    &middot; {linkCoverage.withAppleMusic}/{linkCoverage.total}{' '}
-                    releases with Apple Music links
-                  </span>
-                )}
-              </>
-            )}
+            <MatchDescription
+              isSuggested={isSuggested}
+              syncState={syncState}
+              match={match}
+              linkCoverage={linkCoverage}
+            />
           </p>
         </div>
 

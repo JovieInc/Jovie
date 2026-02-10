@@ -12,11 +12,11 @@ import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { Artist, CreatorProfile } from '@/types/db';
 import { convertCreatorProfileToArtist } from '@/types/db';
 
-/** The three primary DSP fields stored on the profile. */
+/** The three primary DSP fields stored on the profile (camelCase matches API). */
 export interface PrimaryDSPFields {
-  spotify_url: string;
-  apple_music_url: string;
-  youtube_url: string;
+  spotifyUrl: string;
+  appleMusicUrl: string;
+  youtubeUrl: string;
 }
 
 /** An additional music DSP link (stored via social_links table). */
@@ -98,9 +98,9 @@ export function useMusicLinksForm({
 }: UseMusicLinksFormOptions): UseMusicLinksFormReturn {
   // Primary DSP fields (stored on profile)
   const [primaryFields, setPrimaryFields] = useState<PrimaryDSPFields>({
-    spotify_url: artist.spotify_url || '',
-    apple_music_url: artist.apple_music_url || '',
-    youtube_url: artist.youtube_url || '',
+    spotifyUrl: artist.spotify_url || '',
+    appleMusicUrl: artist.apple_music_url || '',
+    youtubeUrl: artist.youtube_url || '',
   });
 
   // Additional music DSP links (stored in social_links table)
@@ -287,9 +287,9 @@ export function useMusicLinksForm({
         updateProfile({
           profileId: artist.id,
           updates: {
-            spotify_url: primaryFields.spotify_url || null,
-            apple_music_url: primaryFields.apple_music_url || null,
-            youtube_url: primaryFields.youtube_url || null,
+            spotifyUrl: primaryFields.spotifyUrl || null,
+            appleMusicUrl: primaryFields.appleMusicUrl || null,
+            youtubeUrl: primaryFields.youtubeUrl || null,
           },
         });
 
