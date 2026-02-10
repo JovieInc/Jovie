@@ -280,6 +280,10 @@ const nextConfig = {
         source: '/app/analytics',
         destination: '/app/dashboard/analytics',
       },
+      {
+        source: '/app/insights',
+        destination: '/app/dashboard/insights',
+      },
     ];
   },
   env: {

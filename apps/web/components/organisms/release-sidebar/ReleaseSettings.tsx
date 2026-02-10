@@ -53,7 +53,7 @@ export function ReleaseSettings({
     <DrawerSection title='Settings'>
       <div className='space-y-2.5'>
         <DrawerPropertyRow
-          label='Allow downloads'
+          label='Allow album art downloads'
           value={
             <Switch
               id={switchId}

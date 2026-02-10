@@ -6,9 +6,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { FileText } from 'lucide-react';
+import { User, Users } from 'lucide-react';
+import { useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { track } from '@/lib/analytics';
+import { ContactDrawer } from './ContactDrawer';
 import { ChannelIcon } from './ContactIcons';
 import type { ArtistContactsButtonProps } from './types';
 import { useArtistContacts } from './useArtistContacts';
@@ -31,10 +34,17 @@ export function ArtistContactsButton({
     isEnabled,
   } = useArtistContacts({ contacts, artistHandle, onNavigate });
 
+  const isMobile = useBreakpointDown('md');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   if (!isEnabled) {
     return null;
   }
 
+  // Choose icon: User for single contact, Users for multiple
+  const ContactIcon = singleContact ? User : Users;
+
+  // Single contact: direct action on tap (no drawer/menu needed)
   if (singleContact) {
     const channel = available[0].channels[0];
     return (
@@ -50,11 +60,43 @@ export function ArtistContactsButton({
           performAction(channel, available[0]);
         }}
       >
-        <FileText className='h-4 w-4' aria-hidden='true' />
+        <ContactIcon className='h-4 w-4' aria-hidden='true' />
       </CircleIconButton>
     );
   }
 
+  // Mobile: open bottom drawer
+  if (isMobile) {
+    return (
+      <>
+        <CircleIconButton
+          size='xs'
+          variant='surface'
+          ariaLabel='Contacts'
+          data-testid='contacts-trigger'
+          className='hover:scale-105'
+          onClick={() => {
+            onIconClick();
+            setDrawerOpen(true);
+          }}
+        >
+          <ContactIcon className='h-4 w-4' aria-hidden='true' />
+        </CircleIconButton>
+        <ContactDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          artistName={artistName}
+          artistHandle={artistHandle}
+          contacts={available}
+          performAction={performAction}
+          primaryChannel={primaryChannel}
+          buildTerritoryLabel={buildTerritoryLabel}
+        />
+      </>
+    );
+  }
+
+  // Desktop: dropdown menu
   return (
     <DropdownMenu
       open={open}
@@ -77,7 +119,7 @@ export function ArtistContactsButton({
           data-testid='contacts-trigger'
           className='hover:scale-105'
         >
-          <FileText className='h-4 w-4' aria-hidden='true' />
+          <ContactIcon className='h-4 w-4' aria-hidden='true' />
         </CircleIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-72'>
