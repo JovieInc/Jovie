@@ -48,7 +48,7 @@ const TITLE_POLL_MAX_DURATION_MS = 15_000;
 
 export function useJovieChat({
   profileId,
-  artistContext,
+  artistContext, // NOSONAR - intentional backward compat usage of deprecated prop
   conversationId,
   onConversationCreate,
 }: UseJovieChatOptions) {

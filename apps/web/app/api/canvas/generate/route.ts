@@ -147,7 +147,7 @@ export async function POST(req: Request) {
       .update(discogReleases)
       .set({
         metadata: {
-          ...(release.metadata ?? {}),
+          ...release.metadata,
           ...buildCanvasMetadata('not_set'),
           canvasJobId: job.id,
         },

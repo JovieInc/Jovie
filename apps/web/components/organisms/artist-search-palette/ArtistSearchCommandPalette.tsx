@@ -134,7 +134,7 @@ function inferArtistNameFromUrl(
     const nameSegment = artistIndex >= 0 ? segments[artistIndex + 1] : null;
     if (!nameSegment) return null;
     const decoded = decodeURIComponent(nameSegment)
-      .replaceAll(/-/g, ' ')
+      .replaceAll('-', ' ')
       .trim();
     return decoded.length > 0 ? decoded : null;
   } catch {

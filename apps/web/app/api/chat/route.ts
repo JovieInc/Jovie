@@ -666,8 +666,7 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
   });
 }
 
-function buildCanvasPlan(release: ReleaseContext, motionPreference?: string) {
-  const motion = motionPreference ?? 'ambient';
+function buildCanvasPlan(release: ReleaseContext, motionPreference = 'ambient') {
   const hasArtwork = Boolean(release.artworkUrl);
 
   return {
@@ -692,7 +691,7 @@ function buildCanvasPlan(release: ReleaseContext, motionPreference?: string) {
         {
           step: 2,
           action: 'Generate Video',
-          description: `Create a ${motion} animation loop (3-8 seconds) from the processed artwork`,
+          description: `Create a ${motionPreference} animation loop (3-8 seconds) from the processed artwork`,
           status: hasArtwork ? 'ready' : 'blocked',
         },
         {
@@ -710,7 +709,7 @@ function buildCanvasPlan(release: ReleaseContext, motionPreference?: string) {
           status: 'manual',
         },
       ],
-      motionStyle: motion,
+      motionStyle: motionPreference,
       specs: {
         resolution: '1080x1920',
         aspectRatio: '9:16',
@@ -825,7 +824,7 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         .update(discogReleases)
         .set({
           metadata: {
-            ...(release.metadata ?? {}),
+            ...release.metadata,
             ...buildCanvasMetadata('uploaded'),
           },
           updatedAt: new Date(),

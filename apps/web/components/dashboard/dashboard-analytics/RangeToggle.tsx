@@ -5,6 +5,12 @@ import { useRef } from 'react';
 import type { RangeToggleProps } from './types';
 import { RANGE_DAYS, RANGE_OPTIONS } from './types';
 
+function getToggleButtonClassName(disabled: boolean, active: boolean): string {
+  if (disabled) return 'text-tertiary-token/40 cursor-not-allowed';
+  if (active) return 'bg-surface-3 text-primary-token';
+  return 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2';
+}
+
 export function RangeToggle({
   value,
   onChange,
@@ -93,13 +99,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${
-              disabled
-                ? 'text-tertiary-token/40 cursor-not-allowed'
-                : active
-                  ? 'bg-surface-3 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
-            }`}
+            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${getToggleButtonClassName(disabled, active)}`}
           >
             {opt.label}
           </button>

@@ -14,7 +14,7 @@ import {
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
@@ -40,7 +40,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 function formatEventType(eventType: string): string {
-  return EVENT_TYPE_LABELS[eventType] ?? eventType.replace(/[._]/g, ' ');
+  return EVENT_TYPE_LABELS[eventType] ?? eventType.replaceAll(/[._]/g, ' ');
 }
 
 function formatDate(dateStr: string): string {
@@ -137,6 +137,50 @@ export const BillingDashboard = memo(function BillingDashboard() {
   }
 
   const billingInfo = billingQuery.data;
+
+  const historyEntries = historyQuery.data?.entries;
+  let billingHistoryContent: ReactNode;
+  if (historyQuery.isLoading) {
+    billingHistoryContent = (
+      <div className='animate-pulse motion-reduce:animate-none space-y-3'>
+        <div className='h-10 rounded bg-muted'></div>
+        <div className='h-10 rounded bg-muted'></div>
+        <div className='h-10 rounded bg-muted'></div>
+      </div>
+    );
+  } else if (historyEntries && historyEntries.length > 0) {
+    billingHistoryContent = (
+      <div className='space-y-3'>
+        {historyEntries.map((entry: BillingHistoryEntry) => (
+          <div
+            key={entry.id}
+            className='flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0'
+          >
+            <div className='flex items-start gap-3'>
+              <Clock className='mt-0.5 h-4 w-4 shrink-0 text-muted-foreground' />
+              <div>
+                <p className='text-sm font-medium text-foreground'>
+                  {formatEventType(entry.eventType)}
+                </p>
+                <p className='text-xs text-muted-foreground'>
+                  {entry.source === 'webhook' ? 'Via Stripe' : entry.source}
+                </p>
+              </div>
+            </div>
+            <p className='shrink-0 text-xs text-muted-foreground'>
+              {formatDate(entry.createdAt)}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  } else {
+    billingHistoryContent = (
+      <p className='text-sm text-muted-foreground'>
+        No billing history yet.
+      </p>
+    );
+  }
 
   return (
     <div className='space-y-6'>
@@ -344,42 +388,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
         <h3 className='mb-4 text-lg font-medium text-foreground'>
           Billing History
         </h3>
-        {historyQuery.isLoading ? (
-          <div className='animate-pulse motion-reduce:animate-none space-y-3'>
-            <div className='h-10 rounded bg-muted'></div>
-            <div className='h-10 rounded bg-muted'></div>
-            <div className='h-10 rounded bg-muted'></div>
-          </div>
-        ) : historyQuery.data?.entries &&
-          historyQuery.data.entries.length > 0 ? (
-          <div className='space-y-3'>
-            {historyQuery.data.entries.map((entry: BillingHistoryEntry) => (
-              <div
-                key={entry.id}
-                className='flex items-start justify-between border-b border-border pb-3 last:border-0 last:pb-0'
-              >
-                <div className='flex items-start gap-3'>
-                  <Clock className='mt-0.5 h-4 w-4 shrink-0 text-muted-foreground' />
-                  <div>
-                    <p className='text-sm font-medium text-foreground'>
-                      {formatEventType(entry.eventType)}
-                    </p>
-                    <p className='text-xs text-muted-foreground'>
-                      {entry.source === 'webhook' ? 'Via Stripe' : entry.source}
-                    </p>
-                  </div>
-                </div>
-                <p className='shrink-0 text-xs text-muted-foreground'>
-                  {formatDate(entry.createdAt)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className='text-sm text-muted-foreground'>
-            No billing history yet.
-          </p>
-        )}
+        {billingHistoryContent}
       </div>
     </div>
   );

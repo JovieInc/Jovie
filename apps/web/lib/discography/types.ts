@@ -45,7 +45,7 @@ export type ReleaseType =
   | 'other';
 
 import type { CanvasStatus } from '@/lib/services/canvas/types';
-export type { CanvasStatus };
+export type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseViewModel {
   profileId: string;

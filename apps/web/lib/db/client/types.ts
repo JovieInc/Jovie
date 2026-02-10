@@ -31,7 +31,7 @@ export type TransactionType = Parameters<DbType['transaction']>[0] extends (
  * Union type for functions that accept either a database or transaction context.
  * Use this when a function can operate within or outside a transaction.
  */
-export type DbOrTransaction = DbType | TransactionType;
+export type DbOrTransaction = DbType | TransactionType; // NOSONAR - intentional use of deprecated TransactionType for compatibility
 
 /** Row type for table existence check query */
 export interface TableExistsRow {

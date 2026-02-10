@@ -10,7 +10,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -144,6 +144,91 @@ export function ReleaseSidebar({
     return items;
   }, [release, handleCopySmartLink, onRefresh, artistName]);
 
+  let sidebarContent: ReactNode;
+  if (selectedTrack && release) {
+    sidebarContent = (
+      <TrackDetailPanel
+        track={selectedTrack}
+        releaseTitle={release.title}
+        onBack={handleBackToRelease}
+      />
+    );
+  } else if (release) {
+    sidebarContent = (
+      <>
+        <div className='pb-5'>
+          <ReleaseArtwork
+            artworkUrl={release.artworkUrl}
+            title={release.title}
+            artistName={artistName}
+            canUploadArtwork={canUploadArtwork}
+            onArtworkUpload={
+              canUploadArtwork ? handleArtworkUpload : undefined
+            }
+          />
+        </div>
+
+        <div className='py-5'>
+          <ReleaseFields
+            title={release.title}
+            releaseDate={release.releaseDate}
+            smartLinkPath={release.smartLinkPath}
+          />
+        </div>
+
+        <div className='py-5'>
+          <ReleaseMetadata release={release} />
+        </div>
+
+        <div className='py-5'>
+          <ReleaseTrackList
+            release={release}
+            onTrackClick={handleTrackClick}
+          />
+        </div>
+
+        <div className='pt-5'>
+          <ReleaseDspLinks
+            release={release}
+            providerConfig={providerConfig}
+            isEditable={isEditable}
+            isAddingLink={isAddingLink}
+            newLinkUrl={newLinkUrl}
+            selectedProvider={selectedProvider}
+            isAddingDspLink={isAddingDspLink}
+            isRemovingDspLink={isRemovingDspLink}
+            onSetIsAddingLink={setIsAddingLink}
+            onSetNewLinkUrl={setNewLinkUrl}
+            onSetSelectedProvider={setSelectedProvider}
+            onAddLink={handleAddLink}
+            onRemoveLink={handleRemoveLink}
+            onNewLinkKeyDown={handleNewLinkKeyDown}
+          />
+        </div>
+
+        {isEditable && onSave && (
+          <div className='pt-2 flex justify-end'>
+            <Button
+              type='button'
+              size='sm'
+              variant='primary'
+              onClick={() => onSave(release)}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save changes'}
+            </Button>
+          </div>
+        )}
+      </>
+    );
+  } else {
+    sidebarContent = (
+      <p className='text-xs text-sidebar-muted'>
+        Select a release in the table to view its details.
+      </p>
+    );
+  }
+
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -162,83 +247,7 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
-          {selectedTrack && release ? (
-            <TrackDetailPanel
-              track={selectedTrack}
-              releaseTitle={release.title}
-              onBack={handleBackToRelease}
-            />
-          ) : release ? (
-            <>
-              <div className='pb-5'>
-                <ReleaseArtwork
-                  artworkUrl={release.artworkUrl}
-                  title={release.title}
-                  artistName={artistName}
-                  canUploadArtwork={canUploadArtwork}
-                  onArtworkUpload={
-                    canUploadArtwork ? handleArtworkUpload : undefined
-                  }
-                />
-              </div>
-
-              <div className='py-5'>
-                <ReleaseFields
-                  title={release.title}
-                  releaseDate={release.releaseDate}
-                  smartLinkPath={release.smartLinkPath}
-                />
-              </div>
-
-              <div className='py-5'>
-                <ReleaseMetadata release={release} />
-              </div>
-
-              <div className='py-5'>
-                <ReleaseTrackList
-                  release={release}
-                  onTrackClick={handleTrackClick}
-                />
-              </div>
-
-              <div className='pt-5'>
-                <ReleaseDspLinks
-                  release={release}
-                  providerConfig={providerConfig}
-                  isEditable={isEditable}
-                  isAddingLink={isAddingLink}
-                  newLinkUrl={newLinkUrl}
-                  selectedProvider={selectedProvider}
-                  isAddingDspLink={isAddingDspLink}
-                  isRemovingDspLink={isRemovingDspLink}
-                  onSetIsAddingLink={setIsAddingLink}
-                  onSetNewLinkUrl={setNewLinkUrl}
-                  onSetSelectedProvider={setSelectedProvider}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  onNewLinkKeyDown={handleNewLinkKeyDown}
-                />
-              </div>
-
-              {isEditable && onSave && (
-                <div className='pt-2 flex justify-end'>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='primary'
-                    onClick={() => onSave(release)}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? 'Saving...' : 'Save changes'}
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className='text-xs text-sidebar-muted'>
-              Select a release in the table to view its details.
-            </p>
-          )}
+          {sidebarContent}
         </div>
       </div>
     </RightDrawer>

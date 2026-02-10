@@ -249,6 +249,19 @@ function ActionsCellRenderer({
   return <ActionsCell tourDate={row.original} onEdit={onEdit} />;
 }
 
+/** Factory function for actions cell renderer (avoids defining component inside parent). */
+function createActionsCellRenderer(
+  onEdit: (tourDate: TourDateViewModel) => void
+) {
+  return function ActionsCellRendererCell({
+    row,
+  }: {
+    readonly row: { readonly original: TourDateViewModel };
+  }) {
+    return <ActionsCellRenderer row={row} onEdit={onEdit} />;
+  };
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -329,7 +342,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'location',
         header: 'Location',
-        cell: ({ row }) => <LocationCellRenderer row={row} />,
+        cell: LocationCellRenderer,
         size: 180,
       }),
 
@@ -366,7 +379,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => <ActionsCellRenderer row={row} onEdit={onEdit} />,
+        cell: createActionsCellRenderer(onEdit),
         size: 80,
       }),
     ];
