@@ -34,7 +34,6 @@ import { ReleaseTable } from './ReleaseTable';
 import {
   DEFAULT_RELEASE_FILTERS,
   type ReleaseFilters,
-  type ReleaseTab,
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
@@ -102,9 +101,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Release view filter state (Tracks / Releases)
   const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
-
-  // Data tab state (Catalog / Links / Details)
-  const [releaseTab, setReleaseTab] = useState<ReleaseTab>('catalog');
 
   // Derive showTracks from releaseView toggle
   const showTracksFromView = releaseView === 'tracks';
@@ -376,8 +372,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
-              releaseTab={releaseTab}
-              onReleaseTabChange={setReleaseTab}
             />
           )}
 
@@ -428,13 +422,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   artistName={artistName}
                   onCopy={handleCopy}
                   onEdit={openEditor}
-                  onAddUrl={handleAddUrl}
-                  isAddingUrl={isSaving}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
-                  activeTab={releaseTab}
                 />
               </QueryErrorBoundary>
             )}
