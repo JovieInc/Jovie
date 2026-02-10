@@ -30,7 +30,7 @@ export const FORM_LAYOUT = {
   formInner: 'space-y-4',
   /** Footer hint text below the main CTA button - prevents layout shift */
   footerHint:
-    'min-h-[40px] w-full max-w-full flex items-center justify-center text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center px-2',
+    'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center px-2',
   /** Reserved space for error messages to prevent layout shift */
   errorContainer: 'min-h-[24px] flex items-center justify-center',
 } as const;
