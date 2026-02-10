@@ -47,7 +47,7 @@ export function buildArtworkSizes(
 
   const sizes: ArtworkSize[] = [];
 
-  if (sizesMap) {
+  if (sizesMap && Object.keys(sizesMap).length > 0) {
     if (sizesMap.original) {
       sizes.push({
         key: 'original',

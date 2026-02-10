@@ -529,8 +529,8 @@ export default async function ContentSmartLinkPage({
           providers={allProviders}
           artworkSizes={content.artworkSizes}
           allowDownloads={
-            ((creator.settings as Record<string, unknown> | null)
-              ?.allowArtworkDownloads as boolean) ?? false
+            (creator.settings as Record<string, unknown> | null)
+              ?.allowArtworkDownloads === true
           }
         />
       )}

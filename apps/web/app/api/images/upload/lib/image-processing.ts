@@ -8,7 +8,7 @@ import type { OutputInfo } from 'sharp';
 import { AVATAR_CANONICAL_SIZE } from './constants';
 import type { SharpConstructor } from './types';
 
-async function getSharp(): Promise<SharpConstructor> {
+export async function getSharp(): Promise<SharpConstructor> {
   const sharpModule = await import('sharp');
   // Handle both ESM default export and CJS module.exports patterns
   const moduleWithDefault = sharpModule as { default?: SharpConstructor };
