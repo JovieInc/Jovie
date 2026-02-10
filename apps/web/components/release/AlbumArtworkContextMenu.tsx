@@ -32,7 +32,7 @@ interface AlbumArtworkContextMenuProps {
   readonly title: string;
   /** Available download sizes */
   readonly sizes: ArtworkSize[];
-  /** Whether downloads are allowed */
+  /** Whether album art downloads are allowed */
   readonly allowDownloads: boolean;
   /** Optional release ID for analytics */
   readonly releaseId?: string;

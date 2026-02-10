@@ -57,8 +57,8 @@ export interface ReleaseSidebarProps {
     provider: ProviderKey
   ) => Promise<void>;
   /**
-   * Whether artwork downloads are allowed on public pages.
-   * Controls the visibility of the "Allow Downloads" setting.
+   * Whether album art downloads are allowed on public pages.
+   * Controls the visibility of the "Allow album art downloads" setting.
    */
   readonly allowDownloads?: boolean;
 }
