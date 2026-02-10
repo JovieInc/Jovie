@@ -39,7 +39,10 @@ import type {
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { captureError } from '@/lib/error-tracking';
-import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
+import {
+  enqueueDspArtistDiscoveryJob,
+  enqueueDspTrackEnrichmentJob,
+} from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { getDashboardData } from '../actions';
@@ -758,8 +761,9 @@ export async function connectAppleMusicArtist(params: {
   const profile = await requireProfile();
   const now = new Date();
 
+  let matchId: string | undefined;
   try {
-    await db
+    const [result] = await db
       .insert(dspArtistMatches)
       .values({
         creatorProfileId: profile.id,
@@ -804,7 +808,9 @@ export async function connectAppleMusicArtist(params: {
           confirmedBy: profile.id,
           updatedAt: now,
         },
-      });
+      })
+      .returning({ id: dspArtistMatches.id });
+    matchId = result?.id;
   } catch (error) {
     await captureError('Apple Music connection save failed', error, {
       action: 'connectAppleMusicArtist',
@@ -814,6 +820,18 @@ export async function connectAppleMusicArtist(params: {
       message: 'Failed to save Apple Music connection. Please try again.',
       artistName: externalArtistName,
     };
+  }
+
+  // Fire-and-forget: enqueue release enrichment to link Apple Music URLs
+  if (matchId) {
+    void enqueueDspTrackEnrichmentJob({
+      creatorProfileId: profile.id,
+      matchId,
+      providerId: 'apple_music',
+      externalArtistId,
+    }).catch(() => {
+      // Enrichment can be retried later; don't fail the connection
+    });
   }
 
   revalidatePath(APP_ROUTES.RELEASES);

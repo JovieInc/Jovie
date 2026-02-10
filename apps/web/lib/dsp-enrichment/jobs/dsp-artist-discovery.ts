@@ -18,6 +18,9 @@ import { discogTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
+import { logger } from '@/lib/utils/logger';
+
 import {
   convertAppleMusicToIsrcMatches,
   type LocalArtistData,
@@ -346,7 +349,7 @@ async function discoverAppleMusicMatch(
     : 'suggested';
 
   // Store the match
-  await storeMatch(
+  const matchId = await storeMatch(
     tx,
     creatorProfileId,
     'apple_music',
@@ -354,12 +357,26 @@ async function discoverAppleMusicMatch(
     status
   );
 
-  // If auto-confirmed, update the creator profile with Apple Music artist ID
+  // If auto-confirmed, update the creator profile and enqueue release enrichment
   if (status === 'auto_confirmed') {
     await tx
       .update(creatorProfiles)
       .set({ appleMusicId: matchingResult.bestMatch.externalArtistId })
       .where(eq(creatorProfiles.id, creatorProfileId));
+
+    // Fire-and-forget: enqueue release enrichment to link Apple Music URLs
+    void enqueueDspTrackEnrichmentJob({
+      creatorProfileId,
+      matchId,
+      providerId: 'apple_music',
+      externalArtistId: matchingResult.bestMatch.externalArtistId,
+    }).catch(error => {
+      logger.warn('Failed to enqueue release enrichment after auto-confirm', {
+        creatorProfileId,
+        matchId,
+        error,
+      });
+    });
   }
 
   return { match: matchingResult.bestMatch, status };
