@@ -1045,6 +1045,97 @@ body {
   }
 }
 
+/* ============================================
+   SONNER TOAST OVERRIDES
+   ============================================
+   Override Sonner's internal CSS variables so toasts
+   use design-system tokens instead of harsh defaults.
+*/
+
+[data-sonner-toaster] {
+  --normal-bg: var(--color-bg-surface-2);
+  --normal-text: var(--color-text-primary-token);
+  --normal-border: var(--color-border-default);
+
+  --success-bg: var(--color-bg-surface-2);
+  --success-text: var(--color-text-primary-token);
+  --success-border: var(--color-success);
+
+  --error-bg: var(--color-bg-surface-2);
+  --error-text: var(--color-text-primary-token);
+  --error-border: var(--color-error);
+
+  --warning-bg: var(--color-bg-surface-2);
+  --warning-text: var(--color-text-primary-token);
+  --warning-border: var(--color-warning);
+
+  --info-bg: var(--color-bg-surface-2);
+  --info-text: var(--color-text-primary-token);
+  --info-border: var(--color-info);
+}
+
+[data-sonner-toast] {
+  --border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  letter-spacing: -0.011em;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--color-text-tertiary-token);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toast] [data-close-button] {
+  background: var(--color-bg-surface-1);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-tertiary-token);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary-token);
+}
+
+[data-sonner-toast] [data-button] {
+  font-weight: 500;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  transition: opacity 150ms ease;
+}
+
+/* Type-specific left-border accent */
+[data-sonner-toast][data-type="success"] {
+  border-left: 3px solid var(--color-success);
+}
+
+[data-sonner-toast][data-type="error"] {
+  border-left: 3px solid var(--color-error);
+}
+
+[data-sonner-toast][data-type="warning"] {
+  border-left: 3px solid var(--color-warning);
+}
+
+[data-sonner-toast][data-type="info"] {
+  border-left: 3px solid var(--color-info);
+}
+
 @media print {
   @page {
     margin: 18mm;
