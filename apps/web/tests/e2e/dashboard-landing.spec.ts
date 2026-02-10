@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
+import { SMOKE_TIMEOUTS, waitForLoad } from './utils/smoke-test-utils';
 
 /**
  * Checks if a page has rendered meaningful content.
@@ -87,7 +87,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
 
     // Wait for URL to stabilize
     const currentUrl = page.url();
@@ -119,7 +119,7 @@ test.describe('Dashboard Landing @smoke', () => {
       waitUntil: 'domcontentloaded',
     });
     // Best-effort wait for full load — may exceed timeout on Turbopack cold compile
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
 
     // Verify onboarding page was never loaded
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -137,7 +137,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
 
     // Wait for any loading states to complete
     await page.waitForLoadState('networkidle').catch(() => {
@@ -179,7 +179,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
 
     // With the cookie set, user should NOT be redirected to onboarding
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -218,7 +218,7 @@ test.describe('Dashboard Landing @smoke', () => {
         }
       }
 
-      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+      await waitForLoad(page);
 
       const currentUrl = page.url();
       expect(

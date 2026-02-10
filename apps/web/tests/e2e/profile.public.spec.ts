@@ -1,5 +1,9 @@
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS, smokeNavigate } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  smokeNavigate,
+  waitForLoad,
+} from './utils/smoke-test-utils';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -156,7 +160,7 @@ test.describe('Public Profile Performance', () => {
         waitUntil: 'domcontentloaded',
         timeout: 10000,
       });
-      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+      await waitForLoad(page);
 
       // Wait for any key elements
       const hasH1 = await page
@@ -387,7 +391,7 @@ test.describe('Public Profile Performance', () => {
       });
 
       // Wait for page to be fully interactive using load state instead of networkidle
-      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+      await waitForLoad(page);
 
       // Check if profile loaded
       const h1Visible = await page

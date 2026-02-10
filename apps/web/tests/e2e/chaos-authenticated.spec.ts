@@ -1,6 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { Page, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { isClerkTestEmail, signInUser } from '../helpers/clerk-auth';
 import {
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
@@ -68,12 +68,9 @@ function hasClerkCredentials(): boolean {
   const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
   const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
 
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = username.includes('+clerk_test');
-
   return (
     username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail) &&
+    (password.length > 0 || isClerkTestEmail(username)) &&
     clerkSetupSuccess
   );
 }
@@ -85,12 +82,9 @@ function getAdminCredentials(): { username: string; password: string } {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
 
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
   if (
     adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
+    (adminPassword.length > 0 || isClerkTestEmail(adminUsername))
   ) {
     return { username: adminUsername, password: adminPassword };
   }

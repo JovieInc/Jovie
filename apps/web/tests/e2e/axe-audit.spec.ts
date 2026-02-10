@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { waitForLoad } from './utils/smoke-test-utils';
 
 /**
  * Axe WCAG 2.1 Level AA Compliance Tests
@@ -33,7 +34,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
       page,
     }) => {
       await page.goto(route.path, { timeout: 120_000 });
-      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+      await waitForLoad(page);
 
       // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
@@ -74,7 +75,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
     }) => {
       test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
       await page.goto(route.path, { timeout: 120_000 });
-      await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+      await waitForLoad(page);
 
       // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
@@ -104,7 +105,7 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
 test.describe('Axe Best Practices', () => {
   test('Homepage should follow best practices', async ({ page }) => {
     await page.goto('/', { timeout: 120_000 });
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
 
     const results = await new AxeBuilder({ page })
       .withTags(['best-practice'])

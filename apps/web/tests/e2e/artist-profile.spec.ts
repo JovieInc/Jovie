@@ -1,4 +1,5 @@
 import { expect, test } from './setup';
+import { checkElementVisibility } from './utils/smoke-test-utils';
 
 /**
  * Artist Profile Pages Tests
@@ -40,20 +41,15 @@ describeArtist('Artist Profile Pages', () => {
 
       // Check artist image — Avatar component uses role="img" with aria-label
       // on a wrapper div, and img has alt="" (correct a11y pattern).
-      // The image may remain in loading state if the CDN URL is stale (404),
-      // so use a generous timeout and skip if not visible.
+      // The image may remain in loading state if the CDN URL is stale (404).
       const artistImage = page
         .locator('[role="img"][aria-label="Dua Lipa"]')
         .or(page.locator('img[alt="Dua Lipa"]'));
-      const imageVisible = await artistImage
-        .first()
-        .isVisible({ timeout: 15_000 })
-        .catch(() => false);
-      if (!imageVisible) {
-        console.log(
-          '⚠ Artist image not visible (CDN image may be stale) — skipping image check'
-        );
-      } else {
+      const imageVisible = await checkElementVisibility(artistImage, {
+        skipMessage:
+          'Artist image not visible (CDN image may be stale) — skipping image check',
+      });
+      if (imageVisible) {
         await expect(artistImage.first()).toBeVisible();
       }
     });

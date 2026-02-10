@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForHydration,
+  waitForLoad,
+} from './utils/smoke-test-utils';
 
 /**
  * CORS Check Tests
@@ -28,7 +32,7 @@ test('No CORS errors on homepage', async ({ page }) => {
 
   // Wait for hydration and async requests to complete deterministically
   await waitForHydration(page);
-  await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+  await waitForLoad(page);
 
   // Verify the page has loaded content before checking CORS errors
   await expect(page.locator('body')).toBeVisible({

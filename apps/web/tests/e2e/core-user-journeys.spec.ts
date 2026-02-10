@@ -3,6 +3,7 @@ import {
   isExpectedError,
   SMOKE_TIMEOUTS,
   smokeNavigate,
+  waitForLoad,
 } from './utils/smoke-test-utils';
 
 /**
@@ -133,12 +134,12 @@ test.describe('Core User Journeys', () => {
 
     // Test homepage - wait for hydration using deterministic method
     await smokeNavigate(page, '/');
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
     await expect(page.locator('body')).toBeVisible();
 
     // Test profile page - wait for content to be present
     await smokeNavigate(page, '/taylorswift');
-    await page.waitForLoadState('load', { timeout: 60_000 }).catch(() => {});
+    await waitForLoad(page);
     await expect(page.locator('h1').first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });

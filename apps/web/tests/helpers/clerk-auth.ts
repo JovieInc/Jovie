@@ -16,6 +16,13 @@ export class ClerkTestError extends Error {
 }
 
 /**
+ * Check if email is a Clerk test email (passwordless auth)
+ */
+export function isClerkTestEmail(email: string): boolean {
+  return email.includes('+clerk_test');
+}
+
+/**
  * Creates or reuses a Clerk test user session for the given email.
  *
  * Assumes the page has already loaded the app and Clerk has been initialized.
