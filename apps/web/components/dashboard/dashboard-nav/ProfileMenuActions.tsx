@@ -44,6 +44,7 @@ export function ProfileMenuActions({
       <SidebarMenuAction asChild>
         <CommonDropdown
           variant='dropdown'
+          size='compact'
           align='start'
           side='bottom'
           items={[

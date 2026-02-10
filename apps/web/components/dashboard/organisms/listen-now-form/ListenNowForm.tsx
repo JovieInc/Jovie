@@ -140,11 +140,11 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   const handlePaletteArtistSelect = useCallback(
     (selected: { url: string; name: string }) => {
       if (searchPaletteProvider === 'spotify') {
-        updatePrimaryField('spotify_url', selected.url);
-        schedulePrimaryNormalize('spotify_url', selected.url);
+        updatePrimaryField('spotifyUrl', selected.url);
+        schedulePrimaryNormalize('spotifyUrl', selected.url);
       } else {
-        updatePrimaryField('apple_music_url', selected.url);
-        schedulePrimaryNormalize('apple_music_url', selected.url);
+        updatePrimaryField('appleMusicUrl', selected.url);
+        schedulePrimaryNormalize('appleMusicUrl', selected.url);
       }
       if (selected.name) {
         toast.success(
@@ -155,8 +155,8 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     [searchPaletteProvider, updatePrimaryField, schedulePrimaryNormalize]
   );
 
-  const spotifyConnected = !!primaryFields.spotify_url;
-  const appleMusicConnected = !!primaryFields.apple_music_url;
+  const spotifyConnected = !!primaryFields.spotifyUrl;
+  const appleMusicConnected = !!primaryFields.appleMusicUrl;
 
   if (initialLoading) {
     return (
@@ -217,13 +217,13 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               ) : null}
               <Input
                 type='url'
-                value={primaryFields.spotify_url}
+                value={primaryFields.spotifyUrl}
                 onChange={e => {
                   const v = e.target.value;
-                  updatePrimaryField('spotify_url', v);
-                  schedulePrimaryNormalize('spotify_url', v);
+                  updatePrimaryField('spotifyUrl', v);
+                  schedulePrimaryNormalize('spotifyUrl', v);
                 }}
-                onBlur={() => handlePrimaryBlur('spotify_url')}
+                onBlur={() => handlePrimaryBlur('spotifyUrl')}
                 placeholder={DSP_PLACEHOLDERS.spotify}
                 inputMode='url'
                 autoCapitalize='none'
@@ -273,13 +273,13 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               ) : null}
               <Input
                 type='url'
-                value={primaryFields.apple_music_url}
+                value={primaryFields.appleMusicUrl}
                 onChange={e => {
                   const v = e.target.value;
-                  updatePrimaryField('apple_music_url', v);
-                  schedulePrimaryNormalize('apple_music_url', v);
+                  updatePrimaryField('appleMusicUrl', v);
+                  schedulePrimaryNormalize('appleMusicUrl', v);
                 }}
-                onBlur={() => handlePrimaryBlur('apple_music_url')}
+                onBlur={() => handlePrimaryBlur('appleMusicUrl')}
                 placeholder={DSP_PLACEHOLDERS.apple_music}
                 inputMode='url'
                 autoCapitalize='none'
@@ -339,13 +339,13 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
             </span>
             <Input
               type='url'
-              value={primaryFields.youtube_url}
+              value={primaryFields.youtubeUrl}
               onChange={e => {
                 const v = e.target.value;
-                updatePrimaryField('youtube_url', v);
-                schedulePrimaryNormalize('youtube_url', v);
+                updatePrimaryField('youtubeUrl', v);
+                schedulePrimaryNormalize('youtubeUrl', v);
               }}
-              onBlur={() => handlePrimaryBlur('youtube_url')}
+              onBlur={() => handlePrimaryBlur('youtubeUrl')}
               placeholder={DSP_PLACEHOLDERS.youtube}
               inputMode='url'
               autoCapitalize='none'

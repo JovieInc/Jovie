@@ -67,6 +67,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const inputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Use a ref so the debounced timeout always calls the latest onSave,
+  // avoiding stale closures when contact state updates between scheduling and firing.
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+
   // Debounced save: coalesces rapid edits into a single save call
   const debouncedSave = useCallback(() => {
     if (saveTimerRef.current) {
@@ -74,18 +79,18 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     }
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      onSave();
+      onSaveRef.current();
     }, PACER_TIMING.SAVE_DEBOUNCE_MS);
-  }, [onSave]);
+  }, []);
 
   // Flush any pending debounced save immediately
   const flushSave = useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
-      onSave();
+      onSaveRef.current();
     }
-  }, [onSave]);
+  }, []);
 
   // Flush pending save on close to prevent data loss
   const handleClose = useCallback(() => {
