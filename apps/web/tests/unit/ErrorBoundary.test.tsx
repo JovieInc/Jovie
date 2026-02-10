@@ -16,6 +16,7 @@ vi.mock('@sentry/nextjs', () => ({
 
 vi.mock('@/lib/sentry/init', () => ({
   isSentryInitialized: vi.fn(),
+  getSentryMode: vi.fn().mockReturnValue('enabled'),
 }));
 
 describe('ErrorBoundary', () => {
@@ -175,7 +176,7 @@ describe('ErrorBoundary', () => {
         expect(Sentry.captureException).toHaveBeenCalledWith(
           mockError,
           expect.objectContaining({
-            tags: { errorBoundary: 'test context' },
+            tags: { errorBoundary: 'test context', sentryMode: 'enabled' },
             extra: { digest: undefined },
           })
         );
@@ -235,7 +236,7 @@ describe('ErrorBoundary', () => {
         expect(Sentry.captureException).toHaveBeenCalledWith(
           mockError,
           expect.objectContaining({
-            tags: { errorBoundary: 'mycomponent' },
+            tags: { errorBoundary: 'mycomponent', sentryMode: 'enabled' },
           })
         );
       });
