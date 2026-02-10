@@ -281,7 +281,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
   test.describe('Accessibility', () => {
     test('homepage has no WCAG 2.1 AA violations', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -310,7 +311,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Force dark mode
       await page.evaluate(() => {
@@ -342,7 +344,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Scroll to ensure all sections are loaded
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -411,7 +414,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       page,
     }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Find all buttons and links
       const buttons = await page.locator('button:visible').all();
@@ -446,7 +450,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
     test('images have alt text', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       const images = await page.locator('img:visible').all();
       const missingAlt: string[] = [];
@@ -476,7 +481,8 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
   test.describe('Theme Switching', () => {
     test('theme switches correctly without layout shift', async ({ page }) => {
       await page.goto('/', { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       // Get initial layout measurements
       const getLayoutMetrics = async () => {

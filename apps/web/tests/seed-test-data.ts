@@ -50,6 +50,14 @@ const TEST_PROFILES: TestProfile[] = [
     avatarUrl:
       'https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0',
   },
+  {
+    username: 'testartist',
+    displayName: 'Test Artist',
+    bio: 'Test artist for E2E tipping tests',
+    spotifyUrl: 'https://open.spotify.com/artist/test',
+    avatarUrl:
+      'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
+  },
 ];
 
 /** Track template for seeding */
@@ -542,6 +550,21 @@ export async function seedTestData() {
           state: 'active',
         });
         console.log(`    ✓ Added Spotify link for ${profile.username}`);
+      }
+
+      // Add Venmo payment link for tipping tests
+      if (profile.username === 'testartist') {
+        await db.insert(socialLinks).values({
+          creatorProfileId: createdProfile.id,
+          platform: 'venmo',
+          platformType: 'payment',
+          url: 'https://venmo.com/testartist',
+          displayText: 'Tip on Venmo',
+          isActive: true,
+          sortOrder: 2,
+          state: 'active',
+        });
+        console.log(`    ✓ Added Venmo link for ${profile.username}`);
       }
 
       // Invalidate Redis cache for this profile to ensure fresh data

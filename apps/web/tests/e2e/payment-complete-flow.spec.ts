@@ -4,6 +4,8 @@ import { signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 
 const stripePriceId =
+  process.env.STRIPE_PRICE_PRO_MONTHLY ||
+  process.env.STRIPE_PRICE_PRO_YEARLY ||
   process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
   process.env.STRIPE_PRICE_STANDARD_YEARLY;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
