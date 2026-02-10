@@ -38,11 +38,16 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { captureError } from '@/lib/error-tracking';
 import {
   enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import {
+  checkIsrcRescanRateLimit,
+  formatTimeRemaining,
+} from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { getDashboardData } from '../actions';
@@ -372,6 +377,112 @@ export async function refreshRelease(params: {
     profile.id,
     profile.handle
   );
+}
+
+/**
+ * Rescan a release's ISRC/UPC codes to discover new DSP links.
+ * Runs Apple Music enrichment for the specific release.
+ * Rate limited to 1 rescan per 5 minutes per release.
+ */
+export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
+  release: ReleaseViewModel;
+  rateLimited: boolean;
+  retryAfter: string | null;
+  linksFound: number;
+}> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Verify the release belongs to the user
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  // Check rate limit
+  const rateLimitResult = await checkIsrcRescanRateLimit(params.releaseId);
+  if (!rateLimitResult.success) {
+    const providerLabels = buildProviderLabels();
+    return {
+      release: mapReleaseToViewModel(
+        release,
+        providerLabels,
+        profile.id,
+        profile.handle
+      ),
+      rateLimited: true,
+      retryAfter: formatTimeRemaining(rateLimitResult.reset),
+      linksFound: 0,
+    };
+  }
+
+  // Look up the Apple Music match for this profile
+  const [match] = await db
+    .select({
+      id: dspArtistMatches.id,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.id),
+        eq(dspArtistMatches.providerId, 'apple_music')
+      )
+    )
+    .limit(1);
+
+  let linksFound = 0;
+
+  if (
+    match &&
+    (match.status === 'confirmed' || match.status === 'auto_confirmed')
+  ) {
+    // Run enrichment for all unlinked releases (including this one)
+    const result = await processReleaseEnrichmentJobStandalone({
+      creatorProfileId: profile.id,
+      matchId: match.id,
+      providerId: 'apple_music',
+      externalArtistId: match.externalArtistId,
+    });
+    linksFound = result.releasesEnriched;
+  }
+
+  // Re-fetch the release to get updated provider links
+  const updatedRelease = await getReleaseById(params.releaseId);
+  if (!updatedRelease) {
+    throw new TypeError('Release not found after rescan');
+  }
+
+  const providerLabels = buildProviderLabels();
+
+  // Invalidate cache
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('release_isrc_rescan', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    linksFound,
+  });
+
+  return {
+    release: mapReleaseToViewModel(
+      updatedRelease,
+      providerLabels,
+      profile.id,
+      profile.handle
+    ),
+    rateLimited: false,
+    retryAfter: null,
+    linksFound,
+  };
 }
 
 /**

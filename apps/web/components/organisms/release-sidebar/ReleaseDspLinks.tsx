@@ -3,7 +3,7 @@
 /**
  * ReleaseDspLinks Component
  *
- * DSP links section with add/remove functionality
+ * DSP links section with add/remove functionality and ISRC rescan
  */
 
 import {
@@ -15,9 +15,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SimpleTooltip,
 } from '@jovie/ui';
-import { Plus } from 'lucide-react';
-import React from 'react';
+import { Loader2, Plus, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import { SidebarLinkRow } from '@/components/molecules/drawer';
@@ -26,6 +27,9 @@ import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
+
+/** Cooldown duration in ms (matches server-side 5 min window) */
+const RESCAN_COOLDOWN_MS = 5 * 60 * 1000;
 
 interface ReleaseDspLinksProps {
   readonly release: Release;
@@ -47,6 +51,8 @@ interface ReleaseDspLinksProps {
   readonly onNewLinkKeyDown: (
     event: React.KeyboardEvent<HTMLInputElement>
   ) => void;
+  readonly onRescanIsrc?: () => void;
+  readonly isRescanningIsrc?: boolean;
 }
 
 // Maps ProviderKey to DspProviderId for icons
@@ -64,6 +70,17 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
 
 const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
 
+/**
+ * Format remaining cooldown time for display.
+ */
+function formatCooldown(remainingMs: number): string {
+  if (remainingMs <= 0) return '';
+  const seconds = Math.ceil(remainingMs / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes}m`;
+}
+
 export function ReleaseDspLinks({
   release,
   providerConfig,
@@ -79,11 +96,74 @@ export function ReleaseDspLinks({
   onAddLink,
   onRemoveLink,
   onNewLinkKeyDown,
+  onRescanIsrc,
+  isRescanningIsrc = false,
 }: ReleaseDspLinksProps) {
+  // Track local cooldown state per release
+  const [cooldownEnd, setCooldownEnd] = useState<number>(0);
+  const [remainingMs, setRemainingMs] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>(null);
+
+  // Reset cooldown when release changes
+  useEffect(() => {
+    setCooldownEnd(0);
+    setRemainingMs(0);
+  }, [release.id]);
+
+  // Start cooldown timer after a successful (non-rate-limited) rescan
+  const wasRescanningRef = useRef(false);
+  useEffect(() => {
+    if (isRescanningIsrc) {
+      wasRescanningRef.current = true;
+    } else if (wasRescanningRef.current) {
+      wasRescanningRef.current = false;
+      // Rescan just finished - start cooldown
+      const end = Date.now() + RESCAN_COOLDOWN_MS;
+      setCooldownEnd(end);
+      setRemainingMs(RESCAN_COOLDOWN_MS);
+    }
+  }, [isRescanningIsrc]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (cooldownEnd <= 0) return;
+
+    const tick = () => {
+      const remaining = cooldownEnd - Date.now();
+      if (remaining <= 0) {
+        setRemainingMs(0);
+        setCooldownEnd(0);
+        if (timerRef.current) clearInterval(timerRef.current);
+      } else {
+        setRemainingMs(remaining);
+      }
+    };
+
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [cooldownEnd]);
+
+  const isCoolingDown = remainingMs > 0;
+  const isRescanDisabled = isRescanningIsrc || isCoolingDown;
+
+  const handleRescan = useCallback(() => {
+    if (isRescanDisabled || !onRescanIsrc) return;
+    onRescanIsrc();
+  }, [isRescanDisabled, onRescanIsrc]);
+
   // Get list of providers that don't have links yet (for the add dropdown)
   const availableProviders = Object.entries(providerConfig).filter(
     ([key]) => !release.providers.some(p => p.key === key)
   ) as [ProviderKey, { label: string; accent: string }][];
+
+  const rescanTooltip = isRescanningIsrc
+    ? 'Scanning...'
+    : isCoolingDown
+      ? `Try again in ${formatCooldown(remainingMs)}`
+      : 'Scan ISRC for links';
 
   return (
     <div className='space-y-3'>
@@ -91,19 +171,39 @@ export function ReleaseDspLinks({
         <span className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
           DSP Links
         </span>
-        {isEditable && availableProviders.length > 0 && (
-          <Button
-            type='button'
-            size='icon'
-            variant='ghost'
-            aria-label='Add DSP link'
-            onClick={() => {
-              onSetIsAddingLink(true);
-            }}
-          >
-            <Plus className='h-4 w-4' />
-          </Button>
-        )}
+        <div className='flex items-center gap-0.5'>
+          {isEditable && onRescanIsrc && (
+            <SimpleTooltip content={rescanTooltip} side='bottom'>
+              <Button
+                type='button'
+                size='icon'
+                variant='ghost'
+                aria-label={rescanTooltip}
+                onClick={handleRescan}
+                disabled={isRescanDisabled}
+              >
+                {isRescanningIsrc ? (
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                ) : (
+                  <RefreshCw className='h-4 w-4' />
+                )}
+              </Button>
+            </SimpleTooltip>
+          )}
+          {isEditable && availableProviders.length > 0 && (
+            <Button
+              type='button'
+              size='icon'
+              variant='ghost'
+              aria-label='Add DSP link'
+              onClick={() => {
+                onSetIsAddingLink(true);
+              }}
+            >
+              <Plus className='h-4 w-4' />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Providers list */}

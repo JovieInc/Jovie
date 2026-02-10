@@ -457,6 +457,26 @@ export async function checkDspDiscoveryRateLimit(
 }
 
 /**
+ * Rate limiter for ISRC rescan
+ * Limit: 1 rescan per 5 minutes per release - prevents API abuse
+ */
+export const isrcRescanLimiter = createRateLimiter(RATE_LIMITERS.isrcRescan);
+
+/**
+ * Check ISRC rescan rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkIsrcRescanRateLimit(
+  releaseId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    isrcRescanLimiter,
+    releaseId,
+    'This release was recently scanned. Please wait before scanning again.'
+  );
+}
+
+/**
  * Check admin fit-scores rate limit
  * Returns the first failure or success if pass
  */
@@ -548,6 +568,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,
     dspDiscovery: dspDiscoveryLimiter,
+    isrcRescan: isrcRescanLimiter,
     trackingClicks: trackingClicksLimiter,
     trackingVisits: trackingVisitsLimiter,
     trackingIpClicks: trackingIpClicksLimiter,

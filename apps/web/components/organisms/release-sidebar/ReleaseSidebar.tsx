@@ -51,6 +51,8 @@ export function ReleaseSidebar({
   onArtworkUpload,
   onAddDspLink,
   onRemoveDspLink,
+  onRescanIsrc,
+  isRescanningIsrc = false,
   allowDownloads = false,
 }: ReleaseSidebarProps) {
   const {
@@ -257,6 +259,8 @@ export function ReleaseSidebar({
                     onAddLink={handleAddLink}
                     onRemoveLink={handleRemoveLink}
                     onNewLinkKeyDown={handleNewLinkKeyDown}
+                    onRescanIsrc={onRescanIsrc}
+                    isRescanningIsrc={isRescanningIsrc}
                   />
                 </div>
               )}
