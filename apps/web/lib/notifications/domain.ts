@@ -369,6 +369,53 @@ function isDoubleOptInEnabled(
   return true; // default: on
 }
 
+/**
+ * Generates and stores a double opt-in confirmation token for a subscription.
+ */
+async function handleDoubleOptInToken(
+  doubleOptIn: boolean,
+  subscriptionId: string | undefined,
+  normalizedEmail: string | null
+): Promise<void> {
+  if (!doubleOptIn || !subscriptionId || !normalizedEmail) return;
+  const token = generateSubscribeConfirmToken(subscriptionId, normalizedEmail);
+  if (!token) return;
+  await db
+    .update(notificationSubscriptions)
+    .set({
+      confirmationToken: token,
+      confirmationSentAt: new Date(),
+    })
+    .where(eq(notificationSubscriptions.id, subscriptionId));
+}
+
+/**
+ * Dispatches the appropriate subscription email based on opt-in type.
+ */
+async function dispatchSubscriptionEmail(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  subscriptionId: string | undefined,
+  doubleOptIn: boolean,
+  artist_id: string,
+  artistProfile: { displayName: string | null; username: string | null }
+): Promise<Awaited<ReturnType<typeof sendNotification>> | null> {
+  if (channel !== 'email' || !normalizedEmail || !subscriptionId) return null;
+  if (doubleOptIn) {
+    return sendSubscriptionVerificationEmail(
+      subscriptionId,
+      artist_id,
+      normalizedEmail,
+      artistProfile
+    );
+  }
+  return sendSubscriptionConfirmationEmail(
+    artist_id,
+    normalizedEmail,
+    artistProfile
+  );
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -455,9 +502,6 @@ export const subscribeToNotificationsDomain = async (
       normalizedEmail &&
       isDoubleOptInEnabled(artistProfile.settings);
 
-    // Generate confirmation token for double opt-in (pre-insert to store with subscription)
-    let confirmationToken: string | null = null;
-
     const [insertedSubscription] = await db
       .insert(notificationSubscriptions)
       .values({
@@ -477,23 +521,12 @@ export const subscribeToNotificationsDomain = async (
         id: notificationSubscriptions.id,
       });
 
-    // Generate token after insert so we have the subscription ID
-    if (doubleOptIn && insertedSubscription?.id) {
-      confirmationToken = generateSubscribeConfirmToken(
-        insertedSubscription.id,
-        normalizedEmail
-      );
-      // Store token on the subscription for lookup/invalidation
-      if (confirmationToken) {
-        await db
-          .update(notificationSubscriptions)
-          .set({
-            confirmationToken,
-            confirmationSentAt: new Date(),
-          })
-          .where(eq(notificationSubscriptions.id, insertedSubscription.id));
-      }
-    }
+    // Generate and store confirmation token for double opt-in
+    await handleDoubleOptInToken(
+      !!doubleOptIn,
+      insertedSubscription?.id,
+      normalizedEmail
+    );
 
     await trackSubscribeSuccess({
       artist_id,
@@ -511,27 +544,14 @@ export const subscribeToNotificationsDomain = async (
       await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
     }
 
-    let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
-      null;
-
-    if (channel === 'email' && normalizedEmail && insertedSubscription?.id) {
-      if (doubleOptIn) {
-        // Send verification email for double opt-in
-        dispatchResult = await sendSubscriptionVerificationEmail(
-          insertedSubscription.id,
-          artist_id,
-          normalizedEmail,
-          artistProfile
-        );
-      } else {
-        // Send regular confirmation email (single opt-in)
-        dispatchResult = await sendSubscriptionConfirmationEmail(
-          artist_id,
-          normalizedEmail,
-          artistProfile
-        );
-      }
-    }
+    const dispatchResult = await dispatchSubscriptionEmail(
+      channel,
+      normalizedEmail,
+      insertedSubscription?.id,
+      !!doubleOptIn,
+      artist_id,
+      artistProfile
+    );
 
     return buildSubscribeSuccessResponse(
       dynamicEnabled,
