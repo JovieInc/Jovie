@@ -12,49 +12,54 @@ import {
 } from '@/components/organisms/Dialog';
 import { type Consent, saveConsent } from '@/lib/cookies/consent';
 
-const COOKIE_CATEGORIES = [
+const COOKIE_CATEGORIES: ReadonlyArray<{
+  id: keyof Consent;
+  label: string;
+  description: string;
+  disabled: boolean;
+}> = [
   {
-    id: 'essential' as const,
+    id: 'essential',
     label: 'Essential',
     description:
-      'Required for basic site functionality like security and accessibility. Always active.',
+      'Required for basic site functionality. Always active.',
     disabled: true,
   },
   {
-    id: 'analytics' as const,
+    id: 'analytics',
     label: 'Analytics',
     description:
-      'Help us understand how visitors use our site to improve your experience.',
+      'Help us understand how visitors use our site.',
     disabled: false,
   },
   {
-    id: 'marketing' as const,
+    id: 'marketing',
     label: 'Marketing',
     description:
-      'Used to deliver relevant ads and measure campaign effectiveness.',
+      'Used to deliver relevant ads and measure campaigns.',
     disabled: false,
   },
-] as const;
+];
 
 const secondaryButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-bg-button)',
   color: 'var(--linear-text-primary)',
   border: '1px solid var(--linear-border-default)',
   borderRadius: 'var(--linear-radius-sm)',
-  fontSize: '12px',
+  fontSize: '11px',
   fontWeight: 'var(--linear-font-weight-medium)',
-  padding: '6px 12px',
-  height: '28px',
+  padding: '4px 10px',
+  height: '26px',
 };
 
 const primaryButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-btn-primary-bg)',
   color: 'var(--linear-btn-primary-fg)',
   borderRadius: 'var(--linear-radius-sm)',
-  fontSize: '12px',
+  fontSize: '11px',
   fontWeight: 'var(--linear-font-weight-medium)',
-  padding: '6px 12px',
-  height: '28px',
+  padding: '4px 10px',
+  height: '26px',
 };
 
 interface CookieModalProps {
@@ -70,9 +75,9 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
     marketing: false,
   });
 
-  const toggle = (key: keyof Consent) => {
+  const handleCheckedChange = (key: keyof Consent, checked: boolean) => {
     if (key === 'essential') return;
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    setSettings(prev => ({ ...prev, [key]: checked }));
   };
 
   const save = async () => {
@@ -85,12 +90,12 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
     <Dialog
       open={open}
       onClose={onClose}
-      size='sm'
+      size='xs'
       className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] sm:mx-auto sm:w-full'
     >
       <DialogTitle
         style={{
-          fontSize: '14px',
+          fontSize: '13px',
           fontWeight: 'var(--linear-font-weight-semibold)',
           color: 'var(--linear-text-primary)',
         }}
@@ -98,7 +103,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         Cookie preferences
       </DialogTitle>
 
-      <DialogBody style={{ marginTop: '12px' }}>
+      <DialogBody style={{ marginTop: '8px' }}>
         {COOKIE_CATEGORIES.map(category => {
           const titleId = `cookie-${category.id}-title`;
           const descId = `cookie-${category.id}-desc`;
@@ -106,21 +111,21 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           return (
             <div
               key={category.id}
-              className='flex items-start justify-between last:border-0'
+              className='flex items-center justify-between last:border-0'
               style={{
-                gap: '12px',
+                gap: '10px',
                 borderBottom: '1px solid var(--linear-border-subtle)',
-                padding: '12px 0',
+                padding: '8px 0',
               }}
             >
               <div
                 className='min-w-0 flex-1'
-                style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}
               >
                 <span
                   id={titleId}
                   style={{
-                    fontSize: '12px',
+                    fontSize: '11px',
                     fontWeight: 'var(--linear-font-weight-medium)',
                     color: 'var(--linear-text-primary)',
                   }}
@@ -130,18 +135,20 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
                 <p
                   id={descId}
                   style={{
-                    fontSize: '12px',
-                    lineHeight: 1.5,
+                    fontSize: '11px',
+                    lineHeight: 1.4,
                     color: 'var(--linear-text-secondary)',
                   }}
                 >
                   {category.description}
                 </p>
               </div>
-              <div className='shrink-0 pt-0.5'>
+              <div className='shrink-0'>
                 <Switch
                   checked={settings[category.id]}
-                  onCheckedChange={() => toggle(category.id)}
+                  onCheckedChange={(checked: boolean) =>
+                    handleCheckedChange(category.id, checked)
+                  }
                   disabled={category.disabled}
                   aria-labelledby={titleId}
                   aria-describedby={descId}
@@ -154,8 +161,8 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         <p
           className='text-center'
           style={{
-            paddingTop: '12px',
-            fontSize: '11px',
+            paddingTop: '8px',
+            fontSize: '10px',
             color: 'var(--linear-text-tertiary)',
           }}
         >
@@ -170,7 +177,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         </p>
       </DialogBody>
 
-      <DialogActions style={{ marginTop: '16px' }}>
+      <DialogActions style={{ marginTop: '12px' }}>
         <button
           type='button'
           onClick={onClose}

@@ -9,6 +9,8 @@ export interface TableActionMenuItem {
   readonly variant?: 'default' | 'destructive';
   readonly disabled?: boolean;
   readonly subText?: string;
+  /** Nested items rendered as a flyout submenu */
+  readonly children?: TableActionMenuItem[];
 }
 
 export interface TableActionMenuProps {

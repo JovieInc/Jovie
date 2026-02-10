@@ -41,6 +41,29 @@ export function TableActionMenu({
       };
     }
 
+    // Handle submenu item
+    if (item.children && item.children.length > 0) {
+      return {
+        type: 'submenu',
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        items: item.children.map(
+          child =>
+            ({
+              type: 'action',
+              id: child.id,
+              label: child.label,
+              icon: child.icon,
+              onClick: child.onClick,
+              disabled: child.disabled,
+              variant: child.variant,
+              subText: child.subText,
+            }) as CommonDropdownItem
+        ),
+      };
+    }
+
     // Handle action item
     return {
       type: 'action',

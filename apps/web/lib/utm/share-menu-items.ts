@@ -6,6 +6,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
+import { Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ContextMenuItemType } from '@/components/organisms/table';
@@ -95,7 +96,7 @@ export function getUTMShareContextMenuItems(params: {
 /**
  * Generate UTM share items as TableActionMenuItem[] (used in legacy table row menus).
  *
- * Returns a separator followed by quick preset actions.
+ * Returns a separator followed by a submenu containing quick preset actions.
  */
 export function getUTMShareActionMenuItems(params: {
   smartLinkUrl: string;
@@ -107,31 +108,36 @@ export function getUTMShareActionMenuItems(params: {
 
   if (quickPresets.length === 0) return [];
 
-  const items: TableActionMenuItem[] = [
+  const children: TableActionMenuItem[] = quickPresets.map(preset => ({
+    id: `utm-share-${preset.id}`,
+    label: preset.label,
+    onClick: () => {
+      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+        onCopied?.(preset.id);
+      });
+    },
+  }));
+
+  return [
     {
       id: 'separator',
       label: '',
       onClick: () => {},
     },
+    {
+      id: 'utm-share-submenu',
+      label: 'Copy with UTM',
+      icon: Share2,
+      onClick: () => {},
+      children,
+    },
   ];
-
-  for (const preset of quickPresets) {
-    items.push({
-      id: `utm-share-${preset.id}`,
-      label: `Copy for ${preset.label}`,
-      onClick: () => {
-        void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
-          onCopied?.(preset.id);
-        });
-      },
-    });
-  }
-
-  return items;
 }
 
 /**
  * Generate UTM share items as CommonDropdownItem[] (used in sidebar/drawer menus).
+ *
+ * Returns a separator followed by a single submenu item containing UTM presets.
  */
 export function getUTMShareDropdownItems(params: {
   smartLinkUrl: string;
@@ -143,23 +149,25 @@ export function getUTMShareDropdownItems(params: {
 
   if (quickPresets.length === 0) return [];
 
-  const items: CommonDropdownItem[] = [
+  const submenuItems: CommonDropdownItem[] = quickPresets.map(preset => ({
+    type: 'action' as const,
+    id: `utm-share-${preset.id}`,
+    label: preset.label,
+    onClick: () => {
+      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+        onCopied?.(preset.id);
+      });
+    },
+  }));
+
+  return [
     { type: 'separator', id: 'sep-utm' },
-    { type: 'label', id: 'label-utm', label: 'Share with UTM' },
+    {
+      type: 'submenu',
+      id: 'utm-share-submenu',
+      label: 'Copy with UTM',
+      icon: Share2,
+      items: submenuItems,
+    },
   ];
-
-  for (const preset of quickPresets) {
-    items.push({
-      type: 'action',
-      id: `utm-share-${preset.id}`,
-      label: `Copy for ${preset.label}`,
-      onClick: () => {
-        void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
-          onCopied?.(preset.id);
-        });
-      },
-    });
-  }
-
-  return items;
 }
