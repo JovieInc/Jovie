@@ -117,13 +117,14 @@ describe('DashboardNav', () => {
   it('renders secondary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
+    expect(getByRole('link', { name: 'Thread' })).toBeDefined();
   });
 
   it('applies active state to current page', () => {
+    mockUsePathname.mockReturnValueOnce('/app/releases');
     const { getByRole } = renderDashboardNav();
 
-    const activeLink = getByRole('link', { name: 'Profile' });
+    const activeLink = getByRole('link', { name: 'Releases' });
     expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
