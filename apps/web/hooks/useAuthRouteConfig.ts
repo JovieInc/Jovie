@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import {
+  adminNavigation,
   primaryNavigation,
   settingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
@@ -51,7 +52,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const navigation = useMemo(() => {
     switch (section) {
       case 'admin':
-        return primaryNavigation;
+        return adminNavigation;
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
