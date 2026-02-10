@@ -16,7 +16,6 @@ import {
   adminNavigation,
   artistSettingsNavigation,
   primaryNavigation,
-  secondaryNavigation,
   userSettingsNavigation,
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
@@ -72,8 +71,6 @@ export function DashboardNav(_: DashboardNavProps) {
     );
   }, [artistName]);
 
-  const secondaryItems = secondaryNavigation;
-
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -81,11 +78,8 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo(
-    () => [
-      { key: 'primary', items: primaryItems },
-      { key: 'secondary', items: secondaryItems },
-    ],
-    [primaryItems, secondaryItems]
+    () => [{ key: 'primary', items: primaryItems }],
+    [primaryItems]
   );
 
   // Memoize renderNavItem to prevent creating new functions on every render
