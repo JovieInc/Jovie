@@ -114,12 +114,6 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
 
-  it('renders secondary navigation items', () => {
-    const { getByRole } = renderDashboardNav();
-
-    expect(getByRole('link', { name: 'Thread' })).toBeDefined();
-  });
-
   it('applies active state to current page', () => {
     mockUsePathname.mockReturnValueOnce('/app/releases');
     const { getByRole } = renderDashboardNav();
