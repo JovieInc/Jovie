@@ -120,5 +120,84 @@ describe('Plan Configuration', () => {
       expect(getPlanDisplayName('pro')).toBe('Pro');
       expect(getPlanDisplayName('growth')).toBe('Growth');
     });
+
+    it('returns "Free" for unknown plan strings', () => {
+      expect(getPlanDisplayName('enterprise')).toBe('Free');
+      expect(getPlanDisplayName('')).toBe('Free');
+      expect(getPlanDisplayName('GROWTH')).toBe('Free');
+    });
+  });
+
+  describe('Edge cases across all helpers', () => {
+    it('getPlanLimits falls back to free for empty string', () => {
+      expect(getPlanLimits('')).toEqual(PLAN_LIMITS.free);
+    });
+
+    it('getPlanLimits falls back to free for undefined', () => {
+      expect(getPlanLimits(undefined as unknown as string)).toEqual(
+        PLAN_LIMITS.free
+      );
+    });
+
+    it('isProPlan rejects case-mismatched strings', () => {
+      expect(isProPlan('Pro')).toBe(false);
+      expect(isProPlan('PRO')).toBe(false);
+      expect(isProPlan('Growth')).toBe(false);
+      expect(isProPlan('GROWTH')).toBe(false);
+    });
+
+    it('isProPlan rejects empty string', () => {
+      expect(isProPlan('')).toBe(false);
+    });
+
+    it('hasAdvancedFeatures rejects case-mismatched growth', () => {
+      expect(hasAdvancedFeatures('Growth')).toBe(false);
+      expect(hasAdvancedFeatures('GROWTH')).toBe(false);
+    });
+
+    it('plan hierarchy: growth > pro > free for retention days', () => {
+      expect(PLAN_LIMITS.growth.analyticsRetentionDays).toBeGreaterThan(
+        PLAN_LIMITS.pro.analyticsRetentionDays
+      );
+      expect(PLAN_LIMITS.pro.analyticsRetentionDays).toBeGreaterThan(
+        PLAN_LIMITS.free.analyticsRetentionDays
+      );
+    });
+
+    it('all paid plans have unlimited contacts (null)', () => {
+      const paidPlans = ['pro', 'growth'] as const;
+      for (const plan of paidPlans) {
+        expect(PLAN_LIMITS[plan].contactsLimit).toBeNull();
+      }
+    });
+
+    it('all paid plans enable all boolean features', () => {
+      const paidPlans = ['pro', 'growth'] as const;
+      const boolFeatures = [
+        'canExportContacts',
+        'canRemoveBranding',
+        'canAccessAdvancedAnalytics',
+        'canFilterSelfFromAnalytics',
+      ] as const;
+
+      for (const plan of paidPlans) {
+        for (const feature of boolFeatures) {
+          expect(PLAN_LIMITS[plan][feature]).toBe(true);
+        }
+      }
+    });
+
+    it('free plan disables all boolean features', () => {
+      const boolFeatures = [
+        'canExportContacts',
+        'canRemoveBranding',
+        'canAccessAdvancedAnalytics',
+        'canFilterSelfFromAnalytics',
+      ] as const;
+
+      for (const feature of boolFeatures) {
+        expect(PLAN_LIMITS.free[feature]).toBe(false);
+      }
+    });
   });
 });
