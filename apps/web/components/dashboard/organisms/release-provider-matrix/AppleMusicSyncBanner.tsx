@@ -38,12 +38,10 @@ function MatchDescription({
   isSuggested,
   syncState,
   match,
-  linkCoverage,
 }: {
   readonly isSuggested: boolean;
   readonly syncState: SyncState;
   readonly match: DspMatch;
-  readonly linkCoverage: { total: number; withAppleMusic: number };
 }) {
   const isrcLabel = match.matchingIsrcCount === 1 ? 'match' : 'matches';
 
@@ -56,17 +54,20 @@ function MatchDescription({
     );
   }
 
+  if (match.matchingIsrcCount === 0) {
+    return (
+      <>
+        {syncState === 'auto_confirmed'
+          ? 'Auto-confirmed match'
+          : 'Manually confirmed match'}
+      </>
+    );
+  }
+
   return (
     <>
       {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
       {match.matchingIsrcCount} ISRC {isrcLabel}
-      {linkCoverage.total > 0 && (
-        <span className='text-tertiary-token'>
-          {' '}
-          &middot; {linkCoverage.withAppleMusic}/{linkCoverage.total} releases
-          with Apple Music links
-        </span>
-      )}
     </>
   );
 }
@@ -226,7 +227,7 @@ export function AppleMusicSyncBanner({
         'rounded-lg border px-4 py-3',
         isSuggested
           ? 'border-[#FA243C]/30 bg-[#FA243C]/5'
-          : 'border-[#FA243C]/20 bg-[#FA243C]/[0.03]',
+          : 'border-green-500/20 bg-green-500/[0.03]',
         className
       )}
     >
@@ -280,7 +281,6 @@ export function AppleMusicSyncBanner({
               isSuggested={isSuggested}
               syncState={syncState}
               match={match}
-              linkCoverage={linkCoverage}
             />
           </p>
         </div>
