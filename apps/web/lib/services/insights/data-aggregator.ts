@@ -760,6 +760,13 @@ async function aggregateTemporalPatterns(
 // Helper: compute growth rates
 // ---------------------------------------------------------------------------
 
+function computeGrowthPct(current: number, previous: number): number {
+  if (previous > 0) {
+    return Math.round(((current - previous) / previous) * 100);
+  }
+  return current > 0 ? 100 : 0;
+}
+
 function computeCityGrowthRates(
   current: { city: string; country: string; count: number }[],
   previous: { city: string; country: string; count: number }[]
@@ -770,12 +777,7 @@ function computeCityGrowthRates(
     .map(c => {
       const prev = previousMap.get(c.city);
       const previousCount = prev?.count ?? 0;
-      const growthPct =
-        previousCount > 0
-          ? Math.round(((c.count - previousCount) / previousCount) * 100)
-          : c.count > 0
-            ? 100
-            : 0;
+      const growthPct = computeGrowthPct(c.count, previousCount);
       return {
         city: c.city,
         country: c.country,
@@ -796,12 +798,7 @@ function computeReferrerGrowthRates(
   return current
     .map(r => {
       const prevCount = previousMap.get(r.referrer) ?? 0;
-      const growthPct =
-        prevCount > 0
-          ? Math.round(((r.count - prevCount) / prevCount) * 100)
-          : r.count > 0
-            ? 100
-            : 0;
+      const growthPct = computeGrowthPct(r.count, prevCount);
       return {
         referrer: r.referrer,
         currentCount: r.count,

@@ -66,18 +66,14 @@ export function buildUserPrompt(
     );
   }
 
-  parts.push(`Total audience members: ${metrics.profile.totalAudienceMembers}`);
-  parts.push(`Total subscribers: ${metrics.profile.totalSubscribers}`);
-
   parts.push(
-    `\nAnalysis period: ${metrics.period.start.toISOString().split('T')[0]} to ${metrics.period.end.toISOString().split('T')[0]}`
+    `Total audience members: ${metrics.profile.totalAudienceMembers}`,
+    `Total subscribers: ${metrics.profile.totalSubscribers}`,
+    `\nAnalysis period: ${metrics.period.start.toISOString().split('T')[0]} to ${metrics.period.end.toISOString().split('T')[0]}`,
+    `Comparison period: ${metrics.comparisonPeriod.start.toISOString().split('T')[0]} to ${metrics.comparisonPeriod.end.toISOString().split('T')[0]}`,
+    '\n--- METRICS DATA ---\n',
+    JSON.stringify(metrics, null, 2)
   );
-  parts.push(
-    `Comparison period: ${metrics.comparisonPeriod.start.toISOString().split('T')[0]} to ${metrics.comparisonPeriod.end.toISOString().split('T')[0]}`
-  );
-
-  parts.push('\n--- METRICS DATA ---\n');
-  parts.push(JSON.stringify(metrics, null, 2));
 
   if (existingInsightTypes.length > 0) {
     parts.push(

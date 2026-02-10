@@ -38,7 +38,7 @@ async function fetchInsights(
   }
 
   const qs = params.toString();
-  const url = `/api/insights${qs ? `?${qs}` : ''}`;
+  const url = qs ? `/api/insights?${qs}` : '/api/insights';
   return fetchWithTimeout<InsightsListResponse>(url, { signal });
 }
 

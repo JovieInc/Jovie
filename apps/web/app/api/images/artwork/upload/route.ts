@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         .where(eq(creatorProfiles.id, release.creatorProfileId))
         .limit(1);
 
-      if (!profile || profile.userId !== dbUser.id) {
+      if (profile?.userId !== dbUser.id) {
         return errorResponse(
           'You do not have permission to modify this release.',
           UPLOAD_ERROR_CODES.UNAUTHORIZED,

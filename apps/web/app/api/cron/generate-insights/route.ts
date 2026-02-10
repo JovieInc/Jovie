@@ -25,6 +25,55 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for batch processing
 
+interface ProfileProcessResult {
+  insightsGenerated: number;
+  error?: string;
+}
+
+async function processProfile(
+  profileId: string
+): Promise<ProfileProcessResult> {
+  const run = await createGenerationRun(profileId);
+  const runStart = Date.now();
+
+  const metrics = await aggregateMetrics(profileId);
+  const totalDataPoints =
+    metrics.traffic.totalClicksCurrent + metrics.traffic.totalClicksPrevious;
+
+  if (totalDataPoints < MIN_TOTAL_CLICKS) {
+    await completeGenerationRun(run.id, {
+      status: 'completed',
+      insightsGenerated: 0,
+      dataPointsAnalyzed: totalDataPoints,
+      durationMs: Date.now() - runStart,
+    });
+    return { insightsGenerated: 0 };
+  }
+
+  const existingTypes = await getExistingInsightTypes(profileId);
+  const result = await generateInsights(metrics, existingTypes);
+
+  const persisted = await persistInsights(
+    profileId,
+    run.id,
+    result.insights,
+    metrics.period,
+    metrics.comparisonPeriod
+  );
+
+  await completeGenerationRun(run.id, {
+    status: 'completed',
+    insightsGenerated: persisted,
+    dataPointsAnalyzed: totalDataPoints,
+    modelUsed: result.modelUsed,
+    promptTokens: result.promptTokens,
+    completionTokens: result.completionTokens,
+    durationMs: Date.now() - runStart,
+  });
+
+  return { insightsGenerated: persisted };
+}
+
 /**
  * GET /api/cron/generate-insights
  *
@@ -102,72 +151,12 @@ export async function GET(request: Request) {
 
     // 3. Process each profile
     for (const { profile_id: profileId } of eligibleProfiles) {
-      let runId: string | null = null;
-      let runStart = Date.now();
-      let dataPointsAnalyzed = 0;
       try {
-        const run = await createGenerationRun(profileId);
-        runId = run.id;
-        runStart = Date.now();
-
-        const metrics = await aggregateMetrics(profileId);
-        const totalDataPoints =
-          metrics.traffic.totalClicksCurrent +
-          metrics.traffic.totalClicksPrevious;
-        dataPointsAnalyzed = totalDataPoints;
-
-        if (totalDataPoints < MIN_TOTAL_CLICKS) {
-          await completeGenerationRun(run.id, {
-            status: 'completed',
-            insightsGenerated: 0,
-            dataPointsAnalyzed: totalDataPoints,
-            durationMs: Date.now() - runStart,
-          });
-          processed++;
-          continue;
-        }
-
-        const existingTypes = await getExistingInsightTypes(profileId);
-        const result = await generateInsights(metrics, existingTypes);
-
-        const persisted = await persistInsights(
-          profileId,
-          run.id,
-          result.insights,
-          metrics.period,
-          metrics.comparisonPeriod
-        );
-
-        await completeGenerationRun(run.id, {
-          status: 'completed',
-          insightsGenerated: persisted,
-          dataPointsAnalyzed: totalDataPoints,
-          modelUsed: result.modelUsed,
-          promptTokens: result.promptTokens,
-          completionTokens: result.completionTokens,
-          durationMs: Date.now() - runStart,
-        });
-
-        insightsTotal += persisted;
+        const result = await processProfile(profileId);
+        insightsTotal += result.insightsGenerated;
         processed++;
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
-        if (runId) {
-          try {
-            await completeGenerationRun(runId, {
-              status: 'failed',
-              insightsGenerated: 0,
-              dataPointsAnalyzed,
-              durationMs: Date.now() - runStart,
-              error: msg,
-            });
-          } catch (updateError) {
-            logger.error(
-              `[insights-cron] Failed to update run status for profile ${profileId}:`,
-              updateError
-            );
-          }
-        }
         errors.push(`Profile ${profileId}: ${msg}`);
         logger.error(`[insights-cron] Failed for profile ${profileId}:`, error);
       }
