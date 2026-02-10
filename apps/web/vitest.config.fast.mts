@@ -82,7 +82,10 @@ export default defineConfig({
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
     // JUnit reporter in CI for Codecov Test Analytics ingestion
     reporters: isCI
-      ? [['default', { summary: false }], ['junit', { outputFile: 'test-report.junit.xml' }]]
+      ? [
+          ['default', { summary: false }],
+          ['junit', { outputFile: 'test-report.junit.xml' }],
+        ]
       : ['default'],
 
     // Optimize file watching
