@@ -21,22 +21,19 @@ const COOKIE_CATEGORIES: ReadonlyArray<{
   {
     id: 'essential',
     label: 'Essential',
-    description:
-      'Required for basic site functionality. Always active.',
+    description: 'Required for basic site functionality. Always active.',
     disabled: true,
   },
   {
     id: 'analytics',
     label: 'Analytics',
-    description:
-      'Help us understand how visitors use our site.',
+    description: 'Help us understand how visitors use our site.',
     disabled: false,
   },
   {
     id: 'marketing',
     label: 'Marketing',
-    description:
-      'Used to deliver relevant ads and measure campaigns.',
+    description: 'Used to deliver relevant ads and measure campaigns.',
     disabled: false,
   },
 ];
