@@ -1,24 +1,44 @@
 'use client';
 
-import {
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@jovie/ui';
-import { Plus, Share2, Trash2 } from 'lucide-react';
+import type { CommonDropdownItem } from '@jovie/ui';
+import { Button, CommonDropdown, Input } from '@jovie/ui';
+import { ChevronDown, Plus, Share2, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
-import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
 import type { SocialsFormProps } from './types';
 import { useSocialsForm } from './useSocialsForm';
+
+/** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
+const CHIP_BG_ALPHA = 0x15 / 255;
+
+/**
+ * Get icon color that meets WCAG 3:1 against the effective chip background.
+ * Unlike getContrastSafeIconColor (which checks against the surface), this accounts
+ * for the tinted chip background that shifts contrast for bright brands.
+ */
+function getChipSafeIconColor(brandHex: string, isDark: boolean): string {
+  if (isDark && isBrandDark(brandHex)) return '#ffffff';
+
+  const surfaceHex = isDark ? '#101012' : '#fcfcfc';
+  const brand = hexToRgb(brandHex);
+  const surface = hexToRgb(surfaceHex);
+  const r = Math.round(
+    brand.r * CHIP_BG_ALPHA + surface.r * (1 - CHIP_BG_ALPHA)
+  );
+  const g = Math.round(
+    brand.g * CHIP_BG_ALPHA + surface.g * (1 - CHIP_BG_ALPHA)
+  );
+  const b = Math.round(
+    brand.b * CHIP_BG_ALPHA + surface.b * (1 - CHIP_BG_ALPHA)
+  );
+  const effectiveBg = `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+
+  return ensureContrast(brandHex, effectiveBg);
+}
 
 const SOCIALS_FORM_LOADING_KEYS = [
   'socials-form-loading-1',
@@ -76,6 +96,35 @@ function getPlatformLabel(platform: string): string {
   return PLATFORM_METADATA_MAP[platform]?.name || platform;
 }
 
+/** Build dropdown items for the platform selector, grouped by category with search support. */
+function buildPlatformItems(
+  onSelect: (platformId: string) => void
+): CommonDropdownItem[] {
+  const items: CommonDropdownItem[] = [];
+
+  SOCIAL_PLATFORM_GROUPS.forEach((group, groupIndex) => {
+    if (groupIndex > 0) {
+      items.push({ type: 'separator', id: `sep-${group.label}` });
+    }
+    items.push({
+      type: 'label',
+      id: `label-${group.label}`,
+      label: group.label,
+    });
+    for (const p of group.platforms) {
+      items.push({
+        type: 'action',
+        id: p.id,
+        label: p.name,
+        icon: <SocialIcon platform={p.id} className='h-4 w-4' aria-hidden />,
+        onClick: () => onSelect(p.id),
+      });
+    }
+  });
+
+  return items;
+}
+
 export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   const {
     loading,
@@ -92,6 +141,17 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
+  /** Memoize platform dropdown items per-row so onClick closures stay stable. */
+  const platformItemsByIndex = useMemo(
+    () =>
+      socialLinks.map((_, index) =>
+        buildPlatformItems(platformId =>
+          updateSocialLink(index, 'platform', platformId)
+        )
+      ),
+    [socialLinks, updateSocialLink]
+  );
+
   if (loading) {
     return (
       <div className='space-y-3'>
@@ -107,18 +167,6 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h3 className='text-[14px] font-medium text-primary-token'>
-            Social Media Links
-          </h3>
-          <p className='text-[13px] text-secondary mt-0.5'>
-            Add your social profiles so fans can find you everywhere.
-          </p>
-        </div>
-      </div>
-
       {socialLinks.length === 0 ? (
         <EmptyState
           icon={<Share2 className='h-6 w-6' aria-hidden='true' />}
@@ -147,7 +195,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                         ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
                         : undefined,
                       color: PLATFORM_METADATA_MAP[link.platform]
-                        ? getContrastSafeIconColor(
+                        ? getChipSafeIconColor(
                             `#${PLATFORM_METADATA_MAP[link.platform].color}`,
                             isDark
                           )
@@ -160,28 +208,26 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                       aria-hidden
                     />
                   </div>
-                  <Select
-                    value={link.platform}
-                    onValueChange={value =>
-                      updateSocialLink(index, 'platform', value)
+                  <CommonDropdown
+                    variant='dropdown'
+                    searchable
+                    searchPlaceholder='Search platforms...'
+                    emptyMessage='No platforms found'
+                    items={platformItemsByIndex[index] ?? []}
+                    align='start'
+                    trigger={
+                      <button
+                        type='button'
+                        className='flex h-10 flex-1 items-center justify-between gap-1 rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-interactive sm:w-[140px]'
+                      >
+                        <span className='truncate'>
+                          {getPlatformLabel(link.platform)}
+                        </span>
+                        <ChevronDown className='h-3.5 w-3.5 shrink-0 opacity-50' />
+                      </button>
                     }
-                  >
-                    <SelectTrigger className='flex-1 sm:w-[140px]'>
-                      <SelectValue placeholder='Platform' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SOCIAL_PLATFORM_GROUPS.map(group => (
-                        <SelectGroup key={group.label}>
-                          <SelectLabel>{group.label}</SelectLabel>
-                          {group.platforms.map(p => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    aria-label={`Select platform for link ${index + 1}`}
+                  />
                 </div>
 
                 {/* URL input */}

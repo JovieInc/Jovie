@@ -32,6 +32,16 @@ export function TourDateCard({
   const isSoldOut = tourDate.ticketStatus === 'sold_out';
   const isCancelled = tourDate.ticketStatus === 'cancelled';
 
+  // Derive timezone abbreviation (e.g., "EST") from IANA timezone
+  const timezoneAbbr = tourDate.timezone
+    ? (new Intl.DateTimeFormat('en-US', {
+        timeZone: tourDate.timezone,
+        timeZoneName: 'short',
+      })
+        .formatToParts(date)
+        .find(part => part.type === 'timeZoneName')?.value ?? null)
+    : null;
+
   const handleAddToCalendar = () => {
     // Generate ICS file URL - use direct navigation for reliable download
     const icsUrl = `/api/calendar/${tourDate.id}`;
@@ -62,19 +72,24 @@ export function TourDateCard({
         {/* Event details */}
         <div className='min-w-0 flex-1'>
           <div className='flex items-start justify-between gap-2'>
-            <div>
+            <div className='min-w-0'>
               {tourDate.title && (
                 <p className='text-sm font-medium text-accent'>
                   {tourDate.title}
                 </p>
               )}
-              <h3 className='font-semibold text-primary-token'>
+              <h3 className='truncate font-semibold text-primary-token'>
                 {tourDate.venueName}
               </h3>
-              <p className='text-sm text-secondary-token'>{location}</p>
+              <p className='truncate text-sm text-secondary-token'>
+                {location}
+              </p>
               {tourDate.startTime && (
                 <p className='mt-1 text-sm text-tertiary-token'>
                   Doors: {tourDate.startTime}
+                  {timezoneAbbr && (
+                    <span className='ml-1 text-xs'>{timezoneAbbr}</span>
+                  )}
                 </p>
               )}
             </div>
@@ -103,7 +118,7 @@ export function TourDateCard({
           </div>
 
           {/* Actions */}
-          <div className='mt-3 flex items-center gap-2'>
+          <div className='mt-3 flex flex-wrap items-center gap-2'>
             {tourDate.ticketUrl && !isCancelled && !isSoldOut && (
               <a
                 href={tourDate.ticketUrl}

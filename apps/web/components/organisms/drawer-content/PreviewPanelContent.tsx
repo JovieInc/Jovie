@@ -1,19 +1,14 @@
 'use client';
 
-import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
-import {
-  Copy,
-  Download,
-  ExternalLink,
-  MoreVertical,
-  QrCode,
-  X,
-} from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { Copy, Download, ExternalLink, QrCode } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { DrawerHeader } from '@/components/molecules/drawer';
+import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 
@@ -89,28 +84,37 @@ export function PreviewPanelContent() {
     }
   };
 
-  // Memoize action menu items - must be called before early return
-  const actionMenuItems = useMemo<CommonDropdownItem[]>(
+  // Header actions using DrawerHeaderActions for consistent styling
+  const primaryActions: DrawerHeaderAction[] = useMemo(
     () => [
       {
-        type: 'action',
+        id: 'open',
+        label: 'Open profile in new tab',
+        icon: ExternalLink,
+        href: profileUrl || undefined,
+      },
+    ],
+    [profileUrl]
+  );
+
+  const overflowActions: DrawerHeaderAction[] = useMemo(
+    () => [
+      {
         id: 'copy-url',
         label: 'Copy Jovie Profile URL',
-        icon: <Copy className='h-4 w-4' />,
-        onClick: handleCopyUrl,
+        icon: Copy,
+        onClick: () => void handleCopyUrl(),
       },
       {
-        type: 'action',
         id: 'download-qr',
         label: 'Download QR Code',
-        icon: <QrCode className='h-4 w-4' />,
-        onClick: handleDownloadQr,
+        icon: QrCode,
+        onClick: () => void handleDownloadQr(),
       },
       {
-        type: 'action',
         id: 'download-vcard',
         label: 'Download vCard',
-        icon: <Download className='h-4 w-4' />,
+        icon: Download,
         onClick: handleDownloadVcard,
       },
     ],
@@ -130,44 +134,16 @@ export function PreviewPanelContent() {
   return (
     <div className='h-full flex flex-col'>
       {/* Header with action buttons */}
-      <div className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'>
-        <h2 className='text-[13px] font-medium text-primary-token'>
-          Live Preview
-        </h2>
-        <div className='flex items-center gap-1'>
-          {/* Action menu */}
-          <CommonDropdown
-            variant='dropdown'
-            items={actionMenuItems}
-            trigger={
-              <button
-                type='button'
-                className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out'
-                aria-label='Profile actions'
-              >
-                <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
-              </button>
-            }
-            align='end'
+      <DrawerHeader
+        title='Live Preview'
+        onClose={close}
+        actions={
+          <DrawerHeaderActions
+            primaryActions={primaryActions}
+            overflowActions={overflowActions}
           />
-          {/* Open button */}
-          <a
-            href={profileUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='h-7 px-2 text-xs rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover transition-colors ease-out inline-flex items-center justify-center'
-            aria-label='Open profile in new tab'
-          >
-            <ExternalLink className='h-3.5 w-3.5' aria-hidden='true' />
-          </a>
-          {/* Close button */}
-          <DashboardHeaderActionButton
-            ariaLabel='Close preview'
-            onClick={close}
-            icon={<X className='h-4 w-4' aria-hidden='true' />}
-          />
-        </div>
-      </div>
+        }
+      />
 
       {/* Preview Content */}
       <div className='flex-1 min-h-0 overflow-y-auto p-4'>

@@ -81,7 +81,8 @@
       "biome check --write --no-errors-on-unmatched"
     ],
     "apps/web/**/*.{ts,tsx}": [
-      "eslint --config apps/web/eslint.config.js --max-warnings=0 --no-warn-ignored --cache --cache-location apps/web/.cache/eslint --cache-strategy content"
+      "eslint --config apps/web/eslint.config.js --max-warnings=0 --no-warn-ignored --cache --cache-location apps/web/.cache/eslint --cache-strategy content",
+      "bash -c 'pnpm turbo typecheck --filter=@jovie/web'"
     ],
     "apps/web/components/**/*.{tsx,ts}": [
       "pnpm --filter=@jovie/web run a11y:check:staged"

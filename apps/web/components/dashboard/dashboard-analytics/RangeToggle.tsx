@@ -3,15 +3,21 @@
 import type { KeyboardEvent } from 'react';
 import { useRef } from 'react';
 import type { RangeToggleProps } from './types';
-import { RANGE_OPTIONS } from './types';
+import { RANGE_DAYS, RANGE_OPTIONS } from './types';
 
 export function RangeToggle({
   value,
   onChange,
   tabsBaseId,
   panelId,
+  maxRetentionDays,
 }: RangeToggleProps) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const isDisabled = (rangeValue: string): boolean => {
+    if (maxRetentionDays === undefined) return false;
+    return RANGE_DAYS[rangeValue as keyof typeof RANGE_DAYS] > maxRetentionDays;
+  };
 
   const focusTabByIndex = (targetIndex: number) => {
     if (!RANGE_OPTIONS.length) {
@@ -22,7 +28,7 @@ export function RangeToggle({
       (targetIndex + RANGE_OPTIONS.length) % RANGE_OPTIONS.length;
     const targetOption = RANGE_OPTIONS[normalizedIndex];
 
-    if (!targetOption) {
+    if (!targetOption || isDisabled(targetOption.value)) {
       return;
     }
 
@@ -66,6 +72,7 @@ export function RangeToggle({
     >
       {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
+        const disabled = isDisabled(opt.value);
         const tabId = `${tabsBaseId}-tab-${opt.value}`;
         return (
           <button
@@ -74,17 +81,24 @@ export function RangeToggle({
             role='tab'
             aria-selected={active}
             aria-controls={panelId}
+            aria-disabled={disabled || undefined}
             type='button'
             tabIndex={active ? 0 : -1}
+            disabled={disabled}
             ref={node => {
               tabRefs.current[index] = node;
             }}
-            onClick={() => onChange(opt.value)}
+            onClick={() => !disabled && onChange(opt.value)}
             onKeyDown={event => handleKeyDown(event, index)}
+            title={
+              disabled ? 'Upgrade to Pro for extended analytics' : undefined
+            }
             className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${
-              active
-                ? 'bg-surface-3 text-primary-token'
-                : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
+              disabled
+                ? 'text-tertiary-token/40 cursor-not-allowed'
+                : active
+                  ? 'bg-surface-3 text-primary-token'
+                  : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
             }`}
           >
             {opt.label}
