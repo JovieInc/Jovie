@@ -5,7 +5,7 @@ export interface TableActionMenuItem {
   readonly id: string;
   readonly label: string;
   readonly icon?: LucideIcon | ReactNode;
-  readonly onClick: () => void;
+  readonly onClick?: () => void;
   readonly variant?: 'default' | 'destructive';
   readonly disabled?: boolean;
   readonly subText?: string;

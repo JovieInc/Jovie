@@ -78,9 +78,14 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
   };
 
   const save = async () => {
-    await saveConsent(settings);
-    onSave?.(settings);
-    onClose();
+    try {
+      await saveConsent(settings);
+      onSave?.(settings);
+      onClose();
+    } catch {
+      // saveConsent writes a cookie — failure is extremely unlikely
+      // but if it happens, don't close the modal so the user can retry
+    }
   };
 
   return (

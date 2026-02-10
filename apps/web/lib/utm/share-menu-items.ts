@@ -122,13 +122,11 @@ export function getUTMShareActionMenuItems(params: {
     {
       id: 'separator',
       label: '',
-      onClick: () => {},
     },
     {
       id: 'utm-share-submenu',
       label: 'Copy with UTM',
       icon: Share2,
-      onClick: () => {},
       children,
     },
   ];
