@@ -10,6 +10,7 @@ import {
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import {
   formatLocationString,
@@ -213,7 +214,7 @@ export async function GET(request: NextRequest) {
           type: 'click' as const,
           description: `${actorLabel}${locationLabel} ${phrase}.`,
           icon,
-          timestamp: row.createdAt.toISOString(),
+          timestamp: toISOStringSafe(row.createdAt),
           href: APP_ROUTES.AUDIENCE,
         };
       });
@@ -224,7 +225,8 @@ export async function GET(request: NextRequest) {
           const actor = getActorKind(row.memberType ?? null);
           const actorLabel = getActorLabel(actor);
           const locationLabel = formatActivityLocation([row.city, row.country]);
-          const timestamp = (row.lastSeenAt as Date).toISOString();
+          // lastSeenAt is guaranteed non-null by the filter above
+          const timestamp = toISOStringSafe(row.lastSeenAt! as Date | string);
           return {
             id: `visit:${row.id}:${timestamp}`,
             type: 'visit' as const,
@@ -247,7 +249,7 @@ export async function GET(request: NextRequest) {
           type: 'subscribe' as const,
           description: `Someone${locationLabel} just subscribed.`,
           icon: row.channel === 'sms' ? '📱' : '📩',
-          timestamp: row.createdAt.toISOString(),
+          timestamp: toISOStringSafe(row.createdAt),
           href: APP_ROUTES.CONTACTS,
         };
       });

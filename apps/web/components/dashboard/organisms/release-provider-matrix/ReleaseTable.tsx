@@ -1,29 +1,29 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   type ContextMenuItemType,
-  type HeaderBulkAction,
   UnifiedTable,
-  useRowSelection,
-  useStableSelectionRefs,
 } from '@/components/organisms/table';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import type { ReleaseTab } from './ReleaseTableSubheader';
 import {
+  createAvailabilityCellRenderer,
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
-  createReleaseHeaderRenderer,
   createRightMetaCellRenderer,
-  createSelectCellRenderer,
-  createSelectHeaderRenderer,
 } from './utils/column-renderers';
 
 interface ProviderConfig {
@@ -47,14 +47,6 @@ interface ReleaseTableProps {
     url: string
   ) => Promise<void>;
   readonly isAddingUrl?: boolean;
-  /** Selected release IDs (controlled from parent) */
-  readonly selectedIds?: Set<string>;
-  /** Callback when selection changes */
-  readonly onSelectionChange?: (selectedIds: Set<string>) => void;
-  /** Bulk actions shown in header when items selected */
-  readonly bulkActions?: HeaderBulkAction[];
-  /** Callback to clear selection */
-  readonly onClearSelection?: () => void;
   /** Column visibility state from preferences */
   readonly columnVisibility?: Record<string, boolean>;
   /** Row height from density preference */
@@ -65,6 +57,8 @@ interface ReleaseTableProps {
   readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
   readonly groupByYear?: boolean;
+  /** Active data tab controlling which columns are displayed */
+  readonly activeTab?: ReleaseTab;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -91,15 +85,12 @@ export function ReleaseTable({
   onEdit,
   onAddUrl,
   isAddingUrl,
-  selectedIds: externalSelectedIds,
-  onSelectionChange,
-  bulkActions = [],
-  onClearSelection,
   columnVisibility,
   rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  activeTab = 'catalog',
 }: ReleaseTableProps) {
   // Track expansion state (only used when showTracks is enabled)
   const {
@@ -112,60 +103,6 @@ export function ReleaseTable({
   // Sorting with URL persistence and debouncing
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
-
-  // Row selection - use external selection if provided, otherwise internal
-  const rowIds = useMemo(() => releases.map(r => r.id), [releases]);
-  const rowIdSet = useMemo(() => new Set(rowIds), [rowIds]);
-  const internalSelection = useRowSelection(rowIds);
-
-  const selectedIds = externalSelectedIds ?? internalSelection.selectedIds;
-
-  // Compute header checkbox state
-  const headerCheckboxState = useMemo(() => {
-    if (externalSelectedIds === undefined) {
-      return internalSelection.headerCheckboxState;
-    }
-
-    let visibleCount = 0;
-    for (const id of selectedIds) {
-      if (rowIdSet.has(id)) visibleCount++;
-    }
-
-    if (visibleCount === 0) return false;
-    if (visibleCount === rowIds.length) return true;
-    return 'indeterminate';
-  }, [
-    externalSelectedIds,
-    internalSelection.headerCheckboxState,
-    selectedIds,
-    rowIdSet,
-    rowIds.length,
-  ]);
-
-  // Use stable selection refs to prevent column recreation loops
-  const {
-    selectedIdsRef,
-    headerCheckboxStateRef,
-    toggleSelect,
-    toggleSelectAll,
-  } = useStableSelectionRefs({
-    selectedIds,
-    rowIds,
-    headerCheckboxState,
-    onSelectionChange,
-    internalToggleSelect: internalSelection.toggleSelect,
-    internalToggleSelectAll: internalSelection.toggleSelectAll,
-  });
-
-  // Refs for bulk actions header
-  const selectedCountRef = useRef(selectedIds.size);
-  const bulkActionsRef = useRef(bulkActions);
-
-  // Update refs in effect rather than during render
-  useEffect(() => {
-    selectedCountRef.current = selectedIds.size;
-    bulkActionsRef.current = bulkActions;
-  }, [selectedIds.size, bulkActions]);
 
   // Context menu items for right-click
   const getContextMenuItems = useCallback(
@@ -280,18 +217,14 @@ export function ReleaseTable({
   const getRowId = useCallback((row: ReleaseViewModel) => row.id, []);
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
-      const isSelected = selectedIdsRef.current?.has(row.id);
       const isRowExpanded = showTracks && isExpanded(row.id);
 
-      if (isSelected) {
-        return 'bg-primary/5 dark:bg-primary/10 border-l-2 border-l-primary hover:bg-primary/8 dark:hover:bg-primary/15';
-      }
       if (isRowExpanded) {
         return 'bg-surface-2/30 hover:bg-surface-2/50';
       }
       return 'hover:bg-surface-2/50';
     },
-    [selectedIdsRef, showTracks, isExpanded]
+    [showTracks, isExpanded]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -307,27 +240,17 @@ export function ReleaseTable({
     [releases, onFocusedRowChange]
   );
 
-  // Build column definitions (dynamic columns only)
-  /* eslint-disable react-hooks/refs -- refs are passed to render functions but only accessed via callbacks, not during render */
-  const columns = useMemo(() => {
-    const checkboxColumn = columnHelper.display({
-      id: 'select',
-      header: createSelectHeaderRenderer(
-        headerCheckboxStateRef,
-        toggleSelectAll
-      ),
-      cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
-      size: 56,
-      meta: { className: 'hidden sm:table-cell' },
-    });
+  // Get all providers for availability column and track row rendering
+  const allProviders = useMemo(
+    () => Object.keys(providerConfig) as ProviderKey[],
+    [providerConfig]
+  );
 
+  // Build column definitions based on active tab
+  const columns = useMemo(() => {
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
-      header: createReleaseHeaderRenderer(
-        selectedCountRef,
-        bulkActionsRef,
-        onClearSelection
-      ),
+      header: () => <span>Release</span>,
       cell: showTracks
         ? createExpandableReleaseCellRenderer(
             artistName,
@@ -341,6 +264,91 @@ export function ReleaseTable({
       enableSorting: true,
     });
 
+    // Tab-specific columns
+    if (activeTab === 'links') {
+      const availabilityColumn = columnHelper.display({
+        id: 'availability',
+        header: () => <span>Availability</span>,
+        cell: createAvailabilityCellRenderer(
+          allProviders,
+          providerConfig,
+          onCopy,
+          onAddUrl,
+          isAddingUrl
+        ),
+        size: 200,
+        minSize: 140,
+        meta: { className: 'hidden sm:table-cell' },
+      });
+
+      return [releaseColumn, availabilityColumn];
+    }
+
+    if (activeTab === 'details') {
+      const detailsColumn = columnHelper.display({
+        id: 'details',
+        header: () => <span className='sr-only'>Details</span>,
+        cell: ({ row }) => {
+          const release = row.original;
+          const duration = release.totalDurationMs
+            ? formatDuration(release.totalDurationMs)
+            : null;
+          return (
+            <div className='flex items-center gap-4 text-xs text-secondary-token'>
+              {release.upc && (
+                <CopyableMonospaceCell value={release.upc} label='UPC' />
+              )}
+              {release.primaryIsrc && (
+                <CopyableMonospaceCell
+                  value={release.primaryIsrc}
+                  label='ISRC'
+                />
+              )}
+              {release.label && (
+                <TruncatedText
+                  lines={1}
+                  className='max-w-28 text-tertiary-token'
+                  tooltipSide='top'
+                >
+                  {release.label}
+                </TruncatedText>
+              )}
+              <span className='tabular-nums' title='Tracks'>
+                {release.totalTracks} trk{release.totalTracks !== 1 ? 's' : ''}
+              </span>
+              {duration && (
+                <span className='tabular-nums' title='Duration'>
+                  {duration}
+                </span>
+              )}
+              {release.genres && release.genres.length > 0 && (
+                <TruncatedText
+                  lines={1}
+                  className='max-w-32 text-tertiary-token'
+                  tooltipSide='top'
+                >
+                  {release.genres.join(', ')}
+                </TruncatedText>
+              )}
+              {!release.upc &&
+                !release.primaryIsrc &&
+                !release.label &&
+                !duration &&
+                (!release.genres || release.genres.length === 0) && (
+                  <EmptyCell tooltip='No metadata available' />
+                )}
+            </div>
+          );
+        },
+        size: 500,
+        minSize: 200,
+        meta: { className: 'hidden sm:table-cell' },
+      });
+
+      return [releaseColumn, detailsColumn];
+    }
+
+    // Default: catalog tab
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
@@ -351,31 +359,26 @@ export function ReleaseTable({
       meta: { className: 'hidden sm:table-cell' },
     });
 
-    // Return all columns - TanStack Table handles visibility natively
-    // Right meta packs smart link + popularity + year; header is sr-only for a11y.
-    // Note: releaseType, availability, and ISRC columns moved to ReleaseSidebar drawer only
-    // UPC column removed per design request.
-    return [checkboxColumn, releaseColumn, rightMetaColumn];
+    return [releaseColumn, rightMetaColumn];
   }, [
     artistName,
-    onClearSelection,
-    headerCheckboxStateRef,
-    selectedIdsRef,
-    toggleSelect,
-    toggleSelectAll,
     showTracks,
     isExpanded,
     isLoadingTracks,
     toggleExpansion,
+    activeTab,
+    allProviders,
+    providerConfig,
+    onCopy,
+    onAddUrl,
+    isAddingUrl,
   ]);
-  /* eslint-enable react-hooks/refs */
 
-  // Transform columnVisibility to TanStack format (always show select and release)
+  // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
     if (!columnVisibility) return undefined;
     return {
       ...columnVisibility,
-      select: true,
       release: true,
     };
   }, [columnVisibility]);
@@ -392,12 +395,6 @@ export function ReleaseTable({
   // When showTracks is enabled and rows are expanded, disable virtualization
   // This allows dynamic row counts with track rows
   const shouldVirtualize = !showTracks || !hasExpandedRows;
-
-  // Get all providers for track row rendering
-  const allProviders = useMemo(
-    () => Object.keys(providerConfig) as ProviderKey[],
-    [providerConfig]
-  );
 
   // Year grouping configuration
   const groupingConfig = useMemo(() => {

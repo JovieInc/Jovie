@@ -10,7 +10,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -23,6 +23,7 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseTrackList } from './ReleaseTrackList';
+import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
@@ -69,6 +70,19 @@ export function ReleaseSidebar({
     onAddDspLink,
     onRemoveDspLink,
   });
+
+  // Track detail panel state — track shape comes from the sidebar route handler
+  const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
+    null
+  );
+
+  const handleTrackClick = useCallback((track: TrackForDetail) => {
+    setSelectedTrack(track);
+  }, []);
+
+  const handleBackToRelease = useCallback(() => {
+    setSelectedTrack(null);
+  }, []);
 
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
@@ -150,7 +164,13 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
-          {release ? (
+          {selectedTrack && release ? (
+            <TrackDetailPanel
+              track={selectedTrack}
+              releaseTitle={release.title}
+              onBack={handleBackToRelease}
+            />
+          ) : release ? (
             <>
               <div className='pb-5'>
                 <ReleaseArtwork
@@ -179,7 +199,10 @@ export function ReleaseSidebar({
               </div>
 
               <div className='py-5'>
-                <ReleaseTrackList release={release} />
+                <ReleaseTrackList
+                  release={release}
+                  onTrackClick={handleTrackClick}
+                />
               </div>
 
               <div className='pt-5'>
