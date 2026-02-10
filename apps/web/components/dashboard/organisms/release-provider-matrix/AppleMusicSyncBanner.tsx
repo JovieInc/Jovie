@@ -233,15 +233,16 @@ export function AppleMusicSyncBanner({
       <div className='flex items-start gap-3'>
         {/* Artist image or provider icon */}
         {match.externalArtistImageUrl ? (
-          <Image
-            src={match.externalArtistImageUrl}
-            alt={match.externalArtistName}
-            width={36}
-            height={36}
-            sizes='36px'
-            className='rounded-full object-cover shrink-0'
-            unoptimized={isExternalDspImage(match.externalArtistImageUrl)}
-          />
+          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#FA243C]/10'>
+            <Image
+              src={match.externalArtistImageUrl}
+              alt={match.externalArtistName}
+              fill
+              sizes='36px'
+              className='object-cover'
+              unoptimized={isExternalDspImage(match.externalArtistImageUrl)}
+            />
+          </div>
         ) : (
           <div className='flex h-9 w-9 items-center justify-center rounded-full bg-[#FA243C]/10 shrink-0'>
             <DspProviderIcon provider='apple_music' size='md' />
@@ -250,9 +251,9 @@ export function AppleMusicSyncBanner({
 
         {/* Match info */}
         <div className='flex-1 min-w-0'>
-          <div className='flex items-center gap-2 flex-wrap'>
-            <DspProviderIcon provider='apple_music' size='sm' />
-            <span className='text-sm font-medium text-primary-token truncate'>
+          <div className='flex items-center gap-2'>
+            <DspProviderIcon provider='apple_music' size='sm' className='shrink-0' />
+            <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
               {match.externalArtistName}
             </span>
             {match.externalArtistUrl && (

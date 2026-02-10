@@ -98,15 +98,16 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <Image
-              src={externalArtistImageUrl}
-              alt={externalArtistName}
-              width={40}
-              height={40}
-              sizes='40px'
-              className='rounded-full object-cover'
-              unoptimized={isExternalDspImage(externalArtistImageUrl)}
-            />
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-2'>
+              <Image
+                src={externalArtistImageUrl}
+                alt={externalArtistName}
+                fill
+                sizes='40px'
+                className='object-cover'
+                unoptimized={isExternalDspImage(externalArtistImageUrl)}
+              />
+            </div>
           ) : (
             <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>
               <DspProviderIcon provider={providerId} size='lg' />
