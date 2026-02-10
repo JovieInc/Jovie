@@ -147,9 +147,10 @@ function slugify(title: string): string {
     .replace(/[^a-z0-9-]/g, '');
 }
 
-/** Generate a fake ISRC */
-function generateIsrc(index: number): string {
-  return `USAT2${String(index).padStart(7, '0')}`;
+/** Generate a fake ISRC (globally unique via module-level counter) */
+let isrcCounter = 100;
+function generateIsrc(): string {
+  return `USAT2${String(isrcCounter++).padStart(7, '0')}`;
 }
 
 /** Generate tracks for a release */
@@ -172,7 +173,7 @@ function generateTracks(
       trackNumber,
       discNumber,
       durationMs: 120000 + Math.floor(Math.random() * 240000), // 2-6 min
-      isrc: generateIsrc(i + 100),
+      isrc: generateIsrc(),
       isExplicit: Math.random() < explicitRate,
     });
   }
@@ -359,7 +360,8 @@ async function seedReleasesForProfile(
 }
 
 /**
- * Seeds tracks for a release. Idempotent — skips if tracks already exist.
+ * Seeds tracks for a release. Idempotent — uses onConflictDoNothing to
+ * safely backfill missing tracks from partial prior seeds.
  */
 async function seedTracksForRelease(
   db: ReturnType<typeof drizzle>,
@@ -367,19 +369,6 @@ async function seedTracksForRelease(
   profileId: string,
   tracks: TestTrack[]
 ) {
-  // Check if tracks already exist for this release
-  const existingTracks = await db
-    .select({ id: discogTracks.id })
-    .from(discogTracks)
-    .where(eq(discogTracks.releaseId, releaseId))
-    .limit(1);
-
-  if (existingTracks.length > 0) {
-    console.log(`      ✓ Tracks already exist (${tracks.length} expected)`);
-    return;
-  }
-
-  // Insert all tracks in a single batch for efficiency
   const trackValues = tracks.map(track => ({
     releaseId,
     creatorProfileId: profileId,
@@ -394,7 +383,7 @@ async function seedTracksForRelease(
   }));
 
   await db.insert(discogTracks).values(trackValues).onConflictDoNothing();
-  console.log(`      ✓ Seeded ${tracks.length} tracks`);
+  console.log(`      ✓ Ensured ${tracks.length} tracks`);
 }
 
 export async function seedTestData() {

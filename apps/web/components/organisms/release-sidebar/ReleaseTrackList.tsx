@@ -24,6 +24,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
+import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -169,15 +170,19 @@ function TrackItem({
 
   const handleCopyIsrc = useCallback(() => {
     if (track.isrc) {
-      navigator.clipboard.writeText(track.isrc);
-      toast.success('ISRC copied');
+      navigator.clipboard.writeText(track.isrc).then(
+        () => toast.success('ISRC copied'),
+        () => toast.error('Failed to copy ISRC')
+      );
     }
   }, [track.isrc]);
 
   const handleCopySmartLink = useCallback(() => {
     const smartLinkUrl = `${getBaseUrl()}${track.smartLinkPath}`;
-    navigator.clipboard.writeText(smartLinkUrl);
-    toast.success('Smart link copied');
+    navigator.clipboard.writeText(smartLinkUrl).then(
+      () => toast.success('Smart link copied'),
+      () => toast.error('Failed to copy link')
+    );
   }, [track.smartLinkPath]);
 
   const streamingProviders = track.providers.filter(p => p.url);
@@ -242,18 +247,7 @@ function TrackItem({
   );
 }
 
-/** Provider label mapping for streaming platform names */
-const PROVIDER_LABELS: Record<string, string> = {
-  spotify: 'Spotify',
-  apple_music: 'Apple Music',
-  youtube: 'YouTube Music',
-  soundcloud: 'SoundCloud',
-  deezer: 'Deezer',
-  tidal: 'Tidal',
-  amazon_music: 'Amazon Music',
-  bandcamp: 'Bandcamp',
-  beatport: 'Beatport',
-};
+// Shared provider labels — single source of truth
 
 function TrackActionsMenu({
   track,

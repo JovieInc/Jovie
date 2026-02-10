@@ -576,7 +576,7 @@ function mapTrackToViewModel(
     releaseId: track.releaseId,
     title: track.title,
     slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, releaseSlug),
+    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -602,7 +602,7 @@ function mapTrackToViewModel(
           source,
           updatedAt,
           path: url
-            ? buildSmartLinkPath(profileHandle, releaseSlug, providerKey)
+            ? buildSmartLinkPath(profileHandle, track.slug, providerKey)
             : '',
           isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
         };

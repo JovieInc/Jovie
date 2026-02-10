@@ -6,21 +6,9 @@ import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerSection } from '@/components/molecules/drawer';
+import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-
-/** Provider label mapping for streaming platform names */
-const PROVIDER_LABELS: Record<string, string> = {
-  spotify: 'Spotify',
-  apple_music: 'Apple Music',
-  youtube: 'YouTube Music',
-  soundcloud: 'SoundCloud',
-  deezer: 'Deezer',
-  tidal: 'Tidal',
-  amazon_music: 'Amazon Music',
-  bandcamp: 'Bandcamp',
-  beatport: 'Beatport',
-};
 
 /** Track shape accepted by the detail panel (subset of TrackViewModel). */
 export interface TrackForDetail {
@@ -50,14 +38,18 @@ export function TrackDetailPanel({
 
   const handleCopyIsrc = useCallback(() => {
     if (track.isrc) {
-      navigator.clipboard.writeText(track.isrc);
-      toast.success('ISRC copied');
+      navigator.clipboard.writeText(track.isrc).then(
+        () => toast.success('ISRC copied'),
+        () => toast.error('Failed to copy ISRC')
+      );
     }
   }, [track.isrc]);
 
   const handleCopySmartLink = useCallback(() => {
-    navigator.clipboard.writeText(smartLinkUrl);
-    toast.success('Smart link copied');
+    navigator.clipboard.writeText(smartLinkUrl).then(
+      () => toast.success('Smart link copied'),
+      () => toast.error('Failed to copy link')
+    );
   }, [smartLinkUrl]);
 
   const trackLabel =

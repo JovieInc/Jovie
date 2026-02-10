@@ -48,7 +48,6 @@ export async function GET(
     const { tracks } = await getTracksForReleaseWithProviders(releaseId);
 
     const handle = profile.usernameNormalized ?? profile.username ?? '';
-    const smartLinkPath = buildSmartLinkPath(handle, release.slug);
 
     // Map to shape needed by the sidebar tracklist + actions menu
     const mapped = tracks.map(track => ({
@@ -56,7 +55,7 @@ export async function GET(
       releaseId: track.releaseId,
       title: track.title,
       slug: track.slug,
-      smartLinkPath,
+      smartLinkPath: buildSmartLinkPath(handle, track.slug),
       trackNumber: track.trackNumber,
       discNumber: track.discNumber,
       durationMs: track.durationMs,
