@@ -861,7 +861,9 @@ export async function uploadReleaseArtwork(
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+    const error = await response
+      .json()
+      .catch(() => ({ message: 'Upload failed' }));
     throw new Error(error.message ?? 'Failed to upload artwork');
   }
 

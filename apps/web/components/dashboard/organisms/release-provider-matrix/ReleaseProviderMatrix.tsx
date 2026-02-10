@@ -219,9 +219,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Handle release changes from the sidebar (e.g., after artwork upload)
   const handleReleaseChange = useCallback(
     (updated: ReleaseViewModel) => {
-      setRows(prev =>
-        prev.map(row => (row.id === updated.id ? updated : row))
-      );
+      setRows(prev => prev.map(row => (row.id === updated.id ? updated : row)));
     },
     [setRows]
   );

@@ -45,18 +45,16 @@ export async function processArtworkToSizes(
   const originalResize =
     maxDim > ARTWORK_MAX_DIMENSION ? ARTWORK_MAX_DIMENSION : undefined;
 
-  const { data: originalData } = await baseImage
-    .clone()
-    .resize(
-      originalResize
-        ? {
-            width: originalResize,
-            height: originalResize,
-            fit: 'inside',
-            withoutEnlargement: true,
-          }
-        : undefined
-    )
+  let originalPipeline = baseImage.clone();
+  if (originalResize) {
+    originalPipeline = originalPipeline.resize({
+      width: originalResize,
+      height: originalResize,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+  const { data: originalData } = await originalPipeline
     .toColourspace('srgb')
     .avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT })
     .toBuffer({ resolveWithObject: true });

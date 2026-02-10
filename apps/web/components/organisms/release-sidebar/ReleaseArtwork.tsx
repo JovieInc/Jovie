@@ -56,10 +56,7 @@ export function ReleaseArtwork({
         />
       ) : (
         <div className='flex h-full w-full items-center justify-center'>
-          <Disc3
-            className='h-8 w-8 text-tertiary-token'
-            aria-hidden='true'
-          />
+          <Disc3 className='h-8 w-8 text-tertiary-token' aria-hidden='true' />
         </div>
       )}
     </div>

@@ -125,6 +125,8 @@ interface ContentData {
   artworkUrl: string | null;
   releaseDate: Date | null;
   providerLinks: Array<{ providerId: string; url: string }>;
+  /** Artwork size URLs from release metadata (for download context menu) */
+  artworkSizes?: Record<string, string> | null;
   creator: {
     id: string;
     displayName: string | null;

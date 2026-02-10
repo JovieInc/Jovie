@@ -49,7 +49,11 @@ export function buildArtworkSizes(
 
   if (sizesMap) {
     if (sizesMap.original) {
-      sizes.push({ key: 'original', label: 'Original', url: sizesMap.original });
+      sizes.push({
+        key: 'original',
+        label: 'Original',
+        url: sizesMap.original,
+      });
     }
     if (sizesMap['1000']) {
       sizes.push({ key: '1000', label: '1000 × 1000', url: sizesMap['1000'] });
@@ -99,7 +103,13 @@ export function AlbumArtworkContextMenu({
 
         const filename = sanitizeFilename(title);
         const sizeLabel = size.key === 'original' ? '' : `-${size.key}`;
-        link.download = `${filename}${sizeLabel}.avif`;
+        const contentType = response.headers.get('content-type') ?? '';
+        let ext = 'avif';
+        if (contentType.includes('jpeg') || contentType.includes('jpg'))
+          ext = 'jpg';
+        else if (contentType.includes('png')) ext = 'png';
+        else if (contentType.includes('webp')) ext = 'webp';
+        link.download = `${filename}${sizeLabel}.${ext}`;
 
         document.body.appendChild(link);
         link.click();
