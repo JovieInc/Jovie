@@ -62,7 +62,6 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       width={SIDEBAR_WIDTH}
       ariaLabel='Profile Contact'
-      className='bg-surface-1'
     >
       <div className='flex h-full flex-col'>
         {/* Header */}

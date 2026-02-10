@@ -28,7 +28,11 @@ export const runtime = 'nodejs';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
-import { createWrappedLink } from '@/lib/services/link-wrapping';
+import {
+  createWrappedLink,
+  deleteWrappedLink,
+  updateWrappedLink,
+} from '@/lib/services/link-wrapping';
 import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
 import { isValidUrl } from '@/lib/utils/url-encryption';
 
@@ -136,14 +140,130 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle other HTTP methods - shared handler for unsupported methods
-function methodNotAllowed() {
+/**
+ * PUT /api/wrap-link
+ *
+ * Update a wrapped link's metadata (titleAlias, expiresAt).
+ * Requires authentication. Only the creator can update their link.
+ */
+export async function PUT(request: NextRequest) {
+  try {
+    const { userId: authUserId } = await auth();
+    if (!authUserId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    let body: {
+      shortId?: string;
+      titleAlias?: string;
+      expiresAt?: string | null;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!body.shortId) {
+      return NextResponse.json(
+        { error: 'shortId is required' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const updated = await updateWrappedLink(
+      body.shortId,
+      {
+        titleAlias: body.titleAlias,
+        expiresAt: body.expiresAt ?? undefined,
+      },
+      authUserId
+    );
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Failed to update link' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
+  } catch (error) {
+    await captureError('Link wrapping PUT error', error, {
+      route: '/api/wrap-link',
+      method: 'PUT',
+    });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * DELETE /api/wrap-link
+ *
+ * Delete a wrapped link by shortId.
+ * Requires authentication. Only the creator can delete their link.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { userId: authUserId } = await auth();
+    if (!authUserId) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    let body: { shortId?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!body.shortId) {
+      return NextResponse.json(
+        { error: 'shortId is required' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const deleted = await deleteWrappedLink(body.shortId, authUserId);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'Link not found or not owned by you' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
+  } catch (error) {
+    await captureError('Link wrapping DELETE error', error, {
+      route: '/api/wrap-link',
+      method: 'DELETE',
+    });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+export function GET() {
   return NextResponse.json(
     { error: 'Method not allowed' },
     { status: 405, headers: NO_STORE_HEADERS }
   );
 }
-
-export const GET = methodNotAllowed;
-export const PUT = methodNotAllowed;
-export const DELETE = methodNotAllowed;

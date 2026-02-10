@@ -59,11 +59,13 @@ async function AudienceContent({
         sort: parsedParams.sort,
         direction: parsedParams.direction,
       },
+      view: parsedParams.view,
     });
 
     return (
       <DashboardAudienceClient
         mode={audienceData.mode}
+        view={audienceData.view}
         initialRows={audienceData.rows}
         total={audienceData.total}
         page={audienceData.page}
@@ -71,6 +73,8 @@ async function AudienceContent({
         sort={audienceData.sort}
         direction={audienceData.direction}
         profileUrl={profileUrl}
+        profileId={artist?.id ?? undefined}
+        subscriberCount={audienceData.subscriberCount}
       />
     );
   } catch (error) {

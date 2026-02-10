@@ -9,6 +9,8 @@ export interface ReleaseProviderMatrixProps {
   readonly primaryProviders: ProviderKey[];
   readonly spotifyConnected?: boolean;
   readonly spotifyArtistName?: string | null;
+  readonly appleMusicConnected?: boolean;
+  readonly appleMusicArtistName?: string | null;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;
@@ -48,6 +50,7 @@ export interface UseReleaseProviderMatrixReturn {
   handleSave: (provider: ProviderKey) => void;
   handleReset: (provider: ProviderKey) => void;
   handleSync: () => void;
+  handleRefreshRelease: (releaseId: string) => void;
   handleAddUrl: (
     releaseId: string,
     provider: ProviderKey,

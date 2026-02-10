@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
+import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
@@ -15,6 +16,7 @@ import { SettingsNotificationsSection } from '@/components/dashboard/organisms/S
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
+import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
@@ -108,6 +110,12 @@ export function SettingsPolished({
         'Manage your subscription, payment methods, and billing history.',
       render: () => <SettingsBillingSection />,
     },
+    {
+      id: 'data-privacy',
+      title: 'Data & Privacy',
+      description: 'Export your data or delete your account.',
+      render: () => <DataPrivacySection />,
+    },
   ];
 
   // -- Artist-level settings --
@@ -115,8 +123,7 @@ export function SettingsPolished({
     {
       id: 'artist-profile',
       title: 'Artist Profile',
-      description:
-        'Manage your profile details and connected streaming platforms.',
+      description: 'Manage your photo, display name, and username.',
       render: () => (
         <SettingsArtistProfileSection
           artist={artist}
@@ -138,11 +145,31 @@ export function SettingsPolished({
     {
       id: 'music-links',
       title: 'Music Links',
-      description: 'Add streaming platform links for your music.',
+      description:
+        'Connect streaming platforms and manage your music profile links.',
       render: () => (
-        <DashboardCard variant='settings'>
-          <ListenNowForm artist={artist} onUpdate={a => onArtistUpdate?.(a)} />
-        </DashboardCard>
+        <div className='space-y-6'>
+          <div>
+            <h3 className='text-[13px] font-medium text-primary-token mb-3'>
+              Connected Platforms
+            </h3>
+            <ConnectedDspList
+              profileId={artist.id}
+              spotifyId={artist.spotify_id}
+            />
+          </div>
+          <div>
+            <h3 className='text-[13px] font-medium text-primary-token mb-3'>
+              Streaming Links
+            </h3>
+            <DashboardCard variant='settings'>
+              <ListenNowForm
+                artist={artist}
+                onUpdate={a => onArtistUpdate?.(a)}
+              />
+            </DashboardCard>
+          </div>
+        </div>
       ),
     },
     {

@@ -13,7 +13,7 @@
 @import "tailwindcss";
 @import "../styles/design-system.css";
 @import "../styles/theme.css";
-/* @import "tw-animate-css"; */
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -572,13 +572,23 @@ body {
     }
   }
 
-  /* Mobile Nav Overlay */
+  /* Mobile Nav Overlay - always mounted, visibility controlled via class */
   .mobile-nav-overlay {
     position: fixed;
-    inset: 0;
+    top: var(--linear-header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 99;
     background: oklch(0 0 0 / 0.5);
-    animation: mobile-nav-fade-in 200ms ease forwards;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+
+  .mobile-nav-overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   /* Mobile Nav Panel */
@@ -612,6 +622,16 @@ body {
     gap: var(--linear-space-1);
   }
 
+  /* Mobile Nav Auth Section */
+  .mobile-nav-auth {
+    display: flex;
+    flex-direction: column;
+    gap: var(--linear-space-1);
+    margin-top: var(--linear-space-3);
+    padding-top: var(--linear-space-3);
+    border-top: 1px solid var(--linear-border-subtle);
+  }
+
   /* Mobile Nav Link */
   .mobile-nav-link {
     display: flex;
@@ -638,7 +658,6 @@ body {
     align-items: center;
     justify-content: center;
     height: 44px;
-    margin-top: var(--linear-space-2);
     font-size: var(--linear-caption-size);
     font-weight: var(--linear-font-weight-medium);
     color: var(--linear-btn-primary-fg);
@@ -655,12 +674,14 @@ body {
     }
   }
 
-  @keyframes mobile-nav-fade-in {
-    from {
-      opacity: 0;
+  /* Reduced motion: disable animations for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-nav-overlay {
+      transition: none;
     }
-    to {
-      opacity: 1;
+
+    .mobile-nav-panel {
+      transition: none;
     }
   }
 
@@ -1022,6 +1043,97 @@ body {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+/* ============================================
+   SONNER TOAST OVERRIDES
+   ============================================
+   Override Sonner's internal CSS variables so toasts
+   use design-system tokens instead of harsh defaults.
+*/
+
+[data-sonner-toaster] {
+  --normal-bg: var(--color-bg-surface-2);
+  --normal-text: var(--color-text-primary-token);
+  --normal-border: var(--color-border-default);
+
+  --success-bg: var(--color-bg-surface-2);
+  --success-text: var(--color-text-primary-token);
+  --success-border: var(--color-success);
+
+  --error-bg: var(--color-bg-surface-2);
+  --error-text: var(--color-text-primary-token);
+  --error-border: var(--color-error);
+
+  --warning-bg: var(--color-bg-surface-2);
+  --warning-text: var(--color-text-primary-token);
+  --warning-border: var(--color-warning);
+
+  --info-bg: var(--color-bg-surface-2);
+  --info-text: var(--color-text-primary-token);
+  --info-border: var(--color-info);
+}
+
+[data-sonner-toast] {
+  --border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  letter-spacing: -0.011em;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--color-text-tertiary-token);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toast] [data-close-button] {
+  background: var(--color-bg-surface-1);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-tertiary-token);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  background: var(--color-bg-surface-0);
+  color: var(--color-text-primary-token);
+}
+
+[data-sonner-toast] [data-button] {
+  font-weight: 500;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  transition: opacity 150ms ease;
+}
+
+/* Type-specific left-border accent */
+[data-sonner-toast][data-type="success"] {
+  border-left: 3px solid var(--color-success);
+}
+
+[data-sonner-toast][data-type="error"] {
+  border-left: 3px solid var(--color-error);
+}
+
+[data-sonner-toast][data-type="warning"] {
+  border-left: 3px solid var(--color-warning);
+}
+
+[data-sonner-toast][data-type="info"] {
+  border-left: 3px solid var(--color-info);
 }
 
 @media print {

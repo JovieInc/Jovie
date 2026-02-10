@@ -9,6 +9,7 @@ import {
   ChatInput,
   ChatMessage,
   ErrorDisplay,
+  SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
 import { useJovieChat } from './hooks';
@@ -16,7 +17,7 @@ import type { JovieChatProps } from './types';
 
 export function JovieChat({
   profileId,
-  artistContext,
+  artistContext, // NOSONAR - intentional backward compatibility for deprecated prop
   conversationId,
   onConversationCreate,
   initialQuery,
@@ -160,6 +161,9 @@ export function JovieChat({
                 isSubmitting={isSubmitting}
               />
             )}
+
+            {/* Suggested profiles carousel (DSP matches, social links, avatars) */}
+            {profileId && <SuggestedProfilesCarousel profileId={profileId} />}
 
             {/* Suggested prompts above input */}
             <SuggestedPrompts onSelect={handleSuggestedPrompt} />

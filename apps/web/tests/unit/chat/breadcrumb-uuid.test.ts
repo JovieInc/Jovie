@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 
 describe('getBreadcrumbLabel', () => {
-  it('returns "Chat" for the chat segment', () => {
-    expect(getBreadcrumbLabel('chat')).toBe('Chat');
+  it('returns "New thread" for the chat segment', () => {
+    expect(getBreadcrumbLabel('chat')).toBe('New thread');
   });
 
   it('returns "Dashboard" for the dashboard segment', () => {

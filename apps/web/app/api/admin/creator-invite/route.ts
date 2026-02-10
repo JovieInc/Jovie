@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueueClaimInviteJob } from '@/lib/email/jobs/enqueue';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
@@ -168,6 +169,10 @@ export async function POST(request: Request) {
     logger.error('Failed to create claim invite', {
       error: errorMessage,
       raw: error,
+    });
+    await captureError('Admin creator invite failed', error, {
+      route: '/api/admin/creator-invite',
+      method: 'POST',
     });
 
     return NextResponse.json(

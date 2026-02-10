@@ -72,6 +72,11 @@ export {
 } from './mutation-utils';
 // Error boundary with automatic query reset
 export { QueryErrorBoundary } from './QueryErrorBoundary';
+// Account mutations (GDPR)
+export {
+  useDeleteAccountMutation,
+  useExportDataMutation,
+} from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
 // Admin social links query
@@ -80,6 +85,13 @@ export {
   type UseAdminSocialLinksQueryOptions,
   useAdminSocialLinksQuery,
 } from './useAdminSocialLinksQuery';
+export {
+  type AppleMusicArtistResult,
+  type AppleMusicSearchState,
+  type UseAppleMusicArtistSearchQueryOptions,
+  type UseAppleMusicArtistSearchQueryReturn,
+  useAppleMusicArtistSearchQuery,
+} from './useAppleMusicArtistSearchQuery';
 export {
   type ArtistSearchState,
   type SpotifyArtistResult,
@@ -95,9 +107,15 @@ export {
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
 export {
+  type BillingHistoryEntry,
+  useBillingHistoryQuery,
+} from './useBillingHistoryQuery';
+export {
+  type CancelSubscriptionResponse,
   type CheckoutInput,
   type CheckoutResponse,
   type PortalResponse,
+  useCancelSubscriptionMutation,
   useCheckoutMutation,
   usePortalMutation,
 } from './useBillingMutations';
@@ -202,6 +220,7 @@ export {
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
+  usePixelSettingsDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
 // Plan gate hook
@@ -229,12 +248,12 @@ export {
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
 export {
+  useRefreshReleaseMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
-// eslint-disable-next-line import/no-cycle -- barrel re-export
 export { useReleasesQuery } from './useReleasesQuery';
 // Settings mutations
 export {

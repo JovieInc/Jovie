@@ -1,8 +1,10 @@
+import { Suspense } from 'react';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
+import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
@@ -79,13 +81,14 @@ interface StaticArtistPageProps {
   readonly latestRelease?: DiscogRelease | null;
 }
 
-function renderContent(
-  mode: string,
+/**
+ * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
+ * Artist DSPs take priority (listed first).
+ */
+function getMergedDSPs(
   artist: Artist,
-  socialLinks: LegacySocialLink[],
-  primaryAction: PrimaryAction,
-  enableDynamicEngagement: boolean
-) {
+  socialLinks: LegacySocialLink[]
+): AvailableDSP[] {
   const socialDSPs: AvailableDSP[] = (() => {
     const mapped = socialLinks
       .filter(link => link.url)
@@ -117,14 +120,21 @@ function renderContent(
   })();
 
   const artistDSPs = getAvailableDSPs(artist);
-  const mergedDSPs = (() => {
-    const byKey = new Map<string, AvailableDSP>();
-    [...artistDSPs, ...socialDSPs].forEach(dsp => {
-      if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
-    });
-    return Array.from(byKey.values());
-  })();
+  const byKey = new Map<string, AvailableDSP>();
+  [...artistDSPs, ...socialDSPs].forEach(dsp => {
+    if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
+  });
+  return Array.from(byKey.values());
+}
 
+function renderContent(
+  mode: string,
+  artist: Artist,
+  socialLinks: LegacySocialLink[],
+  mergedDSPs: AvailableDSP[],
+  primaryAction: PrimaryAction,
+  enableDynamicEngagement: boolean
+) {
   switch (mode) {
     case 'listen':
       return (
@@ -203,6 +213,7 @@ export function StaticArtistPage({
   latestRelease,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
+  const mergedDSPs = getMergedDSPs(artist, socialLinks);
 
   return (
     <div className='w-full'>
@@ -218,6 +229,9 @@ export function StaticArtistPage({
         showNotificationButton={true}
       >
         <div>
+          <Suspense>
+            <SubscriptionConfirmedBanner />
+          </Suspense>
           {mode === 'profile' ? (
             <div className='space-y-4'>
               {latestRelease && (
@@ -230,6 +244,8 @@ export function StaticArtistPage({
                 <ProfilePrimaryCTA
                   artist={artist}
                   socialLinks={socialLinks}
+                  mergedDSPs={mergedDSPs}
+                  enableDynamicEngagement={enableDynamicEngagement}
                   autoOpenCapture={resolvedAutoOpenCapture}
                   showCapture
                 />
@@ -240,6 +256,7 @@ export function StaticArtistPage({
               mode,
               artist,
               socialLinks,
+              mergedDSPs,
               primaryAction,
               enableDynamicEngagement
             )

@@ -1,4 +1,4 @@
-'server-only';
+import 'server-only';
 
 /**
  * Canvas generation service.
@@ -37,6 +37,7 @@ import type {
 // In-memory job tracking (will move to DB table when we build the full UI)
 // ---------------------------------------------------------------------------
 
+const MAX_ACTIVE_JOBS = 1000;
 const activeJobs = new Map<string, CanvasGenerationJob>();
 
 /**
@@ -79,9 +80,20 @@ export function validateArtworkForCanvas(artworkUrl: string): {
     return { valid: false, error: 'No artwork URL provided' };
   }
 
-  // Basic URL validation
+  // URL validation — restrict to https to prevent SSRF
   try {
-    new URL(artworkUrl);
+    const parsed = new URL(artworkUrl);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { valid: false, error: 'Artwork URL must use http or https' };
+    }
+    if (
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '0.0.0.0' ||
+      parsed.hostname === '::1'
+    ) {
+      return { valid: false, error: 'Artwork URL must not point to localhost' };
+    }
   } catch {
     return { valid: false, error: 'Invalid artwork URL' };
   }
@@ -192,6 +204,12 @@ export async function startCanvasGeneration(
     createdAt: now,
     updatedAt: now,
   };
+
+  // Evict oldest jobs if at capacity
+  if (activeJobs.size >= MAX_ACTIVE_JOBS) {
+    const oldestKey = activeJobs.keys().next().value;
+    if (oldestKey) activeJobs.delete(oldestKey);
+  }
 
   activeJobs.set(jobId, job);
 

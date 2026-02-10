@@ -1,6 +1,5 @@
 import {
   Banknote,
-  BarChart3,
   Bell,
   CalendarDays,
   Home,
@@ -42,22 +41,6 @@ export const profileNavItem: NavItem = {
   id: 'profile',
   icon: UserCircle,
   description: 'Update your profile and links',
-  children: [
-    {
-      name: 'Analytics',
-      href: APP_ROUTES.ANALYTICS,
-      id: 'analytics',
-      icon: BarChart3,
-      description: 'View your performance analytics',
-    },
-    {
-      name: 'Earnings',
-      href: APP_ROUTES.EARNINGS,
-      id: 'earnings',
-      icon: Banknote,
-      description: 'Manage tips and monetization',
-    },
-  ],
 };
 
 export const primaryNavigation: NavItem[] = [
@@ -94,7 +77,7 @@ export const primaryNavigation: NavItem[] = [
 
 export const secondaryNavigation: NavItem[] = [
   {
-    name: 'Chat',
+    name: 'Thread',
     href: APP_ROUTES.CHAT,
     id: 'chat',
     icon: MessageCircle,
@@ -231,7 +214,6 @@ export const mobilePrimaryNavigation: NavItem[] = [
 export const mobileExpandedNavigation: NavItem[] = [
   primaryNavigation[1], // Contacts
   primaryNavigation[3], // Tour Dates
-  ...(profileNavItem.children ?? []), // Analytics, Earnings
   ...secondaryNavigation, // Chat
   settingsNavItem,
 ];

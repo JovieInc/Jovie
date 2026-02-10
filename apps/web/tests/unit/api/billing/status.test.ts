@@ -15,6 +15,10 @@ vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
 }));
 
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
+
 describe('GET /api/billing/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,6 +42,7 @@ describe('GET /api/billing/status', () => {
       success: true,
       data: {
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_123',
         stripeSubscriptionId: 'sub_123',
       },
@@ -49,14 +54,31 @@ describe('GET /api/billing/status', () => {
 
     expect(response.status).toBe(200);
     expect(data.isPro).toBe(true);
+    expect(data.plan).toBe('pro');
     expect(data.stripeCustomerId).toBe('cus_123');
     expect(data.stripeSubscriptionId).toBe('sub_123');
   });
 
-  it('returns default values when user not found in database', async () => {
+  it('returns 503 when billing lookup fails (not silent downgrade)', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockResolvedValue({
       success: false,
+      error: 'database connection failed',
+    });
+
+    const { GET } = await import('@/app/api/billing/status/route');
+    const response = await GET();
+    const data = await response.json();
+
+    // Should return 503 so clients can distinguish "free" from "billing unavailable"
+    expect(response.status).toBe(503);
+    expect(data.error).toBe('Billing service temporarily unavailable');
+  });
+
+  it('returns free entitlements when user exists but has no billing data', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
       data: null,
     });
 
@@ -66,11 +88,12 @@ describe('GET /api/billing/status', () => {
 
     expect(response.status).toBe(200);
     expect(data.isPro).toBe(false);
+    expect(data.plan).toBe('free');
     expect(data.stripeCustomerId).toBeNull();
     expect(data.stripeSubscriptionId).toBeNull();
   });
 
-  it('returns 500 on error', async () => {
+  it('returns 500 on unexpected error', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetUserBillingInfo.mockRejectedValue(new Error('Database error'));
 

@@ -219,6 +219,21 @@ export async function GET(req: Request) {
     );
   }
 
+  // Verify the authenticated user owns the profile that created this job
+  const [owner] = await db
+    .select({ clerkId: users.clerkId })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(eq(creatorProfiles.id, job.creatorProfileId))
+    .limit(1);
+
+  if (!owner || owner.clerkId !== userId) {
+    return NextResponse.json(
+      { error: 'Job not found' },
+      { status: 404, headers: CORS_HEADERS }
+    );
+  }
+
   return NextResponse.json(
     {
       jobId: job.id,

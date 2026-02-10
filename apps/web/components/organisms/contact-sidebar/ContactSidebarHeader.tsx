@@ -3,16 +3,63 @@
 /**
  * ContactSidebarHeader Component
  *
- * Header section of the contact sidebar with action buttons
+ * Header section of the contact sidebar with action buttons.
+ * Uses the shared DrawerHeader shell for consistent styling.
  */
 
-import { Check, Copy, ExternalLink, IdCard, RefreshCw, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, IdCard, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { Contact } from './types';
+
+function ContactTitle({
+  hasContact,
+  clerkId,
+  isClerkIdCopied,
+  onCopyClerkId,
+}: {
+  readonly hasContact: boolean;
+  readonly clerkId: string | undefined;
+  readonly isClerkIdCopied: boolean;
+  readonly onCopyClerkId: () => Promise<void>;
+}) {
+  if (!hasContact) return <>No contact selected</>;
+  if (!clerkId) return <>Contact</>;
+
+  return (
+    <span className='flex items-center gap-1'>
+      <span>Contact</span>
+      <button
+        type='button'
+        onClick={onCopyClerkId}
+        className={
+          isClerkIdCopied
+            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400 transition-colors'
+            : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors'
+        }
+        aria-label='Copy Clerk ID'
+      >
+        <span className='relative flex h-3 w-3 items-center justify-center'>
+          <IdCard
+            className={`absolute h-3 w-3 transition-all duration-150 ${
+              isClerkIdCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+            }`}
+          />
+          <Check
+            className={`absolute h-3 w-3 transition-all duration-150 ${
+              isClerkIdCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+            }`}
+          />
+        </span>
+        <span>{isClerkIdCopied ? 'Copied!' : 'Copy ID'}</span>
+      </button>
+    </span>
+  );
+}
 
 interface ContactSidebarHeaderProps {
   readonly contact: Contact | null;
@@ -66,21 +113,8 @@ export function ContactSidebarHeader({
     }
   };
 
-  // Define actions based on plan:
-  // Primary: Close + Copy
-  // Overflow: Refresh + Open
   const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
-
-  // Close is always primary
-  if (onClose) {
-    primaryActions.push({
-      id: 'close',
-      label: 'Close contact sidebar',
-      icon: X,
-      onClick: onClose,
-    });
-  }
 
   if (showActions) {
     // Copy profile link - primary action
@@ -118,47 +152,29 @@ export function ContactSidebarHeader({
     );
   }
 
+  const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
+
+  const titleContent = (
+    <ContactTitle
+      hasContact={hasContact}
+      clerkId={contact?.clerkId}
+      isClerkIdCopied={isClerkIdCopied}
+      onCopyClerkId={handleCopyClerkId}
+    />
+  );
+
   return (
-    <div className='flex items-center justify-between px-3 py-2'>
-      <div className='flex items-center gap-1'>
-        <p className='text-xs text-sidebar-muted'>
-          {hasContact ? 'Contact' : 'No contact selected'}
-        </p>
-        {hasContact && contact?.clerkId && (
-          <button
-            type='button'
-            onClick={handleCopyClerkId}
-            className={
-              isClerkIdCopied
-                ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400 transition-colors'
-                : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors'
-            }
-            aria-label='Copy Clerk ID'
-          >
-            <span className='relative flex h-3 w-3 items-center justify-center'>
-              <IdCard
-                className={`absolute h-3 w-3 transition-all duration-150 ${
-                  isClerkIdCopied
-                    ? 'scale-50 opacity-0'
-                    : 'scale-100 opacity-100'
-                }`}
-              />
-              <Check
-                className={`absolute h-3 w-3 transition-all duration-150 ${
-                  isClerkIdCopied
-                    ? 'scale-100 opacity-100'
-                    : 'scale-50 opacity-0'
-                }`}
-              />
-            </span>
-            <span>{isClerkIdCopied ? 'Copied!' : 'Copy ID'}</span>
-          </button>
-        )}
-      </div>
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-      />
-    </div>
+    <DrawerHeader
+      title={titleContent}
+      onClose={onClose}
+      actions={
+        hasActions ? (
+          <DrawerHeaderActions
+            primaryActions={primaryActions}
+            overflowActions={overflowActions}
+          />
+        ) : undefined
+      }
+    />
   );
 }

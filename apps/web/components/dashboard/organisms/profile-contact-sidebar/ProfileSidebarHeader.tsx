@@ -3,12 +3,14 @@
 /**
  * ProfileSidebarHeader Component
  *
- * Header section of the profile sidebar with action buttons
+ * Header section of the profile sidebar with action buttons.
+ * Uses the shared DrawerHeader shell for consistent styling.
  */
 
-import { Check, Contact, Copy, ExternalLink, QrCode, X } from 'lucide-react';
+import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
@@ -91,14 +93,8 @@ export function ProfileSidebarHeader({
     toast.success('QR code downloaded');
   };
 
-  // Primary actions: Close + Copy (matching ReleaseSidebarHeader pattern)
+  // Primary actions: Copy (close is handled by DrawerHeader)
   const primaryActions: DrawerHeaderAction[] = [
-    {
-      id: 'close',
-      label: 'Close profile sidebar',
-      icon: X,
-      onClick: onClose,
-    },
     {
       id: 'copy',
       label: isCopied ? 'Copied!' : 'Copy profile link',
@@ -132,14 +128,15 @@ export function ProfileSidebarHeader({
   ];
 
   return (
-    <div className='flex items-center justify-between px-3 py-2'>
-      <p className='text-xs font-medium text-sidebar-foreground truncate'>
-        Profile details
-      </p>
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-      />
-    </div>
+    <DrawerHeader
+      title='Profile details'
+      onClose={onClose}
+      actions={
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+        />
+      }
+    />
   );
 }

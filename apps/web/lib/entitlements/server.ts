@@ -9,9 +9,10 @@ import {
   isProPlan,
 } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 import type { UserEntitlements, UserPlan } from '@/types';
 
-const FREE_ENTITLEMENTS: UserEntitlements = {
+const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   userId: null,
   email: null,
   isAuthenticated: false,
@@ -27,10 +28,26 @@ const FREE_ENTITLEMENTS: UserEntitlements = {
   contactsLimit: 100,
 };
 
+/**
+ * Error thrown when billing data cannot be retrieved for an authenticated user.
+ * Callers should catch this and show a retry/error state rather than
+ * silently defaulting to free-tier entitlements.
+ */
+export class BillingUnavailableError extends Error {
+  constructor(
+    public readonly userId: string,
+    public readonly isAdmin: boolean,
+    cause?: string
+  ) {
+    super(`Billing data unavailable for user ${userId}: ${cause ?? 'unknown'}`);
+    this.name = 'BillingUnavailableError';
+  }
+}
+
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    return FREE_ENTITLEMENTS;
+    return UNAUTHENTICATED_ENTITLEMENTS;
   }
 
   let clerkEmail: string | null = null;
@@ -49,9 +66,20 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     getUserBillingInfo(),
   ]);
 
-  if (!billing.success || !billing.data) {
+  if (!billing.success) {
+    // Billing lookup failed — throw so callers surface an error state
+    // instead of silently revoking pro features for paying users.
+    logger.error('Billing lookup failed in entitlements', {
+      userId,
+      error: billing.error,
+    });
+    throw new BillingUnavailableError(userId, adminStatus, billing.error);
+  }
+
+  if (!billing.data) {
+    // User exists in auth but not in billing DB — genuinely a new/free user.
     return {
-      ...FREE_ENTITLEMENTS,
+      ...UNAUTHENTICATED_ENTITLEMENTS,
       userId,
       email: clerkEmail,
       isAuthenticated: true,

@@ -149,14 +149,14 @@ function FloatingSidebar({
   pathname,
   section,
   profileHref,
-}: {
+}: Readonly<{
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   navigation: NavItem[];
   pathname: string;
   section: string;
   profileHref: string | undefined;
-}) {
+}>) {
   return (
     <div className='fixed inset-y-0 left-0 z-50 w-[270px] p-3 animate-in slide-in-from-left duration-200'>
       <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>
@@ -181,7 +181,7 @@ function FloatingSidebar({
           {isDashboardOrAdmin && (
             <Link
               href={APP_ROUTES.CHAT}
-              aria-label='New chat'
+              aria-label='New thread'
               className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent'
             >
               <SquarePen className='h-4 w-4' />
@@ -282,11 +282,11 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               />
             )}
 
-            {/* Compose icon - Linear-style: starts a new chat */}
+            {/* Compose icon - Linear-style: starts a new thread */}
             {!isInSettings && isDashboardOrAdmin && (
               <Link
                 href={APP_ROUTES.CHAT}
-                aria-label='New chat'
+                aria-label='New thread'
                 className='ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
               >
                 <SquarePen className='h-4 w-4' />
@@ -361,7 +361,15 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* No footer — user menu is in the workspace button (header) */}
+        {/* Version + build label */}
+        <div className='px-3 pb-2 pt-1 group-data-[collapsible=icon]:hidden'>
+          <span className='text-[11px] text-sidebar-muted select-none'>
+            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+            {process.env.NEXT_PUBLIC_BUILD_SHA
+              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+              : ''}
+          </span>
+        </div>
 
         <SidebarRail />
       </Sidebar>

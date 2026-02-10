@@ -34,7 +34,7 @@ export function SettingsSection({
       aria-describedby={descriptionId}
       className={cn('scroll-mt-4', className)}
     >
-      <div className={cn('mb-4 pb-3 border-b border-subtle', headerClassName)}>
+      <div className={cn('mb-4', headerClassName)}>
         <h2
           id={headingId}
           className={cn(

@@ -1,12 +1,19 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { parseAsInteger, parseAsStringLiteral, useQueryStates } from 'nuqs';
+import {
+  parseAsInteger,
+  parseAsStringLiteral,
+  useQueryState,
+  useQueryStates,
+} from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
-import { audienceSortFields } from '@/lib/nuqs';
+import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
+import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
+import type { AudienceView } from './dashboard-audience-table/types';
 
 const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
   { length: 10 },
@@ -47,6 +54,7 @@ type AudienceServerRow = AudienceMember;
 
 export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
+  readonly view: AudienceView;
   readonly initialRows: AudienceServerRow[];
   readonly total: number;
   readonly page: number;
@@ -54,6 +62,8 @@ export interface DashboardAudienceClientProps {
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
+  readonly profileId?: string;
+  readonly subscriberCount: number;
 }
 
 /**
@@ -69,6 +79,7 @@ const audienceUrlParsers = {
 
 export function DashboardAudienceClient({
   mode,
+  view,
   initialRows,
   total,
   page,
@@ -76,12 +87,22 @@ export function DashboardAudienceClient({
   sort,
   direction,
   profileUrl,
+  profileId,
+  subscriberCount,
 }: Readonly<DashboardAudienceClientProps>) {
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
     history: 'push',
   });
+
+  const [, setView] = useQueryState(
+    'view',
+    parseAsStringLiteral(audienceViews).withDefault('all').withOptions({
+      shallow: false,
+      history: 'push',
+    })
+  );
 
   const handlePageChange = React.useCallback(
     (nextPage: number) => {
@@ -114,11 +135,24 @@ export function DashboardAudienceClient({
     [sort, direction, setUrlParams]
   );
 
+  const handleViewChange = React.useCallback(
+    (nextView: AudienceView) => {
+      // Reset to page 1 and default sort when changing views
+      setView(nextView);
+      setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
+    },
+    [setView, setUrlParams]
+  );
+
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
       <div data-testid='dashboard-audience-client'>
+        <div className='px-4 pt-4 sm:px-6 sm:pt-5'>
+          <AudienceFunnelMetrics />
+        </div>
         <DashboardAudienceTable
           mode={mode}
+          view={view}
           rows={initialRows}
           total={total}
           page={page}
@@ -128,7 +162,10 @@ export function DashboardAudienceClient({
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
           onSortChange={handleSortChange}
+          onViewChange={handleViewChange}
           profileUrl={profileUrl}
+          profileId={profileId}
+          subscriberCount={subscriberCount}
         />
       </div>
     </QueryErrorBoundary>

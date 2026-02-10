@@ -44,8 +44,8 @@ export type ReleaseType =
   | 'mixtape'
   | 'other';
 
-/** Canvas video status for a release */
-export type CanvasStatus = 'not_set' | 'generated' | 'uploaded';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
+export type { CanvasStatus };
 
 export interface ReleaseViewModel {
   profileId: string;

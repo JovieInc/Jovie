@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -36,7 +37,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
     const limit = Math.min(
-      Math.max(parseInt(limitParam ?? '100', 10) || 100, 1),
+      Math.max(Number.parseInt(limitParam ?? '100', 10) || 100, 1),
       200
     );
     const before = url.searchParams.get('before');
@@ -64,7 +65,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     const conditions = [eq(chatMessages.conversationId, id)];
     if (before) {
       const beforeDate = new Date(before);
-      if (isNaN(beforeDate.getTime())) {
+      if (Number.isNaN(beforeDate.getTime())) {
         return NextResponse.json(
           { error: 'Invalid "before" cursor' },
           { status: 400, headers: NO_STORE_HEADERS }
@@ -97,6 +98,13 @@ export async function GET(req: Request, { params }: RouteParams) {
     );
   } catch (error) {
     logger.error('Error fetching conversation:', error);
+
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to fetch conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'GET',
+      });
+    }
 
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
@@ -169,6 +177,13 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error updating conversation:', error);
 
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to update conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'PATCH',
+      });
+    }
+
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -223,6 +238,13 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     );
   } catch (error) {
     logger.error('Error deleting conversation:', error);
+
+    if (!(error instanceof TypeError && error.message === 'User not found')) {
+      await captureError('Failed to delete conversation', error, {
+        route: '/api/chat/conversations/[id]',
+        method: 'DELETE',
+      });
+    }
 
     if (error instanceof TypeError && error.message === 'User not found') {
       return NextResponse.json(

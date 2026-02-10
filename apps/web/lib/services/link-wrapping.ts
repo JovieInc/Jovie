@@ -3,7 +3,7 @@
  * Handles creation and management of wrapped links
  */
 
-import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, lt } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { wrappedLinks } from '@/lib/db/schema/links';
@@ -317,21 +317,59 @@ export async function createWrappedLinksBatch(
  */
 export async function updateWrappedLink(
   shortId: string,
-  updates: Partial<Pick<WrappedLink, 'titleAlias' | 'expiresAt'>>
+  updates: Partial<Pick<WrappedLink, 'titleAlias' | 'expiresAt'>>,
+  userId?: string
 ): Promise<boolean> {
   try {
     const updateData: Partial<typeof wrappedLinks.$inferInsert> = {};
-    if (updates.titleAlias) updateData.titleAlias = updates.titleAlias;
-    if (updates.expiresAt) updateData.expiresAt = new Date(updates.expiresAt);
+    if (updates.titleAlias !== undefined)
+      updateData.titleAlias = updates.titleAlias;
+    if (updates.expiresAt !== undefined)
+      updateData.expiresAt = updates.expiresAt
+        ? new Date(updates.expiresAt)
+        : null;
+
+    if (Object.keys(updateData).length === 0) return true;
+
+    const conditions = [eq(wrappedLinks.shortId, shortId)];
+    if (userId) {
+      conditions.push(eq(wrappedLinks.createdBy, userId));
+    }
 
     await db
       .update(wrappedLinks)
       .set(updateData)
-      .where(eq(wrappedLinks.shortId, shortId));
+      .where(and(...conditions));
 
     return true;
   } catch (error) {
     captureError('Failed to update wrapped link', error, { shortId, updates });
+    return false;
+  }
+}
+
+/**
+ * Deletes a single wrapped link by shortId.
+ * Optionally scoped to a specific user for ownership verification.
+ */
+export async function deleteWrappedLink(
+  shortId: string,
+  userId?: string
+): Promise<boolean> {
+  try {
+    const conditions = [eq(wrappedLinks.shortId, shortId)];
+    if (userId) {
+      conditions.push(eq(wrappedLinks.createdBy, userId));
+    }
+
+    const deleted = await db
+      .delete(wrappedLinks)
+      .where(and(...conditions))
+      .returning({ id: wrappedLinks.id });
+
+    return deleted.length > 0;
+  } catch (error) {
+    captureError('Failed to delete wrapped link', error, { shortId, userId });
     return false;
   }
 }

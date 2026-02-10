@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, type TransactionType } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
-import { sanitizeErrorResponse } from '@/lib/error-tracking';
+import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -185,7 +185,7 @@ function safeRandomHandle(): string {
  * Ported from approve/route.ts for profile auto-creation on signup
  */
 async function findAvailableHandle(
-  dbOrTx: TransactionType | typeof db,
+  dbOrTx: DbOrTransaction,
   base: string
 ): Promise<string> {
   const normalizedBase = normalizeUsername(base).slice(0, 30);
@@ -221,6 +221,7 @@ function buildWaitlistUpdateValues(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }) {
@@ -232,6 +233,7 @@ function buildWaitlistUpdateValues(params: {
     primarySocialUrlNormalized: params.normalizedUrl,
     spotifyUrl: params.spotifyUrl ?? null,
     spotifyUrlNormalized: params.spotifyUrlNormalized,
+    spotifyArtistName: params.spotifyArtistName,
     heardAbout: params.sanitizedHeardAbout,
     selectedPlan: params.selectedPlan ?? null,
     updatedAt: new Date(),
@@ -272,6 +274,7 @@ async function handleExistingEntry(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }): Promise<NextResponse> {
@@ -306,6 +309,7 @@ async function createNewWaitlistEntry(params: {
   normalizedUrl: string;
   spotifyUrl: string | null | undefined;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
 }): Promise<void> {
@@ -320,6 +324,7 @@ async function createNewWaitlistEntry(params: {
     normalizedUrl,
     spotifyUrl,
     spotifyUrlNormalized,
+    spotifyArtistName,
     sanitizedHeardAbout,
     selectedPlan,
   } = params;
@@ -333,6 +338,7 @@ async function createNewWaitlistEntry(params: {
     primarySocialUrlNormalized: normalizedUrl,
     spotifyUrl: spotifyUrl ?? null,
     spotifyUrlNormalized,
+    spotifyArtistName,
     heardAbout: sanitizedHeardAbout,
     selectedPlan: selectedPlan ?? null,
     status: 'new' as const,
@@ -516,10 +522,12 @@ export async function POST(request: Request) {
       primaryGoal,
       primarySocialUrl,
       spotifyUrl,
+      spotifyArtistName,
       heardAbout,
       selectedPlan,
     } = parseResult.data;
     const sanitizedHeardAbout = heardAbout?.trim() || null;
+    const sanitizedSpotifyArtistName = spotifyArtistName?.trim() || null;
 
     // Detect platform and normalize primary social URL
     const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
@@ -547,6 +555,7 @@ export async function POST(request: Request) {
         normalizedUrl,
         spotifyUrl,
         spotifyUrlNormalized,
+        spotifyArtistName: sanitizedSpotifyArtistName,
         sanitizedHeardAbout,
         selectedPlan,
       });
@@ -564,6 +573,7 @@ export async function POST(request: Request) {
       normalizedUrl,
       spotifyUrl,
       spotifyUrlNormalized,
+      spotifyArtistName: sanitizedSpotifyArtistName,
       sanitizedHeardAbout,
       selectedPlan,
     });
@@ -576,6 +586,10 @@ export async function POST(request: Request) {
     return successResponse({ status: 'new' });
   } catch (error) {
     logger.error('Waitlist API error', error);
+    await captureError('Waitlist signup failed', error, {
+      route: '/api/waitlist',
+      method: 'POST',
+    });
     return buildPostErrorResponse(error, isDev);
   }
 }

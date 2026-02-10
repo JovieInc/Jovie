@@ -14,11 +14,11 @@ import type { CanvasVideoSpec, SocialAdPlatform } from './types';
  */
 export const SPOTIFY_CANVAS_SPEC: CanvasVideoSpec = {
   minWidth: 720,
-  minHeight: 720,
+  minHeight: 1280,
   aspectRatio: '9:16',
   minDurationSec: 3,
   maxDurationSec: 8,
-  maxFileSizeBytes: 100 * 1024 * 1024, // 100 MB
+  maxFileSizeBytes: 10 * 1024 * 1024, // 10 MB
   codecs: ['h264'],
   formats: ['mp4'],
   fps: 30,

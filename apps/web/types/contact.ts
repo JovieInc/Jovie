@@ -18,5 +18,6 @@ export interface Contact {
   displayName?: string | null;
   avatarUrl?: string | null;
   isVerified?: boolean;
+  website?: string | null;
   socialLinks: ContactSocialLink[];
 }

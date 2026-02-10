@@ -20,6 +20,7 @@ import { db } from '@/lib/db';
 import { emailEngagement } from '@/lib/db/schema/email-engagement';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -277,6 +278,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('[Campaign Invites] Failed to fetch invites', {
       error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    await captureError('Admin campaign invites failed', error, {
+      route: '/api/admin/campaigns/invites',
+      method: 'GET',
     });
 
     return NextResponse.json(

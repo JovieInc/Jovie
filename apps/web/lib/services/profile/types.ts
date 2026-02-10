@@ -54,6 +54,7 @@ export type ProfileData = Pick<
   | 'theme'
   | 'profileViews'
   | 'genres'
+  | 'venmoHandle'
   | 'spotifyPopularity'
   | 'createdAt'
   | 'updatedAt'

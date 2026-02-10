@@ -14,7 +14,7 @@ import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
-import { UNKNOWN_ARTIST } from '@/constants/app';
+import { BASE_URL, UNKNOWN_ARTIST } from '@/constants/app';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -248,7 +248,6 @@ export default async function ReleaseSmartLinkPage({
         avatarUrl: creator.avatarUrl ?? null,
       }}
       providers={allProviders}
-      slug={slug}
     />
   );
 }
@@ -289,22 +288,25 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      images: release.artworkUrl
-        ? [
-            {
-              url: release.artworkUrl,
-              width: 640,
-              height: 640,
-              alt: `${release.title} album artwork`,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
+          width: release.artworkUrl ? 640 : 1200,
+          height: release.artworkUrl ? 640 : 630,
+          alt: `${release.title} album artwork`,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      images: release.artworkUrl ? [release.artworkUrl] : undefined,
+      images: [
+        {
+          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
+          alt: `${release.title} album artwork`,
+        },
+      ],
     },
     robots: {
       index: true,

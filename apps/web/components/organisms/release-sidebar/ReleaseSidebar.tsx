@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
@@ -73,6 +74,14 @@ export function ReleaseSidebar({
     const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
     const items: CommonDropdownItem[] = [];
 
+    const utmContext = buildUTMContext({
+      smartLinkUrl,
+      releaseSlug: release.slug,
+      releaseTitle: release.title,
+      artistName,
+      releaseDate: release.releaseDate,
+    });
+
     items.push(
       {
         type: 'action',
@@ -88,6 +97,12 @@ export function ReleaseSidebar({
         icon: <ExternalLink className='h-4 w-4' />,
         onClick: () => globalThis.open(smartLinkUrl, '_blank'),
       },
+      // UTM share presets
+      ...getUTMShareDropdownItems({
+        smartLinkUrl,
+        context: utmContext,
+      }),
+      { type: 'separator', id: 'sep-actions' },
       {
         type: 'action',
         id: 'refresh',
@@ -101,7 +116,7 @@ export function ReleaseSidebar({
           }
         },
       },
-      { type: 'separator', id: 'sep-1' },
+      { type: 'separator', id: 'sep-danger' },
       {
         type: 'action',
         id: 'delete',
@@ -113,7 +128,7 @@ export function ReleaseSidebar({
     );
 
     return items;
-  }, [release, handleCopySmartLink, onRefresh]);
+  }, [release, handleCopySmartLink, onRefresh, artistName]);
 
   return (
     <RightDrawer
@@ -122,7 +137,6 @@ export function ReleaseSidebar({
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
-      className='bg-surface-2'
     >
       <div data-testid='release-sidebar' className='flex h-full flex-col'>
         <ReleaseSidebarHeader
@@ -133,45 +147,55 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
-        <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
+        <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
           {release ? (
             <>
-              <ReleaseArtwork
-                artworkUrl={release.artworkUrl}
-                title={release.title}
-                artistName={artistName}
-                canUploadArtwork={canUploadArtwork}
-                onArtworkUpload={
-                  canUploadArtwork ? handleArtworkUpload : undefined
-                }
-              />
+              <div className='pb-5'>
+                <ReleaseArtwork
+                  artworkUrl={release.artworkUrl}
+                  title={release.title}
+                  artistName={artistName}
+                  canUploadArtwork={canUploadArtwork}
+                  onArtworkUpload={
+                    canUploadArtwork ? handleArtworkUpload : undefined
+                  }
+                />
+              </div>
 
-              <ReleaseFields
-                title={release.title}
-                releaseDate={release.releaseDate}
-                smartLinkPath={release.smartLinkPath}
-              />
+              <div className='py-5'>
+                <ReleaseFields
+                  title={release.title}
+                  releaseDate={release.releaseDate}
+                  smartLinkPath={release.smartLinkPath}
+                />
+              </div>
 
-              <ReleaseMetadata release={release} />
+              <div className='py-5'>
+                <ReleaseMetadata release={release} />
+              </div>
 
-              <ReleaseTrackList release={release} />
+              <div className='py-5'>
+                <ReleaseTrackList release={release} />
+              </div>
 
-              <ReleaseDspLinks
-                release={release}
-                providerConfig={providerConfig}
-                isEditable={isEditable}
-                isAddingLink={isAddingLink}
-                newLinkUrl={newLinkUrl}
-                selectedProvider={selectedProvider}
-                isAddingDspLink={isAddingDspLink}
-                isRemovingDspLink={isRemovingDspLink}
-                onSetIsAddingLink={setIsAddingLink}
-                onSetNewLinkUrl={setNewLinkUrl}
-                onSetSelectedProvider={setSelectedProvider}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                onNewLinkKeyDown={handleNewLinkKeyDown}
-              />
+              <div className='pt-5'>
+                <ReleaseDspLinks
+                  release={release}
+                  providerConfig={providerConfig}
+                  isEditable={isEditable}
+                  isAddingLink={isAddingLink}
+                  newLinkUrl={newLinkUrl}
+                  selectedProvider={selectedProvider}
+                  isAddingDspLink={isAddingDspLink}
+                  isRemovingDspLink={isRemovingDspLink}
+                  onSetIsAddingLink={setIsAddingLink}
+                  onSetNewLinkUrl={setNewLinkUrl}
+                  onSetSelectedProvider={setSelectedProvider}
+                  onAddLink={handleAddLink}
+                  onRemoveLink={handleRemoveLink}
+                  onNewLinkKeyDown={handleNewLinkKeyDown}
+                />
+              </div>
 
               {isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>

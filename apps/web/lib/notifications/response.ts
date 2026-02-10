@@ -59,15 +59,19 @@ export const buildSubscribeErrorResponse = (
 export const buildSubscribeSuccessResponse = (
   audienceIdentified: boolean,
   emailDispatched: boolean,
-  durationMs: number
+  durationMs: number,
+  pendingConfirmation = false
 ): NotificationSubscribeDomainResponse => ({
   status: 200,
   audienceIdentified,
   body: {
     success: true,
-    message: 'Subscription successful',
+    message: pendingConfirmation
+      ? 'Please check your email to confirm your subscription'
+      : 'Subscription successful',
     emailDispatched,
     durationMs,
+    pendingConfirmation,
   },
 });
 
