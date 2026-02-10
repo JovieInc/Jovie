@@ -662,6 +662,7 @@ jobs:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Pre-deploy Lighthouse performance check
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -801,8 +802,16 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           directory: apps/web/coverage
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
+        uses: codecov/test-results-action@v1
+        with:
+          directory: apps/web
           flags: unittests
           fail_ci_if_error: false
           verbose: true
