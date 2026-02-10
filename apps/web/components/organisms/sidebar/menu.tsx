@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Slot } from '@radix-ui/react-slot';
 import { cva } from 'class-variance-authority';
 import React from 'react';
-import { Skeleton } from '@/components/atoms/Skeleton';
+import { Skeleton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
 

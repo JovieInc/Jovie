@@ -7,11 +7,6 @@ import {
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
-/**
- * @deprecated This component is a wrapper that adds business logic (analytics tracking).
- * For new code, use the molecule version directly and handle tracking in the parent component.
- * This wrapper exists for backward compatibility.
- */
 export type CopyToClipboardButtonProps = Omit<
   CopyToClipboardButtonMoleculeProps,
   'onCopySuccess' | 'onCopyError'
