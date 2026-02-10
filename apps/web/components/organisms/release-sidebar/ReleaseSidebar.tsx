@@ -20,6 +20,7 @@ import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseMetadata } from './ReleaseMetadata';
+import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import type { ReleaseSidebarProps } from './types';
@@ -39,6 +40,7 @@ export function ReleaseSidebar({
   onArtworkUpload,
   onAddDspLink,
   onRemoveDspLink,
+  allowDownloads = false,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -159,6 +161,8 @@ export function ReleaseSidebar({
                   onArtworkUpload={
                     canUploadArtwork ? handleArtworkUpload : undefined
                   }
+                  allowDownloads={isEditable}
+                  releaseId={release.id}
                 />
               </div>
 
@@ -196,6 +200,12 @@ export function ReleaseSidebar({
                   onNewLinkKeyDown={handleNewLinkKeyDown}
                 />
               </div>
+
+              {isEditable && (
+                <div className='py-5'>
+                  <ReleaseSettings allowDownloads={allowDownloads} />
+                </div>
+              )}
 
               {isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>

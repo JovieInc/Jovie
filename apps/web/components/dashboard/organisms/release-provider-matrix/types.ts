@@ -11,6 +11,8 @@ export interface ReleaseProviderMatrixProps {
   readonly spotifyArtistName?: string | null;
   readonly appleMusicConnected?: boolean;
   readonly appleMusicArtistName?: string | null;
+  /** Whether artwork downloads are allowed on public pages */
+  readonly allowArtworkDownloads?: boolean;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

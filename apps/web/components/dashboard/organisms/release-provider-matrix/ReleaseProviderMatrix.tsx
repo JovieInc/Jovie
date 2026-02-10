@@ -57,6 +57,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   spotifyArtistName = null,
   appleMusicConnected = false,
   appleMusicArtistName = null,
+  allowArtworkDownloads = false,
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(spotifyConnected);
@@ -225,6 +226,40 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     const encoded = encodeURIComponent(prompt);
     router.push(`${APP_ROUTES.CHAT}?q=${encoded}`);
   }, [router]);
+
+  // Artwork upload handler - calls the artwork upload API endpoint
+  const handleArtworkUpload = useCallback(
+    async (file: File, release: ReleaseViewModel): Promise<string> => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(
+        `/api/images/artwork/upload?releaseId=${encodeURIComponent(release.id)}`,
+        { method: 'POST', body: formData }
+      );
+
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ message: 'Upload failed' }));
+        throw new Error(error.message ?? 'Failed to upload artwork');
+      }
+
+      const result = await response.json();
+      return result.artworkUrl;
+    },
+    []
+  );
+
+  // Handle release changes from the sidebar (e.g., after artwork upload)
+  const handleReleaseChange = useCallback(
+    (updated: ReleaseViewModel) => {
+      setRows(prev =>
+        prev.map(row => (row.id === updated.id ? updated : row))
+      );
+    },
+    [setRows]
+  );
 
   // Show importing state when we're actively importing
   const showImportingState = isImporting && rows.length === 0;
@@ -545,7 +580,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 : undefined
             }
             onAddDspLink={handleAddUrl}
+            onArtworkUpload={handleArtworkUpload}
+            onReleaseChange={handleReleaseChange}
             isSaving={isSaving}
+            allowDownloads={allowArtworkDownloads}
           />
         </Suspense>
       )}

@@ -148,6 +148,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
       avatarUrl: creatorProfiles.avatarUrl,
+      settings: creatorProfiles.settings,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
@@ -191,6 +192,8 @@ interface CachedContentData {
   artworkUrl: string | null;
   releaseDate: string | null;
   providerLinks: Array<{ providerId: string; url: string }>;
+  /** Artwork size URLs from release metadata (for download context menu) */
+  artworkSizes?: Record<string, string> | null;
 }
 
 /**
@@ -208,6 +211,7 @@ const fetchContentBySlug = async (
       slug: discogReleases.slug,
       artworkUrl: discogReleases.artworkUrl,
       releaseDate: discogReleases.releaseDate,
+      metadata: discogReleases.metadata,
     })
     .from(discogReleases)
     .where(
@@ -232,6 +236,10 @@ const fetchContentBySlug = async (
         )
       );
 
+    const metadata = release.metadata as Record<string, unknown> | null;
+    const artworkSizes =
+      (metadata?.artworkSizes as Record<string, string>) ?? null;
+
     return {
       type: 'release',
       id: release.id,
@@ -240,6 +248,7 @@ const fetchContentBySlug = async (
       artworkUrl: release.artworkUrl,
       releaseDate: release.releaseDate?.toISOString() ?? null,
       providerLinks: links,
+      artworkSizes,
     };
   }
 
@@ -516,6 +525,11 @@ export default async function ContentSmartLinkPage({
             avatarUrl: creator.avatarUrl,
           }}
           providers={allProviders}
+          artworkSizes={content.artworkSizes}
+          allowDownloads={
+            ((creator.settings as Record<string, unknown> | null)
+              ?.allowArtworkDownloads as boolean) ?? false
+          }
         />
       )}
     </>
