@@ -304,7 +304,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
 
   // Scrub sensitive query parameters from request URLs
   if (event.request?.url) {
-    event.request.url = event.request.url.replace(
+    event.request.url = event.request.url.replaceAll(
       SENSITIVE_QUERY_PARAMS,
       '$1$2=[Filtered]'
     );
@@ -313,7 +313,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     event.request?.query_string &&
     typeof event.request.query_string === 'string'
   ) {
-    event.request.query_string = event.request.query_string.replace(
+    event.request.query_string = event.request.query_string.replaceAll(
       SENSITIVE_QUERY_PARAMS,
       '$1$2=[Filtered]'
     );

@@ -194,6 +194,32 @@ async function linkViaUpc(
 }
 
 /**
+ * Resolve an Apple Music album URL from a track result.
+ * Tries deriving from the song URL first, then fetches the album directly.
+ */
+async function resolveAlbumUrl(track: {
+  attributes?: { url?: string };
+  relationships?: { albums?: { data?: { id: string }[] } };
+}): Promise<string | null> {
+  // Strategy 2a: Derive album URL from song URL
+  if (track.attributes?.url) {
+    const albumUrl = deriveAlbumUrlFromSongUrl(track.attributes.url);
+    if (albumUrl) return albumUrl;
+  }
+
+  // Strategy 2b: Fetch album directly if we have an album relationship
+  const albumId = track.relationships?.albums?.data?.[0]?.id;
+  if (!albumId) return null;
+
+  try {
+    const album = await getAlbum(albumId);
+    return album?.attributes?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Strategy 2: Link releases via ISRC -> track -> album URL.
  * Batches ISRC lookups for efficiency (25 per API request).
  */
@@ -227,26 +253,9 @@ async function linkViaIsrc(
         const releaseId = isrcToRelease.get(isrc);
         if (!releaseId || linked.has(releaseId)) continue;
 
-        // Strategy 2a: Derive album URL from song URL
-        if (track.attributes?.url) {
-          const albumUrl = deriveAlbumUrlFromSongUrl(track.attributes.url);
-          if (albumUrl) {
-            linked.set(releaseId, albumUrl);
-            continue;
-          }
-        }
-
-        // Strategy 2b: Fetch album directly if we have an album relationship
-        const albumId = track.relationships?.albums?.data?.[0]?.id;
-        if (albumId) {
-          try {
-            const album = await getAlbum(albumId);
-            if (album?.attributes?.url) {
-              linked.set(releaseId, album.attributes.url);
-            }
-          } catch {
-            // Album fetch failed, skip this release
-          }
+        const albumUrl = await resolveAlbumUrl(track);
+        if (albumUrl) {
+          linked.set(releaseId, albumUrl);
         }
       }
     } catch (error) {

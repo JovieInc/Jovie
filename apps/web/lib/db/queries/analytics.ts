@@ -16,6 +16,7 @@ import type {
 } from '@/types/analytics';
 
 type JsonArray<T> = T[] | string | null;
+type AggregateValue = string | number | null;
 
 const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   if (!value) return [];
@@ -331,15 +332,15 @@ export async function getUserDashboardAnalytics(
           top_cities: JsonArray<{ city: string | null; count: number }>;
           top_countries: JsonArray<{ country: string | null; count: number }>;
           top_referrers: JsonArray<{ referrer: string | null; count: number }>;
-          total_views: string | number | null;
-          unique_users: string | number | null;
-          total_clicks: string | number | null;
-          spotify_clicks: string | number | null;
-          social_clicks: string | number | null;
-          recent_clicks: string | number | null;
-          listen_clicks: string | number | null;
-          subscribers: string | number | null;
-          identified_users: string | number | null;
+          total_views: AggregateValue;
+          unique_users: AggregateValue;
+          total_clicks: AggregateValue;
+          spotify_clicks: AggregateValue;
+          social_clicks: AggregateValue;
+          recent_clicks: AggregateValue;
+          listen_clicks: AggregateValue;
+          subscribers: AggregateValue;
+          identified_users: AggregateValue;
           top_links: JsonArray<{
             id: string | null;
             url: string | null;

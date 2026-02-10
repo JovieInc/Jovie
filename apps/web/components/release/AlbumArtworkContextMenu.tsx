@@ -74,8 +74,8 @@ export function buildArtworkSizes(
 
 function sanitizeFilename(title: string): string {
   const sanitized = title
-    .replace(/[^a-zA-Z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
+    .replaceAll(/[^a-zA-Z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
     .toLowerCase()
     .slice(0, 100);
   return sanitized || 'artwork';
@@ -115,7 +115,7 @@ export function AlbumArtworkContextMenu({
 
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
         URL.revokeObjectURL(url);
       } catch {
         // Fallback: open in new tab
@@ -139,7 +139,9 @@ export function AlbumArtworkContextMenu({
         {sizes.map(size => (
           <ContextMenuItem
             key={size.key}
-            onClick={() => void handleDownload(size)}
+            onClick={() => {
+              handleDownload(size);
+            }}
           >
             <Download className='mr-2 h-4 w-4' />
             {size.label}

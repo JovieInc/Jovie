@@ -861,7 +861,7 @@ export async function uploadReleaseArtwork(
 
   // Verify the release belongs to the user
   const release = await getReleaseById(releaseId);
-  if (!release || release.creatorProfileId !== profile.id) {
+  if (release?.creatorProfileId !== profile.id) {
     throw new TypeError('Release not found');
   }
 

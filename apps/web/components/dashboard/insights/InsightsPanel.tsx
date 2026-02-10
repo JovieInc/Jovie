@@ -5,9 +5,105 @@ import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
 import { useInsightsQuery } from '@/lib/queries/useInsightsQuery';
-import type { InsightCategory } from '@/types/insights';
+import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
 import { InsightEmptyState } from './InsightEmptyState';
+
+function getSubtitle(total: number): string {
+  if (total <= 0) return 'AI-powered analytics recommendations';
+  return `${total} active insight${total === 1 ? '' : 's'}`;
+}
+
+interface PrioritySectionProps {
+  readonly label: string;
+  readonly colorClass: string;
+  readonly insights: InsightResponse[];
+}
+
+function PrioritySection({
+  label,
+  colorClass,
+  insights,
+}: PrioritySectionProps) {
+  if (insights.length === 0) return null;
+  return (
+    <section>
+      <h3
+        className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${colorClass}`}
+      >
+        {label}
+      </h3>
+      <div className='space-y-3'>
+        {insights.map(insight => (
+          <InsightCard key={insight.id} insight={insight} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+interface InsightsPanelContentProps {
+  readonly isLoading: boolean;
+  readonly error: Error | null;
+  readonly insights: InsightResponse[];
+  readonly grouped: {
+    high: InsightResponse[];
+    medium: InsightResponse[];
+    low: InsightResponse[];
+  };
+}
+
+function InsightsPanelContent({
+  isLoading,
+  error,
+  insights,
+  grouped,
+}: InsightsPanelContentProps) {
+  if (isLoading) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <Icon
+          name='Loader2'
+          className='h-5 w-5 animate-spin text-tertiary-token'
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className='rounded-xl border border-subtle bg-surface-1 p-6 text-center'>
+        <p className='text-sm text-secondary-token'>
+          Failed to load insights. Please try again.
+        </p>
+      </div>
+    );
+  }
+
+  if (insights.length === 0) {
+    return <InsightEmptyState />;
+  }
+
+  return (
+    <div className='space-y-6'>
+      <PrioritySection
+        label='High Priority'
+        colorClass='text-orange-600 dark:text-orange-400'
+        insights={grouped.high}
+      />
+      <PrioritySection
+        label='Recommended'
+        colorClass='text-blue-600 dark:text-blue-400'
+        insights={grouped.medium}
+      />
+      <PrioritySection
+        label='Informational'
+        colorClass='text-tertiary-token'
+        insights={grouped.low}
+      />
+    </div>
+  );
+}
 
 const CATEGORY_FILTERS: { label: string; value: InsightCategory | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -58,11 +154,7 @@ export function InsightsPanel() {
           <h2 className='text-lg font-semibold text-primary-token'>
             AI Insights
           </h2>
-          <p className='text-xs text-secondary-token'>
-            {total > 0
-              ? `${total} active insight${total === 1 ? '' : 's'}`
-              : 'AI-powered analytics recommendations'}
-          </p>
+          <p className='text-xs text-secondary-token'>{getSubtitle(total)}</p>
         </div>
 
         <Button
@@ -100,67 +192,13 @@ export function InsightsPanel() {
         ))}
       </div>
 
-      {/* Loading state */}
-      {isLoading ? (
-        <div className='flex items-center justify-center py-12'>
-          <Icon
-            name='Loader2'
-            className='h-5 w-5 animate-spin text-tertiary-token'
-          />
-        </div>
-      ) : error ? (
-        <div className='rounded-xl border border-subtle bg-surface-1 p-6 text-center'>
-          <p className='text-sm text-secondary-token'>
-            Failed to load insights. Please try again.
-          </p>
-        </div>
-      ) : insights.length === 0 ? (
-        <InsightEmptyState />
-      ) : (
-        <div className='space-y-6'>
-          {/* High priority */}
-          {grouped.high.length > 0 ? (
-            <section>
-              <h3 className='mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-600 dark:text-orange-400'>
-                High Priority
-              </h3>
-              <div className='space-y-3'>
-                {grouped.high.map(insight => (
-                  <InsightCard key={insight.id} insight={insight} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {/* Medium priority */}
-          {grouped.medium.length > 0 ? (
-            <section>
-              <h3 className='mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400'>
-                Recommended
-              </h3>
-              <div className='space-y-3'>
-                {grouped.medium.map(insight => (
-                  <InsightCard key={insight.id} insight={insight} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {/* Low priority */}
-          {grouped.low.length > 0 ? (
-            <section>
-              <h3 className='mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
-                Informational
-              </h3>
-              <div className='space-y-3'>
-                {grouped.low.map(insight => (
-                  <InsightCard key={insight.id} insight={insight} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      )}
+      {/* Content */}
+      <InsightsPanelContent
+        isLoading={isLoading}
+        error={error}
+        insights={insights}
+        grouped={grouped}
+      />
     </div>
   );
 }

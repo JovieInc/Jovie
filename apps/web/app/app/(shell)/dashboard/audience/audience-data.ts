@@ -326,7 +326,7 @@ async function fetchSubscribersData(
   tx: DbSessionTx,
   clerkUserId: string | null,
   selectedProfileId: string,
-  searchParams: Record<string, string | string[] | undefined>
+  searchParams: SearchParams
 ): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
   const parsed = subscriberQuerySchema.safeParse({
     page: searchParams.page,
@@ -471,7 +471,7 @@ async function countSubscribers(
 export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: SearchParams;
   includeDetails?: boolean;
   memberId?: string;
   view?: AudienceView;
@@ -546,9 +546,7 @@ export async function getAudienceServerData(params: {
   });
 }
 
-export function getAudienceUrlSearchParams(
-  searchParams: Record<string, string | string[] | undefined>
-) {
+export function getAudienceUrlSearchParams(searchParams: SearchParams) {
   const getOne = (key: string): string | undefined => {
     const value = searchParams[key];
     if (Array.isArray(value)) return value[0];

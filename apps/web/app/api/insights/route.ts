@@ -5,7 +5,7 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getActiveInsights } from '@/lib/services/insights/lifecycle';
 import type { InsightCategory, InsightPriority } from '@/types/insights';
 
-const VALID_CATEGORIES: InsightCategory[] = [
+const VALID_CATEGORIES = new Set<InsightCategory>([
   'geographic',
   'growth',
   'content',
@@ -14,9 +14,9 @@ const VALID_CATEGORIES: InsightCategory[] = [
   'platform',
   'engagement',
   'timing',
-];
+]);
 
-const VALID_PRIORITIES: InsightPriority[] = ['high', 'medium', 'low'];
+const VALID_PRIORITIES = new Set<InsightPriority>(['high', 'medium', 'low']);
 
 /**
  * GET /api/insights
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       ? categoryParam
           .split(',')
           .filter((c): c is InsightCategory =>
-            VALID_CATEGORIES.includes(c as InsightCategory)
+            VALID_CATEGORIES.has(c as InsightCategory)
           )
       : undefined;
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       ? priorityParam
           .split(',')
           .filter((p): p is InsightPriority =>
-            VALID_PRIORITIES.includes(p as InsightPriority)
+            VALID_PRIORITIES.has(p as InsightPriority)
           )
       : undefined;
 
