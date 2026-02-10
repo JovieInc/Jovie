@@ -14,6 +14,7 @@ export {
   isTargetGenre,
   LINK_IN_BIO_PLATFORMS,
   MUSIC_TOOL_PLATFORMS,
+  PAID_VERIFICATION_PLATFORMS,
   SCORE_WEIGHTS,
   TARGET_GENRES,
 } from './calculator';
