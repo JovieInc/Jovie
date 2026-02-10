@@ -128,8 +128,6 @@ function AuthShellWrapperInner({
           headerBadge={headerBadge}
           headerAction={headerAction}
           showMobileTabs={config.showMobileTabs}
-          drawerContent={config.drawerContent}
-          drawerWidth={config.drawerWidth ?? undefined}
           isTableRoute={config.isTableRoute}
           previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
           onSidebarOpenChange={
