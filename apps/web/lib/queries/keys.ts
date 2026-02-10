@@ -226,6 +226,19 @@ export const queryKeys = {
     stats: () => [...queryKeys.campaign.all, 'stats'] as const,
   },
 
+  // AI Insights
+  insights: {
+    all: ['insights'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.insights.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    summary: () => [...queryKeys.insights.all, 'summary'] as const,
+    detail: (id: string) => [...queryKeys.insights.all, 'detail', id] as const,
+  },
+
   // Chat conversations
   chat: {
     all: ['chat'] as const,

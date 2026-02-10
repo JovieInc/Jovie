@@ -32,6 +32,8 @@ export * from './email-engagement';
 export * from './enums';
 // Ingestion
 export * from './ingestion';
+// AI Insights (AI-generated analytics insights)
+export * from './insights';
 // Links (Social, Wrapped, Signed)
 export * from './links';
 // Pixel Tracking (Events, Creator Configs)

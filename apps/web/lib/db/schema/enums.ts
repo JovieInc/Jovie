@@ -317,3 +317,53 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'user',
   'assistant',
 ]);
+
+// AI Insights Enums
+export const insightCategoryEnum = pgEnum('insight_category', [
+  'geographic',
+  'growth',
+  'content',
+  'revenue',
+  'tour',
+  'platform',
+  'engagement',
+  'timing',
+]);
+
+export const insightTypeEnum = pgEnum('insight_type', [
+  'city_growth',
+  'new_market',
+  'declining_market',
+  'tour_gap',
+  'tour_timing',
+  'subscriber_surge',
+  'subscriber_churn',
+  'release_momentum',
+  'platform_preference',
+  'referrer_surge',
+  'tip_hotspot',
+  'engagement_quality',
+  'peak_activity',
+  'capture_rate_change',
+  'device_shift',
+]);
+
+export const insightPriorityEnum = pgEnum('insight_priority', [
+  'high',
+  'medium',
+  'low',
+]);
+
+export const insightStatusEnum = pgEnum('insight_status', [
+  'active',
+  'dismissed',
+  'acted_on',
+  'expired',
+]);
+
+export const insightRunStatusEnum = pgEnum('insight_run_status', [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+]);
