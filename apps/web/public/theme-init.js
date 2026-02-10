@@ -1,5 +1,6 @@
 (function () {
   try {
+    if (typeof globalThis.matchMedia !== 'function') return;
     var ls = localStorage.getItem('jovie-theme');
     var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
     var systemPref = mql.matches ? 'dark' : 'light';

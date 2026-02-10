@@ -18,6 +18,8 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (typeof globalThis.matchMedia !== 'function') return;
+
     const onOpen = () => {
       const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
       if (!isMdUp) return;
@@ -33,6 +35,8 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   }, [handle]);
 
   useEffect(() => {
+    if (typeof globalThis.matchMedia !== 'function') return;
+
     const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
     const isLgUp = globalThis.matchMedia('(min-width: 1024px)').matches;
     const hasDismissed =
@@ -58,6 +62,8 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
   useEffect(() => {
+    if (typeof globalThis.matchMedia !== 'function') return;
+
     const mqlMd = globalThis.matchMedia('(min-width: 768px)');
     const mqlLg = globalThis.matchMedia('(min-width: 1024px)');
 
