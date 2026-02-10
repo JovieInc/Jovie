@@ -45,6 +45,7 @@ export const tourDates = pgTable(
     title: text('title'), // Optional custom title override
     startDate: timestamp('start_date', { withTimezone: true }).notNull(),
     startTime: text('start_time'), // Display time e.g. "7:00 PM"
+    timezone: text('timezone'), // IANA timezone e.g. "America/New_York"
 
     // Venue information
     venueName: text('venue_name').notNull(),

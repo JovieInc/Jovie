@@ -149,7 +149,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
           updateSocialLink(index, 'platform', platformId)
         )
       ),
-    [socialLinks.length, updateSocialLink]
+    [socialLinks, updateSocialLink]
   );
 
   if (loading) {
