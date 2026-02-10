@@ -24,6 +24,7 @@ export const waitlistEntries = pgTable(
     primarySocialUrlNormalized: text('primary_social_url_normalized').notNull(),
     spotifyUrl: text('spotify_url'),
     spotifyUrlNormalized: text('spotify_url_normalized'),
+    spotifyArtistName: text('spotify_artist_name'),
     heardAbout: text('heard_about'),
     primaryGoal: text('primary_goal'),
     selectedPlan: text('selected_plan'),

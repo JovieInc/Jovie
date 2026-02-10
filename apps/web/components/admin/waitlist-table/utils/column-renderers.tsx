@@ -101,18 +101,19 @@ export function renderPrimarySocialCell(entry: WaitlistEntryRow) {
 /**
  * Renders the Spotify platform cell
  */
-export function renderSpotifyCell(spotifyUrl: string | null) {
+export function renderSpotifyCell(entry: WaitlistEntryRow) {
+  const spotifyUrl = entry.spotifyUrlNormalized;
   if (!spotifyUrl) {
     return <EmptyCell />;
   }
 
-  const artistName = extractUsername(spotifyUrl) || 'Spotify';
+  const displayName = entry.spotifyArtistName || 'Spotify';
 
   return (
     <PlatformPill
       platformIcon='spotify'
       platformName='Spotify'
-      primaryText={`@${artistName}`}
+      primaryText={displayName}
       onClick={() => globalThis.open(spotifyUrl, '_blank')}
     />
   );

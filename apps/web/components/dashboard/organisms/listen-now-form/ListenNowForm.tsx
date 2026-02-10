@@ -68,10 +68,10 @@ const PRIMARY_DSP_CONFIG = {
 function ConnectedArtistBadge({
   info,
   showImage,
-}: {
+}: Readonly<{
   info: ConnectedDspInfo;
   showImage?: boolean;
-}) {
+}>) {
   return (
     <div className='flex items-center gap-2'>
       {showImage && info.artistImageUrl && (
@@ -224,7 +224,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                   schedulePrimaryNormalize('spotify_url', v);
                 }}
                 onBlur={() => handlePrimaryBlur('spotify_url')}
-                placeholder={DSP_PLACEHOLDERS.spotify!}
+                placeholder={DSP_PLACEHOLDERS.spotify}
                 inputMode='url'
                 autoCapitalize='none'
                 autoCorrect='off'
@@ -280,7 +280,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                   schedulePrimaryNormalize('apple_music_url', v);
                 }}
                 onBlur={() => handlePrimaryBlur('apple_music_url')}
-                placeholder={DSP_PLACEHOLDERS.apple_music!}
+                placeholder={DSP_PLACEHOLDERS.apple_music}
                 inputMode='url'
                 autoCapitalize='none'
                 autoCorrect='off'
@@ -346,7 +346,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                 schedulePrimaryNormalize('youtube_url', v);
               }}
               onBlur={() => handlePrimaryBlur('youtube_url')}
-              placeholder={DSP_PLACEHOLDERS.youtube!}
+              placeholder={DSP_PLACEHOLDERS.youtube}
               inputMode='url'
               autoCapitalize='none'
               autoCorrect='off'

@@ -168,7 +168,7 @@ export async function cacheQuery<T>(
   // Layer 1: Try in-memory cache first (fastest)
   if (!skipMemoryCache) {
     const memoryResult = memoryCache.get(cacheKey) as CacheSentinel<T> | null;
-    if (memoryResult !== null && memoryResult.__sentinel) {
+    if (memoryResult?.__sentinel) {
       return memoryResult.value;
     }
   }
@@ -176,7 +176,7 @@ export async function cacheQuery<T>(
   // Layer 2: Try Redis if enabled
   if (useRedis) {
     const redisResult = await tryReadFromRedis<CacheSentinel<T>>(cacheKey);
-    if (redisResult !== null && redisResult.__sentinel) {
+    if (redisResult?.__sentinel) {
       // Populate memory cache from Redis hit
       if (!skipMemoryCache) {
         memoryCache.set(cacheKey, redisResult, ttlMs);
@@ -254,27 +254,12 @@ async function deleteKeysInBatches(
 }
 
 /**
- * Invalidate all cached queries matching a prefix.
- * Useful for invalidating related caches (e.g., all profile caches for a user).
- *
- * Clears both in-memory and Redis caches so other instances don't serve stale data.
- *
- * @param prefix - Key prefix to match
+ * Scan and delete Redis keys matching a prefix.
  */
-export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
-  const fullPrefix = `${CACHE_PREFIX}${prefix}`;
-
-  // Invalidate memory cache
-  const deleted = memoryCache.deleteByPrefix(fullPrefix);
-  if (deleted > 0) {
-    Sentry.addBreadcrumb({
-      category: 'db-cache',
-      message: `Invalidated ${deleted} memory cache entries`,
-      level: 'info',
-    });
-  }
-
-  // Invalidate Redis cache using SCAN to find matching keys
+async function invalidateRedisByPrefix(
+  fullPrefix: string,
+  prefix: string
+): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
 
@@ -302,6 +287,31 @@ export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
   } catch (error) {
     captureWarning('[db-cache] Redis prefix invalidation failed', error);
   }
+}
+
+/**
+ * Invalidate all cached queries matching a prefix.
+ * Useful for invalidating related caches (e.g., all profile caches for a user).
+ *
+ * Clears both in-memory and Redis caches so other instances don't serve stale data.
+ *
+ * @param prefix - Key prefix to match
+ */
+export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
+  const fullPrefix = `${CACHE_PREFIX}${prefix}`;
+
+  // Invalidate memory cache
+  const deleted = memoryCache.deleteByPrefix(fullPrefix);
+  if (deleted > 0) {
+    Sentry.addBreadcrumb({
+      category: 'db-cache',
+      message: `Invalidated ${deleted} memory cache entries`,
+      level: 'info',
+    });
+  }
+
+  // Invalidate Redis cache using SCAN to find matching keys
+  await invalidateRedisByPrefix(fullPrefix, prefix);
 }
 
 /**

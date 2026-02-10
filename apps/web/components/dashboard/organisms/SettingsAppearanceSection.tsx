@@ -22,14 +22,16 @@ export function SettingsAppearanceSection() {
 
   return (
     <DashboardCard variant='settings' className='space-y-4'>
+      <h3 className='text-[14px] font-medium text-primary-token mb-4'>
+        Interface Theme
+      </h3>
+
       <div className='grid grid-cols-3 gap-4'>
         {THEME_OPTIONS.map(option => (
           <button
             type='button'
             key={option.value}
-            onClick={() =>
-              handleThemeChange(option.value as 'light' | 'dark' | 'system')
-            }
+            onClick={() => handleThemeChange(option.value)}
             disabled={isPending}
             className={cn(
               'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
@@ -117,7 +119,7 @@ export function SettingsAppearanceSection() {
 
       <p className='text-xs text-secondary-token mt-4'>
         {isPending
-          ? 'Saving…'
+          ? 'Saving\u2026'
           : 'Choose how the interface appears. System automatically matches your device settings.'}
       </p>
     </DashboardCard>

@@ -1,3 +1,5 @@
+'use client';
+
 import type { CellContext } from '@tanstack/react-table';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {

@@ -2,6 +2,7 @@ export { DashboardAudienceTableUnified as DashboardAudienceTable } from './Dashb
 export type {
   AudienceMode,
   AudienceRow,
+  AudienceView,
   BulkAction,
   DashboardAudienceTableProps,
 } from './types';
