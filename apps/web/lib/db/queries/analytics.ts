@@ -416,6 +416,8 @@ export async function getUserDashboardAnalytics(
                 and ${audienceMembers.email} is not null
             ),
             audience_views as (
+              -- visits is a lifetime counter; this sums visits for members
+              -- active in the range (an approximation, not exact per-range count)
               select coalesce(sum(${audienceMembers.visits}), 0) as total_views
               from ${audienceMembers}
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
@@ -442,9 +444,16 @@ export async function getUserDashboardAnalytics(
     'getUserDashboardAnalytics'
   );
 
-  // Use SUM(visits) from audience_members in the date range instead of the
-  // all-time creatorProfile.profileViews counter, which suffers from Redis
+  // Use SUM(visits) from audience_members active in the date range instead of
+  // the all-time creatorProfile.profileViews counter, which suffers from Redis
   // batching delays and is not range-filtered.
+  //
+  // NOTE: audience_members.visits is a lifetime cumulative counter (incremented
+  // on every visit). Filtering by lastSeenAt >= startDate selects *members*
+  // active in the range, but their visits count includes all historical visits.
+  // This is an acceptable approximation — it's strictly better than the previous
+  // all-time counter and matches the "active audience" mental model. A precise
+  // per-range count would require a per-visit events table (future enhancement).
   const totalViews = Number(aggregates?.total_views ?? 0);
   const subscribers = Number(aggregates?.subscribers ?? 0);
 
