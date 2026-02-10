@@ -38,7 +38,7 @@ export async function GET(
 
     // Verify the release belongs to the user's profile
     const release = await getReleaseById(releaseId);
-    if (!release || release.creatorProfileId !== profile.id) {
+    if (release?.creatorProfileId !== profile.id) {
       return NextResponse.json(
         { error: 'Release not found' },
         { status: 404, headers: NO_STORE_HEADERS }
