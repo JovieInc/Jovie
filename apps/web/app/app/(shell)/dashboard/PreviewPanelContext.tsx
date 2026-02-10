@@ -66,21 +66,21 @@ export function PreviewPanelProvider({
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
     if (
       typeof globalThis.window === 'undefined' ||
-      typeof globalThis.matchMedia !== 'function'
+      typeof globalThis.window.matchMedia !== 'function'
     )
       return true; // SSR/test default
-    return globalThis.matchMedia('(min-width: 768px)').matches;
+    return globalThis.window.matchMedia('(min-width: 768px)').matches;
   });
 
   // Update isLargeScreen on resize
   useEffect(() => {
     if (
       typeof globalThis.window === 'undefined' ||
-      typeof globalThis.matchMedia !== 'function'
+      typeof globalThis.window.matchMedia !== 'function'
     )
       return;
 
-    const mediaQuery = globalThis.matchMedia('(min-width: 768px)');
+    const mediaQuery = globalThis.window.matchMedia('(min-width: 768px)');
     const handleChange = (e: MediaQueryListEvent) => {
       setIsLargeScreen(e.matches);
     };

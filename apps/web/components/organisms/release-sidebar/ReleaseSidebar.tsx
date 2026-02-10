@@ -10,7 +10,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -75,6 +75,11 @@ export function ReleaseSidebar({
   const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
     null
   );
+
+  // Reset selected track when release changes to avoid stale detail views
+  useEffect(() => {
+    setSelectedTrack(null);
+  }, [release?.id]);
 
   const handleTrackClick = useCallback((track: TrackForDetail) => {
     setSelectedTrack(track);
@@ -164,13 +169,14 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
-          {selectedTrack && release ? (
+          {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
               releaseTitle={release.title}
               onBack={handleBackToRelease}
             />
-          ) : release ? (
+          )}
+          {!(selectedTrack && release) && release && (
             <>
               <div className='pb-5'>
                 <ReleaseArtwork
@@ -244,7 +250,8 @@ export function ReleaseSidebar({
                 </div>
               )}
             </>
-          ) : (
+          )}
+          {!release && (
             <p className='text-xs text-sidebar-muted'>
               Select a release in the table to view its details.
             </p>
