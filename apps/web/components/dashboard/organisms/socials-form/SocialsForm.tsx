@@ -167,18 +167,6 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
-      {/* Header */}
-      <div className='flex items-center justify-between'>
-        <div>
-          <h3 className='text-[14px] font-medium text-primary-token'>
-            Social Media Links
-          </h3>
-          <p className='text-[13px] text-secondary mt-0.5'>
-            Add your social profiles so fans can find you everywhere.
-          </p>
-        </div>
-      </div>
-
       {socialLinks.length === 0 ? (
         <EmptyState
           icon={<Share2 className='h-6 w-6' aria-hidden='true' />}

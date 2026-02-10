@@ -1,6 +1,5 @@
 'use client';
 
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsProfileSection } from '@/components/dashboard/organisms/settings-profile-section';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 import { ConnectedDspList } from './ConnectedDspList';
@@ -38,9 +37,7 @@ export function SettingsArtistProfileSection({
         <h3 className='text-[13px] font-medium text-primary-token mb-3'>
           Social Links
         </h3>
-        <DashboardCard variant='settings'>
-          <SocialsForm artist={artist} />
-        </DashboardCard>
+        <SocialsForm artist={artist} />
       </div>
     </div>
   );
