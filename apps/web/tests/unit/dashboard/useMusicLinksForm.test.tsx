@@ -122,7 +122,7 @@ describe('useMusicLinksForm', () => {
 
     act(() => {
       result.current.updatePrimaryField(
-        'spotify_url',
+        'spotifyUrl',
         'https://open.spotify.com/artist'
       );
       result.current.updateAdditionalLink(
@@ -141,9 +141,9 @@ describe('useMusicLinksForm', () => {
     expect(updateProfile).toHaveBeenCalledWith({
       profileId: 'artist-1',
       updates: {
-        spotify_url: 'https://open.spotify.com/artist',
-        apple_music_url: null,
-        youtube_url: null,
+        spotifyUrl: 'https://open.spotify.com/artist',
+        appleMusicUrl: null,
+        youtubeUrl: null,
       },
     });
 
