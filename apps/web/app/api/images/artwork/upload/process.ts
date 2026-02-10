@@ -4,7 +4,7 @@
  * Processes uploaded artwork into multiple sizes for download options.
  */
 
-import { getSharp } from '../../upload/lib/image-processing';
+import { fileToBuffer, getSharp } from '../../upload/lib/image-processing';
 
 const ARTWORK_MAX_DIMENSION = 3000;
 const ARTWORK_DOWNLOAD_SIZES = [1000, 500, 250] as const;
@@ -15,12 +15,7 @@ export async function processArtworkToSizes(
   file: File
 ): Promise<Record<string, Buffer>> {
   const sharp = await getSharp();
-  const arrayBuffer =
-    typeof file.arrayBuffer === 'function'
-      ? await file.arrayBuffer()
-      : await new Response(file).arrayBuffer();
-
-  const inputBuffer = Buffer.from(arrayBuffer);
+  const inputBuffer = await fileToBuffer(file);
   const baseImage = sharp(inputBuffer, { failOnError: false })
     .rotate()
     .withMetadata({ orientation: undefined });
