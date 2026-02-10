@@ -25,6 +25,7 @@ export const APP_ROUTES = {
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',
   ANALYTICS: '/app/analytics',
+  INSIGHTS: '/app/insights',
 
   // Settings
   SETTINGS: '/app/settings',

@@ -67,11 +67,11 @@ export async function GET(req: Request) {
               : Number.parseFloat(String(r.confidence ?? '0'));
 
           return {
-            id: r.linkId!,
-            platform: r.platform!,
-            platformType: r.platformType!,
-            url: r.url!,
-            sortOrder: r.sortOrder!,
+            id: r.linkId ?? '',
+            platform: r.platform ?? '',
+            platformType: r.platformType ?? 'other',
+            url: r.url ?? '',
+            sortOrder: r.sortOrder ?? 0,
             isActive: state === 'active',
             displayText: r.displayText,
             state,

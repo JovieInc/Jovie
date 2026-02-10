@@ -115,7 +115,7 @@ export function AuthLayout({
       className={cn(
         // Fixed positioning prevents iOS Safari rubber-band overscroll completely
         // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
-        'fixed inset-0 flex flex-col items-center bg-surface-0 text-primary-token overflow-y-auto overflow-x-hidden overscroll-none max-w-[100dvw]',
+        'fixed inset-0 flex flex-col items-center bg-surface-0 text-primary-token overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw]',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
@@ -209,7 +209,7 @@ export function AuthLayout({
           // Smooth scroll target
           'scroll-mt-4',
           // Prevent horizontal overflow from child elements
-          'overflow-x-hidden'
+          'overflow-x-clip'
         )}
       >
         {children}
