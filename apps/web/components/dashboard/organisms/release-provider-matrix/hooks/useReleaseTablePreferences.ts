@@ -27,7 +27,7 @@ export const TOGGLEABLE_COLUMNS = [
 ] as const;
 
 /** Columns always visible (cannot be toggled off) */
-const ALWAYS_VISIBLE_COLUMNS = ['select', 'release', 'actions'];
+const ALWAYS_VISIBLE_COLUMNS = ['release', 'actions'];
 
 /** Default column visibility for desktop - cleaner view with essential columns */
 const DEFAULT_DESKTOP_VISIBILITY: ColumnVisibility = {

@@ -4,6 +4,7 @@ import {
   getReleaseById,
   getTracksForReleaseWithProviders,
 } from '@/lib/discography/queries';
+import { buildSmartLinkPath } from '@/lib/discography/utils';
 
 export const runtime = 'nodejs';
 
@@ -46,17 +47,26 @@ export async function GET(
 
     const { tracks } = await getTracksForReleaseWithProviders(releaseId);
 
-    // Map to a minimal shape for the sidebar tracklist
+    const handle = profile.usernameNormalized ?? profile.username ?? '';
+
+    // Map to shape needed by the sidebar tracklist + actions menu
     const mapped = tracks.map(track => ({
       id: track.id,
       releaseId: track.releaseId,
       title: track.title,
+      slug: track.slug,
+      smartLinkPath: buildSmartLinkPath(handle, track.slug),
       trackNumber: track.trackNumber,
       discNumber: track.discNumber,
       durationMs: track.durationMs,
       isrc: track.isrc,
       isExplicit: track.isExplicit,
       previewUrl: track.previewUrl,
+      providers: track.providerLinks.map(link => ({
+        key: link.providerId,
+        label: link.providerId,
+        url: link.url ?? '',
+      })),
     }));
 
     return NextResponse.json(mapped, { headers: NO_STORE_HEADERS });
