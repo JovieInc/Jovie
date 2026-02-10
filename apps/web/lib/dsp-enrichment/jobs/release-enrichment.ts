@@ -13,14 +13,16 @@
 
 import 'server-only';
 
-import { and, eq, inArray, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
-import { discogReleases, discogTracks, providerLinks } from '@/lib/db/schema/content';
+import {
+  discogReleases,
+  discogTracks,
+  providerLinks,
+} from '@/lib/db/schema/content';
 import { logger } from '@/lib/utils/logger';
-
-import type { DspTrackEnrichmentResult } from '../types';
 import {
   bulkLookupByIsrc,
   getAlbum,
@@ -28,6 +30,7 @@ import {
   lookupByUpc,
   MAX_ISRC_BATCH_SIZE,
 } from '../providers/apple-music';
+import type { DspTrackEnrichmentResult } from '../types';
 
 // ============================================================================
 // Payload Schema
@@ -343,7 +346,10 @@ export async function processReleaseEnrichmentJob(
   }
 
   // 1. Fetch releases that need linking
-  const unlinkedReleases = await fetchUnlinkedReleases(dbConn, creatorProfileId);
+  const unlinkedReleases = await fetchUnlinkedReleases(
+    dbConn,
+    creatorProfileId
+  );
 
   if (unlinkedReleases.length === 0) {
     return result; // Nothing to do

@@ -252,7 +252,11 @@ export function AppleMusicSyncBanner({
         {/* Match info */}
         <div className='flex-1 min-w-0'>
           <div className='flex items-center gap-2'>
-            <DspProviderIcon provider='apple_music' size='sm' className='shrink-0' />
+            <DspProviderIcon
+              provider='apple_music'
+              size='sm'
+              className='shrink-0'
+            />
             <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
               {match.externalArtistName}
             </span>
