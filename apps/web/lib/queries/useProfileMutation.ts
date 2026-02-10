@@ -36,10 +36,10 @@ export interface ProfileUpdateInput {
     username?: string;
     avatarUrl?: string;
     bio?: string;
-    // Music links
-    spotify_url?: string | null;
-    apple_music_url?: string | null;
-    youtube_url?: string | null;
+    // Music links (camelCase to match API validation schema)
+    spotifyUrl?: string | null;
+    appleMusicUrl?: string | null;
+    youtubeUrl?: string | null;
     // Settings object for feature flags
     settings?: ProfileSettingsUpdate;
   };

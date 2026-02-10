@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { UserPlus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
@@ -78,20 +78,40 @@ export const ContactsTable = memo(function ContactsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedContactId, contacts.length, isSidebarOpen]);
 
-  // Set header actions (drawer toggle on right)
+  // Set header actions (add contact button + drawer toggle on right)
   const { setHeaderActions } = useSetHeaderActions();
 
-  // Memoize drawer toggle to avoid creating new JSX on every render
-  const drawerToggle = useMemo(() => <DrawerToggleButton />, []);
+  // Use ref for onAddContact to keep header actions stable
+  const onAddContactRef = useRef(onAddContact);
+  onAddContactRef.current = onAddContact;
+
+  // Memoize header actions to avoid creating new JSX on every render
+  const headerActions = useMemo(
+    () => (
+      <div className='flex items-center gap-1'>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => onAddContactRef.current()}
+          className='gap-1.5 text-secondary-token hover:text-primary-token'
+        >
+          <Plus className='h-3.5 w-3.5' />
+          <span className='hidden sm:inline'>Add contact</span>
+        </Button>
+        <DrawerToggleButton />
+      </div>
+    ),
+    []
+  );
 
   useEffect(() => {
-    setHeaderActions(drawerToggle);
+    setHeaderActions(headerActions);
 
     return () => {
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
-  }, [drawerToggle]);
+  }, [headerActions]);
 
   const handleRowClick = useCallback((contact: EditableContact) => {
     setSelectedContactId(contact.id);
@@ -125,9 +145,10 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
+      // Selected row: solid bg with slightly deeper hover (override base hover:bg-surface-2/50)
       return selectedContactId === contact.id
-        ? 'bg-surface-2'
-        : 'hover:bg-surface-2/50';
+        ? 'bg-surface-2 hover:bg-surface-2'
+        : '';
     },
     [selectedContactId]
   );
@@ -173,19 +194,12 @@ export const ContactsTable = memo(function ContactsTable({
           )}
         </div>
 
-        {/* Footer - only show when not empty */}
+        {/* Footer - contact count */}
         {!isEmpty && (
-          <div className='shrink-0 flex items-center justify-between border-t border-subtle px-4 py-2'>
-            <span className='text-xs text-secondary-token tracking-wide'>
+          <div className='shrink-0 flex items-center border-t border-subtle px-4 py-1.5'>
+            <span className='text-xs text-tertiary-token tabular-nums'>
               {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
             </span>
-            <Button
-              variant='secondary'
-              size='sm'
-              onClick={() => onAddContact()}
-            >
-              Add contact
-            </Button>
           </div>
         )}
       </div>

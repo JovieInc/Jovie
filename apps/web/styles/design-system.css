@@ -108,8 +108,8 @@
   );
 
   /* Interactive states */
-  --color-interactive-hover: oklch(0% 0 0 / 4%);
-  --color-interactive-active: oklch(0% 0 0 / 8%);
+  --color-interactive-hover: oklch(0% 0 0 / 7%);
+  --color-interactive-active: oklch(0% 0 0 / 12%);
 
   /* Table cell hover */
   --color-cell-hover: #f0f0f0;
@@ -224,8 +224,8 @@
   );
 
   /* Interactive states - white-based */
-  --color-interactive-hover: oklch(100% 0 0 / 6%);
-  --color-interactive-active: oklch(100% 0 0 / 10%);
+  --color-interactive-hover: oklch(100% 0 0 / 10%);
+  --color-interactive-active: oklch(100% 0 0 / 14%);
 
   /* Table cell hover - #151618 (21, 22, 24) */
   --color-cell-hover: #151618;
