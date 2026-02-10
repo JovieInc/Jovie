@@ -29,24 +29,42 @@ export function ArtistInfo({
       ? 'text-[11px] sm:text-xs font-normal tracking-[0.2em] uppercase leading-none text-tertiary-token'
       : 'text-base sm:text-lg leading-snug text-secondary-token line-clamp-2';
 
+  // Use smaller avatar on mobile for large sizes to prevent layout dominance
   const avatarSizeMap = {
-    sm: 'display-sm',
-    md: 'display-lg',
-    lg: 'display-xl',
-    xl: 'display-2xl',
+    sm: { mobile: 'display-sm', desktop: 'display-sm' },
+    md: { mobile: 'display-md', desktop: 'display-lg' },
+    lg: { mobile: 'display-lg', desktop: 'display-xl' },
+    xl: { mobile: 'display-xl', desktop: 'display-2xl' },
   } as const;
+
+  const { mobile: mobileSize, desktop: desktopSize } =
+    avatarSizeMap[avatarSize];
 
   const avatarContent = (
     <div className='rounded-full p-[2px] ring-1 ring-black/5 dark:ring-white/6 shadow-sm'>
-      <Avatar
-        src={artist.image_url || ''}
-        alt={artist.name}
-        name={artist.name}
-        size={avatarSizeMap[avatarSize]}
-        priority
-        verified={false}
-        className='ring-0 shadow-none'
-      />
+      {/* Render mobile size by default, desktop size at sm breakpoint */}
+      <div className='sm:hidden'>
+        <Avatar
+          src={artist.image_url || ''}
+          alt={artist.name}
+          name={artist.name}
+          size={mobileSize}
+          priority
+          verified={false}
+          className='ring-0 shadow-none'
+        />
+      </div>
+      <div className='hidden sm:block'>
+        <Avatar
+          src={artist.image_url || ''}
+          alt={artist.name}
+          name={artist.name}
+          size={desktopSize}
+          priority
+          verified={false}
+          className='ring-0 shadow-none'
+        />
+      </div>
     </div>
   );
 

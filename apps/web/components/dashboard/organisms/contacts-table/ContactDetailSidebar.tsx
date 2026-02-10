@@ -209,7 +209,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         isOpen={isOpen}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
-        className='bg-surface-2'
       >
         <div className='flex h-full items-center justify-center p-4'>
           <p className='text-sm text-tertiary-token'>
@@ -275,7 +274,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       isOpen={isOpen}
       width={SIDEBAR_WIDTH}
       ariaLabel='Contact details'
-      className='bg-surface-2'
     >
       <ContactDetailHeader
         role={contact.role}

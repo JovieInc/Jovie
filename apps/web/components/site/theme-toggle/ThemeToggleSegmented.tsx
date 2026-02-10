@@ -67,12 +67,12 @@ export function ThemeToggleSegmented({
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`relative inline-flex items-center gap-0 rounded-full p-0 ${!isLinear ? 'border border-subtle bg-surface-2' : ''} ${className}`}
+        className={`relative inline-flex items-center gap-0 rounded-full p-0 ${isLinear ? '' : 'border border-subtle bg-surface-2'} ${className}`}
         style={isLinear ? LINEAR_STYLES.container : undefined}
       >
         <div
           aria-hidden='true'
-          className={`pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)] ${!isLinear ? 'bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle)' : ''}`}
+          className={`pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)] ${isLinear ? '' : 'bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle)'}`}
           style={{
             transform: `translateX(${indicatorX}px)`,
             ...(isLinear ? LINEAR_STYLES.indicator : {}),

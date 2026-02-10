@@ -34,6 +34,7 @@ export function TourDateSidebar({
     city: '',
     region: '',
     country: '',
+    timezone: '',
     ticketUrl: '',
     ticketStatus: 'available' as TicketStatus,
   });
@@ -48,6 +49,7 @@ export function TourDateSidebar({
         title: tourDate.title ?? '',
         startDate: formatISODate(tourDate.startDate),
         startTime: tourDate.startTime ?? '',
+        timezone: tourDate.timezone ?? '',
         venueName: tourDate.venueName,
         city: tourDate.city,
         region: tourDate.region ?? '',
@@ -67,6 +69,7 @@ export function TourDateSidebar({
         title: formData.title || null,
         startDate: new Date(formData.startDate).toISOString(),
         startTime: formData.startTime || null,
+        timezone: formData.timezone || null,
         venueName: formData.venueName,
         city: formData.city,
         region: formData.region || null,
@@ -145,7 +148,7 @@ export function TourDateSidebar({
             />
           </div>
 
-          {/* Date and Time */}
+          {/* Date, Time, and Timezone */}
           <div className='grid grid-cols-2 gap-3'>
             <div className='space-y-1.5'>
               <Label htmlFor='startDate'>Date</Label>
@@ -173,6 +176,21 @@ export function TourDateSidebar({
                 disabled={isPending}
               />
             </div>
+          </div>
+
+          {/* Timezone */}
+          <div className='space-y-1.5'>
+            <Label htmlFor='timezone'>Timezone (optional)</Label>
+            <Input
+              id='timezone'
+              type='text'
+              placeholder='e.g., America/New_York'
+              value={formData.timezone}
+              onChange={e =>
+                setFormData(prev => ({ ...prev, timezone: e.target.value }))
+              }
+              disabled={isPending}
+            />
           </div>
 
           {/* Venue */}

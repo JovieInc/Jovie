@@ -198,9 +198,9 @@ export function VirtualizedTableBody<TData>({
         // Extract row data based on virtualization mode
         const { row, virtualItem, rowIndex } = useVirtual
           ? {
-              virtualItem: item as VirtualItem,
-              row: rows[(item as VirtualItem).index]!,
-              rowIndex: (item as VirtualItem).index,
+              virtualItem: item as VirtualItem, // NOSONAR - narrowing union type
+              row: rows[(item as VirtualItem).index]!, // NOSONAR - narrowing union type
+              rowIndex: (item as VirtualItem).index, // NOSONAR - narrowing union type
             }
           : {
               virtualItem: undefined,

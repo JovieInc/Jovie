@@ -36,7 +36,7 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const limitParam = url.searchParams.get('limit');
-    const parsed = limitParam ? parseInt(limitParam, 10) : 20;
+    const parsed = limitParam ? Number.parseInt(limitParam, 10) : 20;
     const limit = Number.isFinite(parsed)
       ? Math.min(Math.max(parsed, 1), 50)
       : 20;

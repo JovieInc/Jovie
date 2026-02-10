@@ -25,10 +25,8 @@ interface SsoCallbackHandlerProps {
  */
 function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: role="status" is intentional for ARIA live region
-    <div
+    <output
       className='flex flex-col items-center justify-center min-h-[200px] gap-3'
-      role='status'
       aria-busy='true'
       aria-live='polite'
     >
@@ -48,7 +46,7 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
           .
         </p>
       )}
-    </div>
+    </output>
   );
 }
 

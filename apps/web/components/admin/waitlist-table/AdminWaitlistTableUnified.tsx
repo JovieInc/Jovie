@@ -182,10 +182,10 @@ export function AdminWaitlistTableUnified({
       }),
 
       // Spotify column
-      columnHelper.accessor('spotifyUrlNormalized', {
+      columnHelper.display({
         id: 'spotify',
         header: 'Spotify',
-        cell: ({ getValue }) => renderSpotifyCell(getValue()),
+        cell: ({ row }) => renderSpotifyCell(row.original),
         size: 200,
       }),
 

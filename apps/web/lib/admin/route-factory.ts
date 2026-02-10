@@ -1,6 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  BillingUnavailableError,
+  getCurrentUserEntitlements,
+} from '@/lib/entitlements/server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 
 /**
@@ -38,6 +41,25 @@ function wantsJsonResponse(request: NextRequest): boolean {
 }
 
 /**
+ * Resolves user entitlements, falling back to partial data if billing is unavailable.
+ */
+async function resolveEntitlements() {
+  try {
+    return await getCurrentUserEntitlements();
+  } catch (error) {
+    if (error instanceof BillingUnavailableError) {
+      return {
+        isAdmin: error.isAdmin,
+        userId: error.userId,
+        email: null,
+        isAuthenticated: true,
+      };
+    }
+    throw error;
+  }
+}
+
+/**
  * Creates an admin route handler with standardized authorization,
  * error handling, and response formatting.
  *
@@ -65,7 +87,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
     const wantsJson = wantsJsonResponse(request);
 
     // Check admin authorization
-    const entitlements = await getCurrentUserEntitlements();
+    const entitlements = await resolveEntitlements();
     if (!entitlements.isAdmin) {
       captureWarning(
         `[admin/route-factory] Admin auth denied for ${config.actionName}`,

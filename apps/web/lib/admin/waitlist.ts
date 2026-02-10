@@ -12,6 +12,7 @@ export interface WaitlistEntryRow {
   primarySocialUrlNormalized: string;
   spotifyUrl: string | null;
   spotifyUrlNormalized: string | null;
+  spotifyArtistName: string | null;
   heardAbout: string | null;
   status: WaitlistEntry['status'];
   primarySocialFollowerCount: number | null;
@@ -125,6 +126,7 @@ export async function getAdminWaitlistEntries(
         primarySocialUrlNormalized: entry.primarySocialUrlNormalized,
         spotifyUrl: entry.spotifyUrl,
         spotifyUrlNormalized: entry.spotifyUrlNormalized,
+        spotifyArtistName: entry.spotifyArtistName ?? null,
         heardAbout: entry.heardAbout,
         status: entry.status,
         primarySocialFollowerCount: entry.primarySocialFollowerCount,

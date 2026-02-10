@@ -14,6 +14,7 @@ export default defineConfig({
     exclude: [
       'tests/e2e/**',
       'tests/performance/**',
+      'tests/product-screenshots/**',
       'node_modules/**',
       '.next/**',
     ],

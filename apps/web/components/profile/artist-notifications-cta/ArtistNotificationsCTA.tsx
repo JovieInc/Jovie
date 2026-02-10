@@ -93,6 +93,24 @@ function SubscriptionSuccess() {
   );
 }
 
+/**
+ * Pending confirmation state - shown when double opt-in email was sent
+ */
+function SubscriptionPendingConfirmation() {
+  return (
+    <div className='space-y-1'>
+      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-surface-2 text-primary-token shadow-sm transition-colors duration-200'>
+        <Mail className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
+        <span className='font-semibold'>Check your email</span>
+      </div>
+      <p className='text-xs text-center text-secondary-token'>
+        We sent a confirmation link to your email. Click it to start receiving
+        updates from this artist.
+      </p>
+    </div>
+  );
+}
+
 interface ChannelToggleProps {
   readonly channel: 'email' | 'sms';
   readonly isSubmitting: boolean;
@@ -280,7 +298,8 @@ export function ArtistNotificationsCTA({
   const showsSubscribeForm =
     notificationsEnabled &&
     !(notificationsState === 'idle' && !autoOpen) &&
-    notificationsState !== 'success';
+    notificationsState !== 'success' &&
+    notificationsState !== 'pending_confirmation';
   useImpressionTracking(showsSubscribeForm, artist.handle, variant);
 
   const hasSubscriptions = Boolean(
@@ -296,6 +315,10 @@ export function ArtistNotificationsCTA({
 
   if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
+  }
+
+  if (notificationsState === 'pending_confirmation') {
+    return <SubscriptionPendingConfirmation />;
   }
 
   if (isSubscribed) {

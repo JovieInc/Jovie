@@ -355,7 +355,7 @@ export async function refreshRelease(params: {
   const profile = await requireProfile();
 
   const release = await getReleaseById(params.releaseId);
-  if (!release || release.creatorProfileId !== profile.id) {
+  if (release?.creatorProfileId !== profile.id) {
     throw new TypeError('Release not found');
   }
 
@@ -781,7 +781,7 @@ export async function connectAppleMusicArtist(params: {
         totalTracksChecked: 0,
         status: 'confirmed',
         confirmedAt: now,
-        confirmedBy: userId,
+        confirmedBy: profile.id,
         createdAt: now,
         updatedAt: now,
       })
@@ -797,7 +797,7 @@ export async function connectAppleMusicArtist(params: {
           externalArtistImageUrl: sanitizedImageUrl,
           status: 'confirmed',
           confirmedAt: now,
-          confirmedBy: userId,
+          confirmedBy: profile.id,
           updatedAt: now,
         },
       });

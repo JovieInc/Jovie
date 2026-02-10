@@ -17,7 +17,11 @@ import type {
   NotificationSubscriptionState,
 } from '@/types/notifications';
 
-export type ProfileNotificationsState = 'idle' | 'editing' | 'success';
+export type ProfileNotificationsState =
+  | 'idle'
+  | 'editing'
+  | 'success'
+  | 'pending_confirmation';
 
 export type ProfileNotificationsHydrationStatus = 'idle' | 'checking' | 'done';
 
