@@ -41,7 +41,7 @@ const generatedInsightSchema = z.object({
   description: z.string().max(500),
   actionSuggestion: z.string().max(300).nullable(),
   confidence: z.number().min(0).max(1),
-  dataSnapshot: z.record(z.unknown()),
+  dataSnapshot: z.record(z.string(), z.unknown()),
   expiresInDays: z.number().int().min(1).max(90),
 });
 
@@ -69,12 +69,12 @@ export async function generateInsights(
   const modelId = 'anthropic:claude-sonnet-4-20250514';
 
   const { object, usage } = await generateObject({
-    model: gateway(modelId),
+    model: gateway.languageModel(modelId),
     schema: insightsResponseSchema,
     system: buildSystemPrompt(),
     prompt: buildUserPrompt(metrics, existingInsightTypes),
     temperature: 0.3,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
   });
 
   // Filter out low-confidence insights
@@ -84,8 +84,8 @@ export async function generateInsights(
 
   return {
     insights: validInsights,
-    promptTokens: usage.promptTokens,
-    completionTokens: usage.completionTokens,
+    promptTokens: usage.inputTokens ?? 0,
+    completionTokens: usage.outputTokens ?? 0,
     modelUsed: modelId,
   };
 }
