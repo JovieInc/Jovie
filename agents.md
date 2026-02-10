@@ -205,6 +205,12 @@ All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge
 - Use proper interfaces for all data structures
 - Prefer `unknown` over `any` for truly unknown types
 
+**Typecheck Gate (Mandatory):**
+- **ALWAYS** run `pnpm turbo typecheck` before pushing any branch or creating a PR
+- If typecheck fails, fix all errors before pushing — do not push with known type errors
+- Use `/verify` or `/ship` commands which include typecheck as part of their validation
+- The CI pipeline will block merges on type errors, but catching them locally is faster and prevents wasted CI cycles
+
 **Null Safety for String Methods:**
 - Always guard against null/undefined before calling string methods
 - Common offenders: `.replaceAll()`, `.toLowerCase()`, `.split()`, `.trim()`

@@ -372,6 +372,85 @@ describe('Icon Contrast — WCAG AA Non-Text (3:1)', () => {
   });
 
   // -----------------------------------------------------------------------
+  // SocialsForm platform selector icon chip
+  //
+  // The SocialsForm renders a small icon chip next to each platform dropdown.
+  // The chip uses:
+  //   - background: `#${brandColor}15` (~8% opacity brand over surface-1)
+  //   - foreground: getChipSafeIconColor(brandHex, isDark) [ensureContrast vs blended bg]
+  //
+  // These tests verify every platform's icon color meets WCAG 3:1 against the
+  // effective chip background in both light and dark themes.
+  // -----------------------------------------------------------------------
+  describe('SocialsForm platform icon chip', () => {
+    /** Platforms shown in the SocialsForm dropdown (social, creator, messaging, professional). */
+    const SOCIALS_FORM_PLATFORMS: Record<string, { hex: string }> =
+      Object.fromEntries(
+        Object.entries(SOCIAL_ICONS).filter(([id]) => {
+          const categories = ['social', 'creator', 'messaging', 'professional'];
+          // Match platforms by known category membership
+          const categoryMap: Record<string, string> = {
+            instagram: 'social',
+            twitter: 'social',
+            x: 'social',
+            tiktok: 'social',
+            youtube: 'social',
+            facebook: 'social',
+            reddit: 'social',
+            pinterest: 'social',
+            snapchat: 'social',
+            twitch: 'creator',
+            discord: 'creator',
+            patreon: 'creator',
+            onlyfans: 'creator',
+            medium: 'creator',
+            github: 'creator',
+            telegram: 'messaging',
+            website: 'professional',
+          };
+          return (
+            categoryMap[id] !== undefined ||
+            categories.includes(categoryMap[id] ?? '')
+          );
+        })
+      );
+
+    /** Hex alpha 0x15 = 21 decimal → 21/255 ≈ 0.082 opacity */
+    const CHIP_BG_ALPHA = 0x15 / 255;
+
+    const themes: Theme[] = ['light', 'dark'];
+
+    for (const [platform, meta] of Object.entries(SOCIALS_FORM_PLATFORMS)) {
+      describe(platform, () => {
+        for (const theme of themes) {
+          it(`${theme} — icon chip meets ${WCAG_AA_NON_TEXT}:1 contrast`, () => {
+            const isDark = theme === 'dark';
+            const brandHex = `#${meta.hex}`;
+            const surfaceBg = SURFACES[theme]['surface-1'];
+
+            // Effective chip background: brand at ~8% opacity blended over surface-1
+            const effectiveBg = blendAlpha(brandHex, surfaceBg, CHIP_BG_ALPHA);
+
+            // Icon foreground: same logic as SocialsForm's getChipSafeIconColor —
+            // ensures contrast against the effective chip bg, not the bare surface.
+            const iconColor =
+              isDark && isBrandDark(brandHex)
+                ? '#ffffff'
+                : ensureContrast(brandHex, effectiveBg);
+
+            const ratio = contrastRatio(iconColor, effectiveBg);
+
+            expect(
+              ratio,
+              `FAIL: ${platform} [${theme}] icon chip — ratio ${ratio.toFixed(2)}:1 < required ${WCAG_AA_NON_TEXT}:1 (fg:${iconColor} bg:${effectiveBg})`
+            ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+          });
+        }
+      });
+    }
+  });
+
+  // -----------------------------------------------------------------------
   // ensureContrast unit tests
   // -----------------------------------------------------------------------
   describe('ensureContrast utility', () => {

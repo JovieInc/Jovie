@@ -65,17 +65,17 @@ export interface BioSyncResponse {
 const emailProvider = new ResendEmailProvider();
 
 /**
- * Process a single DSP provider sync, handling both email and API methods.
+ * Process a single DSP provider bio sync, handling both email and API methods.
  * Catches and records failures as tracking records.
  */
-async function processSingleProvider(params: {
+async function syncSingleProvider(params: {
   profile: typeof creatorProfiles.$inferSelect;
   providerId: string;
   provider: DspBioProvider;
   match: typeof dspArtistMatches.$inferSelect | undefined;
   bioText: string;
   creatorProfileId: string;
-}): Promise<BioSyncResult | null> {
+}): Promise<BioSyncResult> {
   const { profile, providerId, provider, match, bioText, creatorProfileId } =
     params;
 
@@ -98,7 +98,12 @@ async function processSingleProvider(params: {
         bioText,
       });
     }
-    return null;
+    return {
+      providerId,
+      method: provider.method,
+      status: 'unsupported',
+      syncRequestId: '',
+    };
   } catch (error) {
     await captureError(
       `[dsp-bio-sync] Failed to sync bio to ${providerId}`,
@@ -171,7 +176,7 @@ export async function syncBioToDsps(
     ? providerIds
         .map(id => [id, getBioProvider(id)] as const)
         .filter((entry): entry is [string, DspBioProvider] => {
-          return entry[1] !== undefined && entry[1].enabled;
+          return entry[1]?.enabled === true;
         })
     : getEnabledBioProviders();
 
@@ -202,7 +207,7 @@ export async function syncBioToDsps(
 
   for (const [providerId, provider] of targetProviders) {
     const match = matchesByProvider.get(providerId);
-    const result = await processSingleProvider({
+    const result = await syncSingleProvider({
       profile,
       providerId,
       provider,
@@ -210,7 +215,7 @@ export async function syncBioToDsps(
       bioText,
       creatorProfileId,
     });
-    if (result) results.push(result);
+    results.push(result);
   }
 
   const sentCount = results.filter(r => r.status === 'sent').length;

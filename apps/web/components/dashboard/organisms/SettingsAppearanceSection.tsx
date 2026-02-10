@@ -32,9 +32,7 @@ export function SettingsAppearanceSection() {
             <button
               type='button'
               key={option.value}
-              onClick={() =>
-                handleThemeChange(option.value as 'light' | 'dark' | 'system')
-              }
+              onClick={() => handleThemeChange(option.value)}
               disabled={isPending}
               className={cn(
                 'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',

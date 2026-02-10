@@ -7,6 +7,9 @@ test-results/
 playwright-report/
 .auth/
 
+# Product screenshot output (generated, not committed)
+tests/product-screenshots/output/*.png
+
 # Linear comparison scripts output
 auth-linear.json
 auth-ours.json

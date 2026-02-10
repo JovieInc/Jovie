@@ -194,8 +194,15 @@
     {
       "idx": 27,
       "version": "7",
+      "when": 1770671504667,
+      "tag": "0027_small_tombstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
       "when": 1770768000000,
-      "tag": "0027_add_tour_date_timezone",
+      "tag": "0028_add_tour_date_timezone",
       "breakpoints": true
     }
   ]

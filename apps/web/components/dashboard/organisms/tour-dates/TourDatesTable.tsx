@@ -223,6 +223,32 @@ const ActionsCell = memo(function ActionsCell({
   );
 });
 
+/** Standalone cell renderer for Location column (avoids defining inside parent component). */
+function LocationCellRenderer({
+  row,
+}: {
+  readonly row: { readonly original: TourDateViewModel };
+}) {
+  return (
+    <LocationCell
+      city={row.original.city}
+      region={row.original.region}
+      country={row.original.country}
+    />
+  );
+}
+
+/** Standalone cell renderer for Actions column (avoids defining inside parent component). */
+function ActionsCellRenderer({
+  row,
+  onEdit,
+}: {
+  readonly row: { readonly original: TourDateViewModel };
+  readonly onEdit: (tourDate: TourDateViewModel) => void;
+}) {
+  return <ActionsCell tourDate={row.original} onEdit={onEdit} />;
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -303,15 +329,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'location',
         header: 'Location',
-        cell: (
-          { row } // NOSONAR
-        ) => (
-          <LocationCell
-            city={row.original.city}
-            region={row.original.region}
-            country={row.original.country}
-          />
-        ),
+        cell: ({ row }) => <LocationCellRenderer row={row} />,
         size: 180,
       }),
 
@@ -348,9 +366,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: (
-          { row } // NOSONAR
-        ) => <ActionsCell tourDate={row.original} onEdit={onEdit} />,
+        cell: ({ row }) => <ActionsCellRenderer row={row} onEdit={onEdit} />,
         size: 80,
       }),
     ];

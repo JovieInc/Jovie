@@ -44,7 +44,7 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/typecheck.sh",
-            "timeout": 30
+            "timeout": 120
           },
           {
             "type": "command",

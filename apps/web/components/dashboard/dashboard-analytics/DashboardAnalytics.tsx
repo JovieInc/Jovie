@@ -95,7 +95,7 @@ function ListSection({
         </h3>
       </div>
 
-      {loading ? (
+      {loading && (
         <ul className='space-y-3' aria-hidden='true'>
           {LOADING_SKELETON_KEYS.map(key => (
             <li key={key} className='flex items-center justify-between'>
@@ -104,7 +104,8 @@ function ListSection({
             </li>
           ))}
         </ul>
-      ) : items.length > 0 ? (
+      )}
+      {!loading && items.length > 0 && (
         <ul className='space-y-2.5'>
           {items.map((item, index) => (
             <li
@@ -125,7 +126,8 @@ function ListSection({
             </li>
           ))}
         </ul>
-      ) : (
+      )}
+      {!loading && items.length === 0 && (
         <p className='text-[13px] text-tertiary-token py-4 text-center'>
           {emptyMessage}
         </p>
