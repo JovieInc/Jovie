@@ -5,6 +5,7 @@ import { Globe, Link2, MapPin } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
@@ -95,7 +96,7 @@ function ListSection({
         </h3>
       </div>
 
-      {loading ? (
+      {loading && (
         <ul className='space-y-3' aria-hidden='true'>
           {LOADING_SKELETON_KEYS.map(key => (
             <li key={key} className='flex items-center justify-between'>
@@ -104,7 +105,8 @@ function ListSection({
             </li>
           ))}
         </ul>
-      ) : items.length > 0 ? (
+      )}
+      {!loading && items.length > 0 && (
         <ul className='space-y-2.5'>
           {items.map((item, index) => (
             <li
@@ -125,7 +127,8 @@ function ListSection({
             </li>
           ))}
         </ul>
-      ) : (
+      )}
+      {!loading && items.length === 0 && (
         <p className='text-[13px] text-tertiary-token py-4 text-center'>
           {emptyMessage}
         </p>
@@ -153,6 +156,8 @@ export function DashboardAnalytics() {
     rangeLabel,
   } = useDashboardAnalyticsState();
 
+  const { analyticsRetentionDays } = usePlanGate();
+
   if (!artist) return null;
 
   const fmt = Intl.NumberFormat();
@@ -178,6 +183,7 @@ export function DashboardAnalytics() {
             onChange={setRange}
             tabsBaseId={rangeTabsBaseId}
             panelId={rangePanelId}
+            maxRetentionDays={analyticsRetentionDays}
           />
         </div>
       </div>

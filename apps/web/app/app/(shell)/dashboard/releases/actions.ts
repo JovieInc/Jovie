@@ -355,7 +355,7 @@ export async function refreshRelease(params: {
   const profile = await requireProfile();
 
   const release = await getReleaseById(params.releaseId);
-  if (!release || release.creatorProfileId !== profile.id) {
+  if (release?.creatorProfileId !== profile.id) {
     throw new TypeError('Release not found');
   }
 

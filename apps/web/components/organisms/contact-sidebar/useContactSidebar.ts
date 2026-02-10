@@ -21,6 +21,7 @@ export interface UseContactSidebarReturn {
   handleCopyProfileUrl: () => Promise<void>;
   handleNameChange: (field: 'firstName' | 'lastName', value: string) => void;
   handleUsernameChange: (raw: string) => void;
+  handleWebsiteChange: (value: string) => void;
   handleAddLink: () => void;
   handleRemoveLink: (index: number) => void;
   handleNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -101,6 +102,13 @@ export function useContactSidebar({
     [handleFieldChange]
   );
 
+  const handleWebsiteChange = useCallback(
+    (value: string) => {
+      handleFieldChange(current => ({ ...current, website: value || null }));
+    },
+    [handleFieldChange]
+  );
+
   const handleAddLink = useCallback(() => {
     if (!contact || !onContactChange) return;
     const trimmedUrl = newLinkUrl.trim();
@@ -177,6 +185,7 @@ export function useContactSidebar({
     handleCopyProfileUrl,
     handleNameChange,
     handleUsernameChange,
+    handleWebsiteChange,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,

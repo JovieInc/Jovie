@@ -29,7 +29,10 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  BillingUnavailableError,
+  getCurrentUserEntitlements,
+} from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
@@ -405,7 +408,36 @@ async function resolveDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
 
-  const entitlements = await getCurrentUserEntitlements();
+  let entitlements;
+  try {
+    entitlements = await getCurrentUserEntitlements();
+  } catch (error) {
+    if (error instanceof BillingUnavailableError) {
+      // Billing DB is down — degrade gracefully instead of crashing dashboard.
+      // Admin status is still available from the error since it's fetched independently.
+      Sentry.captureException(error, {
+        level: 'warning',
+        tags: { context: 'dashboard_billing_unavailable' },
+      });
+      entitlements = {
+        userId: error.userId,
+        isAdmin: error.isAdmin,
+        isAuthenticated: true,
+        email: null,
+        plan: 'free' as const,
+        isPro: false,
+        hasAdvancedFeatures: false,
+        canRemoveBranding: false,
+        canExportContacts: false,
+        canAccessAdvancedAnalytics: false,
+        canFilterSelfFromAnalytics: false,
+        analyticsRetentionDays: 7,
+        contactsLimit: 100,
+      };
+    } else {
+      throw error;
+    }
+  }
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
 

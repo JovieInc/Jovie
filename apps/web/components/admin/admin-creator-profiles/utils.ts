@@ -16,6 +16,7 @@ export function mapProfileToContact(
     firstName: undefined,
     lastName: undefined,
     avatarUrl: profile.avatarUrl ?? null,
+    website: null,
     socialLinks: [],
   };
 }

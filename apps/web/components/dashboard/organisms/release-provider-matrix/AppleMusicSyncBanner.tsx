@@ -86,6 +86,25 @@ type SyncState =
   | 'confirmed'
   | 'no_match';
 
+function determineSyncState(
+  spotifyConnected: boolean,
+  releasesCount: number,
+  isLoading: boolean,
+  appleMusicMatch: DspMatch | null,
+  withAppleMusic: number
+): SyncState {
+  if (!spotifyConnected || releasesCount === 0) return 'hidden';
+  if (isLoading) return 'loading';
+  if (!appleMusicMatch) {
+    return withAppleMusic > 0 ? 'hidden' : 'no_match';
+  }
+  if (appleMusicMatch.status === 'suggested') return 'suggested';
+  if (appleMusicMatch.status === 'auto_confirmed') return 'auto_confirmed';
+  if (appleMusicMatch.status === 'confirmed') return 'confirmed';
+  if (appleMusicMatch.status === 'rejected') return 'hidden';
+  return 'hidden';
+}
+
 export function AppleMusicSyncBanner({
   profileId,
   spotifyConnected,
@@ -121,26 +140,23 @@ export function AppleMusicSyncBanner({
   }, [releases]);
 
   // Determine sync state
-  const syncState: SyncState = useMemo(() => {
-    if (!spotifyConnected || releases.length === 0) return 'hidden';
-    if (isLoading) return 'loading';
-    if (!appleMusicMatch) {
-      // Only show "no match" if we have releases but no Apple Music match yet
-      // and data has loaded (not just empty because query hasn't run)
-      return linkCoverage.withAppleMusic > 0 ? 'hidden' : 'no_match';
-    }
-    if (appleMusicMatch.status === 'suggested') return 'suggested';
-    if (appleMusicMatch.status === 'auto_confirmed') return 'auto_confirmed';
-    if (appleMusicMatch.status === 'confirmed') return 'confirmed';
-    if (appleMusicMatch.status === 'rejected') return 'hidden';
-    return 'hidden';
-  }, [
-    spotifyConnected,
-    releases.length,
-    isLoading,
-    appleMusicMatch,
-    linkCoverage.withAppleMusic,
-  ]);
+  const syncState: SyncState = useMemo(
+    () =>
+      determineSyncState(
+        spotifyConnected,
+        releases.length,
+        isLoading,
+        appleMusicMatch,
+        linkCoverage.withAppleMusic
+      ),
+    [
+      spotifyConnected,
+      releases.length,
+      isLoading,
+      appleMusicMatch,
+      linkCoverage.withAppleMusic,
+    ]
+  );
 
   if (syncState === 'hidden') return null;
 

@@ -22,6 +22,12 @@ import { useSuggestedProfiles } from '../hooks/useSuggestedProfiles';
 // Platform icon mapping (provider_id -> SocialIcon platform name)
 // ============================================================================
 
+function confidenceBadgeClass(confidence: number): string {
+  if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
+  if (confidence >= 0.5) return 'bg-amber-500/15 text-amber-400';
+  return 'bg-red-500/15 text-red-400';
+}
+
 const ICON_PLATFORM_MAP: Record<string, string> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
@@ -168,11 +174,7 @@ function SuggestionCard({
             <span
               className={cn(
                 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                suggestion.confidence >= 0.8
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : suggestion.confidence >= 0.5
-                    ? 'bg-amber-500/15 text-amber-400'
-                    : 'bg-red-500/15 text-red-400'
+                confidenceBadgeClass(suggestion.confidence)
               )}
             >
               {Math.round(suggestion.confidence * 100)}% match

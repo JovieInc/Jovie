@@ -11,6 +11,6 @@
  */
 export function safeJsonLdStringify(data: unknown): string {
   return JSON.stringify(data)
-    .replaceAll('</', '<\\/')
-    .replaceAll('<!--', '<\\!--');
+    .replaceAll('</', String.raw`<\/`)
+    .replaceAll('<!--', String.raw`<\!--`);
 }

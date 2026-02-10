@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, 'codegen-bot/**']
+    branches: [main, 'codegen-bot/**', 'claude/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -234,7 +234,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck --filter=@jovie/web
+        run: pnpm turbo typecheck
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -445,6 +445,35 @@ jobs:
       - name: All fast checks passed
         run: |
           echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), Knip (dead code), and guardrails succeeded"
+
+  ci-pr-ready:
+    name: PR Ready
+    # Merge gate for PRs: fast checks + unit tests must both pass.
+    # Configure this as the required status check in branch protection
+    # instead of ci-fast alone, so unit test failures block merge.
+    needs: [ci-fast, ci-unit-tests]
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate required PR checks
+        run: |
+          echo "ci-fast: ${{ needs.ci-fast.result }}"
+          echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
+
+          # ci-fast must succeed
+          if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
+            echo "❌ ci-fast did not pass"
+            exit 1
+          fi
+
+          # ci-unit-tests must succeed (path-gated skips still report success)
+          if [[ "${{ needs.ci-unit-tests.result }}" == "failure" || "${{ needs.ci-unit-tests.result }}" == "cancelled" ]]; then
+            echo "❌ ci-unit-tests failed"
+            exit 1
+          fi
+
+          echo "✅ All PR checks passed: lint, typecheck, guardrails, and unit tests"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -763,6 +792,10 @@ jobs:
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Run packages/ui unit tests
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/ui run test
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1271,6 +1304,7 @@ jobs:
       - drizzle-migration-guard
       - ci-drizzle-check
       - ci-fast
+      - ci-pr-ready
       - ci-e2e-smoke
       - ci-pr-neon-migrate
       - ci-build
@@ -1361,6 +1395,7 @@ jobs:
             };
 
             const summaryRows = [
+              { label: '**PR Ready (merge gate)**', jobName: 'PR Ready' },
               { label: 'Env Example Guard', jobName: 'Env Example Guard' },
               { label: 'Guardrails', jobName: 'Guardrails (proxy)' },
               { label: 'Biome', jobName: 'Biome (lint + format)' },
