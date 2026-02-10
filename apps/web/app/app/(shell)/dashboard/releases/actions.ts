@@ -895,27 +895,33 @@ export async function updateAllowArtworkDownloads(
 
   const profile = await requireProfile();
 
-  const [currentProfile] = await db
-    .select({ settings: creatorProfiles.settings })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profile.id))
-    .limit(1);
+  try {
+    const [currentProfile] = await db
+      .select({ settings: creatorProfiles.settings })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id))
+      .limit(1);
 
-  const currentSettings = (currentProfile?.settings ?? {}) as Record<
-    string,
-    unknown
-  >;
+    const currentSettings = (currentProfile?.settings ?? {}) as Record<
+      string,
+      unknown
+    >;
 
-  await db
-    .update(creatorProfiles)
-    .set({
-      settings: {
-        ...currentSettings,
-        allowArtworkDownloads: allowDownloads,
-      },
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...currentSettings,
+          allowArtworkDownloads: allowDownloads,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    throw new Error('Failed to update artwork download setting', {
+      cause: error,
+    });
+  }
 
   revalidatePath(APP_ROUTES.RELEASES);
 }

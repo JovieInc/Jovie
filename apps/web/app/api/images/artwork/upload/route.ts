@@ -6,7 +6,7 @@ import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import { avatarUploadLimiter } from '@/lib/rate-limit';
+import { artworkUploadLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
   AVIF_MIME_TYPE,
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     return await runWithSession(async (tx, userIdFromSession) => {
       // Rate limiting
       const rateLimitResult =
-        await avatarUploadLimiter.limit(userIdFromSession);
+        await artworkUploadLimiter.limit(userIdFromSession);
       if (!rateLimitResult.success) {
         const retryAfter = Math.round(
           (rateLimitResult.reset.getTime() - Date.now()) / 1000
@@ -209,7 +209,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Primary artwork URL is the 1000px version (good balance of quality/size)
-      const artworkUrl = sizes['1000'] ?? sizes.original ?? '';
+      const artworkUrl = sizes['1000'] ?? sizes.original;
+      if (!artworkUrl) {
+        return errorResponse(
+          'Image processing produced no usable sizes. Please try a different image.',
+          UPLOAD_ERROR_CODES.UPLOAD_FAILED,
+          422
+        );
+      }
 
       // Update the release record
       const existingMetadata =
