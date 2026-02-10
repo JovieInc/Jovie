@@ -67,6 +67,56 @@ const MetaHeaderCell = () => (
   <span className='sr-only'>Smart link, popularity, year</span>
 );
 
+const DetailsHeaderCell = () => <span className='sr-only'>Details</span>;
+
+function DetailsCellRenderer({ row }: { row: { original: ReleaseViewModel } }) {
+  const release = row.original;
+  const duration = release.totalDurationMs
+    ? formatDuration(release.totalDurationMs)
+    : null;
+  return (
+    <div className='flex items-center gap-4 text-xs text-secondary-token'>
+      {release.upc && <CopyableMonospaceCell value={release.upc} label='UPC' />}
+      {release.primaryIsrc && (
+        <CopyableMonospaceCell value={release.primaryIsrc} label='ISRC' />
+      )}
+      {release.label && (
+        <TruncatedText
+          lines={1}
+          className='max-w-28 text-tertiary-token'
+          tooltipSide='top'
+        >
+          {release.label}
+        </TruncatedText>
+      )}
+      <span className='tabular-nums' title='Tracks'>
+        {release.totalTracks} trk{release.totalTracks === 1 ? '' : 's'}
+      </span>
+      {duration && (
+        <span className='tabular-nums' title='Duration'>
+          {duration}
+        </span>
+      )}
+      {release.genres && release.genres.length > 0 && (
+        <TruncatedText
+          lines={1}
+          className='max-w-32 text-tertiary-token'
+          tooltipSide='top'
+        >
+          {release.genres.join(', ')}
+        </TruncatedText>
+      )}
+      {!release.upc &&
+        !release.primaryIsrc &&
+        !release.label &&
+        !duration &&
+        (!release.genres || release.genres.length === 0) && (
+          <EmptyCell tooltip='No metadata available' />
+        )}
+    </div>
+  );
+}
+
 /**
  * ReleaseTable - Releases table using UnifiedTable
  *
@@ -250,7 +300,7 @@ export function ReleaseTable({
   const columns = useMemo(() => {
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
-      header: () => <span>Release</span>,
+      header: 'Release',
       cell: showTracks
         ? createExpandableReleaseCellRenderer(
             artistName,
@@ -268,7 +318,7 @@ export function ReleaseTable({
     if (activeTab === 'links') {
       const availabilityColumn = columnHelper.display({
         id: 'availability',
-        header: () => <span>Availability</span>,
+        header: 'Availability',
         cell: createAvailabilityCellRenderer(
           allProviders,
           providerConfig,
@@ -287,59 +337,8 @@ export function ReleaseTable({
     if (activeTab === 'details') {
       const detailsColumn = columnHelper.display({
         id: 'details',
-        header: () => <span className='sr-only'>Details</span>,
-        cell: ({ row }) => {
-          const release = row.original;
-          const duration = release.totalDurationMs
-            ? formatDuration(release.totalDurationMs)
-            : null;
-          return (
-            <div className='flex items-center gap-4 text-xs text-secondary-token'>
-              {release.upc && (
-                <CopyableMonospaceCell value={release.upc} label='UPC' />
-              )}
-              {release.primaryIsrc && (
-                <CopyableMonospaceCell
-                  value={release.primaryIsrc}
-                  label='ISRC'
-                />
-              )}
-              {release.label && (
-                <TruncatedText
-                  lines={1}
-                  className='max-w-28 text-tertiary-token'
-                  tooltipSide='top'
-                >
-                  {release.label}
-                </TruncatedText>
-              )}
-              <span className='tabular-nums' title='Tracks'>
-                {release.totalTracks} trk{release.totalTracks !== 1 ? 's' : ''}
-              </span>
-              {duration && (
-                <span className='tabular-nums' title='Duration'>
-                  {duration}
-                </span>
-              )}
-              {release.genres && release.genres.length > 0 && (
-                <TruncatedText
-                  lines={1}
-                  className='max-w-32 text-tertiary-token'
-                  tooltipSide='top'
-                >
-                  {release.genres.join(', ')}
-                </TruncatedText>
-              )}
-              {!release.upc &&
-                !release.primaryIsrc &&
-                !release.label &&
-                !duration &&
-                (!release.genres || release.genres.length === 0) && (
-                  <EmptyCell tooltip='No metadata available' />
-                )}
-            </div>
-          );
-        },
+        header: DetailsHeaderCell,
+        cell: DetailsCellRenderer,
         size: 500,
         minSize: 200,
         meta: { className: 'hidden sm:table-cell' },

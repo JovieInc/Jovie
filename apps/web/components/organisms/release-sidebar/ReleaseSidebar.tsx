@@ -162,13 +162,14 @@ export function ReleaseSidebar({
         />
 
         <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
-          {selectedTrack && release ? (
+          {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
               releaseTitle={release.title}
               onBack={handleBackToRelease}
             />
-          ) : release ? (
+          )}
+          {!(selectedTrack && release) && release && (
             <>
               <div className='pb-5'>
                 <ReleaseArtwork
@@ -234,7 +235,8 @@ export function ReleaseSidebar({
                 </div>
               )}
             </>
-          ) : (
+          )}
+          {!release && (
             <p className='text-xs text-sidebar-muted'>
               Select a release in the table to view its details.
             </p>

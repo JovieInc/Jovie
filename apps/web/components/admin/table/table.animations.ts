@@ -102,7 +102,7 @@ export const toolbarSlideAnimation = {
 // Helper: Check if user prefers reduced motion
 export function prefersReducedMotion(): boolean {
   if (
-    typeof window === 'undefined' ||
+    typeof globalThis.window === 'undefined' ||
     typeof globalThis.matchMedia !== 'function'
   )
     return false;

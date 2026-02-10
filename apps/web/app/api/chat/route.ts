@@ -666,8 +666,11 @@ function createGenerateCanvasPlanTool(profileId: string | null) {
   });
 }
 
-function buildCanvasPlan(release: ReleaseContext, motionPreference?: string) {
-  const motion = motionPreference ?? 'ambient';
+function buildCanvasPlan(
+  release: ReleaseContext,
+  motionPreference = 'ambient'
+) {
+  const motion = motionPreference;
   const hasArtwork = Boolean(release.artworkUrl);
 
   return {
@@ -825,7 +828,7 @@ function createMarkCanvasUploadedTool(profileId: string | null) {
         .update(discogReleases)
         .set({
           metadata: {
-            ...(release.metadata ?? {}),
+            ...release.metadata,
             ...buildCanvasMetadata('uploaded'),
           },
           updatedAt: new Date(),

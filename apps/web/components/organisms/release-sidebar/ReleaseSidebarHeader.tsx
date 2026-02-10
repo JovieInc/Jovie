@@ -93,13 +93,9 @@ export function ReleaseSidebarHeader({
       label: 'Copy release ID',
       icon: Hash,
       onClick: () => {
-        try {
-          navigator.clipboard.writeText(release?.id ?? '').catch(() => {
-            // Silently fail - clipboard may not be available
-          });
-        } catch {
-          // Silently fail - navigator.clipboard may be undefined in insecure contexts
-        }
+        navigator.clipboard.writeText(release?.id ?? '').catch(() => {
+          // Silently fail - clipboard may not be available
+        });
       },
     });
   }

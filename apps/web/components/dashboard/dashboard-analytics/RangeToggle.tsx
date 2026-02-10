@@ -74,6 +74,17 @@ export function RangeToggle({
         const active = opt.value === value;
         const disabled = isDisabled(opt.value);
         const tabId = `${tabsBaseId}-tab-${opt.value}`;
+
+        let stateClass: string;
+        if (disabled) {
+          stateClass = 'text-tertiary-token/40 cursor-not-allowed';
+        } else if (active) {
+          stateClass = 'bg-surface-3 text-primary-token';
+        } else {
+          stateClass =
+            'text-tertiary-token hover:text-secondary-token hover:bg-surface-2';
+        }
+
         return (
           <button
             key={opt.value}
@@ -93,13 +104,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${
-              disabled
-                ? 'text-tertiary-token/40 cursor-not-allowed'
-                : active
-                  ? 'bg-surface-3 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
-            }`}
+            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${stateClass}`}
           >
             {opt.label}
           </button>

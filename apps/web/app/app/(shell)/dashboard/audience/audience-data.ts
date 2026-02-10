@@ -259,7 +259,7 @@ async function fetchMembersData(
   tx: DbSessionTx,
   clerkUserId: string | null,
   selectedProfileId: string,
-  searchParams: Record<string, string | string[] | undefined>,
+  searchParams: SearchParams,
   includeDetails: boolean,
   memberId: string | undefined,
   typeFilter?: AudienceMemberType
