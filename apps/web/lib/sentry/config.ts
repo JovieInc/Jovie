@@ -163,23 +163,27 @@ export const SENSITIVE_HEADERS = [
 ] as const;
 
 /**
- * ReferenceError patterns that occur during deployment transitions.
+ * Query parameter names that may contain sensitive data.
+ * Matches the param name and its value (up to the next & or end of string).
+ */
+const SENSITIVE_QUERY_PARAMS =
+  /(^|[?&])(token|key|secret|password|pwd|api_key|auth|session_id|credit_card)=[^&]*/gi;
+
+/**
+ * Pattern matching ReferenceErrors from deployment transitions.
  *
  * When a new deployment changes chunk hashes, users with stale JavaScript
  * may encounter ReferenceErrors for modules that haven't loaded properly.
  * These are not application bugs but deployment transition artifacts.
  *
+ * Uses a general pattern to catch all "X is not defined" ReferenceErrors
+ * rather than enumerating specific variable names, since new chunk-loading
+ * failures can surface any variable name after a deployment.
+ *
  * These errors are filtered from Sentry to reduce noise while still being
  * handled gracefully by useChunkErrorHandler (which shows a refresh toast).
  */
-const DEPLOYMENT_TRANSITION_ERRORS = [
-  'dynamic is not defined',
-  'usestate is not defined',
-  'useversionmonitor is not defined',
-  'mystatsigenabled is not defined',
-  'checkversionmismatch is not defined',
-  'frequent_cache is not defined',
-] as const;
+const DEPLOYMENT_TRANSITION_PATTERN = /^.+ is not defined$/;
 
 /**
  * React/Next.js internal error patterns that are framework noise.
@@ -207,14 +211,24 @@ function isDeploymentTransitionError(event: SentryEvent): boolean {
   const message = event.exception?.values?.[0]?.value?.toLowerCase() ?? '';
   const type = event.exception?.values?.[0]?.type?.toLowerCase() ?? '';
 
-  // Only filter ReferenceErrors matching known deployment transition patterns
-  if (type !== 'referenceerror') {
-    return false;
+  // Filter ReferenceErrors matching the "X is not defined" pattern
+  if (
+    type === 'referenceerror' &&
+    DEPLOYMENT_TRANSITION_PATTERN.test(message)
+  ) {
+    return true;
   }
 
-  return DEPLOYMENT_TRANSITION_ERRORS.some(pattern =>
-    message.includes(pattern)
-  );
+  // Filter chunk loading errors (stale chunks after deployment)
+  if (
+    type === 'chunkloaderror' ||
+    message.includes('loading chunk') ||
+    message.includes('loading css chunk')
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -286,6 +300,23 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
         event.request.headers[header] = '[Filtered]';
       }
     }
+  }
+
+  // Scrub sensitive query parameters from request URLs
+  if (event.request?.url) {
+    event.request.url = event.request.url.replace(
+      SENSITIVE_QUERY_PARAMS,
+      '$1$2=[Filtered]'
+    );
+  }
+  if (
+    event.request?.query_string &&
+    typeof event.request.query_string === 'string'
+  ) {
+    event.request.query_string = event.request.query_string.replace(
+      SENSITIVE_QUERY_PARAMS,
+      '$1$2=[Filtered]'
+    );
   }
 
   return event;
