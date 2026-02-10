@@ -16,6 +16,51 @@ import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { Contact } from './types';
 
+function ContactTitle({
+  hasContact,
+  clerkId,
+  isClerkIdCopied,
+  onCopyClerkId,
+}: {
+  readonly hasContact: boolean;
+  readonly clerkId: string | undefined;
+  readonly isClerkIdCopied: boolean;
+  readonly onCopyClerkId: () => Promise<void>;
+}) {
+  if (!hasContact) return <>No contact selected</>;
+  if (!clerkId) return <>Contact</>;
+
+  return (
+    <span className='flex items-center gap-1'>
+      <span>Contact</span>
+      <button
+        type='button'
+        onClick={onCopyClerkId}
+        className={
+          isClerkIdCopied
+            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400 transition-colors'
+            : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors'
+        }
+        aria-label='Copy Clerk ID'
+      >
+        <span className='relative flex h-3 w-3 items-center justify-center'>
+          <IdCard
+            className={`absolute h-3 w-3 transition-all duration-150 ${
+              isClerkIdCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+            }`}
+          />
+          <Check
+            className={`absolute h-3 w-3 transition-all duration-150 ${
+              isClerkIdCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+            }`}
+          />
+        </span>
+        <span>{isClerkIdCopied ? 'Copied!' : 'Copy ID'}</span>
+      </button>
+    </span>
+  );
+}
+
 interface ContactSidebarHeaderProps {
   readonly contact: Contact | null;
   readonly hasContact: boolean;
@@ -109,41 +154,14 @@ export function ContactSidebarHeader({
 
   const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
 
-  // Build title with optional Clerk ID copy button
-  const titleContent =
-    hasContact && contact?.clerkId ? (
-      <span className='flex items-center gap-1'>
-        <span>{hasContact ? 'Contact' : 'No contact selected'}</span>
-        <button
-          type='button'
-          onClick={handleCopyClerkId}
-          className={
-            isClerkIdCopied
-              ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400 transition-colors'
-              : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors'
-          }
-          aria-label='Copy Clerk ID'
-        >
-          <span className='relative flex h-3 w-3 items-center justify-center'>
-            <IdCard
-              className={`absolute h-3 w-3 transition-all duration-150 ${
-                isClerkIdCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-              }`}
-            />
-            <Check
-              className={`absolute h-3 w-3 transition-all duration-150 ${
-                isClerkIdCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-              }`}
-            />
-          </span>
-          <span>{isClerkIdCopied ? 'Copied!' : 'Copy ID'}</span>
-        </button>
-      </span>
-    ) : hasContact ? (
-      'Contact'
-    ) : (
-      'No contact selected'
-    );
+  const titleContent = (
+    <ContactTitle
+      hasContact={hasContact}
+      clerkId={contact?.clerkId}
+      isClerkIdCopied={isClerkIdCopied}
+      onCopyClerkId={handleCopyClerkId}
+    />
+  );
 
   return (
     <DrawerHeader
