@@ -85,6 +85,111 @@ describe('scrubPii', () => {
     expect(result).not.toBeNull();
   });
 
+  it('should filter deployment transition ReferenceErrors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'ReferenceError',
+            value: 'someNewChunkVariable is not defined',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should not filter non-ReferenceError "is not defined" errors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'TypeError',
+            value: 'x is not defined',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).not.toBeNull();
+  });
+
+  it('should filter ChunkLoadError errors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'ChunkLoadError',
+            value: 'Loading chunk 123 failed',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter "loading chunk" errors regardless of type', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Loading chunk abc-123 failed after 3 retries',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter CSS chunk loading errors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'Loading CSS chunk main-abc123 failed',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter framework internal errors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'HeadCacheNode error in reconciler',
+          },
+        ],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should scrub sensitive query parameters from request URL', () => {
+    const event = {
+      request: {
+        url: 'https://example.com/api?token=secret123&page=1',
+      },
+    };
+    const result = scrubPii(event as any);
+    expect(result?.request?.url).not.toContain('secret123');
+    expect(result?.request?.url).toContain('page=1');
+  });
+
+  it('should scrub sensitive query parameters from query_string', () => {
+    const event = {
+      request: {
+        query_string: 'api_key=my-secret&limit=10',
+      },
+    };
+    const result = scrubPii(event as any);
+    expect(result?.request?.query_string).not.toContain('my-secret');
+  });
+
   it('should preserve other user properties', () => {
     const event = {
       user: {

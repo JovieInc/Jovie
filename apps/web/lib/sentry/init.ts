@@ -56,6 +56,12 @@ import {
   setCurrentMode,
 } from './state';
 
+/**
+ * Cached initialization promise to prevent race conditions when
+ * multiple code paths call initSentry() concurrently.
+ */
+let pendingInitialization: Promise<SentryInitResult> | null = null;
+
 // Re-export route detection functions for backwards compatibility
 export { isDashboardRoute, isPublicRoute } from './route-detector';
 // Re-export state functions for backwards compatibility
@@ -156,8 +162,6 @@ export function detectSentryMode(pathname: string): 'lite' | 'full' {
 export async function initSentry(
   options: SentryInitOptions = {}
 ): Promise<SentryInitResult> {
-  const { forceMode, liteOptions = {}, fullOptions = {}, pathname } = options;
-
   // If already initialized, return current state
   if (getSentryMode() !== 'none') {
     return {
@@ -165,6 +169,25 @@ export async function initSentry(
       mode: getSentryMode(),
     };
   }
+
+  // If initialization is already in progress, wait for it
+  if (pendingInitialization) {
+    return pendingInitialization;
+  }
+
+  pendingInitialization = doInitSentry(options);
+
+  try {
+    return await pendingInitialization;
+  } finally {
+    pendingInitialization = null;
+  }
+}
+
+async function doInitSentry(
+  options: SentryInitOptions
+): Promise<SentryInitResult> {
+  const { forceMode, liteOptions = {}, fullOptions = {}, pathname } = options;
 
   // Determine the mode to use
   const currentPathname = pathname ?? getCurrentPathname() ?? '/';
