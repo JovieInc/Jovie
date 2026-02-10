@@ -396,7 +396,7 @@ const ADMIN_PAGES = [
 // ============================================================================
 
 test.describe('Authenticated Chaos Testing @chaos', () => {
-  test.setTimeout(600_000); // 10 minutes per test - chaos tests need time for many clicks
+  test.setTimeout(720_000); // 12 minutes per test - signInUser (180s) + chaos clicks (many pages)
 
   test.beforeEach(async ({ page }) => {
     const success = await setupChaosAuth(page);

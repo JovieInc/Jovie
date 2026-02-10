@@ -193,6 +193,8 @@ async function fetchSubscriptionBySession(
 
 test.describe('Billing payment flow - Stripe Checkout', () => {
   test.describe.configure({ mode: 'serial' });
+  // signInUser needs 180s+ for Clerk + Turbopack, plus Stripe checkout page loads
+  test.setTimeout(300_000);
 
   test('completes Standard upgrade and reflects on dashboard', async ({
     page,

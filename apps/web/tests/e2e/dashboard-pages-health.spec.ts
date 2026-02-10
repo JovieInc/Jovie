@@ -202,6 +202,10 @@ const ADMIN_PAGES = [
 ] as const;
 
 test.describe('Dashboard Pages Health Check @smoke', () => {
+  // signInUser navigates to /signin, waits 60s for Clerk, signs in, then navigates to
+  // /app/dashboard/profile (120s Turbopack). Combined with test body, need generous timeout.
+  test.setTimeout(360_000);
+
   test.beforeEach(async ({ page }) => {
     // Skip if no Clerk credentials configured
     if (!hasClerkCredentials()) {
@@ -470,6 +474,9 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 });
 
 test.describe('Admin Pages Health Check @smoke', () => {
+  // Admin pages: signInUser (180s+) + admin page navigation (120s each)
+  test.setTimeout(480_000);
+
   test.beforeEach(async ({ page }) => {
     // Skip if no admin credentials configured
     if (!hasAdminCredentials()) {
