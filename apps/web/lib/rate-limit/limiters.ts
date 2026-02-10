@@ -22,6 +22,14 @@ export const avatarUploadLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for artwork uploads
+ * Limit: 5 uploads per minute per user
+ */
+export const artworkUploadLimiter = createRateLimiter(
+  RATE_LIMITERS.artworkUpload
+);
+
+/**
  * General API rate limiter
  * Limit: 100 requests per minute per IP
  */
@@ -530,6 +538,7 @@ export async function checkAccountExportRateLimit(
 export function getAllLimiters(): Record<string, RateLimiter> {
   return {
     avatarUpload: avatarUploadLimiter,
+    artworkUpload: artworkUploadLimiter,
     api: apiLimiter,
     onboarding: onboardingLimiter,
     handleCheck: handleCheckLimiter,

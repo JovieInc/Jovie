@@ -43,6 +43,7 @@ export {
   adminImpersonateLimiter,
   aiChatLimiter,
   apiLimiter,
+  artworkUploadLimiter,
   avatarUploadLimiter,
   checkAccountDeleteRateLimit,
   checkAccountExportRateLimit,
