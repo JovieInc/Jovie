@@ -41,6 +41,7 @@ import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -158,6 +159,7 @@ function mapReleaseToViewModel(
     totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
     primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
     genres: extractGenres(release.metadata),
+    canvasStatus: getCanvasStatusFromMetadata(release.metadata),
   };
 }
 
