@@ -10,7 +10,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
-import { UnifiedDrawer } from '@/components/organisms/UnifiedDrawer';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -23,8 +22,6 @@ export interface AuthShellProps {
   /** Actions shown on right side of header */
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
-  readonly drawerContent?: ReactNode;
-  readonly drawerWidth?: number;
   readonly isTableRoute?: boolean;
   /** Preview panel slot (rendered alongside main content) */
   readonly previewPanel?: ReactNode;
@@ -42,8 +39,6 @@ function AuthShellInner({
   headerBadge,
   headerAction,
   showMobileTabs = false,
-  drawerContent,
-  drawerWidth,
   isTableRoute = false,
   previewPanel,
   children,
@@ -88,10 +83,6 @@ function AuthShellInner({
           </div>
         )}
       </SidebarInset>
-
-      {drawerContent && (
-        <UnifiedDrawer width={drawerWidth}>{drawerContent}</UnifiedDrawer>
-      )}
     </>
   );
 }
@@ -99,12 +90,12 @@ function AuthShellInner({
 /**
  * AuthShell - Unified layout component for all post-auth pages
  *
- * Pure layout component with 3-panel structure:
+ * Pure layout component with 2-panel structure:
  * - Sidebar (dynamic navigation based on section)
- * - Main content area (with header and surface hierarchy)
- * - Optional drawer (contact sidebar, preview panel, etc.)
+ * - Main content area (with header, surface hierarchy, and optional preview panel)
  *
- * Replaces: DashboardLayoutClient, AdminShell
+ * Right drawers (contact/release/audience detail panels) are rendered
+ * by individual page components using the shared RightDrawer shell.
  */
 export function AuthShell(props: Readonly<AuthShellProps>) {
   const { onSidebarOpenChange, ...rest } = props;

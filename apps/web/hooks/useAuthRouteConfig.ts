@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
+
 import {
   adminNavigation,
   primaryNavigation,
@@ -18,9 +19,6 @@ export interface AuthRouteConfig {
   navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
-  showDrawer: boolean;
-  drawerWidth: number | null;
-  drawerContent: ReactNode;
   headerAction: ReactNode;
   isTableRoute: boolean;
 }
@@ -34,7 +32,6 @@ export interface AuthRouteConfig {
  * - UI feature flags
  * - Breadcrumb generation
  * - Header actions
- * - Drawer configuration
  *
  * Separates routing concerns from layout component.
  */
@@ -97,13 +94,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');
 
-  // Drawer is now controlled by individual pages, not auto-shown
-  const showDrawer = false;
-
-  // Drawer configuration
-  const drawerWidth = showDrawer ? 360 : null;
-  const drawerContent = null; // Controlled by individual pages
-
   // Header action will be determined by AuthShellWrapper based on route type
   const headerAction = null;
 
@@ -112,9 +102,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     navigation,
     breadcrumbs,
     showMobileTabs,
-    showDrawer,
-    drawerWidth,
-    drawerContent,
     headerAction,
     isTableRoute,
   };

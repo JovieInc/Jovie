@@ -1,3 +1,7 @@
+export {
+  DrawerEmptyState,
+  type DrawerEmptyStateProps,
+} from './DrawerEmptyState';
 export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
 export {
   DrawerPropertyRow,
