@@ -5,7 +5,6 @@ import {
   Home,
   IdCard,
   Link2,
-  MessageCircle,
   Music,
   Music2,
   Paintbrush,
@@ -72,16 +71,6 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
-  },
-];
-
-export const secondaryNavigation: NavItem[] = [
-  {
-    name: 'Thread',
-    href: APP_ROUTES.CHAT,
-    id: 'chat',
-    icon: MessageCircle,
-    description: 'Ask Jovie anything about your profile',
   },
 ];
 
@@ -214,6 +203,5 @@ export const mobilePrimaryNavigation: NavItem[] = [
 export const mobileExpandedNavigation: NavItem[] = [
   primaryNavigation[1], // Contacts
   primaryNavigation[3], // Tour Dates
-  ...secondaryNavigation, // Chat
   settingsNavItem,
 ];

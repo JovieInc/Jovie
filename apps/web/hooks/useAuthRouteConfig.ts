@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import {
   primaryNavigation,
-  secondaryNavigation,
   settingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
@@ -52,12 +51,12 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const navigation = useMemo(() => {
     switch (section) {
       case 'admin':
-        return [...primaryNavigation, ...secondaryNavigation];
+        return primaryNavigation;
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
       default:
-        return [...primaryNavigation, ...secondaryNavigation];
+        return primaryNavigation;
     }
   }, [section]);
 
