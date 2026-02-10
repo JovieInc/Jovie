@@ -225,7 +225,8 @@ export async function GET(request: NextRequest) {
           const actor = getActorKind(row.memberType ?? null);
           const actorLabel = getActorLabel(actor);
           const locationLabel = formatActivityLocation([row.city, row.country]);
-          const timestamp = toISOStringSafe(row.lastSeenAt as Date | string);
+          // lastSeenAt is guaranteed non-null by the filter above
+          const timestamp = toISOStringSafe(row.lastSeenAt! as Date | string);
           return {
             id: `visit:${row.id}:${timestamp}`,
             type: 'visit' as const,
