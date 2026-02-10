@@ -123,13 +123,17 @@ export function PreviewPanel() {
         id: 'copy-url',
         label: 'Copy Jovie Profile URL',
         icon: Copy,
-        onClick: () => void handleCopyUrl(),
+        onClick: () => {
+          handleCopyUrl();
+        },
       },
       {
         id: 'download-qr',
         label: 'Download QR Code',
         icon: QrCode,
-        onClick: () => void handleDownloadQr(),
+        onClick: () => {
+          handleDownloadQr();
+        },
       },
       {
         id: 'download-vcard',

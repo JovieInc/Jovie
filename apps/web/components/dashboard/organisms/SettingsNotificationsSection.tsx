@@ -33,7 +33,7 @@ export function SettingsNotificationsSection() {
         description='Receive updates about new features, tips, and promotional offers from Jovie.'
         checked={marketingEmails}
         onCheckedChange={enabled => {
-          void handleMarketingToggle(enabled);
+          handleMarketingToggle(enabled);
         }}
         disabled={isPending}
         ariaLabel='Toggle marketing emails'
@@ -43,7 +43,7 @@ export function SettingsNotificationsSection() {
         description='New fans must confirm their email before receiving notifications. Prevents spam sign-ups and protects your sender reputation.'
         checked={doubleOptIn}
         onCheckedChange={enabled => {
-          void handleDoubleOptInToggle(enabled);
+          handleDoubleOptInToggle(enabled);
         }}
         disabled={isPending}
         ariaLabel='Toggle email verification requirement'

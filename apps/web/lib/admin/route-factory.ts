@@ -41,6 +41,25 @@ function wantsJsonResponse(request: NextRequest): boolean {
 }
 
 /**
+ * Resolves user entitlements, falling back to partial data if billing is unavailable.
+ */
+async function resolveEntitlements() {
+  try {
+    return await getCurrentUserEntitlements();
+  } catch (error) {
+    if (error instanceof BillingUnavailableError) {
+      return {
+        isAdmin: error.isAdmin,
+        userId: error.userId,
+        email: null,
+        isAuthenticated: true,
+      };
+    }
+    throw error;
+  }
+}
+
+/**
  * Creates an admin route handler with standardized authorization,
  * error handling, and response formatting.
  *
@@ -68,22 +87,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
     const wantsJson = wantsJsonResponse(request);
 
     // Check admin authorization
-    let entitlements;
-    try {
-      entitlements = await getCurrentUserEntitlements();
-    } catch (error) {
-      if (error instanceof BillingUnavailableError) {
-        // Billing DB down but admin status is known — use it
-        entitlements = {
-          isAdmin: error.isAdmin,
-          userId: error.userId,
-          email: null,
-          isAuthenticated: true,
-        };
-      } else {
-        throw error;
-      }
-    }
+    const entitlements = await resolveEntitlements();
     if (!entitlements.isAdmin) {
       captureWarning(
         `[admin/route-factory] Admin auth denied for ${config.actionName}`,

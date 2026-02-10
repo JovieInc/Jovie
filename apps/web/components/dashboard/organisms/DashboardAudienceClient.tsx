@@ -137,8 +137,8 @@ export function DashboardAudienceClient({
   const handleViewChange = React.useCallback(
     (nextView: AudienceView) => {
       // Reset to page 1 and default sort when changing views
-      void setView(nextView);
-      void setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
+      setView(nextView);
+      setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
     },
     [setView, setUrlParams]
   );
