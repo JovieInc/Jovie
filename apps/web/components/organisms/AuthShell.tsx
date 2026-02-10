@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { Menu, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
@@ -50,21 +48,10 @@ function AuthShellInner({
   previewPanel,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { toggleSidebar, openMobile, isMobile, state } = useSidebar();
+  const { isMobile, state } = useSidebar();
 
-  // Mobile menu button (only on mobile)
-  const MobileMenuButton = isMobile ? (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={toggleSidebar}
-      aria-label={openMobile ? 'Close menu' : 'Open menu'}
-      aria-expanded={openMobile}
-      className='h-11 w-11'
-    >
-      {openMobile ? <X className='h-6 w-6' /> : <Menu className='h-6 w-6' />}
-    </Button>
-  ) : null;
+  // Mobile menu button - hidden on mobile since bottom tab bar handles navigation
+  const MobileMenuButton = null;
 
   // Sidebar expand button (desktop only, when collapsed)
   const SidebarExpandButton =

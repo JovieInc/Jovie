@@ -33,7 +33,19 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn('z-20 border-b border-subtle', className)}
     >
-      <div className='relative flex h-[52px] w-full items-center gap-2 px-4'>
+      {/* Mobile: Linear-style large page title with actions */}
+      <div className='flex items-center justify-between px-4 pt-3 pb-2 sm:hidden'>
+        <h1 className='text-[22px] font-bold tracking-tight text-primary-token'>
+          {currentLabel}
+        </h1>
+        {action ? (
+          <div className='flex items-center gap-2 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
+            {action}
+          </div>
+        ) : null}
+      </div>
+      {/* Desktop: Standard header bar with breadcrumbs */}
+      <div className='relative hidden h-[52px] w-full items-center gap-2 px-4 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -45,14 +57,8 @@ export function DashboardHeader({
             <VerticalDivider />
           </div>
         ) : null}
-        {/* Mobile: Show current page title centered */}
-        <h1 className='flex-1 text-center text-[15px] font-semibold text-secondary-token sm:hidden'>
-          <span className='block max-w-[200px] truncate mx-auto'>
-            {currentLabel}
-          </span>
-        </h1>
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='hidden flex-1 items-center gap-3 sm:flex'>
+        <div className='flex-1 items-center gap-3 flex'>
           <span className='text-[13px] font-medium text-secondary-token'>
             {currentLabel}
           </span>
@@ -62,7 +68,7 @@ export function DashboardHeader({
           <div className='ml-auto flex items-center gap-2'>{action}</div>
         ) : null}
       </div>
-      {/* Mobile tabs - rendered in header area as per user decision */}
+      {/* Mobile tabs - rendered below header title */}
       {mobileTabs && (
         <div className='lg:hidden border-t border-subtle'>{mobileTabs}</div>
       )}
