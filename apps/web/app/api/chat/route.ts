@@ -16,7 +16,10 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { CORS_HEADERS } from '@/lib/http/headers';
-import { checkAiChatRateLimit, createRateLimitHeaders } from '@/lib/rate-limit';
+import {
+  checkAiChatRateLimitForPlan,
+  createRateLimitHeaders,
+} from '@/lib/rate-limit';
 import {
   buildCanvasMetadata,
   getCanvasStatusFromMetadata,
@@ -28,6 +31,8 @@ import {
 } from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { getPlanLimits } from '@/lib/stripe/config';
+import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 
 export const maxDuration = 30;
 
@@ -356,7 +361,10 @@ function validateMessagesArray(messages: unknown): string | null {
   return null;
 }
 
-function buildSystemPrompt(context: ArtistContext): string {
+function buildSystemPrompt(
+  context: ArtistContext,
+  options?: { aiCanUseTools: boolean; aiDailyMessageLimit: number }
+): string {
   const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
@@ -464,7 +472,14 @@ Optional fields you can ask about:
 - **Label** (record label name)
 - **UPC** (barcode, most artists won't know this)
 
-After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.`;
+After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.${
+    options && !options.aiCanUseTools
+      ? `
+
+## Plan Limitations (Free Tier)
+This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions and give advice, but you do NOT have access to tools (profile editing, canvas planning, promo strategy, release creation, or related artist suggestions). If the artist asks for something that requires a tool, let them know this feature is available on the Pro plan and briefly explain the value.`
+      : ''
+  }`;
 }
 
 /**
@@ -959,8 +974,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // Rate limiting - protect Anthropic API costs
-  const rateLimitResult = await checkAiChatRateLimit(userId);
+  // Fetch user plan for rate limiting and tool gating
+  const billingInfo = await getUserBillingInfo();
+  const userPlan = billingInfo.data?.plan ?? 'free';
+  const planLimits = getPlanLimits(userPlan);
+
+  // Rate limiting - plan-aware daily quota + burst protection
+  const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
   if (!rateLimitResult.success) {
     return NextResponse.json(
       {
@@ -1031,7 +1051,10 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
-  const systemPrompt = buildSystemPrompt(artistContext);
+  const systemPrompt = buildSystemPrompt(artistContext, {
+    aiCanUseTools: planLimits.aiCanUseTools,
+    aiDailyMessageLimit: planLimits.aiDailyMessageLimit,
+  });
 
   try {
     // Convert UIMessages (from the client) to ModelMessages (for streamText)
@@ -1041,25 +1064,29 @@ export async function POST(req: Request) {
     const resolvedProfileId =
       profileId && typeof profileId === 'string' ? profileId : null;
 
+    // Gate AI tools behind paid plans — free users get chat-only
+    const tools = planLimits.aiCanUseTools
+      ? {
+          proposeProfileEdit: createProfileEditTool(artistContext),
+          checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+          suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+          generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+          createPromoStrategy: createPromoStrategyTool(
+            artistContext,
+            resolvedProfileId
+          ),
+          markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+          ...(resolvedProfileId
+            ? { createRelease: createReleaseTool(resolvedProfileId) }
+            : {}),
+        }
+      : {};
+
     const result = streamText({
       model: gateway(CHAT_MODEL),
       system: systemPrompt,
       messages: modelMessages,
-      tools: {
-        proposeProfileEdit: createProfileEditTool(artistContext),
-        checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
-        suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
-        generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
-        createPromoStrategy: createPromoStrategyTool(
-          artistContext,
-          resolvedProfileId
-        ),
-        markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
-        // Only enable release creation when we have a verified profileId
-        ...(resolvedProfileId
-          ? { createRelease: createReleaseTool(resolvedProfileId) }
-          : {}),
-      },
+      tools,
       abortSignal: req.signal,
       onError: ({ error }) => {
         Sentry.captureException(error, {

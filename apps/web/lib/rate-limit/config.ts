@@ -345,12 +345,39 @@ export const RATE_LIMITERS = {
   // AI Chat Operations
   // ---------------------------------------------------------------------------
 
-  /** AI Chat: 30 messages per hour per user - protects Anthropic API costs */
+  /** AI Chat: 30 messages per hour per user - burst protection for all plans */
   aiChat: {
     name: 'AI Chat',
     limit: 30,
     window: '1 h',
     prefix: 'ai:chat',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Free): 5 messages per day */
+  aiChatDailyFree: {
+    name: 'AI Chat Daily (Free)',
+    limit: 5,
+    window: '1 d',
+    prefix: 'ai:chat:daily:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Pro): 100 messages per day */
+  aiChatDailyPro: {
+    name: 'AI Chat Daily (Pro)',
+    limit: 100,
+    window: '1 d',
+    prefix: 'ai:chat:daily:pro',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Growth): 500 messages per day */
+  aiChatDailyGrowth: {
+    name: 'AI Chat Daily (Growth)',
+    limit: 500,
+    window: '1 d',
+    prefix: 'ai:chat:daily:growth',
     analytics: true,
   } satisfies RateLimitConfig,
 
