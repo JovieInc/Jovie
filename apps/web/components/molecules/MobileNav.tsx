@@ -1,6 +1,5 @@
 'use client';
 
-import { SignedIn, SignedOut } from '@clerk/nextjs';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -8,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserButton } from '@/components/organisms/user-button';
 
 import { APP_ROUTES } from '@/constants/routes';
+import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 
 export function MobileNav({
   hidePricingLink = false,
@@ -17,6 +17,7 @@ export function MobileNav({
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
+  const isAuthed = useIsAuthenticated();
 
   const close = useCallback(() => setIsOpen(false), []);
 
@@ -104,17 +105,18 @@ export function MobileNav({
 
         {/* Auth actions - visible in mobile menu */}
         <div className='mobile-nav-auth'>
-          <SignedOut>
-            <Link href='/signin' className='mobile-nav-link' onClick={close}>
-              Log in
-            </Link>
-            <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
-              Sign up
-            </Link>
-          </SignedOut>
-          <SignedIn>
+          {isAuthed ? (
             <UserButton />
-          </SignedIn>
+          ) : (
+            <>
+              <Link href='/signin' className='mobile-nav-link' onClick={close}>
+                Log in
+              </Link>
+              <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
       </nav>
     </>
