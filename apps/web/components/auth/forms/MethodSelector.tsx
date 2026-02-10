@@ -193,7 +193,7 @@ export function MethodSelector({
 
         {/* Secondary methods */}
         {orderedMethods.length > 1 && (
-          <div className={FORM_LAYOUT.formInner}>
+          <div className='space-y-3'>
             {orderedMethods.slice(1).map(method => (
               <div key={method}>{renderMethodButton(method, false)}</div>
             ))}
