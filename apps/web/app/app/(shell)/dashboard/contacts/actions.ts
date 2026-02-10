@@ -1,6 +1,6 @@
 'use server';
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -15,7 +15,23 @@ import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
+
+/**
+ * Error thrown when the contact limit for the user's plan has been reached.
+ */
+export class ContactLimitError extends Error {
+  constructor(
+    public readonly limit: number,
+    public readonly currentCount: number
+  ) {
+    super(
+      `Contact limit reached: ${currentCount}/${limit}. Upgrade your plan for unlimited contacts.`
+    );
+    this.name = 'ContactLimitError';
+  }
+}
 
 function mapContact(
   row: typeof creatorContacts.$inferSelect
@@ -161,6 +177,27 @@ export async function saveContact(
         .where(eq(creatorContacts.id, sanitized.id))
         .returning();
     } else {
+      // Enforce contact limit for the user's plan before inserting new contacts.
+      // Updates to existing contacts are always allowed.
+      let entitlements;
+      try {
+        entitlements = await getCurrentUserEntitlements();
+      } catch {
+        // If billing is unavailable, allow the insert rather than blocking users.
+        entitlements = null;
+      }
+      const contactsLimit = entitlements?.contactsLimit;
+      if (contactsLimit !== null && contactsLimit !== undefined) {
+        const [{ total }] = await tx
+          .select({ total: count() })
+          .from(creatorContacts)
+          .where(eq(creatorContacts.creatorProfileId, sanitized.profileId));
+
+        if (total >= contactsLimit) {
+          throw new ContactLimitError(contactsLimit, total);
+        }
+      }
+
       [saved] = await tx
         .insert(creatorContacts)
         .values({

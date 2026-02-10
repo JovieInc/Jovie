@@ -46,7 +46,7 @@ export function NewUpgradeTeaser() {
                 className='w-full justify-center gap-2 h-11 text-sm font-medium'
               >
                 <Link href='/billing/remove-branding'>
-                  Upgrade to Standard
+                  Upgrade to Pro
                   <ArrowRight className='h-4 w-4' />
                 </Link>
               </Button>

@@ -5,6 +5,7 @@ import { Globe, Link2, MapPin } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
@@ -153,6 +154,8 @@ export function DashboardAnalytics() {
     rangeLabel,
   } = useDashboardAnalyticsState();
 
+  const { analyticsRetentionDays } = usePlanGate();
+
   if (!artist) return null;
 
   const fmt = Intl.NumberFormat();
@@ -178,6 +181,7 @@ export function DashboardAnalytics() {
             onChange={setRange}
             tabsBaseId={rangeTabsBaseId}
             panelId={rangePanelId}
+            maxRetentionDays={analyticsRetentionDays}
           />
         </div>
       </div>

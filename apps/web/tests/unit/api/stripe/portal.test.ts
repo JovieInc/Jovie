@@ -47,7 +47,10 @@ describe('POST /api/stripe/portal', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe('No billing account found');
+    expect(data.error).toBe(
+      'No billing account found. Upgrade to Pro to manage billing.'
+    );
+    expect(data.code).toBe('no_billing_account');
   });
 
   it('creates portal session for user with Stripe customer', async () => {
