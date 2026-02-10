@@ -2,7 +2,10 @@
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useMemo } from 'react';
+import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { Icon } from '@/components/atoms/Icon';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   type ContextMenuItemType,
   UnifiedTable,
@@ -10,11 +13,14 @@ import {
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { formatDuration } from '@/lib/utils/formatDuration';
 import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import type { ReleaseTab } from './ReleaseTableSubheader';
 import {
+  createAvailabilityCellRenderer,
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
@@ -51,6 +57,8 @@ interface ReleaseTableProps {
   readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
   readonly groupByYear?: boolean;
+  /** Active data tab controlling which columns are displayed */
+  readonly activeTab?: ReleaseTab;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -82,6 +90,7 @@ export function ReleaseTable({
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  activeTab = 'catalog',
 }: ReleaseTableProps) {
   // Track expansion state (only used when showTracks is enabled)
   const {
@@ -231,7 +240,13 @@ export function ReleaseTable({
     [releases, onFocusedRowChange]
   );
 
-  // Build column definitions
+  // Get all providers for availability column and track row rendering
+  const allProviders = useMemo(
+    () => Object.keys(providerConfig) as ProviderKey[],
+    [providerConfig]
+  );
+
+  // Build column definitions based on active tab
   const columns = useMemo(() => {
     const releaseColumn = columnHelper.accessor('title', {
       id: 'release',
@@ -249,6 +264,91 @@ export function ReleaseTable({
       enableSorting: true,
     });
 
+    // Tab-specific columns
+    if (activeTab === 'links') {
+      const availabilityColumn = columnHelper.display({
+        id: 'availability',
+        header: () => <span>Availability</span>,
+        cell: createAvailabilityCellRenderer(
+          allProviders,
+          providerConfig,
+          onCopy,
+          onAddUrl,
+          isAddingUrl
+        ),
+        size: 200,
+        minSize: 140,
+        meta: { className: 'hidden sm:table-cell' },
+      });
+
+      return [releaseColumn, availabilityColumn];
+    }
+
+    if (activeTab === 'details') {
+      const detailsColumn = columnHelper.display({
+        id: 'details',
+        header: () => <span className='sr-only'>Details</span>,
+        cell: ({ row }) => {
+          const release = row.original;
+          const duration = release.totalDurationMs
+            ? formatDuration(release.totalDurationMs)
+            : null;
+          return (
+            <div className='flex items-center gap-4 text-xs text-secondary-token'>
+              {release.upc && (
+                <CopyableMonospaceCell value={release.upc} label='UPC' />
+              )}
+              {release.primaryIsrc && (
+                <CopyableMonospaceCell
+                  value={release.primaryIsrc}
+                  label='ISRC'
+                />
+              )}
+              {release.label && (
+                <TruncatedText
+                  lines={1}
+                  className='max-w-28 text-tertiary-token'
+                  tooltipSide='top'
+                >
+                  {release.label}
+                </TruncatedText>
+              )}
+              <span className='tabular-nums' title='Tracks'>
+                {release.totalTracks} trk{release.totalTracks !== 1 ? 's' : ''}
+              </span>
+              {duration && (
+                <span className='tabular-nums' title='Duration'>
+                  {duration}
+                </span>
+              )}
+              {release.genres && release.genres.length > 0 && (
+                <TruncatedText
+                  lines={1}
+                  className='max-w-32 text-tertiary-token'
+                  tooltipSide='top'
+                >
+                  {release.genres.join(', ')}
+                </TruncatedText>
+              )}
+              {!release.upc &&
+                !release.primaryIsrc &&
+                !release.label &&
+                !duration &&
+                (!release.genres || release.genres.length === 0) && (
+                  <EmptyCell tooltip='No metadata available' />
+                )}
+            </div>
+          );
+        },
+        size: 500,
+        minSize: 200,
+        meta: { className: 'hidden sm:table-cell' },
+      });
+
+      return [releaseColumn, detailsColumn];
+    }
+
+    // Default: catalog tab
     const rightMetaColumn = columnHelper.display({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
@@ -260,7 +360,19 @@ export function ReleaseTable({
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [artistName, showTracks, isExpanded, isLoadingTracks, toggleExpansion]);
+  }, [
+    artistName,
+    showTracks,
+    isExpanded,
+    isLoadingTracks,
+    toggleExpansion,
+    activeTab,
+    allProviders,
+    providerConfig,
+    onCopy,
+    onAddUrl,
+    isAddingUrl,
+  ]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {
@@ -283,12 +395,6 @@ export function ReleaseTable({
   // When showTracks is enabled and rows are expanded, disable virtualization
   // This allows dynamic row counts with track rows
   const shouldVirtualize = !showTracks || !hasExpandedRows;
-
-  // Get all providers for track row rendering
-  const allProviders = useMemo(
-    () => Object.keys(providerConfig) as ProviderKey[],
-    [providerConfig]
-  );
 
   // Year grouping configuration
   const groupingConfig = useMemo(() => {
