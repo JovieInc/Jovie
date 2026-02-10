@@ -5,7 +5,7 @@ import { AlertTriangle, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { isSentryInitialized } from '@/lib/sentry/init';
+import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 
 interface ErrorBoundaryProps {
   readonly error: Error & { digest?: string };
@@ -30,7 +30,10 @@ export default function ErrorBoundary({
     // Report to Sentry if initialized
     if (isSentryInitialized()) {
       Sentry.captureException(error, {
-        tags: { errorBoundary: context.toLowerCase() },
+        tags: {
+          errorBoundary: context.toLowerCase(),
+          sentryMode: getSentryMode(),
+        },
         extra: { digest: error.digest },
       });
     }

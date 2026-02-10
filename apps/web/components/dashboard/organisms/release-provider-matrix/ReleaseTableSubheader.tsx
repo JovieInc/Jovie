@@ -5,7 +5,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  SegmentControl,
   TooltipShortcut,
 } from '@jovie/ui';
 import { memo } from 'react';
@@ -40,16 +39,6 @@ export const DEFAULT_RELEASE_FILTERS: ReleaseFilters = {
 /** Release view filter type */
 export type ReleaseView = 'tracks' | 'releases';
 
-/** Tab for organizing release data into focused views */
-export type ReleaseTab = 'catalog' | 'links' | 'details';
-
-/** Options for release tab segment control */
-const RELEASE_TAB_OPTIONS = [
-  { value: 'catalog' as const, label: 'Catalog' },
-  { value: 'links' as const, label: 'Links' },
-  { value: 'details' as const, label: 'Details' },
-];
-
 interface ReleaseTableSubheaderProps {
   /** All releases for export */
   readonly releases: ReleaseViewModel[];
@@ -78,10 +67,6 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
-  /** Active data tab */
-  readonly releaseTab?: ReleaseTab;
-  /** Callback when data tab changes */
-  readonly onReleaseTabChange?: (tab: ReleaseTab) => void;
 }
 
 /** Options for release view segmented control */
@@ -295,8 +280,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
-  releaseTab = 'catalog',
-  onReleaseTabChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -306,17 +289,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: Tabs + Filter */}
+      {/* Left: Filter */}
       <div className='flex items-center gap-2'>
-        {onReleaseTabChange && (
-          <SegmentControl
-            value={releaseTab}
-            onValueChange={onReleaseTabChange}
-            options={RELEASE_TAB_OPTIONS}
-            size='sm'
-            aria-label='Release data view'
-          />
-        )}
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}

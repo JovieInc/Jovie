@@ -8,7 +8,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button } from '@jovie/ui';
+import { Button, SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -26,6 +26,16 @@ import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
+
+/** Tab for organizing sidebar content into focused views */
+type SidebarTab = 'catalog' | 'links' | 'details';
+
+/** Options for sidebar tab segment control */
+const SIDEBAR_TAB_OPTIONS = [
+  { value: 'catalog' as const, label: 'Catalog' },
+  { value: 'links' as const, label: 'Links' },
+  { value: 'details' as const, label: 'Details' },
+];
 
 export function ReleaseSidebar({
   release,
@@ -71,14 +81,18 @@ export function ReleaseSidebar({
     onRemoveDspLink,
   });
 
+  // Sidebar tab state
+  const [activeTab, setActiveTab] = useState<SidebarTab>('catalog');
+
   // Track detail panel state — track shape comes from the sidebar route handler
   const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
     null
   );
 
-  // Reset selected track when release changes to avoid stale detail views
+  // Reset selected track and tab when release changes to avoid stale views
   useEffect(() => {
     setSelectedTrack(null);
+    setActiveTab('catalog');
   }, [release?.id]);
 
   const handleTrackClick = useCallback((track: TrackForDetail) => {
@@ -168,6 +182,19 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
+        {/* Tab navigation */}
+        {release && !selectedTrack && (
+          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+            <SegmentControl
+              value={activeTab}
+              onValueChange={setActiveTab}
+              options={SIDEBAR_TAB_OPTIONS}
+              size='sm'
+              aria-label='Release sidebar view'
+            />
+          </div>
+        )}
+
         <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
           {selectedTrack && release && (
             <TrackDetailPanel
@@ -178,62 +205,75 @@ export function ReleaseSidebar({
           )}
           {!(selectedTrack && release) && release && (
             <>
-              <div className='pb-5'>
-                <ReleaseArtwork
-                  artworkUrl={release.artworkUrl}
-                  title={release.title}
-                  artistName={artistName}
-                  canUploadArtwork={canUploadArtwork}
-                  onArtworkUpload={
-                    canUploadArtwork ? handleArtworkUpload : undefined
-                  }
-                  allowDownloads={isEditable}
-                  releaseId={release.id}
-                />
-              </div>
+              {/* Catalog tab: Artwork, Fields, Track list */}
+              {activeTab === 'catalog' && (
+                <>
+                  <div className='pb-5'>
+                    <ReleaseArtwork
+                      artworkUrl={release.artworkUrl}
+                      title={release.title}
+                      artistName={artistName}
+                      canUploadArtwork={canUploadArtwork}
+                      onArtworkUpload={
+                        canUploadArtwork ? handleArtworkUpload : undefined
+                      }
+                      allowDownloads={isEditable}
+                      releaseId={release.id}
+                    />
+                  </div>
 
-              <div className='py-5'>
-                <ReleaseFields
-                  title={release.title}
-                  releaseDate={release.releaseDate}
-                  smartLinkPath={release.smartLinkPath}
-                />
-              </div>
+                  <div className='py-5'>
+                    <ReleaseFields
+                      title={release.title}
+                      releaseDate={release.releaseDate}
+                      smartLinkPath={release.smartLinkPath}
+                    />
+                  </div>
 
-              <div className='py-5'>
-                <ReleaseMetadata release={release} />
-              </div>
+                  <div className='pt-5'>
+                    <ReleaseTrackList
+                      release={release}
+                      onTrackClick={handleTrackClick}
+                    />
+                  </div>
+                </>
+              )}
 
-              <div className='py-5'>
-                <ReleaseTrackList
-                  release={release}
-                  onTrackClick={handleTrackClick}
-                />
-              </div>
-
-              <div className='pt-5'>
-                <ReleaseDspLinks
-                  release={release}
-                  providerConfig={providerConfig}
-                  isEditable={isEditable}
-                  isAddingLink={isAddingLink}
-                  newLinkUrl={newLinkUrl}
-                  selectedProvider={selectedProvider}
-                  isAddingDspLink={isAddingDspLink}
-                  isRemovingDspLink={isRemovingDspLink}
-                  onSetIsAddingLink={setIsAddingLink}
-                  onSetNewLinkUrl={setNewLinkUrl}
-                  onSetSelectedProvider={setSelectedProvider}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  onNewLinkKeyDown={handleNewLinkKeyDown}
-                />
-              </div>
-
-              {isEditable && (
-                <div className='py-5'>
-                  <ReleaseSettings allowDownloads={allowDownloads} />
+              {/* Links tab: DSP links management */}
+              {activeTab === 'links' && (
+                <div className='pt-0'>
+                  <ReleaseDspLinks
+                    release={release}
+                    providerConfig={providerConfig}
+                    isEditable={isEditable}
+                    isAddingLink={isAddingLink}
+                    newLinkUrl={newLinkUrl}
+                    selectedProvider={selectedProvider}
+                    isAddingDspLink={isAddingDspLink}
+                    isRemovingDspLink={isRemovingDspLink}
+                    onSetIsAddingLink={setIsAddingLink}
+                    onSetNewLinkUrl={setNewLinkUrl}
+                    onSetSelectedProvider={setSelectedProvider}
+                    onAddLink={handleAddLink}
+                    onRemoveLink={handleRemoveLink}
+                    onNewLinkKeyDown={handleNewLinkKeyDown}
+                  />
                 </div>
+              )}
+
+              {/* Details tab: Metadata + Settings */}
+              {activeTab === 'details' && (
+                <>
+                  <div className='pb-5'>
+                    <ReleaseMetadata release={release} />
+                  </div>
+
+                  {isEditable && (
+                    <div className='pt-5'>
+                      <ReleaseSettings allowDownloads={allowDownloads} />
+                    </div>
+                  )}
+                </>
               )}
 
               {isEditable && onSave && (
