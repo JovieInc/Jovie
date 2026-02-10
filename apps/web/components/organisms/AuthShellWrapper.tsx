@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
   createContext,
@@ -12,9 +11,7 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -75,7 +72,6 @@ function AuthShellWrapperInner({
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
-  const pathname = usePathname();
   const headerActionsContext = useOptionalHeaderActions();
   const [, startTransition] = useTransition();
 
@@ -85,17 +81,14 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Determine if preview panel should be enabled (profile route only)
-  const isProfileRoute = pathname?.startsWith(APP_ROUTES.PROFILE) ?? false;
-  const previewEnabled = config.section === 'dashboard' && isProfileRoute;
+  // Preview panel is available on all dashboard routes (toggled via nav)
+  const previewEnabled = config.section === 'dashboard';
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   let defaultHeaderAction: ReactNode = null;
   if (config.isTableRoute) {
     defaultHeaderAction = <DrawerToggleButton />;
-  } else if (isProfileRoute) {
-    defaultHeaderAction = <PreviewToggleButton />;
   }
   const headerAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
@@ -127,7 +120,7 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <PreviewPanelProvider enabled={previewEnabled} defaultOpen>
+      <PreviewPanelProvider enabled={previewEnabled}>
         <AuthShell
           section={config.section}
           navigation={config.navigation}

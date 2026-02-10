@@ -1,12 +1,11 @@
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
+import { ChatPageClient } from './chat/ChatPageClient';
 
 export const metadata = {
-  title: 'Dashboard',
+  title: 'New Thread',
   description: 'Start a new thread with Jovie AI',
 };
 
-// Chat-first experience: new sessions start on the chat page
+// Chat-first experience: /app renders the new chat directly
 export default function AppRootPage() {
-  redirect(APP_ROUTES.CHAT);
+  return <ChatPageClient />;
 }

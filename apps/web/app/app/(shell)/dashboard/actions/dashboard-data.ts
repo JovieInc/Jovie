@@ -38,6 +38,29 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 const { logger } = Sentry;
 
+/**
+ * Executes a query with RLS session setup.
+ * This ensures session variables are set on the same connection as the query execution.
+ *
+ * With the Neon HTTP driver, each db.execute() can hit a different connection.
+ * To ensure RLS session variables (app.user_id, app.clerk_user_id) are available
+ * to the query, we set them immediately before executing the query.
+ *
+ * @param clerkUserId - The Clerk user ID for session setup
+ * @param queryFn - The query function to execute
+ * @param context - Description for error messages
+ */
+async function executeWithSession<T>(
+  clerkUserId: string,
+  queryFn: () => Promise<T>,
+  context?: string
+): Promise<T> {
+  // Set RLS session variables immediately before the query
+  await setupDbSession(clerkUserId);
+  // Execute the query - should use the same connection with the session variables
+  return queryFn();
+}
+
 function truncateString(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
   return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
@@ -125,18 +148,22 @@ type ChromeData = Omit<DashboardData, 'isAdmin' | 'tippingStats'>;
 async function fetchChromeDataWithSession(
   clerkUserId: string
 ): Promise<ChromeData> {
-  // Set up RLS session for all queries
-  await setupDbSession(clerkUserId);
   try {
     // First check if user exists in users table
-    const [userData] = await dashboardQuery(
+    // Set up RLS session immediately before this query
+    const [userData] = await executeWithSession(
+      clerkUserId,
       () =>
-        db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.clerkId, clerkUserId))
-          .limit(1),
-      'User lookup query'
+        dashboardQuery(
+          () =>
+            db
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.clerkId, clerkUserId))
+              .limit(1),
+          'User lookup query'
+        ),
+      'User lookup with session'
     );
 
     if (!userData?.id) {
@@ -153,14 +180,20 @@ async function fetchChromeDataWithSession(
     }
 
     // Now that we know user exists, get creator profiles
-    const creatorData = await dashboardQuery(
+    // Set up RLS session immediately before this query
+    const creatorData = await executeWithSession(
+      clerkUserId,
       () =>
-        db
-          .select()
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, userData.id))
-          .orderBy(asc(creatorProfiles.createdAt)),
-      'Creator profiles query'
+        dashboardQuery(
+          () =>
+            db
+              .select()
+              .from(creatorProfiles)
+              .where(eq(creatorProfiles.userId, userData.id))
+              .orderBy(asc(creatorProfiles.createdAt)),
+          'Creator profiles query'
+        ),
+      'Creator profiles with session'
     ).catch((error: unknown) => {
       const migrationResult = handleMigrationErrors(error, {
         userId: userData.id,
@@ -194,70 +227,84 @@ async function fetchChromeDataWithSession(
 
     // Performance optimization: Single query for both link counts using conditional aggregation
     // This reduces database round trips from 3 to 2 (33% reduction)
+    // Each query in Promise.all needs its own session setup for RLS
     const [settings, linkCounts] = await Promise.all([
-      dashboardQuery(
+      executeWithSession(
+        clerkUserId,
         () =>
-          db
-            .select()
-            .from(userSettings)
-            .where(eq(userSettings.userId, userData.id))
-            .limit(1),
-        'User settings query'
-      )
-        .then(
-          result => result?.[0] as { sidebarCollapsed: boolean } | undefined
-        )
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'user_settings',
-          });
+          dashboardQuery(
+            () =>
+              db
+                .select()
+                .from(userSettings)
+                .where(eq(userSettings.userId, userData.id))
+                .limit(1),
+            'User settings query'
+          )
+            .then(
+              result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+            )
+            .catch((error: unknown) => {
+              const migrationResult = handleMigrationErrors(error, {
+                userId: userData.id,
+                operation: 'user_settings',
+              });
 
-          if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as
-              | { sidebarCollapsed: boolean }
-              | undefined;
-          }
-          Sentry.captureException(error, {
-            tags: { query: 'user_settings', context: 'dashboard_data' },
-          });
-          throw error;
-        }),
+              if (!migrationResult.shouldRetry) {
+                return migrationResult.fallbackData as
+                  | { sidebarCollapsed: boolean }
+                  | undefined;
+              }
+              Sentry.captureException(error, {
+                tags: { query: 'user_settings', context: 'dashboard_data' },
+              });
+              throw error;
+            }),
+        'User settings with session'
+      ),
       // Consolidated link count query - counts all active links and music links in one query
-      dashboardQuery(
+      executeWithSession(
+        clerkUserId,
         () =>
-          db
-            .select({
-              totalActive: count(),
-              musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-            })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
-              )
-            ),
-        'Social links count query'
-      )
-        .then(result => ({
-          hasLinks: Number(result?.[0]?.totalActive ?? 0) > 0,
-          hasMusicLinks: Number(result?.[0]?.musicActive ?? 0) > 0,
-        }))
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'social_links_count',
-          });
+          dashboardQuery(
+            () =>
+              db
+                .select({
+                  totalActive: count(),
+                  musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
+                })
+                .from(socialLinks)
+                .where(
+                  and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active')
+                  )
+                ),
+            'Social links count query'
+          )
+            .then(result => ({
+              hasLinks: Number(result?.[0]?.totalActive ?? 0) > 0,
+              hasMusicLinks: Number(result?.[0]?.musicActive ?? 0) > 0,
+            }))
+            .catch((error: unknown) => {
+              const migrationResult = handleMigrationErrors(error, {
+                userId: userData.id,
+                operation: 'social_links_count',
+              });
 
-          if (!migrationResult.shouldRetry) {
-            return { hasLinks: false, hasMusicLinks: false };
-          }
-          Sentry.captureException(error, {
-            tags: { query: 'social_links_count', context: 'dashboard_data' },
-          });
-          throw error;
-        }),
+              if (!migrationResult.shouldRetry) {
+                return { hasLinks: false, hasMusicLinks: false };
+              }
+              Sentry.captureException(error, {
+                tags: {
+                  query: 'social_links_count',
+                  context: 'dashboard_data',
+                },
+              });
+              throw error;
+            }),
+        'Social links count with session'
+      ),
     ]);
 
     const hasLinks = linkCounts.hasLinks;
@@ -321,23 +368,27 @@ async function fetchTippingStatsWithSession(
   profileId: string,
   clerkUserId: string
 ): Promise<TippingStats> {
-  // Set up RLS session for all queries
-  await setupDbSession(clerkUserId);
   try {
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const startOfMonthISO = startOfMonth.toISOString();
 
+    // Execute queries in parallel, but ensure each has its own session setup
+    // This is critical because the Neon HTTP driver is stateless - each query
+    // may hit a different connection, so session variables must be set per query
     const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      dashboardQuery(
+      executeWithSession(
+        clerkUserId,
         () =>
-          db
-            .select({
-              totalReceived: drizzleSql`
+          dashboardQuery(
+            () =>
+              db
+                .select({
+                  totalReceived: drizzleSql`
             COALESCE(SUM(${tips.amountCents}), 0)
           `,
-              monthReceived: drizzleSql`
+                  monthReceived: drizzleSql`
             COALESCE(
               SUM(
                 CASE
@@ -349,30 +400,37 @@ async function fetchTippingStatsWithSession(
               0
             )
           `,
-              tipsSubmitted: drizzleSql`
+                  tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
-            })
-            .from(tips)
-            .where(eq(tips.creatorProfileId, profileId)),
-        'Tipping stats query'
+                })
+                .from(tips)
+                .where(eq(tips.creatorProfileId, profileId)),
+            'Tipping stats query'
+          ),
+        'Tipping stats with session'
       ),
-      dashboardQuery(
+      executeWithSession(
+        clerkUserId,
         () =>
-          db
-            .select({
-              total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
-              qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
-              link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
-            })
-            .from(clickEvents)
-            .where(
-              and(
-                eq(clickEvents.creatorProfileId, profileId),
-                eq(clickEvents.linkType, 'tip')
-              )
-            ),
-        'Click events query'
+          dashboardQuery(
+            () =>
+              db
+                .select({
+                  total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+                  qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
+                  link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
+                })
+                .from(clickEvents)
+                .where(
+                  and(
+                    eq(clickEvents.creatorProfileId, profileId),
+                    eq(clickEvents.linkType, 'tip')
+                  )
+                ),
+            'Click events query'
+          ),
+        'Click events with session'
       ),
     ]);
 
