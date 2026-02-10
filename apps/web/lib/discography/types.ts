@@ -44,6 +44,9 @@ export type ReleaseType =
   | 'mixtape'
   | 'other';
 
+import type { CanvasStatus } from '@/lib/services/canvas/types';
+export type { CanvasStatus };
+
 export interface ReleaseViewModel {
   profileId: string;
   id: string;
@@ -68,6 +71,8 @@ export interface ReleaseViewModel {
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  /** Spotify Canvas video status for this release */
+  canvasStatus?: CanvasStatus;
 }
 
 /** Track view model for display in expandable release rows */
@@ -75,6 +80,8 @@ export interface TrackViewModel {
   id: string;
   releaseId: string;
   title: string;
+  slug: string;
+  smartLinkPath: string;
   trackNumber: number;
   discNumber: number;
   durationMs: number | null;
