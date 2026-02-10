@@ -21,7 +21,7 @@ import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 /**
  * Error thrown when the contact limit for the user's plan has been reached.
  */
-export class ContactLimitError extends Error {
+class ContactLimitError extends Error {
   constructor(
     public readonly limit: number,
     public readonly currentCount: number
