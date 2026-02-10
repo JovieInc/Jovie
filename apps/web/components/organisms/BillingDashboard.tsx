@@ -169,7 +169,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
             <p className='text-sm text-muted-foreground'>
               {billingInfo?.isPro
                 ? 'Branding is removed from your profile'
-                : 'Upgrade to Standard to remove branding'}
+                : 'Upgrade to Pro to remove branding'}
             </p>
             {billingInfo?.stripeSubscriptionId && (
               <p className='mt-1 text-xs text-muted-foreground'>
@@ -299,7 +299,7 @@ export const BillingDashboard = memo(function BillingDashboard() {
           ) : (
             <div>
               <h4 className='mb-2 text-sm font-medium text-foreground'>
-                Upgrade to Standard
+                Upgrade to Pro
               </h4>
               <p className='mb-3 text-sm text-muted-foreground'>
                 Remove Jovie branding from your profile

@@ -126,7 +126,7 @@ describe('Billing Components', () => {
     it('renders with default props', () => {
       mockUseFeatureFlag.mockReturnValue(false);
       renderWithQueryClient(<UpgradeButton />);
-      expect(screen.getByText('Upgrade to Standard')).toBeInTheDocument();
+      expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
 

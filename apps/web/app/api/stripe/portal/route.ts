@@ -39,21 +39,18 @@ export async function POST() {
 
     const { stripeCustomerId } = billingResult.data;
 
-    // Check if user has a Stripe customer ID
+    // Free users without a Stripe customer can't access the billing portal.
+    // Users who had a subscription but cancelled still have a customer ID
+    // and should be able to manage billing (view invoices, resubscribe).
     if (!stripeCustomerId) {
       return NextResponse.json(
-        { error: 'No billing account found' },
+        {
+          error: 'No billing account found. Upgrade to Pro to manage billing.',
+          code: 'no_billing_account',
+        },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-
-    // Optionally check if user is Pro (uncomment if you want to restrict access)
-    // if (!isPro) {
-    //   return NextResponse.json(
-    //     { error: 'Pro subscription required' },
-    //     { status: 403 }
-    //   );
-    // }
 
     // Create return URL
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

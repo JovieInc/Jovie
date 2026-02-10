@@ -2,10 +2,34 @@ import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
 import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
 
 type TimeRange = AnalyticsRange;
+
+/** Map a retention-days limit to the maximum allowed AnalyticsRange. */
+const RANGE_DAYS: Record<TimeRange, number> = {
+  '1d': 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  all: 365,
+};
+
+/** Clamp the requested range to the user's plan retention limit. */
+function clampRange(requested: TimeRange, retentionDays: number): TimeRange {
+  const requestedDays = RANGE_DAYS[requested];
+  if (requestedDays <= retentionDays) return requested;
+
+  // Find the largest range that fits within retention
+  const ranges: TimeRange[] = ['1d', '7d', '30d', '90d', 'all'];
+  let best: TimeRange = '1d';
+  for (const r of ranges) {
+    if (RANGE_DAYS[r] <= retentionDays) best = r;
+  }
+  return best;
+}
 
 type CacheEntry = {
   payload: unknown;
@@ -77,11 +101,22 @@ export async function GET(request: Request) {
       const viewParam = searchParams.get('view');
       const refreshParam = searchParams.get('refresh');
 
-      const range: TimeRange =
+      const rawRange: TimeRange =
         rangeParam && isRange(rangeParam) ? rangeParam : '30d';
       const view: DashboardAnalyticsView =
         viewParam && isView(viewParam) ? viewParam : 'full';
       const forceRefresh = refreshParam === '1';
+
+      // Clamp date range to user's plan retention limit.
+      // On entitlements failure, default to 7-day (free) limit.
+      let retentionDays = 7;
+      try {
+        const entitlements = await getCurrentUserEntitlements();
+        retentionDays = entitlements.analyticsRetentionDays;
+      } catch {
+        // Billing unavailable — use free-tier default (7 days)
+      }
+      const range = clampRange(rawRange, retentionDays);
 
       const key = getCacheKey(userId, view, range);
       const now = Date.now();
