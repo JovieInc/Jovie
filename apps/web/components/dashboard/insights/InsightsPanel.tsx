@@ -115,7 +115,7 @@ export function InsightsPanel() {
           </p>
         </div>
       ) : insights.length === 0 ? (
-        <InsightEmptyState hasEnoughData />
+        <InsightEmptyState />
       ) : (
         <div className='space-y-6'>
           {/* High priority */}

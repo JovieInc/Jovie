@@ -20,14 +20,6 @@ export async function PATCH(
 ) {
   try {
     const { profile } = await getSessionContext({ requireProfile: true });
-
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'Creator profile not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
     const { id: insightId } = await params;
 
     // Validate UUID format
@@ -61,7 +53,7 @@ export async function PATCH(
 
     const updated = await updateInsightStatus(
       insightId,
-      profile.id,
+      profile!.id,
       parsed.data.status
     );
 
@@ -81,6 +73,17 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      (error.message.includes('User not found') ||
+        error.message.includes('Profile not found'))
+    ) {
+      return NextResponse.json(
+        { error: 'Creator profile not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 

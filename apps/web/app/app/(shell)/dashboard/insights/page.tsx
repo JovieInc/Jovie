@@ -31,6 +31,7 @@ async function InsightsContent() {
 }
 
 const SKELETON_KEYS = Array.from({ length: 4 }, (_, i) => `insight-${i}`);
+const FILTER_SKELETON_KEYS = Array.from({ length: 5 }, (_, i) => `filter-${i}`);
 
 function InsightsSkeleton() {
   return (
@@ -43,15 +44,15 @@ function InsightsSkeleton() {
         <div className='h-8 w-28 animate-pulse rounded-lg bg-surface-1' />
       </div>
       <div className='flex gap-1.5'>
-        {Array.from({ length: 5 }, (_, i) => (
+        {FILTER_SKELETON_KEYS.map(key => (
           <div
-            key={`filter-${i}`}
+            key={key}
             className='h-7 w-20 animate-pulse rounded-full bg-surface-1'
           />
         ))}
       </div>
       <div className='space-y-3'>
-        {SKELETON_KEYS.map((key) => (
+        {SKELETON_KEYS.map(key => (
           <div
             key={key}
             className='h-28 animate-pulse rounded-xl border border-subtle bg-surface-1'

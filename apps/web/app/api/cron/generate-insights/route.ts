@@ -77,6 +77,7 @@ export async function GET(request: Request) {
               SELECT min(ce.created_at)
               FROM ${clickEvents} ce
               WHERE ce.creator_profile_id = cp.id
+                AND (ce.is_bot = false OR ce.is_bot IS NULL)
             ) <= ${sevenDaysAgo.toISOString()}::timestamp
             -- No recent generation run
             AND NOT EXISTS (
@@ -101,14 +102,19 @@ export async function GET(request: Request) {
 
     // 3. Process each profile
     for (const { profile_id: profileId } of eligibleProfiles) {
+      let runId: string | null = null;
+      let runStart = Date.now();
+      let dataPointsAnalyzed = 0;
       try {
         const run = await createGenerationRun(profileId);
-        const runStart = Date.now();
+        runId = run.id;
+        runStart = Date.now();
 
         const metrics = await aggregateMetrics(profileId);
         const totalDataPoints =
           metrics.traffic.totalClicksCurrent +
           metrics.traffic.totalClicksPrevious;
+        dataPointsAnalyzed = totalDataPoints;
 
         if (totalDataPoints < MIN_TOTAL_CLICKS) {
           await completeGenerationRun(run.id, {
@@ -146,6 +152,22 @@ export async function GET(request: Request) {
         processed++;
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
+        if (runId) {
+          try {
+            await completeGenerationRun(runId, {
+              status: 'failed',
+              insightsGenerated: 0,
+              dataPointsAnalyzed,
+              durationMs: Date.now() - runStart,
+              error: msg,
+            });
+          } catch (updateError) {
+            logger.error(
+              `[insights-cron] Failed to update run status for profile ${profileId}:`,
+              updateError
+            );
+          }
+        }
         errors.push(`Profile ${profileId}: ${msg}`);
         logger.error(`[insights-cron] Failed for profile ${profileId}:`, error);
       }

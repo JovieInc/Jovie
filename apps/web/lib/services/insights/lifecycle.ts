@@ -71,7 +71,11 @@ export async function canGenerateInsights(
       and(
         eq(insightGenerationRuns.creatorProfileId, creatorProfileId),
         gte(insightGenerationRuns.createdAt, cooldownStart),
-        inArray(insightGenerationRuns.status, ['completed', 'processing'])
+        inArray(insightGenerationRuns.status, [
+          'completed',
+          'processing',
+          'pending',
+        ])
       )
     )
     .orderBy(desc(insightGenerationRuns.createdAt))
@@ -95,7 +99,7 @@ export async function canGenerateInsights(
  * Persists generated insights to the database.
  *
  * Uses ON CONFLICT to handle dedup (same type + period), replacing
- * existing insights only if the new one has higher confidence.
+ * existing insights with the latest generated data.
  */
 export async function persistInsights(
   creatorProfileId: string,

@@ -6,10 +6,12 @@ import { Icon } from '@/components/atoms/Icon';
 import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
 
 interface InsightEmptyStateProps {
-  readonly hasEnoughData: boolean;
+  readonly hasEnoughData?: boolean;
 }
 
-export function InsightEmptyState({ hasEnoughData }: InsightEmptyStateProps) {
+export function InsightEmptyState({
+  hasEnoughData = true,
+}: InsightEmptyStateProps) {
   const { mutate, isPending } = useGenerateInsightsMutation();
 
   return (

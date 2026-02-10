@@ -32,14 +32,6 @@ const VALID_PRIORITIES: InsightPriority[] = ['high', 'medium', 'low'];
 export async function GET(request: Request) {
   try {
     const { profile } = await getSessionContext({ requireProfile: true });
-
-    if (!profile) {
-      return NextResponse.json(
-        { insights: [], total: 0, hasMore: false },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
 
     // Parse category filter
@@ -69,7 +61,7 @@ export async function GET(request: Request) {
     );
     const offset = Math.max(0, Number(searchParams.get('offset')) || 0);
 
-    const result = await getActiveInsights(profile.id, {
+    const result = await getActiveInsights(profile!.id, {
       category: categories,
       priority: priorities,
       limit,

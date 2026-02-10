@@ -21,7 +21,7 @@ import { MIN_TOTAL_CLICKS } from '@/lib/services/insights/thresholds';
  */
 export async function POST() {
   try {
-    const { profile } = await getSessionContext({ requireProfile: true });
+    const { profile } = await getSessionContext({ requireProfile: false });
 
     if (!profile) {
       return NextResponse.json(
