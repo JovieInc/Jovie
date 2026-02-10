@@ -34,7 +34,7 @@ export type ArtworkSizeKey = keyof typeof ARTWORK_SIZES;
 
 export interface ArtworkUploadResult {
   artworkUrl: string;
-  sizes: Record<ArtworkSizeKey, string>;
+  sizes: Partial<Record<ArtworkSizeKey, string>>;
 }
 
 export async function POST(request: NextRequest) {
@@ -111,9 +111,11 @@ export async function POST(request: NextRequest) {
 
       // Extract releaseId from form data (already consumed, get from URL params)
       const releaseId = request.nextUrl.searchParams.get('releaseId');
-      if (!releaseId) {
+      const UUID_RE =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!releaseId || !UUID_RE.test(releaseId)) {
         return errorResponse(
-          'Release ID is required.',
+          'A valid Release ID is required.',
           UPLOAD_ERROR_CODES.INVALID_FILE,
           400
         );

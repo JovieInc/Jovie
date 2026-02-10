@@ -73,11 +73,12 @@ export function buildArtworkSizes(
 }
 
 function sanitizeFilename(title: string): string {
-  return title
+  const sanitized = title
     .replace(/[^a-zA-Z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
     .toLowerCase()
     .slice(0, 100);
+  return sanitized || 'artwork';
 }
 
 export function AlbumArtworkContextMenu({
@@ -96,6 +97,7 @@ export function AlbumArtworkContextMenu({
         });
 
         const response = await fetch(size.url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');

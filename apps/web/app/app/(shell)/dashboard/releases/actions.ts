@@ -851,7 +851,8 @@ export async function uploadReleaseArtwork(
   const formData = new FormData();
   formData.append('file', file);
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  const { publicEnv } = await import('@/lib/env-public');
+  const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL;
   const response = await fetch(
     `${baseUrl}/api/images/artwork/upload?releaseId=${encodeURIComponent(releaseId)}`,
     {
