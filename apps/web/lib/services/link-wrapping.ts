@@ -8,6 +8,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { wrappedLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
+import { toISOStringSafe } from '@/lib/utils/date';
 import {
   categorizeDomain,
   getCrawlerSafeLabel,
@@ -64,8 +65,8 @@ function buildWrappedLinkFromRecord(
     category: data.category || undefined,
     titleAlias: data.titleAlias || undefined,
     clickCount: data.clickCount || 0,
-    createdAt: data.createdAt.toISOString(),
-    expiresAt: data.expiresAt?.toISOString() || undefined,
+    createdAt: toISOStringSafe(data.createdAt),
+    expiresAt: data.expiresAt ? toISOStringSafe(data.expiresAt) : undefined,
   };
 }
 

@@ -64,14 +64,20 @@ export function PreviewPanelProvider({
 }: Readonly<PreviewPanelProviderProps>) {
   // Check if screen is large (md breakpoint: 768px)
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (typeof globalThis.window === 'undefined' || !globalThis.matchMedia)
+    if (
+      typeof globalThis.window === 'undefined' ||
+      typeof globalThis.matchMedia !== 'function'
+    )
       return true; // SSR/test default
     return globalThis.matchMedia('(min-width: 768px)').matches;
   });
 
   // Update isLargeScreen on resize
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined' || !globalThis.matchMedia)
+    if (
+      typeof globalThis.window === 'undefined' ||
+      typeof globalThis.matchMedia !== 'function'
+    )
       return;
 
     const mediaQuery = globalThis.matchMedia('(min-width: 768px)');

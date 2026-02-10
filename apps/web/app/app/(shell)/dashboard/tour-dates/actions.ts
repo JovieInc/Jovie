@@ -22,6 +22,7 @@ import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
 
@@ -97,7 +98,7 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     externalId: tourDate.externalId,
     provider: tourDate.provider,
     title: tourDate.title,
-    startDate: tourDate.startDate.toISOString(),
+    startDate: toISOStringSafe(tourDate.startDate),
     startTime: tourDate.startTime,
     timezone: tourDate.timezone,
     venueName: tourDate.venueName,
@@ -108,9 +109,11 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     longitude: tourDate.longitude,
     ticketUrl: tourDate.ticketUrl,
     ticketStatus: tourDate.ticketStatus,
-    lastSyncedAt: tourDate.lastSyncedAt?.toISOString() ?? null,
-    createdAt: tourDate.createdAt.toISOString(),
-    updatedAt: tourDate.updatedAt.toISOString(),
+    lastSyncedAt: tourDate.lastSyncedAt
+      ? toISOStringSafe(tourDate.lastSyncedAt)
+      : null,
+    createdAt: toISOStringSafe(tourDate.createdAt),
+    updatedAt: toISOStringSafe(tourDate.updatedAt),
   };
 }
 
