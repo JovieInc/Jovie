@@ -12,8 +12,8 @@ import {
 } from '@/components/organisms/table';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { formatDuration } from '@/lib/utils/formatDuration';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
