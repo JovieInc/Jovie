@@ -45,11 +45,8 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
 
-  // Mobile menu button - hidden on mobile since bottom tab bar handles navigation
-  const MobileMenuButton = null;
-
   // Sidebar expand button (desktop only, when collapsed)
-  const SidebarExpandButton =
+  const sidebarTrigger =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
   return (
@@ -59,8 +56,7 @@ function AuthShellInner({
       <SidebarInset className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'>
         <DashboardHeader
           breadcrumbs={breadcrumbs}
-          leading={MobileMenuButton}
-          sidebarTrigger={SidebarExpandButton}
+          sidebarTrigger={sidebarTrigger}
           breadcrumbSuffix={headerBadge}
           action={headerAction}
           showDivider={isTableRoute}

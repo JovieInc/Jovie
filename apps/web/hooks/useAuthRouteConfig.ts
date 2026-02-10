@@ -1,7 +1,6 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
 import {
@@ -19,7 +18,6 @@ export interface AuthRouteConfig {
   navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
-  headerAction: ReactNode;
   isTableRoute: boolean;
 }
 
@@ -29,9 +27,8 @@ export interface AuthRouteConfig {
  * Returns configuration for AuthShell based on current route:
  * - Section detection (admin/dashboard/settings)
  * - Navigation items
- * - UI feature flags
+ * - UI feature flags (mobile tabs, table routes)
  * - Breadcrumb generation
- * - Header actions
  *
  * Separates routing concerns from layout component.
  */
@@ -94,15 +91,11 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');
 
-  // Header action will be determined by AuthShellWrapper based on route type
-  const headerAction = null;
-
   return {
     section,
     navigation,
     breadcrumbs,
     showMobileTabs,
-    headerAction,
     isTableRoute,
   };
 }

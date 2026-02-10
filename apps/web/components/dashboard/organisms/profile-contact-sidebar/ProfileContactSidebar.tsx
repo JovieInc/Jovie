@@ -72,7 +72,7 @@ export function ProfileContactSidebar() {
         />
 
         {/* Content */}
-        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-6'>
+        <div className='flex-1 min-h-0 overflow-y-auto p-4 space-y-6'>
           {/* Contact Header with Avatar, Name */}
           <ProfileContactHeader
             displayName={displayName}
