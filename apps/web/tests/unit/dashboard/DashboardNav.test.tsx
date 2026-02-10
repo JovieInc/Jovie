@@ -31,6 +31,24 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
   }),
 }));
 
+vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
+  usePreviewPanelState: () => ({
+    isOpen: false,
+    activeTab: null,
+  }),
+  usePreviewPanelData: () => ({
+    data: null,
+  }),
+  usePreviewPanel: () => ({
+    isOpen: false,
+    activeTab: null,
+    data: null,
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
+  }),
+}));
+
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
