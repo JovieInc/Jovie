@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const { codecovWebpackPlugin } = require('@codecov/webpack-plugin');
 
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
@@ -422,6 +423,15 @@ const nextConfig = {
       ...(config.resolve.alias || {}),
       ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
     };
+
+    // Codecov Bundle Analysis plugin - uploads bundle stats during CI builds
+    config.plugins.push(
+      codecovWebpackPlugin({
+        enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
+        bundleName: 'jovie-web',
+        uploadToken: process.env.CODECOV_TOKEN,
+      })
+    );
 
     return config;
   },
