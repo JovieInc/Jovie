@@ -3,17 +3,19 @@
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import dynamic from 'next/dynamic';
+import { useCallback } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
+import { track } from '@/lib/analytics';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
 import { useUserButton } from './useUserButton';
 
-const FeedbackModal = dynamic(
+const DashboardFeedbackModal = dynamic(
   () =>
-    import('../../dashboard/molecules/FeedbackModal').then(mod => ({
-      default: mod.FeedbackModal,
+    import('../../dashboard/organisms/DashboardFeedbackModal').then(mod => ({
+      default: mod.DashboardFeedbackModal,
     })),
   { ssr: false, loading: () => null }
 );
@@ -285,6 +287,14 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
+  const handleFeedbackSubmit = useCallback((feedback: string) => {
+    track('feedback_submitted', {
+      feedback: feedback.trim(),
+      source: 'dashboard_sidebar',
+      method: 'custom_modal',
+      character_count: feedback.trim().length,
+    });
+  }, []);
   const {
     isLoaded,
     user,
@@ -392,9 +402,10 @@ export function UserButton({
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
       />
-      <FeedbackModal
+      <DashboardFeedbackModal
         isOpen={isFeedbackOpen}
         onClose={() => setIsFeedbackOpen(false)}
+        onSubmit={handleFeedbackSubmit}
       />
     </>
   );

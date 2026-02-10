@@ -39,6 +39,7 @@ export interface TourDateViewModel {
   title: string | null;
   startDate: string;
   startTime: string | null;
+  timezone: string | null;
   venueName: string;
   city: string;
   region: string | null;
@@ -98,6 +99,7 @@ function mapTourDateToViewModel(tourDate: TourDate): TourDateViewModel {
     title: tourDate.title,
     startDate: tourDate.startDate.toISOString(),
     startTime: tourDate.startTime,
+    timezone: tourDate.timezone,
     venueName: tourDate.venueName,
     city: tourDate.city,
     region: tourDate.region,
@@ -146,6 +148,7 @@ async function upsertBandsintownEvents(
     title: event.title,
     startDate: event.startDate,
     startTime: event.startTime,
+    timezone: event.timezone,
     venueName: event.venueName,
     city: event.city,
     region: event.region,
@@ -167,6 +170,7 @@ async function upsertBandsintownEvents(
         title: drizzleSql`excluded.title`,
         startDate: drizzleSql`excluded.start_date`,
         startTime: drizzleSql`excluded.start_time`,
+        timezone: drizzleSql`excluded.timezone`,
         venueName: drizzleSql`excluded.venue_name`,
         city: drizzleSql`excluded.city`,
         region: drizzleSql`excluded.region`,
@@ -542,6 +546,7 @@ export async function createTourDate(params: {
   title?: string;
   startDate: string;
   startTime?: string;
+  timezone?: string;
   venueName: string;
   city: string;
   region?: string;
@@ -575,6 +580,7 @@ export async function createTourDate(params: {
       title: params.title ?? null,
       startDate: parsedStartDate,
       startTime: params.startTime ?? null,
+      timezone: params.timezone ?? null,
       venueName: params.venueName,
       city: params.city,
       region: params.region ?? null,
@@ -605,6 +611,7 @@ export async function updateTourDate(params: {
   title?: string | null;
   startDate?: string;
   startTime?: string | null;
+  timezone?: string | null;
   venueName?: string;
   city?: string;
   region?: string | null;
@@ -647,6 +654,7 @@ export async function updateTourDate(params: {
     updateData.startDate = parsedStartDate;
   }
   if (params.startTime !== undefined) updateData.startTime = params.startTime;
+  if (params.timezone !== undefined) updateData.timezone = params.timezone;
   if (params.venueName !== undefined) updateData.venueName = params.venueName;
   if (params.city !== undefined) updateData.city = params.city;
   if (params.region !== undefined) updateData.region = params.region;

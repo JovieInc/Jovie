@@ -115,11 +115,11 @@ export async function POST(request: Request) {
     try {
       const clerk = await clerkClient();
       await clerk.users.deleteUser(clerkUserId);
-    } catch (clerkErr) {
+    } catch (error_) {
       // Log but don't fail - the DB deletion is the critical part
       await captureError(
         'Failed to delete Clerk user during account deletion',
-        clerkErr,
+        error_,
         { route: '/api/account/delete', clerkUserId }
       );
     }

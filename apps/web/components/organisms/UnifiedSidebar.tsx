@@ -149,14 +149,14 @@ function FloatingSidebar({
   pathname,
   section,
   profileHref,
-}: {
+}: Readonly<{
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   navigation: NavItem[];
   pathname: string;
   section: string;
   profileHref: string | undefined;
-}) {
+}>) {
   return (
     <div className='fixed inset-y-0 left-0 z-50 w-[270px] p-3 animate-in slide-in-from-left duration-200'>
       <div className='h-full bg-base border border-subtle rounded-xl shadow-2xl flex flex-col overflow-hidden'>

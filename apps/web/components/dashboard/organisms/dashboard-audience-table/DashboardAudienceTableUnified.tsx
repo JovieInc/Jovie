@@ -27,6 +27,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import { AudienceTableProvider } from './AudienceTableContext';
+import { AudienceTableSubheader } from './AudienceTableSubheader';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { downloadVCard } from './utils';
@@ -160,6 +161,7 @@ const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
 export const DashboardAudienceTableUnified = memo(
   function DashboardAudienceTableUnified({
     mode,
+    view,
     rows,
     total,
     page,
@@ -169,8 +171,10 @@ export const DashboardAudienceTableUnified = memo(
     onPageChange,
     onPageSizeChange,
     onSortChange,
+    onViewChange,
     profileUrl,
     profileId,
+    subscriberCount,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -269,7 +273,7 @@ export const DashboardAudienceTableUnified = memo(
             label: 'Unsubscribe',
             icon: <UserMinus className='h-3.5 w-3.5' />,
             onClick: () => {
-              void handleRemoveMember(member);
+              handleRemoveMember(member).catch(() => {});
             },
             disabled: !profileId,
             destructive: true,
@@ -355,6 +359,16 @@ export const DashboardAudienceTableUnified = memo(
             <p className='sr-only'>
               {getSrDescription(rows.length === 0, mode)}
             </p>
+
+            {/* Subheader with view filter tabs and export */}
+            <AudienceTableSubheader
+              view={view}
+              onViewChange={onViewChange}
+              rows={rows}
+              selectedIds={selectedIds}
+              subscriberCount={subscriberCount}
+              total={total}
+            />
 
             <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
               {/* Scrollable content area */}

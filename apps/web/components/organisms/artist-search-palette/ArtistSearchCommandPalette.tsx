@@ -130,10 +130,12 @@ function inferArtistNameFromUrl(
   try {
     const parsed = new URL(url);
     const segments = parsed.pathname.split('/').filter(Boolean);
-    const artistIndex = segments.findIndex(segment => segment === 'artist');
+    const artistIndex = segments.indexOf('artist');
     const nameSegment = artistIndex >= 0 ? segments[artistIndex + 1] : null;
     if (!nameSegment) return null;
-    const decoded = decodeURIComponent(nameSegment).replace(/-/g, ' ').trim();
+    const decoded = decodeURIComponent(nameSegment)
+      .replaceAll(/-/g, ' ')
+      .trim();
     return decoded.length > 0 ? decoded : null;
   } catch {
     return null;

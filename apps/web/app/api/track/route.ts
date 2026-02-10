@@ -267,25 +267,21 @@ export async function POST(request: NextRequest) {
     // Update social link click count in the background
     // Errors are captured but don't block the response
     if (linkType === 'social' && linkId) {
-      void db
-        .update(socialLinks)
+      db.update(socialLinks)
         .set({
           clicks: drizzleSql`${socialLinks.clicks} + 1`,
           updatedAt: new Date(),
         })
         .where(eq(socialLinks.id, linkId))
-        .then(() => {
-          // Click count updated successfully
-        })
         .catch(error => {
           // Ensure error is always captured even if background task fails
-          void captureError('Failed to update social link click count', error, {
+          captureError('Failed to update social link click count', error, {
             route: '/api/track',
             creatorProfileId: profile.id,
             handle,
             linkId,
             linkType,
-          });
+          }).catch(() => {});
         });
     }
 

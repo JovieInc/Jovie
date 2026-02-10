@@ -131,6 +131,7 @@ const MOCK_DATA_MEDIUM = generateMockAudienceMembers(50);
 
 const defaultProps = {
   mode: 'members' as const,
+  view: 'all' as const,
   total: 0,
   page: 1,
   pageSize: 50,
@@ -139,6 +140,8 @@ const defaultProps = {
   onPageChange: vi.fn(),
   onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
+  onViewChange: vi.fn(),
+  subscriberCount: 0,
 };
 
 describe('DashboardAudienceTable - Virtualization', () => {

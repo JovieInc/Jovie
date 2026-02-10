@@ -55,7 +55,7 @@ export function isBrandDark(hex: string, threshold = 0.35): boolean {
 export function isBrandTooLight(
   hex: string,
   bgHex = '#fcfcfc',
-  minRatio = 3.0
+  minRatio = 3
 ): boolean {
   return contrastRatio(hex, bgHex) < minRatio;
 }
@@ -95,11 +95,11 @@ export function darkenHex(hex: string, factor: number): string {
 export function ensureContrast(
   brandHex: string,
   bgHex: string,
-  minRatio = 3.0
+  minRatio = 3
 ): string {
   const normalizedHex = brandHex.startsWith('#') ? brandHex : `#${brandHex}`;
   let color = normalizedHex;
-  let factor = 1.0;
+  let factor = 1;
   // Iteratively darken; 20 steps is plenty to reach black from any color
   for (let i = 0; i < 20; i++) {
     if (contrastRatio(color, bgHex) >= minRatio) return color;
@@ -125,10 +125,11 @@ export function getBrandIconStyles(
 
   // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility.
   // Otherwise ensure brand color meets WCAG 3:1 against the effective surface.
+  const surfaceColor = isDarkTheme ? '#101012' : '#fcfcfc';
   const iconColor =
     isDarkTheme && brandIsDark
       ? '#ffffff'
-      : ensureContrast(brandHex, isDarkTheme ? '#101012' : '#fcfcfc');
+      : ensureContrast(brandHex, surfaceColor);
 
   // Determine background opacity based on theme and brand darkness
   let iconBg: string;

@@ -49,7 +49,7 @@ export function useExportDataMutation() {
       a.download = `jovie-data-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
     },
     onSuccess: () => {
