@@ -7,7 +7,10 @@ export interface DrawerEmptyStateProps {
   readonly className?: string;
 }
 
-export function DrawerEmptyState({ message, className }: DrawerEmptyStateProps) {
+export function DrawerEmptyState({
+  message,
+  className,
+}: DrawerEmptyStateProps) {
   return (
     <p className={cn('text-xs text-secondary-token', className)}>{message}</p>
   );
