@@ -2,7 +2,14 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button } from '@jovie/ui';
-import { Copy, ExternalLink, RefreshCw, Share2, Trash2, User } from 'lucide-react';
+import {
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Share2,
+  Trash2,
+  User,
+} from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -142,7 +149,9 @@ export const ContactSidebar = memo(function ContactSidebar({
                   username={contact.username}
                   isVerified={contact.isVerified}
                   canUploadAvatar={canUploadAvatar}
-                  onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
+                  onAvatarUpload={
+                    canUploadAvatar ? handleAvatarUpload : undefined
+                  }
                 />
 
                 <ContactFields

@@ -30,9 +30,7 @@ export const ContactWebsite = memo(function ContactWebsite({
         autoCapitalize='none'
         autoCorrect='off'
       />
-      <p className='text-[11px] text-tertiary-token'>
-        One website per artist.
-      </p>
+      <p className='text-[11px] text-tertiary-token'>One website per artist.</p>
     </div>
   );
 });

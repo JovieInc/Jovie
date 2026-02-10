@@ -20,7 +20,10 @@ export function DrawerNav<T extends string = string>({
   onValueChange,
 }: DrawerNavProps<T>) {
   return (
-    <nav className='flex w-full gap-px px-3 py-1' aria-label='Drawer navigation'>
+    <nav
+      className='flex w-full gap-px px-3 py-1'
+      aria-label='Drawer navigation'
+    >
       {items.map(item => (
         <button
           key={item.value}
@@ -42,7 +45,7 @@ export function DrawerNav<T extends string = string>({
               'bg-sidebar-accent-active text-sidebar-foreground [&>svg]:text-sidebar-foreground',
             // Inactive icon color
             item.value !== value &&
-              '[&>svg]:text-sidebar-item-icon hover:[&>svg]:text-sidebar-item-foreground',
+              '[&>svg]:text-sidebar-item-icon hover:[&>svg]:text-sidebar-item-foreground'
           )}
         >
           {item.icon}
