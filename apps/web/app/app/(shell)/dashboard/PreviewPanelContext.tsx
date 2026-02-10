@@ -113,30 +113,6 @@ export function PreviewPanelProvider({
 
   const effectiveIsOpen = enabled ? isOpen : false;
 
-  // Keyboard shortcut: spacebar toggles preview panel
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Only trigger if spacebar and not typing in an input/textarea
-      if (event.code === 'Space' || event.key === ' ') {
-        const target = event.target as HTMLElement;
-        const isTyping =
-          target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable;
-
-        if (!isTyping) {
-          event.preventDefault();
-          setIsOpen(prev => !prev);
-        }
-      }
-    };
-
-    globalThis.addEventListener('keydown', handleKeyDown);
-    return () => globalThis.removeEventListener('keydown', handleKeyDown);
-  }, [enabled]);
-
   // Separate memoized values for each context to prevent cascading re-renders
   const stateValue = useMemo<PreviewPanelStateContextValue>(
     () => ({
