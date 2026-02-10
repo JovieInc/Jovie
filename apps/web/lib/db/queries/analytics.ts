@@ -297,7 +297,6 @@ export async function getUserDashboardAnalytics(
     db
       .select({
         id: creatorProfiles.id,
-        profileViews: creatorProfiles.profileViews,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -332,6 +331,7 @@ export async function getUserDashboardAnalytics(
           top_cities: JsonArray<{ city: string | null; count: number }>;
           top_countries: JsonArray<{ country: string | null; count: number }>;
           top_referrers: JsonArray<{ referrer: string | null; count: number }>;
+          total_views: string | number | null;
           unique_users: string | number | null;
           total_clicks: string | number | null;
           spotify_clicks: string | number | null;
@@ -414,8 +414,17 @@ export async function getUserDashboardAnalytics(
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.updatedAt} >= ${sqlTimestamp(startDate)}
                 and ${audienceMembers.email} is not null
+            ),
+            audience_views as (
+              -- visits is a lifetime counter; this sums visits for members
+              -- active in the range (an approximation, not exact per-range count)
+              select coalesce(sum(${audienceMembers.visits}), 0) as total_views
+              from ${audienceMembers}
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
             )
             select
+              (select total_views from audience_views) as total_views,
               (select count(*) from audience_recent) as unique_users,
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
@@ -435,10 +444,24 @@ export async function getUserDashboardAnalytics(
     'getUserDashboardAnalytics'
   );
 
+  // Use SUM(visits) from audience_members active in the date range instead of
+  // the all-time creatorProfile.profileViews counter, which suffers from Redis
+  // batching delays and is not range-filtered.
+  //
+  // NOTE: audience_members.visits is a lifetime cumulative counter (incremented
+  // on every visit). Filtering by lastSeenAt >= startDate selects *members*
+  // active in the range, but their visits count includes all historical visits.
+  // This is an acceptable approximation — it's strictly better than the previous
+  // all-time counter and matches the "active audience" mental model. A precise
+  // per-range count would require a per-visit events table (future enhancement).
+  const totalViews = Number(aggregates?.total_views ?? 0);
+  const subscribers = Number(aggregates?.subscribers ?? 0);
+
   const base: DashboardAnalyticsResponse = {
     view,
-    profile_views: creatorProfile.profileViews ?? 0,
+    profile_views: totalViews,
     unique_users: Number(aggregates?.unique_users ?? 0),
+    subscribers,
     top_cities: parseJsonArray<{ city: string | null; count: number }>(
       aggregates?.top_cities ?? []
     )
@@ -477,7 +500,6 @@ export async function getUserDashboardAnalytics(
     return base;
   }
 
-  const subscribers = Number(aggregates?.subscribers ?? 0);
   const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
   // Calculate capture rate: (subscribers / unique_users) * 100
@@ -492,7 +514,6 @@ export async function getUserDashboardAnalytics(
     social_clicks: Number(aggregates?.social_clicks ?? 0),
     recent_clicks: Number(aggregates?.recent_clicks ?? 0),
     listen_clicks: Number(aggregates?.listen_clicks ?? 0),
-    subscribers,
     identified_users: Number(aggregates?.identified_users ?? 0),
     capture_rate: captureRate,
   };

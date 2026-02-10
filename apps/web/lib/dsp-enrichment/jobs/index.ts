@@ -23,3 +23,9 @@ export {
   processProfileEnrichmentJobStandalone,
   profileEnrichmentPayloadSchema,
 } from './profile-enrichment';
+
+export {
+  processReleaseEnrichmentJob,
+  processReleaseEnrichmentJobStandalone,
+  releaseEnrichmentPayloadSchema,
+} from './release-enrichment';

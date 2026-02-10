@@ -11,10 +11,10 @@
  * - Merge logic: import from './merge'
  */
 
-import * as Sentry from '@sentry/nextjs';
 import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
+import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';
 import { processInstagramJob } from './jobs/instagram';
@@ -93,20 +93,7 @@ export async function processJob(
     case 'dsp_artist_discovery':
       return processDspArtistDiscoveryJob(tx, job.payload);
     case 'dsp_track_enrichment':
-      // Track enrichment logic will be implemented in a future PR
-      // For now, return success to avoid blocking the queue
-      // See JOV-480: DSP Track Enrichment Implementation
-      Sentry.addBreadcrumb({
-        category: 'ingestion',
-        message:
-          'DSP Track Enrichment job enqueued, processor not yet implemented',
-        level: 'info',
-        data: { payload: job.payload },
-      });
-      return {
-        success: true,
-        message: 'Track enrichment pending implementation',
-      };
+      return processReleaseEnrichmentJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }

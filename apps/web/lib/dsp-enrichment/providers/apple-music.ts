@@ -462,6 +462,30 @@ export async function searchArtist(
 }
 
 /**
+ * Get album by Apple Music ID.
+ *
+ * @param albumId - Apple Music album ID
+ * @param options - Provider options
+ * @returns The album or null if not found
+ */
+export async function getAlbum(
+  albumId: string,
+  options: AppleMusicProviderOptions = {}
+): Promise<AppleMusicAlbum | null> {
+  const storefront = options.storefront ?? DEFAULT_STOREFRONT;
+
+  const result = await executeWithCircuitBreaker(async () => {
+    const response = await musicKitRequest<AppleMusicAlbum>(
+      `/catalog/${storefront}/albums/${albumId}`,
+      options
+    );
+    return response;
+  });
+
+  return result.data?.[0] ?? null;
+}
+
+/**
  * Get artist's albums.
  *
  * @param artistId - Apple Music artist ID
