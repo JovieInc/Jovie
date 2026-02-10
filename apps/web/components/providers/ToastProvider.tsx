@@ -76,37 +76,23 @@ export function ToastProvider({ children }: ToastProviderProps) {
         offset={16}
         // Maximum visible toasts (stacked)
         visibleToasts={5}
-        // Custom styling to match design system
+        // Styling driven by CSS overrides in globals.css on
+        // [data-sonner-toaster] / [data-sonner-toast] selectors.
+        // Sonner CSS variables (--normal-bg, --success-bg, etc.) are
+        // mapped to design-system tokens there, so we only need
+        // lightweight classNames here for icon coloring.
         toastOptions={{
-          // Base styles for all toasts
-          className: 'font-sans',
-          style: {
-            // Use CSS custom properties for theme integration
-            fontFamily: 'var(--font-sans), system-ui, sans-serif',
-          },
           classNames: {
-            toast:
-              'group bg-surface-3 border border-default rounded-xl shadow-md',
-            title: 'text-primary-token font-medium text-sm',
-            description: 'text-quaternary-token text-xs',
             actionButton:
-              'bg-btn-primary text-btn-primary-foreground font-medium text-xs hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-btn-primary text-btn-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
-              'bg-surface-2 text-secondary-token font-medium text-xs hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            closeButton:
-              'bg-surface-2 border-subtle text-tertiary-token hover:bg-surface-1 hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            // Type-specific styles using softened design tokens
-            success: 'border-success/50 [&>svg]:text-success/70',
-            error: 'border-error/50 [&>svg]:text-error/70',
-            warning: 'border-warning/50 [&>svg]:text-warning/70',
-            info: 'border-info/50 [&>svg]:text-info/70',
-            loading: 'border-accent/50 [&>svg]:text-accent/70',
+              'bg-surface-2 text-secondary-token hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+            success: '[&>svg]:text-success',
+            error: '[&>svg]:text-error',
+            warning: '[&>svg]:text-warning',
+            info: '[&>svg]:text-info',
+            loading: '[&>svg]:text-accent',
           },
-          // Type-specific durations
-          // Success: short (users just need confirmation)
-          // Error: longer (users need time to read and potentially take action)
-          // Warning: medium (important but not critical)
-          // Info: standard
         }}
       />
     </>
