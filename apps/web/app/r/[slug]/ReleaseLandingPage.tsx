@@ -5,12 +5,17 @@
  *
  * A public-facing landing page for release smart links.
  * Shows release artwork, title, artist info, and streaming platform buttons.
+ * Includes right-click context menu on artwork for downloading at multiple sizes.
  */
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { DspLogo } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  AlbumArtworkContextMenu,
+  buildArtworkSizes,
+} from '@/components/release/AlbumArtworkContextMenu';
 import type { ProviderKey } from '@/lib/discography/types';
 
 interface Provider {
@@ -33,12 +38,18 @@ interface ReleaseLandingPageProps
       readonly avatarUrl: string | null;
     };
     readonly providers: Provider[];
+    /** Pre-generated artwork sizes for download context menu */
+    readonly artworkSizes?: Record<string, string> | null;
+    /** Whether the artist allows artwork downloads on public pages */
+    readonly allowDownloads?: boolean;
   }> {}
 
 export function ReleaseLandingPage({
   release,
   artist,
   providers,
+  artworkSizes,
+  allowDownloads = false,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -50,6 +61,7 @@ export function ReleaseLandingPage({
   const clickableProviders = providers.filter(
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
+  const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
 
   return (
     <div className='min-h-screen bg-black text-white'>
@@ -60,27 +72,33 @@ export function ReleaseLandingPage({
 
       <main className='relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8'>
         <div className='w-full max-w-sm space-y-5'>
-          {/* Release Artwork */}
-          <div className='relative aspect-square w-full overflow-hidden rounded-[20px] bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
-            {release.artworkUrl ? (
-              <Image
-                src={release.artworkUrl}
-                alt={`${release.title} artwork`}
-                fill
-                className='object-cover'
-                sizes='(max-width: 384px) 100vw, 384px'
-                priority
-              />
-            ) : (
-              <div className='flex h-full w-full items-center justify-center'>
-                <Icon
-                  name='Disc3'
-                  className='h-20 w-20 text-white/20'
-                  aria-hidden='true'
+          {/* Release Artwork with context menu for downloads */}
+          <AlbumArtworkContextMenu
+            title={release.title}
+            sizes={sizes}
+            allowDownloads={allowDownloads}
+          >
+            <div className='relative aspect-square w-full overflow-hidden rounded-[20px] bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
+              {release.artworkUrl ? (
+                <Image
+                  src={release.artworkUrl}
+                  alt={`${release.title} artwork`}
+                  fill
+                  className='object-cover'
+                  sizes='(max-width: 384px) 100vw, 384px'
+                  priority
                 />
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className='flex h-full w-full items-center justify-center'>
+                  <Icon
+                    name='Disc3'
+                    className='h-20 w-20 text-white/20'
+                    aria-hidden='true'
+                  />
+                </div>
+              )}
+            </div>
+          </AlbumArtworkContextMenu>
 
           {/* Release Info */}
           <div className='text-center'>

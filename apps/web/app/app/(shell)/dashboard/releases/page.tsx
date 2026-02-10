@@ -25,6 +25,12 @@ export default async function ReleasesPage() {
     checkAppleMusicConnection(),
   ]);
 
+  // Read allow artwork downloads setting from profile settings
+  const profileSettings =
+    (dashboardData.selectedProfile?.settings as Record<string, unknown>) ?? {};
+  const allowArtworkDownloads =
+    (profileSettings.allowArtworkDownloads as boolean) ?? false;
+
   return (
     <ReleaseProviderMatrix
       releases={releases}
@@ -34,6 +40,7 @@ export default async function ReleasesPage() {
       spotifyArtistName={spotifyStatus.artistName}
       appleMusicConnected={appleMusicStatus.connected}
       appleMusicArtistName={appleMusicStatus.artistName}
+      allowArtworkDownloads={allowArtworkDownloads}
     />
   );
 }
