@@ -3,22 +3,15 @@
 /**
  * ReleaseSidebarHeader Component
  *
- * Header section of the release sidebar with action buttons
+ * Header section of the release sidebar with action buttons.
+ * Uses the shared DrawerHeader shell for consistent styling.
  */
 
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  ExternalLink,
-  Hash,
-  RefreshCw,
-  X,
-} from 'lucide-react';
+import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { useIsMobile } from '@/hooks/useMobile';
 
 import type { Release } from './types';
 
@@ -37,7 +30,6 @@ export function ReleaseSidebarHeader({
   onRefresh,
   onCopySmartLink,
 }: ReleaseSidebarHeaderProps) {
-  const isMobile = useIsMobile();
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,21 +47,8 @@ export function ReleaseSidebarHeader({
     copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopySmartLink]);
 
-  // Define actions based on pattern from ContactSidebarHeader:
-  // Primary: Close + Copy
-  // Overflow: Refresh + Open
   const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
-
-  // Close is always primary (ArrowLeft on mobile, X on desktop)
-  if (onClose) {
-    primaryActions.push({
-      id: 'close',
-      label: isMobile ? 'Go back' : 'Close release sidebar',
-      icon: isMobile ? ArrowLeft : X,
-      onClick: onClose,
-    });
-  }
 
   if (showActions) {
     // Copy smart link - primary action
@@ -125,15 +104,20 @@ export function ReleaseSidebarHeader({
     });
   }
 
+  const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
+
   return (
-    <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-      <p className='text-xs font-medium text-secondary-token truncate'>
-        {hasRelease ? 'Release details' : 'No release selected'}
-      </p>
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-      />
-    </div>
+    <DrawerHeader
+      title={hasRelease ? 'Release details' : 'No release selected'}
+      onClose={onClose}
+      actions={
+        hasActions ? (
+          <DrawerHeaderActions
+            primaryActions={primaryActions}
+            overflowActions={overflowActions}
+          />
+        ) : undefined
+      }
+    />
   );
 }

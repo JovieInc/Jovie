@@ -110,7 +110,6 @@ export const ContactSidebar = memo(function ContactSidebar({
       ariaLabel='Contact details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
-      className='bg-surface-2'
       data-testid='contact-sidebar'
     >
       <ContactSidebarHeader
