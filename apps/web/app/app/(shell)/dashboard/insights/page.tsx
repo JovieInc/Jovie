@@ -67,7 +67,7 @@ export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/insights');
+    redirect('/sign-in?redirect_url=/app/insights');
   }
 
   return (
