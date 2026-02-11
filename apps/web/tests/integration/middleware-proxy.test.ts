@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('middleware convention', () => {
@@ -6,11 +6,13 @@ describe('middleware convention', () => {
   const proxyPath = resolve(projectRoot, 'proxy.ts');
   const middlewarePath = resolve(projectRoot, 'middleware.ts');
 
-  it('uses proxy.ts and does not include middleware.ts', () => {
-    const hasProxy = existsSync(proxyPath);
-    const hasMiddleware = existsSync(middlewarePath);
+  it('has proxy.ts with middleware logic', () => {
+    expect(existsSync(proxyPath)).toBe(true);
+  });
 
-    expect(hasProxy).toBe(true);
-    expect(hasMiddleware).toBe(false);
+  it('has middleware.ts that re-exports from proxy.ts', () => {
+    expect(existsSync(middlewarePath)).toBe(true);
+    const content = readFileSync(middlewarePath, 'utf-8');
+    expect(content).toContain("from './proxy'");
   });
 });
