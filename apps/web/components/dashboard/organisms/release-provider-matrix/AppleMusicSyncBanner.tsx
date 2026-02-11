@@ -234,7 +234,12 @@ export function AppleMusicSyncBanner({
       <div className='flex items-start gap-3'>
         {/* Artist image or provider icon */}
         {match.externalArtistImageUrl ? (
-          <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#FA243C]/10'>
+          <div
+            className={cn(
+              'relative h-9 w-9 shrink-0 overflow-hidden rounded-full',
+              isSuggested ? 'bg-[#FA243C]/10' : 'bg-green-500/10'
+            )}
+          >
             <Image
               src={match.externalArtistImageUrl}
               alt={match.externalArtistName}
@@ -245,7 +250,12 @@ export function AppleMusicSyncBanner({
             />
           </div>
         ) : (
-          <div className='flex h-9 w-9 items-center justify-center rounded-full bg-[#FA243C]/10 shrink-0'>
+          <div
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-full shrink-0',
+              isSuggested ? 'bg-[#FA243C]/10' : 'bg-green-500/10'
+            )}
+          >
             <DspProviderIcon provider='apple_music' size='md' />
           </div>
         )}
