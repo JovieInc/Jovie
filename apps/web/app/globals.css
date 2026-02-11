@@ -15,6 +15,8 @@
 @import "../styles/theme.css";
 @import "tw-animate-css";
 
+@source "../../../packages/ui";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */
