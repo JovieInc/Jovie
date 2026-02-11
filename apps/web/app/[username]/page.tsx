@@ -1,9 +1,8 @@
 import { type Metadata } from 'next';
-import { unstable_cache, unstable_noStore } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
@@ -16,10 +15,7 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import {
-  getProfileWithLinks as getCreatorProfileWithLinks,
-  isClaimTokenValid,
-} from '@/lib/services/profile';
+import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
@@ -318,18 +314,10 @@ const getCachedProfileAndLinks = async (username: string) => {
 };
 
 // Memoize per-request to avoid duplicate DB work between generateMetadata and page render.
-const getProfileAndLinks = cache(
-  async (username: string, options?: { forceNoStore?: boolean }) => {
-    const normalizedUsername = username.toLowerCase();
-
-    if (options?.forceNoStore) {
-      unstable_noStore();
-      return fetchProfileAndLinks(normalizedUsername);
-    }
-
-    return getCachedProfileAndLinks(normalizedUsername);
-  }
-);
+// Now always uses unstable_cache (1-hour TTL) — claim logic moved to /[username]/claim
+const getProfileAndLinks = cache(async (username: string) => {
+  return getCachedProfileAndLinks(username.toLowerCase());
+});
 
 interface Props {
   readonly params: Promise<{
@@ -337,7 +325,6 @@ interface Props {
   }>;
   readonly searchParams?: Promise<{
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
-    claim_token?: string;
   }>;
 }
 
@@ -356,33 +343,13 @@ export default async function ArtistPage({
   }
 
   const resolvedSearchParams = await searchParams;
-  const { mode = 'profile', claim_token: claimTokenParam } =
-    resolvedSearchParams || {};
-
-  if (claimTokenParam) {
-    unstable_noStore();
-  }
+  const { mode = 'profile' } = resolvedSearchParams || {};
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
 
-  const normalizedUsername = username.toLowerCase();
-
-  // Run profile fetch and claim token validation in parallel when claim token is present
-  // This eliminates the sequential DB call that was blocking rendering
-  const hasClaimToken =
-    typeof claimTokenParam === 'string' && claimTokenParam.length > 0;
-
-  const [profileResult, claimTokenValidResult] = await Promise.all([
-    getProfileAndLinks(normalizedUsername, {
-      forceNoStore: hasClaimToken,
-    }),
-    // Only validate claim token if present (returns false immediately otherwise)
-    hasClaimToken
-      ? isClaimTokenValid(normalizedUsername, claimTokenParam)
-      : Promise.resolve(false),
-  ]);
+  const profileResult = await getProfileAndLinks(username);
 
   const {
     profile,
@@ -401,7 +368,7 @@ export default async function ArtistPage({
           title='Profile is temporarily unavailable'
           description='We could not load this Jovie profile right now. Please refresh or try again in a few minutes.'
           actions={[
-            { label: 'Try again', href: `/${normalizedUsername}` },
+            { label: 'Try again', href: `/${username.toLowerCase()}` },
             { label: 'Go home', href: '/' },
           ]}
           testId='public-profile-error'
@@ -429,12 +396,6 @@ export default async function ArtistPage({
   const showTipButton = mode === 'profile' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
-  // Determine if we should show the claim banner
-  // Show only when a claim token is present in the URL and matches the profile's token
-  // The claim token validation was already done in parallel with profile fetch above
-  const showClaimBanner =
-    hasClaimToken && !profile.is_claimed && claimTokenValidResult;
-
   // Generate structured data for SEO
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
     profile,
@@ -460,19 +421,9 @@ export default async function ArtistPage({
         }}
       />
 
-      {/* Prevent claim token leakage via Referer header */}
-      {hasClaimToken && <meta name='referrer' content='no-referrer' />}
-
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
-      {showClaimBanner && (
-        <ClaimBanner
-          claimToken={claimTokenParam}
-          profileHandle={profile.username}
-          displayName={profile.display_name || undefined}
-        />
-      )}
       <StaticArtistPage
         mode={mode}
         artist={artist}
@@ -492,9 +443,7 @@ export default async function ArtistPage({
 // Generate metadata for the page with comprehensive SEO
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  const { profile, genres, status } = await getProfileAndLinks(
-    username.toLowerCase()
-  );
+  const { profile, genres, status } = await getProfileAndLinks(username);
 
   if (status === 'error') {
     return {
@@ -604,7 +553,3 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
   };
 }
-
-// Dynamic rendering required for searchParams access (?mode=, ?claim_token=)
-// Redis edge cache (5 min TTL) provides fast responses without ISR
-export const dynamic = 'force-dynamic';

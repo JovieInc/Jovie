@@ -104,7 +104,7 @@ describe('ClaimBanner', () => {
       const cta = screen.getByTestId('claim-banner-cta');
       expect(cta).toHaveAttribute(
         'href',
-        '/signup?redirect_url=%2Fclaim%2Ftest-claim-token-123'
+        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
       );
     });
 
@@ -114,7 +114,10 @@ describe('ClaimBanner', () => {
       render(<ClaimBanner {...defaultProps} />);
 
       const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute('href', '/claim/test-claim-token-123');
+      expect(cta).toHaveAttribute(
+        'href',
+        '/testartist/claim?token=test-claim-token-123'
+      );
     });
 
     it('defaults to signup URL while loading', () => {
@@ -125,7 +128,7 @@ describe('ClaimBanner', () => {
       const cta = screen.getByTestId('claim-banner-cta');
       expect(cta).toHaveAttribute(
         'href',
-        '/signup?redirect_url=%2Fclaim%2Ftest-claim-token-123'
+        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
       );
     });
 
@@ -141,8 +144,8 @@ describe('ClaimBanner', () => {
 
       const cta = screen.getByTestId('claim-banner-cta');
       const href = cta.getAttribute('href');
-      // Double-encoded because the claim path is encoded, then the whole redirect_url is encoded
-      expect(href).toContain('token-with-special%252Fchars%2526stuff');
+      // The claim path contains encoded token, then the whole redirect_url is encoded
+      expect(href).toContain('token%3Dtoken-with-special');
     });
   });
 

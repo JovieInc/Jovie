@@ -5,7 +5,7 @@
  */
 
 import { APP_NAME } from '@/constants/app';
-import { BASE_URL, getAppUrl, getProfileUrl } from '@/constants/domains';
+import { BASE_URL, getProfileUrl } from '@/constants/domains';
 import {
   buildClickTrackingUrl,
   buildOpenTrackingUrl,
@@ -37,7 +37,7 @@ export interface ClaimInviteTemplateData {
  * Build the claim URL with token
  */
 export function buildClaimUrl(username: string, claimToken: string): string {
-  return `${getAppUrl('/claim')}?token=${encodeURIComponent(claimToken)}&username=${encodeURIComponent(username)}`;
+  return `${getProfileUrl(username)}/claim?token=${encodeURIComponent(claimToken)}`;
 }
 
 /**
