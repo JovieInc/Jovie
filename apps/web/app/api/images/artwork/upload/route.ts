@@ -229,8 +229,7 @@ export async function POST(request: NextRequest) {
       if (!existingMetadata.originalArtworkUrl && release.artworkUrl) {
         originalFields.originalArtworkUrl = release.artworkUrl;
         if (existingMetadata.artworkSizes) {
-          originalFields.originalArtworkSizes =
-            existingMetadata.artworkSizes;
+          originalFields.originalArtworkSizes = existingMetadata.artworkSizes;
         }
       }
 

@@ -11,6 +11,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { createMutationFn } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
@@ -160,12 +161,15 @@ export function useThemeMutation() {
 export function useNotificationSettingsMutation() {
   const mutation = useUpdateSettingsMutation();
 
-  return {
-    updateNotifications: (
-      settings: SettingsUpdateInput['updates']['settings']
-    ) => {
+  const updateNotifications = useCallback(
+    (settings: SettingsUpdateInput['updates']['settings']) => {
       mutation.mutate({ updates: { settings } });
     },
+    [mutation]
+  );
+
+  return {
+    updateNotifications,
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

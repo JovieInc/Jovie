@@ -46,6 +46,7 @@ import {
 } from '@/lib/ingestion/jobs';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
+import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -127,7 +128,7 @@ function mapReleaseToViewModel(
     profileId,
     id: release.id,
     title: release.title,
-    releaseDate: release.releaseDate?.toISOString(),
+    releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
@@ -141,8 +142,7 @@ function mapReleaseToViewModel(
         const url = match?.url ?? '';
         const source: 'manual' | 'ingested' =
           match?.sourceType === 'manual' ? 'manual' : 'ingested';
-        const updatedAt =
-          match?.updatedAt?.toISOString() ?? new Date().toISOString();
+        const updatedAt = toISOStringOrFallback(match?.updatedAt);
 
         return {
           key: providerKey,
@@ -600,8 +600,7 @@ function mapTrackToViewModel(
         const url = match?.url ?? '';
         const source: 'manual' | 'ingested' =
           match?.sourceType === 'manual' ? 'manual' : 'ingested';
-        const updatedAt =
-          match?.updatedAt?.toISOString() ?? new Date().toISOString();
+        const updatedAt = toISOStringOrFallback(match?.updatedAt);
 
         return {
           key: providerKey,

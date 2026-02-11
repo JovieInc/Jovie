@@ -19,9 +19,9 @@ const Switch = React.forwardRef<
       'border-2 transition-colors',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'data-[state=unchecked]:bg-gray-300 data-[state=unchecked]:border-gray-400',
+      'data-[state=unchecked]:bg-gray-200 data-[state=unchecked]:border-gray-300',
       'dark:data-[state=unchecked]:bg-gray-600 dark:data-[state=unchecked]:border-gray-500',
-      'data-[state=checked]:bg-accent data-[state=checked]:border-accent',
+      'data-[state=checked]:bg-[var(--color-accent)] data-[state=checked]:border-[var(--color-accent)]',
       className
     )}
     {...props}

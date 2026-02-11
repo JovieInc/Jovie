@@ -6,7 +6,7 @@ import {
   isAppleMusicAvailable,
   searchArtist,
 } from '@/lib/dsp-enrichment/providers/apple-music';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 
@@ -139,7 +139,10 @@ export async function GET(request: NextRequest) {
   if (!isAppleMusicAvailable()) {
     return NextResponse.json(
       { error: 'Apple Music integration not available', code: 'UNAVAILABLE' },
-      { status: 503, headers: NO_STORE_HEADERS }
+      {
+        status: 503,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+      }
     );
   }
 

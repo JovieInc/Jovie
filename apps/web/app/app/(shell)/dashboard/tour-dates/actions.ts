@@ -22,7 +22,7 @@ import { type TourDate, tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
 import { checkBandsintownSyncRateLimit } from '@/lib/rate-limit/limiters';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { toISOStringSafe } from '@/lib/utils/date';
+import { toISOStringOrNull, toISOStringSafe } from '@/lib/utils/date';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 import { getDashboardData } from '../actions';
 
@@ -289,7 +289,7 @@ export async function checkBandsintownConnection(): Promise<BandsintownConnectio
     return {
       connected: !!profile.bandsintownArtistName,
       artistName: profile.bandsintownArtistName,
-      lastSyncedAt: lastSynced?.lastSyncedAt?.toISOString() ?? null,
+      lastSyncedAt: toISOStringOrNull(lastSynced?.lastSyncedAt),
       // User has API key if they set one OR if there's an env key configured
       hasApiKey: !!profile.bandsintownApiKey || isBandsintownConfigured(),
     };

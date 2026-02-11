@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import { getRedis } from '@/lib/redis';
 
 /**
@@ -16,7 +17,7 @@ export async function GET() {
   if (!redis) {
     return NextResponse.json(
       { status: 'unavailable', error: 'Redis not configured' },
-      { status: 503 }
+      { status: 503, headers: { 'Retry-After': RETRY_AFTER_HEALTH } }
     );
   }
 
@@ -37,7 +38,7 @@ export async function GET() {
         error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
       },
-      { status: 503 }
+      { status: 503, headers: { 'Retry-After': RETRY_AFTER_HEALTH } }
     );
   }
 }

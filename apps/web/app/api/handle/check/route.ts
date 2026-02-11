@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { RETRY_AFTER_TRANSIENT } from '@/lib/http/headers';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   // Helper to return response with constant timing
   const respondWithConstantTime = async (
     body: object,
-    options?: { status?: number }
+    options?: { status?: number; headers?: Record<string, string> }
   ) => {
     const delay = calculateConstantTimeDelay(startTime);
     if (delay > 0) {
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(body, {
       status: options?.status ?? 200,
-      headers: NO_STORE_HEADERS,
+      headers: { ...NO_STORE_HEADERS, ...options?.headers },
     });
   };
 
@@ -158,7 +159,7 @@ export async function GET(request: Request) {
     ) {
       return respondWithConstantTime(
         { available: false, error: 'Service temporarily unavailable' },
-        { status: 503 }
+        { status: 503, headers: { 'Retry-After': RETRY_AFTER_TRANSIENT } }
       );
     }
 
