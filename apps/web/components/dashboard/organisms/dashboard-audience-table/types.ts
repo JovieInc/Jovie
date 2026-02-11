@@ -36,12 +36,14 @@ export interface DashboardAudienceTableProps {
   readonly onPageChange: (page: number) => void;
   readonly onPageSizeChange: (pageSize: number) => void;
   readonly onSortChange: (sort: string) => void;
-  readonly onViewChange: (view: AudienceView) => void;
   readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
   readonly filters: AudienceFilters;
+  /** Controlled selected member (lifted to parent for full-height drawer) */
+  readonly selectedMember: AudienceRow | null;
+  readonly onSelectedMemberChange: (member: AudienceRow | null) => void;
 }
 
 export interface BulkAction {

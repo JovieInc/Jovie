@@ -140,10 +140,11 @@ const defaultProps = {
   onPageChange: vi.fn(),
   onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
-  onViewChange: vi.fn(),
   onFiltersChange: vi.fn(),
   filters: { segments: [] },
   subscriberCount: 0,
+  selectedMember: null,
+  onSelectedMemberChange: vi.fn(),
 };
 
 describe('DashboardAudienceTable - Virtualization', () => {

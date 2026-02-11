@@ -57,12 +57,13 @@ export function DashboardHeader({
             <VerticalDivider />
           </div>
         ) : null}
-        {/* Desktop: Simplified breadcrumb - just current page */}
+        {/* Desktop: Simplified breadcrumb - just current page (or badge override) */}
         <div className='flex-1 items-center gap-3 flex'>
-          <span className='text-[13px] font-medium text-secondary-token'>
-            {currentLabel}
-          </span>
-          {breadcrumbSuffix}
+          {breadcrumbSuffix ?? (
+            <span className='text-[13px] font-medium text-secondary-token'>
+              {currentLabel}
+            </span>
+          )}
         </div>
         {action ? (
           <div className='ml-auto flex items-center gap-2'>{action}</div>

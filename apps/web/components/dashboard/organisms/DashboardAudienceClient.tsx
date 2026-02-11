@@ -1,6 +1,9 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
+import { Copy, Download, Eye, Phone, UserMinus } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import {
   parseAsArrayOf,
   parseAsInteger,
@@ -10,15 +13,21 @@ import {
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
+import { toast } from 'sonner';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
 import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
 import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
+import { downloadVCard } from './dashboard-audience-table/utils';
 
 const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
   { length: 10 },
@@ -56,6 +65,12 @@ const DashboardAudienceTable = dynamic(
 export type AudienceMode = 'members' | 'subscribers';
 
 type AudienceServerRow = AudienceMember;
+
+const VIEW_OPTIONS: { value: AudienceView; label: string }[] = [
+  { value: 'all', label: 'All audience' },
+  { value: 'subscribers', label: 'Subscribers' },
+  { value: 'anonymous', label: 'Anonymous' },
+];
 
 export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
@@ -97,6 +112,18 @@ export function DashboardAudienceClient({
   subscriberCount,
   filters: initialFilters,
 }: Readonly<DashboardAudienceClientProps>) {
+  const router = useRouter();
+
+  // Lifted selectedMember state — so the sidebar can render at this level
+  const [selectedMember, setSelectedMember] =
+    React.useState<AudienceMember | null>(null);
+
+  // Stable callback for child components
+  const handleSelectedMemberChange = React.useCallback(
+    (member: AudienceMember | null) => setSelectedMember(member),
+    []
+  );
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
@@ -168,30 +195,172 @@ export function DashboardAudienceClient({
     [setSegments, setUrlParams]
   );
 
+  // --- Header badge: view tabs replace the breadcrumb ---
+  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+
+  const headerBadge = React.useMemo(
+    () => (
+      <fieldset className='inline-flex items-center gap-0.5 rounded-md bg-transparent p-0'>
+        <legend className='sr-only'>Audience view filter</legend>
+        {VIEW_OPTIONS.map(option => (
+          <button
+            key={option.value}
+            type='button'
+            onClick={() => handleViewChange(option.value)}
+            aria-pressed={view === option.value}
+            className={cn(
+              'h-7 px-2.5 text-[13px] font-medium rounded-md transition-colors',
+              view === option.value
+                ? 'bg-surface-2 text-primary-token'
+                : 'text-tertiary-token hover:text-secondary-token'
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </fieldset>
+    ),
+    [view, handleViewChange]
+  );
+
+  const headerActions = React.useMemo(() => <DrawerToggleButton />, []);
+
+  React.useEffect(() => {
+    setHeaderBadge(headerBadge);
+    setHeaderActions(headerActions);
+    return () => {
+      setHeaderBadge(null);
+      setHeaderActions(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
+  }, [headerBadge, headerActions]);
+
+  // --- Sidebar context menu items ---
+  const handleRemoveMember = React.useCallback(
+    async (member: AudienceMember) => {
+      if (!profileId) return;
+      try {
+        const res = await fetch('/api/dashboard/audience/members', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId: member.id, profileId }),
+        });
+        if (!res.ok) throw new Error('Failed to remove member');
+        toast.success('Member removed');
+        if (selectedMember?.id === member.id) setSelectedMember(null);
+        router.refresh();
+      } catch {
+        toast.error('Failed to remove member');
+      }
+    },
+    [profileId, selectedMember, router]
+  );
+
+  const sidebarContextMenuItems = React.useMemo<
+    CommonDropdownItem[] | undefined
+  >(() => {
+    if (!selectedMember) return undefined;
+    return [
+      {
+        type: 'action' as const,
+        id: 'view-details',
+        label: 'View details',
+        icon: <Eye className='h-3.5 w-3.5' />,
+        onClick: () => {},
+      },
+      {
+        type: 'action' as const,
+        id: 'copy-email',
+        label: 'Copy email',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        disabled: !selectedMember.email,
+        onClick: () => {
+          if (selectedMember.email) {
+            void navigator.clipboard.writeText(selectedMember.email);
+            toast.success('Email copied to clipboard');
+          }
+        },
+      },
+      {
+        type: 'action' as const,
+        id: 'copy-phone',
+        label: 'Copy phone',
+        icon: <Phone className='h-3.5 w-3.5' />,
+        disabled: !selectedMember.phone,
+        onClick: () => {
+          if (selectedMember.phone) {
+            void navigator.clipboard.writeText(selectedMember.phone);
+            toast.success('Phone number copied to clipboard');
+          }
+        },
+      },
+      { type: 'separator' as const, id: 'sep-1' },
+      {
+        type: 'action' as const,
+        id: 'export-contact',
+        label: 'Export as vCard',
+        icon: <Download className='h-3.5 w-3.5' />,
+        onClick: () => {
+          downloadVCard(selectedMember);
+          toast.success('Contact exported as vCard');
+        },
+      },
+      { type: 'separator' as const, id: 'sep-2' },
+      {
+        type: 'action' as const,
+        id: 'remove-member',
+        label: 'Block',
+        icon: <UserMinus className='h-3.5 w-3.5' />,
+        disabled: !profileId,
+        variant: 'destructive' as const,
+        onClick: () => {
+          handleRemoveMember(selectedMember).catch(() => {});
+        },
+      },
+    ];
+  }, [selectedMember, profileId, handleRemoveMember]);
+
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
-      <div data-testid='dashboard-audience-client'>
-        <div className='px-4 pt-4 sm:px-6 sm:pt-5'>
-          <AudienceFunnelMetrics />
+      <div
+        data-testid='dashboard-audience-client'
+        className='flex h-full min-h-0 flex-row'
+      >
+        {/* Main content column: funnel metrics + table */}
+        <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
+          <div className='px-4 pt-4 sm:px-6 sm:pt-5 shrink-0'>
+            <AudienceFunnelMetrics />
+          </div>
+          <div className='flex-1 min-h-0'>
+            <DashboardAudienceTable
+              mode={mode}
+              view={view}
+              rows={initialRows}
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              sort={sort}
+              direction={direction}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              onSortChange={handleSortChange}
+              onFiltersChange={handleFiltersChange}
+              profileUrl={profileUrl}
+              profileId={profileId}
+              subscriberCount={subscriberCount}
+              filters={initialFilters}
+              selectedMember={selectedMember}
+              onSelectedMemberChange={handleSelectedMemberChange}
+            />
+          </div>
         </div>
-        <DashboardAudienceTable
-          mode={mode}
-          view={view}
-          rows={initialRows}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          sort={sort}
-          direction={direction}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onSortChange={handleSortChange}
-          onViewChange={handleViewChange}
-          onFiltersChange={handleFiltersChange}
-          profileUrl={profileUrl}
-          profileId={profileId}
-          subscriberCount={subscriberCount}
-          filters={initialFilters}
+
+        {/* Right sidebar — full-height, sibling to content column */}
+        <AudienceMemberSidebar
+          member={selectedMember}
+          isOpen={Boolean(selectedMember)}
+          onClose={() => setSelectedMember(null)}
+          contextMenuItems={sidebarContextMenuItems}
         />
       </div>
     </QueryErrorBoundary>

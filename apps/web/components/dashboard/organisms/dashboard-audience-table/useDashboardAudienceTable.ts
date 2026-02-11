@@ -5,18 +5,12 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import type {
-  AudienceRow,
-  BulkAction,
-  DashboardAudienceTableProps,
-} from './types';
+import type { BulkAction, DashboardAudienceTableProps } from './types';
 import { copyTextToClipboard } from './utils';
 
 export interface UseDashboardAudienceTableReturn {
   openMenuRowId: string | null;
   setOpenMenuRowId: (id: string | null) => void;
-  selectedMember: AudienceRow | null;
-  setSelectedMember: (member: AudienceRow | null) => void;
   copiedProfileLink: boolean;
   selectedIds: Set<string>;
   selectedCount: number;
@@ -38,12 +32,13 @@ export function useDashboardAudienceTable({
   sort,
   direction,
   profileUrl,
+  selectedMember,
+  onSelectedMemberChange,
 }: Omit<
   DashboardAudienceTableProps,
   | 'onPageChange'
   | 'onPageSizeChange'
   | 'onSortChange'
-  | 'onViewChange'
   | 'onFiltersChange'
   | 'view'
   | 'subscriberCount'
@@ -52,8 +47,6 @@ export function useDashboardAudienceTable({
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
   const [openMenuRowId, setOpenMenuRowId] = React.useState<string | null>(null);
-  const [selectedMember, setSelectedMember] =
-    React.useState<AudienceRow | null>(null);
   const [copiedProfileLink, setCopiedProfileLink] = React.useState(false);
   const copyTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null
@@ -71,13 +64,21 @@ export function useDashboardAudienceTable({
 
   React.useEffect(() => {
     clearSelection();
-    setSelectedMember(null);
-  }, [mode, page, pageSize, sort, direction, clearSelection]);
+    onSelectedMemberChange(null);
+  }, [
+    mode,
+    page,
+    pageSize,
+    sort,
+    direction,
+    clearSelection,
+    onSelectedMemberChange,
+  ]);
 
   React.useEffect(() => {
     const toggle = () => {
       if (rows.length === 0) return;
-      setSelectedMember(current => (current ? null : (rows[0] ?? null)));
+      onSelectedMemberChange(selectedMember ? null : (rows[0] ?? null));
     };
 
     setTableMeta({
@@ -89,7 +90,7 @@ export function useDashboardAudienceTable({
     return () => {
       setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
     };
-  }, [rows, selectedMember, setTableMeta]);
+  }, [rows, selectedMember, setTableMeta, onSelectedMemberChange]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -201,8 +202,6 @@ export function useDashboardAudienceTable({
   return {
     openMenuRowId,
     setOpenMenuRowId,
-    selectedMember,
-    setSelectedMember,
     copiedProfileLink,
     selectedIds,
     selectedCount,
