@@ -106,7 +106,7 @@ export async function discoverLinksForRelease(
                 const albumId = track.relationships?.albums?.data?.[0]?.id;
                 if (albumId) {
                   try {
-                    const album = await getAlbum(albumId);
+                    const album = await getAlbum(albumId, { storefront });
                     url = album?.attributes?.url ?? null;
                   } catch {
                     // Album fetch failed (timeout, rate-limit, storefront miss);
