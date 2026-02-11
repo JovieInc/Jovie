@@ -1,21 +1,4 @@
 /* Feature Accents & Animations - Extends design-system.css */
 
 /* Animation classes now provided by tw-animate-css */
-
-/* Border shimmer effect for newly added link cards */
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-    opacity: 1;
-  }
-
-  70% {
-    background-position: -200% 0;
-    opacity: 1;
-  }
-
-  100% {
-    background-position: -200% 0;
-    opacity: 0;
-  }
-}
+/* Shimmer keyframes defined in globals.css */
