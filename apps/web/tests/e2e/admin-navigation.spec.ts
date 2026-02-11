@@ -161,6 +161,9 @@ const DASHBOARD_PAGES = [
 ] as const;
 
 test.describe('Admin Navigation Persistence @smoke', () => {
+  // signInUser needs 180s+ for Clerk + Turbopack compilation, plus test body navigation
+  test.setTimeout(300_000);
+
   test.beforeEach(async ({ page }) => {
     // Skip if no admin credentials configured
     if (!hasAdminCredentials()) {

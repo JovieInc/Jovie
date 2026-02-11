@@ -102,21 +102,27 @@ describe('Switch', () => {
   });
 
   describe('Styling', () => {
-    it('applies unchecked background', () => {
+    it('applies unchecked background and border for visibility', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:bg-gray-200'
+        'data-[state=unchecked]:bg-gray-300'
+      );
+      expect(switchElement.className).toContain(
+        'data-[state=unchecked]:border-gray-400'
       );
     });
 
-    it('applies checked background', () => {
+    it('applies checked background and matching border', () => {
       render(
         <Switch defaultChecked aria-label='Toggle' data-testid='switch' />
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
         'data-[state=checked]:bg-accent'
+      );
+      expect(switchElement.className).toContain(
+        'data-[state=checked]:border-accent'
       );
     });
 
@@ -247,6 +253,67 @@ describe('Switch', () => {
       const switchElement = screen.getByRole('switch');
       switchElement.focus();
       expect(switchElement).toHaveFocus();
+    });
+  });
+
+  describe('Visual State Differentiation (a11y)', () => {
+    it('has distinct track styling between checked and unchecked states', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const switchElement = screen.getByTestId('switch');
+      const classes = switchElement.className;
+
+      // Unchecked track must use a visible background + border
+      expect(classes).toContain('data-[state=unchecked]:bg-gray-300');
+      expect(classes).toContain('data-[state=unchecked]:border-gray-400');
+
+      // Checked track must use accent background + matching border
+      expect(classes).toContain('data-[state=checked]:bg-accent');
+      expect(classes).toContain('data-[state=checked]:border-accent');
+
+      // Track must NOT use border-transparent (would hide the toggle)
+      expect(classes).not.toContain('border-transparent');
+    });
+
+    it('checked and unchecked use different background colors', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const classes = screen.getByTestId('switch').className;
+
+      // Extract the unchecked and checked bg classes to verify they differ
+      const uncheckedBg = classes.match(
+        /data-\[state=unchecked\]:bg-[\w-]+/
+      )?.[0];
+      const checkedBg = classes.match(/data-\[state=checked\]:bg-[\w-]+/)?.[0];
+
+      expect(uncheckedBg).toBeDefined();
+      expect(checkedBg).toBeDefined();
+      expect(uncheckedBg).not.toEqual(
+        checkedBg?.replace('checked', 'unchecked')
+      );
+    });
+
+    it('disabled switch is visually distinct via opacity', () => {
+      render(<Switch disabled aria-label='Toggle' data-testid='switch' />);
+      const switchElement = screen.getByTestId('switch');
+      expect(switchElement.className).toContain('disabled:opacity-50');
+      expect(switchElement).toBeDisabled();
+    });
+
+    it('switch role exposes aria-checked for screen readers', () => {
+      const { rerender } = render(
+        <Switch checked={false} aria-label='Allow downloads' />
+      );
+      const el = screen.getByRole('switch', { name: 'Allow downloads' });
+      expect(el).toHaveAttribute('aria-checked', 'false');
+
+      rerender(<Switch checked={true} aria-label='Allow downloads' />);
+      expect(el).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('renders with the switch role so assistive tech identifies it', () => {
+      render(<Switch aria-label='Enable feature' />);
+      const el = screen.getByRole('switch');
+      expect(el.tagName).toBe('BUTTON');
+      expect(el).toHaveAttribute('role', 'switch');
     });
   });
 

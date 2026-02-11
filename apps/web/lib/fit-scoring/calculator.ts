@@ -12,14 +12,18 @@
  * - Spotify popularity (proxy for monthly listeners): 0-15 points
  * - Release recency: 0-10 points
  * - Target genre match: +5 points
+ * - Alternative DSP presence: +10 points
+ * - Multi-DSP presence: +5 points
+ * - Has contact email: +5 points
+ * - Paid verification (Twitter/X, Instagram, Facebook, Threads): +10 points
  *
- * Max score: 100 points
+ * Max score: 100 points (capped)
  */
 
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 /** Current version of the scoring algorithm */
-export const FIT_SCORE_VERSION = 2;
+export const FIT_SCORE_VERSION = 3;
 
 /** Point values for each scoring criterion */
 export const SCORE_WEIGHTS = {
@@ -35,6 +39,7 @@ export const SCORE_WEIGHTS = {
   HAS_ALTERNATIVE_DSP: 10, // Apple Music, SoundCloud, etc.
   MULTI_DSP_PRESENCE: 5, // Present on 3+ streaming platforms
   HAS_CONTACT_EMAIL: 5, // Contact email available (easier outreach)
+  PAID_VERIFICATION: 10, // Verified on a paid-verification platform (Twitter/X, Instagram, Facebook, Threads)
 } as const;
 
 const SPOTIFY_POPULARITY_THRESHOLDS = [
@@ -66,6 +71,18 @@ export const MUSIC_TOOL_PLATFORMS = new Set([
   'distrokid', // DistroKid hyperfollow
   'songwhip',
   'odesli', // song.link / odesli
+]);
+
+/**
+ * Platforms where verification requires a paid subscription.
+ * Verified status on these platforms signals willingness/ability to pay.
+ */
+export const PAID_VERIFICATION_PLATFORMS = new Set([
+  'twitter',
+  'x',
+  'instagram',
+  'facebook',
+  'threads',
 ]);
 
 /** Target genres for cohort matching (electronic/DJ focus) */
@@ -141,6 +158,8 @@ export interface FitScoreInput {
   hasSoundCloudId?: boolean;
   /** Number of DSP platforms linked */
   dspPlatformCount?: number;
+  /** Platforms where the creator has paid verification (e.g., ['twitter', 'instagram']) */
+  paidVerificationPlatforms?: string[];
 }
 
 /**
@@ -165,6 +184,7 @@ function createInitialBreakdown(now: Date): FitScoreBreakdown {
     hasAlternativeDsp: 0,
     multiDspPresence: 0,
     hasContactEmail: 0,
+    paidVerification: 0,
     meta: {
       calculatedAt: now.toISOString(),
       version: FIT_SCORE_VERSION,
@@ -232,7 +252,8 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
     breakdown.genreMatch +
     (breakdown.hasAlternativeDsp ?? 0) +
     (breakdown.multiDspPresence ?? 0) +
-    (breakdown.hasContactEmail ?? 0)
+    (breakdown.hasContactEmail ?? 0) +
+    (breakdown.paidVerification ?? 0)
   );
 }
 
@@ -313,6 +334,16 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
   // 10. Has contact email (+5) - easier outreach
   if (input.hasContactEmail) {
     breakdown.hasContactEmail = SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
+  }
+
+  // 11. Paid verification on social platforms (+10) - signals willingness/ability to pay
+  // Platforms like Twitter/X, Instagram, Facebook, Threads require paid subscriptions for verification
+  if (
+    input.paidVerificationPlatforms &&
+    input.paidVerificationPlatforms.length > 0
+  ) {
+    breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
+    breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
   }
 
   // Calculate total score (capped at 100)

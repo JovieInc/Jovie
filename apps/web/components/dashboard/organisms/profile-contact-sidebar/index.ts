@@ -1,8 +1,5 @@
 export { ProfileContactHeader } from './ProfileContactHeader';
-export {
-  PROFILE_CONTACT_SIDEBAR_WIDTH,
-  ProfileContactSidebar,
-} from './ProfileContactSidebar';
+export { ProfileContactSidebar } from './ProfileContactSidebar';
 export {
   type CategoryOption,
   ProfileLinkCategorySelector,
