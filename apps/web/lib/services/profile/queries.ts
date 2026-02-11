@@ -607,6 +607,31 @@ export async function isClaimTokenValid(
 }
 
 /**
+ * Look up a username by claim token.
+ * Used by the dedicated claim route to resolve token → username.
+ *
+ * @param claimToken - The claim token to look up
+ * @returns The username if found (public, unclaimed profile), or null
+ */
+export async function lookupUsernameByClaimToken(
+  claimToken: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ username: creatorProfiles.username })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.claimToken, claimToken),
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, false)
+      )
+    )
+    .limit(1);
+
+  return row?.username ?? null;
+}
+
+/**
  * Get top public profiles for static generation.
  * Returns featured profiles first, then by profile views.
  *

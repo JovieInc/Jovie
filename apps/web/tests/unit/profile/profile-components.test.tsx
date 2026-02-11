@@ -147,7 +147,7 @@ describe('ClaimBanner', () => {
 
     const cta = screen.getByTestId('claim-banner-cta');
     const href = cta.getAttribute('href');
-    expect(href).toBe('/claim/test-token-123');
+    expect(href).toBe('/testartist/claim?token=test-token-123');
     expect(href).not.toContain('signup');
   });
 
