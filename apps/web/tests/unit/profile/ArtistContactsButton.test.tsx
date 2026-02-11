@@ -56,6 +56,8 @@ describe('ArtistContactsButton', () => {
 
     // Should open drawer, not navigate directly
     expect(navigate).not.toHaveBeenCalled();
+    // Verify drawer content is visible
+    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
   });
 
   it('opens drawer when multiple contacts are provided', () => {
@@ -84,5 +86,8 @@ describe('ArtistContactsButton', () => {
     fireEvent.click(trigger);
 
     expect(navigate).not.toHaveBeenCalled();
+    // Verify drawer content is visible with both contacts
+    expect(screen.getByText(/bookings/i)).toBeInTheDocument();
+    expect(screen.getByText(/press/i)).toBeInTheDocument();
   });
 });
