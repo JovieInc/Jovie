@@ -448,10 +448,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Merge gate for PRs: fast checks + unit tests must both pass.
+    # Merge gate for PRs: fast checks + unit tests + a11y must all pass.
     # Configure this as the required status check in branch protection
-    # instead of ci-fast alone, so unit test failures block merge.
-    needs: [ci-fast, ci-unit-tests]
+    # instead of ci-fast alone, so unit test and a11y failures block merge.
+    needs: [ci-fast, ci-unit-tests, ci-a11y]
     if: ${{ always() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -460,6 +460,7 @@ jobs:
         run: |
           echo "ci-fast: ${{ needs.ci-fast.result }}"
           echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
+          echo "ci-a11y: ${{ needs.ci-a11y.result }}"
 
           # ci-fast must succeed
           if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
@@ -473,7 +474,13 @@ jobs:
             exit 1
           fi
 
-          echo "✅ All PR checks passed: lint, typecheck, guardrails, and unit tests"
+          # ci-a11y: allow skip (path-gated) but block on failure
+          if [[ "${{ needs.ci-a11y.result }}" == "failure" ]]; then
+            echo "❌ ci-a11y failed — accessibility violations detected"
+            exit 1
+          fi
+
+          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, and a11y"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -815,6 +822,64 @@ jobs:
           flags: unittests
           fail_ci_if_error: false
           verbose: true
+
+  ci-a11y:
+    name: A11y (axe)
+    # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping a11y audit — no UI-relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run axe a11y audit (public routes)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: cd apps/web && pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line
+        env:
+          SMOKE_ONLY: '1'
+          CI: true
+
+      - name: Upload Playwright Report on Failure
+        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/playwright-report/
+          retention-days: 3
 
   ci-e2e-smoke:
     name: E2E Smoke (PR Fast Feedback)
