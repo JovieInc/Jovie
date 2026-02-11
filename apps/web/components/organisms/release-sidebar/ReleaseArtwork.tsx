@@ -29,6 +29,10 @@ interface ReleaseArtworkProps {
   readonly allowDownloads?: boolean;
   /** Release ID for analytics */
   readonly releaseId?: string;
+  /** Whether the artwork can be reverted to the original DSP-ingested version */
+  readonly canRevert?: boolean;
+  /** Callback to revert artwork to original */
+  readonly onRevert?: () => void;
 }
 
 export function ReleaseArtwork({
@@ -40,6 +44,8 @@ export function ReleaseArtwork({
   artworkSizes,
   allowDownloads = false,
   releaseId,
+  canRevert = false,
+  onRevert,
 }: ReleaseArtworkProps) {
   const altText = title ? `${title} artwork` : 'Release artwork';
   const sizes = buildArtworkSizes(artworkSizes, artworkUrl);
@@ -70,6 +76,8 @@ export function ReleaseArtwork({
           sizes={sizes}
           allowDownloads={allowDownloads}
           releaseId={releaseId}
+          canRevert={canRevert}
+          onRevert={onRevert}
         >
           <AvatarUploadable
             src={artworkUrl}
@@ -88,6 +96,8 @@ export function ReleaseArtwork({
           sizes={sizes}
           allowDownloads={allowDownloads}
           releaseId={releaseId}
+          canRevert={canRevert}
+          onRevert={onRevert}
         >
           {artworkImage}
         </AlbumArtworkContextMenu>

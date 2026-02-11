@@ -50,8 +50,11 @@ export function ReleaseSidebar({
   onSave,
   isSaving,
   onArtworkUpload,
+  onArtworkRevert,
   onAddDspLink,
   onRemoveDspLink,
+  onRescanIsrc,
+  isRescanningIsrc = false,
   allowDownloads = false,
 }: ReleaseSidebarProps) {
   const {
@@ -64,9 +67,11 @@ export function ReleaseSidebar({
     isEditable,
     hasRelease,
     canUploadArtwork,
+    canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
     handleArtworkUpload,
+    handleArtworkRevert,
     handleCopySmartLink,
     handleAddLink,
     handleRemoveLink,
@@ -78,6 +83,7 @@ export function ReleaseSidebar({
     onClose,
     onReleaseChange,
     onArtworkUpload,
+    onArtworkRevert,
     onAddDspLink,
     onRemoveDspLink,
   });
@@ -227,6 +233,24 @@ export function ReleaseSidebar({
               {activeTab === 'catalog' && (
                 <>
                   <div className='pb-5'>
+                    <ReleaseArtwork
+                      artworkUrl={release.artworkUrl}
+                      title={release.title}
+                      artistName={artistName}
+                      canUploadArtwork={canUploadArtwork}
+                      onArtworkUpload={
+                        canUploadArtwork ? handleArtworkUpload : undefined
+                      }
+                      allowDownloads={isEditable}
+                      releaseId={release.id}
+                      canRevert={canRevertArtwork}
+                      onRevert={
+                        canRevertArtwork ? handleArtworkRevert : undefined
+                      }
+                    />
+                  </div>
+
+                  <div className='py-5'>
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}
@@ -261,6 +285,8 @@ export function ReleaseSidebar({
                     onAddLink={handleAddLink}
                     onRemoveLink={handleRemoveLink}
                     onNewLinkKeyDown={handleNewLinkKeyDown}
+                    onRescanIsrc={onRescanIsrc}
+                    isRescanningIsrc={isRescanningIsrc}
                   />
                 </div>
               )}

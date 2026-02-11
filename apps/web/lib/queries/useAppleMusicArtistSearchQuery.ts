@@ -11,6 +11,7 @@ import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
+import { SEARCH_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 export interface AppleMusicArtistResult {
@@ -106,10 +107,7 @@ export function useAppleMusicArtistSearchQuery(
     queryFn: ({ signal }) =>
       fetchAppleMusicArtistSearch(debouncedQuery, limit, signal),
     enabled: debouncedQuery.length >= minQueryLength,
-    staleTime: 1 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
+    ...SEARCH_CACHE,
   });
 
   const state = useMemo<AppleMusicSearchState>(() => {

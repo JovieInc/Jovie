@@ -16,10 +16,12 @@ export interface UseReleaseSidebarReturn {
   isEditable: boolean;
   hasRelease: boolean;
   canUploadArtwork: boolean;
+  canRevertArtwork: boolean;
   isAddingDspLink: boolean;
   isRemovingDspLink: string | null;
   handleFieldChange: (updater: (current: Release) => Release) => void;
   handleArtworkUpload: (file: File) => Promise<string>;
+  handleArtworkRevert: () => Promise<void>;
   handleCopySmartLink: () => Promise<void>;
   handleTitleChange: (value: string) => void;
   handleAddLink: () => Promise<void>;
@@ -34,6 +36,7 @@ export function useReleaseSidebar({
   onClose,
   onReleaseChange,
   onArtworkUpload,
+  onArtworkRevert,
   onAddDspLink,
   onRemoveDspLink,
 }: Pick<
@@ -43,6 +46,7 @@ export function useReleaseSidebar({
   | 'onClose'
   | 'onReleaseChange'
   | 'onArtworkUpload'
+  | 'onArtworkRevert'
   | 'onAddDspLink'
   | 'onRemoveDspLink'
 >): UseReleaseSidebarReturn {
@@ -80,6 +84,17 @@ export function useReleaseSidebar({
     },
     [release, onArtworkUpload, onReleaseChange]
   );
+
+  const handleArtworkRevert = useCallback(async () => {
+    if (!release || !onArtworkRevert || !onReleaseChange) return;
+    track('release_artwork_revert', { releaseId: release.id });
+    const restoredUrl = await onArtworkRevert(release.id);
+    onReleaseChange({
+      ...release,
+      artworkUrl: restoredUrl,
+      originalArtworkUrl: undefined,
+    });
+  }, [release, onArtworkRevert, onReleaseChange]);
 
   const handleCopySmartLink = useCallback(async () => {
     if (!release?.smartLinkPath) return;
@@ -171,6 +186,9 @@ export function useReleaseSidebar({
 
   const canUploadArtwork =
     isEditable && Boolean(onArtworkUpload && release && onReleaseChange);
+  const canRevertArtwork =
+    isEditable &&
+    Boolean(onArtworkRevert && release?.originalArtworkUrl && onReleaseChange);
 
   return {
     isAddingLink,
@@ -182,10 +200,12 @@ export function useReleaseSidebar({
     isEditable,
     hasRelease,
     canUploadArtwork,
+    canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
     handleFieldChange,
     handleArtworkUpload,
+    handleArtworkRevert,
     handleCopySmartLink,
     handleTitleChange,
     handleAddLink,
