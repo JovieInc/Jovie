@@ -230,35 +230,3 @@ export const animation = {
     spring: 'var(--ease-spring)',
   },
 } as const;
-
-// ============================================
-// LEGACY EXPORTS (for backwards compatibility)
-// ============================================
-export const colors = {
-  base: surfaces.base,
-  'surface-0': surfaces['surface-0'],
-  'surface-1': surfaces['surface-1'],
-  'surface-2': surfaces['surface-2'],
-  'surface-3': surfaces['surface-3'],
-  'primary-token': text.primary,
-  'secondary-token': text.secondary,
-  'tertiary-token': text.tertiary,
-  'border-subtle': borders.subtle,
-  border: borders.default,
-  accent: accent.base,
-  'accent-foreground': accent.foreground,
-  'btn-primary': buttons.primary.bg,
-  'btn-primary-foreground': buttons.primary.fg,
-  sidebar: sidebar.background,
-  'sidebar-foreground': sidebar.foreground,
-  'sidebar-primary': sidebar.primary,
-  'sidebar-primary-foreground': sidebar.primaryForeground,
-  'sidebar-accent': sidebar.accent,
-  'sidebar-accent-foreground': sidebar.accentForeground,
-  'sidebar-border': sidebar.border,
-  'sidebar-ring': sidebar.ring,
-} as const;
-
-export const ring = {
-  accent: accent.base,
-} as const;
