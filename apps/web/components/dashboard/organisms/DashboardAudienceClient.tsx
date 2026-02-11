@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import {
   parseAsInteger,
+  parseAsString,
   parseAsStringLiteral,
   useQueryState,
   useQueryStates,
@@ -64,6 +65,7 @@ export interface DashboardAudienceClientProps {
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
+  readonly filter?: string;
 }
 
 /**
@@ -89,6 +91,7 @@ export function DashboardAudienceClient({
   profileUrl,
   profileId,
   subscriberCount,
+  filter,
 }: Readonly<DashboardAudienceClientProps>) {
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
@@ -99,6 +102,14 @@ export function DashboardAudienceClient({
   const [, setView] = useQueryState(
     'view',
     parseAsStringLiteral(audienceViews).withDefault('all').withOptions({
+      shallow: false,
+      history: 'push',
+    })
+  );
+
+  const [, setFilter] = useQueryState(
+    'filter',
+    parseAsString.withOptions({
       shallow: false,
       history: 'push',
     })
@@ -139,9 +150,18 @@ export function DashboardAudienceClient({
     (nextView: AudienceView) => {
       // Reset to page 1 and default sort when changing views
       setView(nextView);
+      setFilter(null);
       setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
     },
-    [setView, setUrlParams]
+    [setView, setFilter, setUrlParams]
+  );
+
+  const handleFilterChange = React.useCallback(
+    (nextFilter: string | null) => {
+      setFilter(nextFilter);
+      setUrlParams({ page: 1 });
+    },
+    [setFilter, setUrlParams]
   );
 
   return (
@@ -163,9 +183,11 @@ export function DashboardAudienceClient({
           onPageSizeChange={handlePageSizeChange}
           onSortChange={handleSortChange}
           onViewChange={handleViewChange}
+          onFilterChange={handleFilterChange}
           profileUrl={profileUrl}
           profileId={profileId}
           subscriberCount={subscriberCount}
+          filter={filter}
         />
       </div>
     </QueryErrorBoundary>

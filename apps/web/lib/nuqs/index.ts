@@ -74,6 +74,7 @@ export {
   type AdminUsersSort,
   type AnalyticsRange,
   type AnalyticsView,
+  type AudienceFilter,
   type AudienceSortField,
   type AudienceView,
   adminCreatorsSearchParams,
@@ -92,6 +93,7 @@ export {
   analyticsSearchParams,
   analyticsViewParser,
   analyticsViews,
+  audienceFilters,
   audienceSearchParams,
   // Audience table
   audienceSortFields,

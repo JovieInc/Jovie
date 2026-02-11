@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   refreshRelease,
+  rescanIsrcLinks,
   resetProviderOverride,
   saveProviderOverride,
   syncFromSpotify,
@@ -211,6 +212,31 @@ export function useRefreshReleaseMutation(profileId: string) {
           queryKeys.releases.matrix(profileId),
           current.map(r => (r.id === updated.id ? updated : r))
         );
+      }
+    },
+  });
+}
+
+/**
+ * Mutation to rescan a release's ISRC/UPC codes to discover new DSP links.
+ * Returns both the updated release and rate limit info.
+ */
+export function useRescanIsrcLinksMutation(profileId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: rescanIsrcLinks,
+    onSuccess: async result => {
+      if (!result.rateLimited) {
+        // Update this release in the matrix cache
+        const current = queryClient.getQueryData<ReleaseViewModel[]>(
+          queryKeys.releases.matrix(profileId)
+        );
+        if (current) {
+          queryClient.setQueryData(
+            queryKeys.releases.matrix(profileId),
+            current.map(r => (r.id === result.release.id ? result.release : r))
+          );
+        }
       }
     },
   });

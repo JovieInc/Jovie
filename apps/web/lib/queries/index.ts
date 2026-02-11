@@ -249,6 +249,7 @@ export {
 } from './usePublicProfileQuery';
 export {
   useRefreshReleaseMutation,
+  useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,

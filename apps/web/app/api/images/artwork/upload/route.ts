@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
           id: discogReleases.id,
           creatorProfileId: discogReleases.creatorProfileId,
           slug: discogReleases.slug,
+          artworkUrl: discogReleases.artworkUrl,
           metadata: discogReleases.metadata,
         })
         .from(discogReleases)
@@ -218,15 +219,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Update the release record
+      // Update the release record, preserving the original (DSP-ingested) artwork
       const existingMetadata =
         (release.metadata as Record<string, unknown>) ?? {};
+
+      // On first custom upload, snapshot the current artwork as the original
+      // so the user can revert to it later.
+      const originalFields: Record<string, unknown> = {};
+      if (!existingMetadata.originalArtworkUrl && release.artworkUrl) {
+        originalFields.originalArtworkUrl = release.artworkUrl;
+        if (existingMetadata.artworkSizes) {
+          originalFields.originalArtworkSizes = existingMetadata.artworkSizes;
+        }
+      }
+
       await tx
         .update(discogReleases)
         .set({
           artworkUrl,
           metadata: {
             ...existingMetadata,
+            ...originalFields,
             artworkSizes: sizes,
           },
           updatedAt: new Date(),

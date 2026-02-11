@@ -9,6 +9,7 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import { PWAInstallPrompt } from '@/components/organisms/PWAInstallPrompt';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
@@ -272,6 +273,7 @@ export default async function RootLayout({
         <CoreProviders>{children}</CoreProviders>
 
         <CookieBannerSection />
+        <PWAInstallPrompt />
         {VercelToolbar && <VercelToolbar />}
       </body>
     </html>

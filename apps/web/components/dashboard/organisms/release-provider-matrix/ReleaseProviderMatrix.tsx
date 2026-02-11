@@ -13,7 +13,10 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { connectAppleMusicArtist } from '@/app/app/(shell)/dashboard/releases/actions';
+import {
+  connectAppleMusicArtist,
+  revertReleaseArtwork,
+} from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
@@ -80,6 +83,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleCopy,
     handleSync,
     handleRefreshRelease,
+    handleRescanIsrc,
+    isRescanningIsrc,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
@@ -207,6 +212,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       }
 
       const result = await response.json();
+      return result.artworkUrl;
+    },
+    []
+  );
+
+  // Artwork revert handler - reverts to original DSP-ingested artwork
+  const handleArtworkRevert = useCallback(
+    async (releaseId: string): Promise<string> => {
+      const result = await revertReleaseArtwork(releaseId);
       return result.artworkUrl;
     },
     []
@@ -531,7 +545,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 : undefined
             }
             onAddDspLink={handleAddUrl}
+            onRescanIsrc={
+              editingRelease
+                ? () => handleRescanIsrc(editingRelease.id)
+                : undefined
+            }
+            isRescanningIsrc={isRescanningIsrc}
             onArtworkUpload={handleArtworkUpload}
+            onArtworkRevert={handleArtworkRevert}
             onReleaseChange={handleReleaseChange}
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}

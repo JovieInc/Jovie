@@ -74,6 +74,8 @@ export interface ReleaseViewModel {
   genres?: string[];
   /** Spotify Canvas video status for this release */
   canvasStatus?: CanvasStatus;
+  /** Original DSP-ingested artwork URL (available when user has uploaded custom art) */
+  originalArtworkUrl?: string;
 }
 
 /** Track view model for display in expandable release rows */

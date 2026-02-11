@@ -154,12 +154,13 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   if (loading) {
     return (
-      <div className='space-y-3'>
+      <div className='rounded-lg border border-subtle divide-y divide-subtle'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-[72px] bg-surface-2 rounded-lg animate-pulse motion-reduce:animate-none'
-          />
+          <div key={key} className='flex items-center gap-3 px-4 py-3'>
+            <div className='h-8 w-8 rounded-md bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
+            <div className='h-4 w-24 rounded bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
+            <div className='flex-1 h-9 rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none' />
+          </div>
         ))}
       </div>
     );
@@ -178,96 +179,88 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
           }}
         />
       ) : (
-        <form onSubmit={handleSubmit} className='space-y-3'>
-          {socialLinks.map((link, index) => (
-            <div
-              key={link.id || `new-${index}`}
-              className='group relative rounded-lg border border-subtle bg-surface-1 p-3 transition-colors hover:border-primary/20'
-            >
-              {/* Mobile: stacked, Desktop: row */}
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
-                {/* Platform selector with icon */}
-                <div className='flex items-center gap-2 sm:w-[180px] shrink-0'>
-                  <div
-                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
-                    style={{
-                      backgroundColor: PLATFORM_METADATA_MAP[link.platform]
-                        ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
-                        : undefined,
-                      color: PLATFORM_METADATA_MAP[link.platform]
-                        ? getChipSafeIconColor(
-                            `#${PLATFORM_METADATA_MAP[link.platform].color}`,
-                            isDark
-                          )
-                        : undefined,
-                    }}
-                  >
-                    <SocialIcon
-                      platform={link.platform}
-                      className='h-4 w-4'
-                      aria-hidden
-                    />
-                  </div>
-                  <CommonDropdown
-                    variant='dropdown'
-                    searchable
-                    searchPlaceholder='Search platforms...'
-                    emptyMessage='No platforms found'
-                    items={platformItemsByIndex[index] ?? []}
-                    align='start'
-                    trigger={
-                      <button
-                        type='button'
-                        className='flex h-10 flex-1 items-center justify-between gap-1 rounded-xl border border-subtle bg-surface-1 px-3 py-2 text-sm focus-visible:outline-none focus-visible:border-interactive sm:w-[140px]'
-                      >
-                        <span className='truncate'>
-                          {getPlatformLabel(link.platform)}
-                        </span>
-                        <ChevronDown className='h-3.5 w-3.5 shrink-0 opacity-50' />
-                      </button>
-                    }
-                    aria-label={`Select platform for link ${index + 1}`}
+        <form onSubmit={handleSubmit} className='space-y-0'>
+          <div className='rounded-lg border border-subtle divide-y divide-subtle'>
+            {socialLinks.map((link, index) => (
+              <div
+                key={link.id || `new-${index}`}
+                className='flex items-center gap-3 px-4 py-3'
+              >
+                <div
+                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
+                  style={{
+                    backgroundColor: PLATFORM_METADATA_MAP[link.platform]
+                      ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
+                      : undefined,
+                    color: PLATFORM_METADATA_MAP[link.platform]
+                      ? getChipSafeIconColor(
+                          `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                          isDark
+                        )
+                      : undefined,
+                  }}
+                >
+                  <SocialIcon
+                    platform={link.platform}
+                    className='h-4 w-4'
+                    aria-hidden
                   />
                 </div>
 
-                {/* URL input */}
-                <div className='flex flex-1 items-center gap-2'>
-                  <Input
-                    type='url'
-                    value={link.url}
-                    onChange={e => {
-                      const v = e.target.value;
-                      updateSocialLink(index, 'url', v);
-                      scheduleNormalize(index, v);
-                    }}
-                    onBlur={() => handleUrlBlur(index)}
-                    placeholder={getPlaceholder(link.platform)}
-                    inputMode='url'
-                    autoCapitalize='none'
-                    autoCorrect='off'
-                    autoComplete='off'
-                    className='flex-1'
-                    aria-label={`${getPlatformLabel(link.platform)} URL`}
-                  />
+                <CommonDropdown
+                  variant='dropdown'
+                  searchable
+                  searchPlaceholder='Search platforms...'
+                  emptyMessage='No platforms found'
+                  items={platformItemsByIndex[index] ?? []}
+                  align='start'
+                  trigger={
+                    <button
+                      type='button'
+                      className='flex h-9 w-[140px] shrink-0 items-center justify-between gap-1 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:border-interactive'
+                    >
+                      <span className='truncate'>
+                        {getPlatformLabel(link.platform)}
+                      </span>
+                      <ChevronDown className='h-3.5 w-3.5 shrink-0 opacity-50' />
+                    </button>
+                  }
+                  aria-label={`Select platform for link ${index + 1}`}
+                />
 
-                  {/* Remove button */}
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => removeSocialLink(index)}
-                    className='shrink-0 text-tertiary-token hover:text-error transition-colors'
-                    aria-label={`Remove ${getPlatformLabel(link.platform)}`}
-                  >
-                    <Trash2 className='h-4 w-4' />
-                  </Button>
-                </div>
+                <Input
+                  type='url'
+                  value={link.url}
+                  onChange={e => {
+                    const v = e.target.value;
+                    updateSocialLink(index, 'url', v);
+                    scheduleNormalize(index, v);
+                  }}
+                  onBlur={() => handleUrlBlur(index)}
+                  placeholder={getPlaceholder(link.platform)}
+                  inputMode='url'
+                  autoCapitalize='none'
+                  autoCorrect='off'
+                  autoComplete='off'
+                  className='flex-1 min-w-0'
+                  aria-label={`${getPlatformLabel(link.platform)} URL`}
+                />
+
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => removeSocialLink(index)}
+                  className='shrink-0 text-tertiary-token hover:text-error transition-colors'
+                  aria-label={`Remove ${getPlatformLabel(link.platform)}`}
+                >
+                  <Trash2 className='h-4 w-4' />
+                </Button>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
 
-          {/* Add + Save row */}
-          <div className='flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button
               type='button'
               variant='outline'
