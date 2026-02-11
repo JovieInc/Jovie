@@ -130,7 +130,9 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('focus-visible:ring-2');
-      expect(switchElement.className).toContain('focus-visible:ring-ring');
+      expect(switchElement.className).toContain(
+        'focus-visible:ring-gray-500/50'
+      );
     });
 
     it('applies disabled styling', () => {
