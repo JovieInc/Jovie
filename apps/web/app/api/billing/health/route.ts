@@ -18,6 +18,7 @@ import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { captureWarning } from '@/lib/error-tracking';
+import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -185,7 +186,10 @@ export async function GET() {
 
     return NextResponse.json(result, {
       status: statusCode,
-      headers: NO_STORE_HEADERS,
+      headers: {
+        ...NO_STORE_HEADERS,
+        ...(hasCritical ? { 'Retry-After': RETRY_AFTER_HEALTH } : {}),
+      },
     });
   } catch (error) {
     logger.error('Billing health check failed:', error);
@@ -196,7 +200,10 @@ export async function GET() {
         timestamp: new Date().toISOString(),
         error: error instanceof Error ? error.message : 'Health check failed',
       },
-      { status: 503, headers: NO_STORE_HEADERS }
+      {
+        status: 503,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_HEALTH },
+      }
     );
   }
 }

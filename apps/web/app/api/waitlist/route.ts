@@ -7,6 +7,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
 import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
+import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -46,7 +47,10 @@ function serviceUnavailableResponse(
       success: false,
       ...sanitizeErrorResponse(userMessage, debugMessage, { code }),
     },
-    { status: 503, headers: NO_STORE_HEADERS }
+    {
+      status: 503,
+      headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+    }
   );
 }
 

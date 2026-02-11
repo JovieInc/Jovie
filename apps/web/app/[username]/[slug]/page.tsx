@@ -29,6 +29,7 @@ import {
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // Use ISR with 5-minute revalidation for smart link pages
@@ -71,7 +72,7 @@ function generateMusicStructuredData(
     url: contentUrl,
     ...(content.artworkUrl && { image: content.artworkUrl }),
     ...(content.releaseDate && {
-      datePublished: content.releaseDate.toISOString().split('T')[0],
+      datePublished: toDateOnlySafe(content.releaseDate),
     }),
     byArtist: {
       '@type': 'MusicGroup',
@@ -248,7 +249,7 @@ const fetchContentBySlug = async (
       title: release.title,
       slug: release.slug,
       artworkUrl: release.artworkUrl,
-      releaseDate: release.releaseDate?.toISOString() ?? null,
+      releaseDate: toISOStringOrNull(release.releaseDate),
       providerLinks: links,
       artworkSizes,
     };
@@ -303,7 +304,7 @@ const fetchContentBySlug = async (
       title: track.title,
       slug: track.slug,
       artworkUrl: releaseData?.artworkUrl ?? null,
-      releaseDate: releaseData?.releaseDate?.toISOString() ?? null,
+      releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
     };
   }
@@ -519,7 +520,7 @@ export default async function ContentSmartLinkPage({
           release={{
             title: content.title,
             artworkUrl: content.artworkUrl,
-            releaseDate: content.releaseDate?.toISOString() ?? null,
+            releaseDate: toISOStringOrNull(content.releaseDate),
           }}
           artist={{
             name: creator.displayName ?? creator.username,
@@ -661,7 +662,7 @@ export async function generateMetadata({
       'music:musician': artistName,
       'music:release_type': content.type,
       ...(content.releaseDate && {
-        'music:release_date': content.releaseDate.toISOString().split('T')[0],
+        'music:release_date': toDateOnlySafe(content.releaseDate),
       }),
     },
   };
