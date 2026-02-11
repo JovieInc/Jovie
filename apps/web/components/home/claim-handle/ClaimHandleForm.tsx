@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
 import { Button, Input } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -15,6 +14,7 @@ import {
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { BASE_URL } from '@/constants/app';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
@@ -128,7 +128,7 @@ export function ClaimHandleForm({
   onHandleChange,
 }: Readonly<ClaimHandleFormProps>) {
   const router = useRouter();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn } = useAuthSafe();
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);

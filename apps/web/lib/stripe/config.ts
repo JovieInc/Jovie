@@ -35,6 +35,11 @@ export const PLAN_LIMITS = {
     canRemoveBranding: false,
     canAccessAdvancedAnalytics: false,
     canFilterSelfFromAnalytics: false,
+    // AI features
+    aiDailyMessageLimit: 5,
+    aiCanUseTools: false,
+    // Verification
+    canBeVerified: false,
   },
   pro: {
     analyticsRetentionDays: 90,
@@ -43,6 +48,11 @@ export const PLAN_LIMITS = {
     canRemoveBranding: true,
     canAccessAdvancedAnalytics: true,
     canFilterSelfFromAnalytics: true,
+    // AI features
+    aiDailyMessageLimit: 100,
+    aiCanUseTools: true,
+    // Verification
+    canBeVerified: true,
   },
   growth: {
     analyticsRetentionDays: 365,
@@ -51,6 +61,11 @@ export const PLAN_LIMITS = {
     canRemoveBranding: true,
     canAccessAdvancedAnalytics: true,
     canFilterSelfFromAnalytics: true,
+    // AI features
+    aiDailyMessageLimit: 500,
+    aiCanUseTools: true,
+    // Verification
+    canBeVerified: true,
   },
 } as const;
 

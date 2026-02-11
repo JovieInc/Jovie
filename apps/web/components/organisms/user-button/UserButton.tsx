@@ -4,7 +4,7 @@ import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { useCallback } from 'react';
-import { Badge } from '@/components/ui/Badge';
+import { Badge } from '@/components/atoms/Badge';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
 import { Icon } from '../../atoms/Icon';

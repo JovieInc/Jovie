@@ -1,7 +1,7 @@
+import { CTAButton } from '@/components/atoms/CTAButton';
 import { Container } from '@/components/site/Container';
 import { Footer } from '@/components/site/Footer';
 import { Header } from '@/components/site/Header';
-import { CTAButton } from '@/components/ui/CTAButton';
 
 export default function NotFound() {
   return (

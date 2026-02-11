@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { CTAButton } from '@/components/ui/CTAButton';
+import { CTAButton } from '@/components/atoms/CTAButton';
 import { HeroSection } from './HeroSection';
 
 const meta: Meta<typeof HeroSection> = {
