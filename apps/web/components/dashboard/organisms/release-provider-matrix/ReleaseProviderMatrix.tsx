@@ -186,6 +186,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     []
   );
 
+  const handleMatchStatusChange = useCallback(
+    (connected: boolean, name: string | null) => {
+      setIsAmConnected(connected);
+      setAmArtistName(name);
+    },
+    []
+  );
+
   const handleNewRelease = useCallback(() => {
     const prompt =
       "I'd like to add a new release to my discography. Help me set it up.";
@@ -293,7 +301,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const spotifyBadge = useMemo(
     () =>
-      isConnected && artistName ? (
+      isConnected ? (
         <button
           type='button'
           onClick={handleSync}
@@ -304,7 +312,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           }
         >
           <SocialIcon platform='spotify' className='h-4 w-4' />
-          <span>{artistName}</span>
+          <span>{artistName || 'Connected'}</span>
           {/* Status dot - visible when not hovered/syncing */}
           <span
             className={cn(
@@ -405,6 +413,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 spotifyConnected={isConnected}
                 releases={rows}
                 className='mx-4 mt-2'
+                onMatchStatusChange={handleMatchStatusChange}
               />
             )}
 
