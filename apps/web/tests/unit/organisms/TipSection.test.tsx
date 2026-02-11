@@ -42,7 +42,6 @@ describe('TipSection', () => {
     render(
       <TipSection
         handle='artist123'
-        artistName='Test Artist'
         onStripePayment={mockOnStripePayment}
       />
     );
@@ -67,7 +66,6 @@ describe('TipSection', () => {
     render(
       <TipSection
         handle='artist123'
-        artistName='Test Artist'
         onStripePayment={mockOnStripePayment}
       />
     );
@@ -90,7 +88,6 @@ describe('TipSection', () => {
     render(
       <TipSection
         handle='artist123'
-        artistName='Test Artist'
         onStripePayment={mockOnStripePayment}
         venmoLink='https://venmo.com/user'
         onVenmoPayment={mockOnVenmoPayment}

@@ -31,7 +31,6 @@ const mockVenmoPayment = (url: string) => {
 export const StripeOnly: Story = {
   args: {
     handle: 'taylorswift',
-    artistName: 'Taylor Swift',
     onStripePayment: mockStripePayment,
   },
 };
@@ -39,7 +38,6 @@ export const StripeOnly: Story = {
 export const VenmoOnly: Story = {
   args: {
     handle: 'edsheeran',
-    artistName: 'Ed Sheeran',
     venmoLink: 'https://venmo.com/u/edsheeran',
     venmoUsername: 'edsheeran',
     onVenmoPayment: mockVenmoPayment,
@@ -49,7 +47,6 @@ export const VenmoOnly: Story = {
 export const BothPaymentMethods: Story = {
   args: {
     handle: 'billieeilish',
-    artistName: 'Billie Eilish',
     onStripePayment: mockStripePayment,
     venmoLink: 'https://venmo.com/u/billieeilish',
     venmoUsername: 'billieeilish',
@@ -60,7 +57,6 @@ export const BothPaymentMethods: Story = {
 export const CustomAmounts: Story = {
   args: {
     handle: 'theweeknd',
-    artistName: 'The Weeknd',
     amounts: [5, 10, 25],
     onStripePayment: mockStripePayment,
   },
@@ -69,7 +65,6 @@ export const CustomAmounts: Story = {
 export const LargeAmounts: Story = {
   args: {
     handle: 'drake',
-    artistName: 'Drake',
     amounts: [10, 25, 50],
     onStripePayment: mockStripePayment,
   },
@@ -78,7 +73,6 @@ export const LargeAmounts: Story = {
 export const QRFallback: Story = {
   args: {
     handle: 'arianagrande',
-    artistName: 'Ariana Grande',
     // No payment methods provided
   },
 };
@@ -86,7 +80,6 @@ export const QRFallback: Story = {
 export const VenmoWithCustomAmounts: Story = {
   args: {
     handle: 'postmalone',
-    artistName: 'Post Malone',
     amounts: [3, 7, 15],
     venmoLink: 'https://venmo.com/u/postmalone',
     venmoUsername: 'postmalone',
@@ -105,7 +98,6 @@ export const LoadingDemo: Story = {
     return (
       <TipSection
         handle='dualipa'
-        artistName='Dua Lipa'
         amounts={[5, 10, 20]}
         onStripePayment={handlePayment}
       />
@@ -128,7 +120,6 @@ export const InteractiveDemo: Story = {
     return (
       <TipSection
         handle='oliviarodrigo'
-        artistName='Olivia Rodrigo'
         amounts={[3, 5, 10]}
         onStripePayment={handleStripePayment}
         venmoLink='https://venmo.com/u/oliviarodrigo'
@@ -142,7 +133,6 @@ export const InteractiveDemo: Story = {
 export const InDarkMode: Story = {
   args: {
     handle: 'weeknd',
-    artistName: 'The Weeknd',
     onStripePayment: mockStripePayment,
   },
   parameters: {
