@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
+import { Ellipsis, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -30,7 +30,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import { useDeleteConversationMutation } from '@/lib/queries/useChatMutations';
-import { cn } from '@/lib/utils';
 
 const MAX_RECENT_CHATS = 10;
 
@@ -123,24 +122,16 @@ export function RecentChats() {
                   className='h-8'
                 >
                   <Link href={href}>
-                    <MessageSquare
-                      className={cn(
-                        'size-4 shrink-0',
-                        isActive
-                          ? 'text-sidebar-foreground'
-                          : 'text-sidebar-muted'
-                      )}
-                      aria-hidden='true'
-                    />
                     <span className='flex-1 truncate text-[13px]'>{title}</span>
-                    <span
-                      className='shrink-0 text-[10px] tabular-nums text-sidebar-muted group-data-[collapsible=icon]:hidden transition-opacity duration-150 group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0'
-                      title={updatedAt.toLocaleString()}
-                    >
-                      {timeAgo}
-                    </span>
                   </Link>
                 </SidebarMenuButton>
+
+                <span
+                  className='absolute right-1 top-1 flex h-5 items-center px-1 text-[10px] tabular-nums text-sidebar-muted pointer-events-none transition-opacity duration-150 group-hover/menu-item:opacity-0 group-focus-within/menu-item:opacity-0 group-data-[collapsible=icon]:hidden'
+                  title={updatedAt.toLocaleString()}
+                >
+                  {timeAgo}
+                </span>
 
                 <SidebarMenuActions showOnHover>
                   <DropdownMenu>
