@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
@@ -137,7 +138,7 @@ export function TipSection({
               onClick={() => setPaymentMethod(null)}
               className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
             >
-              <span aria-hidden>&larr;</span> Back
+              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
             </button>
           )}
           <div className='space-y-2.5'>
@@ -173,7 +174,7 @@ export function TipSection({
               onClick={() => setPaymentMethod(null)}
               className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
             >
-              <span aria-hidden>&larr;</span> Back
+              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
             </button>
           )}
           <TipSelector amounts={amounts} onContinue={handleVenmoPayment} />
