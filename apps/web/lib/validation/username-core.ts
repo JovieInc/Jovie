@@ -3,6 +3,8 @@
  * Single source of truth for username rules and reserved words.
  */
 
+import { checkContent } from './content-filter';
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -177,7 +179,8 @@ export type UsernameValidationErrorCode =
   | 'ENDS_WITH_HYPHEN'
   | 'CONSECUTIVE_HYPHENS'
   | 'RESERVED'
-  | 'RESERVED_PATTERN';
+  | 'RESERVED_PATTERN'
+  | 'INAPPROPRIATE_CONTENT';
 
 export interface DetailedValidationResult {
   isValid: boolean;
@@ -287,6 +290,15 @@ export function validateUsernameCore(
     return createValidationError(
       'RESERVED_PATTERN',
       'This username pattern is reserved'
+    );
+  }
+
+  // Check for inappropriate/non-SEO-safe content
+  const contentCheck = checkContent(normalized);
+  if (!contentCheck.isClean) {
+    return createValidationError(
+      'INAPPROPRIATE_CONTENT',
+      contentCheck.error ?? 'This handle contains language that is not allowed'
     );
   }
 

@@ -19,8 +19,8 @@ export interface ClaimBannerProps {
  * allowing the rightful owner to claim their profile.
  *
  * Behavior:
- * - If user is signed in: links directly to /claim/{token}
- * - If user is signed out: links to /signup with redirect_url to /claim/{token}
+ * - If user is signed in: links directly to /{username}/claim?token={token}
+ * - If user is signed out: links to /signup with redirect_url
  */
 export function ClaimBanner({
   claimToken,
@@ -29,7 +29,7 @@ export function ClaimBanner({
 }: ClaimBannerProps) {
   const { isSignedIn, isLoaded } = useUserSafe();
 
-  const claimPath = `/claim/${encodeURIComponent(claimToken)}`;
+  const claimPath = `/${encodeURIComponent(profileHandle)}/claim?token=${encodeURIComponent(claimToken)}`;
 
   // Build the appropriate URL based on auth state
   const getClaimUrl = useCallback(() => {

@@ -290,8 +290,9 @@ export async function lookupByIsrc(
   const storefront = options.storefront ?? DEFAULT_STOREFRONT;
 
   const result = await executeWithCircuitBreaker(async () => {
+    // Include albums relationship so release enrichment can derive album URLs
     const response = await musicKitRequest<AppleMusicTrack>(
-      `/catalog/${storefront}/songs?filter[isrc]=${encodeURIComponent(isrc)}`,
+      `/catalog/${storefront}/songs?filter[isrc]=${encodeURIComponent(isrc)}&include=albums`,
       options
     );
     return response;
@@ -346,8 +347,10 @@ export async function bulkLookupByIsrc(
   const isrcParam = uncachedIsrcs.map(i => encodeURIComponent(i)).join(',');
 
   const result = await executeWithCircuitBreaker(async () => {
+    // Include albums relationship so release enrichment can derive album URLs
+    // even when the song URL uses the /song/ format instead of /album/
     const response = await musicKitRequest<AppleMusicTrack>(
-      `/catalog/${storefront}/songs?filter[isrc]=${isrcParam}`,
+      `/catalog/${storefront}/songs?filter[isrc]=${isrcParam}&include=albums`,
       options
     );
     return response;

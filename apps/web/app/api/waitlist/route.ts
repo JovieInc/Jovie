@@ -451,22 +451,30 @@ export async function GET() {
     .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
     .limit(1);
 
-  const inviteToken = await (async () => {
+  const invite = await (async () => {
     if (!entry?.id || entry.status !== 'invited') return null;
-    const [invite] = await db
-      .select({ claimToken: waitlistInvites.claimToken })
+    const [row] = await db
+      .select({
+        claimToken: waitlistInvites.claimToken,
+        username: creatorProfiles.username,
+      })
       .from(waitlistInvites)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, waitlistInvites.creatorProfileId)
+      )
       .where(eq(waitlistInvites.waitlistEntryId, entry.id))
       .orderBy(desc(waitlistInvites.createdAt))
       .limit(1);
-    return invite?.claimToken ?? null;
+    return row ?? null;
   })();
 
   return NextResponse.json(
     {
       hasEntry: Boolean(entry),
       status: entry?.status ?? null,
-      inviteToken,
+      inviteToken: invite?.claimToken ?? null,
+      inviteUsername: invite?.username ?? null,
     },
     { headers: NO_STORE_HEADERS }
   );

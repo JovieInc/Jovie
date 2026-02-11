@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { isContentClean } from '../../content-filter';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
 /**
@@ -126,12 +127,15 @@ export const profileUpdateSchema = z
   .object({
     /** Username (3-30 chars, validated externally) */
     username: z.string().trim().min(3).max(30).optional(),
-    /** Display name (1-60 chars) */
+    /** Display name (1-60 chars, content-filtered) */
     displayName: z
       .string()
       .trim()
       .min(1, 'Display name cannot be empty')
       .max(60, 'Display name must be 60 characters or fewer')
+      .refine(val => isContentClean(val), {
+        message: 'This name contains language that is not allowed',
+      })
       .optional(),
     /** Profile bio (max 512 chars) */
     bio: z

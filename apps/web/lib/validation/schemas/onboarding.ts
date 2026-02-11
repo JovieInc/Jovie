@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isContentClean } from '../content-filter';
 
 /**
  * Onboarding validation schemas for user registration and profile setup.
@@ -46,6 +47,9 @@ export const fullNameSchema = z
   .regex(/^[\p{L}0-9\s\-'.]+$/u, {
     message:
       'Only letters, numbers, spaces, hyphens, apostrophes, and periods are allowed',
+  })
+  .refine(val => isContentClean(val), {
+    message: 'This name contains language that is not allowed',
   });
 
 // =============================================================================

@@ -288,7 +288,6 @@ export const profileModeParser =
  */
 export const profileSearchParams = createSearchParamsCache({
   mode: profileModeParser,
-  claim_token: parseAsString,
 });
 
 // ============================================================================
