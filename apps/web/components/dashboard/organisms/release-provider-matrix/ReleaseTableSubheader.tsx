@@ -299,8 +299,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
         />
       </div>
 
-      {/* Right: Display + Export */}
-      <div className='flex items-center gap-2'>
+      {/* Right: Display + Export (hidden on mobile where list view is used) */}
+      <div className='hidden md:flex items-center gap-2'>
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}
