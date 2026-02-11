@@ -15,8 +15,8 @@ import { logger } from '@/lib/utils/logger';
  */
 const confirmEditSchema = z.object({
   profileId: z.string().uuid(),
-  field: z.enum(['displayName', 'bio', 'genres']),
-  newValue: z.union([z.string(), z.array(z.string())]),
+  field: z.enum(['displayName', 'bio']),
+  newValue: z.string(),
   conversationId: z.string().uuid().optional(),
   messageId: z.string().uuid().optional(),
 });
@@ -59,20 +59,6 @@ export async function POST(req: Request) {
   const { profileId, field, newValue, conversationId, messageId } =
     parseResult.data;
 
-  // Validate field-specific value types
-  if (field === 'genres' && !Array.isArray(newValue)) {
-    return NextResponse.json(
-      { error: 'Genres must be an array' },
-      { status: 400, headers: NO_CACHE_HEADERS }
-    );
-  }
-  if (field !== 'genres' && typeof newValue !== 'string') {
-    return NextResponse.json(
-      { error: `${field} must be a string` },
-      { status: 400, headers: NO_CACHE_HEADERS }
-    );
-  }
-
   try {
     // Fetch the profile and verify ownership
     const profile = await db.query.creatorProfiles.findFirst({
@@ -82,7 +68,6 @@ export async function POST(req: Request) {
         userId: true,
         displayName: true,
         bio: true,
-        genres: true,
       },
     });
 
