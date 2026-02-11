@@ -58,6 +58,19 @@ export const IMMUTABLE_CACHE_HEADERS = {
 } as const;
 
 // ============================================================================
+// Retry-After Constants (for 503 Service Unavailable responses)
+// ============================================================================
+
+/** Retry-After for health check endpoints (60 seconds) */
+export const RETRY_AFTER_HEALTH = '60';
+
+/** Retry-After for general service unavailability (30 seconds) */
+export const RETRY_AFTER_SERVICE = '30';
+
+/** Retry-After for transient/timeout errors (10 seconds) */
+export const RETRY_AFTER_TRANSIENT = '10';
+
+// ============================================================================
 // Security Headers
 // ============================================================================
 

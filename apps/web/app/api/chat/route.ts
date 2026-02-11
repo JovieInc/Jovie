@@ -33,6 +33,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getPlanLimits } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
+import { toISOStringOrNull } from '@/lib/utils/date';
 
 export const maxDuration = 30;
 
@@ -241,7 +242,7 @@ async function fetchReleasesForChat(
 
   return releases.map(r => ({
     ...r,
-    releaseDate: r.releaseDate?.toISOString() ?? null,
+    releaseDate: toISOStringOrNull(r.releaseDate),
     canvasStatus: getCanvasStatusFromMetadata(r.metadata),
   }));
 }

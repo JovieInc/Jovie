@@ -21,6 +21,7 @@ import { emailEngagement } from '@/lib/db/schema/email-engagement';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -212,8 +213,8 @@ function buildInviteResponse(
       id: invite.id,
       email: invite.email,
       status: invite.status || 'pending',
-      createdAt: invite.createdAt?.toISOString() ?? '',
-      sentAt: invite.sentAt?.toISOString() ?? null,
+      createdAt: toISOStringOrNull(invite.createdAt) ?? '',
+      sentAt: toISOStringOrNull(invite.sentAt),
       profile: {
         id: invite.profileId,
         username: invite.username,
@@ -224,9 +225,9 @@ function buildInviteResponse(
       },
       engagement: {
         opened: engagement.opened,
-        openedAt: engagement.openedAt?.toISOString() ?? null,
+        openedAt: toISOStringOrNull(engagement.openedAt),
         clicked: engagement.clicked,
-        clickedAt: engagement.clickedAt?.toISOString() ?? null,
+        clickedAt: toISOStringOrNull(engagement.clickedAt),
         clickCount: engagement.clickCount,
       },
     };
