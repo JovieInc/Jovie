@@ -141,7 +141,8 @@ const defaultProps = {
   onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
   onViewChange: vi.fn(),
-  onFilterChange: vi.fn(),
+  onFiltersChange: vi.fn(),
+  filters: { segments: [] },
   subscriberCount: 0,
 };
 
