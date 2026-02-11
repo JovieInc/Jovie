@@ -15,6 +15,9 @@
 @import "../styles/theme.css";
 @import "tw-animate-css";
 
+/* Scan @jovie/ui package so Tailwind v4 detects its class usage */
+@source "../../../packages/ui";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Base document sizing and immediate dark-aware fallback colors */

@@ -22,7 +22,10 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const onOpen = () => {
       const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
-      if (!isMdUp) return;
+      const hasFinePointer = globalThis.matchMedia(
+        '(any-pointer: fine)'
+      ).matches;
+      if (!isMdUp || !hasFinePointer) return;
       setDismissed(false);
       setMode('open');
       setUrl(`${globalThis.location.origin}/${handle}`);
@@ -39,12 +42,13 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
     const isLgUp = globalThis.matchMedia('(min-width: 1024px)').matches;
+    const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
     const hasDismissed =
       localStorage.getItem('viewOnMobileDismissed') === 'true';
 
     setDismissed(hasDismissed);
 
-    if (!isMdUp) {
+    if (!isMdUp || !hasFinePointer) {
       setMode('hidden');
       setUrl('');
       return;
@@ -67,12 +71,15 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     const mqlMd = globalThis.matchMedia('(min-width: 768px)');
     const mqlLg = globalThis.matchMedia('(min-width: 1024px)');
 
+    const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
+
     const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
       void e;
       const isMdUp = mqlMd.matches;
       const isLgUp = mqlLg.matches;
+      const hasFinePointer = mqlPointer.matches;
 
-      if (!isMdUp) {
+      if (!isMdUp || !hasFinePointer) {
         setMode('hidden');
         setUrl('');
         return;
@@ -102,15 +109,20 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     };
     const legacyMqlMd = mqlMd as LegacyMQL;
     const legacyMqlLg = mqlLg as LegacyMQL;
+    const legacyMqlPointer = mqlPointer as LegacyMQL;
 
     if (typeof mqlMd.addEventListener === 'function') {
       mqlMd.addEventListener('change', onChange as EventListener);
       mqlLg.addEventListener('change', onChange as EventListener);
+      mqlPointer.addEventListener('change', onChange as EventListener);
     } else if (typeof legacyMqlMd.addListener === 'function') {
       legacyMqlMd.addListener(
         onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
       );
       legacyMqlLg.addListener(
+        onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
+      );
+      legacyMqlPointer.addListener(
         onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
       );
     }
@@ -119,11 +131,15 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       if (typeof mqlMd.removeEventListener === 'function') {
         mqlMd.removeEventListener('change', onChange as EventListener);
         mqlLg.removeEventListener('change', onChange as EventListener);
+        mqlPointer.removeEventListener('change', onChange as EventListener);
       } else if (typeof legacyMqlMd.removeListener === 'function') {
         legacyMqlMd.removeListener(
           onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
         );
         legacyMqlLg.removeListener(
+          onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
+        );
+        legacyMqlPointer.removeListener(
           onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
         );
       }

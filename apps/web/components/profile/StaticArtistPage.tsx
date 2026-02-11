@@ -238,6 +238,9 @@ export function StaticArtistPage({
                 <LatestReleaseCard
                   release={latestRelease}
                   artistHandle={artist.handle}
+                  artist={artist}
+                  dsps={mergedDSPs}
+                  enableDynamicEngagement={enableDynamicEngagement}
                 />
               )}
               <div data-testid='primary-cta'>
