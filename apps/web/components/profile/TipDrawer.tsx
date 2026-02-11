@@ -111,13 +111,16 @@ export function TipDrawer({
           {/* Drag handle */}
           <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
 
-          <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
+          <Drawer.Title className='relative z-10 px-6 pt-4 pb-0.5 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
             Tip {artistName}
           </Drawer.Title>
+          <p className='relative z-10 px-6 pb-2 text-center text-xs text-secondary-token'>
+            via Venmo
+          </p>
 
           <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
             <TipSelector amounts={amounts} onContinue={handleAmountSelected} />
-            <p className='mt-4 text-center text-sm text-secondary-token'>
+            <p className='mt-4 text-center text-xs text-tertiary-token'>
               You&apos;ll be redirected to Venmo to complete your tip.
             </p>
           </div>

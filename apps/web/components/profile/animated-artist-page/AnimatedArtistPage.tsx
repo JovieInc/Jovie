@@ -79,8 +79,8 @@ export function AnimatedArtistPage({
           return (
             <motion.div {...fadeUpProps}>
               <div className='space-y-4 text-center'>
-                <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm'>
-                  <p className='text-secondary-token' role='alert'>
+                <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+                  <p className='text-sm text-secondary-token' role='alert'>
                     Tipping is not available yet. We&apos;re focused on getting
                     the core Jovie profile experience right before launching
                     tipping.
@@ -110,8 +110,8 @@ export function AnimatedArtistPage({
                 />
               ) : (
                 <div className='text-center'>
-                  <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm'>
-                    <p className='text-secondary-token' role='alert'>
+                  <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+                    <p className='text-sm text-secondary-token' role='alert'>
                       Venmo tipping is not available for this artist yet.
                     </p>
                   </div>

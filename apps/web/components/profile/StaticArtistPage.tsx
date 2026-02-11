@@ -167,8 +167,8 @@ function renderContent(
             />
           ) : (
             <div className='text-center'>
-              <div className='bg-surface-0 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm'>
-                <p className='text-secondary-token' role='alert'>
+              <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+                <p className='text-sm text-secondary-token' role='alert'>
                   Venmo tipping is not available for this artist yet.
                 </p>
               </div>

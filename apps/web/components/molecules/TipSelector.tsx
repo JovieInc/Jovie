@@ -39,13 +39,17 @@ export function TipSelector({
   }, [selectedAmount]);
 
   return (
-    <div className={`space-y-4 ${className}`} data-test='tip-selector'>
+    <div className={`space-y-5 ${className}`} data-test='tip-selector'>
       <h3 id='tip-selector-heading' className='sr-only'>
         Select tip amount
       </h3>
 
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
+
+      <p className='text-xs font-medium uppercase tracking-[0.15em] text-tertiary-token'>
+        Choose amount
+      </p>
 
       {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
       <div // NOSONAR S6819
@@ -64,17 +68,15 @@ export function TipSelector({
         ))}
       </div>
 
-      <hr className='mt-3 pt-3 border-t border-subtle' />
-
       <Button
         onClick={handleContinue}
-        className='w-full bg-black! text-white! hover:bg-gray-800! dark:bg-white! dark:text-black! dark:hover:bg-gray-100!'
+        className='w-full'
         size='lg'
         disabled={isLoading}
-        variant='ghost'
+        variant='primary'
         aria-label={`Continue with $${selectedAmount} tip`}
       >
-        {isLoading ? 'Processing...' : 'Continue'}
+        {isLoading ? 'Processing...' : `Continue with $${selectedAmount}`}
       </Button>
     </div>
   );
