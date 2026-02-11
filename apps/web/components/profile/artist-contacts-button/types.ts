@@ -8,10 +8,7 @@ export interface ArtistContactsButtonProps {
 }
 
 export interface UseArtistContactsReturn {
-  open: boolean;
-  setOpen: (open: boolean) => void;
   available: PublicContact[];
-  singleContact: boolean;
   performAction: (
     channel: PublicContactChannel,
     contact: PublicContact

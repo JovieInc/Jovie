@@ -4,6 +4,7 @@ import {
   Activity,
   AlertTriangle,
   BarChart2,
+  ImageIcon,
   LayoutDashboard,
   Mail,
   ShieldCheck,
@@ -42,6 +43,11 @@ const navItems = [
     icon: ShieldCheck,
   },
   { label: 'Activity', href: APP_ROUTES.ADMIN_ACTIVITY, icon: Activity },
+  {
+    label: 'Screenshots',
+    href: APP_ROUTES.ADMIN_SCREENSHOTS,
+    icon: ImageIcon,
+  },
 ];
 
 interface AdminSidebarProps {
