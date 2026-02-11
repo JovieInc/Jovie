@@ -60,6 +60,7 @@ async function AudienceContent({
         direction: parsedParams.direction,
       },
       view: parsedParams.view,
+      filter: parsedParams.filter ?? undefined,
     });
 
     return (
@@ -75,6 +76,7 @@ async function AudienceContent({
         profileUrl={profileUrl}
         profileId={artist?.id ?? undefined}
         subscriberCount={audienceData.subscriberCount}
+        filter={parsedParams.filter ?? undefined}
       />
     );
   } catch (error) {

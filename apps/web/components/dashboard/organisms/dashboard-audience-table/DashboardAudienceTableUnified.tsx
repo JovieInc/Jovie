@@ -24,6 +24,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { cn } from '@/lib/utils';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { AudienceMember } from '@/types';
 import { AudienceTableProvider } from './AudienceTableContext';
@@ -34,13 +35,13 @@ import { downloadVCard } from './utils';
 import {
   LastSeenCell,
   MenuCell,
-  renderActionsCell,
-  renderDeviceCell,
+  QuickActionsCell,
   renderEmailCell,
-  renderLocationCell,
-  renderTypeCell,
+  renderIntentScoreCell,
+  renderLastActionCell,
+  renderReturningCell,
+  renderSourceCell,
   renderUserCell,
-  renderVisitsCell,
   SelectCell,
 } from './utils/column-renderers';
 
@@ -61,64 +62,55 @@ function getSrDescription(
 }
 
 /**
- * Stable column definitions for members mode.
- * Cell renderers that need dynamic state (selection, menu) read from AudienceTableContext
- * instead of closing over values, keeping these definitions fully stable.
+ * Redesigned column definitions for members mode.
+ *
+ * Columns: Select | User | Intent Score | Returning | Source | Last Action | Quick Actions
+ *
+ * Cell renderers that need dynamic state (selection, menu, quick actions) read from
+ * AudienceTableContext instead of closing over values, keeping these definitions fully stable.
  */
 const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   memberColumnHelper.display({
     id: 'select',
     header: () => null,
     cell: SelectCell,
-    size: 100,
+    size: 56,
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
-    header: 'User',
+    header: 'Visitor',
     cell: renderUserCell,
-    size: 240,
+    size: 220,
   }),
-  memberColumnHelper.accessor('type', {
-    id: 'type',
-    header: 'Type',
-    cell: renderTypeCell,
-    size: 120,
-  }),
-  memberColumnHelper.accessor('locationLabel', {
-    id: 'location',
-    header: 'Location',
-    cell: renderLocationCell,
-    size: 160,
-  }),
-  memberColumnHelper.accessor('deviceType', {
-    id: 'device',
-    header: 'Device',
-    cell: renderDeviceCell,
-    size: 140,
+  memberColumnHelper.accessor('intentLevel', {
+    id: 'intentScore',
+    header: 'Intent',
+    cell: renderIntentScoreCell,
+    size: 110,
   }),
   memberColumnHelper.accessor('visits', {
-    id: 'visits',
-    header: 'Visits',
-    cell: renderVisitsCell,
-    size: 120,
+    id: 'returning',
+    header: 'Returning',
+    cell: renderReturningCell,
+    size: 100,
+  }),
+  memberColumnHelper.accessor('referrerHistory', {
+    id: 'source',
+    header: 'Source',
+    cell: renderSourceCell,
+    size: 140,
   }),
   memberColumnHelper.accessor('latestActions', {
-    id: 'actions',
-    header: 'Actions',
-    cell: renderActionsCell,
-    size: 180,
-  }),
-  memberColumnHelper.accessor('lastSeenAt', {
-    id: 'lastSeen',
-    header: 'Last Seen',
-    cell: LastSeenCell,
+    id: 'lastAction',
+    header: 'Last Action',
+    cell: renderLastActionCell,
     size: 160,
   }),
   memberColumnHelper.display({
-    id: 'menu',
+    id: 'quickActions',
     header: '',
-    cell: MenuCell,
-    size: 48,
+    cell: QuickActionsCell,
+    size: 80,
   }),
 ];
 
@@ -172,9 +164,11 @@ export const DashboardAudienceTableUnified = memo(
     onPageSizeChange,
     onSortChange,
     onViewChange,
+    onFilterChange,
     profileUrl,
     profileId,
     subscriberCount,
+    filter,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -221,6 +215,23 @@ export const DashboardAudienceTableUnified = memo(
         }
       },
       [profileId, selectedMember, setSelectedMember, router]
+    );
+
+    // Quick action: export member as vCard
+    const handleExportMember = React.useCallback(
+      (member: AudienceMember) => {
+        downloadVCard(member);
+        toast.success('Contact exported as vCard');
+      },
+      []
+    );
+
+    // Quick action: block/remove member
+    const handleBlockMember = React.useCallback(
+      (member: AudienceMember) => {
+        handleRemoveMember(member).catch(() => {});
+      },
+      [handleRemoveMember]
     );
 
     // Context menu items for right-click
@@ -270,7 +281,7 @@ export const DashboardAudienceTableUnified = memo(
           { type: 'separator' as const },
           {
             id: 'remove-member',
-            label: 'Unsubscribe',
+            label: 'Block',
             icon: <UserMinus className='h-3.5 w-3.5' />,
             onClick: () => {
               handleRemoveMember(member).catch(() => {});
@@ -295,6 +306,8 @@ export const DashboardAudienceTableUnified = memo(
         openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
+        onExportMember: handleExportMember,
+        onBlockMember: handleBlockMember,
       }),
       [
         selectedIds,
@@ -304,6 +317,8 @@ export const DashboardAudienceTableUnified = memo(
         openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
+        handleExportMember,
+        handleBlockMember,
       ]
     );
 
@@ -336,11 +351,15 @@ export const DashboardAudienceTableUnified = memo(
       href: '/support',
     };
 
-    // Row className - uses unified hover token
+    // Row className — high intent rows get bold styling for visual hierarchy
     const getRowClassName = React.useCallback(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
-        return isSelected ? 'bg-surface-2/70' : 'hover:bg-surface-2/50';
+        const isHighIntent = row.intentLevel === 'high';
+        return cn(
+          isSelected ? 'bg-surface-2/70' : 'hover:bg-surface-2/50',
+          isHighIntent && 'font-medium'
+        );
       },
       [selectedMember]
     );
@@ -364,6 +383,8 @@ export const DashboardAudienceTableUnified = memo(
             <AudienceTableSubheader
               view={view}
               onViewChange={onViewChange}
+              filter={filter ?? null}
+              onFilterChange={onFilterChange}
               rows={rows}
               selectedIds={selectedIds}
               subscriberCount={subscriberCount}

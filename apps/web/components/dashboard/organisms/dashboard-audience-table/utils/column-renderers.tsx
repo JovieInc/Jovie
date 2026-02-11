@@ -5,9 +5,14 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceIntentScoreCell,
+  AudienceLastActionCell,
   AudienceLastSeenCell,
   AudienceLocationCell,
+  AudienceQuickActionsCell,
+  AudienceReturningCell,
   AudienceRowSelectionCell,
+  AudienceSourceCell,
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
@@ -86,6 +91,44 @@ export function renderActionsCell({
 }
 
 /**
+ * Renders the intent score cell with colored dot indicator
+ */
+export function renderIntentScoreCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['intentLevel']>) {
+  return <AudienceIntentScoreCell intentLevel={row.original.intentLevel} />;
+}
+
+/**
+ * Renders the returning badge cell (Yes/No based on visit count)
+ */
+export function renderReturningCell({
+  row,
+}: CellContext<AudienceMember, number>) {
+  return <AudienceReturningCell visits={row.original.visits} />;
+}
+
+/**
+ * Renders the source cell (UTM / Referrer)
+ */
+export function renderSourceCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['referrerHistory']>) {
+  return (
+    <AudienceSourceCell referrerHistory={row.original.referrerHistory} />
+  );
+}
+
+/**
+ * Renders the last action cell (most recent action only)
+ */
+export function renderLastActionCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['latestActions']>) {
+  return <AudienceLastActionCell actions={row.original.latestActions} />;
+}
+
+/**
  * Renders the email cell for subscribers
  */
 export function renderEmailCell({
@@ -143,5 +186,21 @@ export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
     <div className='flex items-center justify-end'>
       <TableActionMenu items={actionMenuItems} align='end' />
     </div>
+  );
+}
+
+/**
+ * Quick actions cell with Export and Block buttons.
+ * Reads handlers from context to keep column defs stable.
+ */
+export function QuickActionsCell({
+  row,
+}: CellContext<AudienceMember, unknown>) {
+  const { onExportMember, onBlockMember } = useAudienceTableContext();
+  return (
+    <AudienceQuickActionsCell
+      onExport={() => onExportMember(row.original)}
+      onBlock={() => onBlockMember(row.original)}
+    />
   );
 }

@@ -15,18 +15,42 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
     accessor: 'displayName',
     formatter: v => (v as string) || 'Anonymous',
   },
-  { header: 'Type', accessor: 'type', formatter: v => capitalize(v) },
   { header: 'Email', accessor: 'email', formatter: v => (v as string) || '' },
   { header: 'Phone', accessor: 'phone', formatter: v => (v as string) || '' },
-  { header: 'Location', accessor: 'locationLabel' },
+  { header: 'Intent', accessor: 'intentLevel', formatter: v => capitalize(v) },
   {
-    header: 'Device',
-    accessor: 'deviceType',
-    formatter: v => (v as string) || '',
+    header: 'Returning',
+    accessor: 'visits',
+    formatter: v => (Number(v) > 1 ? 'Yes' : 'No'),
   },
   { header: 'Visits', accessor: 'visits' },
+  {
+    header: 'Source',
+    accessor: 'referrerHistory',
+    formatter: v => {
+      const history = v as { url: string }[] | null;
+      if (!history || !Array.isArray(history) || history.length === 0)
+        return 'Direct';
+      try {
+        const url = new URL(history[0].url);
+        return url.searchParams.get('utm_source') ?? url.hostname.replace('www.', '');
+      } catch {
+        return history[0].url || 'Direct';
+      }
+    },
+  },
+  {
+    header: 'Last Action',
+    accessor: 'latestActions',
+    formatter: v => {
+      const actions = v as { label: string }[] | null;
+      if (!actions || !Array.isArray(actions) || actions.length === 0) return '';
+      return actions[0].label;
+    },
+  },
+  { header: 'Location', accessor: 'locationLabel' },
+  { header: 'Type', accessor: 'type', formatter: v => capitalize(v) },
   { header: 'Engagement Score', accessor: 'engagementScore' },
-  { header: 'Intent', accessor: 'intentLevel', formatter: v => capitalize(v) },
   {
     header: 'Tags',
     accessor: 'tags',
