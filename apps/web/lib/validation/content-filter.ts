@@ -119,7 +119,7 @@ const BLOCKED_WORDS: readonly string[] = [
   'terrorism',
 
   // Scam/impersonation
-  'officaljovie',
+  'officialjovie',
   'joviesupport',
   'jovieadmin',
   'joviestaff',
@@ -135,7 +135,16 @@ const BLOCKED_WORDS: readonly string[] = [
  * This catches evasion attempts like "f-u-c-k" or "f u c k".
  */
 function normalizeForFilter(input: string): string {
-  return input.toLowerCase().replace(/[\s\-_.']+/g, '');
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/0/g, 'o')
+    .replace(/1/g, 'i')
+    .replace(/3/g, 'e')
+    .replace(/4/g, 'a')
+    .replace(/5/g, 's')
+    .replace(/\$/g, 's')
+    .replace(/@/g, 'a');
 }
 
 // Short words (<=3 chars) are only matched exactly to avoid false positives
@@ -188,6 +197,15 @@ export function checkContent(input: string): ContentFilterResult {
         error: 'This name contains language that is not allowed',
       };
     }
+  }
+
+  // 1b) Also check the fully-normalized string against short words
+  //     (catches obfuscated short words like "a-s-s" -> "ass")
+  if (SHORT_BLOCKED.has(normalized)) {
+    return {
+      isClean: false,
+      error: 'This name contains language that is not allowed',
+    };
   }
 
   // 2) Check longer words via substring match on normalized (collapsed) input

@@ -89,7 +89,7 @@ export async function completeOnboarding({
 
     if (!isContentClean(trimmedDisplayName)) {
       const error = createOnboardingError(
-        OnboardingErrorCode.INVALID_USERNAME,
+        OnboardingErrorCode.INVALID_DISPLAY_NAME,
         'Display name contains language that is not allowed'
       );
       throw onboardingErrorToError(error);
