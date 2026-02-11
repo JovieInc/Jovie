@@ -249,7 +249,7 @@ export const MENU_SEPARATOR_BASE =
  * Keyboard shortcut indicator styles
  */
 export const MENU_SHORTCUT_BASE =
-  'ml-auto text-[12px] tracking-normal text-neutral-500';
+  'ml-auto text-[11px] tracking-wide text-quaternary-token';
 
 // ============================================================================
 // TRIGGER STYLES

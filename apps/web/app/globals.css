@@ -1319,4 +1319,15 @@ body {
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);
   --color-muted-foreground: var(--color-text-secondary-token);
+
+  /* Text hierarchy — enables text-primary-token, text-secondary-token, etc. */
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-disabled-token: var(--color-text-disabled-token);
+
+  /* Interactive states — self-referential aliases expose existing CSS vars to Tailwind v4 color system */
+  --color-interactive-hover: var(--color-interactive-hover);
+  --color-interactive-active: var(--color-interactive-active);
 }
