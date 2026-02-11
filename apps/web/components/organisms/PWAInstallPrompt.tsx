@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Download, Share, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 export function PWAInstallPrompt() {
@@ -11,7 +11,6 @@ export function PWAInstallPrompt() {
 
   return (
     <div
-      data-testid='pwa-install-banner'
       className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
       style={{
         backgroundColor: 'var(--linear-bg-surface-1)',
@@ -20,19 +19,13 @@ export function PWAInstallPrompt() {
       }}
     >
       <div className='mb-2 flex items-center gap-3 md:mb-0 md:flex-1'>
-        <div
-          className='hidden shrink-0 items-center justify-center rounded-lg sm:flex'
-          style={{ width: 40, height: 40 }}
-        >
-          {/* biome-ignore lint/a11y/noSvgWithoutTitle: decorative icon */}
-          <img
-            src='/favicon-96x96.png'
-            alt=''
-            width={40}
-            height={40}
-            className='rounded-lg'
-          />
-        </div>
+        <img
+          src='/favicon-96x96.png'
+          alt=''
+          width={40}
+          height={40}
+          className='hidden shrink-0 rounded-lg sm:block'
+        />
         <div>
           <p
             className='font-medium'
@@ -59,17 +52,7 @@ export function PWAInstallPrompt() {
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
-        {isIOS ? (
-          <Button
-            variant='outline'
-            size='sm'
-            onClick={dismiss}
-            className='gap-1.5 text-xs'
-          >
-            <Share className='size-3.5' />
-            Got it
-          </Button>
-        ) : (
+        {!isIOS && (
           <Button
             variant='default'
             size='sm'
