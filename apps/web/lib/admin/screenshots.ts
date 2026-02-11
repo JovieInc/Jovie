@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
@@ -37,9 +38,35 @@ const SCREENSHOT_SOURCES = [
   },
 ] as const;
 
-/** In Next.js, process.cwd() resolves to apps/web. Monorepo root is two levels up. */
+/**
+ * Resolve the monorepo root directory by trying multiple candidate paths.
+ * In Next.js, process.cwd() typically resolves to apps/web (two levels deep),
+ * but this may vary depending on the environment.
+ */
 function getMonorepoRoot(): string {
-  return join(process.cwd(), '..', '..');
+  const cwd = process.cwd();
+  const candidates = [
+    join(cwd, '..', '..'), // apps/web -> root
+    join(cwd, '..'), // apps -> root (or packages/x -> root)
+    cwd, // already at root
+  ];
+
+  for (const candidate of candidates) {
+    // A valid monorepo root will have a pnpm-workspace.yaml
+    if (existsSync(join(candidate, 'pnpm-workspace.yaml'))) {
+      return candidate;
+    }
+  }
+
+  // Fall back to MONOREPO_ROOT env var if set
+  const envRoot = process.env.MONOREPO_ROOT;
+  if (envRoot && existsSync(envRoot)) {
+    return envRoot;
+  }
+
+  throw new Error(
+    'Unable to determine monorepo root. Set the MONOREPO_ROOT environment variable or run from within the monorepo.'
+  );
 }
 
 export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
@@ -69,9 +96,15 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
           url: `/api/admin/screenshots/${encodeURIComponent(`${source.key}--${filename}`)}`,
         });
       }
-    } catch {
+    } catch (err: unknown) {
       // Directory may not exist in some environments; skip silently
-      continue;
+      if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+        continue;
+      }
+      console.error(
+        `[screenshots] Unexpected error reading ${source.key} directory:`,
+        err
+      );
     }
   }
 

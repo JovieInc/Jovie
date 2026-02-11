@@ -36,12 +36,21 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') handlePrev();
-      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNext();
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [isOpen, handlePrev, handleNext]);
+
+  // Build O(1) lookup map from screenshot id to its global index
+  const indexMap = new Map(screenshots.map((s, i) => [s.id, i]));
 
   // Group by source for section headings
   const grouped = new Map<string, ScreenshotInfo[]>();
@@ -64,7 +73,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </h2>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
               {items.map(ss => {
-                const globalIndex = screenshots.indexOf(ss);
+                const globalIndex = indexMap.get(ss.id) ?? 0;
                 return (
                   <div
                     key={ss.id}
