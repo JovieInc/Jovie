@@ -202,6 +202,8 @@ export function ReleaseSidebar({
               }
               allowDownloads={isEditable}
               releaseId={release.id}
+              canRevert={canRevertArtwork}
+              onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
             />
           </div>
         )}
@@ -233,24 +235,6 @@ export function ReleaseSidebar({
               {activeTab === 'catalog' && (
                 <>
                   <div className='pb-5'>
-                    <ReleaseArtwork
-                      artworkUrl={release.artworkUrl}
-                      title={release.title}
-                      artistName={artistName}
-                      canUploadArtwork={canUploadArtwork}
-                      onArtworkUpload={
-                        canUploadArtwork ? handleArtworkUpload : undefined
-                      }
-                      allowDownloads={isEditable}
-                      releaseId={release.id}
-                      canRevert={canRevertArtwork}
-                      onRevert={
-                        canRevertArtwork ? handleArtworkRevert : undefined
-                      }
-                    />
-                  </div>
-
-                  <div className='py-5'>
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}

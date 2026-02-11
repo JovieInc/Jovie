@@ -48,7 +48,7 @@ export function SettingsPolished({
   };
 
   const renderAccountSection = () => (
-    <div className='space-y-6'>
+    <div className='space-y-3 sm:space-y-6'>
       {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
         <AccountSettingsSection />
       ) : (
@@ -144,9 +144,9 @@ export function SettingsPolished({
       description:
         'Connect streaming platforms and manage your music profile links.',
       render: () => (
-        <div className='space-y-6'>
+        <div className='space-y-4 sm:space-y-6'>
           <div>
-            <h3 className='text-sm font-medium text-primary-token mb-3'>
+            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
               Connected Platforms
             </h3>
             <ConnectedDspList
@@ -155,7 +155,7 @@ export function SettingsPolished({
             />
           </div>
           <div>
-            <h3 className='text-sm font-medium text-primary-token mb-3'>
+            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
               Streaming Links
             </h3>
             <ListenNowForm
@@ -230,7 +230,10 @@ export function SettingsPolished({
     if (!section) return null;
 
     return (
-      <div className='space-y-6 pb-6' data-testid='settings-polished'>
+      <div
+        className='space-y-4 sm:space-y-6 pb-4 sm:pb-6'
+        data-testid='settings-polished'
+      >
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -244,9 +247,12 @@ export function SettingsPolished({
 
   // Full settings view with group headers
   return (
-    <div className='space-y-8 pb-6' data-testid='settings-polished'>
+    <div
+      className='space-y-5 sm:space-y-8 pb-4 sm:pb-6'
+      data-testid='settings-polished'
+    >
       {/* General settings */}
-      <div className='space-y-6'>
+      <div className='space-y-4 sm:space-y-6'>
         <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
           General
         </h2>
@@ -263,7 +269,7 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div className='space-y-6 pt-6 border-t border-subtle'>
+      <div className='space-y-4 sm:space-y-6 pt-4 sm:pt-6 border-t border-subtle'>
         <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
           Artist
         </h2>

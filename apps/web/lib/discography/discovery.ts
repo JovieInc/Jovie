@@ -34,6 +34,111 @@ export interface DiscoverLinksOptions {
 }
 
 /**
+ * Derive album URL from a MusicKit song URL when possible.
+ */
+function deriveAlbumUrl(songUrl: string): string | null {
+  if (!songUrl.includes('/album/')) return null;
+  try {
+    const parsed = new URL(songUrl);
+    parsed.search = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Attempt to resolve the album URL via the album relationship for /song/ URLs.
+ */
+async function resolveAlbumFromRelationship(
+  track: { relationships?: { albums?: { data?: { id: string }[] } } },
+  storefront: string
+): Promise<string | null> {
+  const albumId = track.relationships?.albums?.data?.[0]?.id;
+  if (!albumId) return null;
+  try {
+    const album = await getAlbum(albumId, { storefront });
+    return album?.attributes?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Look up Apple Music URL for a given ISRC, trying MusicKit first then iTunes.
+ */
+async function lookupAppleMusic(
+  isrc: string,
+  storefront: string
+): Promise<{ url: string; externalId: string | null; source: string } | null> {
+  // Try MusicKit API first (officially supports ISRC filtering)
+  if (isAppleMusicAvailable()) {
+    try {
+      const track = await musicKitLookupByIsrc(isrc, { storefront });
+      if (track?.attributes?.url) {
+        const songUrl = track.attributes.url;
+        const albumUrl =
+          deriveAlbumUrl(songUrl) ??
+          (await resolveAlbumFromRelationship(track, storefront));
+        return {
+          url: albumUrl ?? songUrl,
+          externalId: track.id,
+          source: 'musickit_isrc',
+        };
+      }
+    } catch {
+      // MusicKit failed, will try iTunes fallback below
+    }
+  }
+
+  // Fall back to iTunes Search API (undocumented ISRC support)
+  try {
+    const itunesResult = await lookupAppleMusicByIsrc(isrc, { storefront });
+    if (itunesResult) {
+      return {
+        url: itunesResult.url,
+        externalId: itunesResult.trackId,
+        source: 'itunes_isrc',
+      };
+    }
+  } catch {
+    // Both APIs failed
+  }
+
+  return null;
+}
+
+/**
+ * Save a discovered provider link and record it in the result.
+ */
+async function saveDiscoveredLink(
+  releaseId: string,
+  providerId: string,
+  url: string,
+  externalId: string | null,
+  source: string,
+  isrc: string,
+  result: DiscoveryResult,
+  extraMetadata?: Record<string, unknown>
+): Promise<void> {
+  await upsertProviderLink({
+    releaseId,
+    providerId,
+    url,
+    externalId,
+    sourceType: 'ingested',
+    metadata: {
+      discoveredFrom: source,
+      discoveredAt: new Date().toISOString(),
+      isrc,
+      ...extraMetadata,
+    },
+  });
+
+  result.discovered.push({ provider: providerId, url, quality: 'canonical' });
+}
+
+/**
  * Discover cross-platform links for a release using track ISRCs
  *
  * Strategy:
@@ -80,92 +185,25 @@ export async function discoverLinksForRelease(
   // Apple Music lookup — prefer MusicKit API (reliable), fall back to iTunes
   if (!skipExisting || !existingSet.has('apple_music')) {
     lookupPromises.push(
-      (async () => {
-        let url: string | null = null;
-        let externalId: string | null = null;
-        let source = 'apple_music_isrc';
-
-        // Try MusicKit API first (officially supports ISRC filtering)
-        if (isAppleMusicAvailable()) {
-          try {
-            const track = await musicKitLookupByIsrc(isrc, { storefront });
-            if (track?.attributes?.url) {
-              const songUrl = track.attributes.url;
-
-              // Derive album URL from song URL when possible
-              if (songUrl.includes('/album/')) {
-                try {
-                  const parsed = new URL(songUrl);
-                  parsed.search = '';
-                  url = parsed.toString();
-                } catch {
-                  // Malformed URL, will fall back to songUrl below
-                }
-              } else {
-                // For /song/ URLs, try the album relationship
-                const albumId = track.relationships?.albums?.data?.[0]?.id;
-                if (albumId) {
-                  try {
-                    const album = await getAlbum(albumId, { storefront });
-                    url = album?.attributes?.url ?? null;
-                  } catch {
-                    // Album fetch failed (timeout, rate-limit, storefront miss);
-                    // fall through to use songUrl directly below
-                  }
-                }
-              }
-
-              // If album URL derivation failed, use the song URL directly
-              if (!url) url = songUrl;
-              externalId = track.id;
-              source = 'musickit_isrc';
-            }
-          } catch {
-            // MusicKit failed, will try iTunes fallback below
-          }
-        }
-
-        // Fall back to iTunes Search API (undocumented ISRC support)
-        if (!url) {
-          try {
-            const itunesResult = await lookupAppleMusicByIsrc(isrc, {
-              storefront,
-            });
-            if (itunesResult) {
-              url = itunesResult.url;
-              externalId = itunesResult.trackId;
-              source = 'itunes_isrc';
-            }
-          } catch {
-            // Both APIs failed
-          }
-        }
-
-        if (url) {
-          await upsertProviderLink({
-            releaseId,
-            providerId: 'apple_music',
-            url,
-            externalId,
-            sourceType: 'ingested',
-            metadata: {
-              discoveredFrom: source,
-              discoveredAt: new Date().toISOString(),
+      lookupAppleMusic(isrc, storefront)
+        .then(async match => {
+          if (match) {
+            await saveDiscoveredLink(
+              releaseId,
+              'apple_music',
+              match.url,
+              match.externalId,
+              match.source,
               isrc,
-            },
-          });
-
-          result.discovered.push({
-            provider: 'apple_music',
-            url,
-            quality: 'canonical',
-          });
-        }
-      })().catch(error => {
-        result.errors.push(
-          `Apple Music lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      })
+              result
+            );
+          }
+        })
+        .catch(error => {
+          result.errors.push(
+            `Apple Music lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        })
     );
   }
 
@@ -179,26 +217,19 @@ export async function discoverLinksForRelease(
             const url = deezerResult.albumUrl ?? deezerResult.url;
             const externalId = deezerResult.albumId ?? deezerResult.trackId;
 
-            await upsertProviderLink({
+            await saveDiscoveredLink(
               releaseId,
-              providerId: 'deezer',
+              'deezer',
               url,
               externalId,
-              sourceType: 'ingested',
-              metadata: {
-                discoveredFrom: 'deezer_isrc',
-                discoveredAt: new Date().toISOString(),
-                isrc,
+              'deezer_isrc',
+              isrc,
+              result,
+              {
                 trackUrl: deezerResult.url,
                 trackId: deezerResult.trackId,
-              },
-            });
-
-            result.discovered.push({
-              provider: 'deezer',
-              url,
-              quality: 'canonical',
-            });
+              }
+            );
           }
         })
         .catch(error => {

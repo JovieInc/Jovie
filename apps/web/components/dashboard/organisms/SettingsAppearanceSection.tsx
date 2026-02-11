@@ -21,12 +21,12 @@ export function SettingsAppearanceSection() {
   };
 
   return (
-    <DashboardCard variant='settings' className='space-y-4'>
-      <h3 className='text-[14px] font-medium text-primary-token mb-4'>
+    <DashboardCard variant='settings' className='space-y-3 sm:space-y-4'>
+      <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token mb-2 sm:mb-4'>
         Interface Theme
       </h3>
 
-      <div className='grid grid-cols-3 gap-4'>
+      <div className='grid grid-cols-3 gap-2 sm:gap-4'>
         {THEME_OPTIONS.map(option => (
           <button
             type='button'
@@ -34,7 +34,7 @@ export function SettingsAppearanceSection() {
             onClick={() => handleThemeChange(option.value)}
             disabled={isPending}
             className={cn(
-              'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
+              'group relative flex flex-col p-2 sm:p-4 rounded-lg sm:rounded-xl border-2 transition-all duration-300 ease-in-out',
               'hover:translate-y-[-2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base',
               'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none',
               theme === option.value
@@ -43,7 +43,7 @@ export function SettingsAppearanceSection() {
             )}
           >
             {/* Miniature Dashboard Preview */}
-            <div className='relative w-full h-20 rounded-lg overflow-hidden mb-3'>
+            <div className='relative w-full h-14 sm:h-20 rounded-md sm:rounded-lg overflow-hidden mb-1.5 sm:mb-3'>
               {option.value === 'system' ? (
                 <div className='flex w-full h-full'>
                   <div className='relative flex-1 bg-surface-1'>
@@ -87,10 +87,10 @@ export function SettingsAppearanceSection() {
             </div>
 
             <div className='text-left'>
-              <h4 className='font-medium text-primary-token text-sm mb-1'>
+              <h4 className='font-medium text-primary-token text-xs sm:text-sm mb-0.5 sm:mb-1'>
                 {option.label}
               </h4>
-              <p className='text-xs text-secondary-token mt-1'>
+              <p className='text-[10px] sm:text-xs text-secondary-token mt-0.5 sm:mt-1 hidden sm:block'>
                 {option.description}
               </p>
             </div>
@@ -117,7 +117,7 @@ export function SettingsAppearanceSection() {
         ))}
       </div>
 
-      <p className='text-xs text-secondary-token mt-4'>
+      <p className='text-xs text-secondary-token mt-2 sm:mt-4'>
         {isPending
           ? 'Saving\u2026'
           : 'Choose how the interface appears. System automatically matches your device settings.'}

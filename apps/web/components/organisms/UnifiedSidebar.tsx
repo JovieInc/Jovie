@@ -70,9 +70,7 @@ function useFloatingSidebar(isCollapsed: boolean, isMobile: boolean) {
 
     const handleMouseMove = (e: MouseEvent) => {
       latestX = e.clientX;
-      if (rafId === undefined) {
-        rafId = requestAnimationFrame(processMousePosition);
-      }
+      rafId ??= requestAnimationFrame(processMousePosition);
     };
 
     document.addEventListener('mousemove', handleMouseMove);

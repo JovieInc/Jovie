@@ -36,7 +36,10 @@ export function AccountSettingsSection() {
   }
 
   return (
-    <div className='space-y-6' data-testid='account-settings-section'>
+    <div
+      className='space-y-3 sm:space-y-6'
+      data-testid='account-settings-section'
+    >
       <EmailManagementCard user={typedUser} />
       <ConnectedAccountsCard user={typedUser} />
       <SessionManagementCard
