@@ -47,20 +47,20 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-6'>
+      <div className='flex items-start justify-between gap-4 sm:gap-6'>
         <div className='flex-1'>
-          <h3 className='text-[14px] font-medium text-primary-token'>
+          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
             Email addresses
           </h3>
-          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
+          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
             Manage the email addresses tied to your account. Set a verified
             email as primary to use it for sign-in and notifications.
           </p>
         </div>
       </div>
 
-      <div className='mt-6 space-y-6'>
-        <div className='space-y-3'>
+      <div className='mt-3 sm:mt-6 space-y-4 sm:space-y-6'>
+        <div className='space-y-2 sm:space-y-3'>
           {sortedEmails.map(email => {
             const isPrimary = email.id === primaryEmailId;
             const isVerified = email.verification?.status === 'verified';
@@ -68,7 +68,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
             return (
               <div
                 key={email.id}
-                className='flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-subtle px-4 py-3 bg-surface-1 gap-3'
+                className='flex flex-col sm:flex-row sm:items-center justify-between rounded-lg sm:rounded-xl border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 bg-surface-1 gap-2 sm:gap-3'
               >
                 <div>
                   <p className='text-sm font-medium text-primary flex items-center gap-2'>
@@ -124,17 +124,17 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           })}
         </div>
 
-        <div className='rounded-xl border border-dashed border-subtle bg-surface-0 p-4'>
-          <h4 className='text-sm font-semibold text-primary'>
+        <div className='rounded-lg sm:rounded-xl border border-dashed border-subtle bg-surface-0 p-3 sm:p-4'>
+          <h4 className='text-[13px] sm:text-sm font-semibold text-primary'>
             Add a new email
           </h4>
-          <p className='text-xs text-secondary mt-1'>
+          <p className='text-xs text-secondary mt-0.5 sm:mt-1'>
             We will send a six-digit confirmation code to verify ownership.
           </p>
 
           <form
             onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
-            className='mt-4 space-y-3'
+            className='mt-3 sm:mt-4 space-y-2.5 sm:space-y-3'
           >
             {!pendingEmail && (
               <FormField label='New email address' required>

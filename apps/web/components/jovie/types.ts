@@ -73,7 +73,7 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     icon: 'UserSearch',
     label: 'Review my profile and suggest improvements',
     prompt:
-      'Review my full profile — bio, genres, links, and stats — and suggest specific improvements I should make.',
+      'Review my full profile — bio, links, and stats — and suggest specific improvements I should make.',
     accent: 'purple',
   },
   {
@@ -106,17 +106,10 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
     accent: 'purple',
   },
   {
-    icon: 'Music',
-    label: 'Suggest better genres for my profile',
-    prompt:
-      'Look at my current genres and suggest better ones that fit my music and help with discoverability. Propose the changes.',
-    accent: 'purple',
-  },
-  {
     icon: 'UserSearch',
     label: 'Review my profile and suggest improvements',
     prompt:
-      'Review my full profile — bio, genres, links, and stats — and suggest specific improvements I should make.',
+      'Review my full profile — bio, links, and stats — and suggest specific improvements I should make.',
     accent: 'purple',
   },
   {

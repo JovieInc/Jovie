@@ -84,12 +84,12 @@ export function SessionManagementCard({
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-6'>
+      <div className='flex items-start justify-between gap-4 sm:gap-6'>
         <div className='flex-1'>
-          <h3 className='text-[14px] font-medium text-primary-token'>
+          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
             Active sessions
           </h3>
-          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
+          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
             Keep an eye on the devices signed in to your account. End sessions
             you no longer recognise.
           </p>
@@ -99,7 +99,7 @@ export function SessionManagementCard({
       {(() => {
         if (sessionsLoading) {
           return (
-            <div className='mt-6 space-y-3'>
+            <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>
               <LoadingSkeleton height='h-12' />
               <LoadingSkeleton height='h-12' />
             </div>
@@ -108,7 +108,7 @@ export function SessionManagementCard({
 
         if (sessionsError) {
           return (
-            <div className='mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600'>
+            <div className='mt-3 sm:mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-red-600'>
               {sessionsError}
             </div>
           );
@@ -116,14 +116,14 @@ export function SessionManagementCard({
 
         if (sessions.length === 0) {
           return (
-            <div className='mt-6 rounded-lg border border-subtle bg-surface-0 px-4 py-6 text-center text-sm text-secondary'>
+            <div className='mt-3 sm:mt-6 rounded-lg border border-subtle bg-surface-0 px-3 py-4 sm:px-4 sm:py-6 text-center text-sm text-secondary'>
               You have no other active sessions.
             </div>
           );
         }
 
         return (
-          <div className='mt-6 space-y-3'>
+          <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>
             {sessions.map(session => {
               const isCurrent = session.id === activeSessionId;
               const activity = session.latestActivity;
@@ -132,7 +132,7 @@ export function SessionManagementCard({
                 <div
                   key={session.id}
                   className={cn(
-                    'flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl border border-subtle px-4 py-3 bg-surface-1',
+                    'flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 rounded-lg sm:rounded-xl border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 bg-surface-1',
                     isCurrent && 'border-accent'
                   )}
                 >
