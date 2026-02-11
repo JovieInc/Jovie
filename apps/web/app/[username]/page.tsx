@@ -156,7 +156,7 @@ const fetchProfileAndLinks = async (
     // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
     if (!result || !result.isPublic) {
       // Log when a profile query returns not_found to aid debugging production 404s
-      captureWarning('[profile] Public profile not found or not public', {
+      void captureWarning('[profile] Public profile not found or not public', {
         username,
         profileExists: !!result,
         isPublicValue: result ? String(result.isPublic) : 'n/a',
@@ -320,7 +320,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       return error.data;
     }
     // Cache layer failure - fall back to direct fetch
-    captureWarning('[profile] Cache layer failed, using direct fetch', {
+    void captureWarning('[profile] Cache layer failed, using direct fetch', {
       error,
       username,
     });

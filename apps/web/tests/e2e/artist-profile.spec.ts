@@ -365,7 +365,10 @@ describeArtist('Artist Profile Pages', () => {
 
   test.describe('Admin Profile (/tim)', () => {
     test('admin profile does not return 404', async ({ page }) => {
-      const response = await page.goto('/tim', { timeout: 120_000 });
+      const response = await page.goto('/tim', {
+        timeout: 120_000,
+        waitUntil: 'domcontentloaded',
+      });
 
       // The admin profile must NEVER 404 — this is a critical business check.
       // If this test fails, investigate the creator_profiles table for the
@@ -387,7 +390,10 @@ describeArtist('Artist Profile Pages', () => {
     });
 
     test('admin profile renders profile content', async ({ page }) => {
-      await page.goto('/tim', { timeout: 120_000 });
+      await page.goto('/tim', {
+        timeout: 120_000,
+        waitUntil: 'domcontentloaded',
+      });
 
       // The admin profile should render with an h1 (artist name)
       const h1 = page.locator('h1');
