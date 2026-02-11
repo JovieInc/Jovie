@@ -1,27 +1,22 @@
 'use client';
 
 /**
- * AppleMusicSyncBanner - Shows Apple Music sync status and match suggestions
+ * AppleMusicSyncBanner - Shows Apple Music match suggestions requiring action.
  *
- * Displays contextual banners for:
+ * Only renders for actionable states:
  * - Discovery in progress (scanning ISRCs)
  * - Suggested match awaiting confirmation
- * - Auto-confirmed match with link coverage stats
- * - Confirmed match with link coverage stats
  * - No match found
+ *
+ * Confirmed/auto-confirmed matches are NOT shown here — the header pill
+ * (DspConnectionPill) already communicates the connected state.
  */
 
 import { Button } from '@jovie/ui';
-import Image from 'next/image';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
-import { ConfidenceBadge } from '@/components/dashboard/atoms/ConfidenceBadge';
-import {
-  DspProviderIcon,
-  PROVIDER_LABELS,
-} from '@/components/dashboard/atoms/DspProviderIcon';
-import { MatchStatusBadge } from '@/components/dashboard/atoms/MatchStatusBadge';
+import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   useConfirmDspMatchMutation,
@@ -32,60 +27,19 @@ import {
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
 import { cn } from '@/lib/utils';
-import { isExternalDspImage } from '@/lib/utils/dsp-images';
-
-function MatchDescription({
-  isSuggested,
-  syncState,
-  match,
-}: {
-  readonly isSuggested: boolean;
-  readonly syncState: SyncState;
-  readonly match: DspMatch;
-}) {
-  const isrcLabel = match.matchingIsrcCount === 1 ? 'match' : 'matches';
-
-  if (isSuggested) {
-    return (
-      <>
-        Found via {match.matchingIsrcCount} ISRC {isrcLabel}. Confirm to link
-        your Apple Music releases.
-      </>
-    );
-  }
-
-  if (match.matchingIsrcCount === 0) {
-    return (
-      <>
-        {syncState === 'auto_confirmed'
-          ? 'Auto-confirmed match'
-          : 'Manually confirmed match'}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {syncState === 'auto_confirmed' ? 'Auto-linked' : 'Linked'} via{' '}
-      {match.matchingIsrcCount} ISRC {isrcLabel}
-    </>
-  );
-}
 
 interface AppleMusicSyncBannerProps {
   readonly profileId: string;
   readonly spotifyConnected: boolean;
   readonly releases: ReleaseViewModel[];
   readonly className?: string;
+  readonly onMatchStatusChange?: (
+    connected: boolean,
+    artistName: string | null
+  ) => void;
 }
 
-type SyncState =
-  | 'hidden'
-  | 'loading'
-  | 'suggested'
-  | 'auto_confirmed'
-  | 'confirmed'
-  | 'no_match';
+type SyncState = 'hidden' | 'loading' | 'suggested' | 'no_match';
 
 function determineSyncState(
   spotifyConnected: boolean,
@@ -100,9 +54,7 @@ function determineSyncState(
     return withAppleMusic > 0 ? 'hidden' : 'no_match';
   }
   if (appleMusicMatch.status === 'suggested') return 'suggested';
-  if (appleMusicMatch.status === 'auto_confirmed') return 'auto_confirmed';
-  if (appleMusicMatch.status === 'confirmed') return 'confirmed';
-  if (appleMusicMatch.status === 'rejected') return 'hidden';
+  // Confirmed/auto-confirmed/rejected: no banner needed (header pill shows status)
   return 'hidden';
 }
 
@@ -111,8 +63,8 @@ export function AppleMusicSyncBanner({
   spotifyConnected,
   releases,
   className,
+  onMatchStatusChange,
 }: AppleMusicSyncBannerProps) {
-  // Fetch Apple Music matches for this profile
   const { data: matches = [] as DspMatch[], isLoading } = useDspMatchesQuery({
     profileId,
     enabled: spotifyConnected && !!profileId,
@@ -131,16 +83,24 @@ export function AppleMusicSyncBanner({
     return amMatches[0] ?? null;
   }, [matches]);
 
-  // Calculate Apple Music link coverage
-  const linkCoverage = useMemo(() => {
-    if (releases.length === 0) return { total: 0, withAppleMusic: 0 };
-    const withAppleMusic = releases.filter(r =>
+  // Calculate Apple Music link coverage (used only for determineSyncState)
+  const withAppleMusic = useMemo(() => {
+    return releases.filter(r =>
       r.providers.some(p => p.key === 'apple_music' && p.url)
     ).length;
-    return { total: releases.length, withAppleMusic };
   }, [releases]);
 
-  // Determine sync state
+  // Notify parent when match status changes so header pill stays in sync
+  useEffect(() => {
+    if (!onMatchStatusChange || !appleMusicMatch) return;
+    const isConfirmed =
+      appleMusicMatch.status === 'confirmed' ||
+      appleMusicMatch.status === 'auto_confirmed';
+    if (isConfirmed) {
+      onMatchStatusChange(true, appleMusicMatch.externalArtistName);
+    }
+  }, [appleMusicMatch, onMatchStatusChange]);
+
   const syncState: SyncState = useMemo(
     () =>
       determineSyncState(
@@ -148,14 +108,14 @@ export function AppleMusicSyncBanner({
         releases.length,
         isLoading,
         appleMusicMatch,
-        linkCoverage.withAppleMusic
+        withAppleMusic
       ),
     [
       spotifyConnected,
       releases.length,
       isLoading,
       appleMusicMatch,
-      linkCoverage.withAppleMusic,
+      withAppleMusic,
     ]
   );
 
@@ -176,14 +136,7 @@ export function AppleMusicSyncBanner({
             aria-hidden='true'
           />
         </div>
-        <div className='flex-1 min-w-0'>
-          <p className='text-sm font-medium text-primary-token'>
-            Checking Apple Music...
-          </p>
-          <p className='text-xs text-secondary-token'>
-            Scanning your catalog for Apple Music matches
-          </p>
-        </div>
+        <p className='text-sm text-secondary-token'>Checking Apple Music...</p>
       </div>
     );
   }
@@ -199,162 +152,87 @@ export function AppleMusicSyncBanner({
         <div className='flex h-8 w-8 items-center justify-center rounded-full bg-surface-2'>
           <DspProviderIcon provider='apple_music' size='md' />
         </div>
-        <div className='flex-1 min-w-0'>
-          <p className='text-sm font-medium text-primary-token'>
-            Apple Music artist not found
-          </p>
-          <p className='text-xs text-secondary-token'>
-            No matching Apple Music profile was discovered via ISRC matching.
-            Links may still be generated for individual releases.
-          </p>
-        </div>
-        <div className='shrink-0 text-xs text-tertiary-token'>
-          {linkCoverage.withAppleMusic}/{linkCoverage.total} releases linked
-        </div>
+        <p className='text-sm text-secondary-token'>
+          No matching Apple Music artist found
+        </p>
       </div>
     );
   }
 
-  // Shared state for suggested / confirmed / auto_confirmed
+  // Suggested match — the only actionable banner state
   const match = appleMusicMatch!;
-  const isConfirmed =
-    syncState === 'confirmed' || syncState === 'auto_confirmed';
-  const isSuggested = syncState === 'suggested';
 
   return (
     <div
       className={cn(
-        'rounded-lg border px-4 py-3',
-        isSuggested
-          ? 'border-[#FA243C]/30 bg-[#FA243C]/5'
-          : 'border-green-500/20 bg-green-500/[0.03]',
+        'flex items-center gap-3 rounded-lg border border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
         className
       )}
     >
-      <div className='flex items-start gap-3'>
-        {/* Artist image or provider icon */}
-        {match.externalArtistImageUrl ? (
-          <div
-            className={cn(
-              'relative h-9 w-9 shrink-0 overflow-hidden rounded-full',
-              isSuggested ? 'bg-[#FA243C]/10' : 'bg-green-500/10'
-            )}
-          >
-            <Image
-              src={match.externalArtistImageUrl}
-              alt={match.externalArtistName}
-              fill
-              sizes='36px'
-              className='object-cover'
-              unoptimized={isExternalDspImage(match.externalArtistImageUrl)}
-            />
-          </div>
-        ) : (
-          <div
-            className={cn(
-              'flex h-9 w-9 items-center justify-center rounded-full shrink-0',
-              isSuggested ? 'bg-[#FA243C]/10' : 'bg-green-500/10'
-            )}
-          >
-            <DspProviderIcon provider='apple_music' size='md' />
-          </div>
-        )}
+      <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#FA243C]/10 shrink-0'>
+        <DspProviderIcon provider='apple_music' size='md' />
+      </div>
 
-        {/* Match info */}
-        <div className='flex-1 min-w-0'>
-          <div className='flex items-center gap-2'>
-            <DspProviderIcon
-              provider='apple_music'
-              size='sm'
-              className='shrink-0'
-            />
-            <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
-              {match.externalArtistName}
-            </span>
-            {match.externalArtistUrl && (
-              <a
-                href={match.externalArtistUrl}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='shrink-0 text-tertiary-token transition-colors hover:text-secondary-token'
-                title={`View on ${PROVIDER_LABELS.apple_music}`}
-              >
-                <Icon name='ExternalLink' className='h-3 w-3' />
-              </a>
-            )}
-            <MatchStatusBadge status={match.status} size='sm' />
-            <ConfidenceBadge score={match.confidenceScore} size='sm' />
-          </div>
-
-          <p className='mt-0.5 text-xs text-secondary-token'>
-            <MatchDescription
-              isSuggested={isSuggested}
-              syncState={syncState}
-              match={match}
-            />
-          </p>
+      <div className='flex-1 min-w-0'>
+        <div className='flex items-center gap-2'>
+          <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
+            {match.externalArtistName}
+          </span>
+          {match.externalArtistUrl && (
+            <a
+              href={match.externalArtistUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='shrink-0 text-tertiary-token transition-colors hover:text-secondary-token'
+              title='View on Apple Music'
+            >
+              <Icon name='ExternalLink' className='h-3 w-3' />
+            </a>
+          )}
         </div>
+        <p className='mt-0.5 text-xs text-secondary-token'>
+          Confirm to link your Apple Music releases.
+        </p>
+      </div>
 
-        {/* Actions */}
-        <div className='flex items-center gap-2 shrink-0'>
-          {isSuggested && (
+      <div className='flex items-center gap-2 shrink-0'>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() =>
+            rejectMutation.mutate({ matchId: match.id, profileId })
+          }
+          disabled={rejectMutation.isPending || confirmMutation.isPending}
+          className='text-xs'
+        >
+          {rejectMutation.isPending &&
+          rejectMutation.variables?.matchId === match.id
+            ? 'Dismissing...'
+            : 'Dismiss'}
+        </Button>
+        <Button
+          variant='primary'
+          size='sm'
+          onClick={() =>
+            confirmMutation.mutate({ matchId: match.id, profileId })
+          }
+          disabled={confirmMutation.isPending || rejectMutation.isPending}
+          className='text-xs bg-[#FA243C] hover:bg-[#FA243C]/90'
+        >
+          {confirmMutation.isPending &&
+          confirmMutation.variables?.matchId === match.id ? (
             <>
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={() =>
-                  rejectMutation.mutate({
-                    matchId: match.id,
-                    profileId,
-                  })
-                }
-                disabled={rejectMutation.isPending || confirmMutation.isPending}
-                className='text-xs'
-              >
-                {rejectMutation.isPending &&
-                rejectMutation.variables?.matchId === match.id
-                  ? 'Rejecting...'
-                  : 'Dismiss'}
-              </Button>
-              <Button
-                variant='primary'
-                size='sm'
-                onClick={() =>
-                  confirmMutation.mutate({
-                    matchId: match.id,
-                    profileId,
-                  })
-                }
-                disabled={confirmMutation.isPending || rejectMutation.isPending}
-                className='text-xs bg-[#FA243C] hover:bg-[#FA243C]/90'
-              >
-                {confirmMutation.isPending &&
-                confirmMutation.variables?.matchId === match.id ? (
-                  <>
-                    <Icon
-                      name='Loader2'
-                      className='mr-1 h-3 w-3 animate-spin'
-                      aria-hidden='true'
-                    />
-                    Confirming...
-                  </>
-                ) : (
-                  'Confirm Match'
-                )}
-              </Button>
+              <Icon
+                name='Loader2'
+                className='mr-1 h-3 w-3 animate-spin'
+                aria-hidden='true'
+              />
+              Confirming...
             </>
+          ) : (
+            'Confirm'
           )}
-          {isConfirmed && linkCoverage.total > 0 && (
-            <div className='text-right'>
-              <div className='text-sm font-medium text-primary-token'>
-                {linkCoverage.withAppleMusic}/{linkCoverage.total}
-              </div>
-              <div className='text-[10px] text-tertiary-token'>
-                releases linked
-              </div>
-            </div>
-          )}
-        </div>
+        </Button>
       </div>
     </div>
   );
