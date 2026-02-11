@@ -7,6 +7,7 @@ import {
   type ContextMenuItemType,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -14,6 +15,7 @@ import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
+import { MobileReleaseList } from './MobileReleaseList';
 import {
   createExpandableReleaseCellRenderer,
   createReleaseCellRenderer,
@@ -75,6 +77,9 @@ export function ReleaseTable({
   showTracks = false,
   groupByYear = false,
 }: ReleaseTableProps) {
+  // Mobile detection - render list view on small screens
+  const isMobile = useBreakpointDown('md');
+
   // Track expansion state (only used when showTracks is enabled)
   const {
     expandedReleaseIds,
@@ -329,6 +334,32 @@ export function ReleaseTable({
 
   // Only pass expanded IDs when showTracks is enabled
   const expandedRowIds = showTracks ? expandedReleaseIds : undefined;
+
+  // Mobile: render card-based list view instead of table
+  if (isMobile) {
+    if (releases.length === 0) {
+      return (
+        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+          <Icon name='Disc3' className='h-6 w-6' />
+          <div>
+            <div className='font-medium'>No releases</div>
+            <div className='text-xs'>
+              Your releases will appear here once synced.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <MobileReleaseList
+        releases={releases}
+        artistName={artistName}
+        onEdit={onEdit}
+        groupByYear={groupByYear}
+      />
+    );
+  }
 
   return (
     <UnifiedTable
