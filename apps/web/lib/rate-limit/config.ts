@@ -6,6 +6,7 @@
  */
 
 import { env } from '@/lib/env-server';
+import { PLAN_LIMITS } from '@/lib/stripe/config';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -354,28 +355,28 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Free): 5 messages per day */
+  /** AI Chat daily quota (Free): derived from PLAN_LIMITS */
   aiChatDailyFree: {
     name: 'AI Chat Daily (Free)',
-    limit: 5,
+    limit: PLAN_LIMITS.free.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:free',
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Pro): 100 messages per day */
+  /** AI Chat daily quota (Pro): derived from PLAN_LIMITS */
   aiChatDailyPro: {
     name: 'AI Chat Daily (Pro)',
-    limit: 100,
+    limit: PLAN_LIMITS.pro.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:pro',
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Growth): 500 messages per day */
+  /** AI Chat daily quota (Growth): derived from PLAN_LIMITS */
   aiChatDailyGrowth: {
     name: 'AI Chat Daily (Growth)',
-    limit: 500,
+    limit: PLAN_LIMITS.growth.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:growth',
     analytics: true,

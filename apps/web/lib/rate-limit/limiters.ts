@@ -454,7 +454,7 @@ export async function checkAiChatRateLimitForPlan(
     return dailyResult;
   }
 
-  return burstResult;
+  return dailyResult;
 }
 
 // ============================================================================
