@@ -10,12 +10,12 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import {
   unstable_noStore as noStore,
   unstable_cache as unstableCache,
 } from 'next/cache';
 import { cache } from 'react';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { getSessionSetupSql, validateClerkUserId } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
@@ -57,28 +57,20 @@ async function executeWithSession<T>(
   queryFn: () => { execute: () => Promise<T> },
   context?: string
 ): Promise<T> {
-  // Validate the user ID to prevent SQL injection
   validateClerkUserId(clerkUserId);
-  
-  // Get the session setup SQL
+
   const sessionSql = getSessionSetupSql(clerkUserId);
-  
-  // Build the query (but don't execute it yet)
   const query = queryFn();
-  
-  // Batch the session setup with the query to ensure they run on the same connection
-  // The batch API executes all statements as an implicit transaction
-  // Wrap in timeout to prevent hanging queries
-  return dashboardQuery(
-    async () => {
-      const [_sessionResult, queryResult] = await db.batch([
-        db.execute(sessionSql),
-        query,
-      ]);
-      return queryResult as T;
-    },
-    context ?? 'Query with session'
-  );
+
+  // Batch the session setup with the query to ensure they run on the same connection.
+  // The batch API executes all statements as an implicit transaction.
+  return dashboardQuery(async () => {
+    const [_sessionResult, queryResult] = await db.batch([
+      db.execute(sessionSql),
+      query as unknown as BatchItem<'pg'>,
+    ]);
+    return queryResult as T;
+  }, context ?? 'Query with session');
 }
 
 function truncateString(value: string, maxLength: number): string {

@@ -45,7 +45,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 /**
  * Gets the SQL statement for setting up RLS session variables.
  * This allows the session setup to be batched with other queries.
- * 
+ *
  * @param userId - The Clerk user ID (already validated)
  * @returns SQL statement that sets RLS session variables
  */
@@ -59,7 +59,7 @@ export function getSessionSetupSql(userId: string) {
 /**
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
- * 
+ *
  * Note: For better performance with the Neon HTTP driver, consider using
  * getSessionSetupSql() with db.batch() to ensure session setup and queries
  * execute on the same connection.
