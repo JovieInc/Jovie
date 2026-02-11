@@ -199,7 +199,7 @@ function CreatorProfileTableRowComponent({
     if (!profile.claimToken) return;
 
     const baseUrl = getBaseUrl();
-    const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
+    const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
     const success = await copyTextToClipboard(claimUrl);
 
     if (success) {
@@ -207,7 +207,7 @@ function CreatorProfileTableRowComponent({
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
     }
-  }, [profile.claimToken]);
+  }, [profile.claimToken, profile.username]);
 
   const rowContent = (
     <tr

@@ -122,3 +122,17 @@ export const PAGINATED_CACHE: CacheStrategyOptions = {
   refetchOnMount: false, // Don't refetch entire list on mount
   refetchOnWindowFocus: false,
 };
+
+/**
+ * Cache strategy for user-initiated search queries.
+ * Use for: artist search, content search, typeahead results
+ *
+ * Short stale time so previously searched terms are instant,
+ * but no automatic refetching since searches are user-driven.
+ */
+export const SEARCH_CACHE: CacheStrategyOptions = {
+  staleTime: 1 * MINUTE,
+  gcTime: 10 * MINUTE,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
+};

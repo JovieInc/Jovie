@@ -14,6 +14,7 @@ import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
+import { SEARCH_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 // Response shape from /api/spotify/search
@@ -144,10 +145,7 @@ export function useArtistSearchQuery(
     queryKey: queryKeys.spotify.artistSearch(debouncedQuery, limit),
     queryFn: ({ signal }) => fetchArtistSearch(debouncedQuery, limit, signal),
     enabled: debouncedQuery.length >= minQueryLength,
-    staleTime: 1 * 60 * 1000, // 1 min
-    gcTime: 10 * 60 * 1000, // 10 min
-    refetchOnMount: false, // Search results are user-initiated, no auto-refetch needed
-    refetchOnWindowFocus: false, // Avoid unnecessary API calls on tab switch
+    ...SEARCH_CACHE,
   });
 
   // Derive state from query status
