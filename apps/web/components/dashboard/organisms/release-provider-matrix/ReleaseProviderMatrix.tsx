@@ -83,6 +83,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleCopy,
     handleSync,
     handleRefreshRelease,
+    handleRescanIsrc,
+    isRescanningIsrc,
     handleAddUrl,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
@@ -543,6 +545,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 : undefined
             }
             onAddDspLink={handleAddUrl}
+            onRescanIsrc={
+              editingRelease
+                ? () => handleRescanIsrc(editingRelease.id)
+                : undefined
+            }
+            isRescanningIsrc={isRescanningIsrc}
             onArtworkUpload={handleArtworkUpload}
             onArtworkRevert={handleArtworkRevert}
             onReleaseChange={handleReleaseChange}

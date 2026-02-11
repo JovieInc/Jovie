@@ -62,6 +62,14 @@ export interface ReleaseSidebarProps {
     provider: ProviderKey
   ) => Promise<void>;
   /**
+   * Handler for rescanning ISRC codes to discover new DSP links
+   */
+  readonly onRescanIsrc?: () => void;
+  /**
+   * Whether an ISRC rescan is currently in progress
+   */
+  readonly isRescanningIsrc?: boolean;
+  /**
    * Whether album art downloads are allowed on public pages.
    * Controls the visibility of the "Allow album art downloads" setting.
    */

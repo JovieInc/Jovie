@@ -7,6 +7,7 @@ import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import {
   useRefreshReleaseMutation,
+  useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,
@@ -52,6 +53,7 @@ export function useReleaseProviderMatrix({
   const resetProviderMutation = useResetProviderOverrideMutation();
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
+  const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
 
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
@@ -274,6 +276,45 @@ export function useReleaseProviderMatrix({
     [refreshReleaseMutation.mutate]
   );
 
+  // Rescan ISRC links for a single release
+  const handleRescanIsrc = useCallback(
+    (releaseId: string) => {
+      rescanIsrcMutation.mutate(
+        { releaseId },
+        {
+          onSuccess: result => {
+            if (result.rateLimited) {
+              toast.error(
+                `Please wait ${result.retryAfter} before scanning again`
+              );
+              return;
+            }
+            updateRow(result.release);
+            if (result.linksFound > 0) {
+              toast.success(
+                `Found ${result.linksFound} new ${result.linksFound === 1 ? 'link' : 'links'}`
+              );
+            } else {
+              toast.info('No new links found');
+            }
+          },
+          onError: error => {
+            captureError('Failed to rescan ISRC links', error, {
+              context: 'release-mutation',
+              releaseId,
+              action: 'rescan-isrc-links',
+            });
+            toast.error('Failed to scan for links');
+          },
+        }
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+    [rescanIsrcMutation.mutate]
+  );
+
+  const isRescanningIsrc = rescanIsrcMutation.isPending;
+
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
     (count, release) =>
@@ -302,6 +343,8 @@ export function useReleaseProviderMatrix({
     handleReset,
     handleSync,
     handleRefreshRelease,
+    handleRescanIsrc,
+    isRescanningIsrc,
     handleAddUrl,
     setDrafts,
   };
