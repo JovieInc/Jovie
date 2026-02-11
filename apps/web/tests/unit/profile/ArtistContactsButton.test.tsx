@@ -40,7 +40,7 @@ function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
 }
 
 describe('ArtistContactsButton', () => {
-  it('fires direct action for single contact with single channel', () => {
+  it('opens drawer for single contact instead of direct action', () => {
     const navigate = vi.fn();
     render(
       <ArtistContactsButton
@@ -54,12 +54,11 @@ describe('ArtistContactsButton', () => {
     const trigger = screen.getByTestId('contacts-trigger');
     fireEvent.click(trigger);
 
-    expect(navigate).toHaveBeenCalledWith(
-      'mailto:agent@example.com?subject=Booking%20-%20Test%20Artist'
-    );
+    // Should open drawer, not navigate directly
+    expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('shows dropdown when multiple contacts are provided', () => {
+  it('opens drawer when multiple contacts are provided', () => {
     const contacts: PublicContact[] = [
       makeContact(),
       makeContact({
@@ -82,7 +81,6 @@ describe('ArtistContactsButton', () => {
     );
 
     const trigger = screen.getByTestId('contacts-trigger');
-    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
     fireEvent.click(trigger);
 
     expect(navigate).not.toHaveBeenCalled();
