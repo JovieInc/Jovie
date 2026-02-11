@@ -164,11 +164,11 @@ export const DashboardAudienceTableUnified = memo(
     onPageSizeChange,
     onSortChange,
     onViewChange,
-    onFilterChange,
+    onFiltersChange,
     profileUrl,
     profileId,
     subscriberCount,
-    filter,
+    filters,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -380,8 +380,8 @@ export const DashboardAudienceTableUnified = memo(
             <AudienceTableSubheader
               view={view}
               onViewChange={onViewChange}
-              filter={filter ?? null}
-              onFilterChange={onFilterChange}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
               rows={rows}
               selectedIds={selectedIds}
               subscriberCount={subscriberCount}

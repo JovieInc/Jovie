@@ -44,10 +44,10 @@ export function useDashboardAudienceTable({
   | 'onPageSizeChange'
   | 'onSortChange'
   | 'onViewChange'
-  | 'onFilterChange'
+  | 'onFiltersChange'
   | 'view'
   | 'subscriberCount'
-  | 'filter'
+  | 'filters'
 >): UseDashboardAudienceTableReturn {
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();

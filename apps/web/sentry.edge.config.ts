@@ -30,6 +30,14 @@ Sentry.init({
   // Enable sending user PII - scrubbed via beforeSend hook below
   sendDefaultPii: true,
 
+  // AI Agent Monitoring: Explicit for edge runtime (not auto-enabled like Node)
+  integrations: [
+    Sentry.vercelAIIntegration({
+      recordInputs: true,
+      recordOutputs: true,
+    }),
+  ],
+
   // Scrub sensitive data before sending to Sentry
   beforeSend(event) {
     // Anonymize IP addresses

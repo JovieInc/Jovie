@@ -29,6 +29,14 @@ Sentry.init({
   // Enable sending user PII - scrubbed via beforeSend hook below
   sendDefaultPii: true,
 
+  // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)
+  integrations: [
+    Sentry.vercelAIIntegration({
+      recordInputs: true,
+      recordOutputs: true,
+    }),
+  ],
+
   // Suppress initialization timeout warnings (Sentry continues in background)
   debug: false,
 
