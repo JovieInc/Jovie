@@ -33,6 +33,9 @@
       "axios": "^1.13.5",
       "undici": "^6.23.0",
       "webpack": "5.105.0"
+    },
+    "patchedDependencies": {
+      "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
     }
   },
   "scripts": {

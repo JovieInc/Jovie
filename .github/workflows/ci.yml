@@ -879,6 +879,10 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           cd apps/web
+          # Create empty auth state so Playwright's auth-setup project doesn't crash.
+          # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           PORT=3100 npx next start &
           SERVER_PID=$!
           # Wait for server to accept connections
