@@ -171,14 +171,14 @@ export function CreatorActionsMenu({
     if (!profile.claimToken) return;
 
     const baseUrl = getBaseUrl();
-    const claimUrl = `${baseUrl}/claim/${profile.claimToken}`;
+    const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
     const success = await copyTextToClipboard(claimUrl);
 
     if (success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     }
-  }, [profile.claimToken]);
+  }, [profile.claimToken, profile.username]);
 
   const stateClass = cn(
     'transition duration-200 ease-out transform',

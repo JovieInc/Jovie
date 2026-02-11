@@ -379,34 +379,6 @@ describe('Public Profile Page Logic', () => {
     });
   });
 
-  describe('Claim banner logic', () => {
-    it('shows claim banner only when all conditions are met', () => {
-      // Requires: claim token present, profile not claimed, token valid
-      const hasClaimToken = true;
-      const isClaimed = false;
-      const claimTokenValid = true;
-
-      const showClaimBanner = hasClaimToken && !isClaimed && claimTokenValid;
-      expect(showClaimBanner).toBe(true);
-    });
-
-    it('hides claim banner when profile is already claimed', () => {
-      const showClaimBanner = true && !true && true;
-      expect(showClaimBanner).toBe(false);
-    });
-
-    it('hides claim banner when token is invalid', () => {
-      const showClaimBanner = true && !false && false;
-      expect(showClaimBanner).toBe(false);
-    });
-
-    it('hides claim banner when no token in URL', () => {
-      const hasClaimToken = false;
-      const showClaimBanner = hasClaimToken && !false && true;
-      expect(showClaimBanner).toBe(false);
-    });
-  });
-
   describe('Metadata generation logic', () => {
     // Test the metadata construction logic from generateMetadata
 
