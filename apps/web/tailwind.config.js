@@ -73,7 +73,7 @@ module.exports = {
         'accent-active': 'var(--color-accent-active)',
         'accent-subtle': 'var(--color-accent-subtle)',
 
-        // Semantic status colors
+        // Semantic status colors (destructive = error alias for shadcn compatibility)
         destructive: 'var(--color-error)',
         error: 'var(--color-error)',
         success: 'var(--color-success)',
@@ -125,9 +125,6 @@ module.exports = {
         'brand-audiomack': 'var(--color-brand-audiomack)',
         'brand-audiomack-hover': 'var(--color-brand-audiomack-hover)',
         'brand-audiomack-subtle': 'var(--color-brand-audiomack-subtle)',
-
-        // Additional text utilities
-        'muted-secondary': 'var(--color-text-muted-secondary)',
       },
 
       // Border colors with better naming (avoids border-border-subtle)

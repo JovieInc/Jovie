@@ -127,9 +127,6 @@ body {
   --color-subtle: var(--color-border-subtle);
   --color-default: var(--color-border-default);
   --color-strong: var(--color-border-strong);
-
-  /* Additional text utilities */
-  --color-muted-secondary: var(--color-text-muted-secondary);
 }
 
 /* ============================================
@@ -464,36 +461,8 @@ body {
    ============================================ */
 
 @layer components {
-  /* Linear Nav Link - uses Linear tokens */
-  .nav-link-linear {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: var(--linear-button-height-sm);
-    padding: 0 var(--linear-space-3);
-    margin: 0;
-    font-size: var(--linear-caption-size);
-    font-weight: var(--linear-font-weight-medium);
-    line-height: var(--linear-caption-leading);
-    color: var(--linear-text-secondary);
-    background-color: transparent;
-    border: none;
-    border-radius: var(--linear-radius-sm);
-    outline-color: transparent;
-    min-width: 0;
-    min-height: 0;
-    transition:
-      color var(--linear-duration-fast) var(--linear-ease),
-      background var(--linear-duration-fast) var(--linear-ease);
-
-    &:hover {
-      background-color: var(--linear-bg-hover);
-      color: var(--linear-text-primary);
-    }
-  }
-
-  /* Linear Nav Login Button - uses Linear tokens */
+  /* Linear Nav Link & Login Button - identical ghost-style link using Linear tokens */
+  .nav-link-linear,
   .btn-linear-login {
     position: relative;
     display: inline-flex;
@@ -769,13 +738,7 @@ body {
   }
 
   .text-destructive {
-    color: #dc2626;
-    /* red-600 */
-
-    &:is(.dark *) {
-      color: #f87171;
-      /* red-400 */
-    }
+    color: var(--color-error);
   }
 }
 

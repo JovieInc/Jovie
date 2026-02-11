@@ -131,49 +131,6 @@
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
-
-  /* ============================================
-     DSP/BRAND COLORS - External platform colors
-     ============================================
-     Static brand colors (don't change with theme).
-     Used for platform identification.
-  */
-  /* Spotify */
-  --color-brand-spotify: #1db954;
-  --color-brand-spotify-hover: #1aa34a;
-  --color-brand-spotify-subtle: oklch(95% 0.05 145);
-  /* Apple Music */
-  --color-brand-apple: #fa243c;
-  --color-brand-apple-hover: #e01f35;
-  --color-brand-apple-subtle: oklch(95% 0.05 20);
-  /* YouTube */
-  --color-brand-youtube: #ff0000;
-  --color-brand-youtube-hover: #e60000;
-  --color-brand-youtube-subtle: oklch(95% 0.05 25);
-  /* SoundCloud */
-  --color-brand-soundcloud: #ff5500;
-  --color-brand-soundcloud-hover: #e64d00;
-  --color-brand-soundcloud-subtle: oklch(95% 0.05 45);
-  /* Tidal */
-  --color-brand-tidal: #000000;
-  --color-brand-tidal-hover: #1a1a1a;
-  --color-brand-tidal-subtle: oklch(95% 0 0);
-  /* Amazon Music */
-  --color-brand-amazon: #ff9900;
-  --color-brand-amazon-hover: #e68a00;
-  --color-brand-amazon-subtle: oklch(95% 0.05 70);
-  /* Deezer */
-  --color-brand-deezer: #feaa2d;
-  --color-brand-deezer-hover: #e59928;
-  --color-brand-deezer-subtle: oklch(95% 0.05 75);
-  /* Pandora */
-  --color-brand-pandora: #3668ff;
-  --color-brand-pandora-hover: #2d5ce6;
-  --color-brand-pandora-subtle: oklch(95% 0.05 250);
-  /* Audiomack */
-  --color-brand-audiomack: #ffa200;
-  --color-brand-audiomack-hover: #e69200;
-  --color-brand-audiomack-subtle: oklch(95% 0.05 70);
 }
 
 /* Dark mode - same generation logic, inverted lightness */
@@ -313,7 +270,7 @@
   /* Spotify */
   --color-brand-spotify: oklch(68% 0.21 145);
   --color-brand-spotify-hover: oklch(72% 0.21 145);
-  --color-brand-spotify-subtle: oklch(95% 0.06 145);
+  --color-brand-spotify-subtle: oklch(95% 0.05 145);
 
   /* Apple Music */
   --color-brand-apple: oklch(60% 0.2 10);
@@ -325,10 +282,35 @@
   --color-brand-youtube-hover: oklch(65% 0.22 25);
   --color-brand-youtube-subtle: oklch(95% 0.05 25);
 
-  /* Additional text utilities */
-  --color-text-muted-secondary: oklch(
-    55% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  /* SoundCloud */
+  --color-brand-soundcloud: oklch(65% 0.2 45);
+  --color-brand-soundcloud-hover: oklch(70% 0.2 45);
+  --color-brand-soundcloud-subtle: oklch(95% 0.05 45);
+
+  /* Tidal */
+  --color-brand-tidal: oklch(0% 0 0);
+  --color-brand-tidal-hover: oklch(15% 0 0);
+  --color-brand-tidal-subtle: oklch(95% 0 0);
+
+  /* Amazon Music */
+  --color-brand-amazon: oklch(75% 0.17 70);
+  --color-brand-amazon-hover: oklch(70% 0.17 70);
+  --color-brand-amazon-subtle: oklch(95% 0.05 70);
+
+  /* Deezer */
+  --color-brand-deezer: oklch(78% 0.15 75);
+  --color-brand-deezer-hover: oklch(73% 0.15 75);
+  --color-brand-deezer-subtle: oklch(95% 0.05 75);
+
+  /* Pandora */
+  --color-brand-pandora: oklch(52% 0.2 250);
+  --color-brand-pandora-hover: oklch(57% 0.2 250);
+  --color-brand-pandora-subtle: oklch(95% 0.05 250);
+
+  /* Audiomack */
+  --color-brand-audiomack: oklch(74% 0.17 65);
+  --color-brand-audiomack-hover: oklch(69% 0.17 65);
+  --color-brand-audiomack-subtle: oklch(95% 0.05 65);
 }
 
 :root.dark {
@@ -344,10 +326,29 @@
   --color-brand-youtube: oklch(70% 0.22 25);
   --color-brand-youtube-subtle: oklch(20% 0.1 25);
 
-  /* Additional text utilities */
-  --color-text-muted-secondary: oklch(
-    58% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  /* SoundCloud */
+  --color-brand-soundcloud: oklch(70% 0.2 45);
+  --color-brand-soundcloud-subtle: oklch(20% 0.1 45);
+
+  /* Tidal */
+  --color-brand-tidal: oklch(90% 0 0);
+  --color-brand-tidal-subtle: oklch(20% 0 0);
+
+  /* Amazon Music */
+  --color-brand-amazon: oklch(80% 0.17 70);
+  --color-brand-amazon-subtle: oklch(20% 0.08 70);
+
+  /* Deezer */
+  --color-brand-deezer: oklch(82% 0.15 75);
+  --color-brand-deezer-subtle: oklch(20% 0.08 75);
+
+  /* Pandora */
+  --color-brand-pandora: oklch(60% 0.2 250);
+  --color-brand-pandora-subtle: oklch(20% 0.1 250);
+
+  /* Audiomack */
+  --color-brand-audiomack: oklch(78% 0.17 65);
+  --color-brand-audiomack-subtle: oklch(20% 0.08 65);
 }
 
 /* ============================================
@@ -453,19 +454,17 @@
   --text-5xl: 3rem;
   /* 48px */
 
-  /* Line heights */
+  /* Line heights — must match globals.css @theme values (Tailwind v4 source of truth) */
   --leading-none: 1;
-  --leading-tight: 1.1;
-  --leading-snug: 1.25;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
-  /* Letter spacing */
-  --tracking-tighter: -0.0325em;
-  /* Headlines */
-  --tracking-tight: -0.02em;
-  --tracking-normal: -0.011em;
-  /* Body text */
+  /* Letter spacing — must match globals.css @theme values (Tailwind v4 source of truth) */
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
   --tracking-wide: 0.01em;
 }
 
