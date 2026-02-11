@@ -384,14 +384,28 @@ export async function checkSpotifyRefreshRateLimit(
 // ============================================================================
 
 /**
- * Rate limiter for AI chat messages
+ * Rate limiter for AI chat messages (burst protection)
  * Limit: 30 messages per hour per user - protects Anthropic API costs
  */
 export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
 
 /**
- * Check AI chat rate limit
- * Returns the first failure or success if pass
+ * Plan-specific daily AI chat limiters.
+ * Each plan has a separate daily quota on top of the hourly burst limiter.
+ */
+export const aiChatDailyFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatDailyFree
+);
+export const aiChatDailyProLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatDailyPro
+);
+export const aiChatDailyGrowthLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatDailyGrowth
+);
+
+/**
+ * Check AI chat rate limit (burst only, plan-unaware).
+ * Kept for backward compatibility. Prefer checkAiChatRateLimitForPlan.
  */
 export async function checkAiChatRateLimit(
   userId: string
@@ -401,6 +415,46 @@ export async function checkAiChatRateLimit(
     userId,
     'You have reached the chat limit. Please try again later.'
   );
+}
+
+/**
+ * Check AI chat rate limits for a specific plan.
+ * Applies both the hourly burst limiter (all plans) and the daily plan quota.
+ * Returns the first failure or success if all pass.
+ */
+export async function checkAiChatRateLimitForPlan(
+  userId: string,
+  plan: string | null
+): Promise<RateLimitResult> {
+  // 1. Check hourly burst limiter (applies to all plans)
+  const burstResult = await checkRateLimit(
+    aiChatLimiter,
+    userId,
+    'Too many messages in a short time. Please wait a moment.'
+  );
+  if (!burstResult.success) {
+    return burstResult;
+  }
+
+  // 2. Check daily plan-specific quota
+  const dailyLimiter =
+    plan === 'growth'
+      ? aiChatDailyGrowthLimiter
+      : plan === 'pro'
+        ? aiChatDailyProLimiter
+        : aiChatDailyFreeLimiter;
+
+  const dailyMessage =
+    plan === 'growth' || plan === 'pro'
+      ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
+      : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.';
+
+  const dailyResult = await checkRateLimit(dailyLimiter, userId, dailyMessage);
+  if (!dailyResult.success) {
+    return dailyResult;
+  }
+
+  return dailyResult;
 }
 
 // ============================================================================

@@ -43,18 +43,32 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 }
 
 /**
+ * Gets the SQL statement for setting up RLS session variables.
+ * This allows the session setup to be batched with other queries.
+ *
+ * @param userId - The Clerk user ID (already validated)
+ * @returns SQL statement that sets RLS session variables
+ */
+export function getSessionSetupSql(userId: string) {
+  // Set the session variables for RLS in a single query.
+  // is_local=false (session-scoped) because the Neon HTTP driver has no
+  // transaction context — is_local=true would be silently discarded.
+  return drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`;
+}
+
+/**
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
+ *
+ * Note: For better performance with the Neon HTTP driver, consider using
+ * getSessionSetupSql() with db.batch() to ensure session setup and queries
+ * execute on the same connection.
  */
 export async function setupDbSession(clerkUserId?: string) {
   const userId = await resolveClerkUserId(clerkUserId);
 
-  // Set the session variables for RLS in a single query.
-  // is_local=false (session-scoped) because the Neon HTTP driver has no
-  // transaction context — is_local=true would be silently discarded.
-  await db.execute(
-    drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`
-  );
+  // Execute the session setup SQL
+  await db.execute(getSessionSetupSql(userId));
 
   return { userId };
 }

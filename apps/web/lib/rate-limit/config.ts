@@ -6,6 +6,7 @@
  */
 
 import { env } from '@/lib/env-server';
+import { PLAN_LIMITS } from '@/lib/stripe/config';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -354,12 +355,39 @@ export const RATE_LIMITERS = {
   // AI Chat Operations
   // ---------------------------------------------------------------------------
 
-  /** AI Chat: 30 messages per hour per user - protects Anthropic API costs */
+  /** AI Chat: 30 messages per hour per user - burst protection for all plans */
   aiChat: {
     name: 'AI Chat',
     limit: 30,
     window: '1 h',
     prefix: 'ai:chat',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Free): derived from PLAN_LIMITS */
+  aiChatDailyFree: {
+    name: 'AI Chat Daily (Free)',
+    limit: PLAN_LIMITS.free.aiDailyMessageLimit,
+    window: '1 d',
+    prefix: 'ai:chat:daily:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Pro): derived from PLAN_LIMITS */
+  aiChatDailyPro: {
+    name: 'AI Chat Daily (Pro)',
+    limit: PLAN_LIMITS.pro.aiDailyMessageLimit,
+    window: '1 d',
+    prefix: 'ai:chat:daily:pro',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** AI Chat daily quota (Growth): derived from PLAN_LIMITS */
+  aiChatDailyGrowth: {
+    name: 'AI Chat Daily (Growth)',
+    limit: PLAN_LIMITS.growth.aiDailyMessageLimit,
+    window: '1 d',
+    prefix: 'ai:chat:daily:growth',
     analytics: true,
   } satisfies RateLimitConfig,
 

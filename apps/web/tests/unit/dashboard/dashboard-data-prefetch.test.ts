@@ -106,9 +106,13 @@ vi.mock('next/cache', async () => {
 });
 
 const setupDbSessionMock = vi.fn();
+const getSessionSetupSqlMock = vi.fn(() => 'mock-session-sql');
+const validateClerkUserIdMock = vi.fn();
 
 vi.mock('@/lib/auth/session', () => ({
   setupDbSession: setupDbSessionMock,
+  getSessionSetupSql: getSessionSetupSqlMock,
+  validateClerkUserId: validateClerkUserIdMock,
   withDbSessionTx: withDbSessionTxMock,
   withDbSession: vi.fn(async handler => handler('user_123')),
 }));
@@ -126,10 +130,28 @@ vi.mock('@/lib/db', () => ({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 'user_db_1' }]),
-          orderBy: vi.fn().mockResolvedValue([]),
+          limit: vi.fn().mockReturnValue({
+            execute: vi.fn().mockResolvedValue([{ id: 'user_db_1' }]),
+          }),
+          orderBy: vi.fn().mockReturnValue({
+            execute: vi.fn().mockResolvedValue([]),
+          }),
         }),
       }),
+    }),
+    execute: vi.fn().mockResolvedValue({}),
+    batch: vi.fn(async (queries: unknown[]) => {
+      const results = [];
+      for (const q of queries) {
+        if (q && typeof q === 'object' && 'execute' in q) {
+          results.push(
+            await (q as { execute: () => Promise<unknown> }).execute()
+          );
+        } else {
+          results.push({});
+        }
+      }
+      return results;
     }),
   },
 }));
@@ -228,8 +250,8 @@ describe('dashboard data prefetch', () => {
     ]);
 
     expect(first).toEqual(second);
-    // setupDbSession is called for each cached function (chrome data + tipping stats)
+    // getSessionSetupSql is called for each cached function (chrome data + tipping stats)
     // but the actual data fetching is deduplicated via unstable_cache
-    expect(setupDbSessionMock).toHaveBeenCalled();
+    expect(getSessionSetupSqlMock).toHaveBeenCalled();
   });
 });
