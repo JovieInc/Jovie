@@ -1,7 +1,23 @@
-import { render, screen } from '@testing-library/react';
+import { TooltipProvider } from '@jovie/ui';
+import { type RenderOptions, render, screen } from '@testing-library/react';
+import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardAudienceTable } from '@/components/dashboard/organisms/dashboard-audience-table';
 import type { AudienceMember } from '@/types';
+
+/**
+ * Custom render that wraps UI in TooltipProvider, required because
+ * AudienceFilterDropdown uses TooltipShortcut which depends on the provider.
+ */
+function renderWithProviders(
+  ui: React.ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>
+) {
+  return render(ui, {
+    wrapper: ({ children }) => <TooltipProvider>{children}</TooltipProvider>,
+    ...options,
+  });
+}
 
 // Mock next/navigation (useRouter is used in DashboardAudienceTableUnified)
 vi.mock('next/navigation', () => ({
@@ -154,12 +170,12 @@ describe('DashboardAudienceTable - Virtualization', () => {
   });
 
   it('renders the table container with test id', () => {
-    render(<DashboardAudienceTable {...defaultProps} rows={[]} />);
+    renderWithProviders(<DashboardAudienceTable {...defaultProps} rows={[]} />);
     expect(screen.getByTestId('dashboard-audience-table')).toBeInTheDocument();
   });
 
   it('shows empty state when no rows provided', () => {
-    render(<DashboardAudienceTable {...defaultProps} rows={[]} />);
+    renderWithProviders(<DashboardAudienceTable {...defaultProps} rows={[]} />);
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
@@ -170,7 +186,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
       'virtualizes rows - renders significantly fewer DOM rows than total data',
       { timeout: 10000 },
       () => {
-        render(
+        renderWithProviders(
           <DashboardAudienceTable
             {...defaultProps}
             rows={largeDataset}
@@ -189,7 +205,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     );
 
     it('only renders visible rows plus overscan, not all rows', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
@@ -208,7 +224,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     });
 
     it('provides correct row count to virtualizer', () => {
-      render(
+      renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
@@ -221,7 +237,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     });
 
     it('renders rows with absolute positioning for virtual scrolling', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
@@ -241,7 +257,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     });
 
     it('sets tbody height based on total virtual size', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={largeDataset}
@@ -259,7 +275,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     const stressDataset = MOCK_DATA_STRESS;
 
     it('efficiently handles larger datasets via virtualization', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={stressDataset}
@@ -285,7 +301,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
 
     it('uses correct estimated row height (44px)', { timeout: 10000 }, () => {
       // Check tbody height calculation: 50 rows * 44px = 2200px
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
@@ -298,7 +314,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     });
 
     it('applies translateY transform to position rows', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
@@ -318,7 +334,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     });
 
     it('renders rows with data-index attribute for virtualizer', () => {
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={testDataset}
@@ -341,7 +357,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     it('applies virtualization even for small datasets', () => {
       const smallDataset = generateMockAudienceMembers(10);
 
-      render(
+      renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={smallDataset}
@@ -359,7 +375,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
     it('renders all rows when dataset fits in viewport', () => {
       const smallDataset = generateMockAudienceMembers(5);
 
-      const { container } = render(
+      const { container } = renderWithProviders(
         <DashboardAudienceTable
           {...defaultProps}
           rows={smallDataset}
@@ -378,7 +394,7 @@ describe('DashboardAudienceTable - Virtualization', () => {
 
 describe('DashboardAudienceTable - Subscribers Mode', () => {
   it('virtualizes subscriber rows the same as member rows', () => {
-    render(
+    renderWithProviders(
       <DashboardAudienceTable
         {...defaultProps}
         mode='subscribers'
