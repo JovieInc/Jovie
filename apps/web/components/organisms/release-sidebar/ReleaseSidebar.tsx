@@ -50,6 +50,7 @@ export function ReleaseSidebar({
   onSave,
   isSaving,
   onArtworkUpload,
+  onArtworkRevert,
   onAddDspLink,
   onRemoveDspLink,
   allowDownloads = false,
@@ -64,9 +65,11 @@ export function ReleaseSidebar({
     isEditable,
     hasRelease,
     canUploadArtwork,
+    canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
     handleArtworkUpload,
+    handleArtworkRevert,
     handleCopySmartLink,
     handleAddLink,
     handleRemoveLink,
@@ -78,6 +81,7 @@ export function ReleaseSidebar({
     onClose,
     onReleaseChange,
     onArtworkUpload,
+    onArtworkRevert,
     onAddDspLink,
     onRemoveDspLink,
   });
@@ -220,6 +224,10 @@ export function ReleaseSidebar({
                       }
                       allowDownloads={isEditable}
                       releaseId={release.id}
+                      canRevert={canRevertArtwork}
+                      onRevert={
+                        canRevertArtwork ? handleArtworkRevert : undefined
+                      }
                     />
                   </div>
 
