@@ -416,7 +416,7 @@ function buildSystemPrompt(
 - Be encouraging but realistic
 
 ## Profile Editing
-You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio, display name, or genres, use this tool to show them a preview.
+You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
 
 **Editable Fields:**
 - displayName: Their public display name
@@ -430,7 +430,7 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
 
-When asked to edit a blocked field, explain that they need to visit the settings page to make that change.
+When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
 ## Creative & Promotion Tools
 
