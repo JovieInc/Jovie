@@ -6,7 +6,7 @@ import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
  * Turbopack dev mode has slow cold compilation, so we use generous timeouts.
  */
 const TIMEOUTS = {
-  TEST_OVERALL: 120_000, // 2 min for slow dev mode
+  TEST_OVERALL: 180_000, // 3 min for slow dev mode (auth + Turbopack cold compile)
   NAVIGATION: 90_000, // Turbopack cold compilation
   MATRIX_VISIBLE: 15_000,
   ELEMENT_CHECK: 10_000,

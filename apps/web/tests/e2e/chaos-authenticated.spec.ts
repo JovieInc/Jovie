@@ -1,6 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { Page, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { isClerkTestEmail, signInUser } from '../helpers/clerk-auth';
 import {
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
@@ -68,7 +68,11 @@ function hasClerkCredentials(): boolean {
   const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
   const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
 
-  return username.length > 0 && password.length > 0 && clerkSetupSuccess;
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail(username)) &&
+    clerkSetupSuccess
+  );
 }
 
 /**
@@ -78,7 +82,10 @@ function getAdminCredentials(): { username: string; password: string } {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
 
-  if (adminUsername.length > 0 && adminPassword.length > 0) {
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail(adminUsername))
+  ) {
     return { username: adminUsername, password: adminPassword };
   }
 
@@ -383,7 +390,7 @@ const ADMIN_PAGES = [
 // ============================================================================
 
 test.describe('Authenticated Chaos Testing @chaos', () => {
-  test.setTimeout(600_000); // 10 minutes per test - chaos tests need time for many clicks
+  test.setTimeout(720_000); // 12 minutes per test - signInUser (180s) + chaos clicks (many pages)
 
   test.beforeEach(async ({ page }) => {
     const success = await setupChaosAuth(page);

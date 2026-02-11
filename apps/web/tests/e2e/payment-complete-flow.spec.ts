@@ -4,6 +4,8 @@ import { signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 
 const stripePriceId =
+  process.env.STRIPE_PRICE_PRO_MONTHLY ||
+  process.env.STRIPE_PRICE_PRO_YEARLY ||
   process.env.STRIPE_PRICE_STANDARD_MONTHLY ||
   process.env.STRIPE_PRICE_STANDARD_YEARLY;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -193,6 +195,8 @@ async function fetchSubscriptionBySession(
 
 test.describe('Billing payment flow - Stripe Checkout', () => {
   test.describe.configure({ mode: 'serial' });
+  // signInUser needs 180s+ for Clerk + Turbopack, plus Stripe checkout page loads
+  test.setTimeout(300_000);
 
   test('completes Standard upgrade and reflects on dashboard', async ({
     page,

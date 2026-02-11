@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
+import { SMOKE_TIMEOUTS, waitForLoad } from './utils/smoke-test-utils';
 
 /**
  * Checks if a page has rendered meaningful content.
@@ -42,6 +42,9 @@ async function hasPageContent(
  */
 
 test.describe('Dashboard Landing @smoke', () => {
+  // Dashboard pages need Turbopack cold compile (30-55s) + Clerk JS load
+  test.setTimeout(180_000);
+
   // The actual dashboard page (legacy /app/dashboard redirects to /)
   const DASHBOARD_PAGE = '/app/dashboard/profile';
 
@@ -84,7 +87,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await waitForLoad(page);
 
     // Wait for URL to stabilize
     const currentUrl = page.url();
@@ -112,10 +115,11 @@ test.describe('Dashboard Landing @smoke', () => {
     });
 
     await page.goto(DASHBOARD_PAGE, {
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    // Best-effort wait for full load — may exceed timeout on Turbopack cold compile
+    await waitForLoad(page);
 
     // Verify onboarding page was never loaded
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -130,10 +134,10 @@ test.describe('Dashboard Landing @smoke', () => {
 
   test('dashboard content is visible after navigation', async ({ page }) => {
     await page.goto(DASHBOARD_PAGE, {
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await waitForLoad(page);
 
     // Wait for any loading states to complete
     await page.waitForLoadState('networkidle').catch(() => {
@@ -175,7 +179,7 @@ test.describe('Dashboard Landing @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       waitUntil: 'domcontentloaded',
     });
-    await page.waitForLoadState('load');
+    await waitForLoad(page);
 
     // With the cookie set, user should NOT be redirected to onboarding
     const wentToOnboarding = navigatedUrls.some(url =>
@@ -214,7 +218,7 @@ test.describe('Dashboard Landing @smoke', () => {
         }
       }
 
-      await page.waitForLoadState('load');
+      await waitForLoad(page);
 
       const currentUrl = page.url();
       expect(
