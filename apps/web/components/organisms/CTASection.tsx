@@ -1,5 +1,5 @@
-import { SectionHeading } from '@/components/atoms/SectionHeading';
 import { CTAButton } from '@/components/atoms/CTAButton';
+import { SectionHeading } from '@/components/atoms/SectionHeading';
 
 export interface CTASectionProps {
   readonly title: React.ReactNode;

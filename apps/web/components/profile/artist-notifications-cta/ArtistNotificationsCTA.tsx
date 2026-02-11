@@ -15,8 +15,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };
 
 import { Skeleton } from '@jovie/ui';
-import { CountrySelector } from '@/components/profile/notifications';
 import { CTAButton } from '@/components/atoms/CTAButton';
+import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';

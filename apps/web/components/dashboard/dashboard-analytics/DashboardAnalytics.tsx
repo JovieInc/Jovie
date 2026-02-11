@@ -2,8 +2,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { Globe, Link2, MapPin } from 'lucide-react';
-import type { ComponentType, SVGProps } from 'react';
 import { useRouter } from 'next/navigation';
+import type { ComponentType, SVGProps } from 'react';
 import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
