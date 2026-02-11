@@ -828,7 +828,7 @@ jobs:
     # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -866,12 +866,39 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
+      - name: Build app (public routes only — no secrets needed)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: cd apps/web && pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line
+        run: |
+          cd apps/web
+          # Create empty auth state so Playwright's auth-setup project doesn't crash.
+          # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          PORT=3100 npx next start &
+          SERVER_PID=$!
+          # Wait for server to accept connections
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line
+          EXIT_CODE=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT_CODE
         env:
+          BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
           CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload Playwright Report on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'

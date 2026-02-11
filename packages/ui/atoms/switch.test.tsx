@@ -106,10 +106,10 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:bg-gray-300'
+        'data-[state=unchecked]:bg-gray-200'
       );
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:border-gray-400'
+        'data-[state=unchecked]:border-gray-300'
       );
     });
 
@@ -119,10 +119,10 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:bg-accent'
+        'data-[state=checked]:bg-[var(--color-accent)]'
       );
       expect(switchElement.className).toContain(
-        'data-[state=checked]:border-accent'
+        'data-[state=checked]:border-[var(--color-accent)]'
       );
     });
 
@@ -263,12 +263,16 @@ describe('Switch', () => {
       const classes = switchElement.className;
 
       // Unchecked track must use a visible background + border
-      expect(classes).toContain('data-[state=unchecked]:bg-gray-300');
-      expect(classes).toContain('data-[state=unchecked]:border-gray-400');
+      expect(classes).toContain('data-[state=unchecked]:bg-gray-200');
+      expect(classes).toContain('data-[state=unchecked]:border-gray-300');
 
       // Checked track must use accent background + matching border
-      expect(classes).toContain('data-[state=checked]:bg-accent');
-      expect(classes).toContain('data-[state=checked]:border-accent');
+      expect(classes).toContain(
+        'data-[state=checked]:bg-[var(--color-accent)]'
+      );
+      expect(classes).toContain(
+        'data-[state=checked]:border-[var(--color-accent)]'
+      );
 
       // Track must NOT use border-transparent (would hide the toggle)
       expect(classes).not.toContain('border-transparent');
@@ -280,9 +284,9 @@ describe('Switch', () => {
 
       // Extract the unchecked and checked bg classes to verify they differ
       const uncheckedBg = classes.match(
-        /data-\[state=unchecked\]:bg-[\w-]+/
+        /data-\[state=unchecked\]:bg-[^\s]+/
       )?.[0];
-      const checkedBg = classes.match(/data-\[state=checked\]:bg-[\w-]+/)?.[0];
+      const checkedBg = classes.match(/data-\[state=checked\]:bg-[^\s]+/)?.[0];
 
       expect(uncheckedBg).toBeDefined();
       expect(checkedBg).toBeDefined();
