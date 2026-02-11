@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { aiInsights, insightGenerationRuns } from '@/lib/db/schema/insights';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   GeneratedInsight,
   InsightCategory,
@@ -281,7 +282,9 @@ export async function getInsightsSummary(
   return {
     insights: insights.map(formatInsightResponse),
     totalActive: countResult[0]?.count ?? 0,
-    lastGeneratedAt: lastRun[0]?.createdAt?.toISOString() ?? null,
+    lastGeneratedAt: lastRun[0]?.createdAt
+      ? toISOStringSafe(lastRun[0].createdAt)
+      : null,
   };
 }
 
@@ -372,9 +375,9 @@ function formatInsightResponse(
     actionSuggestion: row.actionSuggestion,
     confidence: row.confidence,
     status: row.status,
-    periodStart: row.periodStart.toISOString(),
-    periodEnd: row.periodEnd.toISOString(),
-    createdAt: row.createdAt.toISOString(),
-    expiresAt: row.expiresAt.toISOString(),
+    periodStart: toISOStringSafe(row.periodStart),
+    periodEnd: toISOStringSafe(row.periodEnd),
+    createdAt: toISOStringSafe(row.createdAt),
+    expiresAt: toISOStringSafe(row.expiresAt),
   };
 }

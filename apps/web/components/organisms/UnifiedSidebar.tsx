@@ -38,7 +38,8 @@ export interface UnifiedSidebarProps {
 }
 
 /**
- * Custom hook to manage floating sidebar visibility on desktop
+ * Custom hook to manage floating sidebar visibility on desktop.
+ * Uses requestAnimationFrame to throttle mousemove processing to once per frame.
  */
 function useFloatingSidebar(isCollapsed: boolean, isMobile: boolean) {
   const [isFloatingVisible, setIsFloatingVisible] = useState(false);
@@ -50,13 +51,16 @@ function useFloatingSidebar(isCollapsed: boolean, isMobile: boolean) {
     }
 
     let hideTimeout: ReturnType<typeof setTimeout> | undefined;
+    let rafId: number | undefined;
+    let latestX = 0;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const processMousePosition = () => {
+      rafId = undefined;
       if (hideTimeout !== undefined) clearTimeout(hideTimeout);
 
-      if (e.clientX <= TRIGGER_ZONE) {
+      if (latestX <= TRIGGER_ZONE) {
         setIsFloatingVisible(true);
-      } else if (e.clientX > SIDEBAR_WIDTH) {
+      } else if (latestX > SIDEBAR_WIDTH) {
         hideTimeout = setTimeout(
           () => setIsFloatingVisible(false),
           FLOATING_SIDEBAR_HIDE_DELAY_MS
@@ -64,10 +68,18 @@ function useFloatingSidebar(isCollapsed: boolean, isMobile: boolean) {
       }
     };
 
+    const handleMouseMove = (e: MouseEvent) => {
+      latestX = e.clientX;
+      if (rafId === undefined) {
+        rafId = requestAnimationFrame(processMousePosition);
+      }
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       if (hideTimeout !== undefined) clearTimeout(hideTimeout);
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
     };
   }, [isCollapsed, isMobile]);
 

@@ -131,6 +131,23 @@ export const audienceViewParser =
   parseAsStringLiteral(audienceViews).withDefault('all');
 
 /**
+ * Valid segment filters for the audience table.
+ * Applied on top of the view filter to narrow results.
+ * - 'highIntent': Only show high-intent visitors
+ * - 'returning': Only show returning visitors (visits > 1)
+ * - 'frequent': Only show visitors with 3+ visits
+ * - 'recent24h': Only show visitors seen in the last 24 hours
+ */
+export const audienceFilters = [
+  'highIntent',
+  'returning',
+  'frequent',
+  'recent24h',
+] as const;
+
+export type AudienceFilter = (typeof audienceFilters)[number];
+
+/**
  * Valid sort fields for the audience table.
  */
 export const audienceSortFields = [
@@ -158,7 +175,7 @@ export const audienceSortParser =
  * ```tsx
  * // In a server component
  * export default async function AudiencePage({ searchParams }) {
- *   const { page, pageSize, sort, direction, view } = await audienceSearchParams.parse(searchParams);
+ *   const { page, pageSize, sort, direction, view, filter } = await audienceSearchParams.parse(searchParams);
  *   // Use type-safe params
  * }
  * ```
@@ -169,6 +186,7 @@ export const audienceSearchParams = createSearchParamsCache({
   sort: audienceSortParser,
   direction: sortDirectionParser,
   view: audienceViewParser,
+  filter: parseAsString,
 });
 
 // ============================================================================
@@ -269,7 +287,6 @@ export const profileModeParser =
  */
 export const profileSearchParams = createSearchParamsCache({
   mode: profileModeParser,
-  claim_token: parseAsString,
 });
 
 // ============================================================================

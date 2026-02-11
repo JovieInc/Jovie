@@ -342,6 +342,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** ISRC rescan: 1 rescan per 5 minutes per release - prevents API abuse */
+  isrcRescan: {
+    name: 'ISRC Rescan',
+    limit: 1,
+    window: '5 m',
+    prefix: 'dsp:isrc-rescan',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // AI Chat Operations
   // ---------------------------------------------------------------------------

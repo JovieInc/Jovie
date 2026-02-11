@@ -40,6 +40,7 @@ export {
   getTopProfilesForStaticGeneration,
   invalidateProfileEdgeCache,
   isClaimTokenValid,
+  lookupUsernameByClaimToken,
 } from './queries';
 // Types
 export type {

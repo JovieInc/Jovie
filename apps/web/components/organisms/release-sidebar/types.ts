@@ -42,6 +42,11 @@ export interface ReleaseSidebarProps {
    */
   readonly onArtworkUpload?: (file: File, release: Release) => Promise<string>;
   /**
+   * Handler to revert artwork to the original DSP-ingested version.
+   * Receives the release ID and returns the restored artwork URL.
+   */
+  readonly onArtworkRevert?: (releaseId: string) => Promise<string>;
+  /**
    * Handler for adding a new DSP link
    */
   readonly onAddDspLink?: (
@@ -56,6 +61,14 @@ export interface ReleaseSidebarProps {
     releaseId: string,
     provider: ProviderKey
   ) => Promise<void>;
+  /**
+   * Handler for rescanning ISRC codes to discover new DSP links
+   */
+  readonly onRescanIsrc?: () => void;
+  /**
+   * Whether an ISRC rescan is currently in progress
+   */
+  readonly isRescanningIsrc?: boolean;
   /**
    * Whether album art downloads are allowed on public pages.
    * Controls the visibility of the "Allow album art downloads" setting.

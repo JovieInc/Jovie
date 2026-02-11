@@ -44,6 +44,7 @@ export {
   FREQUENT_CACHE,
   PAGINATED_CACHE,
   REALTIME_CACHE,
+  SEARCH_CACHE,
   STABLE_CACHE,
   STANDARD_CACHE,
   STATIC_CACHE,
@@ -249,6 +250,7 @@ export {
 } from './usePublicProfileQuery';
 export {
   useRefreshReleaseMutation,
+  useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
   useSyncReleasesFromSpotifyMutation,

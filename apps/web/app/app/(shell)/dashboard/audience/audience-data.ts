@@ -1,4 +1,4 @@
-import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -241,6 +241,33 @@ function buildMemberSelectFields(includeDetails: boolean) {
 }
 
 /**
+ * Build segment filter condition based on the filter parameter.
+ * - 'highIntent': intentLevel = 'high'
+ * - 'returning': visits > 1
+ * - 'frequent': visits >= 3
+ * - 'recent24h': lastSeenAt > now - 24 hours
+ */
+function buildSegmentFilter(filter: string | undefined) {
+  if (!filter) return drizzleSql<boolean>`true`;
+
+  switch (filter) {
+    case 'highIntent':
+      return eq(audienceMembers.intentLevel, 'high');
+    case 'returning':
+      return gt(audienceMembers.visits, 1);
+    case 'frequent':
+      return gte(audienceMembers.visits, 3);
+    case 'recent24h':
+      return gt(
+        audienceMembers.lastSeenAt,
+        drizzleSql`NOW() - INTERVAL '24 hours'`
+      );
+    default:
+      return drizzleSql<boolean>`true`;
+  }
+}
+
+/**
  * Fetch audience members data
  */
 async function fetchMembersData(
@@ -250,7 +277,8 @@ async function fetchMembersData(
   searchParams: SearchParams,
   includeDetails: boolean,
   memberId: string | undefined,
-  typeFilter?: AudienceMemberType
+  typeFilter?: AudienceMemberType,
+  segmentFilter?: string
 ): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
@@ -262,11 +290,13 @@ async function fetchMembersData(
   const typeCondition = typeFilter
     ? eq(audienceMembers.type, typeFilter)
     : drizzleSql<boolean>`true`;
+  const segmentCondition = buildSegmentFilter(segmentFilter);
   const whereClause = and(
     ownershipFilter,
     eq(audienceMembers.creatorProfileId, selectedProfileId),
     memberIdFilter,
-    typeCondition
+    typeCondition,
+    segmentCondition
   );
 
   const baseQuery = tx
@@ -463,6 +493,7 @@ export async function getAudienceServerData(params: {
   includeDetails?: boolean;
   memberId?: string;
   view?: AudienceView;
+  filter?: string;
 }): Promise<AudienceServerData> {
   noStore();
 
@@ -473,6 +504,7 @@ export async function getAudienceServerData(params: {
     includeDetails = false,
     memberId,
     view = 'all',
+    filter,
   } = params;
 
   // Map view to internal mode
@@ -522,7 +554,8 @@ export async function getAudienceServerData(params: {
         searchParams,
         includeDetails,
         memberId,
-        typeFilter
+        typeFilter,
+        filter
       );
     }
 

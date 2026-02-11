@@ -15,7 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { Download } from 'lucide-react';
+import { Download, Undo2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { track } from '@/lib/analytics';
 
@@ -36,6 +36,10 @@ interface AlbumArtworkContextMenuProps {
   readonly allowDownloads: boolean;
   /** Optional release ID for analytics */
   readonly releaseId?: string;
+  /** Whether the artwork can be reverted to the original DSP-ingested version */
+  readonly canRevert?: boolean;
+  /** Callback to revert artwork to original */
+  readonly onRevert?: () => void;
 }
 
 /** Default artwork size presets from URL map */
@@ -87,6 +91,8 @@ export function AlbumArtworkContextMenu({
   sizes,
   allowDownloads,
   releaseId,
+  canRevert = false,
+  onRevert,
 }: AlbumArtworkContextMenuProps) {
   const handleDownload = useCallback(
     async (size: ArtworkSize) => {
@@ -125,8 +131,11 @@ export function AlbumArtworkContextMenu({
     [title, releaseId]
   );
 
-  // If downloads are not allowed or no sizes available, render children directly
-  if (!allowDownloads || sizes.length === 0) {
+  const showDownloads = allowDownloads && sizes.length > 0;
+  const showRevert = canRevert && onRevert;
+
+  // If no menu items available, render children directly
+  if (!showDownloads && !showRevert) {
     return <>{children}</>;
   }
 
@@ -134,19 +143,36 @@ export function AlbumArtworkContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuLabel>Download Artwork</ContextMenuLabel>
-        <ContextMenuSeparator />
-        {sizes.map(size => (
-          <ContextMenuItem
-            key={size.key}
-            onClick={() => {
-              handleDownload(size);
-            }}
-          >
-            <Download className='mr-2 h-4 w-4' />
-            {size.label}
-          </ContextMenuItem>
-        ))}
+        {showRevert && (
+          <>
+            <ContextMenuItem
+              onClick={() => {
+                onRevert();
+              }}
+            >
+              <Undo2 className='mr-2 h-4 w-4' />
+              Revert to original artwork
+            </ContextMenuItem>
+            {showDownloads && <ContextMenuSeparator />}
+          </>
+        )}
+        {showDownloads && (
+          <>
+            <ContextMenuLabel>Download Artwork</ContextMenuLabel>
+            <ContextMenuSeparator />
+            {sizes.map(size => (
+              <ContextMenuItem
+                key={size.key}
+                onClick={() => {
+                  handleDownload(size);
+                }}
+              >
+                <Download className='mr-2 h-4 w-4' />
+                {size.label}
+              </ContextMenuItem>
+            ))}
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

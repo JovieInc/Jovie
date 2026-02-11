@@ -180,7 +180,7 @@ export function useContextMenuItems({
             icon: <Copy className='h-3.5 w-3.5' />,
             onClick: () => {
               void (async () => {
-                const claimUrl = `${BASE_URL}/claim/${claimToken}`;
+                const claimUrl = `${BASE_URL}/${encodeURIComponent(profile.username)}/claim?token=${encodeURIComponent(claimToken)}`;
                 try {
                   await navigator.clipboard.writeText(claimUrl);
                   toast.success('Claim link copied to clipboard');
