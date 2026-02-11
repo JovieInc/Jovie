@@ -11,6 +11,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthShellProps {
@@ -60,11 +61,6 @@ function AuthShellInner({
           breadcrumbSuffix={headerBadge}
           action={headerAction}
           showDivider={isTableRoute}
-          mobileTabs={
-            showMobileTabs ? (
-              <DashboardMobileTabs className='static border-0' />
-            ) : undefined
-          }
         />
         {isTableRoute ? (
           <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
@@ -72,13 +68,18 @@ function AuthShellInner({
           </div>
         ) : (
           <div className='flex-1 min-h-0 overflow-hidden flex'>
-            <div className='flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6'>
+            <div className={cn(
+              'flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6',
+              showMobileTabs && 'pb-20 lg:pb-6'
+            )}>
               {children}
             </div>
             {previewPanel}
           </div>
         )}
       </SidebarInset>
+
+      {showMobileTabs && <DashboardMobileTabs />}
     </>
   );
 }
