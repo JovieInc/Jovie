@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { setupDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -73,66 +73,84 @@ export async function GET() {
         .where(eq(creatorProfiles.userId, user.id)),
     ]);
 
-    // Fetch related data for each profile (full export for GDPR compliance)
-    const profileData = await Promise.all(
-      profiles.map(async profile => {
-        const [profileLinks, profileContacts] = await Promise.all([
-          db
-            .select({
-              id: socialLinks.id,
-              platform: socialLinks.platform,
-              platformType: socialLinks.platformType,
-              url: socialLinks.url,
-              displayText: socialLinks.displayText,
-              state: socialLinks.state,
-              createdAt: socialLinks.createdAt,
-              updatedAt: socialLinks.updatedAt,
-            })
-            .from(socialLinks)
-            .where(eq(socialLinks.creatorProfileId, profile.id)),
-          db
-            .select({
-              id: creatorContacts.id,
-              role: creatorContacts.role,
-              customLabel: creatorContacts.customLabel,
-              personName: creatorContacts.personName,
-              companyName: creatorContacts.companyName,
-              territories: creatorContacts.territories,
-              email: creatorContacts.email,
-              phone: creatorContacts.phone,
-              preferredChannel: creatorContacts.preferredChannel,
-              isActive: creatorContacts.isActive,
-              sortOrder: creatorContacts.sortOrder,
-              createdAt: creatorContacts.createdAt,
-              updatedAt: creatorContacts.updatedAt,
-            })
-            .from(creatorContacts)
-            .where(eq(creatorContacts.creatorProfileId, profile.id)),
-        ]);
+    // Batch-fetch related data for all profiles (avoids N+1 queries)
+    const profileIds = profiles.map(p => p.id);
 
-        return {
-          id: profile.id,
-          creatorType: profile.creatorType,
-          username: profile.username,
-          displayName: profile.displayName,
-          bio: profile.bio,
-          avatarUrl: profile.avatarUrl,
-          isPublic: profile.isPublic,
-          isVerified: profile.isVerified,
-          genres: profile.genres,
-          spotifyUrl: profile.spotifyUrl,
-          appleMusicUrl: profile.appleMusicUrl,
-          youtubeUrl: profile.youtubeUrl,
-          settings: profile.settings,
-          theme: profile.theme,
-          notificationPreferences: profile.notificationPreferences,
-          createdAt: profile.createdAt,
-          updatedAt: profile.updatedAt,
-          links: profileLinks,
-          contacts: profileContacts,
-        };
-      })
-    );
+    const [allLinks, allContacts] =
+      profileIds.length > 0
+        ? await Promise.all([
+            db
+              .select({
+                id: socialLinks.id,
+                creatorProfileId: socialLinks.creatorProfileId,
+                platform: socialLinks.platform,
+                platformType: socialLinks.platformType,
+                url: socialLinks.url,
+                displayText: socialLinks.displayText,
+                state: socialLinks.state,
+                createdAt: socialLinks.createdAt,
+                updatedAt: socialLinks.updatedAt,
+              })
+              .from(socialLinks)
+              .where(inArray(socialLinks.creatorProfileId, profileIds)),
+            db
+              .select({
+                id: creatorContacts.id,
+                creatorProfileId: creatorContacts.creatorProfileId,
+                role: creatorContacts.role,
+                customLabel: creatorContacts.customLabel,
+                personName: creatorContacts.personName,
+                companyName: creatorContacts.companyName,
+                territories: creatorContacts.territories,
+                email: creatorContacts.email,
+                phone: creatorContacts.phone,
+                preferredChannel: creatorContacts.preferredChannel,
+                isActive: creatorContacts.isActive,
+                sortOrder: creatorContacts.sortOrder,
+                createdAt: creatorContacts.createdAt,
+                updatedAt: creatorContacts.updatedAt,
+              })
+              .from(creatorContacts)
+              .where(inArray(creatorContacts.creatorProfileId, profileIds)),
+          ])
+        : [[], []];
+
+    // Group by profile ID for O(1) lookup
+    const linksByProfile = new Map<string, typeof allLinks>();
+    for (const link of allLinks) {
+      const arr = linksByProfile.get(link.creatorProfileId) ?? [];
+      arr.push(link);
+      linksByProfile.set(link.creatorProfileId, arr);
+    }
+
+    const contactsByProfile = new Map<string, typeof allContacts>();
+    for (const contact of allContacts) {
+      const arr = contactsByProfile.get(contact.creatorProfileId) ?? [];
+      arr.push(contact);
+      contactsByProfile.set(contact.creatorProfileId, arr);
+    }
+
+    const profileData = profiles.map(profile => ({
+      id: profile.id,
+      creatorType: profile.creatorType,
+      username: profile.username,
+      displayName: profile.displayName,
+      bio: profile.bio,
+      avatarUrl: profile.avatarUrl,
+      isPublic: profile.isPublic,
+      isVerified: profile.isVerified,
+      genres: profile.genres,
+      spotifyUrl: profile.spotifyUrl,
+      appleMusicUrl: profile.appleMusicUrl,
+      youtubeUrl: profile.youtubeUrl,
+      settings: profile.settings,
+      theme: profile.theme,
+      notificationPreferences: profile.notificationPreferences,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      links: linksByProfile.get(profile.id) ?? [],
+      contacts: contactsByProfile.get(profile.id) ?? [],
+    }));
 
     const exportData = {
       exportedAt: new Date().toISOString(),
