@@ -302,7 +302,7 @@ export function ClaimHandleForm({
             })}
             className={cn(
               getInputClassName({ isShaking, available }),
-              'text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
+              'text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-500 dark:placeholder:text-zinc-400 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
             )}
             statusIcon={
               <HandleStatusIcon

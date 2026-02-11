@@ -52,7 +52,7 @@ export const HomeHero = memo(function HomeHero({
   );
   const trustIndicators = useMemo(
     () => (
-      <p className='text-xs text-gray-400 dark:text-white/40 font-medium'>
+      <p className='text-xs text-gray-500 dark:text-white/60 font-medium'>
         Trusted by 10,000+ artists worldwide
       </p>
     ),
