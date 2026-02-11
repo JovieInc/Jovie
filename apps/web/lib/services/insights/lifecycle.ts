@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { aiInsights, insightGenerationRuns } from '@/lib/db/schema/insights';
+import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   GeneratedInsight,
   InsightCategory,
@@ -360,16 +361,6 @@ export async function getExistingInsightTypes(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Safely converts a value that may be a Date or ISO string to an ISO string.
- * The neon-http driver may return date columns as strings instead of Date objects.
- */
-function toISOStringSafe(value: Date | string): string {
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'string') return value;
-  return new Date(value as unknown as string).toISOString();
-}
 
 function formatInsightResponse(
   row: typeof aiInsights.$inferSelect
