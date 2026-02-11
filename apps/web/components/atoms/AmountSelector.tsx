@@ -41,13 +41,19 @@ export const AmountSelector = memo(function AmountSelector({
         className
       )}
     >
-      <span className='text-[10px] font-medium uppercase tracking-wider text-secondary-token' aria-hidden>
+      <span
+        className='text-[10px] font-medium uppercase tracking-wider text-secondary-token'
+        aria-hidden
+      >
         USD
       </span>
-      <span className={cn(
-        'text-2xl font-semibold tabular-nums tracking-tight',
-        isSelected && 'text-accent-token'
-      )} aria-hidden>
+      <span
+        className={cn(
+          'text-2xl font-semibold tabular-nums tracking-tight',
+          isSelected && 'text-accent-token'
+        )}
+        aria-hidden
+      >
         ${amount}
       </span>
     </button>
