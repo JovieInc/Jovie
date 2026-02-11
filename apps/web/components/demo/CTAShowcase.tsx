@@ -40,7 +40,7 @@ export function CTAShowcase() {
                 Listen Now
               </PrimaryCTA>
             </div>
-            <p className='text-sm text-gray-600 dark:text-white/60'>
+            <p className='text-sm text-gray-600 dark:text-white/70'>
               Click to see the smooth loading transition. Notice how the button{' '}
               maintains its exact dimensions and smoothly fades between states.
             </p>
@@ -60,7 +60,7 @@ export function CTAShowcase() {
                 Start Free Trial
               </PrimaryCTA>
             </div>
-            <p className='text-sm text-gray-600 dark:text-white/60'>
+            <p className='text-sm text-gray-600 dark:text-white/70'>
               Compact version perfect for secondary actions or smaller spaces.
             </p>
           </div>
@@ -79,7 +79,7 @@ export function CTAShowcase() {
                 Save Changes
               </PrimaryCTA>
             </div>
-            <p className='text-sm text-gray-600 dark:text-white/60'>
+            <p className='text-sm text-gray-600 dark:text-white/70'>
               Auto-width version that sizes to content while maintaining fixed
               height.
             </p>

@@ -36,19 +36,19 @@ export function ProblemStatement() {
             <div className='grid grid-cols-1 md:grid-cols-3 gap-8 mt-16'>
               <div className='text-center'>
                 <div className='text-3xl font-bold text-red-400'>73%</div>
-                <div className='text-sm text-gray-500 dark:text-white/60'>
+                <div className='text-sm text-gray-500 dark:text-white/70'>
                   Abandon rate on slow pages
                 </div>
               </div>
               <div className='text-center'>
                 <div className='text-3xl font-bold text-yellow-400'>2.3s</div>
-                <div className='text-sm text-gray-500 dark:text-white/60'>
+                <div className='text-sm text-gray-500 dark:text-white/70'>
                   Average load time on competitors
                 </div>
               </div>
               <div className='text-center'>
                 <div className='text-3xl font-bold text-green-400'>3.2x</div>
-                <div className='text-sm text-gray-500 dark:text-white/60'>
+                <div className='text-sm text-gray-500 dark:text-white/70'>
                   Faster than Linktree
                 </div>
               </div>
