@@ -17,6 +17,9 @@ describe('Plan Configuration', () => {
         canRemoveBranding: false,
         canAccessAdvancedAnalytics: false,
         canFilterSelfFromAnalytics: false,
+        aiDailyMessageLimit: 5,
+        aiCanUseTools: false,
+        canBeVerified: false,
       });
     });
 
@@ -28,6 +31,9 @@ describe('Plan Configuration', () => {
         canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
+        aiDailyMessageLimit: 100,
+        aiCanUseTools: true,
+        canBeVerified: true,
       });
     });
 
@@ -39,6 +45,9 @@ describe('Plan Configuration', () => {
         canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
+        aiDailyMessageLimit: 500,
+        aiCanUseTools: true,
+        canBeVerified: true,
       });
     });
 
