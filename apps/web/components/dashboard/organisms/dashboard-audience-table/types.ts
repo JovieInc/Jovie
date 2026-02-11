@@ -7,6 +7,23 @@ export type AudienceView = 'all' | 'subscribers' | 'anonymous';
 
 export type AudienceRow = AudienceMember;
 
+/** Valid segment filter IDs */
+export type AudienceSegment =
+  | 'highIntent'
+  | 'returning'
+  | 'frequent'
+  | 'recent24h';
+
+/** Filter state for audience table — mirrors ReleaseFilters pattern */
+export interface AudienceFilters {
+  readonly segments: AudienceSegment[];
+}
+
+/** Default filter state */
+export const DEFAULT_AUDIENCE_FILTERS: AudienceFilters = {
+  segments: [],
+};
+
 export interface DashboardAudienceTableProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
@@ -20,11 +37,11 @@ export interface DashboardAudienceTableProps {
   readonly onPageSizeChange: (pageSize: number) => void;
   readonly onSortChange: (sort: string) => void;
   readonly onViewChange: (view: AudienceView) => void;
-  readonly onFilterChange: (filter: string | null) => void;
+  readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
-  readonly filter?: string;
+  readonly filters: AudienceFilters;
 }
 
 export interface BulkAction {

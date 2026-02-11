@@ -2,9 +2,10 @@ import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
+import type { AudienceSegment } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
-import { audienceSearchParams } from '@/lib/nuqs';
+import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
@@ -50,6 +51,12 @@ async function AudienceContent({
     // Parse search params using nuqs for type-safe URL state
     const parsedParams = await audienceSearchParams.parse(searchParams);
 
+    // Validate segments from URL against known values
+    const validSegments = parsedParams.segments.filter(
+      (s): s is AudienceSegment =>
+        (audienceFilters as readonly string[]).includes(s)
+    );
+
     const audienceData = await getAudienceServerData({
       userId: dashboardData.user.id,
       selectedProfileId: artist?.id ?? null,
@@ -60,7 +67,7 @@ async function AudienceContent({
         direction: parsedParams.direction,
       },
       view: parsedParams.view,
-      filter: parsedParams.filter ?? undefined,
+      segments: validSegments,
     });
 
     return (
@@ -76,7 +83,7 @@ async function AudienceContent({
         profileUrl={profileUrl}
         profileId={artist?.id ?? undefined}
         subscriberCount={audienceData.subscriberCount}
-        filter={parsedParams.filter ?? undefined}
+        filters={{ segments: validSegments }}
       />
     );
   } catch (error) {

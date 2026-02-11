@@ -13,6 +13,7 @@
 
 import {
   createSearchParamsCache,
+  parseAsArrayOf,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -175,7 +176,7 @@ export const audienceSortParser =
  * ```tsx
  * // In a server component
  * export default async function AudiencePage({ searchParams }) {
- *   const { page, pageSize, sort, direction, view, filter } = await audienceSearchParams.parse(searchParams);
+ *   const { page, pageSize, sort, direction, view, segments } = await audienceSearchParams.parse(searchParams);
  *   // Use type-safe params
  * }
  * ```
@@ -186,7 +187,7 @@ export const audienceSearchParams = createSearchParamsCache({
   sort: audienceSortParser,
   direction: sortDirectionParser,
   view: audienceViewParser,
-  filter: parseAsString,
+  segments: parseAsArrayOf(parseAsString).withDefault([]),
 });
 
 // ============================================================================
