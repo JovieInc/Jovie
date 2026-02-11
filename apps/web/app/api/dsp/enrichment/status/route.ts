@@ -21,6 +21,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import type { EnrichmentPhase, ProviderEnrichmentStatus } from '@/lib/queries';
+import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 
 // ============================================================================
 // Helper Functions
@@ -198,8 +199,7 @@ export async function GET(request: Request) {
         tracksEnriched: match.matchingIsrcCount ?? 0,
         totalTracks: match.totalTracksChecked ?? 0,
         lastError: null,
-        lastUpdatedAt:
-          match.updatedAt?.toISOString() ?? new Date().toISOString(),
+        lastUpdatedAt: toISOStringOrFallback(match?.updatedAt),
       };
     });
 
@@ -213,10 +213,10 @@ export async function GET(request: Request) {
       : calculateOverallProgress(providerStatuses);
 
     // Calculate timestamps from job record
-    const discoveryStartedAt = discoveryJob?.createdAt?.toISOString() ?? null;
+    const discoveryStartedAt = toISOStringOrNull(discoveryJob?.createdAt);
     const discoveryCompletedAt =
       discoveryJob?.status === 'succeeded'
-        ? (discoveryJob.updatedAt?.toISOString() ?? null)
+        ? toISOStringOrNull(discoveryJob?.updatedAt)
         : null;
 
     // Enrichment timestamps are based on provider statuses
