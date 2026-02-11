@@ -90,20 +90,31 @@ export async function discoverLinksForRelease(
           try {
             const track = await musicKitLookupByIsrc(isrc, { storefront });
             if (track?.attributes?.url) {
-              // Derive album URL from song URL when possible
               const songUrl = track.attributes.url;
+
+              // Derive album URL from song URL when possible
               if (songUrl.includes('/album/')) {
-                const parsed = new URL(songUrl);
-                parsed.search = '';
-                url = parsed.toString();
+                try {
+                  const parsed = new URL(songUrl);
+                  parsed.search = '';
+                  url = parsed.toString();
+                } catch {
+                  // Malformed URL, will fall back to songUrl below
+                }
               } else {
                 // For /song/ URLs, try the album relationship
                 const albumId = track.relationships?.albums?.data?.[0]?.id;
                 if (albumId) {
-                  const album = await getAlbum(albumId);
-                  url = album?.attributes?.url ?? null;
+                  try {
+                    const album = await getAlbum(albumId);
+                    url = album?.attributes?.url ?? null;
+                  } catch {
+                    // Album fetch failed (timeout, rate-limit, storefront miss);
+                    // fall through to use songUrl directly below
+                  }
                 }
               }
+
               // If album URL derivation failed, use the song URL directly
               if (!url) url = songUrl;
               externalId = track.id;
