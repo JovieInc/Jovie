@@ -84,19 +84,19 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-6'>
+      <div className='flex items-start justify-between gap-4 sm:gap-6'>
         <div className='flex-1'>
-          <h3 className='text-[14px] font-medium text-primary-token'>
+          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
             Connected accounts
           </h3>
-          <p className='mt-1 text-[13px] text-secondary-token max-w-lg'>
+          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
             OAuth providers linked to your account. Disconnect a provider to
             revoke its access.
           </p>
         </div>
       </div>
 
-      <div className='mt-6 space-y-3'>
+      <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>
         {accounts.map(account => {
           const label = getProviderLabel(account.provider);
           const identifier = getProviderIdentifier(account);
@@ -105,7 +105,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           return (
             <div
               key={account.id}
-              className='flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-subtle px-4 py-3 bg-surface-1 gap-3'
+              className='flex flex-col sm:flex-row sm:items-center justify-between rounded-lg sm:rounded-xl border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 bg-surface-1 gap-2 sm:gap-3'
             >
               <div className='flex items-center gap-3'>
                 <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10'>

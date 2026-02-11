@@ -77,10 +77,10 @@ interface CookieModalProps {
 function CookieCategories({
   settings,
   onCheckedChange,
-}: {
+}: Readonly<{
   settings: Consent;
   onCheckedChange: (key: keyof Consent, checked: boolean) => void;
-}) {
+}>) {
   return (
     <>
       {COOKIE_CATEGORIES.map(category => {

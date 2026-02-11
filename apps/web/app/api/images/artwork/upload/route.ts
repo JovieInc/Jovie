@@ -22,6 +22,67 @@ import { processArtworkToSizes } from './process';
 
 export const runtime = 'nodejs';
 
+/**
+ * Upload processed artwork buffers to blob storage, returning a map of size keys to URLs.
+ */
+async function uploadArtworkSizes(
+  processed: Record<string, Buffer>,
+  releaseId: string,
+  put: Awaited<ReturnType<typeof getVercelBlobUploader>>,
+  token: string | undefined
+): Promise<Record<string, string>> {
+  const sizes: Record<string, string> = {};
+
+  for (const [sizeKey, buffer] of Object.entries(processed)) {
+    const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
+
+    if (!put || !token) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new TypeError('Blob storage not configured');
+      }
+      sizes[sizeKey] = `https://blob.vercel-storage.com/${blobPath}`;
+      continue;
+    }
+
+    const blob = await withTimeout(
+      put(blobPath, buffer, {
+        access: 'public',
+        token,
+        contentType: AVIF_MIME_TYPE,
+        cacheControlMaxAge: 60 * 60 * 24 * 365,
+        addRandomSuffix: false,
+      }),
+      PROCESSING_TIMEOUT_MS,
+      `Blob upload (${sizeKey})`
+    );
+
+    if (!blob.url?.startsWith('https://')) {
+      throw new TypeError('Invalid blob URL returned from storage');
+    }
+
+    sizes[sizeKey] = blob.url;
+  }
+
+  return sizes;
+}
+
+/**
+ * Build original artwork snapshot fields when first custom upload replaces DSP artwork.
+ */
+function buildOriginalArtworkFields(
+  existingMetadata: Record<string, unknown>,
+  currentArtworkUrl: string | null
+): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  if (!existingMetadata.originalArtworkUrl && currentArtworkUrl) {
+    fields.originalArtworkUrl = currentArtworkUrl;
+    if (existingMetadata.artworkSizes) {
+      fields.originalArtworkSizes = existingMetadata.artworkSizes;
+    }
+  }
+  return fields;
+}
+
 /** Artwork size presets for downloads */
 export const ARTWORK_SIZES = {
   original: null, // Keep original dimensions (up to 3000px)
@@ -176,38 +237,7 @@ export async function POST(request: NextRequest) {
 
       const put = await getVercelBlobUploader();
       const token = process.env.BLOB_READ_WRITE_TOKEN;
-      const sizes: Record<string, string> = {};
-
-      // Upload each size
-      for (const [sizeKey, buffer] of Object.entries(processed)) {
-        const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
-
-        if (!put || !token) {
-          if (process.env.NODE_ENV === 'production') {
-            throw new TypeError('Blob storage not configured');
-          }
-          sizes[sizeKey] = `https://blob.vercel-storage.com/${blobPath}`;
-          continue;
-        }
-
-        const blob = await withTimeout(
-          put(blobPath, buffer, {
-            access: 'public',
-            token,
-            contentType: AVIF_MIME_TYPE,
-            cacheControlMaxAge: 60 * 60 * 24 * 365,
-            addRandomSuffix: false,
-          }),
-          PROCESSING_TIMEOUT_MS,
-          `Blob upload (${sizeKey})`
-        );
-
-        if (!blob.url?.startsWith('https://')) {
-          throw new TypeError('Invalid blob URL returned from storage');
-        }
-
-        sizes[sizeKey] = blob.url;
-      }
+      const sizes = await uploadArtworkSizes(processed, releaseId, put, token);
 
       // Primary artwork URL is the 1000px version (good balance of quality/size)
       const artworkUrl = sizes['1000'] ?? sizes.original;
@@ -222,16 +252,10 @@ export async function POST(request: NextRequest) {
       // Update the release record, preserving the original (DSP-ingested) artwork
       const existingMetadata =
         (release.metadata as Record<string, unknown>) ?? {};
-
-      // On first custom upload, snapshot the current artwork as the original
-      // so the user can revert to it later.
-      const originalFields: Record<string, unknown> = {};
-      if (!existingMetadata.originalArtworkUrl && release.artworkUrl) {
-        originalFields.originalArtworkUrl = release.artworkUrl;
-        if (existingMetadata.artworkSizes) {
-          originalFields.originalArtworkSizes = existingMetadata.artworkSizes;
-        }
-      }
+      const originalFields = buildOriginalArtworkFields(
+        existingMetadata,
+        release.artworkUrl
+      );
 
       await tx
         .update(discogReleases)

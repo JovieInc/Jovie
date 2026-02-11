@@ -47,6 +47,12 @@ export const TOAST_MESSAGES = {
   VERSION_UPDATE_DESCRIPTION: 'Refresh to get the latest features and fixes.',
   CHUNK_ERROR: 'The app has been updated',
   CHUNK_ERROR_DESCRIPTION: 'Please refresh to continue.',
+
+  // PWA install
+  PWA_INSTALL: 'Install Jovie',
+  PWA_INSTALL_DESCRIPTION: 'Add Jovie to your dock for quick access.',
+  PWA_INSTALL_IOS:
+    'Tap the Share button, then "Add to Home Screen" to install.',
 } as const;
 
 /**

@@ -15,14 +15,15 @@ export function AudienceQuickActionsCell({
   className,
 }: AudienceQuickActionsCellProps) {
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: presentation div stops row click propagation
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation prevents row click when using action buttons
     <div
+      role='toolbar'
       className={cn(
         'flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
         className
       )}
       onClick={e => e.stopPropagation()}
-      role='presentation'
+      onKeyDown={e => e.stopPropagation()}
     >
       <button
         type='button'
