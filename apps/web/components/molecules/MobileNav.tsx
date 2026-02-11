@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserButton } from '@/components/organisms/user-button';
 
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 
 export function MobileNav({
@@ -18,6 +19,7 @@ export function MobileNav({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const isAuthed = useIsAuthenticated();
+  const { isSignedIn: clerkSignedIn } = useAuthSafe();
 
   const close = useCallback(() => setIsOpen(false), []);
 
@@ -105,7 +107,7 @@ export function MobileNav({
 
         {/* Auth actions - visible in mobile menu */}
         <div className='mobile-nav-auth'>
-          {isAuthed ? (
+          {isAuthed && clerkSignedIn ? (
             <UserButton />
           ) : (
             <>
