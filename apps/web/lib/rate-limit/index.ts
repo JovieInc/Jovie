@@ -45,6 +45,7 @@ export {
   aiChatDailyGrowthLimiter,
   aiChatDailyProLimiter,
   aiChatLimiter,
+  aiInsightGenerationLimiter,
   apiLimiter,
   artworkUploadLimiter,
   avatarUploadLimiter,

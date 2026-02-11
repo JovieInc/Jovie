@@ -384,6 +384,14 @@ export async function checkSpotifyRefreshRateLimit(
 // ============================================================================
 
 /**
+ * Rate limiter for AI insight generation from chat
+ * Limit: 3 generations per hour per user - protects Anthropic API costs
+ */
+export const aiInsightGenerationLimiter = createRateLimiter(
+  RATE_LIMITERS.aiInsightGeneration
+);
+
+/**
  * Rate limiter for AI chat messages (burst protection)
  * Limit: 30 messages per hour per user - protects Anthropic API costs
  */
@@ -639,6 +647,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
+    aiInsightGeneration: aiInsightGenerationLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,

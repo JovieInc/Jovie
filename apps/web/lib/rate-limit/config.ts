@@ -355,6 +355,15 @@ export const RATE_LIMITERS = {
   // AI Chat Operations
   // ---------------------------------------------------------------------------
 
+  /** AI Insight generation from chat: 3 per hour per user - protects Anthropic API costs */
+  aiInsightGeneration: {
+    name: 'AI Insight Generation',
+    limit: 3,
+    window: '1 h',
+    prefix: 'ai:insight-gen',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** AI Chat: 30 messages per hour per user - burst protection for all plans */
   aiChat: {
     name: 'AI Chat',
