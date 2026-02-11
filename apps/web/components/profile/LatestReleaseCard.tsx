@@ -6,12 +6,20 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
-import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { Artist } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
+/** Minimal release shape needed by this client component (avoids server-only schema import). */
+type ReleaseCardData = {
+  title: string;
+  slug: string;
+  artworkUrl: string | null;
+  releaseDate: Date | string | null;
+  releaseType: string;
+};
+
 type LatestReleaseCardProps = {
-  readonly release: DiscogRelease;
+  readonly release: ReleaseCardData;
   readonly artistHandle: string;
   /** Full artist object – required for the mobile listen drawer */
   readonly artist?: Artist;
