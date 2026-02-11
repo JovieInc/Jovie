@@ -22,6 +22,9 @@ function hasClerkCredentials(): boolean {
 }
 
 test.describe('Dashboard Routing', () => {
+  // Dashboard pages require Clerk auth + Turbopack compilation; allow generous time
+  test.setTimeout(180_000);
+
   test.beforeEach(async ({ page }) => {
     // Skip if no Clerk credentials configured
     if (!hasClerkCredentials()) {

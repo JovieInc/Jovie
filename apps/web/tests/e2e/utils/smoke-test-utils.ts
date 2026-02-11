@@ -493,6 +493,18 @@ export async function waitForNetworkIdle(
 }
 
 /**
+ * Best-effort wait for full page load state
+ * Used when Turbopack compilation may exceed standard timeouts
+ */
+export async function waitForLoad(
+  page: Page,
+  options?: { timeout?: number }
+): Promise<void> {
+  const timeout = options?.timeout ?? 60_000;
+  await page.waitForLoadState('load', { timeout }).catch(() => {});
+}
+
+/**
  * Wait for page to be fully interactive (hydration complete)
  * Replaces arbitrary waitForTimeout calls
  */
@@ -502,8 +514,11 @@ export async function waitForHydration(
 ): Promise<void> {
   const timeout = options?.timeout ?? SMOKE_TIMEOUTS.VISIBILITY;
 
-  // Wait for load state
-  await page.waitForLoadState('load', { timeout });
+  // Wait for DOM to be ready (required)
+  await page.waitForLoadState('domcontentloaded', { timeout });
+
+  // Best-effort wait for full load (Turbopack compilation can exceed timeout after redirects)
+  await waitForLoad(page, { timeout });
 
   // Check for React hydration completion by waiting for __NEXT_DATA__ to be processed
   await page
@@ -622,6 +637,29 @@ export async function elementVisible(
   } catch {
     return false;
   }
+}
+
+/**
+ * Check if element is visible, with optional skip message if not found
+ * Returns true if visible, false if not
+ */
+export async function checkElementVisibility(
+  locator: {
+    first: () => { isVisible: (opts: { timeout: number }) => Promise<boolean> };
+  },
+  options?: { timeout?: number; skipMessage?: string }
+): Promise<boolean> {
+  const timeout = options?.timeout ?? 15_000;
+  const isVisible = await locator
+    .first()
+    .isVisible({ timeout })
+    .catch(() => false);
+
+  if (!isVisible && options?.skipMessage) {
+    console.log(`⚠ ${options.skipMessage}`);
+  }
+
+  return isVisible;
 }
 
 // ============================================================================
