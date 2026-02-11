@@ -281,7 +281,9 @@ export async function getInsightsSummary(
   return {
     insights: insights.map(formatInsightResponse),
     totalActive: countResult[0]?.count ?? 0,
-    lastGeneratedAt: lastRun[0]?.createdAt?.toISOString() ?? null,
+    lastGeneratedAt: lastRun[0]?.createdAt
+      ? toISOStringSafe(lastRun[0].createdAt)
+      : null,
   };
 }
 
@@ -359,6 +361,16 @@ export async function getExistingInsightTypes(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Safely converts a value that may be a Date or ISO string to an ISO string.
+ * The neon-http driver may return date columns as strings instead of Date objects.
+ */
+function toISOStringSafe(value: Date | string): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  return new Date(value as unknown as string).toISOString();
+}
+
 function formatInsightResponse(
   row: typeof aiInsights.$inferSelect
 ): InsightResponse {
@@ -372,9 +384,9 @@ function formatInsightResponse(
     actionSuggestion: row.actionSuggestion,
     confidence: row.confidence,
     status: row.status,
-    periodStart: row.periodStart.toISOString(),
-    periodEnd: row.periodEnd.toISOString(),
-    createdAt: row.createdAt.toISOString(),
-    expiresAt: row.expiresAt.toISOString(),
+    periodStart: toISOStringSafe(row.periodStart),
+    periodEnd: toISOStringSafe(row.periodEnd),
+    createdAt: toISOStringSafe(row.createdAt),
+    expiresAt: toISOStringSafe(row.expiresAt),
   };
 }

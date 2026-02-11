@@ -1,7 +1,8 @@
 'use client';
 
+import { QueryClientContext } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
 import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
 
@@ -16,13 +17,17 @@ import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
  * - Shows critical/error issues prominently
  * - Dismissible (state persists in session storage)
  * - Styled consistently with the app's design system
- *
- * Note: This component requires QueryClientProvider to be in the React tree.
- * If QueryClient is not available, the query will be disabled and component won't show.
+ * - Gracefully handles missing QueryClientProvider (disables query)
  */
 export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+
+  // Check if QueryClient is available in the React tree.
+  // This prevents "No QueryClient set" errors when the component renders
+  // outside a QueryClientProvider (e.g. during SSR edge cases).
+  const queryClient = useContext(QueryClientContext);
+  const hasQueryClient = !!queryClient;
 
   // Wait for client-side mount (avoids SSR/hydration issues)
   useEffect(() => {
@@ -41,6 +46,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const showBanner =
     isMounted &&
     isAdmin &&
+    hasQueryClient &&
     (process.env.NODE_ENV !== 'production' ||
       publicEnv.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
 

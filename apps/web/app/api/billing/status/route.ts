@@ -53,7 +53,7 @@ export async function GET() {
       );
       return NextResponse.json(
         { error: 'Billing service temporarily unavailable' },
-        { status: 503, headers: NO_STORE_HEADERS }
+        { status: 503, headers: { ...NO_STORE_HEADERS, 'Retry-After': '30' } }
       );
     }
 
