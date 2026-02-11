@@ -61,7 +61,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     <button
       type='button'
       onClick={() => onEdit(release)}
-      className='flex w-full items-center gap-3 border-b border-subtle px-4 py-3 text-left transition-colors active:bg-surface-2/50'
+      className='flex w-full items-center gap-3 border-b border-subtle px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
     >
       {/* Artwork thumbnail */}
       <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
@@ -130,19 +130,11 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
 });
 
 /** Year group header */
-function YearGroupHeader({
-  year,
-  count,
-}: {
-  year: string;
-  count: number;
-}) {
+function YearGroupHeader({ year, count }: { year: string; count: number }) {
   return (
     <div className='sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2'>
       <span className='text-sm font-semibold text-primary-token'>{year}</span>
-      <span className='text-xs tabular-nums text-tertiary-token'>
-        {count}
-      </span>
+      <span className='text-xs tabular-nums text-tertiary-token'>{count}</span>
     </div>
   );
 }
@@ -173,10 +165,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
       <div className='flex flex-col'>
         {yearGroups.map(group => (
           <div key={group.year}>
-            <YearGroupHeader
-              year={group.year}
-              count={group.releases.length}
-            />
+            <YearGroupHeader year={group.year} count={group.releases.length} />
             {group.releases.map(release => (
               <MobileReleaseRow
                 key={release.id}
