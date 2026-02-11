@@ -4,7 +4,7 @@ This document tracks the required CI checks for the `main` branch.
 
 ## Current Configuration
 
-**Last Updated**: 2025-12-23
+**Last Updated**: 2026-02-10
 
 ### Required Status Checks
 
@@ -17,6 +17,7 @@ The following checks must pass before merging to `main`:
 5. **ci-fast** - Meta-gate aggregating fast checks
 6. **Migration Guard** - Database migration validation
 7. **CodeQL** - SAST security scanning
+8. **A11y (axe)** - WCAG 2.1 AA accessibility audit on public routes (via `ci-pr-ready` gate)
 
 ### Configuration Details
 
@@ -51,6 +52,11 @@ Full configuration is tracked in `/Users/timwhite/.claude/plans/glistening-dazzl
 
 ## History
 
+- **2026-02-10**: Added A11y (axe) check to `ci-pr-ready` gate
+  - Runs axe-core WCAG 2.1 AA audit on 5 public routes (no auth needed)
+  - Path-gated: skips when no UI-relevant files changed
+  - Excluded rules: `color-contrast` (tracked separately as design token issue)
+  - Escape hatch: add rules to `disableRules` in `tests/e2e/axe-audit.spec.ts`
 - **2025-12-23**: Added 6 new required checks (Env Example Guard, Typecheck, Guardrails, ci-fast, Migration Guard, CodeQL)
   - Previously only required: Lint
   - Now requires: 7 total checks covering security, type safety, code quality, and database safety

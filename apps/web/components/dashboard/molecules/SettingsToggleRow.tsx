@@ -31,22 +31,22 @@ export function SettingsToggleRow({
   const descriptionId = description ? `${baseId}-description` : undefined;
 
   return (
-    <div className={cn('flex items-start justify-between gap-6', className)}>
-      <div className='flex-1'>
-        <h3 id={titleId} className='text-[14px] font-medium text-primary-token'>
+    <div className={cn('flex items-center justify-between gap-8', className)}>
+      <div className='flex-1 min-w-0'>
+        <h3 id={titleId} className='text-sm font-medium text-primary-token'>
           {title}
         </h3>
         {description ? (
           <p
             id={descriptionId}
-            className='mt-1 text-[13px] text-secondary-token max-w-md'
+            className='mt-1 text-[13px] leading-relaxed text-tertiary-token'
           >
             {description}
           </p>
         ) : null}
       </div>
 
-      <div className='shrink-0'>
+      <div className='shrink-0 pt-0.5'>
         <Switch
           checked={checked}
           onCheckedChange={onCheckedChange}
@@ -54,7 +54,6 @@ export function SettingsToggleRow({
           aria-label={ariaLabel}
           aria-labelledby={titleId}
           aria-describedby={descriptionId}
-          className={cn(disabled && 'opacity-50 cursor-not-allowed')}
         />
       </div>
     </div>

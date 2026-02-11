@@ -6,6 +6,7 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -53,7 +54,10 @@ export async function GET() {
       );
       return NextResponse.json(
         { error: 'Billing service temporarily unavailable' },
-        { status: 503, headers: { ...NO_STORE_HEADERS, 'Retry-After': '30' } }
+        {
+          status: 503,
+          headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+        }
       );
     }
 
