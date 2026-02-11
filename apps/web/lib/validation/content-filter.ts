@@ -135,28 +135,20 @@ const BLOCKED_WORDS: readonly string[] = [
  * This catches evasion attempts like "f-u-c-k" or "f u c k".
  */
 function normalizeForFilter(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[\s\-_.']+/g, '');
+  return input.toLowerCase().replace(/[\s\-_.']+/g, '');
 }
-
-/**
- * Build a Set of normalized blocked words for O(1) exact lookups,
- * plus keep the list for substring scanning.
- */
-const BLOCKED_SET = new Set(BLOCKED_WORDS.map(w => normalizeForFilter(w)));
 
 // Short words (<=3 chars) are only matched exactly to avoid false positives
 // (e.g. "ass" should not flag "class" or "assassin")
 const SHORT_WORD_THRESHOLD = 3;
 const SHORT_BLOCKED = new Set(
-  BLOCKED_WORDS
-    .filter(w => normalizeForFilter(w).length <= SHORT_WORD_THRESHOLD)
-    .map(w => normalizeForFilter(w))
+  BLOCKED_WORDS.filter(
+    w => normalizeForFilter(w).length <= SHORT_WORD_THRESHOLD
+  ).map(w => normalizeForFilter(w))
 );
-const LONG_BLOCKED = BLOCKED_WORDS
-  .filter(w => normalizeForFilter(w).length > SHORT_WORD_THRESHOLD)
-  .map(w => normalizeForFilter(w));
+const LONG_BLOCKED = BLOCKED_WORDS.filter(
+  w => normalizeForFilter(w).length > SHORT_WORD_THRESHOLD
+).map(w => normalizeForFilter(w));
 
 // ============================================================================
 // Public API
@@ -185,7 +177,10 @@ export function checkContent(input: string): ContentFilterResult {
 
   // 1) Check short words: split original input on non-alphanumeric chars
   //    and check each segment as an exact match
-  const segments = input.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const segments = input
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
   for (const segment of segments) {
     if (SHORT_BLOCKED.has(segment)) {
       return {

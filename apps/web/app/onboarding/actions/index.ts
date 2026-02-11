@@ -21,6 +21,7 @@ import {
 } from '@/lib/errors/onboarding';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
@@ -82,6 +83,14 @@ export async function completeOnboarding({
       const error = createOnboardingError(
         OnboardingErrorCode.DISPLAY_NAME_TOO_LONG,
         'Display name must be 50 characters or less'
+      );
+      throw onboardingErrorToError(error);
+    }
+
+    if (!isContentClean(trimmedDisplayName)) {
+      const error = createOnboardingError(
+        OnboardingErrorCode.INVALID_USERNAME,
+        'Display name contains language that is not allowed'
       );
       throw onboardingErrorToError(error);
     }
