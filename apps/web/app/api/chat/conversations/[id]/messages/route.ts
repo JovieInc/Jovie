@@ -51,6 +51,12 @@ async function maybeGenerateTitle(
       prompt: context,
       maxOutputTokens: 30,
       abortSignal: AbortSignal.timeout(5000),
+      experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+        functionId: 'jovie-chat-title',
+      },
     });
 
     const title = text
