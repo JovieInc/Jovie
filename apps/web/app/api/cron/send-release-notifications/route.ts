@@ -9,6 +9,7 @@ import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-da
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import type { SenderContext } from '@/types/notifications';
 
@@ -338,7 +339,7 @@ async function processNotificationWithBatchedData(
         'Release date changed to future date'
       );
       logger.info(
-        `[send-release-notifications] Cancelled notification ${ctx.notification.id} - release date changed to ${release.releaseDate.toISOString()}`
+        `[send-release-notifications] Cancelled notification ${ctx.notification.id} - release date changed to ${toISOStringSafe(release.releaseDate)}`
       );
       return 'skipped';
     }

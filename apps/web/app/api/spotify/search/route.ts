@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
@@ -164,7 +164,10 @@ export async function GET(request: NextRequest) {
   if (!isSpotifyAvailable()) {
     return NextResponse.json(
       { error: 'Spotify integration not available', code: 'UNAVAILABLE' },
-      { status: 503, headers: NO_STORE_HEADERS }
+      {
+        status: 503,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+      }
     );
   }
 

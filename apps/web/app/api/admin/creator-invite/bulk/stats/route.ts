@@ -5,6 +5,7 @@ import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import { toISOStringSafe } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { NO_STORE_HEADERS } from '../lib';
 
@@ -170,7 +171,7 @@ export async function GET() {
       .limit(1);
 
     if (nextJobResult?.runAt) {
-      jobQueueStats.nextRunAt = nextJobResult.runAt.toISOString();
+      jobQueueStats.nextRunAt = toISOStringSafe(nextJobResult.runAt);
     }
 
     // Calculate estimated time remaining based on pending + processing jobs
