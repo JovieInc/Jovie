@@ -51,8 +51,8 @@ const MAX_MESSAGES_PER_REQUEST = 50;
  */
 const EDITABLE_FIELDS = {
   tier1: ['displayName', 'bio'] as const,
-  tier2: ['genres'] as const,
-  blocked: ['username', 'avatarUrl', 'spotifyId'] as const,
+  tier2: [] as const,
+  blocked: ['username', 'avatarUrl', 'spotifyId', 'genres'] as const,
 };
 
 type EditableField =
@@ -62,7 +62,6 @@ type EditableField =
 const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
   displayName: 'Display name shown on your profile',
   bio: 'Artist bio/description',
-  genres: 'Music genres (comma-separated)',
 };
 
 /**
@@ -422,7 +421,9 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 **Editable Fields:**
 - displayName: Their public display name
 - bio: Artist bio/description
-- genres: Music genres (as an array)
+
+**Read-Only Fields:**
+- genres: Automatically synced from streaming platforms (Spotify, Apple Music, etc.) — cannot be edited manually
 
 **Blocked Fields (cannot edit via chat):**
 - username: Requires settings page
@@ -489,14 +490,8 @@ This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per
  */
 function createProfileEditTool(context: ArtistContext) {
   const profileEditSchema = z.object({
-    field: z
-      .enum(['displayName', 'bio', 'genres'])
-      .describe('The profile field to edit'),
-    newValue: z
-      .union([z.string(), z.array(z.string())])
-      .describe(
-        'The new value for the field. For genres, pass an array of strings.'
-      ),
+    field: z.enum(['displayName', 'bio']).describe('The profile field to edit'),
+    newValue: z.string().describe('The new value for the field.'),
     reason: z
       .string()
       .optional()
@@ -505,18 +500,9 @@ function createProfileEditTool(context: ArtistContext) {
 
   return tool({
     description:
-      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name, bio, or genres.',
+      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio.',
     inputSchema: profileEditSchema,
     execute: async ({ field, newValue, reason }) => {
-      // Validate the new value type matches the field
-      const isGenres = field === 'genres';
-      if (isGenres && !Array.isArray(newValue)) {
-        return { success: false, error: 'Genres must be an array of strings' };
-      }
-      if (!isGenres && typeof newValue !== 'string') {
-        return { success: false, error: `${field} must be a string` };
-      }
-
       // Return preview data for the UI to render
       return {
         success: true,

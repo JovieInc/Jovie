@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@jovie/ui/atoms/badge';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -71,6 +72,7 @@ export function DashboardNav(_: DashboardNavProps) {
     );
   }, [artistName]);
 
+  const genres = selectedProfile?.genres ?? [];
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -140,6 +142,20 @@ export function DashboardNav(_: DashboardNavProps) {
             ))}
           </SidebarGroupContent>
         </SidebarGroup>
+      )}
+
+      {!isInSettings && genres.length > 0 && (
+        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50 group-data-[collapsible=icon]:hidden'>
+          <SidebarCollapsibleGroup label='Genres' defaultOpen>
+            <div className='flex flex-wrap gap-1.5 px-2 py-1'>
+              {genres.map(genre => (
+                <Badge key={genre} variant='secondary' size='sm'>
+                  {genre}
+                </Badge>
+              ))}
+            </div>
+          </SidebarCollapsibleGroup>
+        </div>
       )}
 
       {!isInSettings && (
