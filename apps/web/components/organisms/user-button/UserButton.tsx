@@ -67,19 +67,19 @@ function buildDropdownItems({
         <button
           type='button'
           onClick={handleProfile}
-          className='w-full cursor-pointer rounded-lg px-3 py-2 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
+          className='w-full cursor-pointer rounded-md px-2 py-1.5 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
         >
-          <div className='flex w-full items-center gap-3'>
+          <div className='flex w-full items-center gap-2.5'>
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
               name={displayName || userInitials}
-              size='sm'
+              size='xs'
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-sm font-medium text-primary-token'>
+                <span className='truncate text-[13px] font-medium text-primary-token'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
@@ -94,14 +94,14 @@ function buildDropdownItems({
                 )}
               </div>
               {formattedUsername && (
-                <p className='truncate text-xs text-tertiary-token mt-0.5'>
+                <p className='truncate text-[11px] text-tertiary-token mt-0.5'>
                   {formattedUsername}
                 </p>
               )}
             </div>
             <Icon
               name='ExternalLink'
-              className='h-4 w-4 shrink-0 text-tertiary-token'
+              className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
               aria-hidden='true'
             />
           </div>
@@ -120,6 +120,7 @@ function buildDropdownItems({
         />
       ),
       onClick: handleSettings,
+      shortcut: 'G S',
     },
   ];
 
@@ -273,6 +274,7 @@ function buildDropdownItems({
       onClick: handleSignOut,
       disabled: loading.signOut,
       className: 'disabled:cursor-not-allowed disabled:opacity-60',
+      shortcut: '⌥ ⇧ Q',
     }
   );
 
@@ -401,6 +403,7 @@ export function UserButton({
         align={trigger ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
+        contentClassName='w-[220px]'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}
