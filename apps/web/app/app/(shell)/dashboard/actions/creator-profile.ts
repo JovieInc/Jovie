@@ -16,6 +16,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
+import { isContentClean } from '@/lib/validation/content-filter';
 
 /**
  * Updates a creator profile with the provided data.
@@ -116,6 +117,9 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
     typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
   if (!displayName) {
     throw new TypeError('Display name is required');
+  }
+  if (!isContentClean(displayName)) {
+    throw new TypeError('Display name contains language that is not allowed');
   }
 
   const bio =

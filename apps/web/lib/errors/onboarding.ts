@@ -15,6 +15,7 @@ export enum OnboardingErrorCode {
   USERNAME_INVALID_FORMAT = 'USERNAME_INVALID_FORMAT',
   USERNAME_RESERVED = 'USERNAME_RESERVED',
   DISPLAY_NAME_TOO_LONG = 'DISPLAY_NAME_TOO_LONG',
+  INVALID_DISPLAY_NAME = 'INVALID_DISPLAY_NAME',
 
   // Availability errors
   USERNAME_TAKEN = 'USERNAME_TAKEN',
@@ -348,6 +349,8 @@ export function getUserFriendlyMessage(code: OnboardingErrorCode): string {
       return 'Your session has expired. Please refresh and try again';
     case OnboardingErrorCode.DISPLAY_NAME_REQUIRED:
       return 'Please enter your name to finish setup';
+    case OnboardingErrorCode.INVALID_DISPLAY_NAME:
+      return 'Display name contains language that is not allowed';
     case OnboardingErrorCode.INVALID_USERNAME:
       return 'Please choose a valid username';
     case OnboardingErrorCode.USERNAME_TOO_SHORT:

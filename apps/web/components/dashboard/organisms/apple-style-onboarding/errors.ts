@@ -120,6 +120,14 @@ export function mapErrorToUserMessage(
     };
   }
 
+  // Display name content filter
+  if (message.includes('INVALID_DISPLAY_NAME')) {
+    return {
+      userMessage:
+        'That name contains language that is not allowed. Please choose another.',
+    };
+  }
+
   // Display name required
   if (message.includes('DISPLAY_NAME_REQUIRED')) {
     return {
