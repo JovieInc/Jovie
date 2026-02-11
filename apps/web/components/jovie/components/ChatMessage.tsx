@@ -19,6 +19,7 @@ interface ChatMessageProps {
 export function ChatMessage({ id, role, parts }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
+  const messageText = getMessageText(parts);
 
   return (
     <div
@@ -33,21 +34,21 @@ export function ChatMessage({ id, role, parts }: ChatMessageProps) {
       {isUser ? (
         <div className='max-w-[80%] rounded-2xl px-4 py-3 bg-accent text-accent-foreground'>
           <div className='whitespace-pre-wrap text-sm leading-relaxed'>
-            {getMessageText(parts)}
+            {messageText}
           </div>
         </div>
       ) : (
         <div className='flex max-w-[80%] flex-col'>
           <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
             <div className='whitespace-pre-wrap text-sm leading-relaxed'>
-              {getMessageText(parts)}
+              {messageText}
             </div>
           </div>
           <div className='mt-1 flex items-center gap-0.5 pl-1'>
             <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
               <button
                 type='button'
-                onClick={() => copy(getMessageText(parts))}
+                onClick={() => copy(messageText)}
                 className='rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
                 aria-label={isSuccess ? 'Copied to clipboard' : 'Copy message'}
               >
