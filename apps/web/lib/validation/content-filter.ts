@@ -144,7 +144,7 @@ function normalizeForFilter(input: string): string {
     .replaceAll('3', 'e')
     .replaceAll('4', 'a')
     .replaceAll('5', 's')
-    .replace(/[^a-z0-9]/g, '');
+    .replaceAll(/[^a-z0-9]/g, '');
 }
 
 // Short words (<=3 chars) are only matched exactly to avoid false positives

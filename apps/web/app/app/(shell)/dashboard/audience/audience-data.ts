@@ -285,11 +285,14 @@ async function fetchMembersData(
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: SearchParams,
-  includeDetails: boolean,
-  memberId: string | undefined,
-  typeFilter?: AudienceMemberType,
-  segmentFilter?: string[]
+  options: {
+    includeDetails: boolean;
+    memberId: string | undefined;
+    typeFilter?: AudienceMemberType;
+    segmentFilter?: string[];
+  }
 ): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+  const { includeDetails, memberId, typeFilter, segmentFilter } = options;
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
@@ -562,10 +565,12 @@ export async function getAudienceServerData(params: {
         clerkUserId,
         selectedProfileId,
         searchParams,
-        includeDetails,
-        memberId,
-        typeFilter,
-        segments
+        {
+          includeDetails,
+          memberId,
+          typeFilter,
+          segmentFilter: segments,
+        }
       );
     }
 

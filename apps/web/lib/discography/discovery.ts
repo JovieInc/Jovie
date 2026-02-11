@@ -111,16 +111,17 @@ async function lookupAppleMusic(
 /**
  * Save a discovered provider link and record it in the result.
  */
-async function saveDiscoveredLink(
-  releaseId: string,
-  providerId: string,
-  url: string,
-  externalId: string | null,
-  source: string,
-  isrc: string,
-  result: DiscoveryResult,
-  extraMetadata?: Record<string, unknown>
-): Promise<void> {
+async function saveDiscoveredLink(opts: {
+  releaseId: string;
+  providerId: string;
+  url: string;
+  externalId: string | null;
+  source: string;
+  isrc: string;
+  result: DiscoveryResult;
+  extraMetadata?: Record<string, unknown>;
+}): Promise<void> {
+  const { releaseId, providerId, url, externalId, source, isrc, result, extraMetadata } = opts;
   await upsertProviderLink({
     releaseId,
     providerId,
@@ -188,15 +189,15 @@ export async function discoverLinksForRelease(
       lookupAppleMusic(isrc, storefront)
         .then(async match => {
           if (match) {
-            await saveDiscoveredLink(
+            await saveDiscoveredLink({
               releaseId,
-              'apple_music',
-              match.url,
-              match.externalId,
-              match.source,
+              providerId: 'apple_music',
+              url: match.url,
+              externalId: match.externalId,
+              source: match.source,
               isrc,
-              result
-            );
+              result,
+            });
           }
         })
         .catch(error => {
@@ -217,19 +218,19 @@ export async function discoverLinksForRelease(
             const url = deezerResult.albumUrl ?? deezerResult.url;
             const externalId = deezerResult.albumId ?? deezerResult.trackId;
 
-            await saveDiscoveredLink(
+            await saveDiscoveredLink({
               releaseId,
-              'deezer',
+              providerId: 'deezer',
               url,
               externalId,
-              'deezer_isrc',
+              source: 'deezer_isrc',
               isrc,
               result,
-              {
+              extraMetadata: {
                 trackUrl: deezerResult.url,
                 trackId: deezerResult.trackId,
-              }
-            );
+              },
+            });
           }
         })
         .catch(error => {
