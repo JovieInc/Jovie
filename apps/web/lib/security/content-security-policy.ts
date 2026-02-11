@@ -88,6 +88,7 @@ const STATIC_CSP_PARTS = {
     'https://api.qrserver.com',
     'https://*.public.blob.vercel-storage.com',
     'https://*.blob.vercel-storage.com',
+    'https://*.mzstatic.com',
   ].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
