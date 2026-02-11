@@ -2,8 +2,9 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { Globe, Link2, MapPin } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
-import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
+import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { RangeToggle } from './RangeToggle';
@@ -142,6 +143,7 @@ function ListSection({
 /* ------------------------------------------------------------------ */
 
 export function DashboardAnalytics() {
+  const router = useRouter();
   const {
     artist,
     range,
@@ -172,6 +174,7 @@ export function DashboardAnalytics() {
         <div className='flex items-center gap-2'>
           <DashboardRefreshButton
             ariaLabel='Refresh analytics'
+            onRefresh={() => router.refresh()}
             onRefreshed={() => {
               refresh().catch(refreshError => {
                 Sentry.captureException(refreshError);

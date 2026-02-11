@@ -1,4 +1,4 @@
-import { FooterLink } from '@/components/ui/FooterLink';
+import { FooterLink } from '@/components/atoms/FooterLink';
 
 interface FooterNavigationProps {
   readonly variant?: 'light' | 'dark';

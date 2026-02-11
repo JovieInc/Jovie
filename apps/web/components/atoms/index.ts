@@ -20,6 +20,7 @@ export * from './BrandLogo';
 export * from './CircleIconButton';
 export * from './CopyableMonospaceCell';
 export * from './Copyright';
+export * from './CTAButton';
 // DashboardErrorFallback moved to organisms (uses hooks/router)
 export * from './Divider';
 export * from './DotBadge';
@@ -60,7 +61,7 @@ export * from './Select';
 export * from './Separator';
 export * from './Sheet';
 // SidebarCollapseButton moved to molecules (imports from organisms)
-export * from './Skeleton';
+// Skeleton migrated to @jovie/ui - import { Skeleton } from '@jovie/ui'
 export * from './SkipToContent';
 // SocialIcon is a client component - import directly from './SocialIcon' to avoid server/client boundary issues
 // export * from './SocialIcon';
