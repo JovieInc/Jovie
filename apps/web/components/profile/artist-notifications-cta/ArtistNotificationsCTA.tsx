@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -13,8 +14,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 /** Prevents synthetic font weight rendering for better typography */
 const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };
-
-import { Skeleton } from '@jovie/ui';
 import { CTAButton } from '@/components/atoms/CTAButton';
 import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';

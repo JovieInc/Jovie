@@ -277,9 +277,9 @@ async function fetchMembersData(
   searchParams: SearchParams,
   includeDetails: boolean,
   memberId: string | undefined,
-  typeFilter?: AudienceMemberType,
-  segmentFilter?: string
+  filters?: { typeFilter?: AudienceMemberType; segmentFilter?: string }
 ): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+  const { typeFilter, segmentFilter } = filters ?? {};
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
@@ -554,8 +554,7 @@ export async function getAudienceServerData(params: {
         searchParams,
         includeDetails,
         memberId,
-        typeFilter,
-        filter
+        { typeFilter, segmentFilter: filter }
       );
     }
 

@@ -159,11 +159,12 @@ export function ReleaseDspLinks({
     ([key]) => !release.providers.some(p => p.key === key)
   ) as [ProviderKey, { label: string; accent: string }][];
 
-  const rescanTooltip = isRescanningIsrc
-    ? 'Scanning...'
-    : isCoolingDown
-      ? `Try again in ${formatCooldown(remainingMs)}`
-      : 'Scan ISRC for links';
+  let rescanTooltip = 'Scan ISRC for links';
+  if (isRescanningIsrc) {
+    rescanTooltip = 'Scanning...';
+  } else if (isCoolingDown) {
+    rescanTooltip = `Try again in ${formatCooldown(remainingMs)}`;
+  }
 
   return (
     <div className='space-y-3'>

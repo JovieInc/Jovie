@@ -437,12 +437,14 @@ export async function checkAiChatRateLimitForPlan(
   }
 
   // 2. Check daily plan-specific quota
-  const dailyLimiter =
-    plan === 'growth'
-      ? aiChatDailyGrowthLimiter
-      : plan === 'pro'
-        ? aiChatDailyProLimiter
-        : aiChatDailyFreeLimiter;
+  let dailyLimiter: RateLimiter;
+  if (plan === 'growth') {
+    dailyLimiter = aiChatDailyGrowthLimiter;
+  } else if (plan === 'pro') {
+    dailyLimiter = aiChatDailyProLimiter;
+  } else {
+    dailyLimiter = aiChatDailyFreeLimiter;
+  }
 
   const dailyMessage =
     plan === 'growth' || plan === 'pro'
