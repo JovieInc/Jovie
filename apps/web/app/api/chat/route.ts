@@ -1089,6 +1089,12 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
+      experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+        functionId: 'jovie-chat',
+      },
       onError: ({ error }) => {
         Sentry.captureException(error, {
           tags: { feature: 'ai-chat', errorType: 'streaming' },

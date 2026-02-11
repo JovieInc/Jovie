@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import {
+  parseAsArrayOf,
   parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
@@ -14,7 +15,10 @@ import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
-import type { AudienceView } from './dashboard-audience-table/types';
+import type {
+  AudienceFilters,
+  AudienceView,
+} from './dashboard-audience-table/types';
 
 const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
   { length: 10 },
@@ -65,7 +69,7 @@ export interface DashboardAudienceClientProps {
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
-  readonly filter?: string;
+  readonly filters: AudienceFilters;
 }
 
 /**
@@ -91,7 +95,7 @@ export function DashboardAudienceClient({
   profileUrl,
   profileId,
   subscriberCount,
-  filter,
+  filters: initialFilters,
 }: Readonly<DashboardAudienceClientProps>) {
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
@@ -107,9 +111,9 @@ export function DashboardAudienceClient({
     })
   );
 
-  const [, setFilter] = useQueryState(
-    'filter',
-    parseAsString.withOptions({
+  const [, setSegments] = useQueryState(
+    'segments',
+    parseAsArrayOf(parseAsString).withDefault([]).withOptions({
       shallow: false,
       history: 'push',
     })
@@ -148,20 +152,20 @@ export function DashboardAudienceClient({
 
   const handleViewChange = React.useCallback(
     (nextView: AudienceView) => {
-      // Reset to page 1 and default sort when changing views
+      // Reset to page 1, clear filters, and default sort when changing views
       setView(nextView);
-      setFilter(null);
+      setSegments([]);
       setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
     },
-    [setView, setFilter, setUrlParams]
+    [setView, setSegments, setUrlParams]
   );
 
-  const handleFilterChange = React.useCallback(
-    (nextFilter: string | null) => {
-      setFilter(nextFilter);
+  const handleFiltersChange = React.useCallback(
+    (nextFilters: AudienceFilters) => {
+      setSegments(nextFilters.segments);
       setUrlParams({ page: 1 });
     },
-    [setFilter, setUrlParams]
+    [setSegments, setUrlParams]
   );
 
   return (
@@ -183,11 +187,11 @@ export function DashboardAudienceClient({
           onPageSizeChange={handlePageSizeChange}
           onSortChange={handleSortChange}
           onViewChange={handleViewChange}
-          onFilterChange={handleFilterChange}
+          onFiltersChange={handleFiltersChange}
           profileUrl={profileUrl}
           profileId={profileId}
           subscriberCount={subscriberCount}
-          filter={filter}
+          filters={initialFilters}
         />
       </div>
     </QueryErrorBoundary>

@@ -241,16 +241,10 @@ function buildMemberSelectFields(includeDetails: boolean) {
 }
 
 /**
- * Build segment filter condition based on the filter parameter.
- * - 'highIntent': intentLevel = 'high'
- * - 'returning': visits > 1
- * - 'frequent': visits >= 3
- * - 'recent24h': lastSeenAt > now - 24 hours
+ * Map a single segment filter ID to its drizzle condition.
  */
-function buildSegmentFilter(filter: string | undefined) {
-  if (!filter) return drizzleSql<boolean>`true`;
-
-  switch (filter) {
+function segmentToCondition(segment: string) {
+  switch (segment) {
     case 'highIntent':
       return eq(audienceMembers.intentLevel, 'high');
     case 'returning':
@@ -263,8 +257,24 @@ function buildSegmentFilter(filter: string | undefined) {
         drizzleSql`NOW() - INTERVAL '24 hours'`
       );
     default:
-      return drizzleSql<boolean>`true`;
+      return null;
   }
+}
+
+/**
+ * Build segment filter condition based on multiple segment filters.
+ * When multiple segments are selected, they are combined with AND logic.
+ */
+function buildSegmentFilter(segments: string[] | undefined) {
+  if (!segments || segments.length === 0) return drizzleSql<boolean>`true`;
+
+  const conditions = segments
+    .map(segmentToCondition)
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+
+  if (conditions.length === 0) return drizzleSql<boolean>`true`;
+  if (conditions.length === 1) return conditions[0];
+  return and(...conditions)!;
 }
 
 /**
@@ -278,7 +288,7 @@ async function fetchMembersData(
   includeDetails: boolean,
   memberId: string | undefined,
   typeFilter?: AudienceMemberType,
-  segmentFilter?: string
+  segmentFilter?: string[]
 ): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
@@ -493,7 +503,7 @@ export async function getAudienceServerData(params: {
   includeDetails?: boolean;
   memberId?: string;
   view?: AudienceView;
-  filter?: string;
+  segments?: string[];
 }): Promise<AudienceServerData> {
   noStore();
 
@@ -504,7 +514,7 @@ export async function getAudienceServerData(params: {
     includeDetails = false,
     memberId,
     view = 'all',
-    filter,
+    segments,
   } = params;
 
   // Map view to internal mode
@@ -555,7 +565,7 @@ export async function getAudienceServerData(params: {
         includeDetails,
         memberId,
         typeFilter,
-        filter
+        segments
       );
     }
 
