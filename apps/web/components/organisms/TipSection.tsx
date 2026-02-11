@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
@@ -95,25 +96,33 @@ export function TipSection({
   // Show payment method selection if both are available
   if (onStripePayment && venmoLink && !paymentMethod) {
     return (
-      <div className={`w-full max-w-sm space-y-3 ${className}`}>
-        <h3 className='text-lg font-semibold text-center text-gray-900 dark:text-white mb-4'>
-          Choose payment method
-        </h3>
-        <Button
-          onClick={() => setPaymentMethod('stripe')}
-          className='w-full'
-          size='lg'
-        >
-          Pay with Apple Pay / Card
-        </Button>
-        <Button
-          onClick={() => setPaymentMethod('venmo')}
-          variant='outline'
-          className='w-full'
-          size='lg'
-        >
-          Pay with Venmo
-        </Button>
+      <div className={`w-full max-w-sm ${className}`}>
+        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+          <h3 className='text-[15px] font-semibold tracking-tight text-center text-primary-token mb-1'>
+            Choose payment method
+          </h3>
+          <p className='text-center text-xs text-secondary-token mb-5'>
+            Select how you&apos;d like to send your tip
+          </p>
+          <div className='space-y-2.5'>
+            <Button
+              onClick={() => setPaymentMethod('stripe')}
+              className='w-full'
+              size='lg'
+              variant='primary'
+            >
+              Apple Pay / Card
+            </Button>
+            <Button
+              onClick={() => setPaymentMethod('venmo')}
+              variant='secondary'
+              className='w-full'
+              size='lg'
+            >
+              Venmo
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -121,30 +130,35 @@ export function TipSection({
   // Show Stripe payment flow
   if (paymentMethod === 'stripe' || (onStripePayment && !venmoLink)) {
     return (
-      <div className={`w-full max-w-sm space-y-3 ${className}`}>
-        {paymentMethod && (
-          <button
-            type='button'
-            onClick={() => setPaymentMethod(null)}
-            className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mb-4'
-          >
-            ← Back to payment methods
-          </button>
-        )}
-        {amounts.map(amount => (
-          <Button
-            key={amount}
-            onClick={() => handleStripePayment(amount)}
-            className='w-full'
-            size='lg'
-            loading={loading === amount}
-          >
-            ${amount} Tip
-          </Button>
-        ))}
-        <p className='mt-2 text-center text-xs text-gray-500'>
-          Tips are non-refundable
-        </p>
+      <div className={`w-full max-w-sm ${className}`}>
+        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+          {paymentMethod && (
+            <button
+              type='button'
+              onClick={() => setPaymentMethod(null)}
+              className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
+            >
+              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
+            </button>
+          )}
+          <div className='space-y-2.5'>
+            {amounts.map(amount => (
+              <Button
+                key={amount}
+                onClick={() => handleStripePayment(amount)}
+                className='w-full'
+                size='lg'
+                loading={loading === amount}
+                variant='primary'
+              >
+                ${amount} Tip
+              </Button>
+            ))}
+          </div>
+          <p className='mt-4 text-center text-xs text-tertiary-token'>
+            Tips are non-refundable
+          </p>
+        </div>
       </div>
     );
   }
@@ -153,16 +167,18 @@ export function TipSection({
   if (paymentMethod === 'venmo' || (venmoLink && !onStripePayment)) {
     return (
       <div className={`w-full max-w-sm ${className}`}>
-        {paymentMethod && (
-          <button
-            type='button'
-            onClick={() => setPaymentMethod(null)}
-            className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mb-4'
-          >
-            ← Back to payment methods
-          </button>
-        )}
-        <TipSelector amounts={amounts} onContinue={handleVenmoPayment} />
+        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+          {paymentMethod && (
+            <button
+              type='button'
+              onClick={() => setPaymentMethod(null)}
+              className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
+            >
+              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
+            </button>
+          )}
+          <TipSelector amounts={amounts} onContinue={handleVenmoPayment} />
+        </div>
       </div>
     );
   }

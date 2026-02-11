@@ -33,16 +33,29 @@ export const AmountSelector = memo(function AmountSelector({
       disabled={disabled}
       aria-disabled={disabled}
       className={cn(
-        'w-full aspect-square rounded-xl border text-lg font-semibold transition-colors flex items-center justify-center',
+        'group relative w-full aspect-square rounded-2xl border text-center transition-all duration-150 ease-out flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-        'bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100',
         isSelected
-          ? 'border-purple-500 ring-2 ring-purple-200/60 dark:ring-purple-600/30'
-          : 'border-black/40 hover:border-black/70 dark:border-white/30 dark:hover:border-white/60',
+          ? 'border-accent bg-accent-subtle text-accent-token shadow-sm ring-2 ring-accent/20'
+          : 'border-default bg-surface-1 text-primary-token hover:border-strong hover:bg-surface-2 hover:shadow-sm',
         className
       )}
     >
-      <span aria-hidden>{'$' + amount}</span>
+      <span
+        className='text-[10px] font-medium uppercase tracking-wider text-secondary-token'
+        aria-hidden
+      >
+        USD
+      </span>
+      <span
+        className={cn(
+          'text-2xl font-semibold tabular-nums tracking-tight',
+          isSelected && 'text-accent-token'
+        )}
+        aria-hidden
+      >
+        ${amount}
+      </span>
     </button>
   );
 });
