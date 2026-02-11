@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { NO_STORE_HEADERS, RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import {
   createRateLimitHeadersFromStatus,
   getClientIP,
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       summary.database = 'unavailable';
       return NextResponse.json(summary, {
         status: 503, // Service Unavailable - allows monitoring to detect issues
-        headers: NO_STORE_HEADERS,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_HEALTH },
       });
     }
 
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     summary.database = 'error';
     return NextResponse.json(summary, {
       status: 503, // Service Unavailable - allows monitoring to detect issues
-      headers: NO_STORE_HEADERS,
+      headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_HEALTH },
     });
   }
 }

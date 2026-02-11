@@ -9,6 +9,7 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { formatCountryLabel } from '@/lib/utils/audience';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
 import type {
   AudienceAction,
@@ -153,19 +154,6 @@ function normalizeLocationLabel(
     .filter(Boolean)
     .map(part => safeDecodeURIComponent(part as string));
   return parts.length ? parts.join(', ') : 'Unknown';
-}
-
-/**
- * Safely converts a Date object or ISO string to ISO string format.
- * Handles both Date objects (from database) and already-serialized strings (from SSR).
- */
-function toISOStringOrNull(
-  value: Date | string | null | undefined
-): string | null {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
-  if (value instanceof Date) return value.toISOString();
-  return null;
 }
 
 function isAudienceAction(value: unknown): value is AudienceAction {

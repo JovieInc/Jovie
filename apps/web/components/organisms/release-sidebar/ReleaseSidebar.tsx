@@ -183,6 +183,23 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
+        {/* Always-visible artwork + release name */}
+        {release && !selectedTrack && (
+          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+            <ReleaseArtwork
+              artworkUrl={release.artworkUrl}
+              title={release.title}
+              artistName={artistName}
+              canUploadArtwork={canUploadArtwork}
+              onArtworkUpload={
+                canUploadArtwork ? handleArtworkUpload : undefined
+              }
+              allowDownloads={isEditable}
+              releaseId={release.id}
+            />
+          </div>
+        )}
+
         {/* Tab navigation */}
         {release && !selectedTrack && (
           <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
@@ -206,24 +223,10 @@ export function ReleaseSidebar({
           )}
           {!(selectedTrack && release) && release && (
             <>
-              {/* Catalog tab: Artwork, Fields, Track list */}
+              {/* Catalog tab: Fields, Track list */}
               {activeTab === 'catalog' && (
                 <>
                   <div className='pb-5'>
-                    <ReleaseArtwork
-                      artworkUrl={release.artworkUrl}
-                      title={release.title}
-                      artistName={artistName}
-                      canUploadArtwork={canUploadArtwork}
-                      onArtworkUpload={
-                        canUploadArtwork ? handleArtworkUpload : undefined
-                      }
-                      allowDownloads={isEditable}
-                      releaseId={release.id}
-                    />
-                  </div>
-
-                  <div className='py-5'>
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}
