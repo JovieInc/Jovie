@@ -75,6 +75,12 @@ export async function generateInsights(
     prompt: buildUserPrompt(metrics, existingInsightTypes),
     temperature: 0.3,
     maxOutputTokens: 4096,
+    experimental_telemetry: {
+      isEnabled: true,
+      recordInputs: true,
+      recordOutputs: true,
+      functionId: 'jovie-insight-generator',
+    },
   });
 
   // Filter out low-confidence insights
