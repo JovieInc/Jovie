@@ -130,7 +130,10 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
 });
 
 /** Year group header */
-function YearGroupHeader({ year, count }: Readonly<{ year: string; count: number }>) {
+function YearGroupHeader({
+  year,
+  count,
+}: Readonly<{ year: string; count: number }>) {
   return (
     <div className='sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2'>
       <span className='text-sm font-semibold text-primary-token'>{year}</span>

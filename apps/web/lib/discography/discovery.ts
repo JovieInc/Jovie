@@ -121,7 +121,16 @@ async function saveDiscoveredLink(opts: {
   result: DiscoveryResult;
   extraMetadata?: Record<string, unknown>;
 }): Promise<void> {
-  const { releaseId, providerId, url, externalId, source, isrc, result, extraMetadata } = opts;
+  const {
+    releaseId,
+    providerId,
+    url,
+    externalId,
+    source,
+    isrc,
+    result,
+    extraMetadata,
+  } = opts;
   await upsertProviderLink({
     releaseId,
     providerId,

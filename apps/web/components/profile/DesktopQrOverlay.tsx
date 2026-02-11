@@ -73,8 +73,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
 
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      void e;
+    const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
       const isMdUp = mqlMd.matches;
       const isLgUp = mqlLg.matches;
       const hasFinePointer = mqlPointer.matches;
