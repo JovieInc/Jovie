@@ -9,7 +9,11 @@
  */
 
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
-import { DrawerHeader, DrawerSection } from '@/components/molecules/drawer';
+import {
+  DrawerEmptyState,
+  DrawerHeader,
+  DrawerSection,
+} from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { AudienceMemberActions } from './AudienceMemberActions';
@@ -65,9 +69,7 @@ export function AudienceMemberSidebar({
             </DrawerSection>
           </div>
         ) : (
-          <div className='text-sm text-secondary-token'>
-            Select a row in the table to view contact details.
-          </div>
+          <DrawerEmptyState message='Select a row in the table to view contact details.' />
         )}
       </div>
     </RightDrawer>

@@ -42,6 +42,9 @@ const hasDatabase = !!(
 );
 
 test.describe('Tipping MVP', () => {
+  // Turbopack cold compilation of profile pages can take 60-120s
+  test.setTimeout(180_000);
+
   // Test in both light and dark modes
   ['light', 'dark'].forEach(colorMode => {
     test.describe(`in ${colorMode} mode`, () => {
@@ -99,7 +102,7 @@ test.describe('Tipping MVP', () => {
         // Visit the profile page and wait for hydration (not networkidle)
         await page.goto('/testartist', {
           waitUntil: 'domcontentloaded',
-          timeout: 60000,
+          timeout: 120_000,
         });
         await waitForHydration(page);
 
@@ -197,7 +200,7 @@ test.describe('Tipping MVP', () => {
         // Visit the profile page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',
-          timeout: 60000,
+          timeout: 120_000,
         });
         await waitForHydration(page);
 
@@ -270,7 +273,7 @@ test.describe('Tipping MVP', () => {
         // Visit the tip page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',
-          timeout: 60000,
+          timeout: 120_000,
         });
         await waitForHydration(page);
 
@@ -331,7 +334,7 @@ test.describe('Tipping MVP', () => {
         // Visit the tip page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',
-          timeout: 60000,
+          timeout: 120_000,
         });
         await waitForHydration(page);
 

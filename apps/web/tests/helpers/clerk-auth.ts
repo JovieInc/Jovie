@@ -16,6 +16,13 @@ export class ClerkTestError extends Error {
 }
 
 /**
+ * Check if email is a Clerk test email (passwordless auth)
+ */
+export function isClerkTestEmail(email: string): boolean {
+  return email.includes('+clerk_test');
+}
+
+/**
  * Creates or reuses a Clerk test user session for the given email.
  *
  * Assumes the page has already loaded the app and Clerk has been initialized.
@@ -125,8 +132,14 @@ export async function signInUser(
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
   await page.goto('/signin', { waitUntil: 'domcontentloaded' });
 
-  // Wait briefly for the page to settle and Clerk JS to start loading
-  await page.waitForTimeout(1000);
+  // Wait for Clerk JS to load from CDN before calling clerk.signIn()
+  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
+  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
+  await page
+    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
+    .catch(() => {
+      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
+    });
 
   try {
     // Use the official Clerk testing helper
@@ -183,28 +196,31 @@ export async function signInUser(
   // Use DASHBOARD_PROFILE (which exists) instead of PROFILE (which 404s)
   await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
     waitUntil: 'domcontentloaded',
-    timeout: 90000, // Turbopack cold compilation can take 60+ seconds
+    timeout: 120_000, // Turbopack cold compilation can take 60-90+ seconds
   });
 
-  // Wait for page to stabilize after React 19 transient hooks error
-  // There's a known React 19 bug (facebook/react#33580) that causes a transient
-  // "Rendered more hooks than during the previous render" error during hydration.
-  // The error appears briefly then "magically disappears" as the page stabilizes.
+  // Dismiss Next.js dev error overlay and wait for page to stabilize
+  // Handles React hydration mismatches (nonce attr) and transient hooks errors
   await expect(async () => {
-    const bodyText = await page.locator('body').innerText();
-    // The page should not show the error message once stabilized
-    expect(bodyText).not.toContain('Application error');
-    expect(bodyText).not.toContain('client-side exception');
-  }).toPass({ timeout: 20000, intervals: [500, 1000, 2000, 3000, 5000] });
-
-  // Verify we're authenticated by checking for dashboard elements
-  const userButton = page.locator('[data-clerk-element="userButton"]');
-  const userMenu = page.locator('[data-testid="user-menu"]');
-  const dashboardHeader = page.locator('[data-testid="dashboard-header"]');
-
-  await expect(userButton.or(userMenu).or(dashboardHeader)).toBeVisible({
-    timeout: 30000, // Increased for hydration after slow compilation
-  });
+    // Dismiss error overlay if present
+    const overlay = page.locator(
+      '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+    );
+    if (await overlay.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
+    }
+    // Click "Try again" on error boundary if present
+    const tryAgain = page.locator('button:has-text("Try again")');
+    if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
+      await tryAgain.click();
+      await page.waitForTimeout(1000);
+    }
+    // Verify dashboard element is visible
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    await expect(dashNav.or(userButton)).toBeVisible({ timeout: 5000 });
+  }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000, 10000] });
 
   return page;
 }

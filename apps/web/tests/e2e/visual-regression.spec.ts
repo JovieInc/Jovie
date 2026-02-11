@@ -126,7 +126,7 @@ test.describe('Visual Regression @visual-regression', () => {
 
   test.describe('Public Profile', () => {
     // Use a known test profile handle or skip if not available
-    const testHandle = process.env.E2E_TEST_PROFILE_HANDLE || 'demo';
+    const testHandle = process.env.E2E_TEST_PROFILE_HANDLE || 'dualipa';
 
     test('public profile - light mode', async ({ page }) => {
       await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });

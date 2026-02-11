@@ -14,6 +14,7 @@ import {
   isTargetGenre,
   LINK_IN_BIO_PLATFORMS,
   MUSIC_TOOL_PLATFORMS,
+  PAID_VERIFICATION_PLATFORMS,
   SCORE_WEIGHTS,
   TARGET_GENRES,
 } from '@/lib/fit-scoring/calculator';
@@ -48,6 +49,7 @@ describe('Fit Score Calculator', () => {
           hasAlternativeDsp: 0,
           multiDspPresence: 0,
           hasContactEmail: 0,
+          paidVerification: 0,
           meta: {
             calculatedAt: expect.any(String),
             version: FIT_SCORE_VERSION,
@@ -533,6 +535,57 @@ describe('Fit Score Calculator', () => {
       });
     });
 
+    describe('paid verification scoring (+10 points)', () => {
+      it('should award 10 points for paid verification on Twitter', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: ['twitter'],
+        });
+        expect(result.breakdown.paidVerification).toBe(
+          SCORE_WEIGHTS.PAID_VERIFICATION
+        );
+        expect(result.score).toBe(10);
+      });
+
+      it('should award 10 points for paid verification on Instagram', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: ['instagram'],
+        });
+        expect(result.breakdown.paidVerification).toBe(10);
+      });
+
+      it('should only award 10 points once for multiple verified platforms', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: ['twitter', 'instagram', 'facebook'],
+        });
+        expect(result.breakdown.paidVerification).toBe(10);
+        expect(result.score).toBe(10);
+      });
+
+      it('should store verified platforms in meta', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: ['twitter', 'instagram'],
+        });
+        expect(result.breakdown.meta?.paidVerificationPlatforms).toEqual([
+          'twitter',
+          'instagram',
+        ]);
+      });
+
+      it('should not award points for empty array', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: [],
+        });
+        expect(result.breakdown.paidVerification).toBe(0);
+      });
+
+      it('should not award points when undefined', () => {
+        const result = calculateFitScore({
+          paidVerificationPlatforms: undefined,
+        });
+        expect(result.breakdown.paidVerification).toBe(0);
+      });
+    });
+
     describe('maximum score calculation', () => {
       it('should calculate maximum score of 90 with all criteria met', () => {
         const input: FitScoreInput = {
@@ -582,7 +635,8 @@ describe('Fit Score Calculator', () => {
           result.breakdown.genreMatch +
           (result.breakdown.hasAlternativeDsp ?? 0) +
           (result.breakdown.multiDspPresence ?? 0) +
-          (result.breakdown.hasContactEmail ?? 0);
+          (result.breakdown.hasContactEmail ?? 0) +
+          (result.breakdown.paidVerification ?? 0);
 
         expect(result.score).toBe(breakdownSum);
       });
@@ -662,10 +716,11 @@ describe('Fit Score Calculator', () => {
       expect(SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP).toBe(10);
       expect(SCORE_WEIGHTS.MULTI_DSP_PRESENCE).toBe(5);
       expect(SCORE_WEIGHTS.HAS_CONTACT_EMAIL).toBe(5);
+      expect(SCORE_WEIGHTS.PAID_VERIFICATION).toBe(10);
     });
 
     it('should have correct version', () => {
-      expect(FIT_SCORE_VERSION).toBe(2);
+      expect(FIT_SCORE_VERSION).toBe(3);
     });
 
     it('should have expected link-in-bio platforms', () => {
@@ -688,7 +743,7 @@ describe('Fit Score Calculator', () => {
       expect(TARGET_GENRES.size).toBeGreaterThan(20);
     });
 
-    it('should have total max score of 110', () => {
+    it('should have total max score of 120', () => {
       const maxScore =
         SCORE_WEIGHTS.USES_LINK_IN_BIO +
         SCORE_WEIGHTS.PAID_TIER +
@@ -699,8 +754,18 @@ describe('Fit Score Calculator', () => {
         SCORE_WEIGHTS.GENRE_MATCH +
         SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP +
         SCORE_WEIGHTS.MULTI_DSP_PRESENCE +
-        SCORE_WEIGHTS.HAS_CONTACT_EMAIL;
-      expect(maxScore).toBe(110);
+        SCORE_WEIGHTS.HAS_CONTACT_EMAIL +
+        SCORE_WEIGHTS.PAID_VERIFICATION;
+      expect(maxScore).toBe(120);
+    });
+
+    it('should have expected paid verification platforms', () => {
+      expect(PAID_VERIFICATION_PLATFORMS.has('twitter')).toBe(true);
+      expect(PAID_VERIFICATION_PLATFORMS.has('x')).toBe(true);
+      expect(PAID_VERIFICATION_PLATFORMS.has('instagram')).toBe(true);
+      expect(PAID_VERIFICATION_PLATFORMS.has('facebook')).toBe(true);
+      expect(PAID_VERIFICATION_PLATFORMS.has('threads')).toBe(true);
+      expect(PAID_VERIFICATION_PLATFORMS.size).toBe(5);
     });
   });
 });

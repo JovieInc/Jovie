@@ -104,6 +104,8 @@
       "Skill(ideate-quality:*)",
       "Skill(ideate-perf)",
       "Skill(ideate-perf:*)",
+      "Skill(consolidate-ui)",
+      "Skill(consolidate-ui:*)",
       "SlashCommand(/pr)",
       "SlashCommand(/verify)",
       "SlashCommand(/ship)",

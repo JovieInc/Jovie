@@ -1,5 +1,6 @@
 import { type Page, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
+import { waitForLoad } from './utils/smoke-test-utils';
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:3100';
 
@@ -263,8 +264,8 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of routes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 60000 });
-      await page.waitForLoadState('load');
+      await page.goto(url, { timeout: 120_000 });
+      await waitForLoad(page);
 
       // Always test BOTH themes for every page
       console.log(`Auditing ${route} in Light Mode...`);
@@ -327,8 +328,8 @@ test.describe('Accessibility Audit', () => {
 
     for (const route of authRoutes) {
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 60000 });
-      await page.waitForLoadState('load');
+      await page.goto(url, { timeout: 120_000 });
+      await waitForLoad(page);
 
       // Check if we got redirected to signin (auth failed)
       if (page.url().includes('/signin')) {

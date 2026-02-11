@@ -1,9 +1,10 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
 import { useMemo } from 'react';
+
 import {
+  adminNavigation,
   primaryNavigation,
   settingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
@@ -17,10 +18,6 @@ export interface AuthRouteConfig {
   navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
-  showDrawer: boolean;
-  drawerWidth: number | null;
-  drawerContent: ReactNode;
-  headerAction: ReactNode;
   isTableRoute: boolean;
 }
 
@@ -30,10 +27,8 @@ export interface AuthRouteConfig {
  * Returns configuration for AuthShell based on current route:
  * - Section detection (admin/dashboard/settings)
  * - Navigation items
- * - UI feature flags
+ * - UI feature flags (mobile tabs, table routes)
  * - Breadcrumb generation
- * - Header actions
- * - Drawer configuration
  *
  * Separates routing concerns from layout component.
  */
@@ -51,7 +46,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   const navigation = useMemo(() => {
     switch (section) {
       case 'admin':
-        return primaryNavigation;
+        return adminNavigation;
       case 'settings':
         return settingsNavigation;
       case 'dashboard':
@@ -96,25 +91,11 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');
 
-  // Drawer is now controlled by individual pages, not auto-shown
-  const showDrawer = false;
-
-  // Drawer configuration
-  const drawerWidth = showDrawer ? 360 : null;
-  const drawerContent = null; // Controlled by individual pages
-
-  // Header action will be determined by AuthShellWrapper based on route type
-  const headerAction = null;
-
   return {
     section,
     navigation,
     breadcrumbs,
     showMobileTabs,
-    showDrawer,
-    drawerWidth,
-    drawerContent,
-    headerAction,
     isTableRoute,
   };
 }
