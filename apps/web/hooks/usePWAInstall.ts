@@ -17,6 +17,16 @@ declare global {
 const DISMISSED_KEY = 'jv_pwa_dismissed';
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
+// Module-level capture: the beforeinstallprompt event can fire before React
+// hydrates and useEffect runs.  Stash it so the hook can pick it up later.
+let _earlyPromptEvent: BeforeInstallPromptEvent | null = null;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', e => {
+    _earlyPromptEvent = e as BeforeInstallPromptEvent;
+  });
+}
+
 function isDismissed(): boolean {
   try {
     const ts = Number(localStorage.getItem(DISMISSED_KEY));
@@ -61,9 +71,18 @@ export function usePWAInstall() {
       return;
     }
 
+    // Pick up an event that fired before this effect ran
+    if (_earlyPromptEvent) {
+      _earlyPromptEvent.preventDefault();
+      deferredPrompt.current = _earlyPromptEvent;
+      _earlyPromptEvent = null;
+      setCanPrompt(true);
+    }
+
     function onBeforeInstall(e: BeforeInstallPromptEvent) {
       e.preventDefault();
       deferredPrompt.current = e;
+      _earlyPromptEvent = null;
       setCanPrompt(true);
     }
 
@@ -84,12 +103,21 @@ export function usePWAInstall() {
 
   const install = useCallback(async () => {
     const prompt = deferredPrompt.current;
-    if (!prompt) return;
+    if (!prompt) {
+      // Prompt unavailable — hide the banner rather than leaving a dead button
+      setCanPrompt(false);
+      return;
+    }
 
-    await prompt.prompt();
-    await prompt.userChoice;
-    deferredPrompt.current = null;
-    setCanPrompt(false);
+    try {
+      await prompt.prompt();
+      await prompt.userChoice;
+    } catch {
+      // prompt() can throw if the event was already consumed or invalidated
+    } finally {
+      deferredPrompt.current = null;
+      setCanPrompt(false);
+    }
   }, []);
 
   const dismiss = useCallback(() => {

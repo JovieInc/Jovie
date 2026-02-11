@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Download, X } from 'lucide-react';
+import Image from 'next/image';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 export function PWAInstallPrompt() {
@@ -11,7 +12,7 @@ export function PWAInstallPrompt() {
 
   return (
     <div
-      className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
+      className='fixed inset-x-0 bottom-0 z-[41] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
       style={{
         backgroundColor: 'var(--linear-bg-surface-1)',
         borderTop: '1px solid var(--linear-border-default)',
@@ -19,7 +20,7 @@ export function PWAInstallPrompt() {
       }}
     >
       <div className='mb-2 flex items-center gap-3 md:mb-0 md:flex-1'>
-        <img
+        <Image
           src='/favicon-96x96.png'
           alt=''
           width={40}
