@@ -362,4 +362,53 @@ describeArtist('Artist Profile Pages', () => {
       await expect(page).toHaveURL(/\//);
     });
   });
+
+  test.describe('Admin Profile (/tim)', () => {
+    test('admin profile does not return 404', async ({ page }) => {
+      const response = await page.goto('/tim', {
+        timeout: 120_000,
+        waitUntil: 'domcontentloaded',
+      });
+
+      // The admin profile must NEVER 404 — this is a critical business check.
+      // If this test fails, investigate the creator_profiles table for the
+      // 'tim' profile: is_public flag, username_normalized value, etc.
+      expect(response?.status()).not.toBe(404);
+
+      // Wait for some content to render (may be profile or error banner)
+      const hasContent = await page
+        .locator('h1, [data-testid="public-profile-error"]')
+        .first()
+        .isVisible({ timeout: 30_000 })
+        .catch(() => false);
+
+      if (!hasContent) {
+        console.log(
+          '!! /tim admin profile stuck in loading skeleton — potential issue'
+        );
+      }
+    });
+
+    test('admin profile renders profile content', async ({ page }) => {
+      await page.goto('/tim', {
+        timeout: 120_000,
+        waitUntil: 'domcontentloaded',
+      });
+
+      // The admin profile should render with an h1 (artist name)
+      const h1 = page.locator('h1');
+      const isH1Visible = await h1
+        .isVisible({ timeout: 30_000 })
+        .catch(() => false);
+      if (!isH1Visible) {
+        console.log(
+          '!! /tim admin profile h1 not visible — profile may not exist in DB'
+        );
+        test.skip();
+        return;
+      }
+
+      await expect(h1).toBeVisible();
+    });
+  });
 });

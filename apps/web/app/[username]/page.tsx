@@ -20,6 +20,7 @@ import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
   USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
@@ -146,7 +147,17 @@ const fetchProfileAndLinks = async (
   try {
     const result = await getCreatorProfileWithLinks(username);
 
-    if (!result || result.isPublic !== true) {
+    // Use truthy check (not strict equality) for isPublic because the neon-http
+    // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
+    // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
+    if (!result || !result.isPublic) {
+      // Log when a profile query returns not_found to aid debugging production 404s
+      void captureWarning('[profile] Public profile not found or not public', {
+        username,
+        profileExists: !!result,
+        isPublicValue: result ? String(result.isPublic) : 'n/a',
+        isPublicType: result ? typeof result.isPublic : 'n/a',
+      });
       return {
         profile: null,
         links: [],
@@ -305,7 +316,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       return error.data;
     }
     // Cache layer failure - fall back to direct fetch
-    captureWarning('[profile] Cache layer failed, using direct fetch', {
+    void captureWarning('[profile] Cache layer failed, using direct fetch', {
       error,
       username,
     });
@@ -336,6 +347,7 @@ export default async function ArtistPage({
 
   // Early reject obviously invalid usernames before hitting the database
   if (
+    username.length < USERNAME_MIN_LENGTH ||
     username.length > USERNAME_MAX_LENGTH ||
     !USERNAME_PATTERN.test(username)
   ) {
