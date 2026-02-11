@@ -3,6 +3,7 @@
 import { useTheme } from 'next-themes';
 import type React from 'react';
 import { Toaster } from 'sonner';
+import { useCookieBannerHeight } from '@/lib/hooks/useCookieBannerHeight';
 
 interface ToastProviderProps {
   readonly children: React.ReactNode;
@@ -59,6 +60,7 @@ function getToasterTheme(
 
 export function ToastProvider({ children }: ToastProviderProps) {
   const { resolvedTheme } = useTheme();
+  const bottomOffset = useCookieBannerHeight();
 
   return (
     <>
@@ -72,10 +74,10 @@ export function ToastProvider({ children }: ToastProviderProps) {
         closeButton
         // Gap between toasts
         gap={8}
-        // Visual offset from edges
-        offset={16}
-        // Maximum visible toasts (stacked)
-        visibleToasts={5}
+        // Dynamic offset: pushes toasts above cookie banner when visible
+        offset={bottomOffset}
+        // Maximum visible toasts (stacked); Sonner queues overflow
+        visibleToasts={3}
         // Styling driven by CSS overrides in globals.css on
         // [data-sonner-toaster] / [data-sonner-toast] selectors.
         // Sonner CSS variables (--normal-bg, --success-bg, etc.) are
