@@ -22,8 +22,9 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const onOpen = () => {
       const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
-      const hasFinePointer =
-        globalThis.matchMedia('(any-pointer: fine)').matches;
+      const hasFinePointer = globalThis.matchMedia(
+        '(any-pointer: fine)'
+      ).matches;
       if (!isMdUp || !hasFinePointer) return;
       setDismissed(false);
       setMode('open');
@@ -41,8 +42,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
     const isLgUp = globalThis.matchMedia('(min-width: 1024px)').matches;
-    const hasFinePointer =
-      globalThis.matchMedia('(any-pointer: fine)').matches;
+    const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
     const hasDismissed =
       localStorage.getItem('viewOnMobileDismissed') === 'true';
 
