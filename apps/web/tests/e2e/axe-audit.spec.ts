@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { waitForLoad } from './utils/smoke-test-utils';
 
 /**
  * Axe WCAG 2.1 Level AA Compliance Tests
@@ -17,6 +18,9 @@ import { expect, test } from '@playwright/test';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
+  // Turbopack cold compilation can take 30-90s per route
+  test.setTimeout(180_000);
+
   const publicRoutes = [
     { path: '/', name: 'Homepage' },
     { path: '/signin', name: 'Sign In' },
@@ -29,8 +33,8 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
     test(`${route.name} (${route.path}) should have no a11y violations`, async ({
       page,
     }) => {
-      await page.goto(route.path);
-      await page.waitForLoadState('load');
+      await page.goto(route.path, { timeout: 120_000 });
+      await waitForLoad(page);
 
       // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
@@ -70,8 +74,8 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
       page,
     }) => {
       test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
-      await page.goto(route.path);
-      await page.waitForLoadState('load');
+      await page.goto(route.path, { timeout: 120_000 });
+      await waitForLoad(page);
 
       // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
@@ -100,8 +104,8 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
 
 test.describe('Axe Best Practices', () => {
   test('Homepage should follow best practices', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('load');
+    await page.goto('/', { timeout: 120_000 });
+    await waitForLoad(page);
 
     const results = await new AxeBuilder({ page })
       .withTags(['best-practice'])

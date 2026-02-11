@@ -176,18 +176,18 @@ export function SignUpForm() {
         )}
 
         {step === 'method' && (
-          <p className='mt-6 text-sm text-secondary-token text-center'>
+          <p className='mt-6 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
             By signing up, you agree to our{' '}
             <Link
               href='/legal/terms'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+              className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
               href='/legal/privacy'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+              className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Privacy Policy
             </Link>

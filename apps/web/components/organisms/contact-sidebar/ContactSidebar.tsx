@@ -13,6 +13,7 @@ import {
 import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import {
   type ContextMenuItemType,
@@ -139,7 +140,7 @@ export const ContactSidebar = memo(function ContactSidebar({
             onValueChange={setActiveTab}
           />
 
-          <div className='flex-1 space-y-4 overflow-auto px-4 py-3'>
+          <div className='flex-1 space-y-4 overflow-auto p-4'>
             {activeTab === 'details' && (
               <>
                 <ContactAvatar
@@ -201,9 +202,7 @@ export const ContactSidebar = memo(function ContactSidebar({
         </>
       ) : (
         <div className='flex-1 overflow-auto px-4 py-4'>
-          <p className='text-xs text-sidebar-muted'>
-            Select a row in the table and press Space to view contact details.
-          </p>
+          <DrawerEmptyState message='Select a row in the table to view contact details.' />
         </div>
       )}
     </RightDrawer>

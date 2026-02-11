@@ -48,8 +48,11 @@ async function globalSetup() {
     process.env.CLERK_PUBLISHABLE_KEY;
   const hasRealClerkKeys = isRealKey(secretKey) && isRealKey(publishableKey);
 
+  const testUsername = process.env.E2E_CLERK_USER_USERNAME ?? '';
   const hasTestUser =
-    process.env.E2E_CLERK_USER_USERNAME && process.env.E2E_CLERK_USER_PASSWORD;
+    testUsername.length > 0 &&
+    (testUsername.includes('+clerk_test') ||
+      !!process.env.E2E_CLERK_USER_PASSWORD);
 
   if (hasRealClerkKeys) {
     try {
@@ -124,6 +127,27 @@ async function globalSetup() {
   } else {
     console.log('ℹ DATABASE_URL not set, skipping test data seeding');
   }
+
+  // Warm up critical Turbopack routes before tests start
+  // This pre-compiles /signin and /app so auth.setup.ts doesn't timeout waiting
+  const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+  console.log('🔥 Warming up Turbopack routes...');
+  const warmupRoutes = ['/signin', '/app/dashboard/profile'];
+  await Promise.all(
+    warmupRoutes.map(async route => {
+      try {
+        const res = await fetch(`${baseURL}${route}`, {
+          signal: AbortSignal.timeout(120_000),
+          redirect: 'follow',
+        });
+        console.log(`  ✓ ${route} (${res.status}) warmed up`);
+      } catch {
+        console.log(
+          `  ⚠ ${route} warmup failed (will compile on first test visit)`
+        );
+      }
+    })
+  );
 
   const elapsed = Date.now() - startTime;
   console.log(`✅ E2E global setup complete in ${elapsed}ms`);

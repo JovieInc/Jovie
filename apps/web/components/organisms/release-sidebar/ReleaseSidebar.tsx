@@ -12,6 +12,7 @@ import { Button, SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -296,9 +297,7 @@ export function ReleaseSidebar({
             </>
           )}
           {!release && (
-            <p className='text-xs text-sidebar-muted'>
-              Select a release in the table to view its details.
-            </p>
+            <DrawerEmptyState message='Select a release in the table to view its details.' />
           )}
         </div>
       </div>

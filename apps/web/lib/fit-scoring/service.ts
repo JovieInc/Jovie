@@ -16,7 +16,7 @@ import {
 
 import type { DbOrTransaction } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
-import { socialLinks } from '@/lib/db/schema/links';
+import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -24,6 +24,7 @@ import {
   calculateFitScore,
   FIT_SCORE_VERSION,
   type FitScoreInput,
+  PAID_VERIFICATION_PLATFORMS,
 } from './calculator';
 
 /** Profile data with calculated score for batch updates */
@@ -132,6 +133,23 @@ export async function calculateAndStoreFitScore(
       )
     );
 
+  // Fetch paid verification platforms (Twitter/X, Instagram, Facebook, Threads)
+  const verifiedAccounts = await db
+    .select({
+      platform: socialAccounts.platform,
+    })
+    .from(socialAccounts)
+    .where(
+      and(
+        eq(socialAccounts.creatorProfileId, creatorProfileId),
+        eq(socialAccounts.isVerifiedFlag, true)
+      )
+    );
+
+  const paidVerificationPlatforms = verifiedAccounts
+    .filter(a => PAID_VERIFICATION_PLATFORMS.has(a.platform.toLowerCase()))
+    .map(a => a.platform.toLowerCase());
+
   // Fetch latest release date
   const [latestRelease] = await db
     .select({
@@ -170,6 +188,7 @@ export async function calculateAndStoreFitScore(
     hasAppleMusicId: !!profile.appleMusicId,
     hasSoundCloudId: !!profile.soundcloudId,
     dspPlatformCount,
+    paidVerificationPlatforms,
   };
 
   // Calculate score
@@ -217,6 +236,14 @@ export async function calculateMissingFitScores(
       latestReleaseDate: drizzleSql<Date | null>`
         max(${discogReleases.releaseDate})
       `,
+      paidVerificationPlatforms: drizzleSql<string[]>`
+        (SELECT coalesce(
+          array_agg(distinct lower(sa.platform))
+            filter (where sa.is_verified_flag = true
+              and lower(sa.platform) in ('twitter', 'x', 'instagram', 'facebook', 'threads')),
+          '{}'
+        ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
+      `,
     })
     .from(creatorProfiles)
     .leftJoin(
@@ -256,6 +283,9 @@ export async function calculateMissingFitScores(
       spotifyPopularity: profile.spotifyPopularity,
       genres: profile.genres,
       latestReleaseDate: profile.latestReleaseDate ?? null,
+      paidVerificationPlatforms: (
+        profile.paidVerificationPlatforms ?? []
+      ).filter((p): p is string => !!p),
     };
 
     const { score, breakdown } = calculateFitScore(input);
@@ -309,6 +339,14 @@ export async function recalculateAllFitScores(
         hasContactEmail: drizzleSql<boolean>`
           bool_or(${creatorContacts.email} is not null)
         `,
+        paidVerificationPlatforms: drizzleSql<string[]>`
+          (SELECT coalesce(
+            array_agg(distinct lower(sa.platform))
+              filter (where sa.is_verified_flag = true
+                and lower(sa.platform) in ('twitter', 'x', 'instagram', 'facebook', 'threads')),
+            '{}'
+          ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
+        `,
       })
       .from(creatorProfiles)
       .leftJoin(
@@ -361,6 +399,9 @@ export async function recalculateAllFitScores(
         hasAppleMusicId: !!profile.appleMusicId,
         hasSoundCloudId: !!profile.soundcloudId,
         dspPlatformCount,
+        paidVerificationPlatforms: (
+          profile.paidVerificationPlatforms ?? []
+        ).filter((p): p is string => !!p),
       };
 
       const { score, breakdown } = calculateFitScore(input);

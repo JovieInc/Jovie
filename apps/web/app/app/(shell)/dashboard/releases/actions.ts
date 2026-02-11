@@ -1052,5 +1052,7 @@ export async function updateAllowArtworkDownloads(
     });
   }
 
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — this setting lives on the creator profile, not on
+  // releases. The component already does an optimistic update, and a path
+  // revalidation here would reset client-side state (e.g. closing the sidebar).
 }
