@@ -23,8 +23,8 @@ export function SettingsBillingSection() {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-center justify-between gap-6'>
-        <p className='text-[13px] text-secondary-token'>
+      <div className='flex items-center justify-between gap-3 sm:gap-6'>
+        <p className='text-xs sm:text-[13px] text-secondary-token'>
           Update payment details, change plans, or view invoices.
         </p>
         <div className='shrink-0'>

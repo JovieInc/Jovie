@@ -12,7 +12,7 @@ export function SettingsNotificationsSection() {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='space-y-5'>
+      <div className='space-y-3 sm:space-y-5'>
         <SettingsToggleRow
           title='Marketing Emails'
           description='Receive updates about new features, tips, and promotional offers from Jovie.'

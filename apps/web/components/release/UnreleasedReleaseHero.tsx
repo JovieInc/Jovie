@@ -58,30 +58,32 @@ export function UnreleasedReleaseHero({
 
   return (
     <ReleaseNotificationsProvider artist={artistData}>
-      <div className='min-h-screen bg-black text-white'>
-        {/* Ambient glow background */}
+      <div className='min-h-dvh bg-black text-white'>
+        {/* Ambient glow */}
         <div className='pointer-events-none fixed inset-0'>
-          <div className='absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/3 blur-3xl' />
+          <div className='absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-[120px]' />
         </div>
 
-        <main className='relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-8'>
-          <div className='w-full max-w-sm space-y-6'>
+        <main className='relative z-10 flex min-h-dvh flex-col items-center px-6'>
+          <div className='min-h-6 flex-1' />
+
+          <div className='w-full max-w-[272px]'>
             {/* Release Artwork */}
-            <div className='relative aspect-square w-full overflow-hidden rounded-[20px] bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
+            <div className='relative aspect-square w-full overflow-hidden rounded-2xl bg-white/[0.04] shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
               {release.artworkUrl ? (
                 <Image
                   src={release.artworkUrl}
                   alt={`${release.title} artwork`}
                   fill
                   className='object-cover'
-                  sizes='(max-width: 384px) 100vw, 384px'
+                  sizes='272px'
                   priority
                 />
               ) : (
                 <div className='flex h-full w-full items-center justify-center'>
                   <Icon
                     name='Disc3'
-                    className='h-20 w-20 text-white/20'
+                    className='size-16 text-white/20'
                     aria-hidden='true'
                   />
                 </div>
@@ -89,27 +91,27 @@ export function UnreleasedReleaseHero({
             </div>
 
             {/* Release Info */}
-            <div className='text-center'>
-              <h1 className='text-xl font-semibold tracking-tight sm:text-2xl'>
+            <div className='mt-4 text-center'>
+              <h1 className='text-[17px] font-semibold leading-snug tracking-tight'>
                 {release.title}
               </h1>
               <Link
                 href={`/${artist.handle}`}
-                className='mt-1.5 block text-base text-white/60 transition-colors hover:text-white/80'
+                className='mt-1 block text-[13px] text-white/50 transition-colors hover:text-white/70'
               >
                 {artist.name}
               </Link>
             </div>
 
             {/* Countdown Timer */}
-            <div className='rounded-2xl bg-white/5 p-5 ring-1 ring-inset ring-white/10'>
+            <div className='mt-5 rounded-xl bg-white/[0.05] p-4 ring-1 ring-inset ring-white/[0.06]'>
               <ReleaseCountdown releaseDate={release.releaseDate} />
             </div>
 
             {/* Notify Me CTA */}
-            <div className='space-y-3'>
-              <div className='flex items-center justify-center gap-2 text-sm text-white/60'>
-                <Bell className='h-4 w-4' aria-hidden='true' />
+            <div className='mt-4 space-y-2.5'>
+              <div className='flex items-center justify-center gap-1.5 text-[13px] text-white/50'>
+                <Bell className='size-3.5' aria-hidden='true' />
                 <span>Get notified when it drops</span>
               </div>
               <ArtistNotificationsCTA
@@ -118,18 +120,20 @@ export function UnreleasedReleaseHero({
                 autoOpen
               />
             </div>
-
-            {/* Jovie Branding */}
-            <footer className='pt-4 text-center'>
-              <Link
-                href='/'
-                className='inline-flex items-center gap-1.5 text-[11px] text-white/25 transition-colors hover:text-white/40'
-              >
-                <span>Powered by</span>
-                <span className='font-medium'>Jovie</span>
-              </Link>
-            </footer>
           </div>
+
+          <div className='min-h-6 flex-1' />
+
+          {/* Jovie Branding */}
+          <footer className='shrink-0 pb-5 text-center'>
+            <Link
+              href='/'
+              className='inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-white/20 transition-colors hover:text-white/35'
+            >
+              <span>Powered by</span>
+              <span className='font-semibold'>Jovie</span>
+            </Link>
+          </footer>
         </main>
       </div>
     </ReleaseNotificationsProvider>

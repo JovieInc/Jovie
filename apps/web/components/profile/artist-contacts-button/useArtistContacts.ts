@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { track } from '@/lib/analytics';
 import { decodeContactPayload } from '@/lib/contacts/obfuscation';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
@@ -17,7 +17,6 @@ export function useArtistContacts({
   artistHandle,
   onNavigate,
 }: UseArtistContactsOptions): UseArtistContactsReturn {
-  const [open, setOpen] = useState(false);
   const navigate =
     onNavigate ?? ((url: string) => globalThis.location.assign(url));
 
@@ -26,17 +25,10 @@ export function useArtistContacts({
     [contacts]
   );
 
-  const singleContact =
-    available.length === 1 && available[0].channels.length === 1;
-
   const performAction = (
     channel: PublicContactChannel,
     contact: PublicContact
   ) => {
-    if (open) {
-      setOpen(false);
-    }
-
     const decoded = decodeContactPayload(channel.encoded);
     if (!decoded) return;
 
@@ -78,10 +70,7 @@ export function useArtistContacts({
   };
 
   return {
-    open,
-    setOpen,
     available,
-    singleContact,
     performAction,
     onIconClick,
     primaryChannel,
