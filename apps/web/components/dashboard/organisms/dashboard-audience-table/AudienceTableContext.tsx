@@ -14,6 +14,8 @@ interface AudienceTableContextValue {
   readonly getContextMenuItems: (
     member: AudienceMember
   ) => ContextMenuItemType[];
+  readonly onExportMember: (member: AudienceMember) => void;
+  readonly onBlockMember: (member: AudienceMember) => void;
 }
 
 const AudienceTableContext = createContext<AudienceTableContextValue | null>(
