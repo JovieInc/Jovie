@@ -15,6 +15,7 @@ export function AudienceQuickActionsCell({
   className,
 }: AudienceQuickActionsCellProps) {
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: presentation div stops row click propagation
     <div
       className={cn(
         'flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',

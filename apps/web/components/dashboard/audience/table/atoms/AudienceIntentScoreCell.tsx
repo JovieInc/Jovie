@@ -24,8 +24,7 @@ export function AudienceIntentScoreCell({
   intentLevel,
   className,
 }: AudienceIntentScoreCellProps) {
-  const label =
-    intentLevel.charAt(0).toUpperCase() + intentLevel.slice(1);
+  const label = intentLevel.charAt(0).toUpperCase() + intentLevel.slice(1);
 
   return (
     <div className={cn('flex items-center gap-2 text-xs', className)}>

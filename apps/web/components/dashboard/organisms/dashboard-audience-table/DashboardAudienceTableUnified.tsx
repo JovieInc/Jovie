@@ -24,8 +24,8 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { cn } from '@/lib/utils';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
 import { AudienceTableProvider } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
@@ -218,13 +218,10 @@ export const DashboardAudienceTableUnified = memo(
     );
 
     // Quick action: export member as vCard
-    const handleExportMember = React.useCallback(
-      (member: AudienceMember) => {
-        downloadVCard(member);
-        toast.success('Contact exported as vCard');
-      },
-      []
-    );
+    const handleExportMember = React.useCallback((member: AudienceMember) => {
+      downloadVCard(member);
+      toast.success('Contact exported as vCard');
+    }, []);
 
     // Quick action: block/remove member
     const handleBlockMember = React.useCallback(

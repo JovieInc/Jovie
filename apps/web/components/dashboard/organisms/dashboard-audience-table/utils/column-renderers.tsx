@@ -114,9 +114,7 @@ export function renderReturningCell({
 export function renderSourceCell({
   row,
 }: CellContext<AudienceMember, AudienceMember['referrerHistory']>) {
-  return (
-    <AudienceSourceCell referrerHistory={row.original.referrerHistory} />
-  );
+  return <AudienceSourceCell referrerHistory={row.original.referrerHistory} />;
 }
 
 /**

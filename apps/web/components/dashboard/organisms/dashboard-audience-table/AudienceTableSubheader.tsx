@@ -94,7 +94,9 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
             getData={() => getAudienceForExport(rows, selectedIds)}
             columns={AUDIENCE_CSV_COLUMNS}
             filename='audience'
-            label={selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'}
+            label={
+              selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'
+            }
             disabled={!hasData && subscriberCount === 0}
             variant='ghost'
             size='sm'
@@ -113,9 +115,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
               <button
                 key={option.value}
                 type='button'
-                onClick={() =>
-                  onFilterChange(isActive ? null : option.value)
-                }
+                onClick={() => onFilterChange(isActive ? null : option.value)}
                 aria-pressed={isActive}
                 className={cn(
                   'h-6 px-2.5 text-[11px] font-medium rounded-full border transition-colors',

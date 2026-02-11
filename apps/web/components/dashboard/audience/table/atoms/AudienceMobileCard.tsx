@@ -142,9 +142,7 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
 
       {/* Last action */}
       {lastAction && (
-        <p className='text-[11px] text-tertiary-token truncate'>
-          {lastAction}
-        </p>
+        <p className='text-[11px] text-tertiary-token truncate'>{lastAction}</p>
       )}
     </div>
   );

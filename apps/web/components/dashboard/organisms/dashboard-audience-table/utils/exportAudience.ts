@@ -33,7 +33,9 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
         return 'Direct';
       try {
         const url = new URL(history[0].url);
-        return url.searchParams.get('utm_source') ?? url.hostname.replace('www.', '');
+        return (
+          url.searchParams.get('utm_source') ?? url.hostname.replace('www.', '')
+        );
       } catch {
         return history[0].url || 'Direct';
       }
@@ -44,7 +46,8 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
     accessor: 'latestActions',
     formatter: v => {
       const actions = v as { label: string }[] | null;
-      if (!actions || !Array.isArray(actions) || actions.length === 0) return '';
+      if (!actions || !Array.isArray(actions) || actions.length === 0)
+        return '';
       return actions[0].label;
     },
   },
