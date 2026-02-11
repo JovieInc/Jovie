@@ -42,6 +42,11 @@ export interface ReleaseSidebarProps {
    */
   readonly onArtworkUpload?: (file: File, release: Release) => Promise<string>;
   /**
+   * Handler to revert artwork to the original DSP-ingested version.
+   * Receives the release ID and returns the restored artwork URL.
+   */
+  readonly onArtworkRevert?: (releaseId: string) => Promise<string>;
+  /**
    * Handler for adding a new DSP link
    */
   readonly onAddDspLink?: (

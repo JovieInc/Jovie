@@ -165,7 +165,7 @@ export function useNotificationSettingsMutation() {
     (settings: SettingsUpdateInput['updates']['settings']) => {
       mutation.mutate({ updates: { settings } });
     },
-    [mutation.mutate]
+    [mutation]
   );
 
   return {
