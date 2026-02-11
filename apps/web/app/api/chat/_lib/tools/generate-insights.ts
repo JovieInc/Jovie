@@ -92,11 +92,10 @@ export function createGenerateInsightsTool(
           tags: { feature: 'ai-chat', tool: 'generateInsights' },
           extra: { profileId, focus },
         });
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Failed to generate insights';
-        return { success: false, error: message };
+        return {
+          success: false,
+          error: 'Failed to generate insights. Please try again later.',
+        };
       }
     },
   });

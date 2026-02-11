@@ -155,7 +155,7 @@ function formatTimingResponse(metrics: MetricSnapshot, timeRange: string) {
       })),
       peakActivity: {
         bestHour: peakHour.hour,
-        bestHourLabel: `${peakHour.hour}:00-${peakHour.hour + 1}:00 UTC`,
+        bestHourLabel: `${String(peakHour.hour).padStart(2, '0')}:00-${String((peakHour.hour + 1) % 24).padStart(2, '0')}:00 UTC`,
         bestDay: peakDay.day,
         bestDayLabel: DAY_NAMES[peakDay.day] ?? `Day ${peakDay.day}`,
       },

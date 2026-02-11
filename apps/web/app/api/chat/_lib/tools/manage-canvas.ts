@@ -112,115 +112,123 @@ export function createManageCanvasTool(profileId: string | null) {
         };
       }
 
-      switch (action) {
-        case 'check': {
-          const releases = await fetchReleasesForChat(profileId);
+      try {
+        switch (action) {
+          case 'check': {
+            const releases = await fetchReleasesForChat(profileId);
 
-          if (releases.length === 0) {
+            if (releases.length === 0) {
+              return {
+                success: true,
+                summary: {
+                  total: 0,
+                  message:
+                    'No releases found. Connect your Spotify account and sync your releases first.',
+                },
+              };
+            }
+
+            const summary = summarizeCanvasStatus(
+              releases.map(r => ({
+                id: r.id,
+                title: r.title,
+                metadata: r.metadata,
+                artworkUrl: r.artworkUrl,
+              }))
+            );
+
+            const releaseList = includeAll
+              ? releases.map(r => ({
+                  title: r.title,
+                  releaseType: r.releaseType,
+                  canvasStatus: r.canvasStatus,
+                  hasArtwork: Boolean(r.artworkUrl),
+                  spotifyPopularity: r.spotifyPopularity,
+                }))
+              : summary.releasesNeedingCanvas.map(r => ({
+                  title: r.title,
+                  hasArtwork: r.hasArtwork,
+                }));
+
             return {
               success: true,
               summary: {
-                total: 0,
-                message:
-                  'No releases found. Connect your Spotify account and sync your releases first.',
+                total: summary.total,
+                withCanvas: summary.withCanvas,
+                withoutCanvas: summary.withoutCanvas,
               },
+              releases: releaseList,
             };
           }
 
-          const summary = summarizeCanvasStatus(
-            releases.map(r => ({
-              id: r.id,
-              title: r.title,
-              metadata: r.metadata,
-              artworkUrl: r.artworkUrl,
-            }))
-          );
+          case 'plan': {
+            if (!releaseTitle) {
+              return {
+                success: false,
+                error: 'releaseTitle is required for the plan action',
+              };
+            }
 
-          const releaseList = includeAll
-            ? releases.map(r => ({
-                title: r.title,
-                releaseType: r.releaseType,
-                canvasStatus: r.canvasStatus,
-                hasArtwork: Boolean(r.artworkUrl),
-                spotifyPopularity: r.spotifyPopularity,
-              }))
-            : summary.releasesNeedingCanvas.map(r => ({
-                title: r.title,
-                hasArtwork: r.hasArtwork,
-              }));
+            const releases = await fetchReleasesForChat(profileId);
+            const release = findReleaseByTitle(releases, releaseTitle);
 
-          return {
-            success: true,
-            summary: {
-              total: summary.total,
-              withCanvas: summary.withCanvas,
-              withoutCanvas: summary.withoutCanvas,
-            },
-            releases: releaseList,
-          };
-        }
+            if (!release) {
+              return {
+                success: false,
+                error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
+              };
+            }
 
-        case 'plan': {
-          if (!releaseTitle) {
+            return buildCanvasPlan(release, motionPreference);
+          }
+
+          case 'markUploaded': {
+            if (!releaseTitle) {
+              return {
+                success: false,
+                error: 'releaseTitle is required for the markUploaded action',
+              };
+            }
+
+            const releases = await fetchReleasesForChat(profileId);
+            const release = findReleaseByTitle(releases, releaseTitle);
+
+            if (!release) {
+              return {
+                success: false,
+                error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
+              };
+            }
+
+            // Update the release metadata with canvas status
+            await db
+              .update(discogReleases)
+              .set({
+                metadata: {
+                  ...(release.metadata ?? {}),
+                  ...buildCanvasMetadata('uploaded'),
+                },
+                updatedAt: new Date(),
+              })
+              .where(eq(discogReleases.id, release.id));
+
             return {
-              success: false,
-              error: 'releaseTitle is required for the plan action',
-            };
-          }
-
-          const releases = await fetchReleasesForChat(profileId);
-          const release = findReleaseByTitle(releases, releaseTitle);
-
-          if (!release) {
-            return {
-              success: false,
-              error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-            };
-          }
-
-          return buildCanvasPlan(release, motionPreference);
-        }
-
-        case 'markUploaded': {
-          if (!releaseTitle) {
-            return {
-              success: false,
-              error: 'releaseTitle is required for the markUploaded action',
-            };
-          }
-
-          const releases = await fetchReleasesForChat(profileId);
-          const release = findReleaseByTitle(releases, releaseTitle);
-
-          if (!release) {
-            return {
-              success: false,
-              error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-            };
-          }
-
-          // Update the release metadata with canvas status
-          await db
-            .update(discogReleases)
-            .set({
-              metadata: {
-                ...release.metadata,
-                ...buildCanvasMetadata('uploaded'),
+              success: true,
+              release: {
+                title: release.title,
+                previousStatus: release.canvasStatus,
+                newStatus: 'uploaded',
               },
-              updatedAt: new Date(),
-            })
-            .where(eq(discogReleases.id, release.id));
-
-          return {
-            success: true,
-            release: {
-              title: release.title,
-              previousStatus: release.canvasStatus,
-              newStatus: 'uploaded',
-            },
-            message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
-          };
+              message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
+            };
+          }
         }
+      } catch (error) {
+        console.error('manageCanvas tool failed', error);
+        return {
+          success: false,
+          error: 'Canvas operation failed. Please try again.',
+        };
       }
     },
   });
