@@ -142,10 +142,15 @@ async function fetchPrimaryIsrcsForReleases(
 /**
  * Derive the Apple Music album URL from a song URL.
  *
- * Apple Music song URLs typically look like:
- *   https://music.apple.com/us/album/song-name/1234567890?i=1234567891
+ * Apple Music song URLs come in two formats:
  *
- * Stripping the query string gives the album URL.
+ * 1. Album context (most common):
+ *    https://music.apple.com/us/album/song-name/1234567890?i=1234567891
+ *    → Strip query string to get album URL
+ *
+ * 2. Direct song link:
+ *    https://music.apple.com/us/song/song-name/1234567891
+ *    → Cannot derive album URL (return null, fall through to album relationship)
  */
 function deriveAlbumUrlFromSongUrl(songUrl: string): string | null {
   try {
@@ -195,28 +200,41 @@ async function linkViaUpc(
 
 /**
  * Resolve an Apple Music album URL from a track result.
- * Tries deriving from the song URL first, then fetches the album directly.
+ *
+ * Strategy order:
+ * 2a. Derive album URL from song URL (works for /album/...?i= format)
+ * 2b. Fetch album directly via relationship data (works for /song/ format
+ *     when `include=albums` was requested in the ISRC lookup)
  */
 async function resolveAlbumUrl(track: {
   attributes?: { url?: string };
   relationships?: { albums?: { data?: { id: string }[] } };
 }): Promise<string | null> {
-  // Strategy 2a: Derive album URL from song URL
+  // Strategy 2a: Derive album URL from song URL (handles /album/...?i= format)
   if (track.attributes?.url) {
     const albumUrl = deriveAlbumUrlFromSongUrl(track.attributes.url);
     if (albumUrl) return albumUrl;
   }
 
   // Strategy 2b: Fetch album directly if we have an album relationship
+  // This handles /song/ URLs where we can't derive the album URL from the path.
+  // Requires `include=albums` in the ISRC lookup request.
   const albumId = track.relationships?.albums?.data?.[0]?.id;
-  if (!albumId) return null;
-
-  try {
-    const album = await getAlbum(albumId);
-    return album?.attributes?.url ?? null;
-  } catch {
-    return null;
+  if (albumId) {
+    try {
+      const album = await getAlbum(albumId);
+      if (album?.attributes?.url) return album.attributes.url;
+    } catch {
+      // Fall through to log warning
+    }
   }
+
+  logger.warn('Could not resolve album URL from track', {
+    songUrl: track.attributes?.url,
+    hasAlbumRelationship: !!track.relationships?.albums?.data?.length,
+  });
+
+  return null;
 }
 
 /**
