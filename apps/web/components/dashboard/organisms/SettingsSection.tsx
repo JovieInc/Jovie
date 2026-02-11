@@ -34,11 +34,11 @@ export function SettingsSection({
       aria-describedby={descriptionId}
       className={cn('scroll-mt-4', className)}
     >
-      <div className={cn('mb-4', headerClassName)}>
+      <div className={cn('mb-5', headerClassName)}>
         <h2
           id={headingId}
           className={cn(
-            'text-[13px] font-medium text-tertiary-token uppercase tracking-wider',
+            'text-lg font-semibold text-primary-token',
             titleClassName
           )}
         >
@@ -48,7 +48,7 @@ export function SettingsSection({
           <p
             id={descriptionId}
             className={cn(
-              'mt-1 text-[13px] text-secondary-token',
+              'mt-1.5 text-sm text-secondary-token',
               descriptionClassName
             )}
           >
