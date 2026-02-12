@@ -72,8 +72,14 @@ function VirtualizedTableRowComponent<TData>({
   }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
 
   const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => onRowContextMenu?.(rowData, e),
-    [onRowContextMenu, rowData]
+    (e: React.MouseEvent) => {
+      // Right-click should focus/select the row before opening actions so
+      // side panels and contextual action menus stay in sync.
+      onRowClick?.(rowData);
+      onFocusChange(rowIndex);
+      onRowContextMenu?.(rowData, e);
+    },
+    [onRowClick, rowData, onFocusChange, rowIndex, onRowContextMenu]
   );
 
   const handleRef = useCallback(
