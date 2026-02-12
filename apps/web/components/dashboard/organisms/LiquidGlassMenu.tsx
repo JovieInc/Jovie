@@ -301,6 +301,7 @@ export function LiquidGlassMenu({
           )}
           onClick={() => closeMenu(true)}
           aria-hidden='true'
+          data-testid='menu-backdrop'
         />
 
         {/* Expanded menu */}

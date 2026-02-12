@@ -89,7 +89,7 @@ describe('LiquidGlassMenu', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
 
     const backdrop = container.querySelector(
-      '.fixed.inset-0.z-50.bg-black\\/20'
+      '[data-testid="menu-backdrop"]'
     );
     expect(backdrop).toBeTruthy();
     await user.click(backdrop as HTMLElement);
