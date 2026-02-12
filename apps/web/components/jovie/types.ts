@@ -65,6 +65,12 @@ export interface ChatSuggestion {
   readonly accent: 'blue' | 'green' | 'purple' | 'orange';
 }
 
+export interface StarterSuggestionContext {
+  readonly latestReleaseTitle: string | null;
+  readonly pendingArtistMatches: number;
+  readonly pendingLinkSuggestions: number;
+}
+
 /**
  * Default suggestions shown on the empty chat state.
  * These are the 3 most universally useful starter tasks.
@@ -250,3 +256,51 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
     accent: 'orange',
   },
 ] as const;
+
+export function buildContextualSuggestions(
+  context: StarterSuggestionContext | null
+): readonly ChatSuggestion[] {
+  const latestReleaseTitle = context?.latestReleaseTitle?.trim();
+  const latestReleasePrompt = latestReleaseTitle
+    ? `Create a Spotify Canvas plan for "${latestReleaseTitle}"`
+    : 'Create a Spotify Canvas plan for my newest release';
+
+  const latestReleaseLabel = latestReleaseTitle
+    ? `Create a Spotify Canvas for “${latestReleaseTitle}”`
+    : 'Create a Spotify Canvas for my newest release';
+
+  const contextualCards: ChatSuggestion[] = [
+    {
+      icon: 'Clapperboard',
+      label: latestReleaseLabel,
+      prompt: `${latestReleasePrompt}. Keep it platform-native, high-converting, and tailored to my sound.`,
+      accent: 'green',
+    },
+  ];
+
+  if ((context?.pendingLinkSuggestions ?? 0) > 0) {
+    contextualCards.push({
+      icon: 'Link',
+      label: `Review ${context?.pendingLinkSuggestions} suggested link${
+        context?.pendingLinkSuggestions === 1 ? '' : 's'
+      }`,
+      prompt:
+        'Show me every suggested link waiting for approval, rank them by impact, and tell me exactly which ones to approve first.',
+      accent: 'blue',
+    });
+  }
+
+  if ((context?.pendingArtistMatches ?? 0) > 0) {
+    contextualCards.push({
+      icon: 'UserSearch',
+      label: `Review ${context?.pendingArtistMatches} suggested artist match${
+        context?.pendingArtistMatches === 1 ? '' : 'es'
+      }`,
+      prompt:
+        'Walk me through the pending artist match suggestions and recommend confirm/reject decisions with confidence reasoning.',
+      accent: 'purple',
+    });
+  }
+
+  return [...contextualCards, ...DEFAULT_SUGGESTIONS];
+}

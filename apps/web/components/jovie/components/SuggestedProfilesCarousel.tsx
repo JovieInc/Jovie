@@ -12,7 +12,10 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ProfileSuggestion } from '@/app/api/suggestions/route';
+import type {
+  ProfileSuggestion,
+  SuggestionsStarterContext,
+} from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 
@@ -235,10 +238,12 @@ function SuggestionCard({
 
 interface SuggestedProfilesCarouselProps {
   readonly profileId: string;
+  readonly onContextLoad?: (context: SuggestionsStarterContext | null) => void;
 }
 
 export function SuggestedProfilesCarousel({
   profileId,
+  onContextLoad,
 }: SuggestedProfilesCarouselProps) {
   const {
     suggestions,
@@ -250,6 +255,7 @@ export function SuggestedProfilesCarousel({
     confirm,
     reject,
     isActioning,
+    starterContext,
   } = useSuggestedProfiles(profileId);
 
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(
@@ -286,6 +292,10 @@ export function SuggestedProfilesCarousel({
     setSlideDirection(null);
     next();
   }, [next]);
+
+  useEffect(() => {
+    onContextLoad?.(starterContext);
+  }, [onContextLoad, starterContext]);
 
   // Don't render anything while loading or if there are no suggestions
   if (isLoading || total === 0) return null;
