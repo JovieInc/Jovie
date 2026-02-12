@@ -20,6 +20,7 @@ export function MobileNav({
   const pathname = usePathname();
   const isAuthed = useIsAuthenticated();
   const { isSignedIn: clerkSignedIn } = useAuthSafe();
+  const showAuthenticatedAction = isAuthed && clerkSignedIn;
 
   const close = useCallback(() => setIsOpen(false), []);
 
@@ -83,43 +84,45 @@ export function MobileNav({
         aria-label='Mobile navigation'
         aria-hidden={!isOpen}
       >
+        <div className='mobile-nav-grabber' aria-hidden='true' />
         <div className='mobile-nav-links'>
           {!hidePricingLink && (
             <Link href='/pricing' className='mobile-nav-link' onClick={close}>
               Pricing
             </Link>
           )}
-          <Link
-            href={APP_ROUTES.SIGNIN}
-            className='mobile-nav-link'
-            onClick={close}
-          >
-            Log in
-          </Link>
-          <Link
-            href={APP_ROUTES.WAITLIST}
-            className='mobile-nav-cta'
-            onClick={close}
-          >
-            Sign up
-          </Link>
-        </div>
-
-        {/* Auth actions - visible in mobile menu */}
-        <div className='mobile-nav-auth'>
-          {isAuthed && clerkSignedIn ? (
-            <UserButton />
+          {showAuthenticatedAction ? (
+            <Link
+              href={APP_ROUTES.DASHBOARD}
+              className='mobile-nav-cta'
+              onClick={close}
+            >
+              Open App
+            </Link>
           ) : (
             <>
-              <Link href='/signin' className='mobile-nav-link' onClick={close}>
+              <Link
+                href={APP_ROUTES.SIGNIN}
+                className='mobile-nav-link'
+                onClick={close}
+              >
                 Log in
               </Link>
-              <Link href='/waitlist' className='mobile-nav-cta' onClick={close}>
+              <Link
+                href={APP_ROUTES.WAITLIST}
+                className='mobile-nav-cta'
+                onClick={close}
+              >
                 Sign up
               </Link>
             </>
           )}
         </div>
+        {showAuthenticatedAction ? (
+          <div className='mobile-nav-user'>
+            <UserButton />
+          </div>
+        ) : null}
       </nav>
     </>
   );
