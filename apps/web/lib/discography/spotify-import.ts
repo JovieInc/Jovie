@@ -290,7 +290,11 @@ function sanitizeAlbumMetadata(
   fullAlbum?: SpotifyAlbumFull
 ) {
   const sanitizedTitle = sanitizeName(album.name);
-  const rawArtworkUrl = getBestSpotifyImage(album.images);
+  const preferredImages =
+    fullAlbum?.images && fullAlbum.images.length > 0
+      ? fullAlbum.images
+      : album.images;
+  const rawArtworkUrl = getBestSpotifyImage(preferredImages);
   const artworkUrl = rawArtworkUrl ? sanitizeImageUrl(rawArtworkUrl) : null;
   const sanitizedLabel = fullAlbum?.label
     ? sanitizeText(fullAlbum.label, 200)
@@ -516,13 +520,16 @@ async function importSingleRelease(
       existingRelease?.id
     ));
 
+  const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
+  const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
+
   const releaseType = determineReleaseType(
-    album.album_type,
-    album.total_tracks
+    effectiveAlbumType,
+    effectiveTotalTracks
   );
   const releaseDate = parseSpotifyReleaseDate(
-    album.release_date,
-    album.release_date_precision
+    fullAlbum?.release_date ?? album.release_date,
+    fullAlbum?.release_date_precision ?? album.release_date_precision
   );
 
   // Upsert the release with sanitized data
@@ -534,7 +541,7 @@ async function importSingleRelease(
     releaseDate,
     label: metadata.sanitizedLabel,
     upc: metadata.sanitizedUpc,
-    totalTracks: Math.min(album.total_tracks, MAX_TRACKS_PER_RELEASE),
+    totalTracks: Math.min(effectiveTotalTracks, MAX_TRACKS_PER_RELEASE),
     isExplicit: false,
     artworkUrl: metadata.artworkUrl,
     spotifyPopularity: metadata.popularity,
