@@ -36,16 +36,28 @@ export function AccountSettingsSection() {
   }
 
   return (
-    <div
-      className='space-y-3 sm:space-y-6'
-      data-testid='account-settings-section'
-    >
-      <EmailManagementCard user={typedUser} />
-      <ConnectedAccountsCard user={typedUser} />
-      <SessionManagementCard
-        user={typedUser}
-        activeSessionId={activeSession?.id}
-      />
+    <div className='space-y-8' data-testid='account-settings-section'>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+          Email
+        </h3>
+        <EmailManagementCard user={typedUser} />
+      </div>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+          Connected accounts
+        </h3>
+        <ConnectedAccountsCard user={typedUser} />
+      </div>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+          Sessions
+        </h3>
+        <SessionManagementCard
+          user={typedUser}
+          activeSessionId={activeSession?.id}
+        />
+      </div>
     </div>
   );
 }

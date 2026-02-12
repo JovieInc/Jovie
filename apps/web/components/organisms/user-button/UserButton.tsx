@@ -99,11 +99,6 @@ function buildDropdownItems({
                 </p>
               )}
             </div>
-            <Icon
-              name='ExternalLink'
-              className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-              aria-hidden='true'
-            />
           </div>
         </button>
       ),
@@ -113,12 +108,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'settings',
       label: 'Settings',
-      icon: (
-        <Icon
-          name='Settings'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: handleSettings,
       shortcut: 'G S',
     },
@@ -132,12 +121,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
-      icon: (
-        <Icon
-          name='Keyboard'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: handleOpenShortcuts,
       shortcut: '⌘ /',
     });
@@ -149,12 +132,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'privacy-policy',
       label: 'Privacy Policy',
-      icon: (
-        <Icon
-          name='Shield'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: () =>
         window.open('/legal/privacy', '_blank', 'noopener,noreferrer'),
     },
@@ -162,12 +139,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms of Service',
-      icon: (
-        <Icon
-          name='FileText'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: () =>
         window.open('/legal/terms', '_blank', 'noopener,noreferrer'),
     },
@@ -175,12 +146,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
-      icon: (
-        <Icon
-          name='Cookie'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: () =>
         window.open('/legal/cookies', '_blank', 'noopener,noreferrer'),
     }
@@ -190,12 +155,6 @@ function buildDropdownItems({
     type: 'submenu',
     id: 'learn-more',
     label: 'Learn more',
-    icon: (
-      <Icon
-        name='HelpCircle'
-        className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-      />
-    ),
     items: learnMoreItems,
   };
   items.push(learnMoreSubmenu);
@@ -219,12 +178,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'manage-billing',
       label: loading.manageBilling ? 'Opening…' : 'Manage billing',
-      icon: (
-        <Icon
-          name='CreditCard'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: handleManageBilling,
       disabled: loading.manageBilling,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -234,12 +187,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'upgrade',
       label: loading.upgrade ? 'Opening…' : 'Upgrade to Pro',
-      icon: (
-        <Icon
-          name='Sparkles'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: handleUpgrade,
       disabled: loading.upgrade,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -252,12 +199,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'feedback',
       label: 'Send feedback',
-      icon: (
-        <Icon
-          name='MessageSquare'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: () => setIsFeedbackOpen(true),
     },
     { type: 'separator', id: 'sep-2' },
@@ -265,12 +206,6 @@ function buildDropdownItems({
       type: 'action',
       id: 'sign-out',
       label: loading.signOut ? 'Signing out…' : 'Sign out',
-      icon: (
-        <Icon
-          name='LogOut'
-          className='h-4 w-4 text-tertiary-token group-hover:text-secondary-token transition-colors'
-        />
-      ),
       onClick: handleSignOut,
       disabled: loading.signOut,
       className: 'disabled:cursor-not-allowed disabled:opacity-60',

@@ -9,6 +9,10 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
+import {
+  artistSettingsNavigation,
+  userSettingsNavigation,
+} from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
@@ -108,45 +112,66 @@ function useProfileData(isDashboardOrAdmin: boolean) {
   };
 }
 
-/** Navigation list for settings section */
+/** Render a group of nav items */
+function SettingsNavGroup({
+  items,
+  pathname,
+}: {
+  items: NavItem[];
+  pathname: string;
+}) {
+  return (
+    <SidebarMenu>
+      {items.map(item => {
+        const isActive =
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
+        return (
+          <SidebarMenuItem key={item.id}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              className='font-medium'
+            >
+              <Link
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className='flex w-full min-w-0 items-center gap-3'
+              >
+                <item.icon className='size-4' />
+                <span className='truncate'>{item.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
+
+/** Navigation list for settings section — grouped with labels like Linear */
 function SettingsNavigation({
-  navigation,
   pathname,
   section,
 }: {
-  navigation: NavItem[];
   pathname: string;
   section: string;
 }) {
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col overflow-hidden'
+      className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
-      <SidebarMenu>
-        {navigation.map(item => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <SidebarMenuItem key={item.id}>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive}
-                className='font-medium'
-              >
-                <Link
-                  href={item.href}
-                  aria-current={isActive ? 'page' : undefined}
-                  className='flex w-full min-w-0 items-center gap-3'
-                >
-                  <item.icon className='size-4' />
-                  <span className='truncate'>{item.name}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          );
-        })}
-      </SidebarMenu>
+      <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
+      <div className='mx-2 border-t border-sidebar-border' />
+      <div>
+        <span className='mb-1 block px-2 text-[11px] font-medium text-sidebar-muted'>
+          Artist
+        </span>
+        <SettingsNavGroup
+          items={artistSettingsNavigation}
+          pathname={pathname}
+        />
+      </div>
     </nav>
   );
 }
@@ -204,11 +229,7 @@ function FloatingSidebar({
           {isDashboardOrAdmin ? (
             <DashboardNav />
           ) : (
-            <SettingsNavigation
-              navigation={navigation}
-              pathname={pathname}
-              section={section}
-            />
+            <SettingsNavigation pathname={pathname} section={section} />
           )}
         </div>
       </div>
@@ -243,7 +264,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
         collapsible='offcanvas'
         className={cn(
           'bg-base',
-          '[--sidebar-width:250px]',
+          '[--sidebar-width:220px]',
           'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
         )}
       >
@@ -262,7 +283,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               >
                 <ArrowLeft className='h-4 w-4' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
-                  Back
+                  Back to app
                 </span>
               </Link>
             ) : (
@@ -361,11 +382,7 @@ export function UnifiedSidebar({ section, navigation }: UnifiedSidebarProps) {
               {isDashboardOrAdmin ? (
                 <DashboardNav />
               ) : (
-                <SettingsNavigation
-                  navigation={navigation}
-                  pathname={pathname}
-                  section={section}
-                />
+                <SettingsNavigation pathname={pathname} section={section} />
               )}
             </SidebarGroupContent>
           </SidebarGroup>
