@@ -16,7 +16,7 @@ interface DashboardCardProps {
   readonly className?: string;
   readonly onClick?: () => void;
   readonly hover?: boolean;
-  readonly padding?: 'default' | 'large' | 'compact';
+  readonly padding?: 'none' | 'compact' | 'default' | 'large';
 }
 
 export function DashboardCard({

@@ -11,11 +11,15 @@ export function SettingsNotificationsSection() {
   const { updateNotifications, isPending } = useNotificationSettingsMutation();
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='space-y-3 sm:space-y-5'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      <div className='px-5 py-4'>
         <SettingsToggleRow
           title='Marketing Emails'
-          description='Receive updates about new features, tips, and promotional offers from Jovie.'
+          description='Receive updates about new features, tips, and promotional offers.'
           checked={marketingEmails}
           onCheckedChange={(enabled: boolean) => {
             setMarketingEmails(enabled);
@@ -24,10 +28,11 @@ export function SettingsNotificationsSection() {
           disabled={isPending}
           ariaLabel='Toggle marketing emails'
         />
-        <div className='border-t border-subtle' />
+      </div>
+      <div className='px-5 py-4'>
         <SettingsToggleRow
           title='Require Email Verification'
-          description='New fans must confirm their email before receiving notifications. Prevents spam sign-ups and protects your sender reputation.'
+          description='New fans must confirm their email before receiving notifications.'
           checked={doubleOptIn}
           onCheckedChange={(enabled: boolean) => {
             setDoubleOptIn(enabled);
