@@ -2,8 +2,8 @@
 
 import {
   useAuth as useAuthOriginal,
-  useSignIn as useSignInOriginal,
   useSession as useSessionOriginal,
+  useSignIn as useSignInOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
@@ -91,11 +91,11 @@ const DEFAULT_SESSION_RETURN: UseSessionReturn = {
  * Default return value when Clerk is not available.
  * Matches the shape of useSignIn() return type.
  */
-const DEFAULT_SIGN_IN_RETURN: UseSignInReturn = {
+const DEFAULT_SIGN_IN_RETURN = {
   isLoaded: true,
-  signIn: null,
-  setActive: async () => undefined,
-};
+  signIn: undefined,
+  setActive: async () => {},
+} as unknown as UseSignInReturn;
 
 // ============================================================================
 // Context-based Safe Hooks
