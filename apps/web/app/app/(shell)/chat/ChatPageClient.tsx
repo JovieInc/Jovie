@@ -1,12 +1,22 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import { Archive, Copy, Ellipsis, Loader2, Pencil, Pin } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
@@ -29,8 +39,64 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
-  const { setHeaderBadge } = useSetHeaderActions();
+  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+
+  const handleCopyConversationId = useCallback(async () => {
+    if (!conversationId) {
+      notifications.error(
+        'Session ID is only available after your first message.'
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(conversationId);
+      notifications.success('Session ID copied');
+    } catch {
+      notifications.error('Could not copy session ID');
+    }
+  }, [conversationId, notifications]);
+
+  const headerActions = useMemo(
+    () => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <CircleIconButton
+            size='sm'
+            variant='outline'
+            ariaLabel='Open thread actions'
+          >
+            <Ellipsis aria-hidden='true' className='size-4' />
+          </CircleIconButton>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align='start' sideOffset={10} className='w-56'>
+          <DropdownMenuItem disabled>
+            <Pin className='size-4' aria-hidden='true' />
+            Pin thread
+            <DropdownMenuShortcut>⌘⇧P</DropdownMenuShortcut>
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <Pencil className='size-4' aria-hidden='true' />
+            Rename thread
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled>
+            <Archive className='size-4' aria-hidden='true' />
+            Archive thread
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleCopyConversationId}>
+            <Copy className='size-4' aria-hidden='true' />
+            Copy session ID
+            <DropdownMenuShortcut>⌘⇧C</DropdownMenuShortcut>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+    [handleCopyConversationId]
+  );
 
   const handleConversationCreate = useCallback(
     (newConversationId: string) => {
@@ -55,8 +121,13 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
 
   // Clean up header badge when leaving the chat page
   useEffect(() => {
-    return () => setHeaderBadge(null);
-  }, [setHeaderBadge]);
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderBadge(null);
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderBadge, setHeaderActions]);
 
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.
