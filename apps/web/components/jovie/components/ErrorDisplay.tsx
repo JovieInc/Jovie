@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { AlertCircle, Copy, RefreshCw, WifiOff } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import type { ChatError } from '../types';
 import { getNextStepMessage } from '../utils';
@@ -20,6 +21,21 @@ export function ErrorDisplay({
   isSubmitting,
 }: ErrorDisplayProps) {
   const ErrorIcon = chatError.type === 'network' ? WifiOff : AlertCircle;
+  const [copied, setCopied] = useState(false);
+
+  const supportCode = useMemo(() => {
+    if (!chatError.requestId && !chatError.errorCode) return null;
+    return [chatError.errorCode, chatError.requestId]
+      .filter(Boolean)
+      .join(' · ');
+  }, [chatError.errorCode, chatError.requestId]);
+
+  const handleCopySupportCode = async () => {
+    if (!supportCode || !navigator?.clipboard) return;
+    await navigator.clipboard.writeText(supportCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <div
@@ -36,13 +52,28 @@ export function ErrorDisplay({
           </p>
           <p className='mt-1 text-xs text-secondary-token'>
             {getNextStepMessage(chatError.type)}
-            {chatError.errorCode && (
-              <span className='ml-2 font-mono text-tertiary-token'>
-                ({chatError.errorCode})
-              </span>
-            )}
           </p>
         </div>
+
+        {supportCode && (
+          <div className='flex items-center gap-2 text-xs text-tertiary-token'>
+            <span className='font-mono'>Ref: {supportCode}</span>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => {
+                void handleCopySupportCode();
+              }}
+              className='h-7 gap-1 px-2 text-xs'
+              aria-label='Copy support reference'
+            >
+              <Copy className='h-3 w-3' />
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+        )}
+
         {chatError.failedMessage && !chatError.retryAfter && (
           <Button
             type='button'

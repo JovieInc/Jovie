@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
@@ -357,6 +358,24 @@ function validateMessagesArray(messages: unknown): string | null {
   }
 
   return null;
+}
+
+function extractRequestId(req: Request): string {
+  const incomingRequestId = req.headers.get('x-request-id')?.trim();
+  if (incomingRequestId) return incomingRequestId.slice(0, 120);
+  return randomUUID();
+}
+
+function sanitizeErrorCode(errorCode: string | undefined): string | null {
+  if (!errorCode) return null;
+  return /^[A-Z0-9_:-]{2,64}$/i.test(errorCode) ? errorCode : null;
+}
+
+function sanitizeRetryAfterSeconds(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const normalized = Math.ceil(value);
+  if (normalized < 1) return 1;
+  return Math.min(normalized, 3600);
 }
 
 function buildSystemPrompt(
@@ -950,12 +969,14 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  const requestId = extractRequestId(req);
+
   // Auth check - ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { error: 'Unauthorized', requestId },
+      { status: 401, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -971,15 +992,18 @@ export async function POST(req: Request) {
       {
         error: 'Rate limit exceeded',
         message: rateLimitResult.reason,
-        retryAfter: Math.ceil(
+        errorCode: 'RATE_LIMITED',
+        retryAfter: sanitizeRetryAfterSeconds(
           (rateLimitResult.reset.getTime() - Date.now()) / 1000
         ),
+        requestId,
       },
       {
         status: 429,
         headers: {
           ...CORS_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
+          'x-request-id': requestId,
         },
       }
     );
@@ -995,8 +1019,8 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS }
+      { error: 'Invalid JSON body', requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1008,8 +1032,8 @@ export async function POST(req: Request) {
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {
     return NextResponse.json(
-      { error: 'Missing profileId or artistContext' },
-      { status: 400, headers: CORS_HEADERS }
+      { error: 'Missing profileId or artistContext', requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1017,8 +1041,8 @@ export async function POST(req: Request) {
   const messagesError = validateMessagesArray(messages);
   if (messagesError) {
     return NextResponse.json(
-      { error: messagesError },
-      { status: 400, headers: CORS_HEADERS }
+      { error: messagesError, requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1085,18 +1109,25 @@ export async function POST(req: Request) {
           extra: {
             userId,
             messageCount: uiMessages.length,
+            requestId,
           },
         });
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      headers: {
+        ...CORS_HEADERS,
+        'x-request-id': requestId,
+      },
+    });
   } catch (error) {
     Sentry.captureException(error, {
       tags: { feature: 'ai-chat' },
       extra: {
         userId,
         messageCount: uiMessages.length,
+        requestId,
       },
     });
 
@@ -1104,8 +1135,20 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : 'An unexpected error occurred';
 
     return NextResponse.json(
-      { error: 'Failed to process chat request', message },
-      { status: 500, headers: CORS_HEADERS }
+      {
+        error: 'Failed to process chat request',
+        message:
+          'Jovie hit a temporary issue while processing your message. Please try again.',
+        errorCode:
+          sanitizeErrorCode(
+            error instanceof Error
+              ? (error as { code?: string }).code
+              : undefined
+          ) ?? 'CHAT_STREAM_FAILED',
+        debugMessage: message,
+        requestId,
+      },
+      { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 }

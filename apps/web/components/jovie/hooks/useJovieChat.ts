@@ -15,7 +15,12 @@ import {
 
 import type { ArtistContext, ChatError } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
-import { getErrorType, getMessageText, getUserFriendlyMessage } from '../utils';
+import {
+  extractErrorMetadata,
+  getErrorType,
+  getMessageText,
+  getUserFriendlyMessage,
+} from '../utils';
 
 interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
@@ -125,25 +130,14 @@ export function useJovieChat({
     transport,
     onError: error => {
       const errorType = getErrorType(error);
-      let retryAfter: number | undefined;
-      let errorCode: string | undefined;
-
-      // Parse error response for rate limiting info
-      try {
-        const errorData = JSON.parse(error.message);
-        retryAfter = errorData.retryAfter;
-        errorCode = errorData.code || errorData.errorCode;
-      } catch {
-        // Not JSON, extract error code from message if present
-        const codeMatch = error.message.match(/\[([A-Z_]+)\]/);
-        errorCode = codeMatch?.[1];
-      }
+      const metadata = extractErrorMetadata(error);
 
       setChatError({
         type: errorType,
-        message: getUserFriendlyMessage(errorType, retryAfter),
-        retryAfter,
-        errorCode,
+        message: getUserFriendlyMessage(errorType, metadata.retryAfter),
+        retryAfter: metadata.retryAfter,
+        errorCode: metadata.errorCode,
+        requestId: metadata.requestId,
         failedMessage: lastAttemptedMessageRef.current,
       });
 
@@ -287,7 +281,10 @@ export function useJovieChat({
           console.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
-            message: 'Failed to save messages. Please try again.',
+            message:
+              'Your response arrived, but we could not save it yet. Please retry in a moment.',
+            errorCode: 'MESSAGE_PERSIST_FAILED',
+            failedMessage: lastAttemptedMessageRef.current,
           });
         },
       }
@@ -351,7 +348,9 @@ export function useJovieChat({
           console.error('[useJovieChat] Failed to create conversation:', err);
           setChatError({
             type: 'server',
-            message: 'Failed to create conversation',
+            message:
+              'We could not start a new conversation right now. Please try again.',
+            errorCode: 'CONVERSATION_CREATE_FAILED',
             failedMessage: trimmedText,
           });
           setIsSubmitting(false);
