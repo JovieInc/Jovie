@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildInvalidRequestResponse,
   unsubscribeFromNotificationsDomain,
 } from '@/lib/notifications/domain';
-import {
-  createRateLimitHeaders,
-  generalLimiter,
-  getClientIP,
-} from '@/lib/rate-limit';
+import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
+import {
+  createNotificationJsonResponse,
+  createRateLimitedResponse,
+  createServerErrorResponse,
+} from '../route-helpers';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * POST handler for notification unsubscriptions
@@ -22,20 +22,7 @@ export async function POST(request: NextRequest) {
   const rateLimitResult = await generalLimiter.limit(clientIp);
 
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Too many requests. Please wait and try again.',
-        code: 'rate_limited',
-      },
-      {
-        status: 429,
-        headers: {
-          ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitResult),
-        },
-      }
-    );
+    return createRateLimitedResponse(rateLimitResult);
   }
 
   let body: unknown;
@@ -43,43 +30,26 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     const invalidResponse = buildInvalidRequestResponse();
-    return NextResponse.json(invalidResponse.body, {
-      status: invalidResponse.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    return createNotificationJsonResponse(
+      invalidResponse.body,
+      invalidResponse.status,
+      rateLimitResult
+    );
   }
 
   try {
     const result = await unsubscribeFromNotificationsDomain(body);
-    return NextResponse.json(result.body, {
-      status: result.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    return createNotificationJsonResponse(
+      result.body,
+      result.status,
+      rateLimitResult
+    );
   } catch (error) {
     logger.error('[Notifications Unsubscribe] Error:', error);
     await captureError('Notification unsubscribe failed', error, {
       route: '/api/notifications/unsubscribe',
       method: 'POST',
     });
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Server error',
-        code: 'server_error',
-      },
-      {
-        status: 500,
-        headers: {
-          ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitResult),
-        },
-      }
-    );
+    return createServerErrorResponse(rateLimitResult);
   }
 }
