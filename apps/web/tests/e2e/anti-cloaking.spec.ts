@@ -375,6 +375,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
 
       const data = await response.json();
 
+      // Warm-up request: Turbopack may need to compile /go/[id] on first hit,
+      // which can take seconds. The timing assertion should only measure
+      // redirect latency, not compilation time.
+      await page.request.get(`/go/${data.shortId}`, { maxRedirects: 0 });
+
       const startTime = Date.now();
       await page.request.get(`/go/${data.shortId}`, {
         maxRedirects: 0,

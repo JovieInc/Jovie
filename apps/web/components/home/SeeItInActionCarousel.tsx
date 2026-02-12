@@ -94,19 +94,33 @@ export function SeeItInActionCarousel({ creators }: Props) {
       }}
     >
       <div className='max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8'>
-        <h2
+        <div
           className='text-center'
-          style={{
-            fontSize: 'var(--linear-h2-size)',
-            fontWeight: 'var(--linear-font-weight-medium)',
-            lineHeight: 'var(--linear-h2-leading)',
-            letterSpacing: 'var(--linear-h2-tracking)',
-            color: 'var(--linear-text-primary)',
-            marginBottom: 'var(--linear-space-12)',
-          }}
+          style={{ marginBottom: 'var(--linear-space-12)' }}
         >
-          See it in action
-        </h2>
+          <h2
+            style={{
+              fontSize: 'var(--linear-h2-size)',
+              fontWeight: 'var(--linear-font-weight-medium)',
+              lineHeight: 'var(--linear-h2-leading)',
+              letterSpacing: 'var(--linear-h2-tracking)',
+              color: 'var(--linear-text-primary)',
+              marginBottom: 'var(--linear-space-4)',
+            }}
+          >
+            See it in action
+          </h2>
+          <p
+            className='max-w-xl mx-auto'
+            style={{
+              fontSize: 'var(--linear-body-lg-size)',
+              lineHeight: 'var(--linear-body-lg-leading)',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
+            Artists already using Jovie to connect with fans.
+          </p>
+        </div>
       </div>
 
       <div className='relative'>

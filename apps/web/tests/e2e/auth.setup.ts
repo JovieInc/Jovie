@@ -39,14 +39,15 @@ setup('authenticate', async ({ page, baseURL }) => {
     }
   }
 
-  // 3. Wait for Clerk JS to load from CDN before calling clerk.signIn()
-  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
-  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
-  await page
-    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
-    .catch(() => {
-      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
-    });
+  // 3. Turbopack buffer — absorb compilation time before Clerk's 30s timer starts
+  // Phase 1: Wait for page to be fully compiled and interactive
+  await page.waitForFunction(() => document.readyState === 'complete', {
+    timeout: 120_000,
+  });
+  // Phase 2: Wait for Clerk JS to load from CDN (mandatory — not silently caught)
+  await page.waitForFunction(() => !!(window as any).Clerk?.loaded, {
+    timeout: 60_000,
+  });
 
   // 4. Sign in using appropriate strategy
   // Wrap in try/catch to handle "already signed in" from testing token

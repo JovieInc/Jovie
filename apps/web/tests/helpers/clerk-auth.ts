@@ -130,16 +130,26 @@ export async function signInUser(
 
   // Navigate to a page that loads ClerkProvider
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
-  await page.goto('/signin', { waitUntil: 'domcontentloaded' });
+  // Use 120s timeout — Turbopack cold compilation under parallel workers can take 60s+
+  await page.goto('/signin', {
+    waitUntil: 'domcontentloaded',
+    timeout: 120_000,
+  });
 
-  // Wait for Clerk JS to load from CDN before calling clerk.signIn()
-  // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
-  // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
-  await page
-    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
-    .catch(() => {
-      // If Clerk still hasn't loaded, let clerk.signIn() handle the error
-    });
+  // ── Turbopack buffer ──────────────────────────────────────────────────
+  // Phase 1: Wait for Turbopack to finish compiling the page.
+  // Under parallel workers, compilation can take 30-60s+. We must absorb
+  // this time HERE so it doesn't eat into Clerk's internal hard 30s timeout.
+  await page.waitForFunction(() => document.readyState === 'complete', {
+    timeout: 120_000,
+  });
+
+  // Phase 2: Wait for Clerk JS to load from CDN.
+  // This is a MANDATORY wait — if Clerk hasn't loaded after the page is
+  // fully compiled, clerk.signIn() will fail with its hard 30s timeout.
+  await page.waitForFunction(() => !!(window as any).Clerk?.loaded, {
+    timeout: 60_000,
+  });
 
   try {
     // Use the official Clerk testing helper
