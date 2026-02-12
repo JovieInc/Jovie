@@ -29,9 +29,14 @@ vi.mock('@/lib/db', () => ({
 
 const mockGetSpotifyArtistAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyAlbums = vi.fn().mockResolvedValue([]);
+const mockMapSpotifyAlbumType = vi.fn().mockReturnValue('album');
 const mockSafeParse = vi.fn((id: unknown) => ({
   success: typeof id === 'string' && id.length > 0,
 }));
+const mockGetBestSpotifyImage = vi
+  .fn()
+  .mockReturnValue('https://example.com/image.jpg');
+const mockUpsertRelease = vi.fn().mockResolvedValue({ id: 'release-1' });
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
@@ -42,8 +47,8 @@ vi.mock('@/lib/spotify', () => ({
   buildSpotifyTrackUrl: vi.fn(
     (id: string) => `https://open.spotify.com/track/${id}`
   ),
-  getBestSpotifyImage: vi.fn().mockReturnValue('https://example.com/image.jpg'),
-  mapSpotifyAlbumType: vi.fn().mockReturnValue('album'),
+  getBestSpotifyImage: mockGetBestSpotifyImage,
+  mapSpotifyAlbumType: mockMapSpotifyAlbumType,
   parseSpotifyReleaseDate: vi.fn().mockReturnValue(new Date('2024-01-01')),
 }));
 
@@ -62,7 +67,7 @@ vi.mock('@/lib/validation/schemas/spotify', () => ({
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: vi.fn().mockResolvedValue([]),
   upsertProviderLink: vi.fn().mockResolvedValue({ id: 'link-1' }),
-  upsertRelease: vi.fn().mockResolvedValue({ id: 'release-1' }),
+  upsertRelease: mockUpsertRelease,
   upsertTrack: vi.fn().mockResolvedValue({ id: 'track-1' }),
 }));
 
@@ -89,6 +94,10 @@ describe('spotify-import', () => {
     vi.clearAllMocks();
     // Reset default mock implementations
     mockGetSpotifyArtistAlbums.mockResolvedValue([]);
+    mockGetSpotifyAlbums.mockResolvedValue([]);
+    mockMapSpotifyAlbumType.mockReturnValue('album');
+    mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
+    mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));
@@ -287,6 +296,144 @@ describe('spotify-import', () => {
           market: 'GB',
         })
       );
+    });
+  });
+
+  describe('release metadata precedence', () => {
+    it('classifies EPs based on full album track count when summary album says single', async () => {
+      mockMapSpotifyAlbumType.mockReturnValue('single');
+
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-ep',
+          name: 'Great EP',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-05-10',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [
+            {
+              url: 'https://summary.example/image.jpg',
+              height: 300,
+              width: 300,
+            },
+          ],
+          uri: 'spotify:album:album-ep',
+          external_urls: { spotify: 'https://open.spotify.com/album/album-ep' },
+        },
+      ]);
+
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-ep',
+          name: 'Great EP',
+          album_type: 'single',
+          total_tracks: 5,
+          release_date: '2024-05-10',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [
+            { url: 'https://full.example/image.jpg', height: 640, width: 640 },
+          ],
+          uri: 'spotify:album:album-ep',
+          external_urls: { spotify: 'https://open.spotify.com/album/album-ep' },
+          tracks: { items: [], total: 5, next: null },
+          label: 'Test Label',
+          popularity: 40,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockUpsertRelease).toHaveBeenCalledWith(
+        expect.objectContaining({
+          releaseType: 'ep',
+          totalTracks: 5,
+        })
+      );
+    });
+
+    it('prefers full album artwork when available', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-artwork',
+          name: 'Artwork Release',
+          album_type: 'album',
+          total_tracks: 10,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [
+            {
+              url: 'https://summary.example/image.jpg',
+              height: 300,
+              width: 300,
+            },
+          ],
+          uri: 'spotify:album:album-artwork',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-artwork',
+          },
+        },
+      ]);
+
+      const fullImage = {
+        url: 'https://full.example/image.jpg',
+        height: 640,
+        width: 640,
+      };
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-artwork',
+          name: 'Artwork Release',
+          album_type: 'album',
+          total_tracks: 10,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [fullImage],
+          uri: 'spotify:album:album-artwork',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-artwork',
+          },
+          tracks: { items: [], total: 10, next: null },
+          label: 'Test Label',
+          popularity: 55,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockGetBestSpotifyImage).toHaveBeenCalledWith([fullImage]);
     });
   });
 });
