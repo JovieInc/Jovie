@@ -12,7 +12,6 @@ import {
   createServerErrorResponse,
 } from '../route-helpers';
 
-
 /**
  * POST handler for notification unsubscriptions
  * Implements server-side analytics tracking for unsubscription events

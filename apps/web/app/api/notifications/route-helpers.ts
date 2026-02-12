@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { createRateLimitHeaders } from '@/lib/rate-limit';
 import type { RateLimitResult } from '@/lib/rate-limit';
+import { createRateLimitHeaders } from '@/lib/rate-limit';
 
 const RATE_LIMITED_RESPONSE = {
   success: false,
@@ -30,9 +30,17 @@ export function createNotificationJsonResponse(
 }
 
 export function createRateLimitedResponse(rateLimitResult: RateLimitResult) {
-  return createNotificationJsonResponse(RATE_LIMITED_RESPONSE, 429, rateLimitResult);
+  return createNotificationJsonResponse(
+    RATE_LIMITED_RESPONSE,
+    429,
+    rateLimitResult
+  );
 }
 
 export function createServerErrorResponse(rateLimitResult: RateLimitResult) {
-  return createNotificationJsonResponse(SERVER_ERROR_RESPONSE, 500, rateLimitResult);
+  return createNotificationJsonResponse(
+    SERVER_ERROR_RESPONSE,
+    500,
+    rateLimitResult
+  );
 }
