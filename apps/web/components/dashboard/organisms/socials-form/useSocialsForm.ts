@@ -5,7 +5,11 @@ import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
 } from '@/lib/queries/useDashboardSocialLinksQuery';
-import { normalizeUrl } from '@/lib/utils/platform-detection';
+import {
+  getPlatform,
+  normalizeUrl,
+  validateUrl,
+} from '@/lib/utils/platform-detection';
 import type { SocialLink, UseSocialsFormReturn } from './types';
 
 interface UseSocialsFormOptions {
@@ -33,6 +37,7 @@ export function useSocialsForm({
     isSuccess,
     reset: resetMutation,
   } = useSaveSocialLinksMutation(artistId);
+  const [submitError, setSubmitError] = useState<string | undefined>(undefined);
 
   // Sync fetched data to local state when it changes
   useEffect(() => {
@@ -54,16 +59,30 @@ export function useSocialsForm({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      setSubmitError(undefined);
 
       const linksToInsert = socialLinks
         .filter(link => link.url.trim())
-        .map((link, index) => ({
-          platform: link.platform,
-          platformType: link.platform,
-          url: link.url.trim(),
-          sortOrder: index,
-          isActive: true,
-        }));
+        .map((link, index) => {
+          const normalizedUrl = normalizeUrl(link.url.trim());
+          const platform = link.platform === 'twitter' ? 'x' : link.platform;
+          return {
+            platform,
+            platformType: platform,
+            url: normalizedUrl,
+            sortOrder: index,
+            isActive: true,
+          };
+        });
+
+      for (const link of linksToInsert) {
+        const platform = getPlatform(link.platform);
+        if (!platform) continue;
+        if (!validateUrl(link.url, platform)) {
+          setSubmitError(`Please enter a valid ${platform.name} link.`);
+          return;
+        }
+      }
 
       await saveMutation({ profileId: artistId, links: linksToInsert });
     },
@@ -126,7 +145,9 @@ export function useSocialsForm({
 
   return {
     loading: isFetching || isSaving,
-    error: fetchError ? 'Failed to load social links' : undefined,
+    error:
+      submitError ||
+      (fetchError ? 'Failed to load social links' : undefined),
     success: isSuccess,
     socialLinks,
     handleSubmit,

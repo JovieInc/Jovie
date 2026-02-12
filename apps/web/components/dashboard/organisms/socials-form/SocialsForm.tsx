@@ -4,8 +4,9 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, CommonDropdown, Input } from '@jovie/ui';
 import { ChevronDown, Plus, Share2, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
@@ -46,53 +47,65 @@ const SOCIALS_FORM_LOADING_KEYS = [
   'socials-form-loading-3',
 ];
 
-/** Platforms available in the social links selector, grouped by category. */
+const SUGGESTED_PLATFORM_IDS = [
+  'instagram',
+  'tiktok',
+  'youtube',
+  'x',
+  'facebook',
+  'linkedin',
+  'discord',
+  'reddit',
+  'website',
+] as const;
+
+const EXCLUDED_PLATFORM_IDS = new Set(['onlyfans', 'twitter']);
+
+const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
+  platform =>
+    ['social', 'creator', 'messaging', 'professional'].includes(
+      platform.category
+    ) && !EXCLUDED_PLATFORM_IDS.has(platform.id)
+);
+
+const SUGGESTED_PLATFORM_SET = new Set<string>(SUGGESTED_PLATFORM_IDS);
+
+/** Platforms available in the social links selector, grouped for speed and discoverability. */
 const SOCIAL_PLATFORM_GROUPS = [
   {
-    label: 'Social Media',
-    platforms: ALL_PLATFORMS.filter(p => p.category === 'social'),
+    label: 'Suggested',
+    platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(platform =>
+      SUGGESTED_PLATFORM_SET.has(platform.id)
+    ),
   },
   {
-    label: 'Creator Platforms',
-    platforms: ALL_PLATFORMS.filter(p => p.category === 'creator'),
-  },
-  {
-    label: 'Messaging',
-    platforms: ALL_PLATFORMS.filter(p => p.category === 'messaging'),
-  },
-  {
-    label: 'Professional',
-    platforms: ALL_PLATFORMS.filter(p => p.category === 'professional'),
+    label: 'All supported platforms',
+    platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
+      platform => !SUGGESTED_PLATFORM_SET.has(platform.id)
+    ),
   },
 ] as const;
 
 /** Smart placeholder text per platform. */
-const PLATFORM_PLACEHOLDERS: Record<string, string> = {
-  instagram: 'https://instagram.com/yourhandle',
-  twitter: 'https://x.com/yourhandle',
-  x: 'https://x.com/yourhandle',
-  tiktok: 'https://tiktok.com/@yourhandle',
-  youtube: 'https://youtube.com/@yourchannel',
-  facebook: 'https://facebook.com/yourpage',
-  linkedin: 'https://linkedin.com/in/yourprofile',
-  snapchat: 'https://snapchat.com/add/yourusername',
-  pinterest: 'https://pinterest.com/yourprofile',
-  reddit: 'https://reddit.com/u/yourusername',
-  twitch: 'https://twitch.tv/yourchannel',
-  discord: 'https://discord.gg/yourinvite',
-  patreon: 'https://patreon.com/yourpage',
-  telegram: 'https://t.me/yourhandle',
-  whatsapp: 'https://wa.me/yournumber',
-  website: 'https://yourwebsite.com',
-  blog: 'https://yourblog.com',
-  email: 'mailto:you@example.com',
-};
+const PLATFORM_PLACEHOLDERS = Object.fromEntries(
+  PLATFORM_OPTIONS.map(option => [
+    option.id,
+    `${option.prefill}${option.hint === 'your URL' ? 'yourwebsite.com' : option.hint}`,
+  ])
+) as Record<string, string>;
+
+PLATFORM_PLACEHOLDERS.x = 'https://x.com/yourhandle';
+PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
+PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
+PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
+PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
 
 function getPlaceholder(platform: string): string {
   return PLATFORM_PLACEHOLDERS[platform] || 'https://...';
 }
 
 function getPlatformLabel(platform: string): string {
+  if (platform === 'twitter') return 'X';
   return PLATFORM_METADATA_MAP[platform]?.name || platform;
 }
 
@@ -140,6 +153,37 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
   } = useSocialsForm({ artistId: artist.id });
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const urlInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const focusUrlField = useCallback((index: number) => {
+    requestAnimationFrame(() => {
+      const input = urlInputRefs.current[index];
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
+  }, []);
+
+  const handleAddSocialLink = useCallback(() => {
+    const nextIndex = socialLinks.length;
+    addSocialLink();
+    focusUrlField(nextIndex);
+  }, [addSocialLink, focusUrlField, socialLinks.length]);
+
+  const handleUrlKeyDown = useCallback(
+    (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+
+      const isLastRow = index === socialLinks.length - 1;
+      if (isLastRow) {
+        handleAddSocialLink();
+        return;
+      }
+      focusUrlField(index + 1);
+    },
+    [focusUrlField, handleAddSocialLink, socialLinks.length]
+  );
 
   /** Memoize platform dropdown items per-row so onClick closures stay stable. */
   const platformItemsByIndex = useMemo(
@@ -172,10 +216,10 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
         <EmptyState
           icon={<Share2 className='h-6 w-6' aria-hidden='true' />}
           heading='No social links yet'
-          description='Connect Instagram, TikTok, Twitter, and other platforms to build your fan community.'
+          description='Add your most important social profiles first. You can still add every supported platform when you need it.'
           action={{
             label: 'Add first link',
-            onClick: addSocialLink,
+            onClick: handleAddSocialLink,
           }}
         />
       ) : (
@@ -229,6 +273,9 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 />
 
                 <Input
+                  ref={element => {
+                    urlInputRefs.current[index] = element;
+                  }}
                   type='url'
                   value={link.url}
                   onChange={e => {
@@ -237,6 +284,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                     scheduleNormalize(index, v);
                   }}
                   onBlur={() => handleUrlBlur(index)}
+                  onKeyDown={event => handleUrlKeyDown(index, event)}
                   placeholder={getPlaceholder(link.platform)}
                   inputMode='url'
                   autoCapitalize='none'
@@ -265,7 +313,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
               type='button'
               variant='outline'
               size='sm'
-              onClick={addSocialLink}
+              onClick={handleAddSocialLink}
               className='gap-1.5'
             >
               <Plus className='h-3.5 w-3.5' />
