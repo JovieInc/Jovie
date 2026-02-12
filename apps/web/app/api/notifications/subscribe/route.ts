@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   AUDIENCE_COOKIE_NAME,
   buildInvalidRequestResponse,
   subscribeToNotificationsDomain,
 } from '@/lib/notifications/domain';
-import {
-  createRateLimitHeaders,
-  generalLimiter,
-  getClientIP,
-} from '@/lib/rate-limit';
+import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
+import {
+  createNotificationJsonResponse,
+  createRateLimitedResponse,
+  createServerErrorResponse,
+} from '../route-helpers';
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
@@ -26,20 +26,7 @@ export async function POST(request: NextRequest) {
   const rateLimitResult = await generalLimiter.limit(clientIp);
 
   if (!rateLimitResult.success) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Too many requests. Please wait and try again.',
-        code: 'rate_limited',
-      },
-      {
-        status: 429,
-        headers: {
-          ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitResult),
-        },
-      }
-    );
+    return createRateLimitedResponse(rateLimitResult);
   }
 
   let body: unknown;
@@ -47,13 +34,11 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     const invalidResponse = buildInvalidRequestResponse();
-    return NextResponse.json(invalidResponse.body, {
-      status: invalidResponse.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    return createNotificationJsonResponse(
+      invalidResponse.body,
+      invalidResponse.status,
+      rateLimitResult
+    );
   }
 
   try {
@@ -61,13 +46,11 @@ export async function POST(request: NextRequest) {
       headers: request.headers,
     });
 
-    const response = NextResponse.json(result.body, {
-      status: result.status,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    const response = createNotificationJsonResponse(
+      result.body,
+      result.status,
+      rateLimitResult
+    );
 
     if (result.audienceIdentified) {
       response.cookies.set(AUDIENCE_COOKIE_NAME, '1', {
@@ -86,20 +69,6 @@ export async function POST(request: NextRequest) {
       route: '/api/notifications/subscribe',
       method: 'POST',
     });
-    const response = NextResponse.json(
-      {
-        success: false,
-        error: 'Server error',
-        code: 'server_error',
-      },
-      {
-        status: 500,
-        headers: {
-          ...NO_STORE_HEADERS,
-          ...createRateLimitHeaders(rateLimitResult),
-        },
-      }
-    );
-    return response;
+    return createServerErrorResponse(rateLimitResult);
   }
 }
