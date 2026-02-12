@@ -70,10 +70,10 @@ export interface ChatSuggestion {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
-    icon: 'UserSearch',
-    label: 'Review my profile and suggest improvements',
+    icon: 'PenLine',
+    label: 'Write me a world-class artist bio',
     prompt:
-      'Review my full profile — bio, links, and stats — and suggest specific improvements I should make.',
+      'Write me a world-class artist bio I can use on Spotify and Apple Music. Use my real stats, catalog context, and existing profile details so it reads like premium music journalism.',
     accent: 'purple',
   },
   {
@@ -100,9 +100,9 @@ export const ALL_SUGGESTIONS: readonly ChatSuggestion[] = [
   // --- Profile & Bio ---
   {
     icon: 'PenLine',
-    label: 'Rewrite my bio to sound more compelling',
+    label: 'Write me a world-class artist bio',
     prompt:
-      'Rewrite my artist bio to be more compelling and authentic. Propose the edit so I can review it.',
+      'Write me a world-class artist bio I can use on Spotify and Apple Music. Keep it factual, emotionally resonant, and polished enough for press use.',
     accent: 'purple',
   },
   {

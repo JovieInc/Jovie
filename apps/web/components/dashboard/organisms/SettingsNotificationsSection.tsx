@@ -8,7 +8,43 @@ import { useNotificationSettingsMutation } from '@/lib/queries';
 export function SettingsNotificationsSection() {
   const [marketingEmails, setMarketingEmails] = useState(true);
   const [doubleOptIn, setDoubleOptIn] = useState(true);
-  const { updateNotifications, isPending } = useNotificationSettingsMutation();
+  const [pendingBySetting, setPendingBySetting] = useState<{
+    marketingEmails: boolean;
+    doubleOptIn: boolean;
+  }>({
+    marketingEmails: false,
+    doubleOptIn: false,
+  });
+
+  const { updateNotificationsAsync } = useNotificationSettingsMutation();
+
+  const handleMarketingEmailsToggle = async (enabled: boolean) => {
+    const previousValue = marketingEmails;
+    setMarketingEmails(enabled);
+    setPendingBySetting(prev => ({ ...prev, marketingEmails: true }));
+
+    try {
+      await updateNotificationsAsync({ marketing_emails: enabled });
+    } catch {
+      setMarketingEmails(previousValue);
+    } finally {
+      setPendingBySetting(prev => ({ ...prev, marketingEmails: false }));
+    }
+  };
+
+  const handleDoubleOptInToggle = async (enabled: boolean) => {
+    const previousValue = doubleOptIn;
+    setDoubleOptIn(enabled);
+    setPendingBySetting(prev => ({ ...prev, doubleOptIn: true }));
+
+    try {
+      await updateNotificationsAsync({ require_double_opt_in: enabled });
+    } catch {
+      setDoubleOptIn(previousValue);
+    } finally {
+      setPendingBySetting(prev => ({ ...prev, doubleOptIn: false }));
+    }
+  };
 
   return (
     <DashboardCard variant='settings'>
@@ -17,11 +53,8 @@ export function SettingsNotificationsSection() {
           title='Marketing Emails'
           description='Receive updates about new features, tips, and promotional offers from Jovie.'
           checked={marketingEmails}
-          onCheckedChange={(enabled: boolean) => {
-            setMarketingEmails(enabled);
-            updateNotifications({ marketing_emails: enabled });
-          }}
-          disabled={isPending}
+          onCheckedChange={handleMarketingEmailsToggle}
+          disabled={pendingBySetting.marketingEmails}
           ariaLabel='Toggle marketing emails'
         />
         <div className='border-t border-subtle' />
@@ -29,11 +62,8 @@ export function SettingsNotificationsSection() {
           title='Require Email Verification'
           description='New fans must confirm their email before receiving notifications. Prevents spam sign-ups and protects your sender reputation.'
           checked={doubleOptIn}
-          onCheckedChange={(enabled: boolean) => {
-            setDoubleOptIn(enabled);
-            updateNotifications({ require_double_opt_in: enabled });
-          }}
-          disabled={isPending}
+          onCheckedChange={handleDoubleOptInToggle}
+          disabled={pendingBySetting.doubleOptIn}
           ariaLabel='Toggle email verification requirement'
         />
       </div>

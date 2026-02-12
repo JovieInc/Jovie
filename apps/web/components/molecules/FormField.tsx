@@ -52,13 +52,10 @@ export function FormField({
   return (
     <div className={cn('space-y-2', className)}>
       {label && (
-        <label
-          htmlFor={id}
-          className='text-sm font-medium text-gray-700 dark:text-gray-300'
-        >
+        <label htmlFor={id} className='text-sm font-medium text-primary-token'>
           {label}
           {required && (
-            <span className='text-red-500 ml-1' aria-hidden='true'>
+            <span className='ml-1 text-destructive' aria-hidden='true'>
               *
             </span>
           )}
@@ -67,7 +64,7 @@ export function FormField({
       )}
 
       {helpText && (
-        <p id={helpTextId} className='text-xs text-gray-500 dark:text-gray-400'>
+        <p id={helpTextId} className='text-xs text-tertiary-token'>
           {helpText}
         </p>
       )}
@@ -77,7 +74,7 @@ export function FormField({
       {error && (
         <p
           id={errorId}
-          className='text-sm text-red-600 dark:text-red-400'
+          className='text-sm text-destructive'
           role='alert'
           aria-live='polite'
         >

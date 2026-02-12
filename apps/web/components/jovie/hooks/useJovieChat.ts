@@ -15,7 +15,14 @@ import {
 
 import type { ArtistContext, ChatError } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
-import { getErrorType, getMessageText, getUserFriendlyMessage } from '../utils';
+import {
+  getErrorType,
+  getMessageText,
+  getUpgradePromptMessage,
+  getUserFriendlyMessage,
+  parseChatErrorPayload,
+  shouldShowUpgradeMessage,
+} from '../utils';
 
 interface UseJovieChatOptions {
   /** Profile ID for server-side context fetching (preferred) */
@@ -125,27 +132,44 @@ export function useJovieChat({
     transport,
     onError: error => {
       const errorType = getErrorType(error);
-      let retryAfter: number | undefined;
-      let errorCode: string | undefined;
-
-      // Parse error response for rate limiting info
-      try {
-        const errorData = JSON.parse(error.message);
-        retryAfter = errorData.retryAfter;
-        errorCode = errorData.code || errorData.errorCode;
-      } catch {
-        // Not JSON, extract error code from message if present
-        const codeMatch = error.message.match(/\[([A-Z_]+)\]/);
-        errorCode = codeMatch?.[1];
-      }
+      const parsedError = parseChatErrorPayload(error);
+      const shouldInjectUpgradeMessage = shouldShowUpgradeMessage(
+        errorType,
+        parsedError.message
+      );
 
       setChatError({
         type: errorType,
-        message: getUserFriendlyMessage(errorType, retryAfter),
-        retryAfter,
-        errorCode,
+        message: getUserFriendlyMessage(errorType, parsedError.retryAfter),
+        retryAfter: parsedError.retryAfter,
+        errorCode: parsedError.errorCode,
         failedMessage: lastAttemptedMessageRef.current,
       });
+
+      if (shouldInjectUpgradeMessage) {
+        setMessages(currentMessages => {
+          const upgradeText = getUpgradePromptMessage();
+          const lastMessage = currentMessages[currentMessages.length - 1];
+
+          // Avoid duplicate system prompt if multiple retries fail in succession
+          if (
+            lastMessage?.role === 'assistant' &&
+            getMessageText(lastMessage.parts) === upgradeText
+          ) {
+            return currentMessages;
+          }
+
+          return [
+            ...currentMessages,
+            {
+              id: `upgrade-${Date.now()}`,
+              role: 'assistant',
+              parts: [{ type: 'text', text: upgradeText }],
+              createdAt: new Date(),
+            },
+          ];
+        });
+      }
 
       // Restore the user's message so they don't lose it
       if (lastAttemptedMessageRef.current) {

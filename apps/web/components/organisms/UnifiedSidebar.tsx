@@ -108,7 +108,7 @@ function useProfileData(isDashboardOrAdmin: boolean) {
   };
 }
 
-/** Navigation list for settings section */
+/** Navigation list for settings section — text-only items with group headers (Linear-style) */
 function SettingsNavigation({
   navigation,
   pathname,
@@ -118,34 +118,51 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
+  // Split into user vs artist groups (artist items start at 'artist-profile')
+  const artistStartIndex = navigation.findIndex(
+    item => item.id === 'artist-profile'
+  );
+  const userItems =
+    artistStartIndex > 0 ? navigation.slice(0, artistStartIndex) : navigation;
+  const artistItems =
+    artistStartIndex > 0 ? navigation.slice(artistStartIndex) : [];
+
+  const renderItem = (item: NavItem) => {
+    const isActive =
+      pathname === item.href || pathname.startsWith(`${item.href}/`);
+    return (
+      <SidebarMenuItem key={item.id}>
+        <SidebarMenuButton asChild isActive={isActive}>
+          <Link
+            href={item.href}
+            aria-current={isActive ? 'page' : undefined}
+            className='flex w-full min-w-0 items-center'
+          >
+            <span className='truncate'>{item.name}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
   return (
     <nav
       aria-label={`${section} navigation`}
       className='flex flex-1 flex-col overflow-hidden'
     >
       <SidebarMenu>
-        {navigation.map(item => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <SidebarMenuItem key={item.id}>
-              <SidebarMenuButton
-                asChild
-                isActive={isActive}
-                className='font-medium'
-              >
-                <Link
-                  href={item.href}
-                  aria-current={isActive ? 'page' : undefined}
-                  className='flex w-full min-w-0 items-center gap-3'
-                >
-                  <item.icon className='size-4' />
-                  <span className='truncate'>{item.name}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          );
-        })}
+        {userItems.map(renderItem)}
+        {artistItems.length > 0 && (
+          <>
+            <li
+              aria-hidden='true'
+              className='px-2 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wider text-sidebar-muted select-none'
+            >
+              Artist
+            </li>
+            {artistItems.map(renderItem)}
+          </>
+        )}
       </SidebarMenu>
     </nav>
   );

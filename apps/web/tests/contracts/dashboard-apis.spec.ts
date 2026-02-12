@@ -578,5 +578,88 @@ describe('Dashboard API contracts', () => {
       expect(response.headers.get('Cache-Control')).toBe(NO_STORE);
       expect(body).toEqual({ ok: true, version: 1 });
     });
+
+    it('deduplicates duplicate links in a single save request', async () => {
+      mockSocialLinkDependencies();
+
+      let insertedPayload: unknown[] = [];
+      const tx = {
+        select: createSelectQueue([
+          [
+            {
+              id: PROFILE_ID,
+              usernameNormalized: 'artist',
+              avatarUrl: null,
+              avatarLockedByUser: false,
+              userId: 'user_internal',
+            },
+          ],
+          [],
+        ]),
+        delete: () => createQueryResult([]),
+        insert: () => ({
+          values: (values: unknown[]) => {
+            insertedPayload = values;
+            return createQueryResult([]);
+          },
+        }),
+        update: () => createQueryResult([]),
+      };
+
+      mockSession({ tx });
+      mockDb([[]]); // idempotency lookup
+
+      const { PUT } = await import('@/app/api/dashboard/social-links/route');
+      const response = await PUT(
+        new Request('http://localhost/api/dashboard/social-links', {
+          method: 'PUT',
+          body: JSON.stringify({
+            profileId: PROFILE_ID,
+            links: [
+              {
+                platform: 'instagram',
+                url: 'https://instagram.com/artist',
+                sortOrder: 0,
+                isActive: true,
+              },
+              {
+                platform: 'instagram',
+                url: 'https://instagram.com/artist',
+                sortOrder: 1,
+                isActive: true,
+              },
+              {
+                platform: 'spotify',
+                url: 'https://open.spotify.com/artist/123',
+                sortOrder: 2,
+                isActive: true,
+              },
+              {
+                platform: 'spotify',
+                url: 'https://open.spotify.com/artist/123',
+                sortOrder: 3,
+                isActive: true,
+              },
+            ],
+          }),
+        })
+      );
+      const body = await response.json();
+
+      expectStatusOk(response, body);
+      expect(insertedPayload).toHaveLength(2);
+      expect(insertedPayload).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            platform: 'instagram',
+            url: 'https://instagram.com/artist',
+          }),
+          expect.objectContaining({
+            platform: 'spotify',
+            url: 'https://open.spotify.com/artist/123',
+          }),
+        ])
+      );
+    });
   });
 });

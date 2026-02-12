@@ -169,6 +169,8 @@ export interface FilterSubmenuProps<T = string> {
   readonly searchPlaceholder?: string;
   /** Whether this category should be shown (for main menu filtering) */
   readonly isVisible?: boolean;
+  /** Fallback item icon when some options have icons but others do not */
+  readonly defaultItemIconName?: string;
 }
 
 /**
@@ -200,6 +202,7 @@ export function FilterSubmenu<T extends string = string>({
   counts = {},
   searchPlaceholder = 'Search...',
   isVisible = true,
+  defaultItemIconName = 'Disc',
 }: FilterSubmenuProps<T>) {
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -213,6 +216,10 @@ export function FilterSubmenu<T extends string = string>({
 
   // Count of selected items
   const selectedCount = selectedIds.length;
+  const hasAnyOptionIcon = useMemo(
+    () => options.some(opt => Boolean(opt.iconName)),
+    [options]
+  );
 
   // Reset search when submenu closes
   const handleOpenChange = useCallback((open: boolean) => {
@@ -271,9 +278,9 @@ export function FilterSubmenu<T extends string = string>({
                 key={opt.id}
                 label={opt.label}
                 icon={
-                  opt.iconName ? (
+                  opt.iconName || hasAnyOptionIcon ? (
                     <Icon
-                      name={opt.iconName as 'Disc3'}
+                      name={(opt.iconName ?? defaultItemIconName) as 'Disc3'}
                       className='h-3.5 w-3.5'
                     />
                   ) : undefined

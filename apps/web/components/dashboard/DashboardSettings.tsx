@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import type { BandsintownConnectionStatus } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import type { DashboardContact } from '@/types/contacts';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 const SettingsPolished = dynamic(
@@ -21,10 +23,19 @@ const SettingsPolished = dynamic(
 
 export interface DashboardSettingsProps {
   readonly focusSection?: string;
+  readonly initialContacts?: DashboardContact[];
+  readonly initialTourConnectionStatus?: BandsintownConnectionStatus;
 }
 
 export const DashboardSettings = memo(function DashboardSettings({
   focusSection,
+  initialContacts = [],
+  initialTourConnectionStatus = {
+    connected: false,
+    artistName: null,
+    lastSyncedAt: null,
+    hasApiKey: false,
+  },
 }: DashboardSettingsProps) {
   const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
@@ -43,6 +54,8 @@ export const DashboardSettings = memo(function DashboardSettings({
     <div className='mx-auto max-w-3xl'>
       <SettingsPolished
         artist={artist}
+        initialContacts={initialContacts}
+        initialTourConnectionStatus={initialTourConnectionStatus}
         onArtistUpdate={setArtist}
         focusSection={focusSection}
       />

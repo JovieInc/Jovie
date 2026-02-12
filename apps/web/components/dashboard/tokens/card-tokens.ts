@@ -144,12 +144,9 @@ export const cardTokens = {
       focus-visible:ring-offset-2
     `,
 
-    // Settings card - elevated surface, no hover effects (Linear-style)
+    // Settings card - flat, no border/bg (Linear-style preferences)
     settings: tw`
-      bg-[var(--color-bg-surface-2)]
-      border border-[var(--color-border-subtle)]
-      rounded-lg sm:rounded-xl
-      p-3 sm:p-5
+      p-0
     `,
 
     // Analytics/metric card - minimal, data-focused

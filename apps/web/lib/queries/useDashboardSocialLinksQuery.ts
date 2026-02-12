@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
-import { handleMutationError, handleMutationSuccess } from './mutation-utils';
+import { handleMutationError } from './mutation-utils';
 
 /**
  * Social link type from API response.
@@ -143,7 +143,6 @@ export function useSaveSocialLinksMutation(profileId: string) {
     mutationFn: saveSocialLinks,
 
     onSuccess: (_data, variables) => {
-      handleMutationSuccess('Social links saved');
       track('dashboard_social_links_saved', { profileId: variables.profileId });
 
       // Invalidate social links queries to refetch fresh data

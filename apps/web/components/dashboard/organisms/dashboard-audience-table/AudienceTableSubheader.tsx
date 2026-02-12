@@ -60,7 +60,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   const showFilters = view !== 'subscribers';
 
   const pillButtonClass =
-    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
+    'h-8 gap-1.5 rounded-lg border border-subtle px-3 text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
   return (
     <div className='border-b border-subtle bg-transparent'>
@@ -68,7 +68,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
       <div className='flex items-center justify-between px-4 py-1'>
         {/* Left: View filter tabs + Filter dropdown */}
         <div className='flex items-center gap-2'>
-          <fieldset className='inline-flex items-center gap-0.5 rounded-md bg-transparent p-0'>
+          <fieldset className='inline-flex items-center gap-1 rounded-lg bg-transparent p-0'>
             <legend className='sr-only'>Audience view filter</legend>
             {VIEW_OPTIONS.map(option => (
               <button
@@ -77,10 +77,10 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
                 onClick={() => onViewChange(option.value)}
                 aria-pressed={view === option.value}
                 className={cn(
-                  'h-7 px-2.5 text-xs font-medium rounded-md transition-colors',
+                  'inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors',
                   view === option.value
-                    ? 'bg-surface-2 text-primary-token'
-                    : 'text-tertiary-token hover:text-secondary-token'
+                    ? 'border-subtle bg-surface-2 text-primary-token'
+                    : 'border-subtle text-tertiary-token hover:bg-surface-2 hover:text-secondary-token'
                 )}
               >
                 {option.label}

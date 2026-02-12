@@ -177,9 +177,9 @@ export const MENU_ITEM_BASE =
  * Destructive variant for menu items (delete, remove actions)
  */
 export const MENU_ITEM_DESTRUCTIVE =
-  'text-destructive hover:text-destructive hover:bg-destructive/10 ' +
-  'data-highlighted:text-destructive data-highlighted:bg-destructive/10 ' +
-  'focus-visible:ring-destructive [&_svg]:text-destructive';
+  'text-destructive bg-destructive/8 hover:text-destructive hover:bg-destructive/14 ' +
+  'data-highlighted:text-destructive data-highlighted:bg-destructive/14 ' +
+  'focus-visible:bg-destructive/14 focus-visible:ring-destructive/35 [&_svg]:text-destructive';
 
 /**
  * Checkbox and radio item styles (with left indicator space)

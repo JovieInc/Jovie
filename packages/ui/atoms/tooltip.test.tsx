@@ -187,8 +187,9 @@ describe('Tooltip', () => {
     it('applies theme-aware surface classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
+      expect(content.className).toContain('border-subtle');
       expect(content.className).toContain('bg-surface-3');
-      expect(content.className).toContain('text-primary-token');
+      expect(content.className).toContain('text-secondary-token');
     });
 
     it('applies animation classes', () => {
@@ -245,6 +246,18 @@ describe('Tooltip', () => {
       const content = screen.getByTestId('tooltip-content');
       expect(content).toHaveTextContent('Bold');
       expect(content).toHaveTextContent('italic');
+    });
+
+    it('supports super long content without forcing single-line overflow', () => {
+      const longWord = 'superlongtooltipcontent'.repeat(24);
+      render(<TestTooltip open={true}>{longWord}</TestTooltip>);
+      const content = screen.getByTestId('tooltip-content');
+
+      expect(content).toHaveTextContent(longWord);
+      expect(content.className).toContain('whitespace-normal');
+      expect(content.className).toContain('break-words');
+      expect(content.className).toContain('[overflow-wrap:anywhere]');
+      expect(content.className).not.toContain('whitespace-nowrap');
     });
   });
 });

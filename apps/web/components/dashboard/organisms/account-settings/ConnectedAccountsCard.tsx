@@ -84,16 +84,14 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-4 sm:gap-6'>
-        <div className='flex-1'>
-          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
-            Connected accounts
-          </h3>
-          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
-            OAuth providers linked to your account. Disconnect a provider to
-            revoke its access.
-          </p>
-        </div>
+      <div>
+        <h3 className='text-[13px] sm:text-sm font-medium text-primary-token'>
+          Connected accounts
+        </h3>
+        <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-tertiary-token max-w-lg'>
+          OAuth providers linked to your account. Disconnect a provider to
+          revoke its access.
+        </p>
       </div>
 
       <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>

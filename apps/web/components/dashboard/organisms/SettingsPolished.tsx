@@ -2,11 +2,12 @@
 
 import { BarChart3, Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
+import type { BandsintownConnectionStatus } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
-import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
@@ -21,18 +22,47 @@ import { SocialsForm } from '@/components/dashboard/organisms/socials-form/Socia
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
+import type { DashboardContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
   readonly artist: Artist;
+  readonly initialContacts: DashboardContact[];
+  readonly initialTourConnectionStatus: BandsintownConnectionStatus;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly focusSection?: string;
 }
 
+interface SettingsSectionConfig {
+  id: string;
+  title: string;
+  description: string;
+  render: () => ReactNode;
+}
+
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
+
+function SettingsSectionList({
+  sections,
+}: {
+  sections: SettingsSectionConfig[];
+}) {
+  return sections.map(section => (
+    <SettingsSection
+      key={section.id}
+      id={section.id}
+      title={section.title}
+      description={section.description}
+    >
+      {section.render()}
+    </SettingsSection>
+  ));
+}
 
 export function SettingsPolished({
   artist,
+  initialContacts,
+  initialTourConnectionStatus,
   onArtistUpdate,
   focusSection,
 }: SettingsPolishedProps) {
@@ -83,7 +113,7 @@ export function SettingsPolished({
   );
 
   // -- General (user-level) settings --
-  const userSections = [
+  const userSections: SettingsSectionConfig[] = [
     {
       id: 'account',
       title: 'Account',
@@ -119,7 +149,7 @@ export function SettingsPolished({
   ];
 
   // -- Artist-level settings --
-  const artistSections = [
+  const artistSections: SettingsSectionConfig[] = [
     {
       id: 'artist-profile',
       title: 'Artist Profile',
@@ -127,6 +157,8 @@ export function SettingsPolished({
       render: () => (
         <SettingsArtistProfileSection
           artist={artist}
+          initialContacts={initialContacts}
+          initialTourConnectionStatus={initialTourConnectionStatus}
           onArtistUpdate={onArtistUpdate}
           onRefresh={() => router.refresh()}
         />
@@ -144,25 +176,14 @@ export function SettingsPolished({
       description:
         'Connect streaming platforms and manage your music profile links.',
       render: () => (
-        <div className='space-y-4 sm:space-y-6'>
-          <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
-              Connected Platforms
-            </h3>
-            <ConnectedDspList
-              profileId={artist.id}
-              spotifyId={artist.spotify_id}
-            />
-          </div>
-          <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
-              Streaming Links
-            </h3>
-            <ListenNowForm
-              artist={artist}
-              onUpdate={a => onArtistUpdate?.(a)}
-            />
-          </div>
+        <div>
+          <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
+            Connected Platforms
+          </h3>
+          <ConnectedDspList
+            profileId={artist.id}
+            spotifyId={artist.spotify_id}
+          />
         </div>
       ),
     },
@@ -234,13 +255,7 @@ export function SettingsPolished({
         className='space-y-4 sm:space-y-6 pb-4 sm:pb-6'
         data-testid='settings-polished'
       >
-        <SettingsSection
-          id={section.id}
-          title={section.title}
-          description={section.description}
-        >
-          {section.render()}
-        </SettingsSection>
+        <SettingsSectionList sections={[section]} />
       </div>
     );
   }
@@ -256,16 +271,7 @@ export function SettingsPolished({
         <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
           General
         </h2>
-        {userSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-          >
-            {section.render()}
-          </SettingsSection>
-        ))}
+        <SettingsSectionList sections={userSections} />
       </div>
 
       {/* Artist settings */}
@@ -273,16 +279,7 @@ export function SettingsPolished({
         <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
           Artist
         </h2>
-        {artistSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-          >
-            {section.render()}
-          </SettingsSection>
-        ))}
+        <SettingsSectionList sections={artistSections} />
       </div>
     </div>
   );

@@ -1,10 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Banknote,
-  CalendarDays,
   Command,
   Home,
-  IdCard,
   Keyboard,
   LogOut,
   MessageCircle,
@@ -110,17 +108,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     secondKey: 'p',
   },
   {
-    id: 'nav-contacts',
-    label: 'Go to contacts',
-    keys: 'G then C',
-    category: 'navigation',
-    icon: IdCard,
-    href: APP_ROUTES.CONTACTS,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'c',
-  },
-  {
     id: 'nav-releases',
     label: 'Go to releases',
     keys: 'G then R',
@@ -130,17 +117,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     isSequential: true,
     firstKey: 'g',
     secondKey: 'r',
-  },
-  {
-    id: 'nav-tour-dates',
-    label: 'Go to tour dates',
-    keys: 'G then O',
-    category: 'navigation',
-    icon: CalendarDays,
-    href: APP_ROUTES.TOUR_DATES,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'o',
   },
   {
     id: 'nav-audience',
@@ -212,9 +188,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
-  contacts: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-contacts')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
-  'tour-dates': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-tour-dates')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,
   chat: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-chat')!,

@@ -52,6 +52,7 @@ interface ContactDetailSidebarProps {
   readonly onUpdate: (updates: Partial<EditableContact>) => void;
   readonly onSave: () => void;
   readonly onDelete: () => void;
+  readonly drawerClassName?: string;
 }
 
 export const ContactDetailSidebar = memo(function ContactDetailSidebar({
@@ -61,6 +62,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   onUpdate,
   onSave,
   onDelete,
+  drawerClassName,
 }: ContactDetailSidebarProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -70,7 +72,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   // Use a ref so the debounced timeout always calls the latest onSave,
   // avoiding stale closures when contact state updates between scheduling and firing.
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   // Debounced save: coalesces rapid edits into a single save call
   const debouncedSave = useCallback(() => {
@@ -214,6 +219,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         isOpen={isOpen}
         width={SIDEBAR_WIDTH}
         ariaLabel='Contact details'
+        className={drawerClassName}
       >
         <div className='flex h-full items-center justify-center p-4'>
           <p className='text-sm text-tertiary-token'>
@@ -279,6 +285,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       isOpen={isOpen}
       width={SIDEBAR_WIDTH}
       ariaLabel='Contact details'
+      className={drawerClassName}
     >
       <ContactDetailHeader
         role={contact.role}

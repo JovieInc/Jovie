@@ -73,9 +73,7 @@ describe('keyboard-shortcuts definitions', () => {
       const ids = sequential.map(s => s.id);
       expect(ids).toContain('nav-dashboard');
       expect(ids).toContain('nav-profile');
-      expect(ids).toContain('nav-contacts');
       expect(ids).toContain('nav-releases');
-      expect(ids).toContain('nav-tour-dates');
       expect(ids).toContain('nav-audience');
       expect(ids).toContain('nav-earnings');
       expect(ids).toContain('nav-chat');
@@ -127,9 +125,7 @@ describe('keyboard-shortcuts definitions', () => {
     it('maps all expected sidebar nav items', () => {
       expect(NAV_SHORTCUTS.overview).toBeDefined();
       expect(NAV_SHORTCUTS.profile).toBeDefined();
-      expect(NAV_SHORTCUTS.contacts).toBeDefined();
       expect(NAV_SHORTCUTS.releases).toBeDefined();
-      expect(NAV_SHORTCUTS['tour-dates']).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeDefined();
       expect(NAV_SHORTCUTS.earnings).toBeDefined();
       expect(NAV_SHORTCUTS.chat).toBeDefined();

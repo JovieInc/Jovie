@@ -257,7 +257,7 @@ describe('useDashboardSocialLinksQuery', () => {
       });
     });
 
-    it('shows success toast on success', async () => {
+    it('does not show success toast on success', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ success: true }),
@@ -277,7 +277,7 @@ describe('useDashboardSocialLinksQuery', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(toast.success).toHaveBeenCalledWith('Social links saved');
+      expect(toast.success).not.toHaveBeenCalled();
     });
 
     it('tracks analytics event on success', async () => {

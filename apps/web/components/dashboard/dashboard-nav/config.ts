@@ -1,9 +1,7 @@
 import {
   Banknote,
   Bell,
-  CalendarDays,
   Home,
-  IdCard,
   Link2,
   Music,
   Music2,
@@ -45,25 +43,11 @@ export const profileNavItem: NavItem = {
 export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
-    name: 'Contacts',
-    href: APP_ROUTES.CONTACTS,
-    id: 'contacts',
-    icon: IdCard,
-    description: 'Manage your team and contact routes',
-  },
-  {
     name: 'Releases',
     href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
-  },
-  {
-    name: 'Tour Dates',
-    href: APP_ROUTES.TOUR_DATES,
-    id: 'tour-dates',
-    icon: CalendarDays,
-    description: 'Sync and manage your tour dates',
   },
   {
     name: 'Audience',
@@ -195,13 +179,9 @@ export const adminNavigation: NavItem[] = [
 export const mobilePrimaryNavigation: NavItem[] = [
   dashboardHome,
   primaryNavigation[0], // Profile
-  primaryNavigation[2], // Releases
-  primaryNavigation[4], // Audience
+  primaryNavigation[1], // Releases
+  primaryNavigation[2], // Audience
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = [
-  primaryNavigation[1], // Contacts
-  primaryNavigation[3], // Tour Dates
-  settingsNavItem,
-];
+export const mobileExpandedNavigation: NavItem[] = [settingsNavItem];

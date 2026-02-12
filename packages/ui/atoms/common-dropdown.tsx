@@ -570,7 +570,10 @@ export function CommonDropdown(props: CommonDropdownProps) {
           <ChevronRight className='ml-auto' />
         </SubTrigger>
         <Portal>
-          <SubContent className={cn(subMenuContentClasses, transformOrigin)}>
+          <SubContent
+            sideOffset={8}
+            className={cn(subMenuContentClasses, transformOrigin)}
+          >
             {renderItems(item.items, isContextMenu)}
           </SubContent>
         </Portal>

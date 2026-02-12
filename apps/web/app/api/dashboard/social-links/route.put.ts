@@ -12,6 +12,7 @@ import {
   buildSocialLinksInsertPayload,
   checkIdempotencyKey,
   computeLinkVersioning,
+  dedupeSocialLinksForSave,
   enqueueProfileEnrichment,
   processLinkValidation,
   storeIdempotencyKey,
@@ -90,7 +91,7 @@ export async function PUT(req: Request) {
         idempotencyKey,
         expectedVersion,
       } = validationResult.data;
-      const links = parsedLinks ?? [];
+      const links = dedupeSocialLinksForSave(parsedLinks ?? []);
       if (!profileId) {
         return NextResponse.json(
           { error: 'Profile ID is required' },

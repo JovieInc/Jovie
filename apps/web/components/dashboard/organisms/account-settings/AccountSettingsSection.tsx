@@ -37,15 +37,21 @@ export function AccountSettingsSection() {
 
   return (
     <div
-      className='space-y-3 sm:space-y-6'
+      className='divide-y divide-subtle'
       data-testid='account-settings-section'
     >
-      <EmailManagementCard user={typedUser} />
-      <ConnectedAccountsCard user={typedUser} />
-      <SessionManagementCard
-        user={typedUser}
-        activeSessionId={activeSession?.id}
-      />
+      <div className='pb-5 sm:pb-8'>
+        <EmailManagementCard user={typedUser} />
+      </div>
+      <div className='py-5 sm:py-8'>
+        <ConnectedAccountsCard user={typedUser} />
+      </div>
+      <div className='pt-5 sm:pt-8'>
+        <SessionManagementCard
+          user={typedUser}
+          activeSessionId={activeSession?.id}
+        />
+      </div>
     </div>
   );
 }

@@ -83,13 +83,13 @@ const TooltipContent = React.forwardRef<
         sideOffset={sideOffset}
         data-testid={testId}
         className={cn(
-          // Base layout + spacing (single-line, no wrap)
-          'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
+          // Base layout + spacing
+          'z-50 flex max-w-[min(28rem,calc(100vw-1rem))] select-none items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium leading-tight whitespace-normal break-words [overflow-wrap:anywhere]',
           // Normalize height so presence of a shortcut badge doesn't shift positioning
           'min-h-[28px]',
           // Tokenized surface styling to ensure Tailwind emits the tooltip background
-          'max-w-xs border border-transparent',
-          'bg-surface-3 text-primary-token shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
+          'border border-subtle/90',
+          'bg-surface-3 text-secondary-token shadow-[0_4px_12px_rgba(0,0,0,0.34)]',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',

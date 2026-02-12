@@ -84,16 +84,14 @@ export function SessionManagementCard({
 
   return (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-4 sm:gap-6'>
-        <div className='flex-1'>
-          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
-            Active sessions
-          </h3>
-          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
-            Keep an eye on the devices signed in to your account. End sessions
-            you no longer recognise.
-          </p>
-        </div>
+      <div>
+        <h3 className='text-[13px] sm:text-sm font-medium text-primary-token'>
+          Active sessions
+        </h3>
+        <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-tertiary-token max-w-lg'>
+          Keep an eye on the devices signed in to your account. End sessions you
+          no longer recognise.
+        </p>
       </div>
 
       {(() => {

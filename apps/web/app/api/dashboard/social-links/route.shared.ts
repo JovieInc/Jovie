@@ -44,6 +44,36 @@ type LinkInput = {
   evidence?: Partial<LinkEvidencePayload> | null;
 };
 
+/**
+ * De-duplicate links within a single save request.
+ *
+ * Key: `${platform}:${normalizedUrl}` (first occurrence wins).
+ * This guards against accidental client-side double submission causing
+ * duplicate persisted rows for the same platform/url pair.
+ */
+export function dedupeSocialLinksForSave(links: LinkInput[]): LinkInput[] {
+  const seen = new Set<string>();
+  const deduped: LinkInput[] = [];
+
+  for (const link of links) {
+    const normalizedUrl = detectPlatform(link.url).normalizedUrl;
+    const dedupeKey = `${link.platform}:${normalizedUrl}`;
+
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    deduped.push({
+      ...link,
+      url: normalizedUrl,
+      sortOrder: deduped.length,
+    });
+  }
+
+  return deduped;
+}
+
 type UpdateSocialLinksData = z.infer<typeof updateSocialLinksSchema>;
 
 export const updateSocialLinksSchema = baseUpdateSocialLinksSchema.superRefine(

@@ -34,7 +34,8 @@ interface BuildDropdownItemsParams {
   displayName: string;
   userInitials: string;
   formattedUsername: string | null;
-  handleProfile: () => void;
+  handleOpenProfile: () => void;
+  handleCopyProfileLink: () => void;
   handleSettings: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
@@ -50,7 +51,8 @@ function buildDropdownItems({
   displayName,
   userInitials,
   formattedUsername,
-  handleProfile,
+  handleOpenProfile,
+  handleCopyProfileLink,
   handleSettings,
   handleManageBilling,
   handleUpgrade,
@@ -64,12 +66,8 @@ function buildDropdownItems({
       type: 'custom',
       id: 'profile-card',
       render: () => (
-        <button
-          type='button'
-          onClick={handleProfile}
-          className='w-full cursor-pointer rounded-md px-2 py-1.5 hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover text-left'
-        >
-          <div className='flex w-full items-center gap-2.5'>
+        <div className='w-full rounded-md px-2 py-1.5 text-left'>
+          <div className='flex w-full items-center gap-2'>
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
@@ -99,8 +97,27 @@ function buildDropdownItems({
                 </p>
               )}
             </div>
+
+            <div className='ml-1 flex items-center gap-1'>
+              <button
+                type='button'
+                onClick={handleOpenProfile}
+                className='shrink-0 rounded p-1 text-tertiary-token/80 opacity-75 transition-[color,background-color,opacity] duration-150 ease-out hover:bg-surface-2/60 hover:text-secondary-token hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive/45'
+                aria-label='Open profile'
+              >
+                <Icon name='ExternalLink' className='h-3.5 w-3.5' />
+              </button>
+              <button
+                type='button'
+                onClick={handleCopyProfileLink}
+                className='shrink-0 rounded p-1 text-tertiary-token/80 opacity-75 transition-[color,background-color,opacity] duration-150 ease-out hover:bg-surface-2/60 hover:text-secondary-token hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive/45'
+                aria-label='Copy profile link'
+              >
+                <Icon name='Copy' className='h-3.5 w-3.5' />
+              </button>
+            </div>
           </div>
-        </button>
+        </div>
       ),
     },
     { type: 'separator', id: 'sep-1' },
@@ -256,6 +273,21 @@ export function UserButton({
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
 
+  const handleOpenProfile = useCallback(() => {
+    handleProfile();
+  }, [handleProfile]);
+
+  const handleCopyProfileLink = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    const profileUrl = userInfo.profileUrl;
+    const absoluteProfileUrl = profileUrl.startsWith('http')
+      ? profileUrl
+      : `${window.location.origin}${profileUrl.startsWith('/') ? '' : '/'}${profileUrl}`;
+
+    void navigator.clipboard.writeText(absoluteProfileUrl);
+  }, [userInfo.profileUrl]);
+
   // Handle loading state or no user
   if (!isLoaded || !user) {
     return showUserInfo ? (
@@ -277,7 +309,8 @@ export function UserButton({
     displayName,
     userInitials,
     formattedUsername,
-    handleProfile,
+    handleOpenProfile,
+    handleCopyProfileLink,
     handleSettings,
     handleManageBilling,
     handleUpgrade,

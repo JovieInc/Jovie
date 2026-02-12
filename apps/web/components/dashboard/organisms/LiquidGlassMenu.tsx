@@ -8,6 +8,7 @@ import {
   type SVGProps,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from 'react';
@@ -79,22 +80,18 @@ function useCloseOnEscapeOrOutside(
       if (event.key === 'Escape') onClose();
     };
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: PointerEvent) => {
       if (ref.current && !ref.current.contains(event.target as Node)) {
         onClose();
       }
     };
 
     document.addEventListener('keydown', handleEscape);
-    // Small delay prevents immediate close when opening via click
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 10);
+    document.addEventListener('pointerdown', handleClickOutside, true);
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('pointerdown', handleClickOutside, true);
     };
   }, [ref, isOpen, onClose]);
 }
@@ -156,17 +153,20 @@ function Badge({
 function MenuItemLink({
   item,
   active,
+  onSelect,
 }: {
   readonly item: LiquidGlassMenuItem;
   readonly active: boolean;
+  readonly onSelect?: () => void;
 }) {
   const Icon = item.icon;
 
   return (
     <Link
       href={item.href}
+      onClick={onSelect}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+        'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
@@ -197,19 +197,81 @@ export function LiquidGlassMenu({
   onSearchClick,
   className,
 }: LiquidGlassMenuProps): React.JSX.Element {
+  // Canonical mobile shell behavior:
+  // - Collapsed: primary tabs + "more"
+  // - Expanded: overflow items (and admin section, if available)
+  // - Close on: backdrop, escape, outside click, route change, item selection
+  // - Bottom inset always respects iOS safe area env() value
   const pathname = usePathname();
+  const expandedMenuId = useId();
   const [isExpanded, setIsExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const expandedNavRef = useRef<HTMLElement>(null);
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldRestoreFocusRef = useRef(false);
+  const previousPathnameRef = useRef(pathname);
+  const previousBodyOverflowRef = useRef<string | null>(null);
+  const previousHtmlOverflowRef = useRef<string | null>(null);
 
-  const closeMenu = useCallback(() => setIsExpanded(false), []);
-  const toggleMenu = useCallback(() => setIsExpanded(prev => !prev), []);
+  const closeMenu = useCallback((restoreFocus = false) => {
+    shouldRestoreFocusRef.current = restoreFocus;
+    setIsExpanded(false);
+  }, []);
 
-  useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenu);
+  const toggleMenu = useCallback(() => {
+    setIsExpanded(prev => {
+      if (prev) {
+        shouldRestoreFocusRef.current = true;
+      } else {
+        shouldRestoreFocusRef.current = false;
+      }
+      return !prev;
+    });
+  }, []);
+
+  useCloseOnEscapeOrOutside(menuRef, isExpanded, () => closeMenu(true));
 
   // Close on route change
   useEffect(() => {
-    setIsExpanded(false);
-  }, [pathname]);
+    if (previousPathnameRef.current === pathname) return;
+    previousPathnameRef.current = pathname;
+    closeMenu(false);
+  }, [pathname, closeMenu]);
+
+  // Focus first interactive element when expanded, restore to trigger on close.
+  useEffect(() => {
+    if (isExpanded) {
+      const firstInteractive =
+        expandedNavRef.current?.querySelector<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+      firstInteractive?.focus();
+      return;
+    }
+
+    if (shouldRestoreFocusRef.current) {
+      toggleButtonRef.current?.focus();
+      shouldRestoreFocusRef.current = false;
+    }
+  }, [isExpanded]);
+
+  // Lock background scroll while expanded.
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    previousBodyOverflowRef.current = document.body.style.overflow;
+    previousHtmlOverflowRef.current = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflowRef.current ?? '';
+      document.documentElement.style.overflow =
+        previousHtmlOverflowRef.current ?? '';
+      previousBodyOverflowRef.current = null;
+      previousHtmlOverflowRef.current = null;
+    };
+  }, [isExpanded]);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
@@ -237,7 +299,7 @@ export function LiquidGlassMenu({
             'fixed inset-0 z-50 bg-black/20 backdrop-blur-sm transition-opacity duration-300',
             isExpanded ? 'opacity-100' : 'opacity-0'
           )}
-          onClick={closeMenu}
+          onClick={() => closeMenu(true)}
           aria-hidden='true'
         />
 
@@ -257,6 +319,8 @@ export function LiquidGlassMenu({
           <GlassBlur intense />
 
           <nav
+            id={expandedMenuId}
+            ref={expandedNavRef}
             className='relative z-10 py-3'
             aria-label='Expanded navigation menu'
           >
@@ -267,6 +331,7 @@ export function LiquidGlassMenu({
                   key={item.id}
                   item={item}
                   active={isActive(item.href)}
+                  onSelect={() => closeMenu(false)}
                 />
               ))}
 
@@ -282,6 +347,7 @@ export function LiquidGlassMenu({
                       key={item.id}
                       item={item}
                       active={isActive(item.href)}
+                      onSelect={() => closeMenu(false)}
                     />
                   ))}
                 </>
@@ -315,6 +381,7 @@ export function LiquidGlassMenu({
                 <Link
                   key={item.id}
                   href={item.href}
+                  onClick={() => closeMenu(false)}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
                     'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
@@ -337,8 +404,11 @@ export function LiquidGlassMenu({
             {/* More menu toggle - Linear style */}
             <button
               type='button'
+              ref={toggleButtonRef}
               onClick={toggleMenu}
               aria-label={isExpanded ? 'Close menu' : 'More options'}
+              aria-controls={expandedMenuId}
+              aria-haspopup='menu'
               aria-expanded={isExpanded}
               className={cn(
                 'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',

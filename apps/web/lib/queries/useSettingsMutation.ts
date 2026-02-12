@@ -168,8 +168,16 @@ export function useNotificationSettingsMutation() {
     [mutation]
   );
 
+  const updateNotificationsAsync = useCallback(
+    (settings: SettingsUpdateInput['updates']['settings']) => {
+      return mutation.mutateAsync({ updates: { settings } });
+    },
+    [mutation]
+  );
+
   return {
     updateNotifications,
+    updateNotificationsAsync,
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

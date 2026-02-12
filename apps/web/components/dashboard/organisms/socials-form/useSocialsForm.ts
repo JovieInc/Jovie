@@ -29,7 +29,6 @@ export function useSocialsForm({
   // TanStack Query mutation for saving social links
   const {
     mutateAsync: saveMutation,
-    isPending: isSaving,
     isSuccess,
     reset: resetMutation,
   } = useSaveSocialLinksMutation(artistId);
@@ -125,7 +124,8 @@ export function useSocialsForm({
   }, []);
 
   return {
-    loading: isFetching || isSaving,
+    // Keep the form visible while saving to avoid UI flicker.
+    loading: isFetching,
     error: fetchError ? 'Failed to load social links' : undefined,
     success: isSuccess,
     socialLinks,

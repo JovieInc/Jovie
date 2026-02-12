@@ -39,9 +39,20 @@ export function TooltipShortcut({
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side}>
-        <div className='inline-flex items-center gap-2'>
-          <span>{label}</span>
-          {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
+        <div
+          className='grid max-w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2'
+          data-testid='tooltip-shortcut-row'
+        >
+          <span className='min-w-0 text-secondary-token [overflow-wrap:anywhere]'>
+            {label}
+          </span>
+          <span
+            data-testid='tooltip-shortcut-slot'
+            aria-hidden={!shortcut}
+            className='inline-flex min-w-[2.125rem] justify-end'
+          >
+            {shortcut ? <Kbd variant='tooltip'>{shortcut}</Kbd> : null}
+          </span>
         </div>
       </TooltipContent>
     </Tooltip>

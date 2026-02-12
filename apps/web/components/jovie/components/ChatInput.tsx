@@ -1,9 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { ArrowUp, Loader2 } from 'lucide-react';
 import { forwardRef, useCallback } from 'react';
-
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { cn } from '@/lib/utils';
 
 import { MAX_MESSAGE_LENGTH } from '../types';
@@ -65,70 +64,74 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const isCompact = variant === 'compact';
 
+    const containerClasses = cn(
+      'flex w-full items-center gap-3 rounded-full border bg-surface-2/80',
+      'transition-colors duration-fast focus-within:ring-1 focus-within:ring-offset-0',
+      isCompact ? 'px-4 py-2 min-h-[52px]' : 'px-5 py-3 min-h-[76px]',
+      isOverLimit
+        ? 'border-error/80 focus-within:border-error/80 focus-within:ring-error/15'
+        : 'border-subtle/70 focus-within:border-interactive/60 focus-within:ring-[rgb(var(--focus-ring))/0.28]'
+    );
+
+    const textAreaClasses = cn(
+      'flex-1 resize-none border-none bg-transparent text-sm font-medium',
+      'text-primary-token placeholder:text-secondary-token/70',
+      'focus:outline-none focus-visible:outline-none leading-5',
+      isCompact ? 'pt-1' : 'pt-0.5'
+    );
+
     return (
       <form
         onSubmit={e => {
           e.preventDefault();
           onSubmit(e);
         }}
+        className='space-y-2'
       >
-        <div className='relative'>
+        <div className={containerClasses}>
           <textarea
             ref={ref}
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder}
-            rows={1}
-            className={cn(
-              'w-full resize-none rounded-xl border bg-surface-1',
-              'text-primary-token placeholder:text-tertiary-token',
-              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
-              'transition-colors duration-fast',
-              isCompact
-                ? 'px-4 py-3 pr-14 max-h-32'
-                : 'px-4 py-4 pr-14 min-h-[120px]',
-              isOverLimit
-                ? 'border-error focus:border-error focus:ring-error/20'
-                : 'border-subtle focus:border-accent focus:ring-accent/20'
-            )}
+            rows={isCompact ? 1 : 2}
+            className={textAreaClasses}
             onKeyDown={handleKeyDown}
-            onInput={isCompact ? handleInput : undefined}
+            onInput={handleInput}
             maxLength={MAX_MESSAGE_LENGTH + 100}
             aria-label='Chat message input'
             aria-describedby={isOverLimit ? 'char-limit-error' : undefined}
           />
-          <Button
+          <CircleIconButton
             type='submit'
-            size='icon'
+            size={isCompact ? 'sm' : 'md'}
+            variant='ghost'
             disabled={!value.trim() || isLoading || isSubmitting || isOverLimit}
             className={cn(
-              'absolute rounded-lg',
-              isCompact
-                ? 'bottom-2 right-2 h-8 w-8'
-                : 'bottom-3 right-3 h-10 w-10'
+              'shrink-0 border border-(--color-border-subtle)/80 bg-surface-0/30 text-secondary-token',
+              'hover:bg-surface-0/60 hover:text-primary-token'
             )}
-            aria-label='Send message'
+            ariaLabel='Send message'
           >
             {isLoading || isSubmitting ? (
               <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
               <ArrowUp className='h-4 w-4' />
             )}
-          </Button>
-
-          {isNearLimit && (
-            <div
-              id='char-limit-error'
-              className={cn(
-                'absolute text-xs',
-                isCompact ? 'bottom-2 left-3' : 'bottom-3 left-3',
-                isOverLimit ? 'text-error' : 'text-tertiary-token'
-              )}
-            >
-              {characterCount}/{MAX_MESSAGE_LENGTH}
-            </div>
-          )}
+          </CircleIconButton>
         </div>
+
+        {isNearLimit && (
+          <div
+            id='char-limit-error'
+            className={cn(
+              'text-right text-xs',
+              isOverLimit ? 'text-error' : 'text-tertiary-token'
+            )}
+          >
+            {characterCount}/{MAX_MESSAGE_LENGTH}
+          </div>
+        )}
       </form>
     );
   }

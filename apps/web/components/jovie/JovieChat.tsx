@@ -133,7 +133,7 @@ export function JovieChat({
           )}
 
           {/* Input at bottom */}
-          <div className='border-t border-subtle px-4 py-4'>
+          <div className='px-4 py-4'>
             <div className='mx-auto max-w-2xl'>
               <ChatInput
                 ref={inputRef}

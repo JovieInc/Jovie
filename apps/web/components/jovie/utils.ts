@@ -1,5 +1,11 @@
 import type { ChatErrorType, MessagePart } from './types';
 
+interface ParsedChatErrorPayload {
+  readonly message?: string;
+  readonly retryAfter?: number;
+  readonly errorCode?: string;
+}
+
 /**
  * Extract text content from message parts
  */
@@ -68,6 +74,62 @@ export function getUserFriendlyMessage(
     default:
       return 'Something went wrong. Please try again.';
   }
+}
+
+/**
+ * Parse structured payloads from AI SDK errors when available.
+ * The API sometimes returns JSON in error.message for non-2xx responses.
+ */
+export function parseChatErrorPayload(error: Error): ParsedChatErrorPayload {
+  try {
+    const errorData = JSON.parse(error.message) as Record<string, unknown>;
+    return {
+      message:
+        typeof errorData.message === 'string' ? errorData.message : undefined,
+      retryAfter:
+        typeof errorData.retryAfter === 'number'
+          ? errorData.retryAfter
+          : undefined,
+      errorCode:
+        typeof errorData.code === 'string'
+          ? errorData.code
+          : typeof errorData.errorCode === 'string'
+            ? errorData.errorCode
+            : undefined,
+    };
+  } catch {
+    const codeMatch = error.message.match(/\[([A-Z_]+)\]/);
+    return {
+      errorCode: codeMatch?.[1],
+    };
+  }
+}
+
+/**
+ * Determines if a rate-limit failure represents plan quota exhaustion
+ * ("out of messages") rather than short burst throttling.
+ */
+export function shouldShowUpgradeMessage(
+  type: ChatErrorType,
+  rateLimitReason?: string
+): boolean {
+  if (type !== 'rate_limit') return false;
+  if (!rateLimitReason) return false;
+
+  const normalizedReason = rateLimitReason.toLowerCase();
+  return (
+    normalizedReason.includes('daily ai message limit') ||
+    normalizedReason.includes('out of messages') ||
+    normalizedReason.includes('daily quota') ||
+    normalizedReason.includes('upgrade')
+  );
+}
+
+/**
+ * Assistant copy shown inline when a user runs out of messages.
+ */
+export function getUpgradePromptMessage(): string {
+  return "You've hit your AI message limit for today. Upgrade to keep the conversation going: https://jovie.fm/pricing";
 }
 
 /**

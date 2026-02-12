@@ -18,10 +18,10 @@ import type { AudienceFilters } from './types';
 
 /** Segment filter options */
 const SEGMENT_OPTIONS = [
-  { id: 'highIntent', label: 'High Intent', iconName: 'Zap' },
+  { id: 'highIntent', label: 'High Intent', iconName: 'Bolt' },
   { id: 'returning', label: 'Returning', iconName: 'RefreshCw' },
-  { id: 'frequent', label: '3+ Visits', iconName: 'Repeat' },
-  { id: 'recent24h', label: 'Last 24h', iconName: 'Clock' },
+  { id: 'frequent', label: '3+ Visits', iconName: 'Activity' },
+  { id: 'recent24h', label: 'Last 24h', iconName: 'AlarmClock' },
 ] as const;
 
 type SegmentId = (typeof SEGMENT_OPTIONS)[number]['id'];
