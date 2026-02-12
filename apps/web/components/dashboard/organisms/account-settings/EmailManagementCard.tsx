@@ -12,7 +12,6 @@ import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { FormField } from '@/components/molecules/FormField';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
 import type { ClerkEmailAddressResource, ClerkUserResource } from './types';
@@ -46,111 +45,108 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
   } = useEmailManagement(user);
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-4 sm:gap-6'>
-        <div className='flex-1'>
-          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
-            Email addresses
-          </h3>
-          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
-            Manage the email addresses tied to your account. Set a verified
-            email as primary to use it for sign-in and notifications.
-          </p>
-        </div>
-      </div>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      {/* Existing email rows */}
+      {sortedEmails.map(email => {
+        const isPrimary = email.id === primaryEmailId;
+        const isVerified = email.verification?.status === 'verified';
 
-      <div className='mt-3 sm:mt-6 space-y-4 sm:space-y-6'>
-        <div className='space-y-2 sm:space-y-3'>
-          {sortedEmails.map(email => {
-            const isPrimary = email.id === primaryEmailId;
-            const isVerified = email.verification?.status === 'verified';
-
-            return (
-              <div
-                key={email.id}
-                className='flex flex-col sm:flex-row sm:items-center justify-between rounded-lg sm:rounded-xl border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 bg-surface-1 gap-2 sm:gap-3'
-              >
-                <div>
-                  <p className='text-sm font-medium text-primary flex items-center gap-2'>
-                    {email.emailAddress}
-                    {isPrimary && (
-                      <span className='inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent'>
-                        Primary
-                      </span>
-                    )}
-                  </p>
-                  <p className='text-xs text-secondary flex items-center gap-2 mt-1'>
-                    {isVerified ? (
-                      <span className='inline-flex items-center gap-1 text-emerald-600'>
-                        <CheckCircle className='h-4 w-4' />
-                        Verified
-                      </span>
-                    ) : (
-                      <span className='inline-flex items-center gap-1 text-amber-600'>
-                        <ShieldAlert className='h-4 w-4' />
-                        Verification required
-                      </span>
-                    )}
-                  </p>
-                </div>
-
-                <div className='flex items-center gap-2'>
-                  {!isPrimary && isVerified && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      disabled={syncingEmailId === email.id}
-                      onClick={() => handleMakePrimary(email)}
-                    >
-                      {syncingEmailId === email.id
-                        ? 'Updating…'
-                        : 'Make primary'}
-                    </Button>
-                  )}
-                  {!isPrimary && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='text-red-500 hover:text-red-600 hover:bg-red-50'
-                      disabled={syncingEmailId === email.id}
-                      onClick={() => setEmailToRemove(email)}
-                    >
-                      {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className='rounded-lg sm:rounded-xl border border-dashed border-subtle bg-surface-0 p-3 sm:p-4'>
-          <h4 className='text-[13px] sm:text-sm font-semibold text-primary'>
-            Add a new email
-          </h4>
-          <p className='text-xs text-secondary mt-0.5 sm:mt-1'>
-            We will send a six-digit confirmation code to verify ownership.
-          </p>
-
-          <form
-            onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
-            className='mt-3 sm:mt-4 space-y-2.5 sm:space-y-3'
+        return (
+          <div
+            key={email.id}
+            className='flex items-center justify-between px-5 py-4'
           >
-            {!pendingEmail && (
-              <FormField label='New email address' required>
+            <div className='flex items-center gap-3'>
+              <div>
+                <p className='text-sm text-primary-token flex items-center gap-2'>
+                  {email.emailAddress}
+                  {isPrimary && (
+                    <span className='text-xs text-secondary-token'>
+                      Primary
+                    </span>
+                  )}
+                </p>
+                <p className='text-xs text-secondary-token flex items-center gap-1.5 mt-0.5'>
+                  {isVerified ? (
+                    <span className='inline-flex items-center gap-1 text-emerald-600'>
+                      <CheckCircle className='h-3.5 w-3.5' />
+                      Verified
+                    </span>
+                  ) : (
+                    <span className='inline-flex items-center gap-1 text-amber-600'>
+                      <ShieldAlert className='h-3.5 w-3.5' />
+                      Unverified
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className='flex items-center gap-2'>
+              {!isPrimary && isVerified && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  disabled={syncingEmailId === email.id}
+                  onClick={() => handleMakePrimary(email)}
+                >
+                  {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
+                </Button>
+              )}
+              {!isPrimary && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                  disabled={syncingEmailId === email.id}
+                  onClick={() => setEmailToRemove(email)}
+                >
+                  {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Add email row */}
+      <div className='px-5 py-4'>
+        <form
+          onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
+          className='flex flex-col gap-3 sm:flex-row sm:items-end'
+        >
+          <div className='flex-1'>
+            {!pendingEmail ? (
+              <div>
+                <label
+                  htmlFor='new-email'
+                  className='block text-sm text-primary-token mb-1.5'
+                >
+                  Add email address
+                </label>
                 <Input
+                  id='new-email'
                   type='email'
                   value={newEmail}
                   placeholder='you@example.com'
                   onChange={event => setNewEmail(event.target.value)}
                   required
                 />
-              </FormField>
-            )}
-
-            {pendingEmail && (
-              <FormField label='Verification code' required>
+              </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor='verify-code'
+                  className='block text-sm text-primary-token mb-1.5'
+                >
+                  Verification code
+                </label>
                 <Input
+                  id='verify-code'
                   inputMode='numeric'
                   pattern='[0-9]*'
                   maxLength={6}
@@ -159,37 +155,40 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   placeholder='Enter 6-digit code'
                   required
                 />
-              </FormField>
+              </div>
             )}
-
-            {emailError && <p className='text-sm text-red-500'>{emailError}</p>}
-
-            <div className='flex flex-wrap gap-2'>
+            {emailError && (
+              <p className='text-sm text-red-500 mt-1.5'>{emailError}</p>
+            )}
+          </div>
+          <div className='flex gap-2 shrink-0'>
+            <Button
+              type='submit'
+              size='sm'
+              disabled={
+                emailStatus === 'sending' || emailStatus === 'verifying'
+              }
+            >
+              {pendingEmail
+                ? emailStatus === 'verifying'
+                  ? 'Verifying…'
+                  : 'Confirm'
+                : emailStatus === 'sending'
+                  ? 'Sending…'
+                  : 'Add'}
+            </Button>
+            {pendingEmail && (
               <Button
-                type='submit'
-                disabled={
-                  emailStatus === 'sending' || emailStatus === 'verifying'
-                }
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={resetEmailForm}
               >
-                {(() => {
-                  if (pendingEmail) {
-                    return emailStatus === 'verifying'
-                      ? 'Verifying…'
-                      : 'Confirm email';
-                  }
-                  return emailStatus === 'sending'
-                    ? 'Sending…'
-                    : 'Send verification';
-                })()}
+                Cancel
               </Button>
-              {pendingEmail && (
-                <Button type='button' variant='ghost' onClick={resetEmailForm}>
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </form>
-        </div>
+            )}
+          </div>
+        </form>
       </div>
 
       <ConfirmDialog

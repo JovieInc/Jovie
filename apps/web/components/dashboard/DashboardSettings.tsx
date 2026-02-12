@@ -12,7 +12,7 @@ const SettingsPolished = dynamic(
     })),
   {
     loading: () => (
-      <div className='mx-auto max-w-3xl space-y-8 pb-8'>
+      <div className='mx-auto max-w-2xl space-y-8 pb-8'>
         <div className='h-96 animate-pulse motion-reduce:animate-none rounded-lg bg-surface-1' />
       </div>
     ),
@@ -40,7 +40,7 @@ export const DashboardSettings = memo(function DashboardSettings({
   }
 
   return (
-    <div className='mx-auto max-w-3xl'>
+    <div className='mx-auto max-w-2xl'>
       <SettingsPolished
         artist={artist}
         onArtistUpdate={setArtist}

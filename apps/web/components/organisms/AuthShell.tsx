@@ -50,18 +50,22 @@ function AuthShellInner({
   const sidebarTrigger =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
+  const isInSettings = section === 'settings';
+
   return (
     <>
       <UnifiedSidebar section={section} navigation={navigation} />
 
       <SidebarInset className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'>
-        <DashboardHeader
-          breadcrumbs={breadcrumbs}
-          sidebarTrigger={sidebarTrigger}
-          breadcrumbSuffix={headerBadge}
-          action={headerAction}
-          showDivider={isTableRoute}
-        />
+        {!isInSettings && (
+          <DashboardHeader
+            breadcrumbs={breadcrumbs}
+            sidebarTrigger={sidebarTrigger}
+            breadcrumbSuffix={headerBadge}
+            action={headerAction}
+            showDivider={isTableRoute}
+          />
+        )}
         {isTableRoute ? (
           <div
             className={cn(
