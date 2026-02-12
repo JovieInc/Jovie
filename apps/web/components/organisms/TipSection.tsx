@@ -7,8 +7,11 @@ import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { captureError } from '@/lib/error-tracking';
+import { cn } from '@/lib/utils';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
+const CARD_CLASSES =
+  'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
 
 function isAllowedVenmoUrl(url: string): boolean {
   try {
@@ -21,9 +24,20 @@ function isAllowedVenmoUrl(url: string): boolean {
   }
 }
 
+function BackButton({ onClick }: { readonly onClick: () => void }) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
+    >
+      <ArrowLeft className='h-4 w-4' aria-hidden /> Back
+    </button>
+  );
+}
+
 interface TipSectionProps {
   readonly handle: string;
-  readonly artistName: string;
   readonly amounts?: number[];
   readonly venmoLink?: string;
   readonly venmoUsername?: string | null;
@@ -39,8 +53,8 @@ export function TipSection({
   venmoUsername,
   onStripePayment,
   onVenmoPayment,
-  className = '',
-}: Readonly<TipSectionProps>) {
+  className,
+}: TipSectionProps) {
   const [loading, setLoading] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'venmo' | null>(
     null
@@ -78,12 +92,14 @@ export function TipSection({
     globalThis.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // If no payment methods are supported, show QR fallback
+  const goBack = () => setPaymentMethod(null);
+
+  // No payment methods supported — show QR fallback
   if (!onStripePayment && !venmoLink) {
     const currentUrl =
       typeof window === 'undefined' ? '' : globalThis.location.href;
     return (
-      <div className={`text-center space-y-4 ${className}`}>
+      <div className={cn('text-center space-y-4', className)}>
         <QRCodeCard
           data={currentUrl}
           title='Scan to tip via Apple Pay'
@@ -93,11 +109,11 @@ export function TipSection({
     );
   }
 
-  // Show payment method selection if both are available
+  // Both methods available, user hasn't chosen yet
   if (onStripePayment && venmoLink && !paymentMethod) {
     return (
-      <div className={`w-full max-w-sm ${className}`}>
-        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+      <div className={cn('w-full max-w-sm', className)}>
+        <div className={CARD_CLASSES}>
           <h3 className='text-[15px] font-semibold tracking-tight text-center text-primary-token mb-1'>
             Choose payment method
           </h3>
@@ -127,20 +143,12 @@ export function TipSection({
     );
   }
 
-  // Show Stripe payment flow
+  // Stripe payment flow
   if (paymentMethod === 'stripe' || (onStripePayment && !venmoLink)) {
     return (
-      <div className={`w-full max-w-sm ${className}`}>
-        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-          {paymentMethod && (
-            <button
-              type='button'
-              onClick={() => setPaymentMethod(null)}
-              className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
-            >
-              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
-            </button>
-          )}
+      <div className={cn('w-full max-w-sm', className)}>
+        <div className={CARD_CLASSES}>
+          {paymentMethod && <BackButton onClick={goBack} />}
           <div className='space-y-2.5'>
             {amounts.map(amount => (
               <Button
@@ -163,20 +171,12 @@ export function TipSection({
     );
   }
 
-  // Show Venmo payment flow
+  // Venmo payment flow
   if (paymentMethod === 'venmo' || (venmoLink && !onStripePayment)) {
     return (
-      <div className={`w-full max-w-sm ${className}`}>
-        <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-          {paymentMethod && (
-            <button
-              type='button'
-              onClick={() => setPaymentMethod(null)}
-              className='mb-4 inline-flex items-center gap-1 text-sm font-medium text-secondary-token transition-colors hover:text-primary-token'
-            >
-              <ArrowLeft className='h-4 w-4' aria-hidden /> Back
-            </button>
-          )}
+      <div className={cn('w-full max-w-sm', className)}>
+        <div className={CARD_CLASSES}>
+          {paymentMethod && <BackButton onClick={goBack} />}
           <TipSelector amounts={amounts} onContinue={handleVenmoPayment} />
         </div>
       </div>
