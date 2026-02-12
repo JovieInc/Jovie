@@ -5,7 +5,8 @@ describe('buildArtistBioDraft', () => {
   it('builds a structured draft with facts and directives', () => {
     const result = buildArtistBioDraft({
       artistName: 'Nova Echo',
-      existingBio: 'Independent artist blending electronic and alt-pop textures.',
+      existingBio:
+        'Independent artist blending electronic and alt-pop textures.',
       genres: ['electronic', 'alt-pop'],
       spotifyFollowers: 25300,
       spotifyPopularity: 61,
@@ -38,6 +39,25 @@ describe('buildArtistBioDraft', () => {
 
     expect(result.draft).toContain('New Signal');
     expect(result.facts).toContain('Spotify followers: not available');
+    expect(result.facts).toContain('Spotify popularity: not available');
     expect(result.facts).toContain('Spotify profile linked: no');
+  });
+
+  it('treats zero followers as a real value, not "not available"', () => {
+    const result = buildArtistBioDraft({
+      artistName: 'Zero Test',
+      existingBio: null,
+      genres: [],
+      spotifyFollowers: 0,
+      spotifyPopularity: 0,
+      spotifyUrl: null,
+      appleMusicUrl: null,
+      profileViews: 0,
+      releaseCount: 0,
+      notableReleases: [],
+    });
+
+    expect(result.facts).toContain('Spotify followers: 0');
+    expect(result.facts).toContain('Spotify popularity: 0 / 100');
   });
 });

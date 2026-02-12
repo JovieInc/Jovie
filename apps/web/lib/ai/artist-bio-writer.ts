@@ -22,15 +22,15 @@ function formatNumber(value: number): string {
 }
 
 function buildMarketSignal(input: ArtistBioWriterInput): string {
-  if (input.spotifyFollowers && input.spotifyFollowers >= 100_000) {
+  if (input.spotifyFollowers != null && input.spotifyFollowers >= 100_000) {
     return `The momentum is clear: ${formatNumber(input.spotifyFollowers)} Spotify followers and a catalog built for global scale.`;
   }
 
-  if (input.spotifyFollowers && input.spotifyFollowers >= 10_000) {
+  if (input.spotifyFollowers != null && input.spotifyFollowers >= 10_000) {
     return `With ${formatNumber(input.spotifyFollowers)} Spotify followers, ${input.artistName} has moved beyond discovery and into consistent demand.`;
   }
 
-  if (input.spotifyFollowers && input.spotifyFollowers > 0) {
+  if (input.spotifyFollowers != null && input.spotifyFollowers > 0) {
     return `${input.artistName} is actively building audience traction, now reaching ${formatNumber(input.spotifyFollowers)} Spotify followers.`;
   }
 
@@ -92,8 +92,8 @@ export function buildArtistBioDraft(
     .join(' ');
 
   const facts = [
-    `Spotify followers: ${input.spotifyFollowers ? formatNumber(input.spotifyFollowers) : 'not available'}`,
-    `Spotify popularity: ${input.spotifyPopularity ?? 'not available'} / 100`,
+    `Spotify followers: ${input.spotifyFollowers != null ? formatNumber(input.spotifyFollowers) : 'not available'}`,
+    `Spotify popularity: ${input.spotifyPopularity != null ? `${input.spotifyPopularity} / 100` : 'not available'}`,
     `Catalog size: ${input.releaseCount} release${input.releaseCount === 1 ? '' : 's'}`,
     `Spotify profile linked: ${input.spotifyUrl ? 'yes' : 'no'}`,
     `Apple Music profile linked: ${input.appleMusicUrl ? 'yes' : 'no'}`,

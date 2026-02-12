@@ -5,6 +5,7 @@ import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { CHAT_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -34,7 +35,6 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getPlanLimits } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
-import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 
 export const maxDuration = 30;
 
@@ -979,7 +979,13 @@ function createWorldClassBioTool(
         .describe('Maximum words for the returned draft (default 180)'),
     }),
     execute: async ({ goal, tone, maxWords }) => {
-      const releases = profileId ? await fetchReleasesForChat(profileId) : [];
+      let releases: Awaited<ReturnType<typeof fetchReleasesForChat>> = [];
+      try {
+        releases = profileId ? await fetchReleasesForChat(profileId) : [];
+      } catch {
+        // Non-fatal: proceed with empty releases rather than failing the tool
+      }
+      const wordLimit = maxWords ?? 180;
       const draftPackage = buildArtistBioDraft({
         artistName: context.displayName,
         existingBio: context.bio,
@@ -993,12 +999,17 @@ function createWorldClassBioTool(
         notableReleases: releases.slice(0, 3).map(release => release.title),
       });
 
+      const trimmedDraft =
+        draftPackage.draft.split(/\s+/).length > wordLimit
+          ? `${draftPackage.draft.split(/\s+/).slice(0, wordLimit).join(' ')}…`
+          : draftPackage.draft;
+
       return {
         success: true,
         usageGoal: goal ?? 'general',
         tone: tone ?? 'elevated',
-        maxWords: maxWords ?? 180,
-        draft: draftPackage.draft,
+        maxWords: wordLimit,
+        draft: trimmedDraft,
         facts: draftPackage.facts,
         voiceDirectives: draftPackage.voiceDirectives,
         releaseContext: releases.slice(0, 5).map(release => ({
@@ -1011,7 +1022,6 @@ function createWorldClassBioTool(
     },
   });
 }
-
 
 /**
  * OPTIONS - CORS preflight handler
@@ -1132,7 +1142,10 @@ export async function POST(req: Request) {
           proposeProfileEdit: createProfileEditTool(artistContext),
           checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
           suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
-          writeWorldClassBio: createWorldClassBioTool(artistContext, resolvedProfileId),
+          writeWorldClassBio: createWorldClassBioTool(
+            artistContext,
+            resolvedProfileId
+          ),
           generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
           createPromoStrategy: createPromoStrategyTool(
             artistContext,
