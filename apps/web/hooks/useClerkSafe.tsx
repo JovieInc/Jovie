@@ -2,6 +2,7 @@
 
 import {
   useAuth as useAuthOriginal,
+  useSignIn as useSignInOriginal,
   useSession as useSessionOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
@@ -11,6 +12,7 @@ import { createContext, type ReactNode, useContext, useMemo } from 'react';
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
 type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
 type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
+type UseSignInReturn = ReturnType<typeof useSignInOriginal>;
 
 /**
  * Context to track whether Clerk is available in the current provider tree.
@@ -85,6 +87,16 @@ const DEFAULT_SESSION_RETURN: UseSessionReturn = {
   session: null,
 };
 
+/**
+ * Default return value when Clerk is not available.
+ * Matches the shape of useSignIn() return type.
+ */
+const DEFAULT_SIGN_IN_RETURN: UseSignInReturn = {
+  isLoaded: true,
+  signIn: null,
+  setActive: async () => undefined,
+};
+
 // ============================================================================
 // Context-based Safe Hooks
 // ============================================================================
@@ -101,6 +113,7 @@ interface ClerkSafeContextValue {
   user: UseUserReturn;
   auth: UseAuthReturn;
   session: UseSessionReturn;
+  signIn: UseSignInReturn;
 }
 
 const ClerkSafeContext = createContext<ClerkSafeContextValue | null>(null);
@@ -113,8 +126,12 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
+  const signIn = useSignInOriginal();
 
-  const value = useMemo(() => ({ user, auth, session }), [user, auth, session]);
+  const value = useMemo(
+    () => ({ user, auth, session, signIn }),
+    [user, auth, session, signIn]
+  );
 
   return (
     <ClerkSafeContext.Provider value={value}>
@@ -137,6 +154,7 @@ export function ClerkSafeDefaultsProvider({
         user: DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
+        signIn: DEFAULT_SIGN_IN_RETURN,
       }}
     >
       {children}
@@ -194,5 +212,18 @@ export function useSessionSafe(): UseSessionReturn {
   return context.session;
 }
 
+/**
+ * Safe version of useSignIn that returns defaults when Clerk is unavailable.
+ * Use this instead of useSignIn from @clerk/nextjs to prevent provider errors
+ * on routes rendered in mock/bypass mode.
+ */
+export function useSignInSafe(): UseSignInReturn {
+  const context = useContext(ClerkSafeContext);
+  if (!context) {
+    return DEFAULT_SIGN_IN_RETURN;
+  }
+  return context.signIn;
+}
+
 // Re-export types for convenience
-export type { UseAuthReturn, UseSessionReturn, UseUserReturn };
+export type { UseAuthReturn, UseSessionReturn, UseSignInReturn, UseUserReturn };
