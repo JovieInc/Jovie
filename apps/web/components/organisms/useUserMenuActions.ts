@@ -18,6 +18,8 @@ const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
 
+const MONTHLY_INTERVALS = new Set(['month', 'monthly']);
+
 export interface UserMenuLoadingState {
   signOut: boolean;
   manageBilling: boolean;
@@ -101,17 +103,18 @@ export function useUserMenuActions({
         pricing = result.data;
       }
 
-      const monthPrice = pricing?.pricingOptions?.find(
-        option => option.interval === 'month'
+      const monthPrice = pricing?.pricingOptions?.find(option =>
+        MONTHLY_INTERVALS.has(option.interval)
       );
+      const selectedPrice = monthPrice ?? pricing?.pricingOptions?.[0];
 
-      if (!monthPrice?.priceId) {
-        throw new TypeError('Monthly pricing option missing');
+      if (!selectedPrice?.priceId) {
+        throw new TypeError('Pricing option missing');
       }
 
       // Use TanStack Query mutation for checkout
       const checkout = await checkoutMutation.mutateAsync({
-        priceId: monthPrice.priceId,
+        priceId: selectedPrice.priceId,
       });
 
       if (!checkout.url) {
@@ -120,7 +123,7 @@ export function useUserMenuActions({
 
       track('billing_upgrade_checkout_redirected', {
         ...ANALYTICS_CONTEXT,
-        interval: monthPrice.interval,
+        interval: selectedPrice.interval,
       });
 
       redirectToUrl(checkout.url);
