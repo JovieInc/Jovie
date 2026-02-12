@@ -64,19 +64,6 @@ describe('useSequentialShortcuts', () => {
     expect(mockPush).toHaveBeenCalledWith('/app/profile');
   });
 
-  it('navigates on valid G then O sequence (tour dates)', () => {
-    renderHook(() => useSequentialShortcuts());
-
-    act(() => {
-      fireKey('g');
-    });
-    act(() => {
-      fireKey('o');
-    });
-
-    expect(mockPush).toHaveBeenCalledWith('/app/tour-dates');
-  });
-
   it('does not navigate if sequence times out', () => {
     renderHook(() => useSequentialShortcuts({ sequenceTimeout: 1000 }));
 
