@@ -144,6 +144,13 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
 
       // Return error response
       if (wantsJson) {
+        if (error instanceof TypeError) {
+          return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 400 }
+          );
+        }
+
         const message =
           error instanceof Error
             ? error.message
