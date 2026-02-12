@@ -5,7 +5,6 @@
  * Uses shared base logic from useAuthFlowBase.
  */
 
-import { useSignIn } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
@@ -15,6 +14,7 @@ import {
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
+import { useSignInSafe } from './useClerkSafe';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
 // Re-export types for backwards compatibility
@@ -58,7 +58,7 @@ export interface UseSignInFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignInFlow(): UseSignInFlowReturn {
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn, setActive, isLoaded } = useSignInSafe();
 
   // Use shared auth flow base
   const base = useAuthFlowBase({
