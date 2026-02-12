@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
-import { ListenNowForm } from '@/components/dashboard/organisms/listen-now-form';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
@@ -142,26 +141,7 @@ export function SettingsPolished({
       title: 'Music Links',
       description: 'Streaming platforms and music profile links.',
       render: () => (
-        <div className='space-y-4 sm:space-y-6'>
-          <div>
-            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
-              Connected Platforms
-            </h3>
-            <ConnectedDspList
-              profileId={artist.id}
-              spotifyId={artist.spotify_id}
-            />
-          </div>
-          <div>
-            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
-              Streaming Links
-            </h3>
-            <ListenNowForm
-              artist={artist}
-              onUpdate={a => onArtistUpdate?.(a)}
-            />
-          </div>
-        </div>
+        <ConnectedDspList profileId={artist.id} spotifyId={artist.spotify_id} />
       ),
     },
     {
