@@ -1,5 +1,5 @@
-import { tool } from 'ai';
 import * as Sentry from '@sentry/nextjs';
+import { tool } from 'ai';
 import { z } from 'zod';
 import { aiInsightGenerationLimiter } from '@/lib/rate-limit';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
@@ -20,10 +20,7 @@ const FOCUS_CATEGORIES: Record<string, string[]> = {
  * Creates the generateInsights tool for on-demand AI insight generation from chat.
  * This calls the existing insight generator and returns insights ephemerally (not persisted to DB).
  */
-export function createGenerateInsightsTool(
-  profileId: string,
-  userId: string
-) {
+export function createGenerateInsightsTool(profileId: string, userId: string) {
   return tool({
     description:
       "Generate AI-powered insights from the artist's analytics data. Use this when the artist asks you to analyze their data, find trends, or wants a comprehensive overview of how they're doing. This calls an AI model internally and may take a few seconds.",
@@ -58,9 +55,7 @@ export function createGenerateInsightsTool(
         let insights: GeneratedInsight[] = result.insights;
         const focusCategories = FOCUS_CATEGORIES[focus] ?? [];
         if (focusCategories.length > 0) {
-          insights = insights.filter(i =>
-            focusCategories.includes(i.category)
-          );
+          insights = insights.filter(i => focusCategories.includes(i.category));
         }
 
         if (insights.length === 0) {

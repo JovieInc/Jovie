@@ -51,9 +51,7 @@ export function createQueryAnalyticsTool(profileId: string) {
         }
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
-            : 'Failed to query analytics';
+          error instanceof Error ? error.message : 'Failed to query analytics';
         return { success: false, error: message };
       }
     },
@@ -159,10 +157,7 @@ function formatTimingResponse(metrics: MetricSnapshot, timeRange: string) {
         bestDay: peakDay.day,
         bestDayLabel: DAY_NAMES[peakDay.day] ?? `Day ${peakDay.day}`,
       },
-      totalEventsAnalyzed: clicksByHour.reduce(
-        (sum, h) => sum + h.count,
-        0
-      ),
+      totalEventsAnalyzed: clicksByHour.reduce((sum, h) => sum + h.count, 0),
     },
   };
 }

@@ -1,6 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { FIELD_DESCRIPTIONS, type ArtistContext } from '../helpers';
+import { type ArtistContext, FIELD_DESCRIPTIONS } from '../helpers';
 
 /**
  * Creates the proposeProfileEdit tool for the AI to suggest profile changes.
