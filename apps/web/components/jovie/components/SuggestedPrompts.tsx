@@ -34,8 +34,9 @@ import { cn } from '@/lib/utils';
 
 import {
   ALL_SUGGESTIONS,
+  buildContextualSuggestions,
   type ChatSuggestion,
-  DEFAULT_SUGGESTIONS,
+  type StarterSuggestionContext,
 } from '../types';
 
 /** Map icon name strings to lucide components */
@@ -72,6 +73,7 @@ const ACCENT_CLASSES = {
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
+  readonly context: StarterSuggestionContext | null;
 }
 
 function SuggestionCard({
@@ -110,14 +112,16 @@ function SuggestionCard({
   );
 }
 
-export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
+export function SuggestedPrompts({ onSelect, context }: SuggestedPromptsProps) {
   const [showAll, setShowAll] = useState(false);
 
   const handleToggle = useCallback(() => {
     setShowAll(prev => !prev);
   }, []);
 
-  const suggestions = showAll ? ALL_SUGGESTIONS : DEFAULT_SUGGESTIONS;
+  const suggestions = showAll
+    ? ALL_SUGGESTIONS
+    : buildContextualSuggestions(context);
 
   return (
     <div className='space-y-3'>
