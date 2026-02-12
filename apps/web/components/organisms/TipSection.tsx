@@ -10,7 +10,8 @@ import { captureError } from '@/lib/error-tracking';
 import { cn } from '@/lib/utils';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-const CARD_CLASSES = 'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
+const CARD_CLASSES =
+  'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
 
 function isAllowedVenmoUrl(url: string): boolean {
   try {

@@ -40,10 +40,7 @@ describe('TipSection', () => {
     mockOnStripePayment.mockResolvedValueOnce(undefined);
 
     render(
-      <TipSection
-        handle='artist123'
-        onStripePayment={mockOnStripePayment}
-      />
+      <TipSection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
     // Find and click the $2 tip button
@@ -64,10 +61,7 @@ describe('TipSection', () => {
     mockOnStripePayment.mockRejectedValueOnce(new Error('Payment failed'));
 
     render(
-      <TipSection
-        handle='artist123'
-        onStripePayment={mockOnStripePayment}
-      />
+      <TipSection handle='artist123' onStripePayment={mockOnStripePayment} />
     );
 
     // Find and click the $2 tip button
