@@ -18,6 +18,7 @@ import { SettingsSection } from '@/components/dashboard/organisms/SettingsSectio
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
+
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -87,33 +88,31 @@ export function SettingsPolished({
     {
       id: 'account',
       title: 'Account',
-      description:
-        'Manage email addresses, password, connected accounts, and more.',
+      description: 'Manage your account security and authentication.',
       render: renderAccountSection,
     },
     {
       id: 'appearance',
       title: 'Appearance',
-      description: 'Customize how the interface looks and feels.',
+      description: 'Theme and display preferences.',
       render: () => <SettingsAppearanceSection />,
     },
     {
       id: 'notifications',
       title: 'Notifications',
-      description: 'Manage your email preferences and communication settings.',
+      description: 'Control how you receive updates.',
       render: () => <SettingsNotificationsSection />,
     },
     {
       id: 'billing',
       title: 'Billing & Subscription',
-      description:
-        'Manage your subscription, payment methods, and billing history.',
+      description: 'Subscription, payment methods, and invoices.',
       render: () => <SettingsBillingSection />,
     },
     {
       id: 'data-privacy',
       title: 'Data & Privacy',
-      description: 'Export your data or delete your account.',
+      description: 'Data export and account deletion.',
       render: () => <DataPrivacySection />,
     },
   ];
@@ -123,7 +122,7 @@ export function SettingsPolished({
     {
       id: 'artist-profile',
       title: 'Artist Profile',
-      description: 'Manage your photo, display name, and username.',
+      description: 'Photo, display name, and username.',
       render: () => (
         <SettingsArtistProfileSection
           artist={artist}
@@ -135,18 +134,17 @@ export function SettingsPolished({
     {
       id: 'social-links',
       title: 'Social Links',
-      description: 'Connect your social media accounts.',
+      description: 'Connect your social media profiles.',
       render: () => <SocialsForm artist={artist} />,
     },
     {
       id: 'music-links',
       title: 'Music Links',
-      description:
-        'Connect streaming platforms and manage your music profile links.',
+      description: 'Streaming platforms and music profile links.',
       render: () => (
         <div className='space-y-4 sm:space-y-6'>
           <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
+            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
               Connected Platforms
             </h3>
             <ConnectedDspList
@@ -155,7 +153,7 @@ export function SettingsPolished({
             />
           </div>
           <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
+            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
               Streaming Links
             </h3>
             <ListenNowForm
@@ -169,8 +167,7 @@ export function SettingsPolished({
     {
       id: 'branding',
       title: 'Branding',
-      description:
-        'Remove Jovie branding to create a fully custom experience for your fans.',
+      description: 'Custom branding for your profile page.',
       render: () =>
         isPro ? (
           <SettingsBrandingSection
@@ -188,8 +185,7 @@ export function SettingsPolished({
     {
       id: 'ad-pixels',
       title: 'Ad Pixels',
-      description:
-        'Connect Facebook, Google, and TikTok pixels to track conversions.',
+      description: 'Facebook, Google, and TikTok conversion tracking.',
       render: () =>
         isPro ? (
           <SettingsAdPixelsSection />
@@ -204,8 +200,7 @@ export function SettingsPolished({
     {
       id: 'analytics',
       title: 'Analytics',
-      description:
-        'Control how your own activity is tracked in your analytics.',
+      description: 'Control how your visits appear in analytics.',
       render: () =>
         isPro ? (
           <SettingsAnalyticsSection
@@ -248,14 +243,12 @@ export function SettingsPolished({
   // Full settings view with group headers
   return (
     <div
-      className='space-y-5 sm:space-y-8 pb-4 sm:pb-6'
+      className='space-y-8 sm:space-y-10 pb-4 sm:pb-6'
       data-testid='settings-polished'
     >
       {/* General settings */}
-      <div className='space-y-4 sm:space-y-6'>
-        <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-          General
-        </h2>
+      <div className='space-y-6 sm:space-y-8'>
+        <h3 className='text-[13px] font-medium text-tertiary-token'>General</h3>
         {userSections.map(section => (
           <SettingsSection
             key={section.id}
@@ -269,10 +262,8 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div className='space-y-4 sm:space-y-6 pt-4 sm:pt-6 border-t border-subtle'>
-        <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-          Artist
-        </h2>
+      <div className='space-y-6 sm:space-y-8'>
+        <h3 className='text-[13px] font-medium text-tertiary-token'>Artist</h3>
         {artistSections.map(section => (
           <SettingsSection
             key={section.id}

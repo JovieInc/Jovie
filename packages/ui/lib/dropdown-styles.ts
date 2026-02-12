@@ -164,9 +164,9 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium leading-[20px] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-normal leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
   'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-visible:outline-none focus-visible:bg-interactive-hover ' +
@@ -187,7 +187,7 @@ export const MENU_ITEM_DESTRUCTIVE =
 export const CHECKBOX_RADIO_ITEM_BASE =
   'relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
   'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-visible:outline-none focus-visible:bg-interactive-hover';
@@ -198,7 +198,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
 export const SELECT_ITEM_BASE =
   'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token ' +
+  'text-secondary-token ' +
   'focus-visible:bg-interactive-hover focus-visible:text-primary-token ' +
   'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50';
@@ -211,9 +211,9 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-medium leading-[16px] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-normal leading-[16px] outline-none ' +
   'transition-colors duration-150 ease-out ' +
-  'text-primary-token hover:bg-interactive-hover hover:text-primary-token ' +
+  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
   'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
   'focus-visible:outline-none focus-visible:bg-interactive-hover ' +

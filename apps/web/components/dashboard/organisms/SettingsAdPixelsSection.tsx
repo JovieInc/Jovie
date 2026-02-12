@@ -239,14 +239,15 @@ export function SettingsAdPixelsSection() {
 
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>
-      <DashboardCard variant='settings'>
-        <div className='flex items-center justify-between mb-6'>
-          <p className='text-sm text-secondary-token'>
-            Track conversions via server-side APIs for better accuracy and
-            privacy.
-          </p>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='divide-y divide-subtle'
+      >
+        <div className='flex items-center justify-between px-5 py-4'>
+          <span className='text-sm text-primary-token'>Pixel tracking</span>
           <div className='flex items-center gap-2'>
-            <span className='text-sm text-secondary-token'>
+            <span className='text-xs text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}
             </span>
             <Switch
@@ -257,7 +258,7 @@ export function SettingsAdPixelsSection() {
           </div>
         </div>
 
-        <div className='space-y-4'>
+        <div className='px-5 py-4 space-y-4'>
           <PlatformSection
             platform='Facebook Conversions API'
             pixelIdLabel='Pixel ID'
@@ -315,27 +316,11 @@ export function SettingsAdPixelsSection() {
           />
         </div>
 
-        <div className='mt-6 p-4 bg-surface-1 rounded-lg'>
-          <h4 className='text-sm font-medium text-primary mb-2'>
-            How it works
-          </h4>
-          <ul className='text-xs text-secondary-token space-y-1'>
-            <li>
-              Events from your profile (page views, link clicks) are sent
-              server-side to your ad platforms.
-            </li>
-            <li>
-              No third-party JavaScript on your profile - faster page loads for
-              visitors.
-            </li>
-            <li>
-              Better tracking accuracy - bypasses ad blockers and browser
-              restrictions.
-            </li>
-            <li>
-              Your credentials are encrypted and never exposed to visitors.
-            </li>
-          </ul>
+        <div className='px-5 py-4'>
+          <p className='text-xs text-secondary-token'>
+            Events are sent server-side for better accuracy. No third-party
+            JavaScript on your profile. Credentials are encrypted.
+          </p>
         </div>
       </DashboardCard>
 
