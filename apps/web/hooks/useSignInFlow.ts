@@ -14,8 +14,8 @@ import {
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
-import { useSignInSafe } from './useClerkSafe';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
+import { useSignInSafe } from './useClerkSafe';
 
 // Re-export types for backwards compatibility
 export type { AuthMethod, LoadingState } from '@/lib/auth/types';
