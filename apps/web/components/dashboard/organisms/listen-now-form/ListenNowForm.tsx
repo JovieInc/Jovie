@@ -179,13 +179,9 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     >
       {/* ── Primary Streaming ─────────────────────────────── */}
       <div>
-        <h3 className='text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-3'>
+        <h3 className='text-sm font-medium text-primary-token mb-3'>
           Primary Streaming
         </h3>
-        <p className='text-[13px] text-secondary mb-4'>
-          Connect your main streaming profiles. These appear prominently on your
-          page.
-        </p>
 
         <div className='rounded-lg border border-subtle divide-y divide-subtle'>
           {/* Spotify row */}
@@ -312,12 +308,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       {/* ── Video ─────────────────────────────────────────── */}
       <div>
-        <h3 className='text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-3'>
-          Video
-        </h3>
-        <p className='text-[13px] text-secondary mb-4'>
-          Link your YouTube channel for music videos and content.
-        </p>
+        <h3 className='text-sm font-medium text-primary-token mb-3'>Video</h3>
 
         <div className='rounded-lg border border-subtle'>
           <div className='flex items-center gap-3 px-4 py-3'>
@@ -360,12 +351,9 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       {/* ── Other Platforms ────────────────────────────────── */}
       <div>
-        <h3 className='text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-3'>
+        <h3 className='text-sm font-medium text-primary-token mb-3'>
           Other Platforms
         </h3>
-        <p className='text-[13px] text-secondary mb-4'>
-          Add links to other platforms where fans can find your music.
-        </p>
 
         {additionalLinks.length === 0 ? (
           <div className='rounded-lg border border-dashed border-subtle py-6 text-center'>

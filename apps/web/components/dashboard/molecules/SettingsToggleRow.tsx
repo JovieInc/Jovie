@@ -38,16 +38,13 @@ export function SettingsToggleRow({
       )}
     >
       <div className='flex-1 min-w-0'>
-        <h3
-          id={titleId}
-          className='text-[13px] sm:text-sm font-medium text-primary-token'
-        >
+        <h3 id={titleId} className='text-[13px] font-medium text-primary-token'>
           {title}
         </h3>
         {description ? (
           <p
             id={descriptionId}
-            className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] leading-relaxed text-tertiary-token'
+            className='mt-0.5 text-xs leading-normal text-tertiary-token'
           >
             {description}
           </p>
