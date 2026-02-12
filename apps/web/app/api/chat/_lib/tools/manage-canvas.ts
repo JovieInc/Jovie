@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { tool } from 'ai';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -9,9 +10,9 @@ import {
 } from '@/lib/services/canvas/service';
 import { fetchReleasesForChat } from '../context';
 import {
-  type ReleaseContext,
   findReleaseByTitle,
   formatAvailableReleases,
+  type ReleaseContext,
 } from '../helpers';
 
 function buildCanvasPlan(
@@ -94,15 +95,11 @@ export function createManageCanvasTool(profileId: string | null) {
       releaseTitle: z
         .string()
         .optional()
-        .describe(
-          '(plan/markUploaded) The title of the target release'
-        ),
+        .describe('(plan/markUploaded) The title of the target release'),
       motionPreference: z
         .enum(['zoom', 'pan', 'particles', 'morph', 'ambient'])
         .optional()
-        .describe(
-          '(plan only) Preferred animation style. Default: ambient'
-        ),
+        .describe('(plan only) Preferred animation style. Default: ambient'),
     }),
     execute: async ({ action, includeAll, releaseTitle, motionPreference }) => {
       if (!profileId) {
@@ -224,7 +221,10 @@ export function createManageCanvasTool(profileId: string | null) {
           }
         }
       } catch (error) {
-        console.error('manageCanvas tool failed', error);
+        Sentry.captureException(error, {
+          tags: { feature: 'ai-chat', tool: 'manageCanvas' },
+          extra: { profileId, action },
+        });
         return {
           success: false,
           error: 'Canvas operation failed. Please try again.',
