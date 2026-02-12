@@ -23,7 +23,6 @@ import {
   dropdownMenuContentCompactClasses,
   MENU_ITEM_BASE,
   MENU_ITEM_COMPACT,
-  MENU_ITEM_COMPACT_DESTRUCTIVE,
   MENU_ITEM_DESTRUCTIVE,
   MENU_LABEL_BASE,
   MENU_SEPARATOR_BASE,
@@ -133,9 +132,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
   // Resolve size-dependent token classes
   const isCompact = size === 'compact';
   const itemBase = isCompact ? MENU_ITEM_COMPACT : MENU_ITEM_BASE;
-  const itemDestructive = isCompact
-    ? MENU_ITEM_COMPACT_DESTRUCTIVE
-    : MENU_ITEM_DESTRUCTIVE;
+  const itemDestructive = MENU_ITEM_DESTRUCTIVE;
   const dropdownContentBase = isCompact
     ? dropdownMenuContentCompactClasses
     : dropdownMenuContentClasses;

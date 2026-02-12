@@ -73,8 +73,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
 
     const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
 
-    const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      void e;
+    const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
       const isMdUp = mqlMd.matches;
       const isLgUp = mqlLg.matches;
       const hasFinePointer = mqlPointer.matches;
@@ -98,51 +97,14 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     // Initial sync in case state drifted
     onChange(mqlMd);
 
-    // Add listener with both modern and legacy APIs (feature detection)
-    type LegacyMQL = MediaQueryList & {
-      addListener?: (
-        listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void
-      ) => void;
-      removeListener?: (
-        listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void
-      ) => void;
-    };
-    const legacyMqlMd = mqlMd as LegacyMQL;
-    const legacyMqlLg = mqlLg as LegacyMQL;
-    const legacyMqlPointer = mqlPointer as LegacyMQL;
-
-    if (typeof mqlMd.addEventListener === 'function') {
-      mqlMd.addEventListener('change', onChange as EventListener);
-      mqlLg.addEventListener('change', onChange as EventListener);
-      mqlPointer.addEventListener('change', onChange as EventListener);
-    } else if (typeof legacyMqlMd.addListener === 'function') {
-      legacyMqlMd.addListener(
-        onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-      );
-      legacyMqlLg.addListener(
-        onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-      );
-      legacyMqlPointer.addListener(
-        onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-      );
-    }
+    mqlMd.addEventListener('change', onChange);
+    mqlLg.addEventListener('change', onChange);
+    mqlPointer.addEventListener('change', onChange);
 
     return () => {
-      if (typeof mqlMd.removeEventListener === 'function') {
-        mqlMd.removeEventListener('change', onChange as EventListener);
-        mqlLg.removeEventListener('change', onChange as EventListener);
-        mqlPointer.removeEventListener('change', onChange as EventListener);
-      } else if (typeof legacyMqlMd.removeListener === 'function') {
-        legacyMqlMd.removeListener(
-          onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-        );
-        legacyMqlLg.removeListener(
-          onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-        );
-        legacyMqlPointer.removeListener(
-          onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
-        );
-      }
+      mqlMd.removeEventListener('change', onChange);
+      mqlLg.removeEventListener('change', onChange);
+      mqlPointer.removeEventListener('change', onChange);
     };
   }, [dismissed, handle]);
 
