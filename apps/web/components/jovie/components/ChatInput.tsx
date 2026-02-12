@@ -95,7 +95,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             onInput={isCompact ? handleInput : undefined}
             maxLength={MAX_MESSAGE_LENGTH + 100}
             aria-label='Chat message input'
-            aria-describedby={isNearLimit ? 'char-limit-error' : undefined}
+            aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
           />
           <Button
             type='submit'
@@ -118,7 +118,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
           {isNearLimit && (
             <output
-              id='char-limit-error'
+              id='char-limit-status'
               aria-live='polite'
               className={cn(
                 'absolute text-xs',

@@ -32,9 +32,13 @@ export function ErrorDisplay({
 
   const handleCopySupportCode = async () => {
     if (!supportCode || !navigator?.clipboard) return;
-    await navigator.clipboard.writeText(supportCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(supportCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard write can fail (permissions denied, non-secure context)
+    }
   };
 
   return (

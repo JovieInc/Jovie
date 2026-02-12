@@ -38,9 +38,14 @@ describe('extractErrorMetadata', () => {
     });
   });
 
-  it('clamps invalid retryAfter values', () => {
+  it('clamps negative retryAfter to minimum of 1', () => {
     const err = new Error(JSON.stringify({ retryAfter: -10 }));
     expect(extractErrorMetadata(err)).toEqual({ retryAfter: 1 });
+  });
+
+  it('clamps excessive retryAfter to maximum of 3600', () => {
+    const err = new Error(JSON.stringify({ retryAfter: 99999 }));
+    expect(extractErrorMetadata(err)).toEqual({ retryAfter: 3600 });
   });
 });
 
