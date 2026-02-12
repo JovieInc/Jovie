@@ -18,7 +18,7 @@ import { SettingsSection } from '@/components/dashboard/organisms/SettingsSectio
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
-import { SettingsMenu } from '@/components/settings/organisms/SettingsMenu';
+
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -88,33 +88,31 @@ export function SettingsPolished({
     {
       id: 'account',
       title: 'Account',
-      description:
-        'Manage email addresses, password, connected accounts, and more.',
+      description: 'Manage your account security and authentication.',
       render: renderAccountSection,
     },
     {
       id: 'appearance',
       title: 'Appearance',
-      description: 'Customize how the interface looks and feels.',
+      description: 'Theme and display preferences.',
       render: () => <SettingsAppearanceSection />,
     },
     {
       id: 'notifications',
       title: 'Notifications',
-      description: 'Manage your email preferences and communication settings.',
+      description: 'Control how you receive updates.',
       render: () => <SettingsNotificationsSection />,
     },
     {
       id: 'billing',
       title: 'Billing & Subscription',
-      description:
-        'Manage your subscription, payment methods, and billing history.',
+      description: 'Subscription, payment methods, and invoices.',
       render: () => <SettingsBillingSection />,
     },
     {
       id: 'data-privacy',
       title: 'Data & Privacy',
-      description: 'Export your data or delete your account.',
+      description: 'Data export and account deletion.',
       render: () => <DataPrivacySection />,
     },
   ];
@@ -124,7 +122,7 @@ export function SettingsPolished({
     {
       id: 'artist-profile',
       title: 'Artist Profile',
-      description: 'Manage your photo, display name, and username.',
+      description: 'Photo, display name, and username.',
       render: () => (
         <SettingsArtistProfileSection
           artist={artist}
@@ -136,18 +134,17 @@ export function SettingsPolished({
     {
       id: 'social-links',
       title: 'Social Links',
-      description: 'Connect your social media accounts.',
+      description: 'Connect your social media profiles.',
       render: () => <SocialsForm artist={artist} />,
     },
     {
       id: 'music-links',
       title: 'Music Links',
-      description:
-        'Connect streaming platforms and manage your music profile links.',
+      description: 'Streaming platforms and music profile links.',
       render: () => (
         <div className='space-y-4 sm:space-y-6'>
           <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
+            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
               Connected Platforms
             </h3>
             <ConnectedDspList
@@ -156,7 +153,7 @@ export function SettingsPolished({
             />
           </div>
           <div>
-            <h3 className='text-[13px] sm:text-sm font-medium text-primary-token mb-2 sm:mb-3'>
+            <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
               Streaming Links
             </h3>
             <ListenNowForm
@@ -170,8 +167,7 @@ export function SettingsPolished({
     {
       id: 'branding',
       title: 'Branding',
-      description:
-        'Remove Jovie branding to create a fully custom experience for your fans.',
+      description: 'Custom branding for your profile page.',
       render: () =>
         isPro ? (
           <SettingsBrandingSection
@@ -189,8 +185,7 @@ export function SettingsPolished({
     {
       id: 'ad-pixels',
       title: 'Ad Pixels',
-      description:
-        'Connect Facebook, Google, and TikTok pixels to track conversions.',
+      description: 'Facebook, Google, and TikTok conversion tracking.',
       render: () =>
         isPro ? (
           <SettingsAdPixelsSection />
@@ -205,8 +200,7 @@ export function SettingsPolished({
     {
       id: 'analytics',
       title: 'Analytics',
-      description:
-        'Control how your own activity is tracked in your analytics.',
+      description: 'Control how your visits appear in analytics.',
       render: () =>
         isPro ? (
           <SettingsAnalyticsSection
@@ -232,18 +226,13 @@ export function SettingsPolished({
 
     return (
       <div
-        className='grid gap-4 pb-4 sm:gap-6 sm:pb-6 lg:grid-cols-[240px_minmax(0,1fr)]'
+        className='space-y-4 sm:space-y-6 pb-4 sm:pb-6'
         data-testid='settings-polished'
       >
-        <div className='lg:sticky lg:top-4 lg:self-start'>
-          <SettingsMenu focusSection={focusSection} />
-        </div>
         <SettingsSection
           id={section.id}
           title={section.title}
           description={section.description}
-          className='rounded-xl border border-subtle bg-base p-4 sm:p-6'
-          headerClassName='mb-4 sm:mb-5'
         >
           {section.render()}
         </SettingsSection>
@@ -254,54 +243,37 @@ export function SettingsPolished({
   // Full settings view with group headers
   return (
     <div
-      className='grid gap-4 pb-4 sm:gap-6 sm:pb-6 lg:grid-cols-[240px_minmax(0,1fr)]'
+      className='space-y-8 sm:space-y-10 pb-4 sm:pb-6'
       data-testid='settings-polished'
     >
-      <div className='lg:sticky lg:top-4 lg:self-start'>
-        <SettingsMenu />
+      {/* General settings */}
+      <div className='space-y-6 sm:space-y-8'>
+        <h3 className='text-[13px] font-medium text-tertiary-token'>General</h3>
+        {userSections.map(section => (
+          <SettingsSection
+            key={section.id}
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+        ))}
       </div>
 
-      <div className='space-y-4 rounded-xl border border-subtle bg-base p-4 sm:space-y-6 sm:p-6'>
-        <div className='space-y-2'>
-          <h1 className='text-xl font-semibold text-primary-token'>Settings</h1>
-          <p className='text-sm text-secondary-token'>
-            Everything that controls your account, experience, and artist page.
-          </p>
-        </div>
-
-        {/* General settings */}
-        <div className='space-y-4 sm:space-y-6'>
-          <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-            General
-          </h2>
-          {userSections.map(section => (
-            <SettingsSection
-              key={section.id}
-              id={section.id}
-              title={section.title}
-              description={section.description}
-            >
-              {section.render()}
-            </SettingsSection>
-          ))}
-        </div>
-
-        {/* Artist settings */}
-        <div className='space-y-4 border-t border-subtle pt-4 sm:space-y-6 sm:pt-6'>
-          <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-            Artist
-          </h2>
-          {artistSections.map(section => (
-            <SettingsSection
-              key={section.id}
-              id={section.id}
-              title={section.title}
-              description={section.description}
-            >
-              {section.render()}
-            </SettingsSection>
-          ))}
-        </div>
+      {/* Artist settings */}
+      <div className='space-y-6 sm:space-y-8'>
+        <h3 className='text-[13px] font-medium text-tertiary-token'>Artist</h3>
+        {artistSections.map(section => (
+          <SettingsSection
+            key={section.id}
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+        ))}
       </div>
     </div>
   );

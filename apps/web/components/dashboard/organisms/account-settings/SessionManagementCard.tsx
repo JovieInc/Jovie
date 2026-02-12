@@ -13,7 +13,6 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { cn } from '@/lib/utils';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
 import type { ClerkSessionResource, ClerkUserResource } from './types';
@@ -82,98 +81,77 @@ export function SessionManagementCard({
     }
   };
 
-  return (
-    <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between gap-4 sm:gap-6'>
-        <div className='flex-1'>
-          <h3 className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
-            Active sessions
-          </h3>
-          <p className='mt-0.5 sm:mt-1 text-xs sm:text-[13px] text-secondary-token max-w-lg'>
-            Keep an eye on the devices signed in to your account. End sessions
-            you no longer recognise.
-          </p>
+  if (sessionsLoading) {
+    return (
+      <DashboardCard variant='settings' padding='none'>
+        <div className='px-5 py-4 space-y-3'>
+          <LoadingSkeleton height='h-10' />
+          <LoadingSkeleton height='h-10' />
         </div>
-      </div>
+      </DashboardCard>
+    );
+  }
 
-      {(() => {
-        if (sessionsLoading) {
-          return (
-            <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>
-              <LoadingSkeleton height='h-12' />
-              <LoadingSkeleton height='h-12' />
-            </div>
-          );
-        }
+  if (sessionsError) {
+    return (
+      <DashboardCard variant='settings' padding='none'>
+        <div className='px-5 py-4 text-sm text-red-500'>{sessionsError}</div>
+      </DashboardCard>
+    );
+  }
 
-        if (sessionsError) {
-          return (
-            <div className='mt-3 sm:mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-red-600'>
-              {sessionsError}
-            </div>
-          );
-        }
+  if (sessions.length === 0) {
+    return null;
+  }
 
-        if (sessions.length === 0) {
-          return (
-            <div className='mt-3 sm:mt-6 rounded-lg border border-subtle bg-surface-0 px-3 py-4 sm:px-4 sm:py-6 text-center text-sm text-secondary'>
-              You have no other active sessions.
-            </div>
-          );
-        }
+  return (
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      {sessions.map(session => {
+        const isCurrent = session.id === activeSessionId;
+        const activity = session.latestActivity;
 
         return (
-          <div className='mt-3 sm:mt-6 space-y-2 sm:space-y-3'>
-            {sessions.map(session => {
-              const isCurrent = session.id === activeSessionId;
-              const activity = session.latestActivity;
+          <div
+            key={session.id}
+            className='flex items-center justify-between px-5 py-4'
+          >
+            <div>
+              <p className='text-sm text-primary-token flex items-center gap-2'>
+                {isCurrent
+                  ? 'This device'
+                  : activity?.browserName || 'Unknown device'}
+                {isCurrent && (
+                  <span className='text-xs text-secondary-token'>
+                    Current session
+                  </span>
+                )}
+              </p>
+              <p className='text-xs text-secondary-token mt-0.5'>
+                Last active {formatRelativeDate(session.lastActiveAt)}
+                {activity?.city && activity?.country
+                  ? ` · ${activity.city}, ${activity.country}`
+                  : ''}
+              </p>
+            </div>
 
-              return (
-                <div
-                  key={session.id}
-                  className={cn(
-                    'flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 rounded-lg sm:rounded-xl border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 bg-surface-1',
-                    isCurrent && 'border-accent'
-                  )}
-                >
-                  <div>
-                    <p className='text-sm font-semibold text-primary flex items-center gap-2'>
-                      {isCurrent
-                        ? 'This device'
-                        : activity?.browserName || 'Unknown device'}
-                      {isCurrent && (
-                        <span className='inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent'>
-                          Current session
-                        </span>
-                      )}
-                    </p>
-                    <p className='text-xs text-secondary mt-1'>
-                      Last active {formatRelativeDate(session.lastActiveAt)}
-                      {activity?.city && activity?.country
-                        ? ` · ${activity.city}, ${activity.country}`
-                        : ''}
-                    </p>
-                  </div>
-
-                  {!isCurrent && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='text-red-500 hover:text-red-600 hover:bg-red-50'
-                      disabled={endingSessionId === session.id}
-                      onClick={() => setSessionToEnd(session)}
-                    >
-                      {endingSessionId === session.id
-                        ? 'Ending…'
-                        : 'End session'}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+            {!isCurrent && (
+              <Button
+                variant='ghost'
+                size='sm'
+                className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                disabled={endingSessionId === session.id}
+                onClick={() => setSessionToEnd(session)}
+              >
+                {endingSessionId === session.id ? 'Ending…' : 'End session'}
+              </Button>
+            )}
           </div>
         );
-      })()}
+      })}
 
       <ConfirmDialog
         open={Boolean(sessionToEnd)}

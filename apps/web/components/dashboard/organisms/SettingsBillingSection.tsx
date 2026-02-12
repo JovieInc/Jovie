@@ -22,21 +22,20 @@ export function SettingsBillingSection() {
   };
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='flex items-center justify-between gap-3 sm:gap-6'>
-        <p className='text-xs sm:text-[13px] text-secondary-token'>
+    <DashboardCard variant='settings' padding='none'>
+      <div className='flex items-center justify-between px-5 py-4'>
+        <p className='text-sm text-secondary-token'>
           Update payment details, change plans, or view invoices.
         </p>
-        <div className='shrink-0'>
-          <Button
-            onClick={handleBilling}
-            loading={isBillingLoading || billingLoading}
-            className={SETTINGS_BUTTON_CLASS}
-            variant='primary'
-          >
-            {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
-          </Button>
-        </div>
+        <Button
+          onClick={handleBilling}
+          loading={isBillingLoading || billingLoading}
+          className={SETTINGS_BUTTON_CLASS}
+          variant='primary'
+          size='sm'
+        >
+          {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
+        </Button>
       </div>
     </DashboardCard>
   );

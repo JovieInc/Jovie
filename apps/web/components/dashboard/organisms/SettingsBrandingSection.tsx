@@ -57,30 +57,28 @@ export function SettingsBrandingSection({
   };
 
   return (
-    <DashboardCard variant='settings'>
-      <SettingsToggleRow
-        title='Hide Jovie Branding'
-        description='When enabled, Jovie branding will be removed from your profile page, giving your fans a fully custom experience.'
-        checked={hideBranding}
-        onCheckedChange={handleBrandingToggle}
-        disabled={isPending}
-        ariaLabel='Hide Jovie branding'
-      />
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      <div className='px-5 py-4'>
+        <SettingsToggleRow
+          title='Hide Jovie Branding'
+          description='Remove Jovie branding from your profile page for a fully custom experience.'
+          checked={hideBranding}
+          onCheckedChange={handleBrandingToggle}
+          disabled={isPending}
+          ariaLabel='Hide Jovie branding'
+        />
+      </div>
 
       {hideBranding && (
-        <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
-          <div className='flex items-start gap-3'>
-            <Sparkles className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0' />
-            <div>
-              <p className='text-sm font-medium text-green-800 dark:text-green-200'>
-                Branding Hidden
-              </p>
-              <p className='text-xs text-green-600 dark:text-green-400 mt-1'>
-                Your profile now shows a completely custom experience without
-                Jovie branding.
-              </p>
-            </div>
-          </div>
+        <div className='px-5 py-4 flex items-center gap-3'>
+          <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
+          <p className='text-sm text-emerald-600 dark:text-emerald-400'>
+            Branding is hidden on your profile.
+          </p>
         </div>
       )}
     </DashboardCard>

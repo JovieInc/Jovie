@@ -54,9 +54,9 @@
 
 :root {
   /* Light mode surfaces - neutral grays without color tint */
-  /* prettier-ignore */ --color-bg-base: #f6f6f6; /* Sidebar & page bg */
-  /* prettier-ignore */ --color-bg-surface-0: #f6f6f6; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #fcfcfc; /* Main content */
+  /* prettier-ignore */ --color-bg-base: #111111; /* Sidebar & page bg */
+  /* prettier-ignore */ --color-bg-surface-0: #111111; /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: #191a1c; /* Main content */
   /* prettier-ignore */ --color-bg-surface-2: #ffffff; /* Contact sidebar/drawer */
   /* prettier-ignore */ --color-bg-surface-3: #e6e6e6; /* Modals */
 
@@ -136,18 +136,23 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces - progressively lighter (Linear-style contrast) */
-  /* prettier-ignore */ --color-bg-base: #090909; /* sidebar & page bg */
-  /* prettier-ignore */ --color-bg-surface-0: #090909; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #141416; /* main content — elevated for card definition */
+  /* prettier-ignore */ --color-bg-base: #111111; /* sidebar & page bg */
+  /* prettier-ignore */ --color-bg-surface-0: #111111; /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: #191a1c; /* main content — elevated for card definition */
   /* prettier-ignore */ --color-bg-surface-2: #1b1d21; /* contact sidebar/drawer */
   /* prettier-ignore */ --color-bg-surface-3: #21242a; /* Modals, tooltips */
 
-  /* Text hierarchy - inverted for dark mode */
-  --color-text-primary-token: oklch(100% 0 272);
-  --color-text-secondary-token: oklch(92% 0.005 272);
-  --color-text-tertiary-token: oklch(68% 0.005 272);
-  --color-text-quaternary-token: oklch(47% 0.005 272);
-  --color-text-disabled-token: oklch(35% 0.005 272);
+  /* Text hierarchy - inverted for dark mode (Linear settings-aligned)
+     Primary: headings & row titles — bright white (Linear uses ~97%)
+     Secondary: badges, meta text — medium gray
+     Tertiary: descriptions, helper text — muted gray (Linear descriptions)
+     Quaternary: placeholders
+     Disabled: fully de-emphasized */
+  --color-text-primary-token: oklch(97% 0.003 260);
+  --color-text-secondary-token: oklch(65% 0.01 260);
+  --color-text-tertiary-token: oklch(55% 0.01 260);
+  --color-text-quaternary-token: oklch(40% 0.01 260);
+  --color-text-disabled-token: oklch(32% 0.008 260);
 
   /* Border system - semi-transparent white for dark mode (Linear-style) */
   --color-border-subtle: oklch(100% 0 0 / 6%);
@@ -573,7 +578,7 @@
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Linear-inspired: slightly lighter bg, semi-transparent accents */
-  --sidebar-background: 9 9 9; /* #090909 - matches bg-base */
+  --sidebar-background: 17 17 17; /* #111111 - matches bg-base */
   --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
@@ -583,12 +588,12 @@
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 9 9 9; /* Matches bg-base */
+  --sidebar-surface: 17 17 17; /* Matches bg-base */
   --sidebar-surface-hover: 255 255 255 / 0.04; /* Subtle semi-transparent hover */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 227 228 229; /* Linear's default nav text */
-  --sidebar-item-icon: 148 149 151; /* Linear's nav icon, dimmer than text */
+  --sidebar-item-foreground: 148 152 160; /* Muted nav text, brightens on hover */
+  --sidebar-item-icon: 120 124 132; /* Dimmer nav icons */
   --sidebar-accent-active: 255 255 255 / 0.06; /* Subtler active state, Linear-style */
 }
 
