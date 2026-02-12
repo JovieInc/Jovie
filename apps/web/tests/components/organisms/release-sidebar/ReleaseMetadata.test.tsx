@@ -44,6 +44,18 @@ describe('ReleaseMetadata canvas status', () => {
     expect(screen.getByText('Ready to upload')).toBeInTheDocument();
   });
 
+  it('falls back to not set for unknown canvas status values', () => {
+    render(
+      <ReleaseMetadata
+        release={buildRelease({
+          canvasStatus: 'unknown_value' as Release['canvasStatus'],
+        })}
+      />
+    );
+
+    expect(screen.getByText('Not set')).toBeInTheDocument();
+  });
+
   it('defaults to not set when canvas status is missing', () => {
     render(
       <ReleaseMetadata release={buildRelease({ canvasStatus: undefined })} />
