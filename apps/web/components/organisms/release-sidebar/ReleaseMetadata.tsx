@@ -19,6 +19,21 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
+const CANVAS_STATUS_CONFIG = {
+  uploaded: {
+    label: 'Live',
+    className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  },
+  generated: {
+    label: 'Ready to upload',
+    className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  },
+  not_set: {
+    label: 'Not set',
+    className: 'bg-surface-2 text-secondary-token',
+  },
+} as const;
+
 function PopularityBar({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
@@ -41,6 +56,10 @@ interface ReleaseMetadataProps {
 }
 
 export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
+  const canvasStatus = release.canvasStatus ?? 'not_set';
+  const canvasStatusConfig =
+    CANVAS_STATUS_CONFIG[canvasStatus] ?? CANVAS_STATUS_CONFIG.not_set;
+
   return (
     <DrawerSection title='Metadata'>
       <div className='space-y-2.5'>
@@ -96,6 +115,18 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
               {release.totalTracks}{' '}
               {release.totalTracks === 1 ? 'track' : 'tracks'}
             </span>
+          }
+        />
+
+        <DrawerPropertyRow
+          label='Canvas'
+          value={
+            <Badge
+              variant='secondary'
+              className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
+            >
+              {canvasStatusConfig.label}
+            </Badge>
           }
         />
 
