@@ -19,7 +19,7 @@ function formatSize(bytes: number) {
 export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const isOpen = selectedIndex !== null;
-  const selected = selectedIndex !== null ? screenshots[selectedIndex] : null;
+  const selected = selectedIndex === null ? null : screenshots[selectedIndex];
 
   const handleClose = useCallback(() => setSelectedIndex(null), []);
 
@@ -141,7 +141,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
               <ChevronLeft className='size-4' />
             </Button>
             <span className='text-xs text-secondary-token tabular-nums min-w-[4ch] text-center'>
-              {selectedIndex !== null ? selectedIndex + 1 : 0}/
+              {selectedIndex === null ? 0 : selectedIndex + 1}/
               {screenshots.length}
             </span>
             <Button

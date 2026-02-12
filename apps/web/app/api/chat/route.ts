@@ -55,9 +55,7 @@ const EDITABLE_FIELDS = {
   blocked: ['username', 'avatarUrl', 'spotifyId', 'genres'] as const,
 };
 
-type EditableField =
-  | (typeof EDITABLE_FIELDS.tier1)[number]
-  | (typeof EDITABLE_FIELDS.tier2)[number];
+type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
 
 const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
   displayName: 'Display name shown on your profile',
