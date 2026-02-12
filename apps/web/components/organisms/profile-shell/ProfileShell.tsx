@@ -182,6 +182,7 @@ export function ProfileShell({
                         artistName={artist.name}
                       />
                       {hasTipSupport &&
+                        venmoLink &&
                         (isMobile ? (
                           <>
                             <CircleIconButton
@@ -202,7 +203,7 @@ export function ProfileShell({
                               onOpenChange={setTipDrawerOpen}
                               artistName={artist.name}
                               artistHandle={artist.handle}
-                              venmoLink={venmoLink!}
+                              venmoLink={venmoLink}
                               venmoUsername={venmoUsername}
                             />
                           </>
