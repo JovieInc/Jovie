@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
@@ -13,7 +13,7 @@ import {
   SuggestedPrompts,
 } from './components';
 import { useJovieChat } from './hooks';
-import type { JovieChatProps } from './types';
+import type { JovieChatProps, StarterSuggestionContext } from './types';
 
 export function JovieChat({
   profileId,
@@ -25,6 +25,8 @@ export function JovieChat({
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
+  const [starterContext, setStarterContext] =
+    useState<StarterSuggestionContext | null>(null);
 
   const {
     input,
@@ -163,10 +165,18 @@ export function JovieChat({
             )}
 
             {/* Suggested profiles carousel (DSP matches, social links, avatars) */}
-            {profileId && <SuggestedProfilesCarousel profileId={profileId} />}
+            {profileId && (
+              <SuggestedProfilesCarousel
+                profileId={profileId}
+                onContextLoad={setStarterContext}
+              />
+            )}
 
             {/* Suggested prompts above input */}
-            <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+            <SuggestedPrompts
+              onSelect={handleSuggestedPrompt}
+              context={starterContext}
+            />
 
             {/* Input at bottom */}
             <ChatInput

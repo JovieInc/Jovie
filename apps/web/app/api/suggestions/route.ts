@@ -17,11 +17,12 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import {
   dspArtistMatches,
   socialLinkSuggestions,
@@ -46,6 +47,12 @@ export interface ProfileSuggestion {
   imageUrl: string | null;
   externalUrl: string | null;
   confidence: number | null;
+}
+
+export interface SuggestionsStarterContext {
+  latestReleaseTitle: string | null;
+  pendingArtistMatches: number;
+  pendingLinkSuggestions: number;
 }
 
 // ============================================================================
@@ -97,8 +104,8 @@ export async function GET(request: Request) {
     }
 
     // Fetch all suggestion types in parallel
-    const [dspMatches, socialSuggestions, avatarCandidates] = await Promise.all(
-      [
+    const [dspMatches, socialSuggestions, avatarCandidates, latestRelease] =
+      await Promise.all([
         // DSP matches with status 'suggested'
         db
           .select({
@@ -153,8 +160,26 @@ export async function GET(request: Request) {
               .where(eq(creatorAvatarCandidates.creatorProfileId, profileId))
               .orderBy(desc(creatorAvatarCandidates.confidenceScore))
               .limit(10),
-      ]
-    );
+
+        // Latest release for contextual starter prompts
+        db
+          .select({ title: discogReleases.title })
+          .from(discogReleases)
+          .where(
+            and(
+              eq(discogReleases.creatorProfileId, profileId),
+              or(
+                isNotNull(discogReleases.releaseDate),
+                isNotNull(discogReleases.createdAt)
+              )
+            )
+          )
+          .orderBy(
+            desc(discogReleases.releaseDate),
+            desc(discogReleases.createdAt)
+          )
+          .limit(1),
+      ]);
 
     // Filter out avatar candidates that match the current profile avatar
     const filteredAvatars = avatarCandidates.filter(
@@ -205,7 +230,13 @@ export async function GET(request: Request) {
       })),
     ];
 
-    return NextResponse.json({ success: true, suggestions });
+    const starterContext: SuggestionsStarterContext = {
+      latestReleaseTitle: latestRelease[0]?.title ?? null,
+      pendingArtistMatches: dspMatches.length,
+      pendingLinkSuggestions: socialSuggestions.length,
+    };
+
+    return NextResponse.json({ success: true, suggestions, starterContext });
   } catch (error) {
     await captureError('Suggestions fetch failed', error, {
       route: '/api/suggestions',
