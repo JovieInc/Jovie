@@ -38,6 +38,7 @@ export interface ChatError {
   readonly message: string;
   readonly retryAfter?: number;
   readonly errorCode?: string;
+  readonly requestId?: string;
   readonly failedMessage?: string;
 }
 

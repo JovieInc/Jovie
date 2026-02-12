@@ -85,3 +85,62 @@ export function getNextStepMessage(type: ChatErrorType): string {
       return 'Try again or contact support';
   }
 }
+
+interface ErrorMetadata {
+  retryAfter?: number;
+  errorCode?: string;
+  requestId?: string;
+}
+
+export function extractErrorMetadata(error: Error): ErrorMetadata {
+  const errorObj = error as unknown as Record<string, unknown>;
+  const metadata: ErrorMetadata = {};
+
+  if (
+    typeof errorObj.retryAfter === 'number' &&
+    Number.isFinite(errorObj.retryAfter)
+  ) {
+    metadata.retryAfter = Math.min(
+      Math.max(Math.ceil(errorObj.retryAfter), 1),
+      3600
+    );
+  }
+
+  if (typeof errorObj.errorCode === 'string') {
+    metadata.errorCode = errorObj.errorCode;
+  } else if (typeof errorObj.code === 'string') {
+    metadata.errorCode = errorObj.code;
+  }
+
+  if (typeof errorObj.requestId === 'string') {
+    metadata.requestId = errorObj.requestId;
+  }
+
+  const message = error.message.trim();
+  if (message.startsWith('{') && message.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(message) as Record<string, unknown>;
+      if (
+        typeof parsed.retryAfter === 'number' &&
+        Number.isFinite(parsed.retryAfter)
+      ) {
+        metadata.retryAfter = Math.min(
+          Math.max(Math.ceil(parsed.retryAfter), 1),
+          3600
+        );
+      }
+      if (typeof parsed.errorCode === 'string') {
+        metadata.errorCode = parsed.errorCode;
+      } else if (typeof parsed.code === 'string') {
+        metadata.errorCode = parsed.code;
+      }
+      if (typeof parsed.requestId === 'string') {
+        metadata.requestId = parsed.requestId;
+      }
+    } catch {
+      // Ignore JSON parse failures - metadata may be on structured fields already.
+    }
+  }
+
+  return metadata;
+}
