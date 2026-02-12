@@ -18,6 +18,7 @@ import { SettingsSection } from '@/components/dashboard/organisms/SettingsSectio
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
+import { SettingsMenu } from '@/components/settings/organisms/SettingsMenu';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
@@ -231,13 +232,18 @@ export function SettingsPolished({
 
     return (
       <div
-        className='space-y-4 sm:space-y-6 pb-4 sm:pb-6'
+        className='grid gap-4 pb-4 sm:gap-6 sm:pb-6 lg:grid-cols-[240px_minmax(0,1fr)]'
         data-testid='settings-polished'
       >
+        <div className='lg:sticky lg:top-4 lg:self-start'>
+          <SettingsMenu focusSection={focusSection} />
+        </div>
         <SettingsSection
           id={section.id}
           title={section.title}
           description={section.description}
+          className='rounded-xl border border-subtle bg-base p-4 sm:p-6'
+          headerClassName='mb-4 sm:mb-5'
         >
           {section.render()}
         </SettingsSection>
@@ -248,41 +254,54 @@ export function SettingsPolished({
   // Full settings view with group headers
   return (
     <div
-      className='space-y-5 sm:space-y-8 pb-4 sm:pb-6'
+      className='grid gap-4 pb-4 sm:gap-6 sm:pb-6 lg:grid-cols-[240px_minmax(0,1fr)]'
       data-testid='settings-polished'
     >
-      {/* General settings */}
-      <div className='space-y-4 sm:space-y-6'>
-        <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-          General
-        </h2>
-        {userSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-          >
-            {section.render()}
-          </SettingsSection>
-        ))}
+      <div className='lg:sticky lg:top-4 lg:self-start'>
+        <SettingsMenu />
       </div>
 
-      {/* Artist settings */}
-      <div className='space-y-4 sm:space-y-6 pt-4 sm:pt-6 border-t border-subtle'>
-        <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
-          Artist
-        </h2>
-        {artistSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-          >
-            {section.render()}
-          </SettingsSection>
-        ))}
+      <div className='space-y-4 rounded-xl border border-subtle bg-base p-4 sm:space-y-6 sm:p-6'>
+        <div className='space-y-2'>
+          <h1 className='text-xl font-semibold text-primary-token'>Settings</h1>
+          <p className='text-sm text-secondary-token'>
+            Everything that controls your account, experience, and artist page.
+          </p>
+        </div>
+
+        {/* General settings */}
+        <div className='space-y-4 sm:space-y-6'>
+          <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
+            General
+          </h2>
+          {userSections.map(section => (
+            <SettingsSection
+              key={section.id}
+              id={section.id}
+              title={section.title}
+              description={section.description}
+            >
+              {section.render()}
+            </SettingsSection>
+          ))}
+        </div>
+
+        {/* Artist settings */}
+        <div className='space-y-4 border-t border-subtle pt-4 sm:space-y-6 sm:pt-6'>
+          <h2 className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
+            Artist
+          </h2>
+          {artistSections.map(section => (
+            <SettingsSection
+              key={section.id}
+              id={section.id}
+              title={section.title}
+              description={section.description}
+            >
+              {section.render()}
+            </SettingsSection>
+          ))}
+        </div>
       </div>
     </div>
   );
