@@ -208,6 +208,102 @@ describe('UserButton billing actions', () => {
     );
   });
 
+  it('uses a monthly interval alias when starting checkout', async () => {
+    const checkoutUrl = 'https://checkout.stripe.com/session/monthly';
+
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUsePricingOptionsQuery.mockReturnValue({
+      data: {
+        pricingOptions: [
+          { interval: 'year', priceId: 'price_year' },
+          { interval: 'monthly', priceId: 'price_monthly' },
+        ],
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: checkoutUrl }),
+    });
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+
+    await user.click(screen.getByText('Adele Adkins'));
+    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    await user.click(upgradeButton);
+
+    await flushMicrotasks();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/stripe/checkout',
+      expect.objectContaining({
+        body: JSON.stringify({ priceId: 'price_monthly' }),
+      })
+    );
+    expect(window.location.href).toBe(checkoutUrl);
+    expect(track).toHaveBeenCalledWith(
+      'billing_upgrade_checkout_redirected',
+      expect.objectContaining({ interval: 'monthly' })
+    );
+  });
+
+  it('falls back to the first available pricing option when monthly is unavailable', async () => {
+    const checkoutUrl = 'https://checkout.stripe.com/session/fallback';
+
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUsePricingOptionsQuery.mockReturnValue({
+      data: {
+        pricingOptions: [
+          { interval: 'year', priceId: 'price_year' },
+          { interval: 'annual', priceId: 'price_annual' },
+        ],
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: checkoutUrl }),
+    });
+
+    const user = userEvent.setup();
+    render(<UserButton showUserInfo />);
+
+    await user.click(screen.getByText('Adele Adkins'));
+    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    await user.click(upgradeButton);
+
+    await flushMicrotasks();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/stripe/checkout',
+      expect.objectContaining({
+        body: JSON.stringify({ priceId: 'price_year' }),
+      })
+    );
+    expect(window.location.href).toBe(checkoutUrl);
+    expect(track).toHaveBeenCalledWith(
+      'billing_upgrade_checkout_redirected',
+      expect.objectContaining({ interval: 'year' })
+    );
+  });
+
   it('opens the Stripe billing portal for Pro users', async () => {
     const portalUrl = 'https://billing.stripe.com/session/test';
 
