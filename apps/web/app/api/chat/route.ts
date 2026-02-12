@@ -34,6 +34,7 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getPlanLimits } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 
 export const maxDuration = 30;
 
@@ -75,6 +76,8 @@ const artistContextSchema = z.object({
   genres: z.array(z.string().max(50)).max(10),
   spotifyFollowers: z.number().int().nonnegative().nullable(),
   spotifyPopularity: z.number().int().min(0).max(100).nullable(),
+  spotifyUrl: z.string().url().nullable().optional(),
+  appleMusicUrl: z.string().url().nullable().optional(),
   profileViews: z.number().int().nonnegative(),
   hasSocialLinks: z.boolean(),
   hasMusicLinks: z.boolean(),
@@ -105,6 +108,8 @@ async function fetchArtistContext(
       genres: creatorProfiles.genres,
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       spotifyPopularity: creatorProfiles.spotifyPopularity,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
       profileViews: creatorProfiles.profileViews,
       userClerkId: users.clerkId,
     })
@@ -167,6 +172,8 @@ async function fetchArtistContext(
     genres: result.genres ?? [],
     spotifyFollowers: result.spotifyFollowers,
     spotifyPopularity: result.spotifyPopularity,
+    spotifyUrl: result.spotifyUrl,
+    appleMusicUrl: result.appleMusicUrl,
     profileViews: result.profileViews ?? 0,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
     hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
@@ -431,6 +438,13 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Connected accounts: Requires settings page
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
+
+## World-Class Bio Writing
+You have access to the writeWorldClassBio tool. Use it when the artist asks for a new biography, a rewrite for Spotify/Apple Music, or an AllMusic-quality narrative.
+- Pull in the artist's real platform signals and catalog context
+- Keep all claims factual and grounded in available data
+- Deliver a polished draft the artist can use directly or refine
+
 
 ## Creative & Promotion Tools
 
@@ -939,6 +953,69 @@ function createReleaseTool(resolvedProfileId: string) {
 }
 
 /**
+ * Creates the writeWorldClassBio tool.
+ * Produces an AllMusic-style draft using profile + DSP context.
+ */
+function createWorldClassBioTool(
+  context: ArtistContext,
+  profileId: string | null
+) {
+  return tool({
+    description:
+      'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use. Uses real artist context from profile + DSP metadata.',
+    inputSchema: z.object({
+      goal: z
+        .enum(['spotify', 'apple_music', 'press_kit', 'general'])
+        .optional()
+        .describe('Primary usage context for the bio draft'),
+      tone: z
+        .enum(['cinematic', 'intimate', 'confident', 'elevated'])
+        .optional()
+        .describe('Preferred writing tone while maintaining factual rigor'),
+      maxWords: z
+        .number()
+        .int()
+        .min(80)
+        .max(350)
+        .optional()
+        .describe('Maximum words for the returned draft (default 180)'),
+    }),
+    execute: async ({ goal, tone, maxWords }) => {
+      const releases = profileId ? await fetchReleasesForChat(profileId) : [];
+      const draftPackage = buildArtistBioDraft({
+        artistName: context.displayName,
+        existingBio: context.bio,
+        genres: context.genres,
+        spotifyFollowers: context.spotifyFollowers,
+        spotifyPopularity: context.spotifyPopularity,
+        spotifyUrl: context.spotifyUrl ?? null,
+        appleMusicUrl: context.appleMusicUrl ?? null,
+        profileViews: context.profileViews,
+        releaseCount: releases.length,
+        notableReleases: releases.slice(0, 3).map(release => release.title),
+      });
+
+      return {
+        success: true,
+        usageGoal: goal ?? 'general',
+        tone: tone ?? 'elevated',
+        maxWords: maxWords ?? 180,
+        draft: draftPackage.draft,
+        facts: draftPackage.facts,
+        voiceDirectives: draftPackage.voiceDirectives,
+        releaseContext: releases.slice(0, 5).map(release => ({
+          title: release.title,
+          releaseType: release.releaseType,
+          releaseDate: release.releaseDate,
+          spotifyPopularity: release.spotifyPopularity,
+        })),
+      };
+    },
+  });
+}
+
+
+/**
  * OPTIONS - CORS preflight handler
  */
 export async function OPTIONS() {
@@ -1057,6 +1134,7 @@ export async function POST(req: Request) {
           proposeProfileEdit: createProfileEditTool(artistContext),
           checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
           suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+          writeWorldClassBio: createWorldClassBioTool(artistContext, resolvedProfileId),
           generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
           createPromoStrategy: createPromoStrategyTool(
             artistContext,
