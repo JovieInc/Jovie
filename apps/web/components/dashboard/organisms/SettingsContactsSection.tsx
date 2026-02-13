@@ -1,8 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Loader2, Plus, UserPlus } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { AlertCircle, Loader2, Plus, UserPlus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import {
@@ -29,7 +29,12 @@ export function SettingsContactsSection({
   const artistHandle =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username ?? '';
 
-  const { data: initialContacts, isLoading } = useContactsQuery(artist.id);
+  const {
+    data: initialContacts,
+    isLoading,
+    isError,
+    refetch,
+  } = useContactsQuery(artist.id);
 
   if (isLoading) {
     return (
@@ -39,6 +44,22 @@ export function SettingsContactsSection({
           <span className='ml-2 text-sm text-secondary-token'>
             Loading contacts...
           </span>
+        </div>
+      </DashboardCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardCard variant='settings'>
+        <div className='flex flex-col items-center justify-center gap-2 py-8'>
+          <AlertCircle className='h-6 w-6 text-destructive' />
+          <p className='text-sm text-secondary-token'>
+            Failed to load contacts.
+          </p>
+          <Button variant='ghost' size='sm' onClick={() => refetch()}>
+            Try again
+          </Button>
         </div>
       </DashboardCard>
     );
@@ -130,9 +151,11 @@ function ContactsListInner({
 
   // Auto-select newly added contacts
   const newContact = contacts.find(c => c.isNew);
-  if (newContact && selectedContactId !== newContact.id) {
-    setSelectedContactId(newContact.id);
-  }
+  useEffect(() => {
+    if (newContact && newContact.id !== selectedContactId) {
+      setSelectedContactId(newContact.id);
+    }
+  }, [newContact?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteLabel = pendingDeleteContact
     ? getContactRoleLabel(

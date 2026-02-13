@@ -12,15 +12,7 @@ import {
   saveBandsintownApiKey,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import type { Artist } from '@/types/db';
-
-interface SettingsTouringSectionProps {
-  readonly artist: Artist;
-}
-
-export function SettingsTouringSection({
-  artist,
-}: SettingsTouringSectionProps) {
+export function SettingsTouringSection() {
   const [apiKey, setApiKey] = useState('');
   const [artistName, setArtistName] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -88,22 +80,22 @@ export function SettingsTouringSection({
   const handleDisconnect = useCallback(async () => {
     setIsDisconnecting(true);
     try {
-      const [disconnectResult, removeKeyResult] = await Promise.all([
-        disconnectBandsintown(),
-        removeBandsintownApiKey(),
-      ]);
-
-      if (disconnectResult.success) {
-        toast.success('Bandsintown disconnected.');
-        setIsConnected(false);
-        setConnectedArtist(null);
-        setLastSyncedAt(null);
-        setArtistName('');
-      } else {
-        toast.error(
-          removeKeyResult.message ?? 'Failed to disconnect. Please try again.'
-        );
+      const disconnectResult = await disconnectBandsintown();
+      if (!disconnectResult.success) {
+        toast.error('Failed to disconnect. Please try again.');
+        return;
       }
+
+      const removeKeyResult = await removeBandsintownApiKey();
+      if (!removeKeyResult.success) {
+        toast.error(removeKeyResult.message ?? 'Failed to remove API key.');
+      }
+
+      toast.success('Bandsintown disconnected.');
+      setIsConnected(false);
+      setConnectedArtist(null);
+      setLastSyncedAt(null);
+      setArtistName('');
     } catch {
       toast.error('Failed to disconnect. Please try again.');
     } finally {
