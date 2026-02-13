@@ -2,15 +2,16 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, CommonDropdown, Input } from '@jovie/ui';
-import { ChevronDown, Plus, Share2, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useMemo, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
-import { EmptyState } from '@/components/organisms/EmptyState';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
+import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
+import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
 import { useSocialsForm } from './useSocialsForm';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
@@ -59,7 +60,24 @@ const SUGGESTED_PLATFORM_IDS = [
   'website',
 ] as const;
 
-const EXCLUDED_PLATFORM_IDS = new Set(['onlyfans', 'twitter']);
+const EXCLUDED_PLATFORM_IDS = new Set([
+  'onlyfans',
+  'twitter',
+  // Professional links (only 'website' remains)
+  'blog',
+  'portfolio',
+  'booking',
+  'press_kit',
+  'other',
+  // Link aggregators
+  'linktree',
+  'beacons',
+  'linkin_bio',
+  'allmylinks',
+  'linkfire',
+  'toneden',
+  'featurefm',
+]);
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
@@ -151,6 +169,13 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     handleUrlBlur,
     addSocialLink,
   } = useSocialsForm({ artistId: artist.id });
+  const {
+    suggestions,
+    isLoading: suggestionsLoading,
+    actioningId,
+    confirm: confirmSuggestion,
+    dismiss: dismissSuggestion,
+  } = useSocialLinkSuggestions(artist.id);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const urlInputRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -212,16 +237,28 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
-      {socialLinks.length === 0 ? (
-        <EmptyState
-          icon={<Share2 className='h-6 w-6' aria-hidden='true' />}
-          heading='No social links yet'
-          description='Add your most important social profiles first. You can still add every supported platform when you need it.'
-          action={{
-            label: 'Add first link',
-            onClick: handleAddSocialLink,
-          }}
+      {!suggestionsLoading && suggestions.length > 0 && (
+        <SocialLinkSuggestionRows
+          suggestions={suggestions}
+          actioningId={actioningId}
+          onConfirm={confirmSuggestion}
+          onDismiss={dismissSuggestion}
         />
+      )}
+
+      {socialLinks.length === 0 ? (
+        <div className='flex justify-center py-6'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={handleAddSocialLink}
+            className='gap-1.5'
+          >
+            <Plus className='h-3.5 w-3.5' />
+            Add Link
+          </Button>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className='space-y-0'>
           <div className='rounded-lg border border-subtle divide-y divide-subtle'>

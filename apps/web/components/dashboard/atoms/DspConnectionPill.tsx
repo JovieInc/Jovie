@@ -15,6 +15,21 @@ const PROVIDER_STYLES = {
     label: 'Apple Music',
     platform: 'applemusic',
   },
+  youtube_music: {
+    accent: '#FF0000',
+    label: 'YouTube Music',
+    platform: 'youtube_music',
+  },
+  soundcloud: {
+    accent: '#FF5500',
+    label: 'SoundCloud',
+    platform: 'soundcloud',
+  },
+  tidal: {
+    accent: '#000000',
+    label: 'Tidal',
+    platform: 'tidal',
+  },
 } as const;
 
 type DspProvider = keyof typeof PROVIDER_STYLES;

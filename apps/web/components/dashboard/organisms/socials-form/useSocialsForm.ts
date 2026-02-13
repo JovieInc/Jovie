@@ -12,6 +12,8 @@ import {
 } from '@/lib/utils/platform-detection';
 import type { SocialLink, UseSocialsFormReturn } from './types';
 
+const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube'] as const;
+
 interface UseSocialsFormOptions {
   artistId: string;
 }
@@ -39,10 +41,17 @@ export function useSocialsForm({
   } = useSaveSocialLinksMutation(artistId);
   const [submitError, setSubmitError] = useState<string | undefined>(undefined);
 
-  // Sync fetched data to local state when it changes
+  // Sync fetched data to local state when it changes.
+  // When the user has no saved links, prefill with top 3 social networks.
   useEffect(() => {
     if (fetchedLinks) {
-      setSocialLinks(fetchedLinks);
+      if (fetchedLinks.length === 0) {
+        setSocialLinks(
+          DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
+        );
+      } else {
+        setSocialLinks(fetchedLinks);
+      }
     }
   }, [fetchedLinks]);
 

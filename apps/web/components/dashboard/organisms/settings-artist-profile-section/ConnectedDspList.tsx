@@ -30,6 +30,12 @@ import {
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
 
+const DEFAULT_OTHER_DSPS = [
+  'youtube_music',
+  'soundcloud',
+  'tidal',
+] as const satisfies readonly DspProviderId[];
+
 const DSP_DISPLAY: Record<DspProviderId, { label: string; color: string }> = {
   spotify: { label: 'Spotify', color: 'text-[#1DB954]' },
   apple_music: { label: 'Apple Music', color: 'text-[#FA243C]' },
@@ -326,6 +332,15 @@ export function ConnectedDspList({
     m => m.providerId !== 'spotify' && m.providerId !== 'apple_music'
   );
 
+  // Default DSPs that don't have any match yet — always show as pills
+  const otherMatchedIds = new Set([
+    ...otherConfirmed.map(m => m.providerId),
+    ...otherSuggested.map(m => m.providerId),
+  ]);
+  const unconnectedDefaultDsps = DEFAULT_OTHER_DSPS.filter(
+    id => !otherMatchedIds.has(id)
+  );
+
   if (isLoading) {
     return (
       <DashboardCard variant='settings'>
@@ -378,7 +393,7 @@ export function ConnectedDspList({
           )}
         </div>
 
-        {/* Primary DSP connection pills */}
+        {/* DSP connection pills */}
         <div className='flex flex-wrap items-center gap-2'>
           <DspConnectionPill
             provider='spotify'
@@ -400,6 +415,21 @@ export function ConnectedDspList({
                 : () => handleOpenPalette('apple_music')
             }
           />
+          {unconnectedDefaultDsps.map(providerId => (
+            <DspConnectionPill
+              key={providerId}
+              provider={providerId}
+              connected={false}
+              onClick={
+                spotifyId
+                  ? handleDiscover
+                  : () =>
+                      toast.info(
+                        'Connect Spotify first to discover other DSP profiles'
+                      )
+              }
+            />
+          ))}
         </div>
 
         {/* Other confirmed and suggested matches */}
