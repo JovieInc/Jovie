@@ -3,19 +3,12 @@
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 
-import {
-  adminNavigation,
-  primaryNavigation,
-  settingsNavigation,
-} from '@/components/dashboard/dashboard-nav/config';
-import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { APP_ROUTES } from '@/constants/routes';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthRouteConfig {
   section: 'admin' | 'dashboard' | 'settings';
-  navigation: NavItem[];
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
@@ -26,7 +19,6 @@ export interface AuthRouteConfig {
  *
  * Returns configuration for AuthShell based on current route:
  * - Section detection (admin/dashboard/settings)
- * - Navigation items
  * - UI feature flags (mobile tabs, table routes)
  * - Breadcrumb generation
  *
@@ -41,19 +33,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     if (pathname.startsWith(APP_ROUTES.SETTINGS)) return 'settings';
     return 'dashboard';
   }, [pathname]);
-
-  // Build navigation based on section
-  const navigation = useMemo(() => {
-    switch (section) {
-      case 'admin':
-        return adminNavigation;
-      case 'settings':
-        return settingsNavigation;
-      case 'dashboard':
-      default:
-        return primaryNavigation;
-    }
-  }, [section]);
 
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
@@ -93,7 +72,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
 
   return {
     section,
-    navigation,
     breadcrumbs,
     showMobileTabs,
     isTableRoute,
