@@ -1,13 +1,13 @@
 'use client';
 
 import {
-  Badge,
   Button,
   Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@jovie/ui';
+import { useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { IngestProfileDropdownProps } from './types';
 import { useIngestProfile } from './useIngestProfile';
@@ -25,95 +25,87 @@ export function IngestProfileDropdown({
     detectedPlatform,
     handleSubmit,
   } = useIngestProfile({ onIngestPending });
+  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          type='button'
-          size='sm'
-          variant='ghost'
-          className='gap-1.5 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-        >
+        <Button type='button' size='sm' variant='ghost'>
           <Icon name='Plus' className='h-3.5 w-3.5' />
           Ingest Profile
         </Button>
       </PopoverTrigger>
-      <PopoverContent align='end' className='w-80'>
-        <div className='space-y-4'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <p className='text-sm font-semibold text-primary-token'>
-                Ingest profile
-              </p>
-              <p className='text-xs text-secondary-token'>
-                Paste any social profile URL
-              </p>
-            </div>
-            <Badge
-              variant='secondary'
-              size='sm'
-              className='uppercase text-[10px]'
-            >
-              Admin
-            </Badge>
+      <PopoverContent
+        align='end'
+        className='w-72 p-3'
+        onOpenAutoFocus={e => {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <form onSubmit={handleSubmit} className='space-y-3'>
+          <div className='flex items-center gap-2'>
+            <Icon
+              name='UserPlus'
+              className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+              aria-hidden='true'
+            />
+            <span className='text-xs font-medium text-primary-token'>
+              Ingest social profile
+            </span>
           </div>
 
-          <form onSubmit={handleSubmit} className='space-y-3'>
-            {isSuccess && (
-              <div className='rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-200'>
-                Profile created — refreshing table…
-              </div>
-            )}
+          {isSuccess && (
+            <div className='rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success'>
+              Profile created — refreshing table…
+            </div>
+          )}
 
-            <div className='space-y-2'>
-              <Input
-                type='text'
-                placeholder='https://instagram.com/username'
-                value={url}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setUrl(e.target.value)
-                }
-                disabled={isLoading}
-                autoFocus
-                className='w-full'
+          <Input
+            ref={inputRef}
+            type='url'
+            inputSize='sm'
+            placeholder='https://instagram.com/username'
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            disabled={isLoading}
+            autoComplete='off'
+            className='text-xs'
+          />
+
+          {detectedPlatform && (
+            <div className='flex items-center gap-2 text-xs text-secondary-token'>
+              <span
+                className='h-2 w-2 shrink-0 rounded-full'
+                style={{ backgroundColor: `#${detectedPlatform.color}` }}
+                aria-hidden='true'
               />
-              {detectedPlatform && (
-                <div className='flex items-center gap-2 text-xs text-secondary-token'>
-                  <div
-                    className='w-3 h-3 rounded-full'
-                    style={{ backgroundColor: `#${detectedPlatform.color}` }}
-                  />
-                  <span>Detected: {detectedPlatform.name}</span>
-                </div>
-              )}
-              <p className='text-xs text-tertiary-token'>
-                Supports Instagram, TikTok, Twitter/X, YouTube, Spotify,
-                Linktree, and 40+ more platforms
-              </p>
+              <span>Detected: {detectedPlatform.name}</span>
             </div>
+          )}
 
-            <div className='flex justify-end gap-2'>
-              <Button
-                type='button'
-                size='sm'
-                variant='ghost'
-                onClick={() => setOpen(false)}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type='submit'
-                size='sm'
-                variant='primary'
-                disabled={isLoading || !url.trim()}
-              >
-                {isLoading ? 'Ingesting...' : 'Ingest'}
-              </Button>
-            </div>
-          </form>
-        </div>
+          <div className='flex justify-end gap-2'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => setOpen(false)}
+              disabled={isLoading}
+              className='text-xs'
+            >
+              Cancel
+            </Button>
+            <Button
+              type='submit'
+              variant='primary'
+              size='sm'
+              disabled={isLoading || !url.trim()}
+              className='text-xs'
+            >
+              {isLoading ? 'Ingesting…' : 'Ingest'}
+            </Button>
+          </div>
+        </form>
       </PopoverContent>
     </Popover>
   );
