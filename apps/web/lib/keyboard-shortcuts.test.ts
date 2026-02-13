@@ -129,7 +129,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.profile).toBeDefined();
       expect(NAV_SHORTCUTS.contacts).toBeDefined();
       expect(NAV_SHORTCUTS.releases).toBeDefined();
-      expect(NAV_SHORTCUTS['tour-dates']).toBeDefined();
+      expect(NAV_SHORTCUTS.touring).toBeDefined();
       expect(NAV_SHORTCUTS.audience).toBeDefined();
       expect(NAV_SHORTCUTS.earnings).toBeDefined();
       expect(NAV_SHORTCUTS.chat).toBeDefined();
