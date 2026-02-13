@@ -3,18 +3,19 @@ import { Container } from '@/components/site/Container';
 
 const benefits = [
   {
-    title: 'Capture every visitor',
+    title: 'Capture fan contacts on every visit',
     description:
-      'Email & SMS on first visit. No bounce, no lost fans. Export to Mailchimp, Kit, or your favorite tools.',
+      'Collect email and SMS with a flow that feels native to your profile, then sync to the tools you already use.',
   },
   {
-    title: 'One clear action',
+    title: 'Guide fans to one clear next action',
     description:
-      'AI picks the right CTA for each fan. Stream, buy tickets, or grab merch.',
+      'Prioritize the right click for the moment: stream the release, join your list, or take the next step you choose.',
   },
   {
-    title: 'Continuous optimization',
-    description: 'Your page improves itself based on what converts.',
+    title: 'Improve performance with real signal',
+    description:
+      'See what fans actually do and refine your page with confidence instead of guesswork.',
   },
 ];
 
@@ -39,9 +40,9 @@ export function ProblemSection() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            Everything you need.{' '}
+            Built for growth with discipline.{' '}
             <span style={{ color: 'var(--linear-text-tertiary)' }}>
-              Nothing you don&apos;t.
+              Clear value. No fluff.
             </span>
           </h2>
 

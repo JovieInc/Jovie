@@ -15,9 +15,9 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
+  const title = `${APP_NAME} — The Link-in-Bio Built for Artists`;
   const description =
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube. Free to start.';
+    'Capture fan contacts, guide listeners to the right music destination, and grow your owned audience with a conversion-first artist profile.';
   const keywords = [
     'link in bio',
     'linktree alternative',
@@ -83,7 +83,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The Link-in-Bio Built for Artists`,
           type: 'image/png',
         },
       ],
@@ -95,7 +95,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The Link-in-Bio Built for Artists`,
           width: 1200,
           height: 630,
         },
@@ -139,7 +139,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: 'Jovie Link in Bio',
   description:
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.',
+    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -168,7 +168,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
+    'A conversion-first link-in-bio platform for artists to capture fan contacts and drive clear next actions.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -206,7 +206,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
+    'A conversion-first link-in-bio platform for artists to capture fan contacts and drive clear next actions.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
   contactPoint: {
     '@type': 'ContactPoint',
