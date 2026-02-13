@@ -201,7 +201,7 @@ export function AuthLayout({
       )}
 
       {/* Form content - centered with mobile-optimized width */}
-      <main
+      <div
         ref={formRef}
         id='auth-form'
         className={cn(
@@ -213,7 +213,7 @@ export function AuthLayout({
         )}
       >
         {children}
-      </main>
+      </div>
 
       {/* Footer - hide when keyboard is visible */}
       {showFooterPrompt && !isKeyboardVisible && (
