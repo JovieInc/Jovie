@@ -1,19 +1,51 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
 import {
   ChatInput,
   ChatMessage,
+  ChatMessageSkeleton,
   ErrorDisplay,
+  ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
 import { useJovieChat } from './hooks';
-import type { JovieChatProps } from './types';
+import type { JovieChatProps, MessagePart } from './types';
+import { TOOL_LABELS } from './types';
+
+/** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
+const SCROLL_THRESHOLD = 200;
+
+/**
+ * Derives a user-friendly label from the last assistant message's active tool invocation.
+ * Returns null when no tool is actively being called.
+ */
+function getActiveToolLabel(
+  messages: Array<{ role: string; parts: MessagePart[] }>
+): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== 'assistant') continue;
+
+    for (let j = msg.parts.length - 1; j >= 0; j--) {
+      const part = msg.parts[j];
+      if (
+        part.type === 'tool-invocation' &&
+        part.toolInvocation &&
+        part.toolInvocation.state === 'call'
+      ) {
+        return TOOL_LABELS[part.toolInvocation.toolName] ?? 'Working on it...';
+      }
+    }
+    break;
+  }
+  return null;
+}
 
 export function JovieChat({
   profileId,
@@ -24,7 +56,9 @@ export function JovieChat({
   onTitleChange,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const {
     input,
@@ -36,6 +70,7 @@ export function JovieChat({
     hasMessages,
     isLoadingConversation,
     conversationTitle,
+    status,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -76,14 +111,40 @@ export function JovieChat({
     }
   }, [messages]);
 
-  // Show loading state while fetching existing conversation
+  // Track scroll position to show/hide scroll-to-bottom button
+  const handleScroll = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > SCROLL_THRESHOLD);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
-      <div className='flex h-full items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin text-secondary-token' />
+      <div className='flex h-full flex-col'>
+        <ChatMessageSkeleton />
       </div>
     );
   }
+
+  // Determine the active tool label for contextual loading state
+  const isStreaming = status === 'streaming';
+  const activeToolLabel = isLoading ? getActiveToolLabel(messages) : null;
+  const thinkingLabel = activeToolLabel ?? 'Thinking...';
+
+  // Find the last assistant message index for streaming cursor
+  const lastAssistantIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return i;
+    }
+    return -1;
+  })();
 
   return (
     <div className='flex h-full flex-col'>
@@ -91,14 +152,19 @@ export function JovieChat({
         // Chat view - messages + input at bottom
         <>
           {/* Messages area */}
-          <div className='flex-1 overflow-y-auto px-4 py-6'>
+          <div
+            ref={messagesContainerRef}
+            className='relative flex-1 overflow-y-auto px-4 py-6'
+            onScroll={handleScroll}
+          >
             <div className='mx-auto max-w-2xl space-y-6'>
-              {messages.map(message => (
+              {messages.map((message, index) => (
                 <ChatMessage
                   key={message.id}
                   id={message.id}
                   role={message.role}
                   parts={message.parts}
+                  isStreaming={isStreaming && index === lastAssistantIndex}
                 />
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
@@ -107,15 +173,26 @@ export function JovieChat({
                     <BrandLogo size={16} tone='auto' />
                   </div>
                   <div className='rounded-2xl bg-surface-2 px-4 py-3'>
-                    <Loader2 className='h-4 w-4 animate-spin motion-reduce:animate-none text-secondary-token' />
+                    <div className='flex items-center gap-2'>
+                      <Loader2 className='h-4 w-4 animate-spin motion-reduce:animate-none text-secondary-token' />
+                      <span className='text-xs text-secondary-token'>
+                        {thinkingLabel}
+                      </span>
+                    </div>
                   </div>
                   <span className='sr-only' aria-live='polite'>
-                    Jovie is thinking...
+                    Jovie is {thinkingLabel.toLowerCase().replace(/\.{3}$/, '')}
                   </span>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Scroll to bottom button */}
+            <ScrollToBottom
+              visible={showScrollToBottom}
+              onClick={scrollToBottom}
+            />
           </div>
 
           {/* Error display in chat view */}

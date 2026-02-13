@@ -50,7 +50,22 @@ export const SUBMIT_THROTTLE_MS = 1000;
 export interface MessagePart {
   readonly type: string;
   readonly text?: string;
+  readonly toolInvocation?: {
+    readonly toolName: string;
+    readonly state: string;
+  };
 }
+
+/** User-friendly labels for AI tool invocations shown during streaming. */
+export const TOOL_LABELS: Record<string, string> = {
+  proposeProfileEdit: 'Editing profile...',
+  checkCanvasStatus: 'Checking canvas status...',
+  suggestRelatedArtists: 'Finding related artists...',
+  generateCanvasPlan: 'Planning canvas video...',
+  createPromoStrategy: 'Building promo strategy...',
+  markCanvasUploaded: 'Updating canvas status...',
+  createRelease: 'Creating release...',
+};
 
 /** A chat suggestion card with icon, label, and prompt */
 export interface ChatSuggestion {
