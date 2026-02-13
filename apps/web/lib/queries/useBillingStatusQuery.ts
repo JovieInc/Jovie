@@ -41,7 +41,8 @@ async function fetchBillingStatus({
 }
 
 // Shared query options for billing status queries
-const billingStatusQueryOptions = {
+// Exported for SSR prefetching in app shell layout
+export const billingStatusQueryOptions = {
   queryKey: queryKeys.billing.status(),
   queryFn: fetchBillingStatus,
   // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
