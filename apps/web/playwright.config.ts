@@ -91,8 +91,9 @@ export default defineConfig({
     {
       name: 'auth-setup',
       testMatch: /auth\.setup\.ts/,
-      // biome-ignore lint/suspicious/noExplicitAny: Playwright requires this pattern for setup projects
-      use: { storageState: undefined as any },
+      // Ensure setup project never attempts to read persisted auth from disk.
+      // Using an explicit empty state is more reliable than `undefined` across Playwright versions.
+      use: { storageState: { cookies: [], origins: [] } },
     },
     {
       name: 'chromium',
