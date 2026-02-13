@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui/atoms/button';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -362,11 +363,12 @@ export function ConnectedDspList({
             Link your profiles on streaming platforms.
           </p>
           {spotifyId && (
-            <button
-              type='button'
+            <Button
+              variant='ghost'
+              size='sm'
               onClick={handleDiscover}
               disabled={isDiscovering}
-              className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 disabled:opacity-50 transition-colors'
+              className='gap-1.5 text-secondary-token hover:text-primary-token'
             >
               {isDiscovering ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -374,7 +376,7 @@ export function ConnectedDspList({
                 <RefreshCw className='h-3.5 w-3.5' />
               )}
               Discover
-            </button>
+            </Button>
           )}
         </div>
 

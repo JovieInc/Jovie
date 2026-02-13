@@ -4,7 +4,6 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -40,8 +39,6 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
-  const { toggle: toggleProfileDrawer, isOpen: isProfileDrawerOpen } =
-    usePreviewPanelState();
 
   // Debug: track isAdmin changes in development
   useEffect(() => {
@@ -88,9 +85,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
-      const isActive = isProfileItem
-        ? isProfileDrawerOpen
-        : isItemActive(pathname, item);
+      const isActive = isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
 
       return (
@@ -100,11 +95,10 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-          onClick={isProfileItem ? toggleProfileDrawer : undefined}
         />
       );
     },
-    [pathname, profileActions, toggleProfileDrawer, isProfileDrawerOpen]
+    [pathname, profileActions]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
