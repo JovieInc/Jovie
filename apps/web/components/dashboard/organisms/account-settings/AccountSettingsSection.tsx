@@ -3,11 +3,13 @@
 /**
  * AccountSettingsSection Component
  *
- * Main container for account settings, composing email and session management cards.
+ * Main container for account settings, composing email, session management,
+ * appearance, and notification preference cards.
  */
 
 import { useSession, useUser } from '@clerk/nextjs';
-
+import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
+import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
@@ -16,7 +18,7 @@ import { EmailManagementCard } from './EmailManagementCard';
 import { SessionManagementCard } from './SessionManagementCard';
 import type { ClerkUserResource } from './types';
 
-export function AccountSettingsSection() {
+function ClerkAccountSections() {
   const { user, isLoaded } = useUser();
   const { session: activeSession } = useSession();
 
@@ -36,7 +38,7 @@ export function AccountSettingsSection() {
   }
 
   return (
-    <div className='space-y-8' data-testid='account-settings-section'>
+    <>
       <div>
         <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
           Email
@@ -57,6 +59,26 @@ export function AccountSettingsSection() {
           user={typedUser}
           activeSessionId={activeSession?.id}
         />
+      </div>
+    </>
+  );
+}
+
+export function AccountSettingsSection() {
+  return (
+    <div className='space-y-8' data-testid='account-settings-section'>
+      <ClerkAccountSections />
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+          Appearance
+        </h3>
+        <SettingsAppearanceSection />
+      </div>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+          Notifications
+        </h3>
+        <SettingsNotificationsSection />
       </div>
     </div>
   );

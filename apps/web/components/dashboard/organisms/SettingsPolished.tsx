@@ -8,11 +8,9 @@ import { AccountSettingsSection } from '@/components/dashboard/organisms/account
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
-import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
-import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
@@ -89,20 +87,8 @@ export function SettingsPolished({
     {
       id: 'account',
       title: 'Account',
-      description: 'Manage your account security and authentication.',
+      description: 'Manage your security, theme, and notification preferences.',
       render: renderAccountSection,
-    },
-    {
-      id: 'appearance',
-      title: 'Appearance',
-      description: 'Theme and display preferences.',
-      render: () => <SettingsAppearanceSection />,
-    },
-    {
-      id: 'notifications',
-      title: 'Notifications',
-      description: 'Control how you receive updates.',
-      render: () => <SettingsNotificationsSection />,
     },
     {
       id: 'billing',
