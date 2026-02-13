@@ -215,6 +215,7 @@ export function ConnectedDspList({
 
   const { mutate: triggerDiscovery, isPending: isDiscovering } =
     useTriggerDiscoveryMutation();
+  const { mutate: rejectMatch } = useRejectDspMatchMutation();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteProvider, setPaletteProvider] = useState<
@@ -239,6 +240,46 @@ export function ConnectedDspList({
       }
     );
   };
+
+  const handleDisconnect = useCallback(
+    (match: DspMatch | undefined) => {
+      if (!match) return;
+      const label =
+        DSP_DISPLAY[match.providerId as DspProviderId]?.label ??
+        match.providerId;
+      rejectMatch(
+        { matchId: match.id, profileId, reason: 'user_disconnected' },
+        {
+          onSuccess: () => toast.success(`${label} disconnected`),
+          onError: err =>
+            toast.error(err.message || `Failed to disconnect ${label}`),
+        }
+      );
+    },
+    [profileId, rejectMatch]
+  );
+
+  const handleSyncNow = useCallback(
+    (provider: 'spotify' | 'apple_music') => {
+      if (!spotifyId) {
+        toast.error('A Spotify ID is required to sync DSP profiles');
+        return;
+      }
+      const label = DSP_DISPLAY[provider as DspProviderId]?.label ?? provider;
+      triggerDiscovery(
+        {
+          profileId,
+          spotifyArtistId: spotifyId,
+          targetProviders: [provider],
+        },
+        {
+          onSuccess: () => toast.success(`${label} sync started`),
+          onError: err => toast.error(err.message || `Failed to sync ${label}`),
+        }
+      );
+    },
+    [profileId, spotifyId, triggerDiscovery]
+  );
 
   const handleOpenPalette = useCallback(
     (provider: 'spotify' | 'apple_music') => {
@@ -404,6 +445,10 @@ export function ConnectedDspList({
                 ? () => handleOpenPalette('spotify')
                 : undefined
             }
+            onSyncNow={spotifyId ? () => handleSyncNow('spotify') : undefined}
+            onDisconnect={
+              spotifyMatch ? () => handleDisconnect(spotifyMatch) : undefined
+            }
           />
           <DspConnectionPill
             provider='apple_music'
@@ -413,6 +458,14 @@ export function ConnectedDspList({
               appleMusicMatch
                 ? undefined
                 : () => handleOpenPalette('apple_music')
+            }
+            onSyncNow={
+              appleMusicMatch ? () => handleSyncNow('apple_music') : undefined
+            }
+            onDisconnect={
+              appleMusicMatch
+                ? () => handleDisconnect(appleMusicMatch)
+                : undefined
             }
           />
           {unconnectedDefaultDsps.map(providerId => (
