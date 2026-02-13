@@ -1,8 +1,9 @@
 'use client';
 
 import { Badge } from '@jovie/ui/atoms/badge';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
@@ -21,8 +22,19 @@ import {
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
-import { RecentChats } from './RecentChats';
 import type { DashboardNavProps, NavItem } from './types';
+
+const RecentChats = dynamic(
+  () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className='px-2 py-1 text-sm text-secondary-token animate-pulse'>
+        Loading threads…
+      </div>
+    ),
+  }
+);
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.href) {
@@ -42,13 +54,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const { toggle: toggleProfileDrawer, isOpen: isProfileDrawerOpen } =
     usePreviewPanelState();
-
-  // Debug: track isAdmin changes in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DashboardNav] isAdmin changed:', isAdmin);
-    }
-  }, [isAdmin]);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;

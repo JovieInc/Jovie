@@ -25,6 +25,8 @@ export interface AuthShellProps {
   /** Preview panel slot (rendered alongside main content) */
   readonly previewPanel?: ReactNode;
   readonly onSidebarOpenChange?: (open: boolean) => void;
+  /** Server-provided sidebar default open state (from cookie). Eliminates layout flash. */
+  readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -103,11 +105,14 @@ function AuthShellInner({
  * by individual page components using the shared RightDrawer shell.
  */
 export function AuthShell(props: Readonly<AuthShellProps>) {
-  const { onSidebarOpenChange, ...rest } = props;
+  const { onSidebarOpenChange, sidebarDefaultOpen, ...rest } = props;
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SidebarProvider onOpenChange={onSidebarOpenChange}>
+      <SidebarProvider
+        defaultOpen={sidebarDefaultOpen}
+        onOpenChange={onSidebarOpenChange}
+      >
         <AuthShellInner {...rest} />
       </SidebarProvider>
     </div>

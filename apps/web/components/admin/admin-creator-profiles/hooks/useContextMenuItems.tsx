@@ -22,6 +22,7 @@ import { useCallback } from 'react';
 import { toast } from 'sonner';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/domains';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow, IngestRefreshStatus } from '../types';
 
 export interface ContextMenuDependencies {
@@ -181,12 +182,11 @@ export function useContextMenuItems({
             onClick: () => {
               void (async () => {
                 const claimUrl = `${BASE_URL}/${encodeURIComponent(profile.username)}/claim?token=${encodeURIComponent(claimToken)}`;
-                try {
-                  await navigator.clipboard.writeText(claimUrl);
+                const ok = await copyToClipboard(claimUrl);
+                if (ok) {
                   toast.success('Claim link copied to clipboard');
-                } catch {
+                } else {
                   toast.error('Failed to copy claim link');
-                  globalThis.prompt('Copy claim link:', claimUrl);
                 }
               })();
             },

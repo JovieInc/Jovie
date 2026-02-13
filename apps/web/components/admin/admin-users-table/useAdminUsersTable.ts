@@ -8,10 +8,10 @@ import {
   type UserSortableColumnKey,
 } from '@/components/admin/users-sort-config';
 import { APP_ROUTES } from '@/constants/routes';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AdminUsersTableProps } from './types';
-import { copyTextToClipboard } from './utils';
 
 export interface UseAdminUsersTableReturn {
   router: ReturnType<typeof useRouter>;
@@ -73,7 +73,7 @@ export function useAdminUsersTable({
       return;
     }
 
-    const success = await copyTextToClipboard(emails.join('\n'));
+    const success = await copyToClipboard(emails.join('\n'));
     if (success) {
       notifications.success(`Copied ${emails.length} email(s)`);
       return;
@@ -92,7 +92,7 @@ export function useAdminUsersTable({
       return;
     }
 
-    const success = await copyTextToClipboard(ids.join('\n'));
+    const success = await copyToClipboard(ids.join('\n'));
     if (success) {
       notifications.success(`Copied ${ids.length} Clerk ID(s)`);
       return;
