@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 
@@ -15,7 +15,11 @@ import {
   SuggestedPrompts,
 } from './components';
 import { useJovieChat } from './hooks';
-import type { JovieChatProps, MessagePart } from './types';
+import type {
+  JovieChatProps,
+  MessagePart,
+  StarterSuggestionContext,
+} from './types';
 import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
@@ -59,6 +63,8 @@ export function JovieChat({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [starterContext, setStarterContext] =
+    useState<StarterSuggestionContext | null>(null);
 
   const {
     input,
@@ -124,6 +130,14 @@ export function JovieChat({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Find the last assistant message index for streaming cursor
+  const lastAssistantIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return i;
+    }
+    return -1;
+  }, [messages]);
+
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
@@ -137,14 +151,6 @@ export function JovieChat({
   const isStreaming = status === 'streaming';
   const activeToolLabel = isLoading ? getActiveToolLabel(messages) : null;
   const thinkingLabel = activeToolLabel ?? 'Thinking...';
-
-  // Find the last assistant message index for streaming cursor
-  const lastAssistantIndex = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') return i;
-    }
-    return -1;
-  })();
 
   return (
     <div className='flex h-full flex-col'>
@@ -240,10 +246,18 @@ export function JovieChat({
             )}
 
             {/* Suggested profiles carousel (DSP matches, social links, avatars) */}
-            {profileId && <SuggestedProfilesCarousel profileId={profileId} />}
+            {profileId && (
+              <SuggestedProfilesCarousel
+                profileId={profileId}
+                onContextLoad={setStarterContext}
+              />
+            )}
 
             {/* Suggested prompts above input */}
-            <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+            <SuggestedPrompts
+              onSelect={handleSuggestedPrompt}
+              context={starterContext}
+            />
 
             {/* Input at bottom */}
             <ChatInput

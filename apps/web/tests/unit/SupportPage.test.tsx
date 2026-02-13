@@ -76,13 +76,8 @@ describe('SupportPage', () => {
     render(<SupportPage />);
 
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveClass(
-      'text-5xl',
-      'font-bold',
-      'tracking-tight',
-      'text-gray-900',
-      'dark:text-white'
-    );
+    expect(heading).toHaveClass('text-5xl', 'font-bold', 'tracking-tight');
+    expect(heading).toHaveStyle({ color: 'var(--linear-text-primary)' });
 
     const contactButton = screen.getByRole('link', {
       name: /send email to support team/i,

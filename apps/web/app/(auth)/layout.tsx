@@ -24,7 +24,7 @@ export default function AuthLayout({
   return (
     <ClientProviders publishableKey={publishableKey} skipCoreProviders>
       <div className={inter.className}>
-        {children}
+        <main id='main-content'>{children}</main>
         <ClerkAnalytics />
       </div>
     </ClientProviders>

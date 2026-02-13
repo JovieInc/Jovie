@@ -39,7 +39,7 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
           aria-label='Scroll to latest messages'
         >
           <ArrowDown className='h-3 w-3' />
-          New messages
+          Back to bottom
         </motion.button>
       )}
     </AnimatePresence>

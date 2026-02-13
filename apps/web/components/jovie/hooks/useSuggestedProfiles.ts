@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ProfileSuggestion } from '@/app/api/suggestions/route';
+import type {
+  ProfileSuggestion,
+  SuggestionsStarterContext,
+} from '@/app/api/suggestions/route';
 
 interface UseSuggestedProfilesReturn {
   suggestions: ProfileSuggestion[];
@@ -21,6 +24,9 @@ interface UseSuggestedProfilesReturn {
   reject: () => Promise<void>;
   /** Whether an action (confirm/reject) is in progress */
   isActioning: boolean;
+
+  /** Contextual data used to personalize starter prompts */
+  starterContext: SuggestionsStarterContext | null;
 }
 
 export function useSuggestedProfiles(
@@ -30,6 +36,8 @@ export function useSuggestedProfiles(
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isActioning, setIsActioning] = useState(false);
+  const [starterContext, setStarterContext] =
+    useState<SuggestionsStarterContext | null>(null);
   const fetchedRef = useRef(false);
 
   // Fetch suggestions on mount
@@ -46,6 +54,7 @@ export function useSuggestedProfiles(
         const data = await res.json();
         if (data.success && Array.isArray(data.suggestions)) {
           setSuggestions(data.suggestions);
+          setStarterContext(data.starterContext ?? null);
         }
       } finally {
         setIsLoading(false);
@@ -158,5 +167,6 @@ export function useSuggestedProfiles(
     confirm,
     reject,
     isActioning,
+    starterContext,
   };
 }

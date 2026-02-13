@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { gateway } from '@ai-sdk/gateway';
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
@@ -5,6 +6,7 @@ import { convertToModelMessages, streamText, tool, type UIMessage } from 'ai';
 import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { CHAT_MODEL } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -55,9 +57,7 @@ const EDITABLE_FIELDS = {
   blocked: ['username', 'avatarUrl', 'spotifyId', 'genres'] as const,
 };
 
-type EditableField =
-  | (typeof EDITABLE_FIELDS.tier1)[number]
-  | (typeof EDITABLE_FIELDS.tier2)[number];
+type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
 
 const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
   displayName: 'Display name shown on your profile',
@@ -75,6 +75,8 @@ const artistContextSchema = z.object({
   genres: z.array(z.string().max(50)).max(10),
   spotifyFollowers: z.number().int().nonnegative().nullable(),
   spotifyPopularity: z.number().int().min(0).max(100).nullable(),
+  spotifyUrl: z.string().url().nullable().optional(),
+  appleMusicUrl: z.string().url().nullable().optional(),
   profileViews: z.number().int().nonnegative(),
   hasSocialLinks: z.boolean(),
   hasMusicLinks: z.boolean(),
@@ -105,6 +107,8 @@ async function fetchArtistContext(
       genres: creatorProfiles.genres,
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       spotifyPopularity: creatorProfiles.spotifyPopularity,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
       profileViews: creatorProfiles.profileViews,
       userClerkId: users.clerkId,
     })
@@ -167,6 +171,8 @@ async function fetchArtistContext(
     genres: result.genres ?? [],
     spotifyFollowers: result.spotifyFollowers,
     spotifyPopularity: result.spotifyPopularity,
+    spotifyUrl: result.spotifyUrl,
+    appleMusicUrl: result.appleMusicUrl,
     profileViews: result.profileViews ?? 0,
     hasSocialLinks: Number(linkCounts?.totalActive ?? 0) > 0,
     hasMusicLinks: Number(linkCounts?.musicActive ?? 0) > 0,
@@ -361,6 +367,24 @@ function validateMessagesArray(messages: unknown): string | null {
   return null;
 }
 
+function extractRequestId(req: Request): string {
+  const incomingRequestId = req.headers.get('x-request-id')?.trim();
+  if (incomingRequestId) return incomingRequestId.slice(0, 120);
+  return randomUUID();
+}
+
+function sanitizeErrorCode(errorCode: string | undefined): string | null {
+  if (!errorCode) return null;
+  return /^[A-Z0-9_:-]{2,64}$/i.test(errorCode) ? errorCode : null;
+}
+
+function sanitizeRetryAfterSeconds(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const normalized = Math.ceil(value);
+  if (normalized < 1) return 1;
+  return Math.min(normalized, 3600);
+}
+
 function buildSystemPrompt(
   context: ArtistContext,
   options?: { aiCanUseTools: boolean; aiDailyMessageLimit: number }
@@ -431,6 +455,13 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Connected accounts: Requires settings page
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
+
+## World-Class Bio Writing
+You have access to the writeWorldClassBio tool. Use it when the artist asks for a new biography, a rewrite for Spotify/Apple Music, or an AllMusic-quality narrative.
+- Pull in the artist's real platform signals and catalog context
+- Keep all claims factual and grounded in available data
+- Deliver a polished draft the artist can use directly or refine
+
 
 ## Creative & Promotion Tools
 
@@ -939,6 +970,79 @@ function createReleaseTool(resolvedProfileId: string) {
 }
 
 /**
+ * Creates the writeWorldClassBio tool.
+ * Produces an AllMusic-style draft using profile + DSP context.
+ */
+function createWorldClassBioTool(
+  context: ArtistContext,
+  profileId: string | null
+) {
+  return tool({
+    description:
+      'Write a world-class artist bio in an editorial style suitable for Spotify, Apple Music, and press use. Uses real artist context from profile + DSP metadata.',
+    inputSchema: z.object({
+      goal: z
+        .enum(['spotify', 'apple_music', 'press_kit', 'general'])
+        .optional()
+        .describe('Primary usage context for the bio draft'),
+      tone: z
+        .enum(['cinematic', 'intimate', 'confident', 'elevated'])
+        .optional()
+        .describe('Preferred writing tone while maintaining factual rigor'),
+      maxWords: z
+        .number()
+        .int()
+        .min(80)
+        .max(350)
+        .optional()
+        .describe('Maximum words for the returned draft (default 180)'),
+    }),
+    execute: async ({ goal, tone, maxWords }) => {
+      let releases: Awaited<ReturnType<typeof fetchReleasesForChat>> = [];
+      try {
+        releases = profileId ? await fetchReleasesForChat(profileId) : [];
+      } catch {
+        // Non-fatal: proceed with empty releases rather than failing the tool
+      }
+      const wordLimit = maxWords ?? 180;
+      const draftPackage = buildArtistBioDraft({
+        artistName: context.displayName,
+        existingBio: context.bio,
+        genres: context.genres,
+        spotifyFollowers: context.spotifyFollowers,
+        spotifyPopularity: context.spotifyPopularity,
+        spotifyUrl: context.spotifyUrl ?? null,
+        appleMusicUrl: context.appleMusicUrl ?? null,
+        profileViews: context.profileViews,
+        releaseCount: releases.length,
+        notableReleases: releases.slice(0, 3).map(release => release.title),
+      });
+
+      const trimmedDraft =
+        draftPackage.draft.split(/\s+/).length > wordLimit
+          ? `${draftPackage.draft.split(/\s+/).slice(0, wordLimit).join(' ')}…`
+          : draftPackage.draft;
+
+      return {
+        success: true,
+        usageGoal: goal ?? 'general',
+        tone: tone ?? 'elevated',
+        maxWords: wordLimit,
+        draft: trimmedDraft,
+        facts: draftPackage.facts,
+        voiceDirectives: draftPackage.voiceDirectives,
+        releaseContext: releases.slice(0, 5).map(release => ({
+          title: release.title,
+          releaseType: release.releaseType,
+          releaseDate: release.releaseDate,
+          spotifyPopularity: release.spotifyPopularity,
+        })),
+      };
+    },
+  });
+}
+
+/**
  * OPTIONS - CORS preflight handler
  */
 export async function OPTIONS() {
@@ -952,12 +1056,14 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: Request) {
+  const requestId = extractRequestId(req);
+
   // Auth check - ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { error: 'Unauthorized', requestId },
+      { status: 401, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -973,15 +1079,18 @@ export async function POST(req: Request) {
       {
         error: 'Rate limit exceeded',
         message: rateLimitResult.reason,
-        retryAfter: Math.ceil(
+        errorCode: 'RATE_LIMITED',
+        retryAfter: sanitizeRetryAfterSeconds(
           (rateLimitResult.reset.getTime() - Date.now()) / 1000
         ),
+        requestId,
       },
       {
         status: 429,
         headers: {
           ...CORS_HEADERS,
           ...createRateLimitHeaders(rateLimitResult),
+          'x-request-id': requestId,
         },
       }
     );
@@ -997,8 +1106,8 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS }
+      { error: 'Invalid JSON body', requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1010,8 +1119,8 @@ export async function POST(req: Request) {
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {
     return NextResponse.json(
-      { error: 'Missing profileId or artistContext' },
-      { status: 400, headers: CORS_HEADERS }
+      { error: 'Missing profileId or artistContext', requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1019,8 +1128,8 @@ export async function POST(req: Request) {
   const messagesError = validateMessagesArray(messages);
   if (messagesError) {
     return NextResponse.json(
-      { error: messagesError },
-      { status: 400, headers: CORS_HEADERS }
+      { error: messagesError, requestId },
+      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 
@@ -1057,6 +1166,10 @@ export async function POST(req: Request) {
           proposeProfileEdit: createProfileEditTool(artistContext),
           checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
           suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+          writeWorldClassBio: createWorldClassBioTool(
+            artistContext,
+            resolvedProfileId
+          ),
           generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
           createPromoStrategy: createPromoStrategyTool(
             artistContext,
@@ -1087,18 +1200,25 @@ export async function POST(req: Request) {
           extra: {
             userId,
             messageCount: uiMessages.length,
+            requestId,
           },
         });
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      headers: {
+        ...CORS_HEADERS,
+        'x-request-id': requestId,
+      },
+    });
   } catch (error) {
     Sentry.captureException(error, {
       tags: { feature: 'ai-chat' },
       extra: {
         userId,
         messageCount: uiMessages.length,
+        requestId,
       },
     });
 
@@ -1106,8 +1226,20 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : 'An unexpected error occurred';
 
     return NextResponse.json(
-      { error: 'Failed to process chat request', message },
-      { status: 500, headers: CORS_HEADERS }
+      {
+        error: 'Failed to process chat request',
+        message:
+          'Jovie hit a temporary issue while processing your message. Please try again.',
+        errorCode:
+          sanitizeErrorCode(
+            error instanceof Error
+              ? (error as { code?: string }).code
+              : undefined
+          ) ?? 'CHAT_STREAM_FAILED',
+        debugMessage: message,
+        requestId,
+      },
+      { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
     );
   }
 }

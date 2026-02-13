@@ -9,6 +9,8 @@ import { fastRender } from '@/tests/utils/fast-render';
 const mockReplace = vi.fn();
 const mockSetHeaderBadge = vi.fn();
 const mockSetHeaderActions = vi.fn();
+const mockSuccessNotification = vi.fn();
+const mockErrorNotification = vi.fn();
 
 let mockSearchParams = new URLSearchParams();
 
@@ -48,6 +50,13 @@ vi.mock('@/components/jovie/JovieChat', () => ({
       'data-conversation-id': props.conversationId ?? '',
     });
   },
+}));
+
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => ({
+    success: mockSuccessNotification,
+    error: mockErrorNotification,
+  }),
 }));
 
 vi.mock('@statsig/react-bindings', () => ({
@@ -97,6 +106,8 @@ describe('ChatPageClient', () => {
     vi.clearAllMocks();
     mockSearchParams = new URLSearchParams();
     capturedOnTitleChange = undefined;
+    mockSuccessNotification.mockReset();
+    mockErrorNotification.mockReset();
   });
 
   it('renders JovieChat with profileId from selected profile', () => {
@@ -149,6 +160,26 @@ describe('ChatPageClient', () => {
 
     // Should set badge to null on cleanup
     expect(mockSetHeaderBadge).toHaveBeenCalledWith(null);
+  });
+
+  it('registers header actions on mount', () => {
+    renderChatPage('conv-123');
+
+    expect(mockSetHeaderActions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.anything(),
+      })
+    );
+  });
+
+  it('cleans up header actions on unmount', () => {
+    const { unmount } = renderChatPage('conv-123');
+
+    mockSetHeaderActions.mockClear();
+
+    unmount();
+
+    expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
   });
 
   it('shows loading state when no profile is selected', () => {

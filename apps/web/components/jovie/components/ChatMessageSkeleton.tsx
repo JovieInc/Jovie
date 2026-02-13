@@ -20,7 +20,7 @@ export function ChatMessageSkeleton() {
 
       {/* User message skeleton */}
       <div className='flex gap-3 justify-end'>
-        <Skeleton className='h-4 w-36 rounded-2xl' rounded='lg' />
+        <Skeleton className='h-4 w-36' rounded='lg' />
         <Skeleton className='h-8 w-8 shrink-0' rounded='lg' />
       </div>
 

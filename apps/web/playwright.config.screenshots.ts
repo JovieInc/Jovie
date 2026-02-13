@@ -55,8 +55,8 @@ export default defineConfig({
       name: 'auth-setup',
       testMatch: /auth\.setup\.ts/,
       testDir: './tests/e2e',
-      // biome-ignore lint/suspicious/noExplicitAny: Playwright requires this pattern for setup projects
-      use: { storageState: undefined as any },
+      // Ensure setup project never attempts to read persisted auth from disk.
+      use: { storageState: { cookies: [], origins: [] } },
     },
     {
       name: 'screenshots',

@@ -92,7 +92,8 @@ export function CookieBannerSection({
   return (
     <>
       {showBanner && visible ? (
-        <div
+        <aside
+          aria-label='Cookie consent'
           data-testid='cookie-banner'
           className='fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-6 md:flex md:items-center md:justify-between md:gap-4'
           style={{
@@ -117,7 +118,7 @@ export function CookieBannerSection({
             onReject={reject}
             onCustomize={() => setCustomize(true)}
           />
-        </div>
+        </aside>
       ) : null}
 
       {customize ? (

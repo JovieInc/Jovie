@@ -84,8 +84,9 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
         const filePath = join(dirPath, filename);
         const fileStat = await stat(filePath);
         const nameWithoutExt = basename(filename, '.png');
-        const displayName = nameWithoutExt.replace(/[-_]/g, ' ');
+        const displayName = nameWithoutExt.replaceAll(/[-_]/g, ' ');
 
+        const compositeFilename = `${source.key}--${filename}`;
         results.push({
           id: `${source.key}--${nameWithoutExt}`,
           name: displayName,
@@ -93,7 +94,7 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
           source: source.key,
           sourceLabel: source.label,
           sizeBytes: fileStat.size,
-          url: `/api/admin/screenshots/${encodeURIComponent(`${source.key}--${filename}`)}`,
+          url: `/api/admin/screenshots/${encodeURIComponent(compositeFilename)}`,
         });
       }
     } catch (err: unknown) {

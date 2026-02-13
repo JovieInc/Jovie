@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "0.1.0",
+  "version": "26.2.0",
   "private": true,
   "config": {
     "commitizen": {
@@ -64,7 +64,8 @@
     "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "knip": "knip",
-    "version:bump": "node scripts/version-bump.mjs"
+    "version:bump": "node scripts/version-bump.mjs",
+    "version:check": "node scripts/version-check.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",

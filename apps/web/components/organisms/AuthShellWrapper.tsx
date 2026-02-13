@@ -123,7 +123,6 @@ function AuthShellWrapperInner({
       <PreviewPanelProvider enabled={previewEnabled}>
         <AuthShell
           section={config.section}
-          navigation={config.navigation}
           breadcrumbs={config.breadcrumbs}
           headerBadge={headerBadge}
           headerAction={headerAction}
