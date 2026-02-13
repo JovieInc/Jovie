@@ -4,7 +4,7 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useRef } from 'react';
 
-import { useIsMobile } from '@/hooks/useMobile';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 
 export interface RightDrawerProps
@@ -32,7 +32,7 @@ export function RightDrawer({
   ...rest
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpointDown('lg');
 
   // Handle keyboard events at the document level when drawer is open
   useEffect(() => {

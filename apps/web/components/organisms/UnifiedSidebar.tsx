@@ -4,16 +4,17 @@ import { Button } from '@jovie/ui';
 import { ArrowLeft, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   artistSettingsNavigation,
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
+import { Avatar } from '@/components/molecules/Avatar';
 import {
   Sidebar,
   SidebarContent,
@@ -103,6 +104,17 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
+  const { selectedProfile } = useDashboardData();
+  const artistName = selectedProfile?.displayName?.trim() || undefined;
+
+  // Replace "Profile" label with the artist's display name when available
+  const artistItems = useMemo(() => {
+    if (!artistName) return artistSettingsNavigation;
+    return artistSettingsNavigation.map(item =>
+      item.id === 'artist-profile' ? { ...item, name: artistName } : item
+    );
+  }, [artistName]);
+
   return (
     <nav
       aria-label={`${section} navigation`}
@@ -112,12 +124,9 @@ function SettingsNavigation({
       <div className='mx-2 border-t border-sidebar-border group-data-[collapsible=icon]:mx-0' />
       <div>
         <span className='mb-1 block px-2 text-[11px] font-medium text-sidebar-muted group-data-[collapsible=icon]:hidden'>
-          Artist
+          {artistName || 'Artist'}
         </span>
-        <SettingsNavGroup
-          items={artistSettingsNavigation}
-          pathname={pathname}
-        />
+        <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
     </nav>
   );
@@ -138,10 +147,11 @@ function MobileProfileCard({
   return (
     <div className='px-2 pb-3 pt-2 lg:hidden'>
       <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-        <OptimizedAvatar
+        <Avatar
           src={avatarUrl}
           alt={displayName}
-          size={64}
+          name={displayName}
+          size='lg'
           className='h-10 w-10'
         />
         <div className='min-w-0'>
