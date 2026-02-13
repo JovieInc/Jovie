@@ -3,7 +3,7 @@
 import { Badge } from '@jovie/ui/atoms/badge';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
@@ -47,13 +47,6 @@ export function DashboardNav(_: DashboardNavProps) {
   const pathname = usePathname();
   const { toggle: toggleProfileDrawer, isOpen: isProfileDrawerOpen } =
     usePreviewPanelState();
-
-  // Debug: track isAdmin changes in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DashboardNav] isAdmin changed:', isAdmin);
-    }
-  }, [isAdmin]);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
