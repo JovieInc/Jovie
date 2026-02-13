@@ -116,19 +116,31 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       {
         label: 'Copy Emails',
         icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          const emails = selectedEntries.map(e => e.email).join('\n');
-          void copyToClipboard(emails);
-          clearSelection();
+        onClick: async () => {
+          const emails = selectedEntries.map(e => e.email).filter(Boolean);
+          if (emails.length === 0) return;
+          const ok = await copyToClipboard(emails.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${emails.length} email(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy emails');
+          }
         },
       },
       {
         label: 'Copy Names',
         icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          const names = selectedEntries.map(e => e.fullName).join('\n');
-          void copyToClipboard(names);
-          clearSelection();
+        onClick: async () => {
+          const names = selectedEntries.map(e => e.fullName).filter(Boolean);
+          if (names.length === 0) return;
+          const ok = await copyToClipboard(names.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${names.length} name(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy names');
+          }
         },
       },
     ];

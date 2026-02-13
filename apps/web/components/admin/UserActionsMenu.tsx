@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { Copy, ExternalLink, MoreVertical } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
@@ -26,21 +26,30 @@ export function UserActionsMenu({
   onOpenChange,
 }: Readonly<UserActionsMenuProps>) {
   const [copySuccess, setCopySuccess] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const handleCopyClerkId = useCallback(async () => {
     const success = await copyToClipboard(user.clerkId);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
       setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 1500);
+      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 1500);
     }
   }, [user.clerkId]);
 
   const handleCopyEmail = useCallback(async () => {
     if (!user.email) return;
     const success = await copyToClipboard(user.email);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
       setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 1500);
+      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 1500);
     }
   }, [user.email]);
 

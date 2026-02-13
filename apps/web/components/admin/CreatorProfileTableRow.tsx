@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { toast } from 'sonner';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/components/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
@@ -206,6 +207,8 @@ function CreatorProfileTableRowComponent({
       setCopySuccess(true);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
+    } else {
+      toast.error('Failed to copy claim link');
     }
   }, [profile.claimToken, profile.username]);
 

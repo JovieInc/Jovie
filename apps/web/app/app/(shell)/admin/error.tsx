@@ -7,7 +7,7 @@ interface ErrorProps {
   readonly reset: () => void;
 }
 
-export default function AdminError({ error, reset }: Readonly<ErrorProps>) {
+export default function AdminError({ error, reset }: ErrorProps) {
   return (
     <ErrorBoundary
       error={error}

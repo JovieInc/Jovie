@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -161,6 +161,13 @@ export function CreatorActionsMenu({
   onOpenChange,
 }: Readonly<CreatorActionsMenuProps>) {
   const [copySuccess, setCopySuccess] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
   const isSuccess = status === 'success';
@@ -173,9 +180,10 @@ export function CreatorActionsMenu({
     const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
     const success = await copyToClipboard(claimUrl);
 
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
       setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
     }
   }, [profile.claimToken, profile.username]);
 

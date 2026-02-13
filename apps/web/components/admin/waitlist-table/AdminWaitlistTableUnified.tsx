@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import {
   type ContextMenuItemType,
   UnifiedTable,
@@ -114,9 +115,11 @@ export function AdminWaitlistTableUnified({
     [rowSelection, setSelection]
   );
 
-  // Helper to copy to clipboard using shared safe utility
-  const safeCopyToClipboard = useCallback((text: string, _label: string) => {
-    void copyToClipboard(text);
+  // Helper to copy to clipboard with toast feedback
+  const safeCopyToClipboard = useCallback((text: string, label: string) => {
+    void copyToClipboard(text).then(ok => {
+      if (ok) toast.success(`${label} copied`, { duration: 2000 });
+    });
   }, []);
 
   // Create context menu items for a waitlist entry

@@ -26,7 +26,14 @@ import type { DashboardNavProps, NavItem } from './types';
 
 const RecentChats = dynamic(
   () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <div className='px-2 py-1 text-sm text-secondary-token animate-pulse'>
+        Loading threads…
+      </div>
+    ),
+  }
 );
 
 function isItemActive(pathname: string, item: NavItem): boolean {
