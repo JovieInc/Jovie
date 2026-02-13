@@ -8,10 +8,9 @@
  */
 
 import { useSession, useUser } from '@clerk/nextjs';
-
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 import { DashboardCard } from '../../atoms/DashboardCard';
 import { ConnectedAccountsCard } from './ConnectedAccountsCard';
