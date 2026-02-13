@@ -42,16 +42,19 @@ export function useSocialsForm({
   const [submitError, setSubmitError] = useState<string | undefined>(undefined);
 
   // Sync fetched data to local state when it changes.
-  // When the user has no saved links, prefill with top 3 social networks.
+  // Sync fetched links into local state only when the local state hasn't been
+  // touched yet (empty array). This prevents background refetches from
+  // clobbering in-progress user edits.
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (fetchedLinks) {
-      if (fetchedLinks.length === 0) {
-        setSocialLinks(
-          DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
-        );
-      } else {
-        setSocialLinks(fetchedLinks);
-      }
+    if (!fetchedLinks || initializedRef.current) return;
+    initializedRef.current = true;
+    if (fetchedLinks.length === 0) {
+      setSocialLinks(
+        DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
+      );
+    } else {
+      setSocialLinks(fetchedLinks);
     }
   }, [fetchedLinks]);
 

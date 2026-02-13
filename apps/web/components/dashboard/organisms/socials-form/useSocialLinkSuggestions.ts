@@ -37,14 +37,20 @@ export function useSocialLinkSuggestions(
   profileId: string | undefined
 ): UseSocialLinkSuggestionsReturn {
   const [suggestions, setSuggestions] = useState<SocialLinkSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!profileId);
   const [actioningId, setActioningId] = useState<string | null>(null);
-  const fetchedRef = useRef(false);
+  const fetchedProfileIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!profileId || fetchedRef.current) return;
-    fetchedRef.current = true;
+    if (!profileId) {
+      setIsLoading(false);
+      return;
+    }
+    if (fetchedProfileIdRef.current === profileId) return;
+    fetchedProfileIdRef.current = profileId;
+    setIsLoading(true);
+    setSuggestions([]);
 
     (async () => {
       try {
