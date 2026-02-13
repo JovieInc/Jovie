@@ -370,10 +370,8 @@ const DASHBOARD_PAGES = [
 const SETTINGS_PAGES = [
   '/app/settings',
   '/app/settings/billing',
-  '/app/settings/appearance',
   '/app/settings/branding',
   '/app/settings/ad-pixels',
-  '/app/settings/notifications',
 ];
 
 const ADMIN_PAGES = [

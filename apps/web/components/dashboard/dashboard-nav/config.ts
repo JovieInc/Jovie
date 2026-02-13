@@ -1,13 +1,11 @@
 import {
   Banknote,
-  Bell,
   CalendarDays,
   Home,
   IdCard,
   Link2,
   Music,
   Music2,
-  Paintbrush,
   PieChart,
   Rocket,
   Settings,
@@ -88,18 +86,6 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS,
     id: 'account',
     icon: ShieldCheck,
-  },
-  {
-    name: 'Appearance',
-    href: APP_ROUTES.SETTINGS_APPEARANCE,
-    id: 'appearance',
-    icon: Paintbrush,
-  },
-  {
-    name: 'Notifications',
-    href: APP_ROUTES.SETTINGS_NOTIFICATIONS,
-    id: 'notifications',
-    icon: Bell,
   },
   {
     name: 'Billing',
