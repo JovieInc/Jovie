@@ -4,26 +4,29 @@ import { Container } from '@/components/site/Container';
 const features = [
   {
     icon: RefreshCw,
-    title: 'Auto-updating',
-    description: 'New releases sync instantly. Nothing to manage.',
+    title: 'Auto-updating profile essentials',
+    description: 'Keep your profile current without constant manual updates.',
     iconColor: '#3b82f6', // blue
   },
   {
     icon: Mail,
     title: 'Built-in fan capture',
-    description: 'Email and SMS on every visit. Automatic.',
+    description:
+      'Capture email and SMS in a clean flow that respects fan attention.',
     iconColor: '#8b5cf6', // violet
   },
   {
     icon: Palette,
-    title: 'Beautiful by default',
-    description: 'One design, perfected. No choices, no guesswork.',
+    title: 'Premium by default',
+    description:
+      'Use a refined layout that looks credible from your first campaign.',
     iconColor: '#ec4899', // pink
   },
   {
     icon: BarChart3,
-    title: 'Simple analytics',
-    description: 'Know who visits and what converts.',
+    title: 'Actionable analytics',
+    description:
+      'Understand what drives clicks and conversion so every update has a reason.',
     iconColor: '#f59e0b', // amber
   },
 ];

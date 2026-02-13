@@ -7,9 +7,12 @@
 
 import {
   and,
+  asc,
   desc,
   sql as drizzleSql,
   eq,
+  gt,
+  inArray,
   isNotNull,
   isNull,
 } from 'drizzle-orm';
@@ -32,6 +35,23 @@ interface ScoredProfile {
   id: string;
   score: number;
   breakdown: FitScoreBreakdown;
+}
+
+interface RecalculateProfileRow {
+  id: string;
+  spotifyId: string | null;
+  spotifyPopularity: number | null;
+  genres: string[] | null;
+  ingestionSourcePlatform: string | null;
+  appleMusicId: string | null;
+  soundcloudId: string | null;
+  deezerId: string | null;
+  tidalId: string | null;
+  youtubeMusicId: string | null;
+  socialLinkPlatforms: string[] | null;
+  latestReleaseDate: Date | null;
+  hasContactEmail: boolean | null;
+  paidVerificationPlatforms: string[] | null;
 }
 
 /**
@@ -310,11 +330,29 @@ export async function recalculateAllFitScores(
   batchSize = 100
 ): Promise<number> {
   let totalScored = 0;
-  let offset = 0;
+  let lastProcessedId: string | null = null;
 
   while (true) {
+    const profileIdRows: Array<{ id: string }> = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.isClaimed, false),
+          lastProcessedId ? gt(creatorProfiles.id, lastProcessedId) : undefined
+        )
+      )
+      .orderBy(asc(creatorProfiles.id))
+      .limit(batchSize);
+
+    if (profileIdRows.length === 0) {
+      break;
+    }
+
+    const profileIds = profileIdRows.map((row: { id: string }) => row.id);
+
     // Fetch all needed data with batched JOINs (same as calculateMissingFitScores)
-    const profiles = await db
+    const profiles: RecalculateProfileRow[] = await db
       .select({
         id: creatorProfiles.id,
         spotifyId: creatorProfiles.spotifyId,
@@ -367,14 +405,11 @@ export async function recalculateAllFitScores(
         creatorContacts,
         eq(creatorContacts.creatorProfileId, creatorProfiles.id)
       )
-      .where(eq(creatorProfiles.isClaimed, false))
+      .where(inArray(creatorProfiles.id, profileIds))
       .groupBy(creatorProfiles.id)
-      .limit(batchSize)
-      .offset(offset);
+      .orderBy(asc(creatorProfiles.id));
 
-    if (profiles.length === 0) {
-      break;
-    }
+    if (profiles.length === 0) continue;
 
     // Calculate all scores in memory
     const scoredProfiles: ScoredProfile[] = profiles.map(profile => {
@@ -410,7 +445,12 @@ export async function recalculateAllFitScores(
 
     await batchUpdateFitScores(db, scoredProfiles);
     totalScored += scoredProfiles.length;
-    offset += batchSize;
+
+    const lastProfile = profiles[profiles.length - 1];
+    if (!lastProfile) {
+      break;
+    }
+    lastProcessedId = lastProfile.id;
   }
 
   return totalScored;
