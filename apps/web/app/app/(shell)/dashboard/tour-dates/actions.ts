@@ -218,7 +218,7 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`/sign-in?redirect_url=${APP_ROUTES.TOUR_DATES}`);
+    redirect(`/sign-in?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`);
   }
 
   const profile = await requireProfile();
@@ -345,7 +345,7 @@ export async function saveBandsintownApiKey(params: {
       profileId: profile.id,
     });
 
-    revalidatePath(APP_ROUTES.TOUR_DATES);
+    revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return {
       success: true,
@@ -394,7 +394,7 @@ export async function removeBandsintownApiKey(): Promise<{
       profileId: profile.id,
     });
 
-    revalidatePath(APP_ROUTES.TOUR_DATES);
+    revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return { success: true };
   } catch (error) {
@@ -463,7 +463,7 @@ export async function connectBandsintownArtist(params: {
     isInitialConnect: true,
   });
 
-  revalidatePath(APP_ROUTES.TOUR_DATES);
+  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   // Load updated tour dates
   const dates = await db
@@ -533,7 +533,7 @@ export async function syncFromBandsintown(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.TOUR_DATES);
+  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   return {
     success: true,
@@ -601,7 +601,7 @@ export async function createTourDate(params: {
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.TOUR_DATES);
+  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   return mapTourDateToViewModel(created);
 }
@@ -677,7 +677,7 @@ export async function updateTourDate(params: {
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.TOUR_DATES);
+  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   return mapTourDateToViewModel(updated);
 }
@@ -713,7 +713,7 @@ export async function deleteTourDate(
 
   // Invalidate cache and revalidate path
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.TOUR_DATES);
+  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
   return { success: true };
 }
@@ -751,7 +751,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
         )
       );
 
-    revalidatePath(APP_ROUTES.TOUR_DATES);
+    revalidatePath(APP_ROUTES.SETTINGS_TOURING);
 
     return { success: true };
   } catch (error) {

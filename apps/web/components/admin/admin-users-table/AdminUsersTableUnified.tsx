@@ -17,6 +17,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -91,19 +92,27 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           id: 'copy-clerk-id',
           label: 'Copy Clerk user ID',
           icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(user.clerkId);
-            toast.success('Clerk ID copied', { duration: 2000 });
+          onClick: async () => {
+            const ok = await copyToClipboard(user.clerkId);
+            if (ok) {
+              toast.success('Clerk ID copied', { duration: 2000 });
+            } else {
+              toast.error('Failed to copy Clerk ID');
+            }
           },
         },
         {
           id: 'copy-email',
           label: 'Copy email',
           icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
+          onClick: async () => {
             if (user.email) {
-              navigator.clipboard.writeText(user.email);
-              toast.success('Email copied', { duration: 2000 });
+              const ok = await copyToClipboard(user.email);
+              if (ok) {
+                toast.success('Email copied', { duration: 2000 });
+              } else {
+                toast.error('Failed to copy email');
+              }
             }
           },
           disabled: !user.email,
@@ -112,9 +121,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           id: 'copy-user-id',
           label: 'Copy User ID',
           icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            navigator.clipboard.writeText(user.id);
-            toast.success('User ID copied', { duration: 2000 });
+          onClick: async () => {
+            const ok = await copyToClipboard(user.id);
+            if (ok) {
+              toast.success('User ID copied', { duration: 2000 });
+            } else {
+              toast.error('Failed to copy User ID');
+            }
           },
         }
       );
@@ -149,22 +162,31 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       {
         label: 'Copy Clerk IDs',
         icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          const ids = selectedUsers.map(u => u.clerkId).join('\n');
-          navigator.clipboard.writeText(ids);
-          clearSelection();
+        onClick: async () => {
+          const ids = selectedUsers.map(u => u.clerkId).filter(Boolean);
+          if (ids.length === 0) return;
+          const ok = await copyToClipboard(ids.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${ids.length} Clerk ID(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy Clerk IDs');
+          }
         },
       },
       {
         label: 'Copy Emails',
         icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          const emails = selectedUsers
-            .map(u => u.email)
-            .filter(Boolean)
-            .join('\n');
-          navigator.clipboard.writeText(emails);
-          clearSelection();
+        onClick: async () => {
+          const emails = selectedUsers.map(u => u.email).filter(Boolean);
+          if (emails.length === 0) return;
+          const ok = await copyToClipboard(emails.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${emails.length} email(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy emails');
+          }
         },
       },
     ];

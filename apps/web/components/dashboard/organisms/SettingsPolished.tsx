@@ -10,8 +10,10 @@ import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/Settin
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
+import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
 import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
+import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
@@ -129,6 +131,18 @@ export function SettingsPolished({
       render: () => (
         <ConnectedDspList profileId={artist.id} spotifyId={artist.spotify_id} />
       ),
+    },
+    {
+      id: 'contacts',
+      title: 'Contacts',
+      description: 'Manage bookings, management, and press contacts.',
+      render: () => <SettingsContactsSection artist={artist} />,
+    },
+    {
+      id: 'touring',
+      title: 'Touring',
+      description: 'Connect Bandsintown to display tour dates on your profile.',
+      render: () => <SettingsTouringSection />,
     },
     {
       id: 'branding',

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui/atoms/button';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -29,6 +30,12 @@ import {
   type DspMatch,
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
+
+const DEFAULT_OTHER_DSPS = [
+  'youtube_music',
+  'soundcloud',
+  'tidal',
+] as const satisfies readonly DspProviderId[];
 
 const DSP_DISPLAY: Record<DspProviderId, { label: string; color: string }> = {
   spotify: { label: 'Spotify', color: 'text-[#1DB954]' },
@@ -367,6 +374,15 @@ export function ConnectedDspList({
     m => m.providerId !== 'spotify' && m.providerId !== 'apple_music'
   );
 
+  // Default DSPs that don't have any match yet — always show as pills
+  const otherMatchedIds = new Set([
+    ...otherConfirmed.map(m => m.providerId),
+    ...otherSuggested.map(m => m.providerId),
+  ]);
+  const unconnectedDefaultDsps = DEFAULT_OTHER_DSPS.filter(
+    id => !otherMatchedIds.has(id)
+  );
+
   if (isLoading) {
     return (
       <DashboardCard variant='settings'>
@@ -403,11 +419,12 @@ export function ConnectedDspList({
             Link your profiles on streaming platforms.
           </p>
           {spotifyId && (
-            <button
-              type='button'
+            <Button
+              variant='ghost'
+              size='sm'
               onClick={handleDiscover}
               disabled={isDiscovering}
-              className='inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 disabled:opacity-50 transition-colors'
+              className='gap-1.5 text-secondary-token hover:text-primary-token'
             >
               {isDiscovering ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -415,11 +432,11 @@ export function ConnectedDspList({
                 <RefreshCw className='h-3.5 w-3.5' />
               )}
               Discover
-            </button>
+            </Button>
           )}
         </div>
 
-        {/* Primary DSP connection pills */}
+        {/* DSP connection pills */}
         <div className='flex flex-wrap items-center gap-2'>
           <DspConnectionPill
             provider='spotify'
@@ -453,6 +470,21 @@ export function ConnectedDspList({
                 : undefined
             }
           />
+          {unconnectedDefaultDsps.map(providerId => (
+            <DspConnectionPill
+              key={providerId}
+              provider={providerId}
+              connected={false}
+              onClick={
+                spotifyId
+                  ? handleDiscover
+                  : () =>
+                      toast.info(
+                        'Connect Spotify first to discover other DSP profiles'
+                      )
+              }
+            />
+          ))}
         </div>
 
         {/* Other confirmed and suggested matches */}

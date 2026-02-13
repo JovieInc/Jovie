@@ -18,12 +18,13 @@ import {
   useRef,
   useState,
 } from 'react';
+import { toast } from 'sonner';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import { CreatorProfileSocialLinks } from '@/components/admin/CreatorProfileSocialLinks';
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/components/admin/creator-actions-menu/CreatorActionsMenuContent';
-import { copyTextToClipboard } from '@/components/admin/creator-actions-menu/utils';
 import { TableRowActions } from '@/components/admin/table/TableRowActions';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -200,12 +201,14 @@ function CreatorProfileTableRowComponent({
 
     const baseUrl = getBaseUrl();
     const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
-    const success = await copyTextToClipboard(claimUrl);
+    const success = await copyToClipboard(claimUrl);
 
     if (success) {
       setCopySuccess(true);
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
+    } else {
+      toast.error('Failed to copy claim link');
     }
   }, [profile.claimToken, profile.username]);
 
