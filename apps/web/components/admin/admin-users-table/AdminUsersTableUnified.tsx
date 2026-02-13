@@ -17,6 +17,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
@@ -92,8 +93,9 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           label: 'Copy Clerk user ID',
           icon: <Copy className='h-3.5 w-3.5' />,
           onClick: () => {
-            navigator.clipboard.writeText(user.clerkId);
-            toast.success('Clerk ID copied', { duration: 2000 });
+            void copyToClipboard(user.clerkId).then(ok => {
+              if (ok) toast.success('Clerk ID copied', { duration: 2000 });
+            });
           },
         },
         {
@@ -102,8 +104,9 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           icon: <Copy className='h-3.5 w-3.5' />,
           onClick: () => {
             if (user.email) {
-              navigator.clipboard.writeText(user.email);
-              toast.success('Email copied', { duration: 2000 });
+              void copyToClipboard(user.email).then(ok => {
+                if (ok) toast.success('Email copied', { duration: 2000 });
+              });
             }
           },
           disabled: !user.email,
@@ -113,8 +116,9 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           label: 'Copy User ID',
           icon: <Copy className='h-3.5 w-3.5' />,
           onClick: () => {
-            navigator.clipboard.writeText(user.id);
-            toast.success('User ID copied', { duration: 2000 });
+            void copyToClipboard(user.id).then(ok => {
+              if (ok) toast.success('User ID copied', { duration: 2000 });
+            });
           },
         }
       );
@@ -151,7 +155,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const ids = selectedUsers.map(u => u.clerkId).join('\n');
-          navigator.clipboard.writeText(ids);
+          void copyToClipboard(ids);
           clearSelection();
         },
       },
@@ -163,7 +167,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             .map(u => u.email)
             .filter(Boolean)
             .join('\n');
-          navigator.clipboard.writeText(emails);
+          void copyToClipboard(emails);
           clearSelection();
         },
       },

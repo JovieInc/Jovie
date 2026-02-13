@@ -23,11 +23,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useState } from 'react';
-
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { CreatorActionsMenuProps } from './types';
-import { copyTextToClipboard } from './utils';
 
 interface MenuItemsProps {
   readonly profile: CreatorActionsMenuProps['profile'];
@@ -172,7 +171,7 @@ export function CreatorActionsMenu({
 
     const baseUrl = getBaseUrl();
     const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
-    const success = await copyTextToClipboard(claimUrl);
+    const success = await copyToClipboard(claimUrl);
 
     if (success) {
       setCopySuccess(true);

@@ -16,6 +16,7 @@ import {
   useRowSelection,
   type ViewMode,
 } from '@/components/organisms/table';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   WAITLIST_CSV_FILENAME_PREFIX,
   waitlistCSVColumns,
@@ -117,7 +118,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const emails = selectedEntries.map(e => e.email).join('\n');
-          navigator.clipboard.writeText(emails);
+          void copyToClipboard(emails);
           clearSelection();
         },
       },
@@ -126,7 +127,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         icon: <Copy className='h-3.5 w-3.5' />,
         onClick: () => {
           const names = selectedEntries.map(e => e.fullName).join('\n');
-          navigator.clipboard.writeText(names);
+          void copyToClipboard(names);
           clearSelection();
         },
       },

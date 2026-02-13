@@ -12,6 +12,7 @@ import {
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
@@ -113,18 +114,17 @@ export function AdminWaitlistTableUnified({
     [rowSelection, setSelection]
   );
 
-  // Helper to copy to clipboard
-  const copyToClipboard = useCallback((text: string, label: string) => {
-    void navigator.clipboard.writeText(text);
-    // Note: Silent copy - toast notifications can be added in future PR
+  // Helper to copy to clipboard using shared safe utility
+  const safeCopyToClipboard = useCallback((text: string, _label: string) => {
+    void copyToClipboard(text);
   }, []);
 
   // Create context menu items for a waitlist entry
   const createContextMenuItems = useCallback(
     (entry: WaitlistEntryRow): ContextMenuItemType[] => {
-      return buildContextMenuItems(entry, copyToClipboard, approveEntry);
+      return buildContextMenuItems(entry, safeCopyToClipboard, approveEntry);
     },
-    [approveEntry, copyToClipboard]
+    [approveEntry, safeCopyToClipboard]
   );
 
   // Define columns using TanStack Table

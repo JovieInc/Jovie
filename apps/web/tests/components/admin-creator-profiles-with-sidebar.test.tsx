@@ -70,7 +70,6 @@ vi.mock('@/components/admin/creator-actions-menu', () => ({
       ⋯
     </button>
   ),
-  copyTextToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/components/organisms/UserButton', () => ({

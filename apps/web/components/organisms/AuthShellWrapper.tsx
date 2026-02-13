@@ -49,6 +49,7 @@ export function useTableMeta(): TableMetaContextValue {
 
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
+  readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -66,9 +67,11 @@ function KeyboardShortcutsHandler() {
  */
 function AuthShellWrapperInner({
   persistSidebarCollapsed,
+  sidebarDefaultOpen,
   children,
 }: Readonly<{
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
+  sidebarDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
@@ -132,6 +135,7 @@ function AuthShellWrapperInner({
           onSidebarOpenChange={
             persistSidebarCollapsed ? handleSidebarOpenChange : undefined
           }
+          sidebarDefaultOpen={sidebarDefaultOpen}
         >
           {children}
         </AuthShell>
@@ -154,6 +158,7 @@ function AuthShellWrapperInner({
  */
 export function AuthShellWrapper({
   persistSidebarCollapsed,
+  sidebarDefaultOpen,
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
@@ -161,6 +166,7 @@ export function AuthShellWrapper({
       <HeaderActionsProvider>
         <AuthShellWrapperInner
           persistSidebarCollapsed={persistSidebarCollapsed}
+          sidebarDefaultOpen={sidebarDefaultOpen}
         >
           {children}
         </AuthShellWrapperInner>

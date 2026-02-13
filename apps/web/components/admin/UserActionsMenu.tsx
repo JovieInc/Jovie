@@ -11,6 +11,7 @@ import {
 import { Copy, ExternalLink, MoreVertical } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 interface UserActionsMenuProps {
@@ -18,18 +19,6 @@ interface UserActionsMenuProps {
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
 }
-
-const copyTextToClipboard = async (text: string): Promise<boolean> => {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return false;
-};
 
 export function UserActionsMenu({
   user,
@@ -39,7 +28,7 @@ export function UserActionsMenu({
   const [copySuccess, setCopySuccess] = useState(false);
 
   const handleCopyClerkId = useCallback(async () => {
-    const success = await copyTextToClipboard(user.clerkId);
+    const success = await copyToClipboard(user.clerkId);
     if (success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 1500);
@@ -48,7 +37,7 @@ export function UserActionsMenu({
 
   const handleCopyEmail = useCallback(async () => {
     if (!user.email) return;
-    const success = await copyTextToClipboard(user.email);
+    const success = await copyToClipboard(user.email);
     if (success) {
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 1500);

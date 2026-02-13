@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui/atoms/badge';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -21,8 +22,12 @@ import {
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
-import { RecentChats } from './RecentChats';
 import type { DashboardNavProps, NavItem } from './types';
+
+const RecentChats = dynamic(
+  () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
+  { ssr: false }
+);
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.href) {
