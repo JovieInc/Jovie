@@ -12,10 +12,10 @@
  * - Dynamic pages: ~80-150ms (with Redis cache), ~200-500ms (cache miss)
  *
  * Resource size budgets are set to current production values + 10% headroom.
- * Current baseline (2026-02-04):
- * - Script: ~437KB (optimized with code splitting)
- * - Stylesheet: ~45KB (Tailwind + custom styles)
- * - Total: ~535KB
+ * Current baseline (2026-02-13):
+ * - Script: ~640KB (grew from ~437KB via chat, tipping, AI bio, fit-scoring features)
+ * - Stylesheet: ~52KB (Tailwind + custom styles)
+ * - Total: ~786KB
  */
 module.exports = {
   budgets: [
@@ -31,7 +31,7 @@ module.exports = {
         { metric: 'time-to-first-byte', budget: 1800 },
       ],
       resourceSizes: [
-        { resourceType: 'script', budget: 600 },
+        { resourceType: 'script', budget: 700 },
         { resourceType: 'image', budget: 500 },
         { resourceType: 'font', budget: 100 },
         { resourceType: 'stylesheet', budget: 100 },
@@ -50,7 +50,7 @@ module.exports = {
         { metric: 'time-to-first-byte', budget: 2500 },
       ],
       resourceSizes: [
-        { resourceType: 'script', budget: 600 },
+        { resourceType: 'script', budget: 700 },
         { resourceType: 'image', budget: 500 },
         { resourceType: 'font', budget: 100 },
         { resourceType: 'stylesheet', budget: 100 },
