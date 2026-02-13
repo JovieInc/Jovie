@@ -37,6 +37,10 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
 
   const handleCopy = () => {
     const details = buildErrorDetails(error, timestamp, extraContext);
+    if (!navigator?.clipboard) {
+      toast.error('Clipboard not available');
+      return;
+    }
     navigator.clipboard
       .writeText(details)
       .then(() => {
