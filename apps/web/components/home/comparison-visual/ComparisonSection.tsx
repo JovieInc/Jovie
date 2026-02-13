@@ -71,7 +71,7 @@ export function ComparisonSection() {
               marginBottom: 'var(--linear-space-4)',
             }}
           >
-            One action. The right one.
+            Turn profile traffic into meaningful action.
           </h2>
           <p
             className='max-w-xl mx-auto'
@@ -81,7 +81,8 @@ export function ComparisonSection() {
               color: 'var(--linear-text-tertiary)',
             }}
           >
-            Traditional link pages scatter attention. Jovie profiles focus it.
+            Traditional link pages spread attention thin. Jovie keeps focus on
+            the action that matters most.
           </p>
         </motion.div>
 
@@ -185,7 +186,7 @@ export function ComparisonSection() {
                       color: 'var(--linear-success)',
                     }}
                   >
-                    2–5× Conversions
+                    Conversion-first design
                   </span>
                 </div>
               </div>
@@ -205,9 +206,9 @@ export function ComparisonSection() {
                   color: 'var(--linear-text-tertiary)',
                 }}
               >
-                One perfect CTA.
+                Clear primary CTA.
                 <br />
-                Personalized for each visitor.
+                Optimized for artist growth.
               </p>
             </div>
           </motion.div>

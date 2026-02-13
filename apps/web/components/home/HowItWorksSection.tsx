@@ -4,21 +4,22 @@ import { Container } from '@/components/site/Container';
 const steps = [
   {
     icon: Link,
-    title: 'Connect Spotify',
-    description: 'Sign in with your Spotify for Artists account.',
+    title: 'Connect your artist profile',
+    description: 'Set up your profile and key links in minutes.',
     iconColor: '#22c55e', // green
   },
   {
     icon: Globe,
-    title: 'We find every link',
+    title: 'Prioritize your primary action',
     description:
-      'Your whole catalog, discovered across Apple Music, YouTube, Tidal, and more.',
+      'Choose the one action that matters most for this release cycle.',
     iconColor: '#3b82f6', // blue
   },
   {
     icon: Sparkles,
-    title: 'SmartLinks created instantly',
-    description: 'Every song gets a link. New releases added automatically.',
+    title: 'Refine with real behavior',
+    description:
+      'Track results and improve continuously with real audience signal.',
     iconColor: '#f59e0b', // amber
   },
 ];

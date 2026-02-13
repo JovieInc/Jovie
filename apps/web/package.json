@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "0.1.0",
+  "version": "26.2.0",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
@@ -172,7 +172,6 @@
     "resend": "^6.5.2",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
-    "simple-icons": "^16.8.0",
     "sonner": "^2.0.7",
     "statsig-node": "^5.32.0",
     "stripe": "^20.1.2",
@@ -235,7 +234,7 @@
     "glob": "^11.0.3",
     "hono": "^4.11.9",
     "ignore-loader": "^0.1.2",
-    "jsdom": "28.0.0",
+    "jsdom": "26.1.0",
     "next-sitemap": "^4.2.3",
     "plop": "^4.0.2",
     "postcss": "^8",

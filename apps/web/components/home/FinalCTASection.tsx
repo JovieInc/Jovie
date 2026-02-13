@@ -24,7 +24,7 @@ export function FinalCTASection() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            Ready to capture every fan?
+            Ready to turn listeners into loyal fans?
           </h2>
 
           <div className='flex justify-center lg:justify-end'>

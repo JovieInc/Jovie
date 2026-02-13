@@ -1,5 +1,29 @@
 import { type NextRequest } from 'next/server';
 
+function parseBooleanField(
+  value: FormDataEntryValue | null,
+  fieldName: string,
+  defaultValue: boolean
+): boolean {
+  if (value === null) {
+    return defaultValue;
+  }
+
+  if (typeof value !== 'string') {
+    throw new TypeError(`${fieldName} must be "true" or "false"`);
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  throw new TypeError(`${fieldName} must be "true" or "false"`);
+}
+
 /**
  * Type guard to check if value is a non-empty string array
  */
@@ -71,8 +95,11 @@ function createToggleParser<TKey extends string>(
           throw new TypeError('profileId is required');
         }
 
-        const boolValue =
-          typeof fieldValue === 'string' ? fieldValue === 'true' : defaultValue;
+        const boolValue = parseBooleanField(
+          fieldValue,
+          fieldName,
+          defaultValue
+        );
 
         return {
           profileId,
@@ -205,10 +232,11 @@ function createBulkParser<TKey extends string>(
 
         if (fieldName) {
           const fieldValue = formData.get(fieldName);
-          const boolValue =
-            typeof fieldValue === 'string'
-              ? fieldValue === 'true'
-              : defaultValue;
+          const boolValue = parseBooleanField(
+            fieldValue,
+            fieldName,
+            defaultValue
+          );
 
           return {
             profileIds: parsed,

@@ -9,6 +9,34 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- 
+
+### Changed
+
+- 
+
+### Fixed
+
+- 
+
+## [26.2.0] - 2026-02-12
+
+### Added
+
+- Added `pnpm version:check` to validate CalVer alignment, package-version sync, and changelog consistency before releases.
+
+### Changed
+
+- Hardened `pnpm version:bump` to enforce valid CalVer input, prevent calendar regressions, rotate changelog sections safely, and sync all workspace package versions.
+
+### Fixed
+
+- Closed versioning drift risk where `apps/should-i-make` and `packages/ui` package versions were not updated during version bumps.
+
+## [25.1.0] - 2025-01-01
+
+### Added
+
 - Initial design token map and tailwind v4 config
 - Canonical shadcn Button atom
 - Button atom now supports loading state and token-driven accent styles
@@ -31,6 +59,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
   - Supports "free" (shows branding) and "pro" (hides branding) plans
   - Removed hardcoded "Powered by Jovie" text from artist profile routes
   - Updated `lib/footer.ts` to accept user plan parameter
+- Hardened Drizzle migration flow on `main` by fixing index migrations to avoid `CREATE INDEX CONCURRENTLY` inside the transactional migrator, pinned `parse5` via `pnpm.overrides` to stabilize Vitest jsdom tests, and aligned `CTAButton` `data-state` semantics with loading/disabled states so the component and unit tests stay in sync.
 
 ### Technical Details
 
@@ -40,8 +69,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Added E2E tests for pricing page functionality
 - All changes follow existing TypeScript and ESLint standards
 - Maintains backward compatibility with existing artist profiles
-
-- Hardened Drizzle migration flow on `main` by fixing index migrations to avoid `CREATE INDEX CONCURRENTLY` inside the transactional migrator, pinned `parse5` via `pnpm.overrides` to stabilize Vitest jsdom tests, and aligned `CTAButton` `data-state` semantics with loading/disabled states so the component and unit tests stay in sync.
 
 ### Security
 
