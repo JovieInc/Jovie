@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { track } from '@/lib/analytics';
 
 import {

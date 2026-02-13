@@ -34,4 +34,4 @@ export type {
   SidebarPosition,
 } from './types';
 
-export { useSidebarState } from './useSidebarState';
+export { useSidebarEscapeKey } from './useSidebarEscapeKey';
