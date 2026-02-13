@@ -1,8 +1,10 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { isProfileRoute } from '@/lib/sentry/route-detector';
 
 const TOAST_ID = 'pwa-install';
 
@@ -16,9 +18,11 @@ const TOAST_ID = 'pwa-install';
 export function PWAInstallToastActivator() {
   const { canPrompt, isIOS, install, dismiss } = usePWAInstall();
   const hasShown = useRef(false);
+  const pathname = usePathname() ?? '';
+  const onProfilePage = isProfileRoute(pathname);
 
   useEffect(() => {
-    if (!canPrompt || hasShown.current) return;
+    if (!canPrompt || hasShown.current || onProfilePage) return;
     hasShown.current = true;
 
     const description = isIOS
@@ -39,7 +43,7 @@ export function PWAInstallToastActivator() {
           }),
       onDismiss: () => dismiss(),
     });
-  }, [canPrompt, isIOS, install, dismiss]);
+  }, [canPrompt, isIOS, install, dismiss, onProfilePage]);
 
   // When canPrompt becomes false (app installed or dismissed via hook), dismiss the toast
   useEffect(() => {
