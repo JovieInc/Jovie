@@ -7,7 +7,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { CheckCircle2, MoreHorizontal, Plus, RefreshCw, Unlink } from 'lucide-react';
+import {
+  CheckCircle2,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Unlink,
+} from 'lucide-react';
 import { useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
@@ -52,6 +58,30 @@ export function DspConnectionPill({
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const hasActions = onSyncNow || onDisconnect;
+
+  if (connected && !hasActions) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium',
+          className
+        )}
+        style={{
+          borderColor: `${style.accent}30`,
+          backgroundColor: `${style.accent}10`,
+          color: style.accent,
+        }}
+      >
+        <SocialIcon platform={style.platform} className='h-4 w-4' />
+        <span className='truncate max-w-[120px]'>
+          {artistName || 'Connected'}
+        </span>
+        <CheckCircle2 className='h-4 w-4 shrink-0' />
+      </span>
+    );
+  }
+
   if (connected) {
     return (
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -65,12 +95,14 @@ export function DspConnectionPill({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               className
             )}
-            style={{
-              borderColor: `${style.accent}30`,
-              backgroundColor: `${style.accent}10`,
-              color: style.accent,
-              '--tw-ring-color': `${style.accent}50`,
-            } as React.CSSProperties}
+            style={
+              {
+                borderColor: `${style.accent}30`,
+                backgroundColor: `${style.accent}10`,
+                color: style.accent,
+                '--tw-ring-color': `${style.accent}50`,
+              } as React.CSSProperties
+            }
           >
             <SocialIcon platform={style.platform} className='h-4 w-4' />
             <span className='truncate max-w-[120px]'>

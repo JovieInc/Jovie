@@ -30,11 +30,6 @@ import {
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
 
-const DSP_PROVIDER_LABELS: Record<string, string> = {
-  spotify: 'Spotify',
-  apple_music: 'Apple Music',
-};
-
 const DSP_DISPLAY: Record<DspProviderId, { label: string; color: string }> = {
   spotify: { label: 'Spotify', color: 'text-[#1DB954]' },
   apple_music: { label: 'Apple Music', color: 'text-[#FA243C]' },
@@ -243,7 +238,9 @@ export function ConnectedDspList({
   const handleDisconnect = useCallback(
     (match: DspMatch | undefined) => {
       if (!match) return;
-      const label = DSP_PROVIDER_LABELS[match.providerId] ?? match.providerId;
+      const label =
+        DSP_DISPLAY[match.providerId as DspProviderId]?.label ??
+        match.providerId;
       rejectMatch(
         { matchId: match.id, profileId, reason: 'user_disconnected' },
         {
@@ -262,7 +259,7 @@ export function ConnectedDspList({
         toast.error('A Spotify ID is required to sync DSP profiles');
         return;
       }
-      const label = DSP_PROVIDER_LABELS[provider] ?? provider;
+      const label = DSP_DISPLAY[provider as DspProviderId]?.label ?? provider;
       triggerDiscovery(
         {
           profileId,
@@ -271,8 +268,7 @@ export function ConnectedDspList({
         },
         {
           onSuccess: () => toast.success(`${label} sync started`),
-          onError: err =>
-            toast.error(err.message || `Failed to sync ${label}`),
+          onError: err => toast.error(err.message || `Failed to sync ${label}`),
         }
       );
     },
@@ -436,9 +432,7 @@ export function ConnectedDspList({
             }
             onSyncNow={() => handleSyncNow('spotify')}
             onDisconnect={
-              spotifyMatch
-                ? () => handleDisconnect(spotifyMatch)
-                : undefined
+              spotifyMatch ? () => handleDisconnect(spotifyMatch) : undefined
             }
           />
           <DspConnectionPill
