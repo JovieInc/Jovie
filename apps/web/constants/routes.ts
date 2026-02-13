@@ -37,6 +37,8 @@ export const APP_ROUTES = {
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
   SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
+  SETTINGS_CONTACTS: '/app/settings/contacts',
+  SETTINGS_TOURING: '/app/settings/touring',
 
   // Admin
   ADMIN: '/app/admin',

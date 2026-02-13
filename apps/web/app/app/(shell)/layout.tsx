@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
@@ -61,6 +62,11 @@ export default async function AppShellLayout({
       auth.userId ?? null
     );
 
+    // Read sidebar cookie server-side so SSR matches client state (no flash)
+    const cookieStore = await cookies();
+    const sidebarCookie = cookieStore.get('sidebar:state');
+    const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
+
     return (
       <HydrateClient state={getDehydratedState()}>
         {/* ENG-004: Show environment issues to admins in non-production */}
@@ -69,7 +75,10 @@ export default async function AppShellLayout({
         <VersionUpdateToastActivator />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>
-            <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
+            <AuthShellWrapper
+              persistSidebarCollapsed={setSidebarCollapsed}
+              sidebarDefaultOpen={sidebarDefaultOpen}
+            >
               {children}
             </AuthShellWrapper>
           </DashboardDataProvider>

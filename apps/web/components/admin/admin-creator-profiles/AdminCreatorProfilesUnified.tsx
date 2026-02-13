@@ -146,10 +146,26 @@ export function AdminCreatorProfilesUnified({
   headerCheckboxStateRef.current = headerCheckboxState;
 
   const confirmBulkDelete = useCallback((count: number) => {
+    // Resolve any previous pending promise before creating a new one
+    bulkDeleteResolverRef.current?.(false);
+
     setBulkDeleteCount(count);
     setBulkDeleteDialogOpen(true);
     return new Promise<boolean>(resolve => {
-      bulkDeleteResolverRef.current = resolve;
+      // Safety timeout: if dialog doesn't respond within 30s, resolve false
+      const timeout = setTimeout(() => {
+        if (bulkDeleteResolverRef.current === wrappedResolve) {
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
+          resolve(false);
+        }
+      }, 30_000);
+
+      const wrappedResolve = (confirmed: boolean) => {
+        clearTimeout(timeout);
+        resolve(confirmed);
+      };
+      bulkDeleteResolverRef.current = wrappedResolve;
     });
   }, []);
 

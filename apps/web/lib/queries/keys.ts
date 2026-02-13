@@ -181,6 +181,13 @@ export const queryKeys = {
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },
 
+  // Contacts queries
+  contacts: {
+    all: ['contacts'] as const,
+    list: (profileId: string) =>
+      [...queryKeys.contacts.all, 'list', profileId] as const,
+  },
+
   // Tour dates queries
   tourDates: {
     all: ['tour-dates'] as const,
