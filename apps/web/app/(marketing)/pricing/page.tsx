@@ -296,7 +296,7 @@ function PricingTier({
 
 export default function PricingPage() {
   return (
-    <div className='min-h-screen bg-base'>
+    <div className='min-h-screen'>
       {/* Structured Data for SEO */}
       <script
         type='application/ld+json'

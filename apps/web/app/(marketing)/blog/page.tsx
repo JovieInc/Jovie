@@ -36,11 +36,22 @@ export default async function BlogIndexPage() {
 
         <Container size='lg' className='relative py-20 sm:py-28 lg:py-32'>
           <div className='mx-auto max-w-3xl text-center'>
-            <p className='text-sm font-medium tracking-widest uppercase text-tertiary-token mb-4'>
+            <p
+              className='text-sm font-medium tracking-widest uppercase mb-4'
+              style={{ color: 'var(--linear-text-tertiary)' }}
+            >
               Updates
             </p>
-            <h1 className='marketing-h1-linear text-primary-token mb-6'>Now</h1>
-            <p className='marketing-lead-linear text-secondary-token max-w-2xl mx-auto'>
+            <h1
+              className='marketing-h1-linear mb-6'
+              style={{ color: 'var(--linear-text-primary)' }}
+            >
+              Now
+            </h1>
+            <p
+              className='marketing-lead-linear max-w-2xl mx-auto'
+              style={{ color: 'var(--linear-text-secondary)' }}
+            >
               Thoughts on product, strategy, and the craft of building tools for
               artists.
             </p>
@@ -56,17 +67,26 @@ export default async function BlogIndexPage() {
               <article key={post.slug} className='group relative'>
                 {/* Timeline connector */}
                 {index < posts.length - 1 && (
-                  <div className='absolute left-[7px] top-[2.5rem] bottom-0 w-px bg-border-subtle' />
+                  <div
+                    className='absolute left-[7px] top-[2.5rem] bottom-0 w-px'
+                    style={{ backgroundColor: 'var(--linear-border-subtle)' }}
+                  />
                 )}
 
                 <Link
                   href={`/blog/${post.slug}`}
-                  className='block py-8 -mx-4 px-4 sm:-mx-6 sm:px-6 rounded-xl transition-all duration-200 hover:bg-surface-1'
+                  className='block py-8 -mx-4 px-4 sm:-mx-6 sm:px-6 rounded-xl transition-all duration-200'
                 >
                   <div className='flex gap-6 sm:gap-8'>
                     {/* Timeline dot */}
                     <div className='relative flex-shrink-0 pt-1.5'>
-                      <div className='w-[15px] h-[15px] rounded-full border-2 border-border-default bg-bg-base group-hover:border-primary-token group-hover:bg-surface-2 transition-colors duration-200' />
+                      <div
+                        className='w-[15px] h-[15px] rounded-full border-2 transition-colors duration-200'
+                        style={{
+                          borderColor: 'var(--linear-border-default)',
+                          backgroundColor: 'var(--linear-bg-page)',
+                        }}
+                      />
                     </div>
 
                     {/* Content */}
@@ -75,14 +95,21 @@ export default async function BlogIndexPage() {
                       <div className='flex items-center gap-3 mb-3'>
                         <time
                           dateTime={post.date}
-                          className='text-sm font-medium text-tertiary-token tabular-nums'
+                          className='text-sm font-medium tabular-nums'
+                          style={{ color: 'var(--linear-text-tertiary)' }}
                         >
                           {formatDate(post.date)}
                         </time>
                         {post.category && (
                           <>
-                            <span className='text-quaternary-token'>·</span>
-                            <span className='text-sm font-medium text-tertiary-token'>
+                            <span
+                              style={{ color: 'var(--linear-text-tertiary)' }}
+                            >
+                              ·
+                            </span>
+                            <span
+                              style={{ color: 'var(--linear-text-tertiary)' }}
+                            >
                               {post.category}
                             </span>
                           </>
@@ -90,24 +117,39 @@ export default async function BlogIndexPage() {
                       </div>
 
                       {/* Title */}
-                      <h2 className='text-xl sm:text-2xl font-semibold text-primary-token tracking-tight mb-3 group-hover:text-primary-token transition-colors'>
+                      <h2
+                        className='text-xl sm:text-2xl font-semibold tracking-tight mb-3 transition-colors'
+                        style={{ color: 'var(--linear-text-primary)' }}
+                      >
                         {post.title}
                       </h2>
 
                       {/* Excerpt */}
-                      <p className='text-base text-secondary-token leading-relaxed line-clamp-2'>
+                      <p
+                        className='text-base leading-relaxed line-clamp-2'
+                        style={{ color: 'var(--linear-text-secondary)' }}
+                      >
                         {post.excerpt}
                       </p>
 
                       {/* Author */}
                       <div className='mt-4 flex items-center gap-2 text-sm'>
-                        <span className='font-medium text-primary-token'>
+                        <span
+                          className='font-medium'
+                          style={{ color: 'var(--linear-text-primary)' }}
+                        >
                           {post.author}
                         </span>
                         {post.authorTitle && (
                           <>
-                            <span className='text-quaternary-token'>·</span>
-                            <span className='text-tertiary-token'>
+                            <span
+                              style={{ color: 'var(--linear-text-tertiary)' }}
+                            >
+                              ·
+                            </span>
+                            <span
+                              style={{ color: 'var(--linear-text-tertiary)' }}
+                            >
                               {post.authorTitle}
                             </span>
                           </>
@@ -118,7 +160,7 @@ export default async function BlogIndexPage() {
                     {/* Arrow indicator */}
                     <div className='flex-shrink-0 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
                       <svg
-                        className='w-5 h-5 text-tertiary-token'
+                        className='w-5 h-5'
                         fill='none'
                         viewBox='0 0 24 24'
                         stroke='currentColor'

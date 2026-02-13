@@ -132,13 +132,13 @@ export function Footer({
 
             <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-2 sm:gap-8 sm:text-left lg:grid-cols-3 lg:gap-12'>
               <nav aria-labelledby='footer-product-heading'>
-                <h3
+                <h2
                   id='footer-product-heading'
                   className={SECTION_HEADING_CLASS_NAME}
                   style={SECTION_HEADING_STYLE}
                 >
                   Product
-                </h3>
+                </h2>
                 <ul className='space-y-1'>
                   {productLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
@@ -158,13 +158,13 @@ export function Footer({
               </nav>
 
               <nav aria-labelledby='footer-company-heading'>
-                <h3
+                <h2
                   id='footer-company-heading'
                   className={SECTION_HEADING_CLASS_NAME}
                   style={SECTION_HEADING_STYLE}
                 >
                   Company
-                </h3>
+                </h2>
                 <ul className='space-y-1'>
                   {companyLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
@@ -187,13 +187,13 @@ export function Footer({
                 aria-labelledby='footer-legal-heading'
                 className='col-span-2 sm:col-span-1'
               >
-                <h3
+                <h2
                   id='footer-legal-heading'
                   className={SECTION_HEADING_CLASS_NAME}
                   style={SECTION_HEADING_STYLE}
                 >
                   Legal
-                </h3>
+                </h2>
                 <ul className='space-y-1'>
                   {legalLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>

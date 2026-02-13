@@ -115,7 +115,7 @@ export const HeroSection = memo(function HeroSection({
 
         {/* Main content area */}
         {children && (
-          <main className='w-full max-w-xl'>
+          <div className='w-full max-w-xl'>
             <div className='relative group'>
               {/* Background glow effect */}
               {showBackgroundEffects && (
@@ -134,7 +134,7 @@ export const HeroSection = memo(function HeroSection({
                 {supportingText}
               </div>
             )}
-          </main>
+          </div>
         )}
 
         {/* Trust indicators */}

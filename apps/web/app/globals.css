@@ -570,10 +570,16 @@ body {
     left: 0;
     right: 0;
     z-index: 100;
-    background-color: color-mix(in oklab, var(--linear-bg-header) 92%, white 8%);
-    border-top: 1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%);
+    background-color: color-mix(
+      in oklab,
+      var(--linear-bg-header) 92%,
+      white 8%
+    );
+    border-top: 1px solid
+      color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%);
     border-radius: 20px 20px 0 0;
-    padding: var(--linear-space-2) var(--linear-container-padding) var(--linear-space-4);
+    padding: var(--linear-space-2) var(--linear-container-padding)
+      var(--linear-space-4);
     padding-bottom: calc(var(--linear-space-4) + env(safe-area-inset-bottom));
     box-shadow: 0 -12px 32px oklch(0 0 0 / 0.18);
     transform: translateY(100%);
@@ -590,13 +596,16 @@ body {
     pointer-events: auto;
   }
 
-
   .mobile-nav-grabber {
     width: 36px;
     height: 5px;
     margin: 0 auto var(--linear-space-3);
     border-radius: 9999px;
-    background: color-mix(in oklab, var(--linear-text-tertiary) 35%, transparent);
+    background: color-mix(
+      in oklab,
+      var(--linear-text-tertiary) 35%,
+      transparent
+    );
   }
 
   /* Mobile Nav Links Container */
@@ -621,7 +630,11 @@ body {
       background var(--linear-duration-fast) var(--linear-ease);
 
     &:hover {
-      background-color: color-mix(in oklab, var(--linear-bg-hover) 88%, white 12%);
+      background-color: color-mix(
+        in oklab,
+        var(--linear-bg-hover) 88%,
+        white 12%
+      );
       color: var(--linear-text-primary);
     }
   }
