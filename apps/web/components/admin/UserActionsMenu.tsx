@@ -36,8 +36,8 @@ export function UserActionsMenu({
 
   const handleCopyClerkId = useCallback(async () => {
     const success = await copyToClipboard(user.clerkId);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       setCopySuccess(true);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 1500);
     }
@@ -46,8 +46,8 @@ export function UserActionsMenu({
   const handleCopyEmail = useCallback(async () => {
     if (!user.email) return;
     const success = await copyToClipboard(user.email);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       setCopySuccess(true);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 1500);
     }

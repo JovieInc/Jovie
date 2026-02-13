@@ -118,7 +118,11 @@ export function AdminWaitlistTableUnified({
   // Helper to copy to clipboard with toast feedback
   const safeCopyToClipboard = useCallback((text: string, label: string) => {
     void copyToClipboard(text).then(ok => {
-      if (ok) toast.success(`${label} copied`, { duration: 2000 });
+      if (ok) {
+        toast.success(`${label} copied`, { duration: 2000 });
+      } else {
+        toast.error(`Failed to copy ${label}`);
+      }
     });
   }, []);
 

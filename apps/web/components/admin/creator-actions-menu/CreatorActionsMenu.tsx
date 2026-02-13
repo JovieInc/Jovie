@@ -180,8 +180,8 @@ export function CreatorActionsMenu({
     const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
     const success = await copyToClipboard(claimUrl);
 
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     if (success) {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       setCopySuccess(true);
       copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
     }
