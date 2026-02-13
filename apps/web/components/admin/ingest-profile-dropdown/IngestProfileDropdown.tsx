@@ -76,8 +76,12 @@ export function IngestProfileDropdown({
           {detectedPlatform && (
             <div className='flex items-center gap-2 text-xs text-secondary-token'>
               <span
-                className='h-2 w-2 shrink-0 rounded-full'
-                style={{ backgroundColor: `#${detectedPlatform.color}` }}
+                className='h-2 w-2 shrink-0 rounded-full bg-secondary'
+                style={
+                  detectedPlatform.color
+                    ? { backgroundColor: `#${detectedPlatform.color}` }
+                    : undefined
+                }
                 aria-hidden='true'
               />
               <span>Detected: {detectedPlatform.name}</span>
