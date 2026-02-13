@@ -80,153 +80,162 @@ const formatMetric = (value: number, unit: string) =>
 
 const collectMetrics = async (url: string): Promise<PageMetrics> => {
   const browser = await chromium.launch();
-  const page = await browser.newPage();
-
-  await page.addInitScript(() => {
-    type LayoutShiftEntry = PerformanceEntry & {
-      hadRecentInput?: boolean;
-      value?: number;
-    };
-
-    type FirstInputEntry = PerformanceEntry & {
-      processingStart?: number;
-      startTime: number;
-    };
-
-    const metrics = {
-      lcp: 0,
-      cls: 0,
-      fid: 0,
-    };
-
-    new PerformanceObserver(list => {
-      const entries = list.getEntries();
-      const last = entries[entries.length - 1];
-      if (last && last.startTime) {
-        metrics.lcp = last.startTime;
-      }
-    }).observe({ type: 'largest-contentful-paint', buffered: true });
-
-    new PerformanceObserver(list => {
-      for (const entry of list.getEntries() as LayoutShiftEntry[]) {
-        // Only count layout shifts without recent input.
-        if (!entry.hadRecentInput) {
-          metrics.cls += entry.value ?? 0;
-        }
-      }
-    }).observe({ type: 'layout-shift', buffered: true });
-
-    new PerformanceObserver(list => {
-      const entry =
-        (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
-      if (entry) {
-        metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
-      }
-    }).observe({ type: 'first-input', buffered: true });
-
-    (
-      window as Window & { __perfBudgetMetrics?: typeof metrics }
-    ).__perfBudgetMetrics = metrics;
-  });
-
-  await page.goto(url, { waitUntil: 'load', timeout: 30000 });
-  await page.waitForLoadState('networkidle');
+  let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
-    await page.mouse.click(8, 8);
-  } catch {
-    // Ignore input errors; FID will remain 0.
-  }
+    page = await browser.newPage();
+    await page.addInitScript(() => {
+      type LayoutShiftEntry = PerformanceEntry & {
+        hadRecentInput?: boolean;
+        value?: number;
+      };
 
-  await page.waitForTimeout(1000);
+      type FirstInputEntry = PerformanceEntry & {
+        processingStart?: number;
+        startTime: number;
+      };
 
-  const metrics = await page.evaluate(() => {
-    const paintEntries = performance.getEntriesByType('paint');
-    const fcp = paintEntries.find(
-      entry => entry.name === 'first-contentful-paint'
-    );
-    const navEntry = performance.getEntriesByType(
-      'navigation'
-    )[0] as PerformanceNavigationTiming;
-    const ttfb = navEntry ? navEntry.responseStart : 0;
+      const metrics = {
+        lcp: 0,
+        cls: 0,
+        fid: 0,
+      };
 
-    const resourceEntries = performance.getEntriesByType(
-      'resource'
-    ) as PerformanceResourceTiming[];
+      new PerformanceObserver(list => {
+        const entries = list.getEntries();
+        const last = entries[entries.length - 1];
+        if (last && last.startTime) {
+          metrics.lcp = last.startTime;
+        }
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
 
-    const resourceTotals = {
-      script: 0,
-      image: 0,
-      font: 0,
-      stylesheet: 0,
-      total: 0,
-    };
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries() as LayoutShiftEntry[]) {
+          // Only count layout shifts without recent input.
+          if (!entry.hadRecentInput) {
+            metrics.cls += entry.value ?? 0;
+          }
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
 
-    const fontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
+      new PerformanceObserver(list => {
+        const entry =
+          (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
+        if (entry) {
+          metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
+        }
+      }).observe({ type: 'first-input', buffered: true });
 
-    for (const entry of resourceEntries) {
-      const size = entry.transferSize || entry.encodedBodySize || 0;
-      const lowerName = entry.name.toLowerCase();
-      const isFont =
-        entry.initiatorType === 'font' ||
-        fontExtensions.some(ext => lowerName.includes(ext));
-      const isStylesheet =
-        entry.initiatorType === 'css' ||
-        (entry.initiatorType === 'link' && lowerName.includes('.css'));
+      (
+        window as Window & { __perfBudgetMetrics?: typeof metrics }
+      ).__perfBudgetMetrics = metrics;
+    });
 
-      if (entry.initiatorType === 'script') {
-        resourceTotals.script += size;
-      }
-      if (entry.initiatorType === 'img') {
-        resourceTotals.image += size;
-      }
-      if (isFont) {
-        resourceTotals.font += size;
-      }
-      if (isStylesheet) {
-        resourceTotals.stylesheet += size;
-      }
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // Best-effort networkidle wait; fall back gracefully for dynamic pages
+    // where third-party scripts or long-polling prevent idle state.
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
+      console.warn(
+        `  ⚠ networkidle timeout for ${url}, continuing with load state`
+      );
+    });
 
-      resourceTotals.total += size;
+    try {
+      await page.mouse.click(8, 8);
+    } catch {
+      // Ignore input errors; FID will remain 0.
     }
 
-    const metrics = (
-      window as Window & {
-        __perfBudgetMetrics?: { lcp: number; cls: number; fid: number };
+    await page.waitForTimeout(2000);
+
+    const metrics = await page.evaluate(() => {
+      const paintEntries = performance.getEntriesByType('paint');
+      const fcp = paintEntries.find(
+        entry => entry.name === 'first-contentful-paint'
+      );
+      const navEntry = performance.getEntriesByType(
+        'navigation'
+      )[0] as PerformanceNavigationTiming;
+      const ttfb = navEntry ? navEntry.responseStart : 0;
+
+      const resourceEntries = performance.getEntriesByType(
+        'resource'
+      ) as PerformanceResourceTiming[];
+
+      const resourceTotals = {
+        script: 0,
+        image: 0,
+        font: 0,
+        stylesheet: 0,
+        total: 0,
+      };
+
+      const fontExtensions = ['.woff2', '.woff', '.ttf', '.otf'];
+
+      for (const entry of resourceEntries) {
+        const size = entry.transferSize || entry.encodedBodySize || 0;
+        const lowerName = entry.name.toLowerCase();
+        const isFont =
+          entry.initiatorType === 'font' ||
+          fontExtensions.some(ext => lowerName.includes(ext));
+        const isStylesheet =
+          entry.initiatorType === 'css' ||
+          (entry.initiatorType === 'link' && lowerName.includes('.css'));
+
+        if (entry.initiatorType === 'script') {
+          resourceTotals.script += size;
+        }
+        if (entry.initiatorType === 'img') {
+          resourceTotals.image += size;
+        }
+        if (isFont) {
+          resourceTotals.font += size;
+        }
+        if (isStylesheet) {
+          resourceTotals.stylesheet += size;
+        }
+
+        resourceTotals.total += size;
       }
-    ).__perfBudgetMetrics;
+
+      const metrics = (
+        window as Window & {
+          __perfBudgetMetrics?: { lcp: number; cls: number; fid: number };
+        }
+      ).__perfBudgetMetrics;
+
+      return {
+        timings: {
+          'first-contentful-paint': fcp?.startTime || 0,
+          'largest-contentful-paint': metrics?.lcp || 0,
+          'cumulative-layout-shift': metrics?.cls || 0,
+          'first-input-delay': metrics?.fid || 0,
+          'time-to-first-byte': ttfb,
+        },
+        resourceSizes: resourceTotals,
+      };
+    });
 
     return {
       timings: {
-        'first-contentful-paint': fcp?.startTime || 0,
-        'largest-contentful-paint': metrics?.lcp || 0,
-        'cumulative-layout-shift': metrics?.cls || 0,
-        'first-input-delay': metrics?.fid || 0,
-        'time-to-first-byte': ttfb,
+        'first-contentful-paint': metrics.timings['first-contentful-paint'],
+        'largest-contentful-paint': metrics.timings['largest-contentful-paint'],
+        'cumulative-layout-shift': metrics.timings['cumulative-layout-shift'],
+        'first-input-delay': metrics.timings['first-input-delay'],
+        'time-to-first-byte': metrics.timings['time-to-first-byte'],
       },
-      resourceSizes: resourceTotals,
+      resourceSizes: {
+        script: toKilobytes(metrics.resourceSizes.script),
+        image: toKilobytes(metrics.resourceSizes.image),
+        font: toKilobytes(metrics.resourceSizes.font),
+        stylesheet: toKilobytes(metrics.resourceSizes.stylesheet),
+        total: toKilobytes(metrics.resourceSizes.total),
+      },
     };
-  });
-
-  await page.close();
-  await browser.close();
-
-  return {
-    timings: {
-      'first-contentful-paint': metrics.timings['first-contentful-paint'],
-      'largest-contentful-paint': metrics.timings['largest-contentful-paint'],
-      'cumulative-layout-shift': metrics.timings['cumulative-layout-shift'],
-      'first-input-delay': metrics.timings['first-input-delay'],
-      'time-to-first-byte': metrics.timings['time-to-first-byte'],
-    },
-    resourceSizes: {
-      script: toKilobytes(metrics.resourceSizes.script),
-      image: toKilobytes(metrics.resourceSizes.image),
-      font: toKilobytes(metrics.resourceSizes.font),
-      stylesheet: toKilobytes(metrics.resourceSizes.stylesheet),
-      total: toKilobytes(metrics.resourceSizes.total),
-    },
-  };
+  } finally {
+    await page?.close().catch(() => undefined);
+    await browser.close().catch(() => undefined);
+  }
 };
 
 const runBudgetGuard = async () => {
@@ -240,7 +249,18 @@ const runBudgetGuard = async () => {
 
     console.log(`\n🔎 Checking ${budgetEntry.path} (${url})`);
 
-    const metrics = await collectMetrics(url);
+    let metrics!: PageMetrics;
+    const MAX_RETRIES = 2;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        metrics = await collectMetrics(url);
+        break;
+      } catch (error) {
+        if (attempt === MAX_RETRIES) throw error;
+        console.warn(`  ⚠ Attempt ${attempt} failed for ${url}, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
 
     for (const timing of budgetEntry.timings) {
       const measured = metrics.timings[timing.metric];
