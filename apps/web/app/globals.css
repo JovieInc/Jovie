@@ -1062,33 +1062,36 @@ body {
 }
 
 [data-sonner-toast] {
-  --border-radius: 12px;
+  --border-radius: var(--linear-radius-lg);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-feature-settings:
-    "cv01",
-    "ss03",
-    "rlig" 1,
-    "calt" 1;
-  letter-spacing: -0.011em;
+  font-feature-settings: var(--linear-font-features);
+  font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+  letter-spacing: var(--linear-tracking-body);
 }
 
 [data-sonner-toast] [data-title] {
-  font-weight: 500;
+  font-weight: var(--linear-font-weight-semibold);
   font-size: 0.875rem;
-  line-height: 1.4;
+  line-height: var(--linear-leading-relaxed);
+  letter-spacing: var(--linear-tracking-subheadline);
+  color: var(--color-text-primary-token);
 }
 
 [data-sonner-toast] [data-description] {
-  color: var(--color-text-tertiary-token);
-  font-size: 0.75rem;
-  line-height: 1.4;
+  color: var(--color-text-secondary-token);
+  font-weight: var(--linear-font-weight-normal);
+  font-size: 0.8125rem;
+  line-height: var(--linear-leading-normal);
+  letter-spacing: var(--linear-tracking-body);
+  margin-top: 2px;
 }
 
 [data-sonner-toast] [data-close-button] {
   background: var(--color-bg-surface-1);
   border-color: var(--color-border-subtle);
   color: var(--color-text-tertiary-token);
+  border-radius: var(--linear-radius-sm);
   transition:
     background 150ms ease,
     color 150ms ease;
@@ -1100,10 +1103,14 @@ body {
 }
 
 [data-sonner-toast] [data-button] {
-  font-weight: 500;
-  font-size: 0.75rem;
-  border-radius: 6px;
-  transition: opacity 150ms ease;
+  font-weight: var(--linear-font-weight-medium);
+  font-size: 0.8125rem;
+  line-height: 1;
+  border-radius: var(--linear-radius-sm);
+  padding: 6px 12px;
+  transition:
+    opacity 150ms ease,
+    background-color 150ms ease;
 }
 
 /* Type-specific left-border accent */
