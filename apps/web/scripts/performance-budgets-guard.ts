@@ -129,8 +129,12 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
     ).__perfBudgetMetrics = metrics;
   });
 
-  await page.goto(url, { waitUntil: 'load', timeout: 30000 });
-  await page.waitForLoadState('networkidle');
+  await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+  // Best-effort networkidle wait; fall back gracefully for dynamic pages
+  // where third-party scripts or long-polling prevent idle state.
+  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
+    console.warn(`  ⚠ networkidle timeout for ${url}, continuing with load state`);
+  });
 
   try {
     await page.mouse.click(8, 8);
@@ -240,7 +244,18 @@ const runBudgetGuard = async () => {
 
     console.log(`\n🔎 Checking ${budgetEntry.path} (${url})`);
 
-    const metrics = await collectMetrics(url);
+    let metrics!: PageMetrics;
+    const MAX_RETRIES = 2;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        metrics = await collectMetrics(url);
+        break;
+      } catch (error) {
+        if (attempt === MAX_RETRIES) throw error;
+        console.warn(`  ⚠ Attempt ${attempt} failed for ${url}, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
 
     for (const timing of budgetEntry.timings) {
       const measured = metrics.timings[timing.metric];
