@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { usePagination as usePaginationCore } from '@/hooks/usePagination';
 
 interface UsePaginationProps {
   readonly page: number;
@@ -10,14 +11,9 @@ interface UsePaginationProps {
 }
 
 export function usePagination({ page, pageSize, total }: UsePaginationProps) {
+  const core = usePaginationCore({ page, pageSize, total });
+
   return useMemo(() => {
-    const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
-    const canPrev = page > 1;
-    const canNext = page < totalPages;
-
-    const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-    const to = total === 0 ? 0 : Math.min(page * pageSize, total);
-
     const buildHref = (targetPage: number): string => {
       const params = new URLSearchParams();
       params.set('page', String(targetPage));
@@ -28,17 +24,25 @@ export function usePagination({ page, pageSize, total }: UsePaginationProps) {
         : APP_ROUTES.ADMIN_WAITLIST;
     };
 
-    const prevHref = canPrev ? buildHref(page - 1) : undefined;
-    const nextHref = canNext ? buildHref(page + 1) : undefined;
+    const prevHref = core.canPrev ? buildHref(page - 1) : undefined;
+    const nextHref = core.canNext ? buildHref(page + 1) : undefined;
 
     return {
-      totalPages,
-      canPrev,
-      canNext,
-      from,
-      to,
+      totalPages: core.totalPages,
+      canPrev: core.canPrev,
+      canNext: core.canNext,
+      from: core.from,
+      to: core.to,
       prevHref,
       nextHref,
     };
-  }, [page, pageSize, total]);
+  }, [
+    core.totalPages,
+    core.canPrev,
+    core.canNext,
+    core.from,
+    core.to,
+    page,
+    pageSize,
+  ]);
 }

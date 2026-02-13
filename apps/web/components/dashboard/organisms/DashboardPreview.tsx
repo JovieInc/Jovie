@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import React, { useMemo } from 'react';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { StatusBarMock } from '@/components/dashboard/molecules/StatusBarMock';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { BASE_URL } from '@/constants/domains';

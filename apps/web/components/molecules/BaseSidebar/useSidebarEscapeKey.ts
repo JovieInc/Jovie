@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * useSidebarState Hook
+ * useSidebarEscapeKey Hook
  *
- * Shared state management for sidebar components.
+ * Handles Escape key dismissal for sidebar components.
  */
 
 import { useCallback, useEffect } from 'react';
@@ -21,7 +21,7 @@ export interface UseSidebarStateOptions {
 /**
  * Hook for managing sidebar keyboard interactions and state.
  */
-export function useSidebarState({
+export function useSidebarEscapeKey({
   isOpen,
   onClose,
   closeOnEscape = true,

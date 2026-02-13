@@ -6,14 +6,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   artistSettingsNavigation,
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
+import { Avatar } from '@/components/molecules/Avatar';
 import {
   Sidebar,
   SidebarContent,
@@ -138,10 +138,11 @@ function MobileProfileCard({
   return (
     <div className='px-2 pb-3 pt-2 lg:hidden'>
       <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-        <OptimizedAvatar
+        <Avatar
           src={avatarUrl}
           alt={displayName}
-          size={64}
+          name={displayName}
+          size='lg'
           className='h-10 w-10'
         />
         <div className='min-w-0'>
