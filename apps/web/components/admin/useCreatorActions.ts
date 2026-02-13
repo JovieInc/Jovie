@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
@@ -30,10 +30,24 @@ type UseCreatorActionsResult = {
   deleteCreatorOrUser: (profileId: string) => Promise<ActionResult>;
 };
 
+/**
+ * Manages creator profile actions (feature, marketing, delete) with optimistic updates.
+ *
+ * Uses an overlay pattern instead of duplicating the profiles array:
+ * - `initialProfiles` is the source of truth (comes from useCreatorVerification or server)
+ * - Optimistic overrides are stored in a separate map and merged on read
+ * - This eliminates the useEffect sync delay that caused state to be overwritten
+ *   when useCreatorVerification updated profiles after a verify action
+ */
 export function useCreatorActions(
   initialProfiles: AdminCreatorProfileRow[]
 ): UseCreatorActionsResult {
-  const [profiles, setProfiles] = useState(initialProfiles);
+  // Optimistic field overrides keyed by profile ID
+  const [overrides, setOverrides] = useState<
+    Map<string, Partial<AdminCreatorProfileRow>>
+  >(new Map());
+  // IDs of profiles optimistically removed (pending delete confirmation from server)
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [statuses, setStatuses] = useState<Record<string, CreatorActionStatus>>(
     {}
   );
@@ -46,9 +60,22 @@ export function useCreatorActions(
   const toggleMarketingMutation = useToggleMarketingMutation();
   const deleteCreatorMutation = useDeleteCreatorMutation();
 
-  useEffect(() => {
-    setProfiles(initialProfiles);
-  }, [initialProfiles]);
+  // Derive profiles by applying optimistic overrides on top of initialProfiles.
+  // When initialProfiles changes (e.g. after a verify action updates useCreatorVerification),
+  // this immediately reflects those changes without a useEffect delay.
+  const profiles = useMemo(() => {
+    const filtered =
+      deletedIds.size > 0
+        ? initialProfiles.filter(p => !deletedIds.has(p.id))
+        : initialProfiles;
+
+    if (overrides.size === 0) return filtered;
+
+    return filtered.map(p => {
+      const override = overrides.get(p.id);
+      return override ? { ...p, ...override } : p;
+    });
+  }, [initialProfiles, overrides, deletedIds]);
 
   useEffect(() => {
     const timeouts = statusTimeoutsRef.current;
@@ -79,31 +106,52 @@ export function useCreatorActions(
     [setStatus]
   );
 
-  const updateProfile = useCallback(
-    <K extends keyof AdminCreatorProfileRow>(
-      profileId: string,
-      field: K,
-      value: AdminCreatorProfileRow[K]
-    ) => {
-      setProfiles(prev =>
-        prev.map(p => (p.id === profileId ? { ...p, [field]: value } : p))
-      );
+  const setOverride = useCallback(
+    (profileId: string, fields: Partial<AdminCreatorProfileRow>) => {
+      setOverrides(prev => {
+        const next = new Map(prev);
+        const existing = next.get(profileId);
+        next.set(profileId, existing ? { ...existing, ...fields } : fields);
+        return next;
+      });
+    },
+    []
+  );
+
+  const clearOverride = useCallback(
+    (profileId: string, field: keyof AdminCreatorProfileRow) => {
+      setOverrides(prev => {
+        const existing = prev.get(profileId);
+        if (!existing) return prev;
+
+        const next = new Map(prev);
+        const { [field]: _, ...rest } = existing;
+        if (Object.keys(rest).length === 0) {
+          next.delete(profileId);
+        } else {
+          next.set(profileId, rest);
+        }
+        return next;
+      });
     },
     []
   );
 
   const toggleFeatured = useCallback(
     async (profileId: string, nextFeatured: boolean) => {
-      updateProfile(profileId, 'isFeatured', nextFeatured);
+      setOverride(profileId, { isFeatured: nextFeatured });
       setStatus(profileId, 'loading');
 
       try {
         await toggleFeaturedMutation.mutateAsync({ profileId, nextFeatured });
+        // On success, clear the override — server data will reflect the change
+        // after revalidation. Keep the override until then for visual continuity.
         setStatus(profileId, 'success');
         resetStatus(profileId);
         return { success: true };
       } catch (error) {
-        updateProfile(profileId, 'isFeatured', !nextFeatured);
+        // Revert optimistic override
+        clearOverride(profileId, 'isFeatured');
         setStatus(profileId, 'error');
         resetStatus(profileId);
         const errorMessage =
@@ -113,12 +161,12 @@ export function useCreatorActions(
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus, setStatus, updateProfile, toggleFeaturedMutation]
+    [resetStatus, setStatus, setOverride, clearOverride, toggleFeaturedMutation]
   );
 
   const toggleMarketing = useCallback(
     async (profileId: string, nextMarketingOptOut: boolean) => {
-      updateProfile(profileId, 'marketingOptOut', nextMarketingOptOut);
+      setOverride(profileId, { marketingOptOut: nextMarketingOptOut });
       setStatus(profileId, 'loading');
 
       try {
@@ -130,7 +178,7 @@ export function useCreatorActions(
         resetStatus(profileId);
         return { success: true };
       } catch (error) {
-        updateProfile(profileId, 'marketingOptOut', !nextMarketingOptOut);
+        clearOverride(profileId, 'marketingOptOut');
         setStatus(profileId, 'error');
         resetStatus(profileId);
         const errorMessage =
@@ -140,7 +188,13 @@ export function useCreatorActions(
         return { success: false, error: errorMessage };
       }
     },
-    [resetStatus, setStatus, updateProfile, toggleMarketingMutation]
+    [
+      resetStatus,
+      setStatus,
+      setOverride,
+      clearOverride,
+      toggleMarketingMutation,
+    ]
   );
 
   const deleteCreatorOrUser = useCallback(
@@ -149,7 +203,11 @@ export function useCreatorActions(
 
       try {
         await deleteCreatorMutation.mutateAsync({ profileId });
-        setProfiles(prev => prev.filter(p => p.id !== profileId));
+        setDeletedIds(prev => {
+          const next = new Set(prev);
+          next.add(profileId);
+          return next;
+        });
         setStatus(profileId, 'success');
         return { success: true };
       } catch (error) {
