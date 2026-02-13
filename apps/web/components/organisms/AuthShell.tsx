@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import {
@@ -16,7 +15,6 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
-  readonly navigation: NavItem[];
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   /** Badge/pill shown after breadcrumb (left side) */
   readonly headerBadge?: ReactNode;
@@ -35,7 +33,6 @@ export interface AuthShellProps {
  */
 function AuthShellInner({
   section,
-  navigation,
   breadcrumbs,
   headerBadge,
   headerAction,
@@ -54,7 +51,7 @@ function AuthShellInner({
 
   return (
     <>
-      <UnifiedSidebar section={section} navigation={navigation} />
+      <UnifiedSidebar section={section} />
 
       <SidebarInset className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'>
         {!isInSettings && (
