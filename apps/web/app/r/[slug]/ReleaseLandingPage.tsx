@@ -96,7 +96,7 @@ export function ReleaseLandingPage({
                   <div className='flex h-full w-full items-center justify-center'>
                     <Icon
                       name='Disc3'
-                      className='size-16 text-white/20'
+                      className='h-16 w-16 text-white/20'
                       aria-hidden='true'
                     />
                   </div>
@@ -151,7 +151,7 @@ export function ReleaseLandingPage({
                       <svg
                         viewBox='0 0 24 24'
                         fill='currentColor'
-                        className='size-5 shrink-0 text-white/70 transition-colors duration-150 group-hover:text-[var(--brand-hover)]'
+                        className='h-5 w-5 shrink-0 text-white/70 transition-colors duration-150 group-hover:text-[var(--brand-hover)]'
                         aria-hidden='true'
                       >
                         <path d={logoConfig.iconPath} />
@@ -162,7 +162,7 @@ export function ReleaseLandingPage({
                     </span>
                     <Icon
                       name='ChevronRight'
-                      className='size-3.5 text-white/25 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-white/40'
+                      className='h-4 w-4 text-white/25 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-white/40'
                       aria-hidden='true'
                     />
                   </a>
@@ -175,7 +175,7 @@ export function ReleaseLandingPage({
               <div className='rounded-xl bg-white/[0.04] p-5 text-center ring-1 ring-inset ring-white/[0.06]'>
                 <Icon
                   name='Music'
-                  className='mx-auto size-8 text-white/20'
+                  className='mx-auto h-8 w-8 text-white/20'
                   aria-hidden='true'
                 />
                 <p className='mt-2 text-[13px] text-white/40'>
