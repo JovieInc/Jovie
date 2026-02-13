@@ -178,11 +178,11 @@ const DASHBOARD_PAGES = [
   { path: '/app/dashboard/analytics', name: 'Analytics' },
   { path: '/app/dashboard/audience', name: 'Audience' },
   { path: '/app/dashboard/chat', name: 'Chat' },
-  { path: '/app/dashboard/contacts', name: 'Contacts' },
   { path: '/app/dashboard/earnings', name: 'Earnings' },
   { path: '/app/dashboard/profile', name: 'Profile' },
   { path: '/app/dashboard/releases', name: 'Releases' },
-  { path: '/app/dashboard/tour-dates', name: 'Tour Dates' },
+  { path: '/app/settings/contacts', name: 'Contacts' },
+  { path: '/app/settings/touring', name: 'Touring' },
 ] as const;
 
 /**
