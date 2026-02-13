@@ -430,7 +430,7 @@ export function ConnectedDspList({
                 ? () => handleOpenPalette('spotify')
                 : undefined
             }
-            onSyncNow={() => handleSyncNow('spotify')}
+            onSyncNow={spotifyId ? () => handleSyncNow('spotify') : undefined}
             onDisconnect={
               spotifyMatch ? () => handleDisconnect(spotifyMatch) : undefined
             }
@@ -444,7 +444,9 @@ export function ConnectedDspList({
                 ? undefined
                 : () => handleOpenPalette('apple_music')
             }
-            onSyncNow={() => handleSyncNow('apple_music')}
+            onSyncNow={
+              appleMusicMatch ? () => handleSyncNow('apple_music') : undefined
+            }
             onDisconnect={
               appleMusicMatch
                 ? () => handleDisconnect(appleMusicMatch)

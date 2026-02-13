@@ -88,11 +88,13 @@ export function DspConnectionPill({
         <DropdownMenuTrigger asChild>
           <button
             type='button'
+            disabled={disabled}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
               className
             )}
             style={
