@@ -45,10 +45,10 @@ export function useSocialsForm({
   // Sync fetched links into local state only when the local state hasn't been
   // touched yet (empty array). This prevents background refetches from
   // clobbering in-progress user edits.
-  const initializedRef = useRef(false);
+  const initializedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!fetchedLinks || initializedRef.current) return;
-    initializedRef.current = true;
+    if (!fetchedLinks || initializedRef.current === artistId) return;
+    initializedRef.current = artistId;
     if (fetchedLinks.length === 0) {
       setSocialLinks(
         DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
@@ -56,7 +56,7 @@ export function useSocialsForm({
     } else {
       setSocialLinks(fetchedLinks);
     }
-  }, [fetchedLinks]);
+  }, [artistId, fetchedLinks]);
 
   // Auto-clear success state after 3 seconds
   useEffect(() => {
