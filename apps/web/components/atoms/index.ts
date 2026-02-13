@@ -9,7 +9,6 @@
 // } from '@/components/molecules/WrappedSocialLink';
 
 export * from './AmountSelector';
-export * from './ArtistAvatar';
 export * from './ArtistName';
 export * from './AvatarUploadAnnouncer';
 export * from './AvatarUploadOverlay';

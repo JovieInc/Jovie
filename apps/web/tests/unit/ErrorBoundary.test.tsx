@@ -177,7 +177,7 @@ describe('ErrorBoundary', () => {
           mockError,
           expect.objectContaining({
             tags: { errorBoundary: 'test context', sentryMode: 'enabled' },
-            extra: { digest: undefined },
+            extra: { digest: undefined, sentryMode: 'enabled' },
           })
         );
       });
@@ -215,7 +215,7 @@ describe('ErrorBoundary', () => {
         expect(Sentry.captureException).toHaveBeenCalledWith(
           errorWithDigest,
           expect.objectContaining({
-            extra: { digest: 'abc123' },
+            extra: { digest: 'abc123', sentryMode: 'enabled' },
           })
         );
       });

@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ArrowLeft, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useIsMobile } from '@/hooks/useMobile';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderProps {
@@ -22,7 +22,7 @@ export function DrawerHeader({
   actions,
   className,
 }: DrawerHeaderProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpointDown('lg');
 
   return (
     <div
