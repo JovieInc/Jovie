@@ -70,7 +70,7 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
             className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors'
             aria-label='Copy error details to clipboard'
           >
-            <Copy className='h-3 w-3' aria-hidden='true' />
+            <Copy className='h-4 w-4' aria-hidden='true' />
             Copy Error Details
           </button>
         </div>
