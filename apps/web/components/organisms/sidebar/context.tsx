@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useIsMobile } from '@/hooks/useMobile';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
 import {
   SIDEBAR_KEYBOARD_SHORTCUT,
@@ -52,7 +52,7 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useIsMobile();
+    const isMobile = useBreakpointDown('lg');
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
       defaultOpen,

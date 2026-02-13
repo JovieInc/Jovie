@@ -4,6 +4,8 @@ import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
+import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 export interface CopyToClipboardButtonProps
   extends Readonly<{
@@ -55,9 +57,21 @@ export function CopyToClipboardButton({
   onCopySuccess,
   onCopyError,
 }: CopyToClipboardButtonProps) {
+  const notifications = useNotifications();
+
+  const defaultOnSuccess = () => {
+    notifications.success('Copied to clipboard', { duration: 2000 });
+    track('profile_copy_url_click', { status: 'success' });
+  };
+
+  const defaultOnError = () => {
+    notifications.error('Failed to copy');
+    track('profile_copy_url_click', { status: 'error' });
+  };
+
   const { copy, status, isSuccess, isError } = useClipboard({
-    onSuccess: onCopySuccess,
-    onError: onCopyError,
+    onSuccess: onCopySuccess ?? defaultOnSuccess,
+    onError: onCopyError ?? defaultOnError,
   });
 
   const handleCopy = () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 
 export interface ClaimLinkCopyButtonProps
   extends Readonly<{
