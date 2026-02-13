@@ -7,6 +7,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
+import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { queryKeys } from '@/lib/queries/keys';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 
@@ -21,11 +25,35 @@ export default async function AppShellLayout({
   // NO MORE AUTH GATE - proxy.ts already routed us correctly!
   // If we're rendering this layout, user is ACTIVE and can access the app.
   try {
-    // Parallelize auth and dashboard data fetching for better performance
-    // Both share getCachedAuth() via React's cache(), so the auth call is deduplicated
+    const queryClient = getQueryClient();
+
+    // Parallelize auth, dashboard data, and billing status prefetch for better performance.
+    // Both getDashboardData and billing prefetch share getCachedAuth() via React's cache(),
+    // so the auth call is deduplicated. prefetchQuery swallows errors silently —
+    // if billing fetch fails, the client falls back to its own fetch.
     const [dashboardData, auth] = await Promise.all([
       getDashboardData(),
       getCachedAuth(),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.billing.status(),
+        queryFn: async () => {
+          const result = await getUserBillingInfo();
+          if (!result.success || !result.data) {
+            return {
+              isPro: false,
+              plan: null,
+              hasStripeCustomer: false,
+              stripeSubscriptionId: null,
+            };
+          }
+          return {
+            isPro: result.data.isPro,
+            plan: result.data.plan ?? null,
+            hasStripeCustomer: Boolean(result.data.stripeCustomerId),
+            stripeSubscriptionId: result.data.stripeSubscriptionId,
+          };
+        },
+      }),
     ]);
 
     // Evaluate feature flags server-side for this user
@@ -34,7 +62,7 @@ export default async function AppShellLayout({
     );
 
     return (
-      <>
+      <HydrateClient state={getDehydratedState()}>
         {/* ENG-004: Show environment issues to admins in non-production */}
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
@@ -46,7 +74,7 @@ export default async function AppShellLayout({
             </AuthShellWrapper>
           </DashboardDataProvider>
         </FeatureFlagsProvider>
-      </>
+      </HydrateClient>
     );
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
