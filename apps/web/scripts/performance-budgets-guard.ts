@@ -80,9 +80,10 @@ const formatMetric = (value: number, unit: string) =>
 
 const collectMetrics = async (url: string): Promise<PageMetrics> => {
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
+    page = await browser.newPage();
     await page.addInitScript(() => {
       type LayoutShiftEntry = PerformanceEntry & {
         hadRecentInput?: boolean;
@@ -130,7 +131,7 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
       ).__perfBudgetMetrics = metrics;
     });
 
-    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     // Best-effort networkidle wait; fall back gracefully for dynamic pages
     // where third-party scripts or long-polling prevent idle state.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
@@ -145,7 +146,7 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
       // Ignore input errors; FID will remain 0.
     }
 
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     const metrics = await page.evaluate(() => {
       const paintEntries = performance.getEntriesByType('paint');
@@ -232,7 +233,7 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
       },
     };
   } finally {
-    await page.close().catch(() => undefined);
+    await page?.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
   }
 };
