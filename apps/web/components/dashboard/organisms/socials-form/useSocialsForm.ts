@@ -146,8 +146,7 @@ export function useSocialsForm({
   return {
     loading: isFetching || isSaving,
     error:
-      submitError ||
-      (fetchError ? 'Failed to load social links' : undefined),
+      submitError || (fetchError ? 'Failed to load social links' : undefined),
     success: isSuccess,
     socialLinks,
     handleSubmit,
