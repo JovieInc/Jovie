@@ -31,7 +31,7 @@ const DSP_DISPLAY: Record<
 
 interface ConnectedDspListProps {
   readonly profileId: string;
-  readonly spotifyId: string;
+  readonly spotifyId: string | null;
 }
 
 export function ConnectedDspList({
@@ -232,7 +232,9 @@ export function ConnectedDspList({
                 : () => handleOpenPalette('apple_music')
             }
             onSyncNow={
-              appleMusicMatch ? () => handleSyncNow('apple_music') : undefined
+              appleMusicMatch && spotifyId
+                ? () => handleSyncNow('apple_music')
+                : undefined
             }
             onDisconnect={
               appleMusicMatch

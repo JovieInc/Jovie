@@ -2,7 +2,7 @@
 
 import { BarChart3, Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
@@ -42,160 +42,177 @@ export function SettingsPolished({
   const isPro = billingData?.isPro ?? false;
   const [isBillingLoading, setIsBillingLoading] = useState(false);
 
-  const handleBilling = async () => {
+  const handleBilling = useCallback(async () => {
     setIsBillingLoading(true);
     await router.push(APP_ROUTES.SETTINGS_BILLING);
-  };
+  }, [router]);
 
-  const renderAccountSection = () => (
-    <div className='space-y-3 sm:space-y-6'>
-      {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-        <AccountSettingsSection />
-      ) : (
-        <DashboardCard variant='settings'>
-          <div className='text-center py-4'>
-            <h3 className='text-[14px] font-medium text-primary-token mb-2'>
-              Account settings unavailable
-            </h3>
-            <p className='text-sm text-secondary'>
-              Clerk is not configured (missing publishable key). Set
-              NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-            </p>
-          </div>
-        </DashboardCard>
-      )}
-    </div>
+  const renderAccountSection = useCallback(
+    () => (
+      <div className='space-y-3 sm:space-y-6'>
+        {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+          <AccountSettingsSection />
+        ) : (
+          <DashboardCard variant='settings'>
+            <div className='text-center py-4'>
+              <h3 className='text-[14px] font-medium text-primary-token mb-2'>
+                Account settings unavailable
+              </h3>
+              <p className='text-sm text-secondary'>
+                Clerk is not configured (missing publishable key). Set
+                NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+              </p>
+            </div>
+          </DashboardCard>
+        )}
+      </div>
+    ),
+    []
   );
 
-  const renderProUpgradeCard = (
-    title: string,
-    description: string,
-    icon: React.ComponentType<{ className?: string }>
-  ) => (
-    <SettingsProGateCard
-      title={title}
-      description={description}
-      icon={icon}
-      onUpgrade={handleBilling}
-      loading={isBillingLoading || billingLoading}
-      buttonClassName={SETTINGS_BUTTON_CLASS}
-    />
+  const renderProUpgradeCard = useCallback(
+    (
+      title: string,
+      description: string,
+      icon: React.ComponentType<{ className?: string }>
+    ) => (
+      <SettingsProGateCard
+        title={title}
+        description={description}
+        icon={icon}
+        onUpgrade={handleBilling}
+        loading={isBillingLoading || billingLoading}
+        buttonClassName={SETTINGS_BUTTON_CLASS}
+      />
+    ),
+    [handleBilling, isBillingLoading, billingLoading]
   );
 
   // -- General (user-level) settings --
-  const userSections = [
-    {
-      id: 'account',
-      title: 'Account',
-      description: 'Manage your security, theme, and notification preferences.',
-      render: renderAccountSection,
-    },
-    {
-      id: 'billing',
-      title: 'Billing & Subscription',
-      description: 'Subscription, payment methods, and invoices.',
-      render: () => <SettingsBillingSection />,
-    },
-    {
-      id: 'data-privacy',
-      title: 'Data & Privacy',
-      description: 'Data export and account deletion.',
-      render: () => <DataPrivacySection />,
-    },
-  ];
+  const userSections = useMemo(
+    () => [
+      {
+        id: 'account',
+        title: 'Account',
+        description:
+          'Manage your security, theme, and notification preferences.',
+        render: renderAccountSection,
+      },
+      {
+        id: 'billing',
+        title: 'Billing & Subscription',
+        description: 'Subscription, payment methods, and invoices.',
+        render: () => <SettingsBillingSection />,
+      },
+      {
+        id: 'data-privacy',
+        title: 'Data & Privacy',
+        description: 'Data export and account deletion.',
+        render: () => <DataPrivacySection />,
+      },
+    ],
+    [renderAccountSection]
+  );
 
   // -- Artist-level settings --
-  const artistSections = [
-    {
-      id: 'artist-profile',
-      title: 'Artist Profile',
-      description: 'Photo, display name, and username.',
-      render: () => (
-        <SettingsArtistProfileSection
-          artist={artist}
-          onArtistUpdate={onArtistUpdate}
-          onRefresh={() => router.refresh()}
-        />
-      ),
-    },
-    {
-      id: 'social-links',
-      title: 'Social Links',
-      description: 'Connect your social media profiles.',
-      render: () => <SocialsForm artist={artist} />,
-    },
-    {
-      id: 'music-links',
-      title: 'Music Links',
-      description: 'Streaming platforms and music profile links.',
-      render: () => (
-        <ConnectedDspList profileId={artist.id} spotifyId={artist.spotify_id} />
-      ),
-    },
-    {
-      id: 'contacts',
-      title: 'Contacts',
-      description: 'Manage bookings, management, and press contacts.',
-      render: () => <SettingsContactsSection artist={artist} />,
-    },
-    {
-      id: 'touring',
-      title: 'Touring',
-      description: 'Connect Bandsintown to display tour dates on your profile.',
-      render: () => <SettingsTouringSection />,
-    },
-    {
-      id: 'branding',
-      title: 'Branding',
-      description: 'Custom branding for your profile page.',
-      render: () =>
-        isPro ? (
-          <SettingsBrandingSection
+  const artistSections = useMemo(
+    () => [
+      {
+        id: 'artist-profile',
+        title: 'Artist Profile',
+        description: 'Photo, display name, and username.',
+        render: () => (
+          <SettingsArtistProfileSection
             artist={artist}
             onArtistUpdate={onArtistUpdate}
+            onRefresh={() => router.refresh()}
           />
-        ) : (
-          renderProUpgradeCard(
-            'Professional Appearance',
-            'Remove Jovie branding to create a fully custom experience for your fans.',
-            Sparkles
-          )
         ),
-    },
-    {
-      id: 'ad-pixels',
-      title: 'Ad Pixels',
-      description: 'Facebook, Google, and TikTok conversion tracking.',
-      render: () =>
-        isPro ? (
-          <SettingsAdPixelsSection />
-        ) : (
-          renderProUpgradeCard(
-            'Unlock Growth Tracking',
-            'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-            Rocket
-          )
-        ),
-    },
-    {
-      id: 'analytics',
-      title: 'Analytics',
-      description: 'Control how your visits appear in analytics.',
-      render: () =>
-        isPro ? (
-          <SettingsAnalyticsSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
+      },
+      {
+        id: 'social-links',
+        title: 'Social Links',
+        description: 'Connect your social media profiles.',
+        render: () => <SocialsForm artist={artist} />,
+      },
+      {
+        id: 'music-links',
+        title: 'Music Links',
+        description: 'Streaming platforms and music profile links.',
+        render: () => (
+          <ConnectedDspList
+            profileId={artist.id}
+            spotifyId={artist.spotify_id}
           />
-        ) : (
-          renderProUpgradeCard(
-            'Pro Analytics Filtering',
-            'Exclude your own visits from analytics to get cleaner data about your real audience.',
-            BarChart3
-          )
         ),
-    },
-  ];
+      },
+      {
+        id: 'contacts',
+        title: 'Contacts',
+        description: 'Manage bookings, management, and press contacts.',
+        render: () => <SettingsContactsSection artist={artist} />,
+      },
+      {
+        id: 'touring',
+        title: 'Touring',
+        description:
+          'Connect Bandsintown to display tour dates on your profile.',
+        render: () => <SettingsTouringSection />,
+      },
+      {
+        id: 'branding',
+        title: 'Branding',
+        description: 'Custom branding for your profile page.',
+        render: () =>
+          isPro ? (
+            <SettingsBrandingSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+            />
+          ) : (
+            renderProUpgradeCard(
+              'Professional Appearance',
+              'Remove Jovie branding to create a fully custom experience for your fans.',
+              Sparkles
+            )
+          ),
+      },
+      {
+        id: 'ad-pixels',
+        title: 'Ad Pixels',
+        description: 'Facebook, Google, and TikTok conversion tracking.',
+        render: () =>
+          isPro ? (
+            <SettingsAdPixelsSection />
+          ) : (
+            renderProUpgradeCard(
+              'Unlock Growth Tracking',
+              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+              Rocket
+            )
+          ),
+      },
+      {
+        id: 'analytics',
+        title: 'Analytics',
+        description: 'Control how your visits appear in analytics.',
+        render: () =>
+          isPro ? (
+            <SettingsAnalyticsSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+            />
+          ) : (
+            renderProUpgradeCard(
+              'Pro Analytics Filtering',
+              'Exclude your own visits from analytics to get cleaner data about your real audience.',
+              BarChart3
+            )
+          ),
+      },
+    ],
+    [artist, isPro, onArtistUpdate, router, renderProUpgradeCard]
+  );
 
   const allSections = [...userSections, ...artistSections];
 
