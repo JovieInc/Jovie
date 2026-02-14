@@ -24,7 +24,9 @@ export default async function SettingsArtistProfilePage() {
   }
 
   const profileId = dashboardData.selectedProfile?.id;
-  const initialLinks = profileId ? await getProfileSocialLinks(profileId) : [];
+  const initialLinks = profileId
+    ? await getProfileSocialLinks(profileId).catch(() => [])
+    : [];
 
   return (
     <>

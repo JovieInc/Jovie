@@ -41,30 +41,20 @@ export function ProfileContactSidebar() {
     );
   }, [categoryCounts]);
 
-  // Auto-select first category with links if current selection is empty
+  // Synchronously resolve category to prevent brief mismatch when visibleTabs changes
+  const resolvedCategory = useMemo(() => {
+    if (visibleTabs.some(tab => tab.value === selectedCategory)) {
+      return selectedCategory;
+    }
+    return visibleTabs[0]?.value ?? selectedCategory;
+  }, [visibleTabs, selectedCategory]);
+
+  // Sync state when resolved category differs (e.g., after data load)
   useEffect(() => {
-    if (!categoryCounts) return;
-
-    setSelectedCategory(prevSelectedCategory => {
-      const currentCount = categoryCounts[prevSelectedCategory] ?? 0;
-      if (currentCount > 0) return prevSelectedCategory;
-
-      // Find first category with links
-      const categories: CategoryOption[] = [
-        'social',
-        'dsp',
-        'earnings',
-        'custom',
-      ];
-      for (const cat of categories) {
-        if ((categoryCounts[cat] ?? 0) > 0) {
-          return cat;
-        }
-      }
-
-      return prevSelectedCategory;
-    });
-  }, [categoryCounts]);
+    if (resolvedCategory !== selectedCategory) {
+      setSelectedCategory(resolvedCategory);
+    }
+  }, [resolvedCategory, selectedCategory]);
 
   // Don't render until we have preview data
   if (!previewData) {
@@ -101,7 +91,7 @@ export function ProfileContactSidebar() {
         {visibleTabs.length > 1 && (
           <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
             <SegmentControl
-              value={selectedCategory}
+              value={resolvedCategory}
               onValueChange={setSelectedCategory}
               options={visibleTabs}
               size='sm'
@@ -112,7 +102,7 @@ export function ProfileContactSidebar() {
 
         {/* Links List */}
         <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4'>
-          <ProfileLinkList links={links} selectedCategory={selectedCategory} />
+          <ProfileLinkList links={links} selectedCategory={resolvedCategory} />
         </div>
       </div>
     </RightDrawer>

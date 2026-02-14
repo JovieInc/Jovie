@@ -10,7 +10,7 @@ export function ProfilePageChat() {
   if (!selectedProfile) {
     return (
       <div className='flex h-full items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin text-secondary-token' />
+        <Loader2 className='h-6 w-6 animate-spin text-secondary-token' />
       </div>
     );
   }
