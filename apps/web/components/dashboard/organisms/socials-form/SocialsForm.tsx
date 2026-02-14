@@ -12,7 +12,7 @@ import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
 import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
 import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
-import { useSocialsForm } from './useSocialsForm';
+import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
 const CHIP_BG_ALPHA = 0x15 / 255;
@@ -78,9 +78,6 @@ const EXCLUDED_PLATFORM_IDS = new Set([
   'toneden',
   'featurefm',
 ]);
-
-/** Spotify and Apple Music keep their dedicated connection UI; other music DSPs get text inputs. */
-const PRIMARY_DSP_IDS = new Set(['spotify', 'apple_music']);
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
