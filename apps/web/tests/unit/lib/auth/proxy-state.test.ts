@@ -55,6 +55,11 @@ vi.mock('@/lib/redis', () => ({
   getRedis: vi.fn().mockReturnValue(null),
 }));
 
+// Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
+vi.mock('@/lib/auth/waitlist-config', () => ({
+  isWaitlistEnabled: vi.fn().mockReturnValue(true),
+}));
+
 describe('proxy-state.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();

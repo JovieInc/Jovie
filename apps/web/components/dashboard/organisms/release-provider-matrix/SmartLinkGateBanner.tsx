@@ -22,7 +22,6 @@ export function SmartLinkGateBanner({
   smartLinksLimit,
   className,
 }: SmartLinkGateBannerProps) {
-  const lockedCount = totalReleases - smartLinksLimit;
   // ~20 minutes saved per auto-created smart link
   const minutesSaved = totalReleases * 20;
   const hoursSaved = Math.round(minutesSaved / 60);
@@ -33,7 +32,6 @@ export function SmartLinkGateBanner({
         'flex items-start gap-3 rounded-lg border border-subtle bg-surface-1 p-3',
         className
       )}
-      role='status'
     >
       <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
         <Icon name='Sparkles' className='h-4 w-4 text-primary' aria-hidden='true' />

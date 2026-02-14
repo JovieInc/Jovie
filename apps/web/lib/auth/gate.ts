@@ -293,7 +293,7 @@ async function handleMissingDbUser(
       {
         clerkUserId,
         email,
-        waitlistEntryId: waitlistResult.entryId,
+        waitlistEntryId,
         context: 'resolveUserState',
       }
     );

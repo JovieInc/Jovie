@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   type KeyboardEvent,
@@ -207,8 +208,7 @@ export function HeroSpotifySearch() {
         <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0' style={{ backgroundColor: 'rgba(30, 215, 96, 0.15)' }}>
           <SocialIcon
             platform='spotify'
-            className='w-3.5 h-3.5'
-            style={{ color: '#1DB954' }}
+            className='w-3.5 h-3.5 text-[#1DB954]'
           />
         </div>
         <input
@@ -375,8 +375,7 @@ export function HeroSpotifySearch() {
                       <div className='w-full h-full flex items-center justify-center'>
                         <SocialIcon
                           platform='spotify'
-                          className='w-5 h-5'
-                          style={{ color: 'var(--linear-text-tertiary)' }}
+                          className='w-5 h-5 text-tertiary-token'
                         />
                       </div>
                     )}
@@ -447,13 +446,13 @@ export function HeroSpotifySearch() {
         style={{ fontSize: '13px', color: 'var(--linear-text-tertiary)' }}
       >
         or{' '}
-        <a
+        <Link
           href='/signup'
           className='underline transition-colors'
           style={{ color: 'var(--linear-text-secondary)' }}
         >
           sign up without Spotify
-        </a>
+        </Link>
       </p>
     </div>
   );
