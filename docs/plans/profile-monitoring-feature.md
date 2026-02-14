@@ -4,7 +4,7 @@
 > **Author**: Claude (AI-assisted planning)
 > **Date**: 2026-02-14
 > **Branch**: `claude/plan-profile-monitoring-feature-wOALT`
-> **Plan tier**: Pro ($99/mo) — exclusive feature
+> **Plan tier**: Growth ($99/mo) — exclusive feature
 
 ---
 
@@ -18,9 +18,9 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 
 ### Who is this for?
 
-- **Primary**: **Pro plan ($99/mo) artists** with a linked Spotify profile
-- **Secondary**: Free/Basic/Premium users see the feature as a locked upsell in their dashboard — "Upgrade to Pro to monitor your streaming profiles for unauthorized releases"
-- **Tertiary**: Unclaimed profiles (Jovie can auto-detect and use it as a claim + upgrade incentive — "We found suspicious activity on your Spotify, claim your Jovie Pro to investigate")
+- **Primary**: **Growth plan ($99/mo) artists** with a linked Spotify profile
+- **Secondary**: Free/Basic/Premium users see the feature as a locked upsell in their dashboard — "Upgrade to Growth to monitor your streaming profiles for unauthorized releases"
+- **Tertiary**: Unclaimed profiles (Jovie can auto-detect and use it as a claim + upgrade incentive — "We found suspicious activity on your Spotify, claim your Jovie Growth plan to investigate")
 
 ### What does "success" look like?
 
@@ -34,20 +34,20 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 
 ## 2. User Experience
 
-### 2.1 Activation (Pro Plan Only — $99/mo)
+### 2.1 Activation (Growth Plan Only — $99/mo)
 
-**Eligibility**: Only users where `isPro === true` (on the Pro plan at $99/mo) are eligible. This is enforced at three levels:
+**Eligibility**: Only users where `isPro === true` (on the Growth plan at $99/mo) are eligible. This is enforced at three levels:
 
-1. **Cron scanner**: Skips profiles where the associated user is not on Pro
-2. **API routes**: All `/api/catalog-monitor/*` endpoints check `isPro` via `getSessionContext()` and return 403 with an upgrade prompt for non-Pro users
-3. **Dashboard UI**: Non-Pro users see a locked preview of the feature with an upgrade CTA
+1. **Cron scanner**: Skips profiles where the associated user is not on Growth
+2. **API routes**: All `/api/catalog-monitor/*` endpoints check `isPro` via `getSessionContext()` and return 403 with an upgrade prompt for non-Growth users
+3. **Dashboard UI**: Non-Growth users see a locked preview of the feature with an upgrade CTA
 
-**For Pro users**: Artists who already have a `spotifyId` on their `creatorProfiles` row are automatically enrolled when they upgrade to Pro. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
+**For Growth users**: Artists who already have a `spotifyId` on their `creatorProfiles` row are automatically enrolled when they upgrade to Growth. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
 
-**For non-Pro users**: The catalog monitor page is visible in the sidebar but shows a locked state:
-```
+**For non-Growth users**: The catalog monitor page is visible in the sidebar but shows a locked state:
+```text
 ┌─────────────────────────────────────────────────┐
-│  🔒 Catalog Monitor — Pro Feature               │
+│  🔒 Catalog Monitor — Growth Feature               │
 │                                                 │
 │  Monitor your streaming profiles for            │
 │  unauthorized releases and impersonation.       │
@@ -55,20 +55,20 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 │  Get alerted the moment new music appears       │
 │  on your Spotify profile.                       │
 │                                                 │
-│  [Upgrade to Pro — $99/mo]                      │
+│  [Upgrade to Growth — $99/mo]                   │
 └─────────────────────────────────────────────────┘
 ```
 
-**On downgrade from Pro**: Monitoring is paused (cron skips), existing data is retained for 90 days (in case they re-subscribe), alerts stop sending. If they re-upgrade, monitoring resumes from where it left off.
+**On downgrade from Growth**: Monitoring is paused (cron skips), existing data is retained for 90 days (in case they re-subscribe), alerts stop sending. If they re-upgrade, monitoring resumes from where it left off.
 
-For new Pro users, monitoring begins after DSP discovery completes (existing `dsp-artist-discovery` job).
+For new Growth users, monitoring begins after DSP discovery completes (existing `dsp-artist-discovery` job).
 
 ### 2.2 The Alert
 
 When an unrecognized release is detected:
 
 **Email** (via existing Resend infrastructure):
-```
+```text
 Subject: "New release detected on your Spotify — is this yours?"
 
 Body:
@@ -83,7 +83,7 @@ Body:
 ```
 
 **In-app dashboard** (new section on creator dashboard):
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │  🔍 Catalog Monitor                             │
 │                                                 │
@@ -98,7 +98,7 @@ Body:
 │  └───────────────────────────────────────────┘  │
 │                                                 │
 │  ✅ 2 confirmed releases                        │
-│  └ "Stay With Me" — Album · Apple Music      │  │
+│  └ "Stay With Me" — Album · Spotify           │  │
 │  └ "Echoes" — Single · Spotify               │  │
 └─────────────────────────────────────────────────┘
 ```
@@ -129,7 +129,7 @@ When an artist clicks "Yes, this is mine":
 
 ### 3.1 High-Level Data Flow
 
-```
+```text
                     ┌──────────────┐
                     │  Cron Job    │
                     │  (6-12 hrs)  │
@@ -527,7 +527,7 @@ async function tryAutoConfirm(
 **Runtime**: 120 seconds max
 **Concurrency**: 5 profiles scanned in parallel per batch
 
-```
+```text
 Algorithm:
 1. RECOVERY: Reset stuck "scanning" rows older than 15 minutes → "pending"
 
@@ -536,7 +536,7 @@ Algorithm:
    JOIN users ON creator_profiles.user_id = users.id
    WHERE nextScanAt <= NOW()
      AND (status != 'failed' OR consecutiveFailures < 5)
-     AND users.is_pro = true              ← Pro gate
+     AND users.is_pro = true              ← Growth gate
      AND creator_profiles.is_claimed = true
    ORDER BY nextScanAt ASC
    LIMIT 50
@@ -575,7 +575,7 @@ Algorithm:
 
 Follows the exact `send-release-notifications` pattern:
 
-```
+```text
 Algorithm:
 1. RECOVERY: Reset stuck "sending" alerts older than 10 minutes → "pending"
 
@@ -591,8 +591,8 @@ Algorithm:
 
 4. For each alert (10 concurrent):
    a. CLAIM: Atomically set status = 'sending'
-   b. CHECK: Is user still on Pro plan? Is catalogMonitoring still enabled? Is email still valid?
-      - If user downgraded from Pro → cancel alert, skip
+   b. CHECK: Is user still on Growth plan? Is catalogMonitoring still enabled? Is email still valid?
+      - If user downgraded from Growth → cancel alert, skip
    c. GENERATE action token: HMAC-SHA256 signed token encoding:
       - alertId, detectedReleaseId, creatorProfileId
       - Used for one-click confirm/dispute from email
@@ -615,14 +615,14 @@ Add to `vercel.json`:
 
 ## 7. API Routes
 
-All catalog monitor API routes enforce Pro plan access using the existing `getSessionContext()` helper:
+All catalog monitor API routes enforce Growth plan access using the existing `getSessionContext()` helper:
 
 ```typescript
 // Shared guard used by all /api/catalog-monitor/* routes
 const { user, profile } = await getSessionContext({ requireUser: true, requireProfile: true });
 if (!user.isPro) {
   return NextResponse.json(
-    { error: 'Pro plan required', upgradeUrl: '/pricing' },
+    { error: 'Growth plan required', upgradeUrl: '/pricing' },
     { status: 403 }
   );
 }
@@ -632,9 +632,9 @@ if (!user.isPro) {
 
 Artist confirms a detected release is theirs.
 
-```
+```text
 Request: { detectedReleaseId: string }
-Auth: Clerk session required, must own the creator profile, must be Pro plan
+Auth: Clerk session required, must own the creator profile, must be Growth plan
 
 Response: 200 { success: true, importable: boolean }
 
@@ -648,12 +648,12 @@ Side effects:
 
 Artist disputes a detected release — it's not theirs.
 
-```
+```text
 Request: {
   detectedReleaseId: string,
   notes?: string,          // Optional artist notes
 }
-Auth: Clerk session required, must own the creator profile
+Auth: Clerk session required, must own the creator profile, must be Growth plan
 
 Response: 200 {
   success: true,
@@ -674,7 +674,7 @@ Side effects:
 
 Artist dismisses an alert (they know about it but don't care).
 
-```
+```text
 Request: { detectedReleaseId: string }
 Auth: Clerk session required
 
@@ -685,7 +685,7 @@ Response: 200 { success: true }
 
 Returns the current monitoring state for the artist's dashboard.
 
-```
+```text
 Auth: Clerk session required
 
 Response: 200 {
@@ -705,7 +705,7 @@ Response: 200 {
 
 Update monitoring preferences.
 
-```
+```text
 Request: {
   enabled?: boolean,
   emailAlerts?: boolean,
@@ -720,7 +720,7 @@ Response: 200 { success: true }
 
 Paginated history of all detected releases for audit/review.
 
-```
+```text
 Query: ?status=confirmed&page=1&limit=20
 Auth: Clerk session required
 
@@ -736,7 +736,7 @@ Response: 200 {
 
 Handles one-click actions from alert emails (confirm/dispute via signed token).
 
-```
+```text
 Request: { token: string, action: 'confirm' | 'dispute' }
 Auth: Token-based (HMAC-signed, 7-day expiry)
 
@@ -751,7 +751,7 @@ Response: 302 redirect to dashboard with flash message
 
 Follows the existing `release-day-notification.ts` pattern with `escapeHtml()` on all inputs.
 
-```
+```text
 Subject: "New release detected on your {Provider} — is this yours?"
 
 HTML structure:
@@ -789,7 +789,7 @@ Plain text fallback:
 ```
 
 Action URLs use HMAC-signed tokens (same pattern as existing `actionToken` in impersonation):
-```
+```text
 https://jov.ie/api/catalog-monitor/action?token={hmac_token}&action=confirm
 ```
 
@@ -803,13 +803,13 @@ https://jov.ie/api/catalog-monitor/action?token={hmac_token}&action=confirm
 
 When the artist opens the right drawer (sidebar settings panel), a new **"Catalog Monitor"** section appears below existing settings sections. This uses the existing `SettingsToggleRow` component pattern for consistency.
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │  Right Drawer                      [×]  │
 │                                         │
 │  ... existing settings sections ...     │
 │                                         │
-│  ─── Catalog Monitor (Pro) ───────────  │
+│  ─── Catalog Monitor (Growth) ───────────  │
 │                                         │
 │  Monitor my profiles          [══●]  ON │
 │  Scans your DSP profiles for            │
@@ -829,13 +829,13 @@ When the artist opens the right drawer (sidebar settings panel), a new **"Catalo
 └─────────────────────────────────────────┘
 ```
 
-**For non-Pro users**, the section appears but all toggles are disabled with a lock icon and the description reads "Upgrade to Pro to enable catalog monitoring":
+**For non-Growth users**, the section appears but all toggles are disabled with a lock icon and the description reads "Upgrade to Growth to enable catalog monitoring":
 
-```
+```text
 │  ─── Catalog Monitor ─────────────────  │
 │                                         │
 │  🔒 Monitor my profiles      [○══] OFF │
-│  Upgrade to Pro ($99/mo) to scan your   │
+│  Upgrade to Growth ($99/mo) to scan your   │
 │  streaming profiles for unauthorized    │
 │  releases. [Upgrade →]                  │
 ```
@@ -857,7 +857,7 @@ The carousel currently shows DSP match suggestions, social link suggestions, and
 
 When there are unconfirmed releases detected by the catalog scanner, they appear as cards in the carousel alongside existing suggestions:
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │                                          1 of 4 │
 │                                                 │
@@ -923,11 +923,11 @@ interface CatalogAlertCard extends CarouselCard {
 
 **Empty state**: If there are no unconfirmed releases and no other suggestions, the carousel is hidden (existing behavior). If there are only catalog alerts and no other suggestions, the carousel shows only the alert cards.
 
-**Pro gating in carousel**: Catalog alert cards only appear when `isPro === true`. Non-Pro users never see them in the carousel (the scan doesn't run, so there's no data to show). However, if we implement the "teaser" variant (Section 11, future backlog), we could show a locked card:
+**Growth gating in carousel**: Catalog alert cards only appear when `isPro === true`. Non-Growth users never see them in the carousel (the scan doesn't run, so there's no data to show). However, if we implement the "teaser" variant (Section 11, future backlog), we could show a locked card:
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
-│  🔒 CATALOG MONITOR · Pro Feature               │
+│  🔒 CATALOG MONITOR · Growth Feature               │
 │                                                 │
 │  You have 47 releases on Spotify.               │
 │  Are they all yours?                            │
@@ -936,7 +936,7 @@ interface CatalogAlertCard extends CarouselCard {
 │  profiles and alerts you when unauthorized      │
 │  music appears.                                 │
 │                                                 │
-│  [Upgrade to Pro — $99/mo]                      │
+│  [Upgrade to Growth — $99/mo]                   │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -946,10 +946,10 @@ The full dedicated page for in-depth catalog monitoring management, accessible f
 
 ### 9.4 Components
 
-#### `CatalogMonitorUpgradeGate` (for non-Pro users)
+#### `CatalogMonitorUpgradeGate` (for non-Growth users)
 - Full-page locked state shown to free/basic/premium users
 - Explains the feature value prop with visual mockup
-- Shows "Upgrade to Pro — $99/mo" CTA button → links to `/pricing` or Stripe checkout
+- Shows "Upgrade to Growth — $99/mo" CTA button → links to `/pricing` or Stripe checkout
 - Optionally shows a teaser: "You have X releases on Spotify — are they all yours?" (uses public DSP data to create urgency)
 
 #### `CatalogMonitorDrawerSection` (right drawer integration)
@@ -966,7 +966,7 @@ The full dedicated page for in-depth catalog monitoring management, accessible f
 - Loading spinner during confirm/dispute API calls
 - Slide-out animation on action (existing carousel animation: `animate-slide-out-left`)
 
-#### `CatalogMonitorOverview` (Pro users only)
+#### `CatalogMonitorOverview` (Growth users only)
 - Shows monitoring status (enabled/disabled), last scan time, next scan
 - Provider badges showing connected platforms being monitored
 - Stats: total releases tracked, unconfirmed count, disputed count
@@ -1040,9 +1040,9 @@ When a provider returns errors, apply exponential backoff on `nextScanAt`:
 
 ### Access Control: Pro Plan ($99/mo)
 
-This feature is **permanently gated to the Pro plan**. It is not a temporary feature flag — it's a plan differentiator. The gating is enforced at three levels:
+This feature is **permanently gated to the Growth plan**. It is not a temporary feature flag — it's a plan differentiator. The gating is enforced at three levels:
 
-| Layer | How | What happens for non-Pro |
+| Layer | How | What happens for non-Growth |
 |-------|-----|--------------------------|
 | **Cron scanner** | JOIN to `users.is_pro` in SELECT query | Profile is skipped entirely |
 | **API routes** | `user.isPro` check via `getSessionContext()` | 403 with `{ upgradeUrl: '/pricing' }` |
@@ -1050,14 +1050,14 @@ This feature is **permanently gated to the Pro plan**. It is not a temporary fea
 
 ### Statsig Feature Gate: `catalog_monitoring`
 
-Used **only for progressive rollout within Pro users** (not for plan gating):
+Used **only for progressive rollout within Growth users** (not for plan gating):
 
 ```typescript
-// Rollout stages (all within Pro plan only):
+// Rollout stages (all within Growth plan only):
 // 1. Internal team only (manual list) — validate in production
-// 2. 10% of Pro users — monitor error rates and API usage
-// 3. 50% of Pro users — verify at scale
-// 4. 100% of Pro users — general availability within Pro
+// 2. 10% of Growth users — monitor error rates and API usage
+// 3. 50% of Growth users — verify at scale
+// 4. 100% of Growth users — general availability within Growth
 //
 // This feature does NOT roll out to free/basic/premium tiers.
 // Plan gating is separate from the feature gate.
@@ -1065,8 +1065,8 @@ Used **only for progressive rollout within Pro users** (not for plan gating):
 
 ### Pricing Page Update
 
-Add to the Pro plan feature list on `/pricing`:
-```
+Add to the Growth plan feature list on `/pricing`:
+```text
 Pro — $99/mo
   ✅ Everything in Premium, plus:
   ✅ Catalog Monitoring — Get alerted when new music appears on your streaming profiles
@@ -1076,19 +1076,19 @@ Pro — $99/mo
 
 ### Downgrade Handling
 
-When a Pro user downgrades:
+When a Growth user downgrades:
 1. `catalogScanState.status` stays as-is (not deleted)
 2. Cron scanner's `users.is_pro = true` filter naturally excludes them
 3. Pending `catalogAlerts` are **cancelled** (not sent) — a background check in the alert cron
 4. Existing `detectedReleases` data is **retained for 90 days** via the existing `data-retention` cron
-5. If the user re-upgrades to Pro, monitoring resumes seamlessly — `nextScanAt` is set to `NOW()` on re-activation
+5. If the user re-upgrades to Growth, monitoring resumes seamlessly — `nextScanAt` is set to `NOW()` on re-activation
 
 ### Re-upgrade Path
 
-When a user returns to Pro:
+When a user returns to Growth:
 1. Detect via Stripe webhook (`customer.subscription.updated` where plan = 'pro')
 2. Set `catalogScanState.nextScanAt = NOW()` for all their providers
-3. Run a fresh baseline scan (to catch anything that appeared while they were off Pro)
+3. Run a fresh baseline scan (to catch anything that appeared while they were off Growth)
 4. Resume normal 6-12h scan cycle
 
 ### Notification Preference Migration
@@ -1126,12 +1126,12 @@ This is critical — without it, every artist would get 50+ alerts on day one.
 ### Trigger
 
 The initial scan should fire as a background job when:
-- The user is on the **Pro plan** (`isPro === true`) **AND**
+- The user is on the **Growth plan** (`isPro === true`) **AND**
 - The `catalog_monitoring` feature gate is enabled for the user **AND**
 - They have a `spotifyId` set on their creator profile
 - They don't already have a `catalogScanState` row for Spotify
 
-**Upgrade trigger**: When a user upgrades to Pro (detected via Stripe webhook `customer.subscription.updated`), enqueue an initial baseline scan for their Spotify profile. This gives them immediate value the moment they subscribe.
+**Upgrade trigger**: When a user upgrades to Growth (detected via Stripe webhook `customer.subscription.updated`), enqueue an initial baseline scan for their Spotify profile. This gives them immediate value the moment they subscribe.
 
 ---
 
@@ -1253,13 +1253,13 @@ The full implementation plan is documented above (Sections 3–14) and remains t
 - **Collaborative verification** (let managers/labels confirm on behalf)
 - **Weekly digest email** (summary of all monitoring activity)
 - **Unclaimed profile incentive** ("We found suspicious activity — claim your Jovie")
-- **Non-Pro carousel teaser card** (locked card in carousel showing release count to drive upgrades)
+- **Non-Growth carousel teaser card** (locked card in carousel showing release count to drive upgrades)
 
 ---
 
 ## 16. Open Questions
 
-1. **Scan frequency default**: Since this is Pro-only, we can afford 6h default. At $99/mo per user, the API cost per scan is negligible. Recommend **6h default** with option to choose 12h or 24h if they want fewer alerts.
+1. **Scan frequency default**: Since this is Growth-only, we can afford 6h default. At $99/mo per user, the API cost per scan is negligible. Recommend **6h default** with option to choose 12h or 24h if they want fewer alerts.
 
 2. **"Appears on" releases**: Spotify shows releases where the artist appears as a featured artist. Should we monitor those too? They're a common impersonation vector (bad actor features a real artist without permission). Recommend yes, but flagged differently.
 
