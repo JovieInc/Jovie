@@ -4,6 +4,7 @@
 > **Author**: Claude (AI-assisted planning)
 > **Date**: 2026-02-14
 > **Branch**: `claude/plan-profile-monitoring-feature-wOALT`
+> **Plan tier**: Pro ($99/mo) — exclusive feature
 
 ---
 
@@ -15,8 +16,9 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 
 ### Who is this for?
 
-- **Primary**: Claimed Jovie artists with at least one linked DSP profile
-- **Secondary**: Unclaimed profiles (Jovie can auto-detect and use it as a claim incentive — "We found suspicious activity on your Spotify, claim your Jovie to investigate")
+- **Primary**: **Pro plan ($99/mo) artists** with at least one linked DSP profile
+- **Secondary**: Free/Basic/Premium users see the feature as a locked upsell in their dashboard — "Upgrade to Pro to monitor your streaming profiles for unauthorized releases"
+- **Tertiary**: Unclaimed profiles (Jovie can auto-detect and use it as a claim + upgrade incentive — "We found suspicious activity on your Spotify, claim your Jovie Pro to investigate")
 
 ### What does "success" look like?
 
@@ -30,11 +32,34 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 
 ## 2. User Experience
 
-### 2.1 Activation (Zero-config for existing users)
+### 2.1 Activation (Pro Plan Only — $99/mo)
 
-Artists who already have a `spotifyId` or `appleMusicId` on their `creatorProfiles` row are automatically enrolled. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
+**Eligibility**: Only users where `isPro === true` (on the Pro plan at $99/mo) are eligible. This is enforced at three levels:
 
-For new users, monitoring begins after DSP discovery completes (existing `dsp-artist-discovery` job).
+1. **Cron scanner**: Skips profiles where the associated user is not on Pro
+2. **API routes**: All `/api/catalog-monitor/*` endpoints check `isPro` via `getSessionContext()` and return 403 with an upgrade prompt for non-Pro users
+3. **Dashboard UI**: Non-Pro users see a locked preview of the feature with an upgrade CTA
+
+**For Pro users**: Artists who already have a `spotifyId` or `appleMusicId` on their `creatorProfiles` row are automatically enrolled when they upgrade to Pro. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
+
+**For non-Pro users**: The catalog monitor page is visible in the sidebar but shows a locked state:
+```
+┌─────────────────────────────────────────────────┐
+│  🔒 Catalog Monitor — Pro Feature               │
+│                                                 │
+│  Monitor your streaming profiles for            │
+│  unauthorized releases and impersonation.       │
+│                                                 │
+│  Get alerted the moment new music appears       │
+│  on your Spotify or Apple Music profile.        │
+│                                                 │
+│  [Upgrade to Pro — $99/mo]                      │
+└─────────────────────────────────────────────────┘
+```
+
+**On downgrade from Pro**: Monitoring is paused (cron skips), existing data is retained for 90 days (in case they re-subscribe), alerts stop sending. If they re-upgrade, monitoring resumes from where it left off.
+
+For new Pro users, monitoring begins after DSP discovery completes (existing `dsp-artist-discovery` job).
 
 ### 2.2 The Alert
 
@@ -519,8 +544,12 @@ Algorithm:
 1. RECOVERY: Reset stuck "scanning" rows older than 15 minutes → "pending"
 
 2. SELECT profiles due for scanning:
+   JOIN creator_profiles ON creator_profile_id
+   JOIN users ON creator_profiles.user_id = users.id
    WHERE nextScanAt <= NOW()
      AND (status != 'failed' OR consecutiveFailures < 5)
+     AND users.is_pro = true              ← Pro gate
+     AND creator_profiles.is_claimed = true
    ORDER BY nextScanAt ASC
    LIMIT 50
 
@@ -574,7 +603,8 @@ Algorithm:
 
 4. For each alert (10 concurrent):
    a. CLAIM: Atomically set status = 'sending'
-   b. CHECK: Is catalogMonitoring still enabled? Is email still valid?
+   b. CHECK: Is user still on Pro plan? Is catalogMonitoring still enabled? Is email still valid?
+      - If user downgraded from Pro → cancel alert, skip
    c. GENERATE action token: HMAC-SHA256 signed token encoding:
       - alertId, detectedReleaseId, creatorProfileId
       - Used for one-click confirm/dispute from email
@@ -597,13 +627,26 @@ Add to `vercel.json`:
 
 ## 7. API Routes
 
+All catalog monitor API routes enforce Pro plan access using the existing `getSessionContext()` helper:
+
+```typescript
+// Shared guard used by all /api/catalog-monitor/* routes
+const { user, profile } = await getSessionContext({ requireUser: true, requireProfile: true });
+if (!user.isPro) {
+  return NextResponse.json(
+    { error: 'Pro plan required', upgradeUrl: '/pricing' },
+    { status: 403 }
+  );
+}
+```
+
 ### 7.1 `POST /api/catalog-monitor/confirm`
 
 Artist confirms a detected release is theirs.
 
 ```
 Request: { detectedReleaseId: string }
-Auth: Clerk session required, must own the creator profile
+Auth: Clerk session required, must own the creator profile, must be Pro plan
 
 Response: 200 { success: true, importable: boolean }
 
@@ -773,7 +816,13 @@ A new page in the creator dashboard, accessible from the sidebar navigation.
 
 ### 9.2 Components
 
-#### `CatalogMonitorOverview`
+#### `CatalogMonitorUpgateGate` (for non-Pro users)
+- Full-page locked state shown to free/basic/premium users
+- Explains the feature value prop with visual mockup
+- Shows "Upgrade to Pro — $99/mo" CTA button → links to `/pricing` or Stripe checkout
+- Optionally shows a teaser: "You have X releases on Spotify — are they all yours?" (uses public DSP data to create urgency)
+
+#### `CatalogMonitorOverview` (Pro users only)
 - Shows monitoring status (enabled/disabled), last scan time, next scan
 - Provider badges showing connected platforms being monitored
 - Stats: total releases tracked, unconfirmed count, disputed count
@@ -847,17 +896,60 @@ When a provider returns errors, apply exponential backoff on `nextScanAt`:
 
 ---
 
-## 11. Feature Flag & Rollout
+## 11. Feature Flag, Plan Gating & Rollout
+
+### Access Control: Pro Plan ($99/mo)
+
+This feature is **permanently gated to the Pro plan**. It is not a temporary feature flag — it's a plan differentiator. The gating is enforced at three levels:
+
+| Layer | How | What happens for non-Pro |
+|-------|-----|--------------------------|
+| **Cron scanner** | JOIN to `users.is_pro` in SELECT query | Profile is skipped entirely |
+| **API routes** | `user.isPro` check via `getSessionContext()` | 403 with `{ upgradeUrl: '/pricing' }` |
+| **Dashboard UI** | `isPro` from `useBillingStatusQuery()` | Locked preview with upgrade CTA |
 
 ### Statsig Feature Gate: `catalog_monitoring`
 
+Used **only for progressive rollout within Pro users** (not for plan gating):
+
 ```typescript
-// Rollout stages:
-// 1. Internal team only (manual list)
-// 2. Pro plan users (subscription_plan = 'pro')
-// 3. All claimed profiles with DSP IDs
-// 4. General availability
+// Rollout stages (all within Pro plan only):
+// 1. Internal team only (manual list) — validate in production
+// 2. 10% of Pro users — monitor error rates and API usage
+// 3. 50% of Pro users — verify at scale
+// 4. 100% of Pro users — general availability within Pro
+//
+// This feature does NOT roll out to free/basic/premium tiers.
+// Plan gating is separate from the feature gate.
 ```
+
+### Pricing Page Update
+
+Add to the Pro plan feature list on `/pricing`:
+```
+Pro — $99/mo
+  ✅ Everything in Premium, plus:
+  ✅ Catalog Monitoring — Get alerted when new music appears on your streaming profiles
+  ✅ Impersonation Detection — Identify and dispute unauthorized releases
+  ...existing Pro features...
+```
+
+### Downgrade Handling
+
+When a Pro user downgrades:
+1. `catalogScanState.status` stays as-is (not deleted)
+2. Cron scanner's `users.is_pro = true` filter naturally excludes them
+3. Pending `catalogAlerts` are **cancelled** (not sent) — a background check in the alert cron
+4. Existing `detectedReleases` data is **retained for 90 days** via the existing `data-retention` cron
+5. If the user re-upgrades to Pro, monitoring resumes seamlessly — `nextScanAt` is set to `NOW()` on re-activation
+
+### Re-upgrade Path
+
+When a user returns to Pro:
+1. Detect via Stripe webhook (`customer.subscription.updated` where plan = 'pro')
+2. Set `catalogScanState.nextScanAt = NOW()` for all their providers
+3. Run a fresh baseline scan (to catch anything that appeared while they were off Pro)
+4. Resume normal 6-12h scan cycle
 
 ### Notification Preference Migration
 
@@ -867,13 +959,13 @@ Existing `notificationPreferences` JSON on `creatorProfiles` gets new fields wit
 // Default for existing users (non-breaking):
 {
   ...existingPreferences,
-  catalogMonitoring: true,        // Enabled by default
+  catalogMonitoring: true,        // Enabled by default (only active if isPro)
   catalogMonitoringEmail: true,   // Email alerts on
   catalogMonitoringInApp: true,   // In-app alerts on
 }
 ```
 
-No data migration needed — the `.$type<>()` handles missing fields via defaults in application code.
+No data migration needed — the `.$type<>()` handles missing fields via defaults in application code. The preferences exist for all users but only take effect when `isPro === true`.
 
 ---
 
@@ -894,9 +986,12 @@ This is critical — without it, every artist would get 50+ alerts on day one.
 ### Trigger
 
 The initial scan should fire as a background job when:
+- The user is on the **Pro plan** (`isPro === true`) **AND**
 - The `catalog_monitoring` feature gate is enabled for the user **AND**
 - They have at least one DSP ID (`spotifyId`, `appleMusicId`, etc.)
 - They don't already have a `catalogScanState` row for that provider
+
+**Upgrade trigger**: When a user upgrades to Pro (detected via Stripe webhook `customer.subscription.updated`), enqueue an initial baseline scan for all their linked DSP providers. This gives them immediate value the moment they subscribe.
 
 ---
 
@@ -1025,6 +1120,8 @@ Tokens are:
 | API: `/api/catalog-monitor/history` | S | `app/api/catalog-monitor/history/route.ts` |
 | API: `/api/catalog-monitor/settings` | S | `app/api/catalog-monitor/settings/route.ts` |
 | Dashboard page layout | M | `app/(dashboard)/catalog-monitor/page.tsx` |
+| `CatalogMonitorUpgradeGate` (non-Pro upsell) | M | `components/catalog-monitor/upgrade-gate.tsx` |
+| Pro guard wrapper (checks `isPro`, routes to gate) | S | `components/catalog-monitor/pro-guard.tsx` |
 | `CatalogMonitorOverview` component | M | `components/catalog-monitor/overview.tsx` |
 | `UnconfirmedReleaseCard` component | M | `components/catalog-monitor/release-card.tsx` |
 | `CatalogMonitorHistory` component | M | `components/catalog-monitor/history.tsx` |
@@ -1068,7 +1165,7 @@ Tokens are:
 
 ## 16. Open Questions
 
-1. **Scan frequency default**: 6h vs 12h vs 24h? More frequent = more API calls but faster detection. Recommend 12h as default, 6h for Pro users.
+1. **Scan frequency default**: Since this is Pro-only, we can afford 6h default. At $99/mo per user, the API cost per scan is negligible. Recommend **6h default** with option to choose 12h or 24h if they want fewer alerts.
 
 2. **"Appears on" releases**: Spotify shows releases where the artist appears as a featured artist. Should we monitor those too? They're a common impersonation vector (bad actor features a real artist without permission). Recommend yes, but flagged differently.
 
@@ -1084,11 +1181,17 @@ Tokens are:
 
 ## 17. Summary
 
-This feature turns Jovie from a passive link-in-bio tool into an **active guardian of the artist's streaming identity**. It leverages existing infrastructure (DSP IDs, Spotify client, Resend email, cron jobs, notification preferences) with minimal new surface area — 3 new tables, 2 cron jobs, 7 API routes, and a dashboard page.
+This feature turns Jovie from a passive link-in-bio tool into an **active guardian of the artist's streaming identity** — and gives Pro ($99/mo) subscribers a compelling reason to stay. It leverages existing infrastructure (DSP IDs, Spotify client, Resend email, cron jobs, notification preferences) with minimal new surface area — 3 new tables, 2 cron jobs, 7 API routes, and a dashboard page.
 
-The approach is designed to be:
-- **Zero-config**: Existing users are automatically enrolled
+### Why this justifies $99/mo
+
+No other link-in-bio platform offers continuous catalog monitoring. Distrokid has rudimentary alerts but only for their own distribution. Spotify for Artists notifications are delayed and don't help with impersonation detection. **Jovie becomes the first platform that watches your identity across DSPs and helps you fight back** — that's a premium value prop that justifies Pro pricing.
+
+### The approach is designed to be:
+- **Pro-exclusive**: Gated at cron, API, and UI layers — non-Pro users see a locked upsell
+- **Zero-config for Pro users**: Automatically enrolled when they upgrade, monitoring starts immediately
 - **Low-noise**: Baseline seeding + auto-confirmation prevents alert fatigue
 - **Actionable**: One-click confirm/dispute from email, with takedown guidance
 - **Extensible**: Provider interface makes adding Apple Music, YouTube, etc. straightforward
 - **Safe**: HMAC-signed action tokens, rate limiting, feature-gated rollout
+- **Downgrade-safe**: Data retained 90 days, seamless re-activation on re-upgrade
