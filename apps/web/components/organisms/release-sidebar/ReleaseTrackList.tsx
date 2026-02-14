@@ -20,7 +20,7 @@ import {
   Loader2,
   MoreHorizontal,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
@@ -68,10 +68,23 @@ export function ReleaseTrackList({
   release,
   onTrackClick,
 }: ReleaseTrackListProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  // Auto-fetch tracks on mount since tracklist starts expanded
+  useEffect(() => {
+    if (release.totalTracks === 0) return;
+    setIsLoading(true);
+    fetchTracks(release.id)
+      .then(setTracks)
+      .catch(() => {
+        setTracks(null);
+        setHasError(true);
+      })
+      .finally(() => setIsLoading(false));
+  }, [release.id, release.totalTracks]);
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {
