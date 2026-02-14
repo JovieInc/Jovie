@@ -36,6 +36,8 @@ export const users = pgTable(
     // Growth plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
+    // Referral tracking
+    referredByCode: text('referred_by_code'), // The referral code used at signup
     deletedAt: timestamp('deleted_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

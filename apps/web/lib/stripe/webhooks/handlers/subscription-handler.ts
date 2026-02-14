@@ -21,6 +21,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
+import { churnReferral, getInternalUserId } from '@/lib/referrals/service';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -263,6 +264,19 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       );
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
+
+    // Mark referral as churned (fire-and-forget)
+    getInternalUserId(userId)
+      .then(internalId => {
+        if (internalId) {
+          return churnReferral(internalId);
+        }
+      })
+      .catch(error => {
+        logger.warn('Failed to churn referral on subscription deletion', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      });
 
     await invalidateBillingCache();
 

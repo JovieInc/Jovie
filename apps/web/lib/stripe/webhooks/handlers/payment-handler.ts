@@ -23,6 +23,11 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import {
+  getInternalUserId,
+  reactivateReferral,
+  recordCommission,
+} from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -180,6 +185,39 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       });
 
       await invalidateBillingCache();
+
+      // Record referral commission if applicable (fire-and-forget)
+      if (userId && invoice.amount_paid > 0) {
+        getInternalUserId(userId)
+          .then(internalId => {
+            if (!internalId) return;
+
+            // Reactivate referral if previously churned (e.g., user re-subscribed)
+            reactivateReferral(internalId).catch(err => {
+              logger.warn('Failed to reactivate referral', {
+                error: err instanceof Error ? err.message : 'Unknown error',
+              });
+            });
+
+            return recordCommission({
+              referredUserId: internalId,
+              stripeInvoiceId: invoice.id,
+              paymentAmountCents: invoice.amount_paid,
+              currency: invoice.currency,
+              periodStart: invoice.period_start
+                ? new Date(invoice.period_start * 1000)
+                : undefined,
+              periodEnd: invoice.period_end
+                ? new Date(invoice.period_end * 1000)
+                : undefined,
+            });
+          })
+          .catch(error => {
+            logger.warn('Failed to record referral commission', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          });
+      }
 
       // Check if this is a recovery from a failed payment (attempt_count > 1)
       // If so, send a recovery confirmation email

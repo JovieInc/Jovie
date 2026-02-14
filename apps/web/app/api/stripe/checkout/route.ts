@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { priceId } = body;
+    const { priceId, referralCode } = body;
 
     if (!priceId || typeof priceId !== 'string') {
       return NextResponse.json(
@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
       successUrl,
       cancelUrl,
       idempotencyKey,
+      referralCode: typeof referralCode === 'string' ? referralCode : undefined,
     });
 
     // Log successful checkout creation

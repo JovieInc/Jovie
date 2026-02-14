@@ -16,7 +16,9 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { activateReferral, getInternalUserId } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
+import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -115,6 +117,21 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       stripeEventTimestamp,
       eventType: 'subscription_created',
     });
+
+    // Activate referral if this user was referred (fire-and-forget)
+    if (userId) {
+      getInternalUserId(userId)
+        .then(internalId => {
+          if (internalId) {
+            return activateReferral(internalId);
+          }
+        })
+        .catch(error => {
+          logger.warn('Failed to activate referral on checkout', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        });
+    }
 
     // Invalidate client cache
     await invalidateBillingCache();
