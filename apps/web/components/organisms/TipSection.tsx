@@ -177,7 +177,7 @@ export function TipSection({
       <div className={cn('w-full max-w-sm', className)}>
         <div className={CARD_CLASSES}>
           {paymentMethod && <BackButton onClick={goBack} />}
-          <TipSelector amounts={amounts} onContinue={handleVenmoPayment} />
+          <TipSelector amounts={amounts} onContinue={handleVenmoPayment} paymentLabel='Venmo' />
         </div>
       </div>
     );

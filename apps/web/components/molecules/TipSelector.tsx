@@ -9,6 +9,8 @@ interface TipSelectorProps {
   readonly onContinue: (amount: number) => void;
   readonly isLoading?: boolean;
   readonly className?: string;
+  /** Label for the payment method shown on the continue button (e.g. "Venmo", "Apple Pay") */
+  readonly paymentLabel?: string;
 }
 
 export function TipSelector({
@@ -16,6 +18,7 @@ export function TipSelector({
   onContinue,
   isLoading = false,
   className = '',
+  paymentLabel,
 }: TipSelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
@@ -74,9 +77,17 @@ export function TipSelector({
         size='lg'
         disabled={isLoading}
         variant='primary'
-        aria-label={`Continue with $${selectedAmount} tip`}
+        aria-label={
+          paymentLabel
+            ? `Continue with ${paymentLabel}`
+            : `Continue with $${selectedAmount} tip`
+        }
       >
-        {isLoading ? 'Processing...' : `Continue with $${selectedAmount}`}
+        {isLoading
+          ? 'Processing...'
+          : paymentLabel
+            ? `Continue with ${paymentLabel}`
+            : `Continue with $${selectedAmount}`}
       </Button>
     </div>
   );
