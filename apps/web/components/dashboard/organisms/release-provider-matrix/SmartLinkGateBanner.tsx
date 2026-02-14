@@ -27,11 +27,12 @@ export function SmartLinkGateBanner({
   const hoursSaved = Math.round(minutesSaved / 60);
 
   return (
-    <div
+    <aside
       className={cn(
         'flex items-start gap-3 rounded-lg border border-subtle bg-surface-1 p-3',
         className
       )}
+      aria-label='Smart link upgrade prompt'
     >
       <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
         <Icon
@@ -56,6 +57,6 @@ export function SmartLinkGateBanner({
           {hoursSaved > 0 && ` and save ~${hoursSaved}h of setup`}.
         </p>
       </div>
-    </div>
+    </aside>
   );
 }
