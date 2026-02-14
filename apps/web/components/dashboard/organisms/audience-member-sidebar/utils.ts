@@ -1,4 +1,5 @@
 import { capitalize } from '@/lib/utils/csv';
+import { getGravatarUrl } from '@/lib/utils/gravatar';
 
 /**
  * Empty value placeholder text
@@ -91,14 +92,20 @@ export function computeMemberSubtitle(
 }
 
 /**
- * Compute avatar source for audience member
+ * Compute avatar source for audience member.
+ * Returns a Gravatar URL when an email is available, allowing the Avatar
+ * component to show a real face. Falls back to initials if no Gravatar exists.
  */
 export function computeMemberAvatarSrc(
-  member: { type: string } | null
+  member: { type: string; email?: string | null } | null
 ): string | null {
-  return !member || member.type === 'anonymous'
-    ? '/avatars/default-user.png'
-    : null;
+  if (!member || member.type === 'anonymous') {
+    return '/avatars/default-user.png';
+  }
+  if (member.email) {
+    return getGravatarUrl(member.email);
+  }
+  return null;
 }
 
 /**
