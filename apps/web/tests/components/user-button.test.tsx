@@ -88,7 +88,7 @@ describe('UserButton billing actions', () => {
       error: null,
       refetch: vi.fn().mockResolvedValue({
         data: {
-          pricingOptions: [
+          options: [
             { interval: 'year', priceId: 'price_year' },
             { interval: 'month', priceId: 'price_month' },
           ],
@@ -219,7 +219,7 @@ describe('UserButton billing actions', () => {
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
-        pricingOptions: [
+        options: [
           { interval: 'year', priceId: 'price_year' },
           { interval: 'monthly', priceId: 'price_monthly' },
         ],
@@ -267,7 +267,7 @@ describe('UserButton billing actions', () => {
 
     mockUsePricingOptionsQuery.mockReturnValue({
       data: {
-        pricingOptions: [
+        options: [
           { interval: 'year', priceId: 'price_year' },
           { interval: 'annual', priceId: 'price_annual' },
         ],
