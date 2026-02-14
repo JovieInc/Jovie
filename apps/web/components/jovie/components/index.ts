@@ -1,4 +1,5 @@
 export { ChatInput } from './ChatInput';
+export { ChatMarkdown } from './ChatMarkdown';
 export { ChatMessage } from './ChatMessage';
 export { ChatMessageSkeleton } from './ChatMessageSkeleton';
 export { ErrorDisplay } from './ErrorDisplay';

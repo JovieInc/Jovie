@@ -1,14 +1,7 @@
 'use client';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import { Archive, Copy, Ellipsis, Loader2, Pencil, Pin } from 'lucide-react';
+import { SimpleTooltip } from '@jovie/ui';
+import { Copy, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -60,42 +53,22 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   }, [conversationId, notifications]);
 
   const headerActions = useMemo(
-    () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+    () =>
+      conversationId ? (
+        <SimpleTooltip content='Copy session ID'>
           <CircleIconButton
             size='sm'
             variant='outline'
-            ariaLabel='Open thread actions'
+            ariaLabel='Copy session ID'
+            onClick={() => {
+              void handleCopyConversationId();
+            }}
           >
-            <Ellipsis aria-hidden='true' className='size-4' />
+            <Copy aria-hidden='true' className='size-4' />
           </CircleIconButton>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent align='start' sideOffset={10} className='w-56'>
-          <DropdownMenuItem disabled>
-            <Pin className='size-4' aria-hidden='true' />
-            Pin thread
-            <DropdownMenuShortcut>⌘⇧P</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <Pencil className='size-4' aria-hidden='true' />
-            Rename thread
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <Archive className='size-4' aria-hidden='true' />
-            Archive thread
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleCopyConversationId}>
-            <Copy className='size-4' aria-hidden='true' />
-            Copy session ID
-            <DropdownMenuShortcut>⌘⇧C</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    [handleCopyConversationId]
+        </SimpleTooltip>
+      ) : null,
+    [conversationId, handleCopyConversationId]
   );
 
   const handleConversationCreate = useCallback(
@@ -158,6 +131,8 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       onConversationCreate={handleConversationCreate}
       onTitleChange={handleTitleChange}
       initialQuery={initialQuery ?? undefined}
+      displayName={selectedProfile.displayName ?? undefined}
+      avatarUrl={selectedProfile.avatarUrl}
     />
   );
 }
