@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 /** Get color class based on contribution score threshold */
 function getContributionColorClass(contribution: number): string {
-  if (contribution >= 10) return 'text-green-600 dark:text-green-400';
+  if (contribution >= 10) return 'text-success';
   if (contribution >= 5) return 'text-amber-600 dark:text-amber-400';
   return 'text-tertiary-token';
 }
@@ -18,7 +18,7 @@ function getPercentageColorClass(percentage: number): string {
 
 /** Get total score color class */
 function getTotalScoreColorClass(percentage: number): string {
-  if (percentage >= 80) return 'text-green-600 dark:text-green-400';
+  if (percentage >= 80) return 'text-success';
   if (percentage >= 50) return 'text-amber-600 dark:text-amber-400';
   return 'text-red-600 dark:text-red-400';
 }

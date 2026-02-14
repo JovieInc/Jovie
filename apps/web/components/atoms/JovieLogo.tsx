@@ -31,7 +31,7 @@ export function JovieLogo({
 
   const colorClass =
     variant === 'light'
-      ? 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+      ? 'text-tertiary-token hover:text-primary-token'
       : 'text-white hover:text-white/80';
 
   const wrapperClasses = cn('flex items-center gap-2', className);

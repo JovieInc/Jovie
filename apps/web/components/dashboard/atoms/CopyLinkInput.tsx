@@ -122,7 +122,7 @@ export function CopyLinkInput({
           'absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded',
           'text-tertiary-token hover:text-primary-token hover:bg-surface-2',
           'transition-colors',
-          isCopied && 'text-green-600 dark:text-green-400'
+          isCopied && 'text-success'
         )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>

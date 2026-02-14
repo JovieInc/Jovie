@@ -56,7 +56,7 @@ export function BillingActionsSection({
                 <Button
                   variant='ghost'
                   size='sm'
-                  className='text-red-600 hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/10'
+                  className='text-destructive hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/10'
                   onClick={() => {
                     track('subscription_cancel_clicked', {
                       source: 'billing_dashboard',
@@ -78,35 +78,35 @@ export function BillingActionsSection({
                       </p>
                       <ul className='space-y-2 text-sm'>
                         <li className='flex items-start gap-2'>
-                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-red-500' />
+                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Branding removal</strong> &mdash; Jovie
                             branding will reappear on your profile
                           </span>
                         </li>
                         <li className='flex items-start gap-2'>
-                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-red-500' />
+                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Advanced analytics</strong> &mdash;
                             Retention drops from 90 days to 7 days
                           </span>
                         </li>
                         <li className='flex items-start gap-2'>
-                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-red-500' />
+                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Contact export</strong> &mdash; You
                             won&apos;t be able to export audience contacts
                           </span>
                         </li>
                         <li className='flex items-start gap-2'>
-                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-red-500' />
+                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Unlimited contacts</strong> &mdash; Contact
                             limit drops to 100
                           </span>
                         </li>
                         <li className='flex items-start gap-2'>
-                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-red-500' />
+                          <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Self-filtering</strong> &mdash; Your own
                             visits will count in analytics
