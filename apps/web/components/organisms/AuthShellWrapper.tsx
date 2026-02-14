@@ -84,8 +84,9 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Preview panel is available on all dashboard routes (toggled via nav)
-  const previewEnabled = config.section === 'dashboard';
+  // Preview panel is available on all dashboard routes and the artist-profile settings page
+  const previewEnabled =
+    config.section === 'dashboard' || config.isArtistProfileSettings;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
