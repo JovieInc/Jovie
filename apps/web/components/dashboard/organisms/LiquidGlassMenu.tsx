@@ -138,7 +138,7 @@ function Badge({
 
   const sizeClasses =
     size === 'sm'
-      ? 'min-w-[18px] h-[18px] px-1.5 text-[10px]'
+      ? 'min-w-[16px] h-[16px] px-1 text-[9px]'
       : 'min-w-[24px] h-[20px] px-2 text-xs';
 
   return (
@@ -244,7 +244,7 @@ export function LiquidGlassMenu({
         {/* Expanded menu */}
         <div
           className={cn(
-            'relative z-50 mx-4 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
+            'relative z-50 mx-3 mb-2 rounded-2xl overflow-hidden transition-all duration-300 ease-out',
             isExpanded ? 'translate-y-0 scale-100' : 'translate-y-4 scale-95'
           )}
           style={{
@@ -257,7 +257,7 @@ export function LiquidGlassMenu({
           <GlassBlur intense />
 
           <nav
-            className='relative z-10 py-3'
+            className='relative z-10 py-2'
             aria-label='Expanded navigation menu'
           >
             {/* Menu items */}
@@ -304,63 +304,86 @@ export function LiquidGlassMenu({
         <GlassHighlight subtle />
         <GlassBlur />
 
-        <div className='relative z-10 flex items-center justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2'>
-          {/* Primary nav items */}
-          <div className='flex items-center gap-1'>
-            {primaryItems.slice(0, 4).map(item => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
+        <div className='relative z-10 flex items-stretch justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1.5'>
+          {/* Primary nav items with labels */}
+          {primaryItems.slice(0, 4).map(item => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
 
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
-                    'active:scale-95',
-                    active
-                      ? 'bg-bg-surface-2 text-primary-token'
-                      : 'text-tertiary-token hover:text-secondary-token'
-                  )}
-                >
-                  <Icon className='size-5' aria-hidden='true' />
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl transition-all duration-150',
+                  'active:scale-95',
+                  active
+                    ? 'text-primary-token'
+                    : 'text-tertiary-token hover:text-secondary-token'
+                )}
+              >
+                <div className='relative'>
+                  <Icon className='size-[22px]' aria-hidden='true' />
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className='absolute -top-0.5 -right-0.5'>
+                    <span className='absolute -top-1 -right-2'>
                       <Badge count={item.badge} size='sm' />
                     </span>
                   )}
-                </Link>
-              );
-            })}
+                </div>
+                <span
+                  className={cn(
+                    'text-[10px] leading-tight',
+                    active ? 'font-semibold' : 'font-medium'
+                  )}
+                >
+                  {item.label}
+                </span>
+                {/* Active indicator dot */}
+                {active && (
+                  <div className='absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary-token' />
+                )}
+              </Link>
+            );
+          })}
 
-            {/* More menu toggle - Linear style */}
-            <button
-              type='button'
-              onClick={toggleMenu}
-              aria-label={isExpanded ? 'Close menu' : 'More options'}
-              aria-expanded={isExpanded}
+          {/* More menu toggle with label */}
+          <button
+            type='button'
+            onClick={toggleMenu}
+            aria-label={isExpanded ? 'Close menu' : 'More options'}
+            aria-expanded={isExpanded}
+            className={cn(
+              'relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl transition-all duration-150',
+              'active:scale-95',
+              isExpanded
+                ? 'text-primary-token'
+                : 'text-tertiary-token hover:text-secondary-token'
+            )}
+          >
+            <MoreHorizontal className='size-[22px]' aria-hidden='true' />
+            <span
               className={cn(
-                'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
-                'active:scale-95',
-                isExpanded
-                  ? 'bg-bg-surface-2 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token'
+                'text-[10px] leading-tight',
+                isExpanded ? 'font-semibold' : 'font-medium'
               )}
             >
-              <MoreHorizontal className='size-5' aria-hidden='true' />
-            </button>
-          </div>
+              More
+            </span>
+          </button>
 
-          {/* Search button - Linear floating style */}
+          {/* Search button */}
           {onSearchClick && (
             <button
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='flex items-center justify-center size-12 rounded-full bg-bg-surface-2 text-primary-token transition-all duration-150 active:scale-95 shadow-sm'
+              className='relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl text-tertiary-token hover:text-secondary-token transition-all duration-150 active:scale-95'
             >
-              <Search className='size-5' aria-hidden='true' />
+              <Search className='size-[22px]' aria-hidden='true' />
+              <span className='text-[10px] leading-tight font-medium'>
+                Search
+              </span>
             </button>
           )}
         </div>
