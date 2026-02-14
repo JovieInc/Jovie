@@ -540,39 +540,26 @@ export async function getAudienceServerData(params: {
   // All audience reads now go through authenticated RLS-protected sessions
   // RLS bypass capability has been removed for security hardening
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    // Always count subscribers for the export button state
-    const subscriberCount = await countSubscribers(
-      tx,
-      clerkUserId,
-      selectedProfileId
-    );
+    // Subscriber count and main data query are independent — run in parallel
+    // to eliminate the sequential waterfall.
+    const dataPromise =
+      mode === 'subscribers'
+        ? fetchSubscribersData(tx, clerkUserId, selectedProfileId, searchParams)
+        : fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
+            includeDetails,
+            memberId,
+            // 'all' shows all members, 'anonymous' filters to anonymous only
+            typeFilter:
+              view === 'anonymous'
+                ? ('anonymous' as AudienceMemberType)
+                : undefined,
+            segmentFilter: segments,
+          });
 
-    let data: Omit<AudienceServerData, 'view' | 'subscriberCount'>;
-
-    if (mode === 'subscribers') {
-      data = await fetchSubscribersData(
-        tx,
-        clerkUserId,
-        selectedProfileId,
-        searchParams
-      );
-    } else {
-      // 'all' shows all members, 'anonymous' filters to anonymous only
-      const typeFilter =
-        view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined;
-      data = await fetchMembersData(
-        tx,
-        clerkUserId,
-        selectedProfileId,
-        searchParams,
-        {
-          includeDetails,
-          memberId,
-          typeFilter,
-          segmentFilter: segments,
-        }
-      );
-    }
+    const [subscriberCount, data] = await Promise.all([
+      countSubscribers(tx, clerkUserId, selectedProfileId),
+      dataPromise,
+    ]);
 
     return {
       ...data,
