@@ -39,7 +39,7 @@ export function SmartLinkArtwork({
         sizes={sizes}
         allowDownloads={allowDownloads}
       >
-        <div className='relative size-56 overflow-hidden rounded-[20px] bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
+        <div className='relative size-56 overflow-hidden rounded-lg bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
           {src ? (
             <Image
               src={src}
