@@ -79,7 +79,7 @@ export function TipSelector({
         variant='primary'
         aria-label={
           paymentLabel
-            ? `Continue with ${paymentLabel}`
+            ? `Continue with ${paymentLabel} for $${selectedAmount} tip`
             : `Continue with $${selectedAmount} tip`
         }
       >
