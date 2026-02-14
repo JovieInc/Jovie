@@ -197,10 +197,11 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           }
 
           // Navigate to onboarding with fresh_signup flag for loop detection.
-          // Use URL separator that respects existing query params (e.g. ?handle=x).
+          // Use URL API to safely append the param regardless of existing query/hash.
           const redirectUrl = base.getRedirectUrl();
-          const separator = redirectUrl.includes('?') ? '&' : '?';
-          base.router.push(`${redirectUrl}${separator}fresh_signup=true`);
+          const url = new URL(redirectUrl, window.location.origin);
+          url.searchParams.set('fresh_signup', 'true');
+          base.router.push(url.pathname + url.search);
 
           return true;
         }

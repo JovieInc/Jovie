@@ -16,14 +16,17 @@ The `ClaimHandleForm` **can safely live on the homepage** with the architecture 
 ## 1. Current State of the Homepage
 
 ### Static Generation Configuration
+
 - **Route segment config:** `export const revalidate = false` in `app/(marketing)/page.tsx:15` — fully static, no ISR, no database dependency at build time.
 - **Cache headers:** `next.config.js:188` sets `Cache-Control: public, max-age=31536000, immutable` for `/` — CDN caches the page for 1 year.
 - **Result:** The homepage HTML is generated once at build time and served from the CDN edge. There is zero server compute per request.
 
 ### Current Hero
+
 `RedesignedHero` (`components/home/RedesignedHero.tsx`) is a **pure server component** — no `'use client'` directive, no hooks, no state. It renders a static `<Link href="/waitlist">` button. Zero JavaScript footprint in the hero.
 
 ### Unused ClaimHandleForm
+
 A complete `ClaimHandleForm` component tree already exists at `components/home/claim-handle/` with:
 - `ClaimHandleForm.tsx` — the form component (`'use client'`)
 - `useHandleValidation.ts` — debounced availability checking via TanStack Pacer
