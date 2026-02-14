@@ -103,16 +103,18 @@ function SettingsNavGroup({
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem
-                onClick={() => {
-                  void (async () => {
-                    const url = `${BASE_URL}${item.href}`;
-                    const ok = await copyToClipboard(url);
-                    if (ok) {
-                      toast.success('Link copied to clipboard');
-                    } else {
-                      toast.error('Failed to copy link');
-                    }
-                  })();
+                onSelect={async () => {
+                  const origin =
+                    typeof window !== 'undefined'
+                      ? window.location.origin
+                      : BASE_URL;
+                  const url = `${origin}${item.href}`;
+                  const ok = await copyToClipboard(url);
+                  if (ok) {
+                    toast.success('Link copied to clipboard');
+                  } else {
+                    toast.error('Failed to copy link');
+                  }
                 }}
               >
                 <Copy className='mr-2 h-4 w-4' />
