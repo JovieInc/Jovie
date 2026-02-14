@@ -16,3 +16,23 @@ Execute the ship command:
 ```bash
 pnpm run ship
 ```
+
+## Result
+
+After the command completes, you MUST output one of the following messages:
+
+**If ALL checks passed (exit code 0):**
+
+```
+============================================
+  SHIP CHECK PASSED — This is ready to ship
+============================================
+```
+
+**If ANY check failed (non-zero exit code):**
+
+```
+============================================
+  SHIP CHECK FAILED — Do NOT ship this
+============================================
+```
