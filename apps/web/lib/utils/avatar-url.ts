@@ -351,3 +351,7 @@ export function isUpgradeableAvatarUrl(
     return false;
   }
 }
+
+// Re-export Gravatar URL generation for discoverability alongside
+// other avatar utilities.
+export { getGravatarUrl } from './gravatar';
