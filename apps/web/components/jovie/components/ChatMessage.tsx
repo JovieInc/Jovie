@@ -2,8 +2,8 @@
 
 import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, User } from 'lucide-react';
-import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
+import Image from 'next/image';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';

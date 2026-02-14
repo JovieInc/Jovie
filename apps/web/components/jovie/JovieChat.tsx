@@ -198,8 +198,7 @@ export function JovieChat({
                     </div>
                   </div>
                   <span className='sr-only' aria-live='polite'>
-                    Jovie is{' '}
-                    {thinkingLabel.toLowerCase().replace(/\.{3}$/, '')}
+                    Jovie is {thinkingLabel.toLowerCase().replace(/\.{3}$/, '')}
                   </span>
                 </div>
               )}
