@@ -215,7 +215,10 @@ export function ClaimHandleForm({
       }
 
       if (!isSignedIn) {
-        router.push('/waitlist');
+        // Send to signup with redirect_url pointing to onboarding with the handle.
+        // This preserves the handle through the auth flow so onboarding can pre-fill it.
+        const onboardingUrl = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
+        router.push(`/signup?redirect_url=${encodeURIComponent(onboardingUrl)}`);
         return;
       }
 
