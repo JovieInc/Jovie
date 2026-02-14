@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       geoCountry,
       deviceType,
       trackingToken,
+      utmParams,
     } = parsed.data;
 
     // Validate tracking token if enabled
@@ -179,6 +180,7 @@ export async function POST(request: NextRequest) {
           geoCity: audienceMembers.geoCity,
           geoCountry: audienceMembers.geoCountry,
           deviceType: audienceMembers.deviceType,
+          utmParams: audienceMembers.utmParams,
         })
         .from(audienceMembers)
         .where(
@@ -206,6 +208,16 @@ export async function POST(request: NextRequest) {
       const geoCountryValue =
         resolvedGeoCountry ?? existing?.geoCountry ?? null;
 
+      // Merge UTM params: new visit's UTM overwrites if present, else keep existing
+      const hasUtmParams =
+        !!utmParams &&
+        Object.values(utmParams).some(
+          value => typeof value === 'string' && value.length > 0
+        );
+      const resolvedUtmParams = hasUtmParams
+        ? utmParams
+        : (existing?.utmParams ?? {});
+
       if (existing) {
         await tx
           .update(audienceMembers)
@@ -219,6 +231,7 @@ export async function POST(request: NextRequest) {
             geoCountry: geoCountryValue,
             deviceType: normalizedDevice,
             referrerHistory,
+            ...(utmParams && { utmParams: resolvedUtmParams }),
           })
           .where(eq(audienceMembers.id, existing.id));
         return;
@@ -238,6 +251,7 @@ export async function POST(request: NextRequest) {
         geoCountry: geoCountryValue,
         deviceType: normalizedDevice,
         referrerHistory,
+        utmParams: resolvedUtmParams,
         tags: [],
         latestActions: [],
         updatedAt: now,

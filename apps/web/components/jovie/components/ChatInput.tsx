@@ -58,9 +58,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       (e: React.FormEvent<HTMLTextAreaElement>) => {
         const target = e.target as HTMLTextAreaElement;
         target.style.height = 'auto';
-        target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+        const maxH = variant === 'compact' ? 128 : 192;
+        target.style.height = `${Math.min(target.scrollHeight, maxH)}px`;
       },
-      []
+      [variant]
     );
 
     const isCompact = variant === 'compact';
@@ -80,19 +81,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             placeholder={placeholder}
             rows={1}
             className={cn(
-              'w-full resize-none rounded-xl border bg-surface-1',
+              'w-full resize-none rounded-2xl border bg-surface-1',
               'text-primary-token placeholder:text-tertiary-token',
               'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
               'transition-colors duration-fast',
               isCompact
                 ? 'px-4 py-3 pr-14 max-h-32'
-                : 'px-4 py-4 pr-14 min-h-[120px]',
+                : 'px-4 py-3.5 pr-14 max-h-48',
               isOverLimit
                 ? 'border-error focus:border-error focus:ring-error/20'
                 : 'border-subtle focus:border-accent focus:ring-accent/20'
             )}
             onKeyDown={handleKeyDown}
-            onInput={isCompact ? handleInput : undefined}
+            onInput={handleInput}
             maxLength={MAX_MESSAGE_LENGTH + 100}
             aria-label='Chat message input'
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}

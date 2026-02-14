@@ -31,6 +31,8 @@ const GROWTH_FEATURES = [
   'A/B testing',
   'Meta pixel integration',
   'Custom domain',
+  'Catalog monitoring',
+  'Impersonation detection',
 ] as const;
 
 // SEO Metadata
@@ -373,12 +375,12 @@ export default function PricingPage() {
               <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
                 <PricingTier
                   name='Growth'
-                  badge='Soon'
+                  badge='Early Access'
                   billingLabel='Billed monthly'
                   price='$99'
                   priceSuffix='/month'
                   yearlyPrice='or $948/year (save $240)'
-                  buttonLabel='Get started'
+                  buttonLabel='Request Early Access'
                   buttonHref='/waitlist?plan=growth'
                   buttonVariant='secondary'
                   features={GROWTH_FEATURES}

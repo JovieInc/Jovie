@@ -14,6 +14,9 @@ import type { SocialLink, UseSocialsFormReturn } from './types';
 
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube'] as const;
 
+/** DSPs managed via the dedicated connections UI — exclude from social links. */
+export const PRIMARY_DSP_IDS = new Set(['spotify', 'apple_music']);
+
 interface UseSocialsFormOptions {
   artistId: string;
 }
@@ -54,7 +57,9 @@ export function useSocialsForm({
         DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
       );
     } else {
-      setSocialLinks(fetchedLinks);
+      setSocialLinks(
+        fetchedLinks.filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+      );
     }
   }, [artistId, fetchedLinks]);
 

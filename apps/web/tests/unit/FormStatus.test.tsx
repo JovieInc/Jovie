@@ -41,11 +41,7 @@ describe('FormStatus', () => {
 
     const errorElement = screen.getByText(errorMessage);
     expect(errorElement).toBeInTheDocument();
-    expect(errorElement).toHaveClass(
-      'text-sm',
-      'text-red-600',
-      'dark:text-red-400'
-    );
+    expect(errorElement).toHaveClass('text-sm', 'text-destructive');
     expect(errorElement.tagName.toLowerCase()).toBe('p');
   });
 
@@ -55,11 +51,7 @@ describe('FormStatus', () => {
 
     const successElement = screen.getByText(successMessage);
     expect(successElement).toBeInTheDocument();
-    expect(successElement).toHaveClass(
-      'text-sm',
-      'text-green-600',
-      'dark:text-green-400'
-    );
+    expect(successElement).toHaveClass('text-sm', 'text-success');
     expect(successElement.tagName.toLowerCase()).toBe('p');
   });
 

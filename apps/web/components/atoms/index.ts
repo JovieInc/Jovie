@@ -66,6 +66,7 @@ export * from './SkipToContent';
 // export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';
+export * from './SwipeToReveal';
 export * from './TableErrorFallback';
 // Textarea migrated to @jovie/ui - import { Textarea } from '@jovie/ui'
 export * from './Tooltip';

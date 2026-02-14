@@ -12,7 +12,7 @@ import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
 import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
 import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
-import { useSocialsForm } from './useSocialsForm';
+import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
 const CHIP_BG_ALPHA = 0x15 / 255;
@@ -81,9 +81,11 @@ const EXCLUDED_PLATFORM_IDS = new Set([
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
-    ['social', 'creator', 'messaging', 'professional'].includes(
+    (['social', 'creator', 'messaging', 'professional'].includes(
       platform.category
-    ) && !EXCLUDED_PLATFORM_IDS.has(platform.id)
+    ) ||
+      (platform.category === 'music' && !PRIMARY_DSP_IDS.has(platform.id))) &&
+    !EXCLUDED_PLATFORM_IDS.has(platform.id)
 );
 
 const SUGGESTED_PLATFORM_SET = new Set<string>(SUGGESTED_PLATFORM_IDS);
@@ -97,9 +99,17 @@ const SOCIAL_PLATFORM_GROUPS = [
     ),
   },
   {
+    label: 'Music',
+    platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
+      platform => platform.category === 'music'
+    ),
+  },
+  {
     label: 'All supported platforms',
     platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
-      platform => !SUGGESTED_PLATFORM_SET.has(platform.id)
+      platform =>
+        !SUGGESTED_PLATFORM_SET.has(platform.id) &&
+        platform.category !== 'music'
     ),
   },
 ] as const;
@@ -117,6 +127,16 @@ PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
+
+// Music DSP placeholders (canonical underscore IDs from ALL_PLATFORMS)
+PLATFORM_PLACEHOLDERS.youtube_music =
+  'https://music.youtube.com/channel/UCxxxxx';
+PLATFORM_PLACEHOLDERS.bandcamp = 'https://yourname.bandcamp.com';
+PLATFORM_PLACEHOLDERS.tidal = 'https://tidal.com/browse/artist/12345';
+PLATFORM_PLACEHOLDERS.deezer = 'https://deezer.com/artist/12345';
+PLATFORM_PLACEHOLDERS.amazon_music = 'https://music.amazon.com/artists/B0xxxxx';
+PLATFORM_PLACEHOLDERS.pandora = 'https://pandora.com/artist/yourname';
+PLATFORM_PLACEHOLDERS.beatport = 'https://beatport.com/artist/yourname';
 
 function getPlaceholder(platform: string): string {
   return PLATFORM_PLACEHOLDERS[platform] || 'https://...';

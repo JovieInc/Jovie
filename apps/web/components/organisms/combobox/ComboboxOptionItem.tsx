@@ -76,7 +76,9 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
         clsx(
           'relative cursor-pointer select-none px-4 py-3 transition-colors',
           'focus-visible:outline-none',
-          active ? 'bg-indigo-600 text-white' : 'text-gray-900 hover:bg-gray-50'
+          active
+            ? 'bg-accent text-accent-foreground'
+            : 'text-primary-token hover:bg-surface-1'
         )
       }
       value={option}

@@ -97,7 +97,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
           className
         )}
       >
-        <div className='flex items-center gap-2 text-red-600 dark:text-red-400'>
+        <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
           <span className='text-sm font-medium'>Failed to load matches</span>
         </div>

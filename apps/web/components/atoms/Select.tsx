@@ -32,12 +32,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={cn(
-          'block w-full rounded-md border border-default bg-white px-3 py-2 text-sm',
-          'focus-visible:border-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-500',
-          'dark:bg-gray-800 dark:text-gray-50',
+          'block w-full rounded-md border border-default bg-surface-1 px-3 py-2 text-sm text-primary-token',
+          'focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
           'disabled:opacity-50 disabled:cursor-not-allowed',
           error &&
-            'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500',
+            'border-destructive focus-visible:border-destructive focus-visible:ring-destructive',
           className
         )}
         {...props}
@@ -60,15 +59,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <div className='space-y-2'>
           {label && (
             // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with select via DOM structure
-            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+            <label className='text-sm font-medium text-secondary-token'>
               {label}
-              {required && <span className='text-red-500 ml-1'>*</span>}
+              {required && <span className='text-destructive ml-1'>*</span>}
             </label>
           )}
           {selectElement}
-          {error && (
-            <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
-          )}
+          {error && <p className='text-sm text-destructive'>{error}</p>}
         </div>
       );
     }

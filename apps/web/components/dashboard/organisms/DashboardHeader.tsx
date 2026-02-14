@@ -57,9 +57,11 @@ export function DashboardHeader({
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex-1 items-center gap-3 flex'>
-          <span className='text-[13px] font-medium text-secondary-token'>
-            {currentLabel}
-          </span>
+          {!breadcrumbSuffix && (
+            <span className='text-[13px] font-medium text-secondary-token'>
+              {currentLabel}
+            </span>
+          )}
           {breadcrumbSuffix}
         </div>
         {action ? (

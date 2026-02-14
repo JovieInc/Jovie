@@ -90,36 +90,27 @@ export function TipDrawer({
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
+        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/40 backdrop-blur-sm' />
         <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t'
-          style={{
-            backgroundColor: 'var(--liquid-glass-bg)',
-            backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            WebkitBackdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            borderColor: 'var(--liquid-glass-border)',
-            boxShadow: 'var(--liquid-glass-shadow-elevated)',
-          }}
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
           aria-describedby={undefined}
         >
-          {/* Specular highlight */}
-          <div
-            className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-2xl'
-            style={{ background: 'var(--liquid-glass-highlight)' }}
-          />
-
           {/* Drag handle */}
-          <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+          <div className='mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-quaternary-token/40' />
 
-          <Drawer.Title className='relative z-10 px-6 pt-4 pb-0.5 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
+          <Drawer.Title className='px-6 pt-4 pb-0.5 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
             Tip {artistName}
           </Drawer.Title>
-          <p className='relative z-10 px-6 pb-2 text-center text-xs text-secondary-token'>
+          <p className='px-6 pb-3 text-center text-xs text-secondary-token'>
             via Venmo
           </p>
 
-          <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-            <TipSelector amounts={amounts} onContinue={handleAmountSelected} />
+          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
+            <TipSelector
+              amounts={amounts}
+              onContinue={handleAmountSelected}
+              paymentLabel='Venmo'
+            />
             <p className='mt-4 text-center text-xs text-tertiary-token'>
               You&apos;ll be redirected to Venmo to complete your tip.
             </p>

@@ -1,10 +1,17 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ArrowLeft, SquarePen } from 'lucide-react';
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@jovie/ui';
+import { ArrowLeft, Copy, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
@@ -28,7 +35,9 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedSidebarProps {
@@ -73,23 +82,47 @@ function SettingsNavGroup({
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
-          <SidebarMenuItem key={item.id}>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive}
-              tooltip={item.name}
-              className='font-medium'
-            >
-              <Link
-                href={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className='flex w-full min-w-0 items-center gap-3'
+          <ContextMenu key={item.id}>
+            <ContextMenuTrigger asChild>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  tooltip={item.name}
+                  className='font-medium'
+                >
+                  <Link
+                    href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className='flex w-full min-w-0 items-center gap-3'
+                  >
+                    <item.icon className='size-4' />
+                    <span className='truncate'>{item.name}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onSelect={async () => {
+                  const origin =
+                    typeof window !== 'undefined'
+                      ? window.location.origin
+                      : BASE_URL;
+                  const url = `${origin}${item.href}`;
+                  const ok = await copyToClipboard(url);
+                  if (ok) {
+                    toast.success('Link copied to clipboard');
+                  } else {
+                    toast.error('Failed to copy link');
+                  }
+                }}
               >
-                <item.icon className='size-4' />
-                <span className='truncate'>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+                <Copy className='mr-2 h-4 w-4' />
+                Copy link
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
     </SidebarMenu>

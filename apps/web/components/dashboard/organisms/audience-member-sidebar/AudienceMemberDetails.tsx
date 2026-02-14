@@ -49,9 +49,7 @@ function CopyableValue({ value, label }: CopyableValueProps) {
       onClick={handleCopy}
       className={cn(
         'group inline-flex items-center gap-1.5 text-left transition-colors',
-        isCopied
-          ? 'text-green-600 dark:text-green-400'
-          : 'hover:text-interactive'
+        isCopied ? 'text-success' : 'hover:text-interactive'
       )}
     >
       <span className='break-all'>{value}</span>
@@ -69,6 +67,11 @@ interface AudienceMemberDetailsProps {
 }
 
 export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
+  const utm = member.utmParams;
+  const hasUtm =
+    utm &&
+    (utm.source || utm.medium || utm.campaign || utm.content || utm.term);
+
   return (
     <div className='space-y-3'>
       <DrawerPropertyRow
@@ -100,6 +103,23 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
         label='Intent'
         value={<AudienceIntentBadge intentLevel={member.intentLevel} />}
       />
+      {hasUtm && (
+        <>
+          {utm.source && (
+            <DrawerPropertyRow label='Source' value={utm.source} />
+          )}
+          {utm.medium && (
+            <DrawerPropertyRow label='Medium' value={utm.medium} />
+          )}
+          {utm.campaign && (
+            <DrawerPropertyRow label='Campaign' value={utm.campaign} />
+          )}
+          {utm.content && (
+            <DrawerPropertyRow label='Content' value={utm.content} />
+          )}
+          {utm.term && <DrawerPropertyRow label='Term' value={utm.term} />}
+        </>
+      )}
       <DrawerPropertyRow
         label='Email'
         value={

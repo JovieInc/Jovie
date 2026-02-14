@@ -16,6 +16,14 @@ export type AudienceAction = {
 
 export type AudienceReferrer = { url: string; timestamp?: string };
 
+export type AudienceUtmParams = {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  content?: string;
+  term?: string;
+};
+
 export type AudienceMember = {
   id: string;
   type: AudienceMemberType;
@@ -28,6 +36,7 @@ export type AudienceMember = {
   intentLevel: AudienceIntentLevel;
   latestActions: AudienceAction[];
   referrerHistory: AudienceReferrer[];
+  utmParams: AudienceUtmParams;
   email: string | null;
   phone: string | null;
   spotifyConnected: boolean;

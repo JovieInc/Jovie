@@ -399,11 +399,12 @@ export function useJovieChat({
     [input, throttledSubmit]
   );
 
-  const handleSuggestedPrompt = useCallback((prompt: string) => {
-    setInput(prompt);
-    // Focus the input after setting the prompt
-    inputRef.current?.focus();
-  }, []);
+  const handleSuggestedPrompt = useCallback(
+    (prompt: string) => {
+      doSubmit(prompt);
+    },
+    [doSubmit]
+  );
 
   return {
     // State

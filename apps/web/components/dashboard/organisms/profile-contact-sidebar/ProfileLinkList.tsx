@@ -9,6 +9,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,9 @@ function getLinkSection(platform: string): LinkSection {
 
 const ACTION_BUTTON_CLASS =
   'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+
+const SWIPE_ACTION_CLASS =
+  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
 
@@ -99,64 +103,108 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors ease-out hover:bg-surface-2',
-        !link.isVisible && 'opacity-60'
-      )}
-    >
-      {/* Left: Icon + Platform Name */}
-      <div className='flex items-center gap-3 min-w-0'>
-        <span
-          className='shrink-0'
-          style={
-            brandColor
-              ? { color: getContrastSafeIconColor(brandColor, isDark) }
-              : undefined
-          }
-        >
-          <SocialIcon platform={link.platform} className='h-4 w-4' />
-        </span>
-        <span className='text-sm font-medium text-primary-token truncate'>
-          {platformName}
-        </span>
-      </div>
+  const swipeActionsWidth = onRemove ? 132 : 88;
 
-      {/* Right: Actions (always visible) */}
-      <div className='flex items-center gap-1 shrink-0'>
+  const swipeActions = (
+    <>
+      <button
+        type='button'
+        onClick={handleCopy}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
+        aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+      >
+        {copied ? (
+          <Check className='h-4 w-4' aria-hidden='true' />
+        ) : (
+          <Copy className='h-4 w-4' aria-hidden='true' />
+        )}
+      </button>
+      <button
+        type='button'
+        onClick={handleOpen}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        aria-label={`Open ${link.title}`}
+      >
+        <ExternalLink className='h-4 w-4' aria-hidden='true' />
+      </button>
+      {onRemove && (
         <button
           type='button'
-          onClick={handleOpen}
-          className={ACTION_BUTTON_CLASS}
-          aria-label={`Open ${link.title}`}
+          onClick={handleRemove}
+          className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
+          aria-label={`Remove ${link.title}`}
         >
-          <ExternalLink className='h-4 w-4' aria-hidden='true' />
+          <X className='h-4 w-4' aria-hidden='true' />
         </button>
-        <button
-          type='button'
-          onClick={handleCopy}
-          className={ACTION_BUTTON_CLASS}
-          aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
-        >
-          {copied ? (
-            <Check className='h-4 w-4 text-success' aria-hidden='true' />
-          ) : (
-            <Copy className='h-4 w-4' aria-hidden='true' />
-          )}
-        </button>
-        {onRemove && (
+      )}
+    </>
+  );
+
+  return (
+    <SwipeToReveal
+      itemId={`profile-link-${link.id}`}
+      actions={swipeActions}
+      actionsWidth={swipeActionsWidth}
+      className='rounded-xl'
+    >
+      <div
+        className={cn(
+          'flex items-center justify-between rounded-xl px-3 py-2.5 bg-base transition-colors ease-out hover:bg-surface-2',
+          !link.isVisible && 'opacity-60'
+        )}
+      >
+        {/* Left: Icon + Platform Name */}
+        <div className='flex items-center gap-3 min-w-0'>
+          <span
+            className='shrink-0'
+            style={
+              brandColor
+                ? { color: getContrastSafeIconColor(brandColor, isDark) }
+                : undefined
+            }
+          >
+            <SocialIcon platform={link.platform} className='h-4 w-4' />
+          </span>
+          <span className='text-sm font-medium text-primary-token truncate'>
+            {platformName}
+          </span>
+        </div>
+
+        {/* Right: Actions (visible on hover/focus - desktop only) */}
+        <div className='hidden sm:flex items-center gap-1 shrink-0'>
           <button
             type='button'
-            onClick={handleRemove}
+            onClick={handleOpen}
             className={ACTION_BUTTON_CLASS}
-            aria-label={`Remove ${link.title}`}
+            aria-label={`Open ${link.title}`}
           >
-            <X className='h-4 w-4' aria-hidden='true' />
+            <ExternalLink className='h-4 w-4' aria-hidden='true' />
           </button>
-        )}
+          <button
+            type='button'
+            onClick={handleCopy}
+            className={ACTION_BUTTON_CLASS}
+            aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+          >
+            {copied ? (
+              <Check className='h-4 w-4 text-success' aria-hidden='true' />
+            ) : (
+              <Copy className='h-4 w-4' aria-hidden='true' />
+            )}
+          </button>
+          {onRemove && (
+            <button
+              type='button'
+              onClick={handleRemove}
+              className={ACTION_BUTTON_CLASS}
+              aria-label={`Remove ${link.title}`}
+            >
+              <X className='h-4 w-4' aria-hidden='true' />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </SwipeToReveal>
   );
 }
 

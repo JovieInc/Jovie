@@ -9,22 +9,40 @@ import {
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
-import { X } from 'lucide-react';
-import { useCallback, useState } from 'react';
-import { Icon } from '@/components/atoms/Icon';
-import { FilterSubmenu } from '@/components/dashboard/organisms/release-provider-matrix/FilterSubmenu';
+import { Check, Clock, Filter, RefreshCw, Repeat, X, Zap } from 'lucide-react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { AudienceFilters } from './types';
 
-/** Segment filter options */
-const SEGMENT_OPTIONS = [
-  { id: 'highIntent', label: 'High Intent', iconName: 'Zap' },
-  { id: 'returning', label: 'Returning', iconName: 'RefreshCw' },
-  { id: 'frequent', label: '3+ Visits', iconName: 'Repeat' },
-  { id: 'recent24h', label: 'Last 24h', iconName: 'Clock' },
-] as const;
+/** Segment filter options with inline icons */
+const SEGMENT_OPTIONS: readonly {
+  id: SegmentId;
+  label: string;
+  icon: ReactNode;
+}[] = [
+  {
+    id: 'highIntent',
+    label: 'High Intent',
+    icon: <Zap className='h-3.5 w-3.5' />,
+  },
+  {
+    id: 'returning',
+    label: 'Returning',
+    icon: <RefreshCw className='h-3.5 w-3.5' />,
+  },
+  {
+    id: 'frequent',
+    label: '3+ Visits',
+    icon: <Repeat className='h-3.5 w-3.5' />,
+  },
+  {
+    id: 'recent24h',
+    label: 'Last 24h',
+    icon: <Clock className='h-3.5 w-3.5' />,
+  },
+];
 
-type SegmentId = (typeof SEGMENT_OPTIONS)[number]['id'];
+type SegmentId = 'highIntent' | 'returning' | 'frequent' | 'recent24h';
 
 interface ActiveFilterPillProps {
   readonly groupLabel: string;
@@ -109,7 +127,7 @@ export function AudienceFilterDropdown({
                 buttonClassName
               )}
             >
-              <Icon name='Filter' className='h-3.5 w-3.5' />
+              <Filter className='h-3.5 w-3.5' />
               Filter
             </Button>
           </DropdownMenuTrigger>
@@ -118,34 +136,46 @@ export function AudienceFilterDropdown({
         <DropdownMenuContent
           align='start'
           sideOffset={4}
-          className='min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+          className='min-w-[180px]'
           onCloseAutoFocus={e => e.preventDefault()}
         >
-          <div className='flex-1 overflow-y-auto p-1'>
-            <FilterSubmenu
-              label='Segment'
-              iconName='Users'
-              options={SEGMENT_OPTIONS}
-              selectedIds={filters.segments}
-              onToggle={handleSegmentToggle}
-              searchPlaceholder='Search segments...'
-            />
+          {SEGMENT_OPTIONS.map(opt => {
+            const checked = filters.segments.includes(opt.id);
+            return (
+              <DropdownMenuItem
+                key={opt.id}
+                onSelect={e => {
+                  e.preventDefault();
+                  handleSegmentToggle(opt.id);
+                }}
+                className={cn(
+                  'justify-between',
+                  checked && 'bg-primary/5 dark:bg-primary/10'
+                )}
+              >
+                <div className='flex items-center gap-2'>
+                  <span className='text-tertiary-token'>{opt.icon}</span>
+                  <span>{opt.label}</span>
+                </div>
+                {checked && <Check className='h-3.5 w-3.5 text-primary' />}
+              </DropdownMenuItem>
+            );
+          })}
 
-            {hasAnyFilter && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className='text-tertiary-token hover:text-primary-token'
-                  onSelect={() => {
-                    onFiltersChange({ segments: [] });
-                  }}
-                >
-                  <X className='h-3.5 w-3.5' />
-                  <span>Clear all filters</span>
-                </DropdownMenuItem>
-              </>
-            )}
-          </div>
+          {hasAnyFilter && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className='text-tertiary-token hover:text-primary-token'
+                onSelect={() => {
+                  onFiltersChange({ segments: [] });
+                }}
+              >
+                <X className='h-3.5 w-3.5' />
+                <span>Clear all filters</span>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
