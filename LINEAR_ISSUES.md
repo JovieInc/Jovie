@@ -276,4 +276,4 @@ From DATA_FETCHING_AUDIT.md — several endpoints use raw `fetch()` instead of t
 ### Audit-03: Test status tracker cleanup
 **Priority:** Low | **Labels:** `tech-debt`, `testing`
 
-From tests/e2e/TEST-STATUS.md — test status is being tracked in markdown instead of CI. Move all test status tracking to CI dashboard and Linear.
+From tests/e2e/TEST-STATUS.md — test status is being tracked in Markdown instead of CI. Move all test status tracking to CI dashboard and Linear.
