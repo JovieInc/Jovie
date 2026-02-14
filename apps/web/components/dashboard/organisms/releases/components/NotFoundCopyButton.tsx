@@ -32,7 +32,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       className={cn(
         'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
         isCopied
-          ? 'bg-green-100 text-success dark:bg-green-900/30 dark:text-success'
+          ? 'bg-success/10 text-success'
           : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
       )}
       onClick={() =>
