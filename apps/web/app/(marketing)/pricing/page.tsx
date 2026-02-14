@@ -31,6 +31,8 @@ const GROWTH_FEATURES = [
   'A/B testing',
   'Meta pixel integration',
   'Custom domain',
+  'Catalog monitoring',
+  'Impersonation detection',
 ] as const;
 
 // SEO Metadata
