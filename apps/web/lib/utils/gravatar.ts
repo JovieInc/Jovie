@@ -14,6 +14,9 @@
 /** Default avatar size in pixels (matches HIGH_RES_SIZE in avatar-url.ts) */
 const GRAVATAR_SIZE = 512;
 
+/** Maximum size supported by the Gravatar API */
+const MAX_GRAVATAR_SIZE = 2048;
+
 /**
  * Generate a Gravatar avatar URL from an email address.
  *
@@ -28,13 +31,18 @@ const GRAVATAR_SIZE = 512;
  * ```
  */
 export function getGravatarUrl(email: string, size = GRAVATAR_SIZE): string {
+  const clampedSize = Math.round(
+    Math.max(1, Math.min(size, MAX_GRAVATAR_SIZE))
+  );
   const hash = md5Hex(email.toLowerCase().trim());
-  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=404`;
+  return `https://www.gravatar.com/avatar/${hash}?s=${clampedSize}&d=404`;
 }
 
 // ---------------------------------------------------------------------------
 // Minimal MD5 (RFC 1321)
-// Used ONLY for Gravatar URL generation — not for security purposes.
+// Intentionally embedded for non-security Gravatar URL hashing only.
+// Tested against Node.js crypto to verify correctness.
+// Avoids adding a dependency for a single non-cryptographic use case.
 // ---------------------------------------------------------------------------
 
 /** Per-round left-rotate amounts. */

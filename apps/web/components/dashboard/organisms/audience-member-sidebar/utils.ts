@@ -102,8 +102,9 @@ export function computeMemberAvatarSrc(
   if (!member || member.type === 'anonymous') {
     return '/avatars/default-user.png';
   }
-  if (member.email) {
-    return getGravatarUrl(member.email);
+  const normalizedEmail = member.email?.trim();
+  if (normalizedEmail) {
+    return getGravatarUrl(normalizedEmail);
   }
   return null;
 }
