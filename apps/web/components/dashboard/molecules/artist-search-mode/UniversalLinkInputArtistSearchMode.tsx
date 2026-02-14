@@ -155,7 +155,9 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm text-red-500'>{error || 'Search failed'}</p>
+              <p className='text-sm text-destructive'>
+                {error || 'Search failed'}
+              </p>
               <button
                 type='button'
                 onClick={exitSearchMode}

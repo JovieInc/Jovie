@@ -49,9 +49,7 @@ function CopyableValue({ value, label }: CopyableValueProps) {
       onClick={handleCopy}
       className={cn(
         'group inline-flex items-center gap-1.5 text-left transition-colors',
-        isCopied
-          ? 'text-green-600 dark:text-green-400'
-          : 'hover:text-interactive'
+        isCopied ? 'text-success' : 'hover:text-interactive'
       )}
     >
       <span className='break-all'>{value}</span>

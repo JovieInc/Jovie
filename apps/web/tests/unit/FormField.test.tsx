@@ -47,7 +47,7 @@ describe('FormField', () => {
 
     expect(screen.getByText('This field is required')).toBeInTheDocument();
     expect(screen.getByText('This field is required')).toHaveClass(
-      'text-red-600'
+      'text-destructive'
     );
   });
 

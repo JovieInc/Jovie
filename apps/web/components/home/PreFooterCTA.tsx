@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export function PreFooterCTA() {
   return (
-    <section className='relative py-24 sm:py-32 bg-white dark:bg-gray-900 transition-colors duration-300'>
+    <section className='relative py-24 sm:py-32 bg-base transition-colors duration-300'>
       {/* Background with gradient - Light theme */}
       <div className='absolute inset-0 bg-linear-to-br from-blue-500/5 via-purple-500/5 to-cyan-500/5 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-cyan-500/10' />
 
@@ -18,7 +18,7 @@ export function PreFooterCTA() {
         <div className='mx-auto max-w-4xl text-center'>
           {/* Badge with glass morphism effect */}
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-subtle backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-all duration-300 hover:bg-gray-200/80 dark:hover:bg-white/20 hover:scale-105'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-1/80 border border-subtle backdrop-blur-sm text-sm font-medium text-secondary-token transition-all duration-300 hover:bg-surface-2/80 hover:scale-105'>
               <svg
                 className='w-4 h-4 text-blue-600 dark:text-blue-400'
                 fill='none'
@@ -38,7 +38,7 @@ export function PreFooterCTA() {
           </div>
 
           {/* Main heading with improved typography hierarchy */}
-          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-medium text-gray-900 dark:text-white tracking-tight leading-[1.1] transition-colors duration-300'>
+          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-medium text-primary-token tracking-tight leading-[1.1] transition-colors duration-300'>
             Ready to turn fans
             <br />
             <span className='text-transparent bg-linear-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text font-extrabold'>
@@ -47,10 +47,10 @@ export function PreFooterCTA() {
           </h2>
 
           {/* Description with improved readability */}
-          <p className='mt-8 text-xl text-gray-600 dark:text-gray-300 font-light leading-relaxed max-w-2xl mx-auto transition-colors duration-300'>
+          <p className='mt-8 text-xl text-secondary-token font-light leading-relaxed max-w-2xl mx-auto transition-colors duration-300'>
             Create your professional music profile in 60 seconds.
             <br />
-            <span className='text-gray-500 dark:text-gray-400'>
+            <span className='text-tertiary-token'>
               Start converting fans today.
             </span>
           </p>
@@ -76,9 +76,9 @@ export function PreFooterCTA() {
             </Button>
 
             {/* Secondary info with better visual hierarchy */}
-            <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400 transition-colors duration-300'>
+            <div className='flex items-center gap-2 text-tertiary-token transition-colors duration-300'>
               <svg
-                className='w-5 h-5 text-green-600 dark:text-green-400'
+                className='w-5 h-5 text-success'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
@@ -96,8 +96,8 @@ export function PreFooterCTA() {
           </div>
 
           {/* Social proof with enhanced styling */}
-          <div className='mt-10 p-4 rounded-2xl bg-gray-50/50 dark:bg-white/5 backdrop-blur-sm border border-subtle transition-all duration-300'>
-            <p className='text-sm text-gray-600 dark:text-gray-400 font-medium'>
+          <div className='mt-10 p-4 rounded-2xl bg-surface-1/50 backdrop-blur-sm border border-subtle transition-all duration-300'>
+            <p className='text-sm text-tertiary-token font-medium'>
               Join{' '}
               <span className='text-blue-600 dark:text-blue-400 font-semibold'>
                 10,000+
