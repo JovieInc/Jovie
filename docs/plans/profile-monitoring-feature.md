@@ -12,11 +12,13 @@
 
 Artists on streaming platforms face a growing threat: **unauthorized music appearing on their profiles**. This happens when bad actors distribute music using another artist's name, exploiting distributor verification gaps. The result is fraudulent streams, brand damage, and listener confusion — and most artists don't discover it until fans point it out.
 
-**Jovie already knows who an artist is on every major DSP** (Spotify ID, Apple Music ID, etc.) and already polls those APIs for enrichment. We're uniquely positioned to turn that data into a **continuous catalog watchdog** that alerts artists the moment something unexpected appears.
+**Jovie already knows who an artist is on Spotify** (via `spotifyId`) and already polls the Spotify API for enrichment. We're uniquely positioned to turn that data into a **continuous catalog watchdog** that alerts artists the moment something unexpected appears.
+
+> **Scope note**: V1 is **Spotify-only**. The schema and provider interface support multiple DSPs by design, but Apple Music and other providers will only be added if users request it. No speculative multi-provider work.
 
 ### Who is this for?
 
-- **Primary**: **Pro plan ($99/mo) artists** with at least one linked DSP profile
+- **Primary**: **Pro plan ($99/mo) artists** with a linked Spotify profile
 - **Secondary**: Free/Basic/Premium users see the feature as a locked upsell in their dashboard — "Upgrade to Pro to monitor your streaming profiles for unauthorized releases"
 - **Tertiary**: Unclaimed profiles (Jovie can auto-detect and use it as a claim + upgrade incentive — "We found suspicious activity on your Spotify, claim your Jovie Pro to investigate")
 
@@ -40,7 +42,7 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 2. **API routes**: All `/api/catalog-monitor/*` endpoints check `isPro` via `getSessionContext()` and return 403 with an upgrade prompt for non-Pro users
 3. **Dashboard UI**: Non-Pro users see a locked preview of the feature with an upgrade CTA
 
-**For Pro users**: Artists who already have a `spotifyId` or `appleMusicId` on their `creatorProfiles` row are automatically enrolled when they upgrade to Pro. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
+**For Pro users**: Artists who already have a `spotifyId` on their `creatorProfiles` row are automatically enrolled when they upgrade to Pro. No toggle required — monitoring starts on the next cron cycle. A notification preference (`catalogMonitoring: true`) defaults to `true` and can be turned off in settings.
 
 **For non-Pro users**: The catalog monitor page is visible in the sidebar but shows a locked state:
 ```
@@ -51,7 +53,7 @@ Artists on streaming platforms face a growing threat: **unauthorized music appea
 │  unauthorized releases and impersonation.       │
 │                                                 │
 │  Get alerted the moment new music appears       │
-│  on your Spotify or Apple Music profile.        │
+│  on your Spotify profile.                       │
 │                                                 │
 │  [Upgrade to Pro — $99/mo]                      │
 └─────────────────────────────────────────────────┘
@@ -108,7 +110,6 @@ When an artist clicks "This isn't mine":
 1. Release is flagged as `disputed` in our system
 2. Artist sees a confirmation screen with guidance:
    - Link to Spotify's "Report Infringement" form
-   - Link to Apple Music's takedown request
    - Template text they can copy/paste for their distributor
    - Option to add notes ("I think this is from a distributor I used to work with")
 3. Jovie stores the dispute with timestamps for the artist's records
@@ -135,8 +136,8 @@ When an artist clicks "Yes, this is mine":
                     └──────┬───────┘
                            │
                     ┌──────▼───────┐
-                    │  Catalog     │  Polls Spotify, Apple Music, etc.
-                    │  Scanner     │  using existing provider clients
+                    │  Catalog     │  Polls Spotify
+                    │  Scanner     │  using existing Spotify client
                     └──────┬───────┘
                            │
                     ┌──────▼───────┐
@@ -453,20 +454,7 @@ async function fetchSpotifyCatalog(spotifyId: string): Promise<CatalogProviderRe
 }
 ```
 
-### 5.3 Apple Music Provider
-
-Uses existing Apple Music client infrastructure from `dsp-enrichment/providers/`:
-
-```typescript
-async function fetchAppleMusicCatalog(appleMusicId: string): Promise<CatalogProviderResult> {
-  // 1. Fetch artist's albums via Apple Music API
-  //    GET /v1/catalog/{storefront}/artists/{id}/albums
-  // 2. Paginate through results (Apple Music pages at 25)
-  // 3. Map to CatalogRelease format
-}
-```
-
-### 5.4 Diff Engine
+### 5.3 Diff Engine
 
 The diff engine compares the current DSP catalog against the last known snapshot:
 
@@ -500,7 +488,7 @@ function diffCatalog(
 }
 ```
 
-### 5.5 Auto-Confirmation Logic
+### 5.4 Auto-Confirmation Logic
 
 Before alerting the artist, we try to automatically match new detections against their existing Jovie discography:
 
@@ -703,8 +691,7 @@ Auth: Clerk session required
 Response: 200 {
   enabled: boolean,
   providers: [
-    { providerId: 'spotify', lastScanAt: '...', nextScanAt: '...', releasesKnown: 42, status: 'completed' },
-    { providerId: 'apple_music', lastScanAt: '...', ... }
+    { providerId: 'spotify', lastScanAt: '...', nextScanAt: '...', releasesKnown: 42, status: 'completed' }
   ],
   unconfirmedCount: 1,
   disputedCount: 0,
@@ -832,18 +819,11 @@ When the artist opens the right drawer (sidebar settings panel), a new **"Catalo
 │  Get notified when new music            │
 │  appears on your profiles               │
 │                                         │
-│  ─── Monitored Platforms ─────────────  │
+│  ─── Monitored Platform ──────────────  │
 │                                         │
 │  ♫ Spotify                    [══●]  ON │
 │  Connected as "Artist Name"             │
 │  Last scanned: 2h ago                   │
-│                                         │
-│  ♫ Apple Music                [══●]  ON │
-│  Connected as "Artist Name"             │
-│  Last scanned: 2h ago                   │
-│                                         │
-│  ♫ YouTube Music              [○══]  OFF│
-│  Not connected                          │
 │                                         │
 │  [View full monitoring dashboard →]     │
 └─────────────────────────────────────────┘
@@ -864,7 +844,7 @@ When the artist opens the right drawer (sidebar settings panel), a new **"Catalo
 - Renders inside the existing right drawer settings layout
 - Uses `SettingsToggleRow` for each toggle (same component as analytics/appearance toggles)
 - Master toggle (`catalogMonitoring`) disables all child toggles when off
-- Per-provider toggles only show for connected DSPs (checks `spotifyId`, `appleMusicId`, etc.)
+- Spotify toggle only shows when `spotifyId` is set (V1 is Spotify-only)
 - "Last scanned" timestamp updates via the existing `useBillingStatusQuery` pattern or a new lightweight query
 - Optimistic toggle updates with rollback on error + toast feedback (existing pattern in `SettingsToggleRow`)
 - PATCH to `/api/catalog-monitor/settings` on toggle change
@@ -1025,11 +1005,6 @@ The full dedicated page for in-depth catalog monitoring management, accessible f
 - **Budget per scan cycle (50 artists max)**: ~100 Spotify API calls
 - If we scan 50 artists every 6 hours → 400 calls/day (well within limits)
 
-### Apple Music API Limits
-- 2,000 requests/day per developer token (MusicKit)
-- ~2 requests per artist (paginated at 25)
-- **Budget**: ~100 calls per cycle → 400/day (within limits)
-
 ### Rate Limit Configuration
 
 Add to existing `lib/rate-limit/config.ts`:
@@ -1153,10 +1128,10 @@ This is critical — without it, every artist would get 50+ alerts on day one.
 The initial scan should fire as a background job when:
 - The user is on the **Pro plan** (`isPro === true`) **AND**
 - The `catalog_monitoring` feature gate is enabled for the user **AND**
-- They have at least one DSP ID (`spotifyId`, `appleMusicId`, etc.)
-- They don't already have a `catalogScanState` row for that provider
+- They have a `spotifyId` set on their creator profile
+- They don't already have a `catalogScanState` row for Spotify
 
-**Upgrade trigger**: When a user upgrades to Pro (detected via Stripe webhook `customer.subscription.updated`), enqueue an initial baseline scan for all their linked DSP providers. This gives them immediate value the moment they subscribe.
+**Upgrade trigger**: When a user upgrades to Pro (detected via Stripe webhook `customer.subscription.updated`), enqueue an initial baseline scan for their Spotify profile. This gives them immediate value the moment they subscribe.
 
 ---
 
@@ -1234,110 +1209,48 @@ Tokens are:
 
 ## 15. Implementation Phases
 
-### Phase 1: Foundation (Week 1-2)
+### Strategy: Marketing-First, Build Later
 
-**Goal**: Schema, scanner, and background job working end-to-end for Spotify
+**We are NOT building this feature yet.** The Growth plan ($99/mo) is not enabled for purchase. The immediate action is to **advertise catalog monitoring on the pricing table and marketing pages** as a Growth plan feature. This creates demand signal — when users start asking for it, we build it.
 
-| Task | Est. Effort | Files |
-|------|-------------|-------|
-| New enums in `enums.ts` | S | `schema/enums.ts` |
-| New schema file `catalog-monitoring.ts` | M | `schema/catalog-monitoring.ts` |
-| Export from schema barrel file | S | `schema/index.ts` |
-| Generate Drizzle migration | S | `drizzle/` |
-| Add `catalogMonitoring` to `NotificationPreferences` interface | S | `schema/profiles.ts` |
-| Spotify catalog provider | M | `lib/catalog-monitoring/providers/spotify.ts` |
-| Diff engine | M | `lib/catalog-monitoring/diff.ts` |
-| Auto-confirm logic | M | `lib/catalog-monitoring/auto-confirm.ts` |
-| Scanner orchestrator | L | `lib/catalog-monitoring/scanner.ts` |
-| Cron: `catalog-scan` route | M | `app/api/cron/catalog-scan/route.ts` |
-| First-time baseline seeding | M | `lib/catalog-monitoring/seed.ts` |
-| Unit tests for diff engine | M | `lib/catalog-monitoring/__tests__/` |
+### Phase 0: Marketing & Pricing (NOW — ship immediately)
 
-**Deliverable**: Spotify catalog is scanned every 6 hours, new releases are detected and stored. No alerts yet.
-
-### Phase 2: Alerts (Week 2-3)
-
-**Goal**: Artists receive email alerts and can respond
+**Goal**: Advertise catalog monitoring as a Growth plan feature on pricing and marketing pages
 
 | Task | Est. Effort | Files |
 |------|-------------|-------|
-| Alert service (create alert records) | M | `lib/catalog-monitoring/alerts.ts` |
-| Email template | M | `lib/email/templates/catalog-alert.ts` |
-| HMAC token signing for email actions | S | `lib/catalog-monitoring/tokens.ts` |
-| Cron: `catalog-alerts` route | M | `app/api/cron/catalog-alerts/route.ts` |
-| API: `/api/catalog-monitor/action` (email handler) | M | `app/api/catalog-monitor/action/route.ts` |
-| API: `/api/catalog-monitor/confirm` | S | `app/api/catalog-monitor/confirm/route.ts` |
-| API: `/api/catalog-monitor/dispute` | S | `app/api/catalog-monitor/dispute/route.ts` |
-| API: `/api/catalog-monitor/dismiss` | S | `app/api/catalog-monitor/dismiss/route.ts` |
-| Add crons to `vercel.json` | S | `vercel.json` |
-| Rate limit config | S | `lib/rate-limit/config.ts` |
-| Integration tests | M | `app/api/catalog-monitor/__tests__/` |
+| Add catalog monitoring features to `GROWTH_FEATURES` on pricing page | S | `app/(marketing)/pricing/page.tsx` |
+| Update pricing page JSON-LD schema with new feature description | S | `app/(marketing)/pricing/page.tsx` |
+| Add catalog monitoring mention to marketing/homepage copy (if applicable) | S | Marketing pages |
+| Update SEO metadata for pricing page to mention impersonation detection | S | `app/(marketing)/pricing/page.tsx` |
 
-**Deliverable**: Artists get emails when new releases appear, can confirm/dispute via email links.
+**Deliverable**: Growth plan ($99/mo, "Soon" badge) lists catalog monitoring and impersonation detection as features. No backend, no schema, no crons. Growth plan remains non-purchasable.
 
-### Phase 3: Right Drawer + Chat Carousel (Week 3-4)
+**Signal to build**: When users start asking about the Growth plan specifically because of catalog monitoring, or when we're ready to enable the Growth plan for purchase.
 
-**Goal**: Core in-app surfaces — drawer toggles and carousel alerts
+---
 
-| Task | Est. Effort | Files |
-|------|-------------|-------|
-| API: `/api/catalog-monitor/status` | S | `app/api/catalog-monitor/status/route.ts` |
-| API: `/api/catalog-monitor/settings` | S | `app/api/catalog-monitor/settings/route.ts` |
-| `CatalogMonitorDrawerSection` (right drawer toggles) | M | `components/catalog-monitor/drawer-section.tsx` |
-| Integrate drawer section into `RightDrawer` | S | `components/organisms/RightDrawer.tsx` |
-| Non-Pro locked state in drawer | S | `components/catalog-monitor/drawer-section.tsx` |
-| `CatalogAlertCarouselCard` (new card type) | M | `components/jovie/components/CatalogAlertCarouselCard.tsx` |
-| Extend `SuggestedProfilesCarousel` to fetch & render catalog alerts | M | `components/jovie/components/SuggestedProfilesCarousel.tsx` |
-| `DisputeDialog` modal (shared by carousel + dashboard) | M | `components/catalog-monitor/dispute-dialog.tsx` |
-| Pro guard wrapper (checks `isPro`, routes to upgrade gate) | S | `components/catalog-monitor/pro-guard.tsx` |
-| Statsig feature gate setup | S | Statsig dashboard |
+### Phase 1–5: Build When Ready (deferred)
 
-**Deliverable**: Pro users see monitoring toggles in the right drawer and unauthorized release cards in the chat carousel with confirm/reject actions.
+The full implementation plan is documented above (Sections 3–14) and remains the blueprint for when we're ready to build. The phases are:
 
-### Phase 4: Full Dashboard Page (Week 4-5)
+| Phase | Focus | Trigger to Start |
+|-------|-------|-----------------|
+| **1: Foundation** | Schema, Spotify scanner, diff engine, cron | Growth plan goes live |
+| **2: Alerts** | Email alerts, confirm/dispute API, HMAC tokens | Immediately after Phase 1 |
+| **3: Drawer + Carousel** | Right drawer toggles, chat carousel alert cards | After Phase 2 |
+| **4: Full Dashboard** | Dedicated `/dashboard/catalog-monitor` page | After Phase 3 |
+| **5: Additional Providers** | Apple Music (only if users request it), admin tools | Demand-driven |
 
-**Goal**: Dedicated monitoring dashboard for deep management
+### Future Phases (Backlog — only if requested)
 
-| Task | Est. Effort | Files |
-|------|-------------|-------|
-| API: `/api/catalog-monitor/history` | S | `app/api/catalog-monitor/history/route.ts` |
-| Dashboard page layout | M | `app/(dashboard)/catalog-monitor/page.tsx` |
-| `CatalogMonitorUpgradeGate` (non-Pro full-page upsell) | M | `components/catalog-monitor/upgrade-gate.tsx` |
-| `CatalogMonitorOverview` component | M | `components/catalog-monitor/overview.tsx` |
-| `UnconfirmedReleaseCard` component | M | `components/catalog-monitor/release-card.tsx` |
-| `CatalogMonitorHistory` component | M | `components/catalog-monitor/history.tsx` |
-| `CatalogMonitorSettings` (full settings page) | S | `components/catalog-monitor/settings.tsx` |
-| Sidebar nav item | S | Dashboard layout |
-| "View full monitoring dashboard →" link in drawer | S | `components/catalog-monitor/drawer-section.tsx` |
-
-**Deliverable**: Full dedicated dashboard page with history, filtering, and settings — linked from the right drawer.
-
-### Phase 5: Apple Music + Polish (Week 5-6)
-
-**Goal**: Multi-provider support, admin tools, observability
-
-| Task | Est. Effort | Files |
-|------|-------------|-------|
-| Apple Music catalog provider | M | `lib/catalog-monitoring/providers/apple-music.ts` |
-| Provider abstraction/registry | S | `lib/catalog-monitoring/providers/index.ts` |
-| Admin monitoring section | M | Admin dashboard |
-| Statsig metric events | S | Throughout |
-| Sentry alert rules | S | Sentry dashboard |
-| Data retention policy for `rawMetadata` | S | `app/api/cron/data-retention/route.ts` |
-| E2E tests with Playwright | M | `tests/catalog-monitor/` |
-| Documentation | S | Internal docs |
-
-**Deliverable**: Full feature with multi-provider support, admin visibility, and production monitoring.
-
-### Future Phases (Backlog)
-
+- **Apple Music, YouTube Music, Tidal, SoundCloud** providers
 - **Push notifications** (mobile app)
 - **Auto-dispute filing** (generate and submit takedown requests)
 - **Distributor integration** (alert your distributor directly)
 - **Catalog health score** (% of releases that are verified yours)
 - **Metadata change detection** (alert when artwork/title/label changes)
 - **Collaborative verification** (let managers/labels confirm on behalf)
-- **YouTube Music, Tidal, SoundCloud** providers
 - **Weekly digest email** (summary of all monitoring activity)
 - **Unclaimed profile incentive** ("We found suspicious activity — claim your Jovie")
 - **Non-Pro carousel teaser card** (locked card in carousel showing release count to drive upgrades)
@@ -1362,17 +1275,23 @@ Tokens are:
 
 ## 17. Summary
 
-This feature turns Jovie from a passive link-in-bio tool into an **active guardian of the artist's streaming identity** — and gives Pro ($99/mo) subscribers a compelling reason to stay. It leverages existing infrastructure (DSP IDs, Spotify client, Resend email, cron jobs, notification preferences) with minimal new surface area — 3 new tables, 2 cron jobs, 7 API routes, and a dashboard page.
+### What ships now
+
+**Just marketing.** Add catalog monitoring and impersonation detection to the Growth plan ($99/mo) feature list on the pricing page. The Growth plan already has a "Soon" badge and is not purchasable. This plants the seed and gauges demand with zero engineering investment.
+
+### What ships later (when Growth plan goes live)
+
+The full feature turns Jovie into an **active guardian of the artist's streaming identity** — Spotify-only at launch, with other providers added only if users ask. It leverages existing infrastructure (Spotify client, Resend email, cron jobs, notification preferences) with minimal new surface area — 3 new tables, 2 cron jobs, 7 API routes, right drawer toggles, chat carousel cards, and a dashboard page.
 
 ### Why this justifies $99/mo
 
-No other link-in-bio platform offers continuous catalog monitoring. Distrokid has rudimentary alerts but only for their own distribution. Spotify for Artists notifications are delayed and don't help with impersonation detection. **Jovie becomes the first platform that watches your identity across DSPs and helps you fight back** — that's a premium value prop that justifies Pro pricing.
+No other link-in-bio platform offers continuous catalog monitoring. Distrokid has rudimentary alerts but only for their own distribution. Spotify for Artists notifications are delayed and don't help with impersonation detection. **Jovie becomes the first platform that watches your Spotify identity and helps you fight back** — that's a premium value prop that justifies Growth pricing.
 
-### The approach is designed to be:
-- **Pro-exclusive**: Gated at cron, API, and UI layers — non-Pro users see a locked upsell
-- **Zero-config for Pro users**: Automatically enrolled when they upgrade, monitoring starts immediately
+### When built, the approach is designed to be:
+- **Growth-exclusive**: Gated at cron, API, and UI layers — non-Growth users see a locked upsell
+- **Spotify-only at launch**: Apple Music and other providers only if users request them
+- **Zero-config for Growth users**: Automatically enrolled when they upgrade, monitoring starts immediately
 - **Low-noise**: Baseline seeding + auto-confirmation prevents alert fatigue
-- **Actionable**: One-click confirm/dispute from email, with takedown guidance
-- **Extensible**: Provider interface makes adding Apple Music, YouTube, etc. straightforward
+- **Actionable**: One-click confirm/dispute from email and chat carousel, with takedown guidance
 - **Safe**: HMAC-signed action tokens, rate limiting, feature-gated rollout
 - **Downgrade-safe**: Data retained 90 days, seamless re-activation on re-upgrade
