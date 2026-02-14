@@ -28,13 +28,17 @@ export default async function AppShellLayout({
   try {
     const queryClient = getQueryClient();
 
-    // Parallelize auth, dashboard data, and billing status prefetch for better performance.
-    // Both getDashboardData and billing prefetch share getCachedAuth() via React's cache(),
-    // so the auth call is deduplicated. prefetchQuery swallows errors silently —
-    // if billing fetch fails, the client falls back to its own fetch.
-    const [dashboardData, auth] = await Promise.all([
+    // Get auth first (fast — reads from request headers, cached via React cache()).
+    // This lets us start feature flags in parallel with dashboard data and billing,
+    // rather than waiting for the entire Promise.all to complete before starting flags.
+    const auth = await getCachedAuth();
+
+    // Parallelize dashboard data, feature flags, and billing status prefetch.
+    // getDashboardData internally calls getCachedAuth() which is deduplicated.
+    // Feature flags now run in parallel instead of waiting for dashboard data.
+    const [dashboardData, featureFlagsBootstrap] = await Promise.all([
       getDashboardData(),
-      getCachedAuth(),
+      getFeatureFlagsBootstrap(auth.userId ?? null),
       queryClient.prefetchQuery({
         queryKey: queryKeys.billing.status(),
         queryFn: async () => {
@@ -56,11 +60,6 @@ export default async function AppShellLayout({
         },
       }),
     ]);
-
-    // Evaluate feature flags server-side for this user
-    const featureFlagsBootstrap = await getFeatureFlagsBootstrap(
-      auth.userId ?? null
-    );
 
     // Read sidebar cookie server-side so SSR matches client state (no flash)
     const cookieStore = await cookies();
