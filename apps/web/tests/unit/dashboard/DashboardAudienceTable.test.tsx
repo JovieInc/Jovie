@@ -128,6 +128,7 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
     intentLevel: i % 3 === 0 ? 'high' : i % 3 === 1 ? 'medium' : 'low',
     latestActions: [{ label: 'Visited profile' }],
     referrerHistory: [{ url: 'https://example.com' }],
+    utmParams: {},
     email: i % 3 === 0 ? `user${i + 1}@example.com` : null,
     phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
     spotifyConnected: i % 5 === 0,

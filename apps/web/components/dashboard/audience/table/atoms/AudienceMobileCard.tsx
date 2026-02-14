@@ -108,8 +108,10 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
 /** Subtitle lines for members mode */
 function MemberDetails({ member }: { readonly member: AudienceMember }) {
   const isReturning = member.visits > 1;
-  const source =
-    member.referrerHistory.length > 0
+  const utmSource = member.utmParams?.source;
+  const source = utmSource
+    ? utmSource.charAt(0).toUpperCase() + utmSource.slice(1)
+    : member.referrerHistory.length > 0
       ? parseSourceForMobile(member.referrerHistory[0].url)
       : 'Direct';
   const lastAction =

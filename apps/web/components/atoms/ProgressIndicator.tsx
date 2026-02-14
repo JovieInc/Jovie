@@ -54,16 +54,16 @@ export function ProgressIndicator({
       {/* Progress bar */}
       <div className='space-y-2'>
         <div className='flex justify-between items-center text-sm'>
-          <span className='font-medium text-gray-900 dark:text-white'>
+          <span className='font-medium text-primary-token'>
             Step {currentStep + 1} of {totalSteps}
           </span>
           {showTimeEstimate && remainingTime > 0 && (
-            <span className='text-gray-500 dark:text-gray-400'>
+            <span className='text-tertiary-token'>
               {formatTime(remainingTime)} remaining
             </span>
           )}
         </div>
-        <div className='w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden'>
+        <div className='w-full bg-surface-2 rounded-full h-2 overflow-hidden'>
           <div
             className='bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full transition-all duration-300 ease-out'
             style={{ width: `${progressPercentage}%` }}
@@ -83,11 +83,9 @@ export function ProgressIndicator({
               className={(() => {
                 const baseClasses =
                   'flex flex-col items-center space-y-1 transition-all duration-200 flex-1';
-                if (isCompleted)
-                  return `${baseClasses} text-green-600 dark:text-green-400`;
-                if (isCurrent)
-                  return `${baseClasses} text-blue-600 dark:text-blue-400`;
-                return `${baseClasses} text-gray-400 dark:text-gray-600`;
+                if (isCompleted) return `${baseClasses} text-success`;
+                if (isCurrent) return `${baseClasses} text-accent`;
+                return `${baseClasses} text-quaternary-token`;
               })()}
             >
               {/* Step circle */}
@@ -99,7 +97,7 @@ export function ProgressIndicator({
                     return `${baseClasses} bg-green-500 border-green-500 text-white`;
                   if (isCurrent)
                     return `${baseClasses} bg-blue-500 border-blue-500 text-white`;
-                  return `${baseClasses} bg-white dark:bg-gray-800 border-default text-gray-500 dark:text-gray-400`;
+                  return `${baseClasses} bg-surface-1 border-default text-tertiary-token`;
                 })()}
               >
                 {isCompleted ? (
@@ -128,7 +126,7 @@ export function ProgressIndicator({
                   {step.title}
                 </div>
                 {step.description && isCurrent && (
-                  <div className='hidden sm:block text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-20 leading-tight'>
+                  <div className='hidden sm:block text-xs text-tertiary-token mt-1 max-w-20 leading-tight'>
                     {step.description}
                   </div>
                 )}

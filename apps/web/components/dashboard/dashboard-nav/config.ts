@@ -1,13 +1,11 @@
 import {
   Banknote,
-  Bell,
   CalendarDays,
   Home,
   IdCard,
   Link2,
   Music,
   Music2,
-  Paintbrush,
   PieChart,
   Rocket,
   Settings,
@@ -45,25 +43,11 @@ export const profileNavItem: NavItem = {
 export const primaryNavigation: NavItem[] = [
   profileNavItem,
   {
-    name: 'Contacts',
-    href: APP_ROUTES.CONTACTS,
-    id: 'contacts',
-    icon: IdCard,
-    description: 'Manage your team and contact routes',
-  },
-  {
     name: 'Releases',
     href: APP_ROUTES.RELEASES,
     id: 'releases',
     icon: Music,
     description: 'Link out every provider with one smart link',
-  },
-  {
-    name: 'Tour Dates',
-    href: APP_ROUTES.TOUR_DATES,
-    id: 'tour-dates',
-    icon: CalendarDays,
-    description: 'Sync and manage your tour dates',
   },
   {
     name: 'Audience',
@@ -88,18 +72,6 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS,
     id: 'account',
     icon: ShieldCheck,
-  },
-  {
-    name: 'Appearance',
-    href: APP_ROUTES.SETTINGS_APPEARANCE,
-    id: 'appearance',
-    icon: Paintbrush,
-  },
-  {
-    name: 'Notifications',
-    href: APP_ROUTES.SETTINGS_NOTIFICATIONS,
-    id: 'notifications',
-    icon: Bell,
   },
   {
     name: 'Billing',
@@ -128,6 +100,18 @@ export const artistSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_MUSIC_LINKS,
     id: 'music-links',
     icon: Music2,
+  },
+  {
+    name: 'Contacts',
+    href: APP_ROUTES.SETTINGS_CONTACTS,
+    id: 'contacts',
+    icon: IdCard,
+  },
+  {
+    name: 'Touring',
+    href: APP_ROUTES.SETTINGS_TOURING,
+    id: 'touring',
+    icon: CalendarDays,
   },
   {
     name: 'Branding',
@@ -194,14 +178,10 @@ export const adminNavigation: NavItem[] = [
 /** Items shown as icons in the bottom tab bar (max 4). */
 export const mobilePrimaryNavigation: NavItem[] = [
   dashboardHome,
-  primaryNavigation[0], // Profile
-  primaryNavigation[2], // Releases
-  primaryNavigation[4], // Audience
+  primaryNavigation.find(i => i.id === 'profile')!,
+  primaryNavigation.find(i => i.id === 'releases')!,
+  primaryNavigation.find(i => i.id === 'audience')!,
 ];
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = [
-  primaryNavigation[1], // Contacts
-  primaryNavigation[3], // Tour Dates
-  settingsNavItem,
-];
+export const mobileExpandedNavigation: NavItem[] = [settingsNavItem];

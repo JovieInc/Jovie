@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ArrowUp, Loader2 } from 'lucide-react';
+import { Button, SimpleTooltip } from '@jovie/ui';
+import { ArrowUp, Camera, Loader2 } from 'lucide-react';
 import { forwardRef, useCallback } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -17,6 +17,10 @@ interface ChatInputProps {
   readonly placeholder?: string;
   /** Compact variant for chat view, default for empty state */
   readonly variant?: 'default' | 'compact';
+  /** Callback when the image upload button is clicked */
+  readonly onImageUpload?: () => void;
+  /** Whether an image is currently uploading */
+  readonly isImageUploading?: boolean;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -29,12 +33,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isSubmitting,
       placeholder = 'What do you wanna ask Jovie?',
       variant = 'default',
+      onImageUpload,
+      isImageUploading = false,
     },
     ref
   ) {
     const characterCount = value.length;
     const isNearLimit = characterCount > MAX_MESSAGE_LENGTH * 0.9;
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
+    const hasImageUpload = Boolean(onImageUpload);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -58,9 +65,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       (e: React.FormEvent<HTMLTextAreaElement>) => {
         const target = e.target as HTMLTextAreaElement;
         target.style.height = 'auto';
-        target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+        const maxH = variant === 'compact' ? 128 : 192;
+        target.style.height = `${Math.min(target.scrollHeight, maxH)}px`;
       },
-      []
+      [variant]
     );
 
     const isCompact = variant === 'compact';
@@ -80,23 +88,53 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             placeholder={placeholder}
             rows={1}
             className={cn(
-              'w-full resize-none rounded-xl border bg-surface-1',
+              'w-full resize-none rounded-2xl border bg-surface-1',
               'text-primary-token placeholder:text-tertiary-token',
               'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
               'transition-colors duration-fast',
               isCompact
-                ? 'px-4 py-3 pr-14 max-h-32'
-                : 'px-4 py-4 pr-14 min-h-[120px]',
+                ? cn('px-4 py-3 max-h-32', hasImageUpload ? 'pr-24' : 'pr-14')
+                : cn(
+                    'px-4 py-3.5 max-h-48',
+                    hasImageUpload ? 'pr-28' : 'pr-14'
+                  ),
               isOverLimit
                 ? 'border-error focus:border-error focus:ring-error/20'
                 : 'border-subtle focus:border-accent focus:ring-accent/20'
             )}
             onKeyDown={handleKeyDown}
-            onInput={isCompact ? handleInput : undefined}
+            onInput={handleInput}
             maxLength={MAX_MESSAGE_LENGTH + 100}
             aria-label='Chat message input'
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
           />
+
+          {onImageUpload && (
+            <SimpleTooltip content='Upload profile photo'>
+              <button
+                type='button'
+                onClick={onImageUpload}
+                disabled={isImageUploading || isLoading || isSubmitting}
+                className={cn(
+                  'absolute flex items-center justify-center rounded-lg',
+                  'text-tertiary-token transition-colors',
+                  'hover:text-secondary-token hover:bg-surface-2',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  isCompact
+                    ? 'bottom-2 right-12 h-8 w-8'
+                    : 'bottom-3 right-14 h-10 w-10'
+                )}
+                aria-label='Upload profile photo'
+              >
+                {isImageUploading ? (
+                  <Loader2 className='h-4 w-4 animate-spin' />
+                ) : (
+                  <Camera className='h-4 w-4' />
+                )}
+              </button>
+            </SimpleTooltip>
+          )}
+
           <Button
             type='submit'
             size='icon'

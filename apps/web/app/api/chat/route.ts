@@ -54,7 +54,7 @@ const MAX_MESSAGES_PER_REQUEST = 50;
 const EDITABLE_FIELDS = {
   tier1: ['displayName', 'bio'] as const,
   tier2: [] as const,
-  blocked: ['username', 'avatarUrl', 'spotifyId', 'genres'] as const,
+  blocked: ['username', 'spotifyId', 'genres'] as const,
 };
 
 type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
@@ -451,8 +451,10 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 
 **Blocked Fields (cannot edit via chat):**
 - username: Requires settings page
-- avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
+
+**Client-Handled Fields:**
+- avatar/profile image: Users can upload a new profile photo directly from the chat input using the camera button. If they tell you they updated their profile photo, acknowledge it warmly. You do NOT have a tool for this — the upload is handled by the client UI.
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 

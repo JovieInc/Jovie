@@ -174,13 +174,37 @@ export function useCancelSubscriptionMutation() {
   return useMutation({
     mutationFn: cancelSubscriptionRequest,
 
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.billing.status(),
+      });
+
+      const previousBilling = queryClient.getQueryData(
+        queryKeys.billing.status()
+      );
+
+      queryClient.setQueryData(
+        queryKeys.billing.status(),
+        (old: { isPro: boolean; plan: string | null } | undefined) =>
+          old ? { ...old, isPro: false, plan: 'free' } : old
+      );
+
+      return { previousBilling };
+    },
+
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.billing.all,
       });
     },
 
-    onError: error => {
+    onError: (error, _variables, context) => {
+      if (context?.previousBilling) {
+        queryClient.setQueryData(
+          queryKeys.billing.status(),
+          context.previousBilling
+        );
+      }
       handleMutationError(error, 'Failed to cancel subscription');
     },
   });

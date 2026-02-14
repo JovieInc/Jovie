@@ -1,62 +1,82 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import type { AudienceReferrer } from '@/types';
+import type { AudienceReferrer, AudienceUtmParams } from '@/types';
 
 export interface AudienceSourceCellProps {
   readonly referrerHistory: AudienceReferrer[];
+  readonly utmParams?: AudienceUtmParams;
   readonly className?: string;
 }
 
+const DOMAIN_MAP: Record<string, string> = {
+  'x.com': 'X',
+  'twitter.com': 'X',
+  'instagram.com': 'Instagram',
+  'facebook.com': 'Facebook',
+  'tiktok.com': 'TikTok',
+  'youtube.com': 'YouTube',
+  'spotify.com': 'Spotify',
+  'google.com': 'Google',
+  'reddit.com': 'Reddit',
+  'linkedin.com': 'LinkedIn',
+  't.co': 'X',
+  'l.facebook.com': 'Facebook',
+  'l.instagram.com': 'Instagram',
+};
+
 /**
  * Extracts a human-readable source label from a referrer URL.
- * Detects UTM sources, known social platforms, and falls back to domain name.
+ * Detects known social platforms and falls back to domain name.
  */
 function parseSourceLabel(url: string): string {
   try {
     const parsed = new URL(url);
-
-    // Check for UTM source first
-    const utmSource = parsed.searchParams.get('utm_source');
-    if (utmSource) return utmSource;
-
     const hostname = parsed.hostname.replace('www.', '');
-
-    // Map known domains to friendly names
-    const domainMap: Record<string, string> = {
-      'x.com': 'X',
-      'twitter.com': 'X',
-      'instagram.com': 'Instagram',
-      'facebook.com': 'Facebook',
-      'tiktok.com': 'TikTok',
-      'youtube.com': 'YouTube',
-      'spotify.com': 'Spotify',
-      'google.com': 'Google',
-      'reddit.com': 'Reddit',
-      'linkedin.com': 'LinkedIn',
-      't.co': 'X',
-      'l.facebook.com': 'Facebook',
-      'l.instagram.com': 'Instagram',
-    };
-
-    return domainMap[hostname] ?? hostname;
+    return DOMAIN_MAP[hostname] ?? hostname;
   } catch {
-    // Not a valid URL, return as-is (could be a UTM string)
     return url || 'Direct';
   }
 }
 
+/**
+ * Build a source label from UTM params (source + medium).
+ * Returns null if no meaningful UTM data is available.
+ */
+function formatUtmSourceLabel(utm: AudienceUtmParams): string | null {
+  if (!utm.source) return null;
+  const source = utm.source.charAt(0).toUpperCase() + utm.source.slice(1);
+  if (utm.medium) return `${source} / ${utm.medium}`;
+  return source;
+}
+
 export function AudienceSourceCell({
   referrerHistory,
+  utmParams,
   className,
 }: AudienceSourceCellProps) {
+  // Prefer UTM params from the landing page URL
+  const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;
+  if (utmLabel) {
+    return (
+      <div className={cn('text-xs text-secondary-token truncate', className)}>
+        {utmLabel}
+        {utmParams?.campaign && (
+          <span className='text-tertiary-token ml-1'>
+            ({utmParams.campaign})
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Fall back to referrer-based source
   if (!referrerHistory.length) {
     return (
       <div className={cn('text-xs text-tertiary-token', className)}>Direct</div>
     );
   }
 
-  // Show the most recent referrer source
   const latestReferrer = referrerHistory[0];
   const sourceLabel = parseSourceLabel(latestReferrer.url);
 

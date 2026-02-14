@@ -3,6 +3,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import React from 'react';
+import { Icon } from '@/components/atoms/Icon';
+import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import {
   LinkPill,
   type LinkPillMenuItem,
@@ -14,6 +16,9 @@ import {
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
 import { compactUrlDisplay } from './utils';
+
+const SWIPE_ACTION_CLASS =
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-medium transition-colors active:opacity-80';
 
 /**
  * Determine the pill state based on visibility and validity.
@@ -79,27 +84,10 @@ export interface SortableLinkItemProps<T extends DetectedLink = DetectedLink> {
  * - Action menu (edit, toggle visibility, delete)
  * - Visual states (connected, hidden, error, loading)
  * - Highlight animation for newly added links
+ * - Mobile swipe-to-reveal actions (edit, toggle, delete)
  *
  * Uses React.memo for performance optimization since the component is rendered
  * multiple times in a list and receives stable callbacks from the parent.
- *
- * @example
- * ```tsx
- * <SortableLinkItem
- *   id={linkId}
- *   link={link}
- *   index={0}
- *   onToggle={handleToggle}
- *   onRemove={handleRemove}
- *   onEdit={handleEdit}
- *   visible={true}
- *   draggable={true}
- *   openMenuId={openMenuId}
- *   onAnyMenuOpen={handleAnyMenuOpen}
- *   isLastAdded={false}
- *   buildPillLabel={buildPillLabel}
- * />
- * ```
  */
 export const SortableLinkItem = React.memo(function SortableLinkItem<
   T extends DetectedLink = DetectedLink,
@@ -168,6 +156,38 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
     },
   ];
 
+  const swipeActions = (
+    <>
+      <button
+        type='button'
+        onClick={() => onEdit(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
+        aria-label={`Edit ${link.platform.name || link.platform.id}`}
+      >
+        <Icon name='Pencil' className='h-4 w-4' />
+        <span>Edit</span>
+      </button>
+      <button
+        type='button'
+        onClick={() => onToggle(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        aria-label={visible ? 'Hide link' : 'Show link'}
+      >
+        <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
+        <span>{visible ? 'Hide' : 'Show'}</span>
+      </button>
+      <button
+        type='button'
+        onClick={() => onRemove(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
+        aria-label={`Delete ${link.platform.name || link.platform.id}`}
+      >
+        <Icon name='Trash' className='h-4 w-4' />
+        <span>Delete</span>
+      </button>
+    </>
+  );
+
   return (
     <div
       ref={setNodeRef}
@@ -176,20 +196,27 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       style={cardStyle}
       {...listeners}
     >
-      <LinkPill
-        platformIcon={link.platform.icon}
-        platformName={link.platform.name || link.platform.id}
-        primaryText={buildPillLabel(link)}
-        secondaryText={secondaryText}
-        state={pillState}
-        badgeText={badgeText}
-        shimmerOnMount={isLastAdded}
-        menuItems={menuItems}
-        menuId={id}
-        isMenuOpen={openMenuId === id}
-        onMenuOpenChange={next => onAnyMenuOpen(next ? id : null)}
-        className='max-w-full'
-      />
+      <SwipeToReveal
+        itemId={id}
+        actions={swipeActions}
+        actionsWidth={180}
+        className='rounded-2xl'
+      >
+        <LinkPill
+          platformIcon={link.platform.icon}
+          platformName={link.platform.name || link.platform.id}
+          primaryText={buildPillLabel(link)}
+          secondaryText={secondaryText}
+          state={pillState}
+          badgeText={badgeText}
+          shimmerOnMount={isLastAdded}
+          menuItems={menuItems}
+          menuId={id}
+          isMenuOpen={openMenuId === id}
+          onMenuOpenChange={next => onAnyMenuOpen(next ? id : null)}
+          className='max-w-full'
+        />
+      </SwipeToReveal>
 
       {/* Screen reader accessible URL display */}
       <div className='sr-only'>{urlDisplay}</div>

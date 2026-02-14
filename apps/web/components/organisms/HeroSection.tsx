@@ -96,7 +96,7 @@ export const HeroSection = memo(function HeroSection({
         <div className='mb-8 space-y-4'>
           <h1
             id='hero-headline'
-            className='text-4xl font-semibold tracking-[-0.03em] text-gray-900 dark:text-white sm:text-5xl lg:text-6xl leading-[1.1]'
+            className='text-4xl font-semibold tracking-[-0.03em] text-primary-token sm:text-5xl lg:text-6xl leading-[1.1]'
             style={{ letterSpacing: '-0.03em' }}
           >
             {processedHeadline}
@@ -105,7 +105,7 @@ export const HeroSection = memo(function HeroSection({
           {/* Subtitle */}
           {subtitle && (
             <p
-              className='mx-auto max-w-2xl text-lg text-gray-600 dark:text-white/70 font-normal leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9'
+              className='mx-auto max-w-2xl text-lg text-secondary-token font-normal leading-7 sm:text-xl sm:leading-8 lg:text-2xl lg:leading-9'
               role='doc-subtitle'
             >
               {subtitle}
@@ -123,14 +123,14 @@ export const HeroSection = memo(function HeroSection({
               )}
 
               {/* Content card */}
-              <div className='relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 p-8'>
+              <div className='relative bg-surface-0/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1 p-8'>
                 {children}
               </div>
             </div>
 
             {/* Supporting text under content */}
             {supportingText && (
-              <div className='mt-8 text-sm text-gray-500 dark:text-white/50 text-center leading-6'>
+              <div className='mt-8 text-sm text-tertiary-token text-center leading-6'>
                 {supportingText}
               </div>
             )}

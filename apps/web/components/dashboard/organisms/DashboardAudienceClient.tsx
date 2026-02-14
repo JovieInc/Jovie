@@ -11,10 +11,12 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
+import { AudienceHeaderBadge } from './dashboard-audience-table/AudienceHeaderBadge';
 import type {
   AudienceFilters,
   AudienceView,
@@ -55,12 +57,10 @@ const DashboardAudienceTable = dynamic(
 
 export type AudienceMode = 'members' | 'subscribers';
 
-type AudienceServerRow = AudienceMember;
-
 export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
-  readonly initialRows: AudienceServerRow[];
+  readonly initialRows: AudienceMember[];
   readonly total: number;
   readonly page: number;
   readonly pageSize: number;
@@ -167,6 +167,20 @@ export function DashboardAudienceClient({
     },
     [setSegments, setUrlParams]
   );
+
+  // Push audience segment control into the breadcrumb header bar
+  const { setHeaderBadge } = useSetHeaderActions();
+
+  const headerBadge = React.useMemo(
+    () => <AudienceHeaderBadge view={view} onViewChange={handleViewChange} />,
+    [view, handleViewChange]
+  );
+
+  React.useEffect(() => {
+    setHeaderBadge(headerBadge);
+    return () => setHeaderBadge(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge is a stable context setter
+  }, [headerBadge]);
 
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>

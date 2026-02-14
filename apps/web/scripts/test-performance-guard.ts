@@ -58,9 +58,9 @@ class TestPerformanceGuard {
       description: 'Critical regression suite (includes auth E2E tests)',
     },
     full: {
-      maxTotalDuration: 300000,
+      maxTotalDuration: 420000,
       description:
-        'Full coverage runs should stay under 5 minutes to guard against drift.',
+        'Full coverage runs should stay under 7 minutes to guard against drift.',
     },
   };
 

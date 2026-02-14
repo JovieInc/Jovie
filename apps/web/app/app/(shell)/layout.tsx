@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
@@ -7,6 +8,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
+import { HydrateClient } from '@/lib/queries/HydrateClient';
+import { queryKeys } from '@/lib/queries/keys';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
+import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 
@@ -21,32 +26,63 @@ export default async function AppShellLayout({
   // NO MORE AUTH GATE - proxy.ts already routed us correctly!
   // If we're rendering this layout, user is ACTIVE and can access the app.
   try {
-    // Parallelize auth and dashboard data fetching for better performance
-    // Both share getCachedAuth() via React's cache(), so the auth call is deduplicated
-    const [dashboardData, auth] = await Promise.all([
+    const queryClient = getQueryClient();
+
+    // Get auth first (fast — reads from request headers, cached via React cache()).
+    // This lets us start feature flags in parallel with dashboard data and billing,
+    // rather than waiting for the entire Promise.all to complete before starting flags.
+    const auth = await getCachedAuth();
+
+    // Parallelize dashboard data, feature flags, and billing status prefetch.
+    // getDashboardData internally calls getCachedAuth() which is deduplicated.
+    // Feature flags now run in parallel instead of waiting for dashboard data.
+    const [dashboardData, featureFlagsBootstrap] = await Promise.all([
       getDashboardData(),
-      getCachedAuth(),
+      getFeatureFlagsBootstrap(auth.userId ?? null),
+      queryClient.prefetchQuery({
+        queryKey: queryKeys.billing.status(),
+        queryFn: async () => {
+          const result = await getUserBillingInfo();
+          if (!result.success || !result.data) {
+            return {
+              isPro: false,
+              plan: null,
+              hasStripeCustomer: false,
+              stripeSubscriptionId: null,
+            };
+          }
+          return {
+            isPro: result.data.isPro,
+            plan: result.data.plan ?? null,
+            hasStripeCustomer: Boolean(result.data.stripeCustomerId),
+            stripeSubscriptionId: result.data.stripeSubscriptionId,
+          };
+        },
+      }),
     ]);
 
-    // Evaluate feature flags server-side for this user
-    const featureFlagsBootstrap = await getFeatureFlagsBootstrap(
-      auth.userId ?? null
-    );
+    // Read sidebar cookie server-side so SSR matches client state (no flash)
+    const cookieStore = await cookies();
+    const sidebarCookie = cookieStore.get('sidebar:state');
+    const sidebarDefaultOpen = sidebarCookie?.value !== 'false';
 
     return (
-      <>
+      <HydrateClient state={getDehydratedState()}>
         {/* ENG-004: Show environment issues to admins in non-production */}
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
         <VersionUpdateToastActivator />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>
-            <AuthShellWrapper persistSidebarCollapsed={setSidebarCollapsed}>
+            <AuthShellWrapper
+              persistSidebarCollapsed={setSidebarCollapsed}
+              sidebarDefaultOpen={sidebarDefaultOpen}
+            >
               {children}
             </AuthShellWrapper>
           </DashboardDataProvider>
         </FeatureFlagsProvider>
-      </>
+      </HydrateClient>
     );
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

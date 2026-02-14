@@ -1,9 +1,11 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import type React from 'react';
 import { Toaster } from 'sonner';
 import { useCookieBannerHeight } from '@/lib/hooks/useCookieBannerHeight';
+import { isProfileRoute } from '@/lib/sentry/route-detector';
 
 interface ToastProviderProps {
   readonly children: React.ReactNode;
@@ -61,6 +63,13 @@ function getToasterTheme(
 export function ToastProvider({ children }: ToastProviderProps) {
   const { resolvedTheme } = useTheme();
   const bottomOffset = useCookieBannerHeight();
+  const pathname = usePathname() ?? '';
+
+  // Public profile pages are visitor-facing surfaces — suppress all app toasts
+  // (PWA install, error copy, etc.) to keep them clean and distraction-free.
+  if (isProfileRoute(pathname)) {
+    return <>{children}</>;
+  }
 
   return (
     <>
@@ -85,10 +94,13 @@ export function ToastProvider({ children }: ToastProviderProps) {
         // lightweight classNames here for icon coloring.
         toastOptions={{
           classNames: {
+            toast: 'items-start',
+            title: 'font-linear-semibold',
+            description: 'font-linear-normal',
             actionButton:
-              'bg-btn-primary text-btn-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-btn-primary text-btn-primary-foreground font-linear-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
-              'bg-surface-2 text-secondary-token hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'bg-surface-2 text-secondary-token font-linear-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             success: '[&>svg]:text-success',
             error: '[&>svg]:text-error',
             warning: '[&>svg]:text-warning',

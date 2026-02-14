@@ -219,7 +219,7 @@ export async function saveContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
-  revalidatePath(APP_ROUTES.CONTACTS);
+  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
 
   return result;
 }
@@ -260,5 +260,5 @@ export async function deleteContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${profileId}`, 'max');
-  revalidatePath(APP_ROUTES.CONTACTS);
+  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
 }

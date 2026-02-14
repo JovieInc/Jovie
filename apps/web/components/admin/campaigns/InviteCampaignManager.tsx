@@ -493,15 +493,12 @@ export function InviteCampaignManager() {
 
         {sendResult?.ok && (
           <div className='mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3'>
-            <Icon
-              name='CheckCircle'
-              className='h-3.5 w-3.5 text-green-600 dark:text-green-400'
-            />
+            <Icon name='CheckCircle' className='h-3.5 w-3.5 text-success' />
             <div>
               <p className='text-sm font-medium text-green-700 dark:text-green-300'>
                 Successfully queued {sendResult.jobsEnqueued} invites!
               </p>
-              <p className='text-xs text-green-600 dark:text-green-400'>
+              <p className='text-xs text-success'>
                 Estimated completion: ~{sendResult.estimatedMinutes} minutes
               </p>
             </div>

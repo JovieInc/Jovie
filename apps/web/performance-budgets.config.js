@@ -12,10 +12,10 @@
  * - Dynamic pages: ~80-150ms (with Redis cache), ~200-500ms (cache miss)
  *
  * Resource size budgets are set to current production values + 10% headroom.
- * Current baseline (2026-02-04):
- * - Script: ~437KB (optimized with code splitting)
- * - Stylesheet: ~45KB (Tailwind + custom styles)
- * - Total: ~535KB
+ * Current baseline (2026-02-14):
+ * - Script: ~939KB (grew from ~640KB via billing redesign, swipe-to-reveal, UTM tracking)
+ * - Stylesheet: ~52KB (Tailwind + custom styles)
+ * - Total: ~1084KB
  */
 module.exports = {
   budgets: [
@@ -31,11 +31,11 @@ module.exports = {
         { metric: 'time-to-first-byte', budget: 1800 },
       ],
       resourceSizes: [
-        { resourceType: 'script', budget: 600 },
+        { resourceType: 'script', budget: 1050 },
         { resourceType: 'image', budget: 500 },
         { resourceType: 'font', budget: 100 },
         { resourceType: 'stylesheet', budget: 100 },
-        { resourceType: 'total', budget: 1000 },
+        { resourceType: 'total', budget: 1200 },
       ],
     },
     {
@@ -50,11 +50,11 @@ module.exports = {
         { metric: 'time-to-first-byte', budget: 2500 },
       ],
       resourceSizes: [
-        { resourceType: 'script', budget: 600 },
+        { resourceType: 'script', budget: 1050 },
         { resourceType: 'image', budget: 500 },
         { resourceType: 'font', budget: 100 },
         { resourceType: 'stylesheet', budget: 100 },
-        { resourceType: 'total', budget: 1000 },
+        { resourceType: 'total', budget: 1200 },
       ],
     },
     // NOTE: /app/dashboard routes require authentication

@@ -174,8 +174,7 @@ function useAutoFocusOnEdit(
   useEffect(() => {
     if (notificationsState !== 'editing' || !inputRef.current) return;
     const timeoutId = window.setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      inputRef.current?.focus({ preventScroll: true });
     }, 100);
     return () => window.clearTimeout(timeoutId);
   }, [notificationsState, inputRef]);

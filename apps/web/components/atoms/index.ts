@@ -9,7 +9,6 @@
 // } from '@/components/molecules/WrappedSocialLink';
 
 export * from './AmountSelector';
-export * from './ArtistAvatar';
 export * from './ArtistName';
 export * from './AvatarUploadAnnouncer';
 export * from './AvatarUploadOverlay';
@@ -67,6 +66,7 @@ export * from './SkipToContent';
 // export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';
+export * from './SwipeToReveal';
 export * from './TableErrorFallback';
 // Textarea migrated to @jovie/ui - import { Textarea } from '@jovie/ui'
 export * from './Tooltip';

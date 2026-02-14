@@ -92,7 +92,7 @@ if [ "$is_test" = false ] && [[ "$file_path" =~ \.(ts|tsx)$ ]]; then
     if grep -q '@ts-ignore' "$file_path" 2>/dev/null; then
       echo "WARNING: @ts-ignore found in $file_path"
       echo "Use @ts-expect-error with explanation instead"
-      echo "Track in TECH_DEBT_TRACKER.md if unavoidable"
+      echo "Track in docs/TECH_DEBT_TRACKER.md if unavoidable"
       echo ""
       warnings=1
     fi

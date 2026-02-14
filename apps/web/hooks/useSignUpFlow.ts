@@ -15,6 +15,7 @@ import {
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
+import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
 /**
@@ -96,10 +97,12 @@ export interface UseSignUpFlowReturn {
 export function useSignUpFlow(): UseSignUpFlowReturn {
   const { signUp, setActive, isLoaded } = useSignUp();
 
-  // Use shared auth flow base - sign-up always goes to onboarding
+  // Use shared auth flow base - sign-up goes to onboarding.
+  // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup
+  // (e.g. /onboarding?handle=myhandle from the claim-handle form) is preserved.
   const base = useAuthFlowBase({
     defaultRedirectUrl: '/onboarding',
-    useStoredRedirectUrl: false,
+    useStoredRedirectUrl: true,
   });
 
   // Sign-up specific state
@@ -186,14 +189,19 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           // by the time the page loads, and the fresh_signup flag provides
           // additional protection against redirect loops
           if (!sessionReady) {
-            console.warn(
-              '[useSignUpFlow] Session polling timed out, proceeding with redirect'
+            logger.warn(
+              'Session polling timed out, proceeding with redirect',
+              undefined,
+              'useSignUpFlow'
             );
           }
 
-          // Navigate to onboarding with fresh_signup flag for loop detection
+          // Navigate to onboarding with fresh_signup flag for loop detection.
+          // Use URL API to safely append the param regardless of existing query/hash.
           const redirectUrl = base.getRedirectUrl();
-          base.router.push(`${redirectUrl}?fresh_signup=true`);
+          const url = new URL(redirectUrl, window.location.origin);
+          url.searchParams.set('fresh_signup', 'true');
+          base.router.push(url.pathname + url.search);
 
           return true;
         }
@@ -261,11 +269,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
 
       try {
         // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments
+        // behavior across local, preview, and production environments.
+        // Include the stored redirect URL (which may contain ?handle=X from the
+        // claim form) so the handle survives the OAuth round-trip.
+        const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
           redirectUrl: `${APP_URL}/signup/sso-callback`,
-          redirectUrlComplete: `${APP_URL}/onboarding`,
+          redirectUrlComplete: `${APP_URL}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard

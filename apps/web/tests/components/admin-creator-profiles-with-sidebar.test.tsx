@@ -31,6 +31,7 @@ vi.mock('next/navigation', () => ({
     refresh: vi.fn(),
     prefetch: vi.fn().mockResolvedValue(undefined),
   }),
+  usePathname: () => '/app/admin',
 }));
 
 vi.mock('@/components/admin/CreatorAvatarCell', () => ({
@@ -70,7 +71,6 @@ vi.mock('@/components/admin/creator-actions-menu', () => ({
       ⋯
     </button>
   ),
-  copyTextToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/components/organisms/UserButton', () => ({
