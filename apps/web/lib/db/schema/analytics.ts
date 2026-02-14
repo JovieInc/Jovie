@@ -56,6 +56,15 @@ export const audienceMembers = pgTable(
     spotifyConnected: boolean('spotify_connected').default(false).notNull(),
     purchaseCount: integer('purchase_count').default(0).notNull(),
     tags: jsonb('tags').$type<string[]>().default([]),
+    utmParams: jsonb('utm_params')
+      .$type<{
+        source?: string;
+        medium?: string;
+        campaign?: string;
+        content?: string;
+        term?: string;
+      }>()
+      .default({}),
     fingerprint: text('fingerprint'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

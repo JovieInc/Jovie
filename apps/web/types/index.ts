@@ -25,6 +25,7 @@ export type {
   AudienceMember,
   AudienceMemberType,
   AudienceReferrer,
+  AudienceUtmParams,
 } from './audience';
 // Contact / CRM types
 export type {
