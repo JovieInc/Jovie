@@ -228,7 +228,6 @@ vi.mock('@/components/dashboard/organisms/GroupedLinksManager', () => ({
   },
 }));
 
-// TODO: Needs mock infrastructure for useLinksPersistence, useSuggestionSync, useProfileEditor hooks
 describe.skip('EnhancedDashboardLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
