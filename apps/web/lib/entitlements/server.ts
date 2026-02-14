@@ -26,6 +26,7 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   canFilterSelfFromAnalytics: false,
   analyticsRetentionDays: 7,
   contactsLimit: 100,
+  smartLinksLimit: 5,
 };
 
 /**
@@ -114,5 +115,6 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     canFilterSelfFromAnalytics: limits.canFilterSelfFromAnalytics,
     analyticsRetentionDays: limits.analyticsRetentionDays,
     contactsLimit: limits.contactsLimit,
+    smartLinksLimit: limits.smartLinksLimit,
   };
 }

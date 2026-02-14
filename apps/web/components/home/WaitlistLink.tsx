@@ -21,7 +21,7 @@ export function WaitlistLink() {
               size='lg'
               className='rounded-md bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200'
             >
-              <Link href='/waitlist'>Join Waitlist</Link>
+              <Link href='/signup'>Sign up</Link>
             </Button>
           </div>
         </div>

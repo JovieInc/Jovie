@@ -37,7 +37,7 @@ test.describe('Homepage', () => {
       name: /Get started/i,
     });
     await expect(getStartedButton).toBeVisible();
-    await expect(getStartedButton).toHaveAttribute('href', '/waitlist');
+    await expect(getStartedButton).toHaveAttribute('href', '/signup');
 
     // Check "See how it works" button
     const howItWorksButton = heroSection.getByRole('link', {

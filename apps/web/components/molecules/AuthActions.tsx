@@ -24,7 +24,7 @@ export function AuthActions() {
           </Link>
           {/* Signup - Linear exact specs via CSS class */}
           <Link
-            href='/waitlist'
+            href='/signup'
             className='btn-linear-signup focus-ring-themed'
           >
             Sign up

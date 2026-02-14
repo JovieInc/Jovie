@@ -349,7 +349,7 @@ export default function PricingPage() {
                   billingLabel='Free for everyone'
                   price='$0'
                   buttonLabel='Get started'
-                  buttonHref='/waitlist?plan=free'
+                  buttonHref='/signup?plan=free'
                   buttonVariant='secondary'
                   features={FREE_FEATURES}
                 />
@@ -363,7 +363,7 @@ export default function PricingPage() {
                 priceSuffix='/month'
                 yearlyPrice='or $348/year (save $120)'
                 buttonLabel='Get started'
-                buttonHref='/waitlist?plan=pro'
+                buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
                 features={PRO_FEATURES}
                 isHighlighted
@@ -379,7 +379,7 @@ export default function PricingPage() {
                   priceSuffix='/month'
                   yearlyPrice='or $948/year (save $240)'
                   buttonLabel='Request Early Access'
-                  buttonHref='/waitlist?plan=growth'
+                  buttonHref='/signup?plan=growth'
                   buttonVariant='secondary'
                   features={GROWTH_FEATURES}
                 />
