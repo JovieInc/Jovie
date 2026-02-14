@@ -162,9 +162,9 @@ export function SendInviteDialog({
             <div className='flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2'>
               <Icon
                 name='CheckCircle'
-                className='h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0'
+                className='h-3.5 w-3.5 text-success shrink-0'
               />
-              <p className='text-xs font-medium text-green-600 dark:text-green-400'>
+              <p className='text-xs font-medium text-success'>
                 Invite created successfully!
               </p>
             </div>

@@ -89,7 +89,7 @@ export function DrawerHeaderActions({
             className={cn(
               'h-8 w-8 rounded-md transition-colors hover:bg-surface-2',
               action.isActive
-                ? 'text-green-600 hover:text-green-600 dark:text-green-400 dark:hover:text-green-400'
+                ? 'text-success hover:text-success'
                 : 'text-tertiary-token hover:text-primary-token'
             )}
             aria-label={action.label}

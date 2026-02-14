@@ -354,7 +354,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
                             'rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            isCopied && 'text-green-600 dark:text-green-400'
+                            isCopied && 'text-success'
                           )}
                         >
                           <Icon

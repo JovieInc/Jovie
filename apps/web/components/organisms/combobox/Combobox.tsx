@@ -258,7 +258,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                 {error && (
                   <p
                     id={errorId}
-                    className='mt-2 text-sm text-red-400'
+                    className='mt-2 text-sm text-destructive'
                     role='alert'
                   >
                     {error}

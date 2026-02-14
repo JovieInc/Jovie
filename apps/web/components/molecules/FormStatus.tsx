@@ -23,20 +23,18 @@ export function FormStatus({
   return (
     <div className={cn('space-y-2', className)}>
       {loading && (
-        <div className='flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400'>
+        <div className='flex items-center space-x-2 text-sm text-tertiary-token'>
           <LoadingSpinner size='sm' tone='muted' />
           <span>Processing...</span>
         </div>
       )}
 
       {trimmedError && (
-        <p className='text-sm text-red-600 dark:text-red-400'>{trimmedError}</p>
+        <p className='text-sm text-destructive'>{trimmedError}</p>
       )}
 
       {trimmedSuccess && (
-        <p className='text-sm text-green-600 dark:text-green-400'>
-          {trimmedSuccess}
-        </p>
+        <p className='text-sm text-success'>{trimmedSuccess}</p>
       )}
     </div>
   );

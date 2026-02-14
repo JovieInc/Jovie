@@ -164,9 +164,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           role='status'
           aria-live='polite'
         >
-          <p className='text-sm text-green-600 dark:text-green-400'>
-            Profile updated successfully!
-          </p>
+          <p className='text-sm text-success'>Profile updated successfully!</p>
         </div>
       )}
     </form>
