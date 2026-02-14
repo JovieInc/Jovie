@@ -34,7 +34,11 @@ export function SmartLinkGateBanner({
       )}
     >
       <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
-        <Icon name='Sparkles' className='h-4 w-4 text-primary' aria-hidden='true' />
+        <Icon
+          name='Sparkles'
+          className='h-4 w-4 text-primary'
+          aria-hidden='true'
+        />
       </div>
       <div className='min-w-0 flex-1'>
         <p className='text-sm font-medium text-primary-token'>

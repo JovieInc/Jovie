@@ -136,9 +136,7 @@ export function useOnboardingSubmit({
 
         // Auto-connect Spotify artist from homepage search (fire-and-forget)
         try {
-          const spotifyUrl = sessionStorage.getItem(
-            'jovie_signup_spotify_url'
-          );
+          const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
           const artistName =
             sessionStorage.getItem('jovie_signup_artist_name') ?? '';
 

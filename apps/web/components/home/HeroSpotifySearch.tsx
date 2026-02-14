@@ -205,7 +205,10 @@ export function HeroSpotifySearch() {
           minHeight: '48px',
         }}
       >
-        <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0' style={{ backgroundColor: 'rgba(30, 215, 96, 0.15)' }}>
+        <div
+          className='flex items-center justify-center w-6 h-6 rounded-full shrink-0'
+          style={{ backgroundColor: 'rgba(30, 215, 96, 0.15)' }}
+        >
           <SocialIcon
             platform='spotify'
             className='w-3.5 h-3.5 text-[#1DB954]'
@@ -237,9 +240,18 @@ export function HeroSpotifySearch() {
           }
         />
         {state === 'loading' ? (
-          <div className='w-4 h-4 border-2 border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0' style={{ borderColor: 'var(--linear-text-tertiary)', borderTopColor: 'transparent' }} />
+          <div
+            className='w-4 h-4 border-2 border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0'
+            style={{
+              borderColor: 'var(--linear-text-tertiary)',
+              borderTopColor: 'transparent',
+            }}
+          />
         ) : (
-          <Search className='w-4 h-4 shrink-0' style={{ color: 'var(--linear-text-tertiary)' }} />
+          <Search
+            className='w-4 h-4 shrink-0'
+            style={{ color: 'var(--linear-text-tertiary)' }}
+          />
         )}
       </div>
 
@@ -305,10 +317,19 @@ export function HeroSpotifySearch() {
                   key={key}
                   className='flex items-center gap-3 animate-pulse'
                 >
-                  <div className='w-10 h-10 rounded-full' style={{ backgroundColor: 'var(--linear-bg-surface-1)' }} />
+                  <div
+                    className='w-10 h-10 rounded-full'
+                    style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+                  />
                   <div className='flex-1 space-y-1'>
-                    <div className='h-4 w-32 rounded' style={{ backgroundColor: 'var(--linear-bg-surface-1)' }} />
-                    <div className='h-3 w-20 rounded' style={{ backgroundColor: 'var(--linear-bg-surface-1)' }} />
+                    <div
+                      className='h-4 w-32 rounded'
+                      style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+                    />
+                    <div
+                      className='h-3 w-20 rounded'
+                      style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+                    />
                   </div>
                 </div>
               ))}
@@ -318,14 +339,21 @@ export function HeroSpotifySearch() {
           {/* Empty state */}
           {state === 'empty' && (
             <div className='p-4 text-center'>
-              <p className='text-sm' style={{ color: 'var(--linear-text-secondary)' }}>No artists found</p>
+              <p
+                className='text-sm'
+                style={{ color: 'var(--linear-text-secondary)' }}
+              >
+                No artists found
+              </p>
             </div>
           )}
 
           {/* Error state */}
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm' style={{ color: 'var(--linear-error)' }}>Search failed. Try again.</p>
+              <p className='text-sm' style={{ color: 'var(--linear-error)' }}>
+                Search failed. Try again.
+              </p>
             </div>
           )}
 
@@ -381,11 +409,22 @@ export function HeroSpotifySearch() {
                     )}
                   </div>
                   <div className='flex-1 min-w-0'>
-                    <div className='font-medium truncate' style={{ color: 'var(--linear-text-primary)', fontSize: '14px' }}>
+                    <div
+                      className='font-medium truncate'
+                      style={{
+                        color: 'var(--linear-text-primary)',
+                        fontSize: '14px',
+                      }}
+                    >
                       {artist.name}
                     </div>
                     {artist.followers && (
-                      <div style={{ color: 'var(--linear-text-tertiary)', fontSize: '12px' }}>
+                      <div
+                        style={{
+                          color: 'var(--linear-text-tertiary)',
+                          fontSize: '12px',
+                        }}
+                      >
                         {formatFollowers(artist.followers)}
                       </div>
                     )}
@@ -429,10 +468,21 @@ export function HeroSpotifySearch() {
               />
             </div>
             <div className='flex-1'>
-              <div className='font-medium' style={{ color: 'var(--linear-text-primary)', fontSize: '14px' }}>
+              <div
+                className='font-medium'
+                style={{
+                  color: 'var(--linear-text-primary)',
+                  fontSize: '14px',
+                }}
+              >
                 Paste a Spotify URL instead
               </div>
-              <div style={{ color: 'var(--linear-text-tertiary)', fontSize: '12px' }}>
+              <div
+                style={{
+                  color: 'var(--linear-text-tertiary)',
+                  fontSize: '12px',
+                }}
+              >
                 open.spotify.com/artist/...
               </div>
             </div>

@@ -280,7 +280,14 @@ export function ReleaseTable({
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [artistName, showTracks, isExpanded, isLoadingTracks, toggleExpansion, isSmartLinkLocked]);
+  }, [
+    artistName,
+    showTracks,
+    isExpanded,
+    isLoadingTracks,
+    toggleExpansion,
+    isSmartLinkLocked,
+  ]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {

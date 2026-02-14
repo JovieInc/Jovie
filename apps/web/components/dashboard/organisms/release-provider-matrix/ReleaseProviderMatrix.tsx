@@ -32,7 +32,6 @@ import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
-import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
@@ -42,6 +41,7 @@ import {
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
+import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -463,13 +463,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             )}
 
             {/* Smart link gate banner for free users */}
-            {showReleasesTable && !isPro && rows.length > (smartLinksLimit ?? Infinity) && (
-              <SmartLinkGateBanner
-                totalReleases={rows.length}
-                smartLinksLimit={smartLinksLimit ?? 5}
-                className='mx-4 mt-2'
-              />
-            )}
+            {showReleasesTable &&
+              !isPro &&
+              rows.length > (smartLinksLimit ?? Infinity) && (
+                <SmartLinkGateBanner
+                  totalReleases={rows.length}
+                  smartLinksLimit={smartLinksLimit ?? 5}
+                  className='mx-4 mt-2'
+                />
+              )}
 
             {showReleasesTable && (
               <QueryErrorBoundary>
