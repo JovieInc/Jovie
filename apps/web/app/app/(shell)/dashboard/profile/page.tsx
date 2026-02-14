@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation';
-import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
+import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData, getProfileSocialLinks } from '../actions';
+import { ProfilePageChat } from './ProfilePageChat';
 import { ProfilePreviewOpener } from './ProfilePreviewOpener';
 
 export const runtime = 'nodejs';
@@ -31,11 +32,11 @@ export default async function ProfilePage() {
       ? await getProfileSocialLinks(profileId)
       : [];
 
-    // Pass server-fetched data to lazy-loaded client component
     return (
       <>
         <ProfilePreviewOpener />
-        <LazyEnhancedDashboardLinks initialLinks={initialLinks} />
+        <PreviewDataHydrator initialLinks={initialLinks} />
+        <ProfilePageChat />
       </>
     );
   } catch (error) {
