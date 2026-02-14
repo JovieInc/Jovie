@@ -7,7 +7,7 @@ This document identifies the top performance issues found in the codebase, prior
 ### 1. Missing Database Indexes
 
 **Impact**: Slow database queries, especially as data grows
-**Location**: `db_indexes.md`
+**Location**: `docs/db_indexes.md`
 **Details**:
 
 - Featured creators query performs full table scans without proper indexes
