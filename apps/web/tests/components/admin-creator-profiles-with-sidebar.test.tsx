@@ -31,6 +31,7 @@ vi.mock('next/navigation', () => ({
     refresh: vi.fn(),
     prefetch: vi.fn().mockResolvedValue(undefined),
   }),
+  usePathname: () => '/app/admin',
 }));
 
 vi.mock('@/components/admin/CreatorAvatarCell', () => ({
