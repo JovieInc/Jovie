@@ -504,7 +504,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
   try {
     const chromeData = await Sentry.startSpan(
       { op: 'task', name: 'dashboard.getChromeData' },
-      async () => getCachedChromeData(userId)
+      async () => getChromeData(userId)
     );
 
     let tippingStats = createEmptyTippingStats();
@@ -512,7 +512,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       tippingStats = await Sentry.startSpan(
         { op: 'task', name: 'dashboard.getTippingStats' },
         async () =>
-          getCachedTippingStats(chromeData.selectedProfile!.id, userId)
+          getTippingStats(chromeData.selectedProfile!.id, userId)
       );
     }
 
@@ -540,18 +540,30 @@ async function resolveDashboardData(): Promise<DashboardData> {
   }
 }
 
-const getCachedChromeData = unstableCache(
-  async (clerkUserId: string) => fetchChromeDataWithSession(clerkUserId),
-  ['dashboard-chrome'],
-  { revalidate: 30 }
-);
+/**
+ * Gets chrome data (user, profiles, settings, links) for the dashboard.
+ * This function is NOT wrapped in unstable_cache because it internally calls
+ * Clerk auth functions (getCachedAuth) which access request headers.
+ * Using unstable_cache would cause errors since headers() cannot be accessed
+ * inside a cache boundary.
+ */
+async function getChromeData(clerkUserId: string): Promise<ChromeData> {
+  return fetchChromeDataWithSession(clerkUserId);
+}
 
-const getCachedTippingStats = unstableCache(
-  async (profileId: string, clerkUserId: string) =>
-    fetchTippingStatsWithSession(profileId, clerkUserId),
-  ['dashboard-tipping-stats'],
-  { revalidate: 30 }
-);
+/**
+ * Gets tipping statistics for a creator profile.
+ * This function is NOT wrapped in unstable_cache because it internally calls
+ * Clerk auth functions (getCachedAuth) which access request headers.
+ * Using unstable_cache would cause errors since headers() cannot be accessed
+ * inside a cache boundary.
+ */
+async function getTippingStats(
+  profileId: string,
+  clerkUserId: string
+): Promise<TippingStats> {
+  return fetchTippingStatsWithSession(profileId, clerkUserId);
+}
 
 /**
  * Cached loader for dashboard data.
