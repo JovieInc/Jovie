@@ -2,6 +2,7 @@
 
 import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, User } from 'lucide-react';
+import Image from 'next/image';
 import { motion, useReducedMotion } from 'motion/react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
 
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
+import { ChatMarkdown } from './ChatMarkdown';
 
 interface ChatMessageProps {
   readonly id: string;
@@ -17,6 +19,8 @@ interface ChatMessageProps {
   readonly parts: MessagePart[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
+  /** Avatar URL for user messages. */
+  readonly avatarUrl?: string | null;
 }
 
 export function ChatMessage({
@@ -24,6 +28,7 @@ export function ChatMessage({
   role,
   parts,
   isStreaming,
+  avatarUrl,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
@@ -52,12 +57,10 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[80%] flex-col'>
           <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
-            <div className='whitespace-pre-wrap text-sm leading-relaxed'>
-              {messageText}
-              {isStreaming && (
-                <span className='inline-block w-[2px] h-[1em] ml-0.5 align-text-bottom bg-current animate-pulse motion-reduce:hidden' />
-              )}
-            </div>
+            <ChatMarkdown content={messageText} />
+            {isStreaming && (
+              <span className='inline-block w-[2px] h-[1em] ml-0.5 align-text-bottom bg-current animate-pulse motion-reduce:hidden' />
+            )}
           </div>
           {!isStreaming && (
             <div className='mt-1 flex items-center gap-0.5 pl-1'>
@@ -82,8 +85,19 @@ export function ChatMessage({
         </div>
       )}
       {isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-          <User className='h-4 w-4 text-secondary-token' />
+        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 overflow-hidden'>
+          {avatarUrl ? (
+            <Image
+              src={avatarUrl}
+              alt=''
+              width={32}
+              height={32}
+              className='h-full w-full object-cover'
+              unoptimized
+            />
+          ) : (
+            <User className='h-4 w-4 text-secondary-token' />
+          )}
         </div>
       )}
     </motion.div>
