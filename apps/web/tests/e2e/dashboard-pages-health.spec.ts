@@ -183,6 +183,9 @@ const DASHBOARD_PAGES = [
   { path: '/app/dashboard/releases', name: 'Releases' },
   { path: '/app/settings/contacts', name: 'Contacts' },
   { path: '/app/settings/touring', name: 'Touring' },
+  { path: '/app/settings/billing', name: 'Settings Billing' },
+  { path: '/billing', name: 'Billing' },
+  { path: '/account', name: 'Account' },
 ] as const;
 
 /**
@@ -238,7 +241,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test('All dashboard pages load without errors', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(300_000); // 5 minutes for 8 pages (dev mode is slow)
+    test.setTimeout(300_000); // 5 minutes for 11 pages (dev mode is slow)
 
     const results: PageHealthResult[] = [];
 
@@ -280,12 +283,14 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           continue;
         }
 
-        // Check if redirected to different dashboard/settings page (feature gate, etc.)
+        // Check if redirected to different dashboard/settings/billing page (feature gate, etc.)
         // This is okay - the page exists, it just redirected based on permissions
         if (
           !currentUrl.includes(pageConfig.path) &&
           (currentUrl.includes('/app/dashboard') ||
-            currentUrl.includes('/app/settings'))
+            currentUrl.includes('/app/settings') ||
+            currentUrl.includes('/billing') ||
+            currentUrl.includes('/account'))
         ) {
           results.push({
             path: pageConfig.path,
