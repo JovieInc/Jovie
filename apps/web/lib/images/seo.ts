@@ -420,8 +420,7 @@ export function generateArtworkImageObject(
     artworkSizes?: Record<string, string> | null;
   }
 ): Record<string, unknown> {
-  const typeLabel =
-    context.contentType === 'release' ? 'album cover' : 'track';
+  const typeLabel = context.contentType === 'release' ? 'album cover' : 'track';
 
   return {
     '@type': 'ImageObject',

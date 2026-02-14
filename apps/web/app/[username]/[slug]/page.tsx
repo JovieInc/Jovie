@@ -60,7 +60,6 @@ function generateMusicStructuredData(
     artworkSizes?: Record<string, string> | null;
     releaseType?: string | null;
     totalTracks?: number | null;
-    previewUrl?: string | null;
   },
   creator: {
     displayName: string | null;
@@ -79,7 +78,10 @@ function generateMusicStructuredData(
     content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
 
   // Build rich image structured data with multiple sizes
-  let imageValue: Record<string, unknown> | (Record<string, unknown> | string)[] | undefined;
+  let imageValue:
+    | Record<string, unknown>
+    | (Record<string, unknown> | string)[]
+    | undefined;
   if (content.artworkUrl) {
     const primaryImage = generateArtworkImageObject(content.artworkUrl, {
       title: content.title,
@@ -544,7 +546,6 @@ export default async function ContentSmartLinkPage({
       artworkSizes: content.artworkSizes,
       releaseType: content.releaseType,
       totalTracks: content.totalTracks,
-      previewUrl: content.previewUrl,
     },
     creator
   );

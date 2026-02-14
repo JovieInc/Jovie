@@ -5,10 +5,7 @@ import { BASE_URL } from '@/constants/app';
 import { HOSTNAME } from '@/constants/domains';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
-import {
-  discogReleases,
-  discogTracks,
-} from '@/lib/db/schema/content';
+import { discogReleases, discogTracks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
@@ -153,13 +150,19 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Track smart link pages with parent release artwork as sitemap images
-  const trackPages = tracks.map(track => ({
-    url: `${BASE_URL}/${track.username}/${track.slug}`,
-    lastModified: track.updatedAt || new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.6,
-    ...(track.artworkUrl && { images: [track.artworkUrl] }),
-  }));
+  // De-duplicate against release URLs since tracks within a release can share slugs
+  const releaseUrls = new Set(releasePages.map(r => r.url));
+  const trackPages = tracks
+    .filter(
+      track => !releaseUrls.has(`${BASE_URL}/${track.username}/${track.slug}`)
+    )
+    .map(track => ({
+      url: `${BASE_URL}/${track.username}/${track.slug}`,
+      lastModified: track.updatedAt || new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+      ...(track.artworkUrl && { images: [track.artworkUrl] }),
+    }));
 
   return [homePage, ...profilePages, ...releasePages, ...trackPages];
 }
