@@ -17,6 +17,7 @@ import type {
   AudienceMember,
   AudienceMemberType,
   AudienceReferrer,
+  AudienceUtmParams,
 } from '@/types';
 
 export type AudienceMode = 'members' | 'subscribers';
@@ -116,6 +117,7 @@ function transformMemberRow(member: {
   deviceType: string | null;
   latestActions: unknown[] | Record<string, unknown>[] | null;
   referrerHistory: unknown[] | Record<string, unknown>[] | null;
+  utmParams: AudienceUtmParams | null;
   email: string | null;
   phone: string | null;
   spotifyConnected: boolean | null;
@@ -135,6 +137,7 @@ function transformMemberRow(member: {
     intentLevel: member.intentLevel,
     latestActions: normalizeLatestActions(member.latestActions),
     referrerHistory: normalizeReferrerHistory(member.referrerHistory),
+    utmParams: normalizeUtmParams(member.utmParams),
     email: member.email,
     phone: member.phone,
     spotifyConnected: Boolean(member.spotifyConnected),
@@ -188,6 +191,18 @@ function normalizeReferrerHistory(value: unknown): AudienceReferrer[] {
   }));
 }
 
+function normalizeUtmParams(value: unknown): AudienceUtmParams {
+  if (!value || typeof value !== 'object') return {};
+  const record = value as Record<string, unknown>;
+  const result: AudienceUtmParams = {};
+  if (typeof record.source === 'string') result.source = record.source;
+  if (typeof record.medium === 'string') result.medium = record.medium;
+  if (typeof record.campaign === 'string') result.campaign = record.campaign;
+  if (typeof record.content === 'string') result.content = record.content;
+  if (typeof record.term === 'string') result.term = record.term;
+  return result;
+}
+
 /** Default member query params when validation fails */
 const DEFAULT_MEMBER_PARAMS = {
   page: 1,
@@ -231,6 +246,7 @@ function buildMemberSelectFields(includeDetails: boolean) {
     referrerHistory: includeDetails
       ? audienceMembers.referrerHistory
       : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
+    utmParams: audienceMembers.utmParams,
     email: audienceMembers.email,
     phone: audienceMembers.phone,
     spotifyConnected: audienceMembers.spotifyConnected,
@@ -446,6 +462,7 @@ async function fetchSubscribersData(
       intentLevel: 'medium',
       latestActions: [],
       referrerHistory: [],
+      utmParams: {},
       email: subscriber.email,
       phone: subscriber.phone,
       spotifyConnected: false,

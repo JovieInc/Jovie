@@ -69,6 +69,11 @@ interface AudienceMemberDetailsProps {
 }
 
 export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
+  const utm = member.utmParams;
+  const hasUtm =
+    utm &&
+    (utm.source || utm.medium || utm.campaign || utm.content || utm.term);
+
   return (
     <div className='space-y-3'>
       <DrawerPropertyRow
@@ -100,6 +105,23 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
         label='Intent'
         value={<AudienceIntentBadge intentLevel={member.intentLevel} />}
       />
+      {hasUtm && (
+        <>
+          {utm.source && (
+            <DrawerPropertyRow label='Source' value={utm.source} />
+          )}
+          {utm.medium && (
+            <DrawerPropertyRow label='Medium' value={utm.medium} />
+          )}
+          {utm.campaign && (
+            <DrawerPropertyRow label='Campaign' value={utm.campaign} />
+          )}
+          {utm.content && (
+            <DrawerPropertyRow label='Content' value={utm.content} />
+          )}
+          {utm.term && <DrawerPropertyRow label='Term' value={utm.term} />}
+        </>
+      )}
       <DrawerPropertyRow
         label='Email'
         value={
