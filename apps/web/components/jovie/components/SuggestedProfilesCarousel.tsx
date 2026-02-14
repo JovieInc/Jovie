@@ -201,9 +201,9 @@ function SuggestionCard({
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <X className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
+              <X className='h-4 w-4' />
             )}
             {isAvatar ? 'Skip' : 'Not me'}
           </button>
@@ -220,9 +220,9 @@ function SuggestionCard({
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <Check className='h-4 w-4 sm:h-3.5 sm:w-3.5' />
+              <Check className='h-4 w-4' />
             )}
             {isAvatar ? 'Use photo' : "That's me"}
           </button>
@@ -334,7 +334,7 @@ export function SuggestedProfilesCarousel({
                 )}
                 aria-label='Previous suggestion'
               >
-                <ChevronLeft className='h-5 w-5 sm:h-3.5 sm:w-3.5' />
+                <ChevronLeft className='h-5 w-5' />
               </button>
               <button
                 type='button'
@@ -348,7 +348,7 @@ export function SuggestedProfilesCarousel({
                 )}
                 aria-label='Next suggestion'
               >
-                <ChevronRight className='h-5 w-5 sm:h-3.5 sm:w-3.5' />
+                <ChevronRight className='h-5 w-5' />
               </button>
             </div>
           )}
