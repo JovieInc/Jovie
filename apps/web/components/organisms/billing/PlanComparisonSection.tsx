@@ -8,9 +8,10 @@ import {
   SegmentControl,
   Separator,
 } from '@jovie/ui';
-import { Check } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { parseAsStringLiteral, useQueryState } from 'nuqs';
+import { useState } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ import {
   PLAN_KEYS,
   type PlanKey,
 } from './billing-constants';
+import { GrowthAccessRequestModal } from './GrowthAccessRequestModal';
 
 function findPriceForPlan(
   options: PricingOption[],
@@ -45,6 +47,7 @@ export function PlanComparisonSection({
     'interval',
     parseAsStringLiteral(['month', 'year'] as const).withDefault('month')
   );
+  const [growthModalOpen, setGrowthModalOpen] = useState(false);
   const activePlan = currentPlan ?? 'free';
 
   return (
@@ -163,6 +166,15 @@ export function PlanComparisonSection({
                       <Check className='mr-2 h-4 w-4' />
                       Current Plan
                     </Button>
+                  ) : planKey === 'growth' ? (
+                    <Button
+                      variant='secondary'
+                      className='w-full'
+                      onClick={() => setGrowthModalOpen(true)}
+                    >
+                      <Sparkles className='mr-2 h-4 w-4' />
+                      Request Early Access
+                    </Button>
                   ) : planKey !== 'free' && hasAvailablePrice ? (
                     <UpgradeButton
                       priceId={priceOption?.priceId ?? defaultPriceId}
@@ -203,6 +215,11 @@ export function PlanComparisonSection({
           );
         })}
       </div>
+
+      <GrowthAccessRequestModal
+        open={growthModalOpen}
+        onOpenChange={setGrowthModalOpen}
+      />
     </motion.div>
   );
 }

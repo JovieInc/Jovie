@@ -29,6 +29,10 @@ export interface JovieChatProps {
   readonly initialQuery?: string;
   /** Callback when the conversation title changes (e.g. after auto-generation) */
   readonly onTitleChange?: (title: string | null) => void;
+  /** Artist display name for the welcome greeting */
+  readonly displayName?: string;
+  /** Artist avatar URL for user message bubbles */
+  readonly avatarUrl?: string | null;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
