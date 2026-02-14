@@ -29,7 +29,7 @@ export const PLAN_FEATURES = {
   },
   growth: {
     name: 'Growth',
-    tagline: 'For serious artists',
+    tagline: 'For serious artists — Early Access',
     features: [
       { label: 'Full analytics', detail: '1-year retention' },
       { label: 'Everything in Pro' },
