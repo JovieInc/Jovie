@@ -810,17 +810,181 @@ https://jov.ie/api/catalog-monitor/action?token={hmac_token}&action=confirm
 
 ## 9. Dashboard UI
 
-### 9.1 New Route: `/dashboard/catalog-monitor`
+### 9.1 Right Drawer: Monitoring Toggles
 
-A new page in the creator dashboard, accessible from the sidebar navigation.
+**Integration point**: The existing `RightDrawer` component (`components/organisms/RightDrawer.tsx`) with `SettingsToggleRow` (`components/dashboard/molecules/SettingsToggleRow.tsx`).
 
-### 9.2 Components
+When the artist opens the right drawer (sidebar settings panel), a new **"Catalog Monitor"** section appears below existing settings sections. This uses the existing `SettingsToggleRow` component pattern for consistency.
 
-#### `CatalogMonitorUpgateGate` (for non-Pro users)
+```
+┌─────────────────────────────────────────┐
+│  Right Drawer                      [×]  │
+│                                         │
+│  ... existing settings sections ...     │
+│                                         │
+│  ─── Catalog Monitor (Pro) ───────────  │
+│                                         │
+│  Monitor my profiles          [══●]  ON │
+│  Scans your DSP profiles for            │
+│  unauthorized releases                  │
+│                                         │
+│  Email alerts                 [══●]  ON │
+│  Get notified when new music            │
+│  appears on your profiles               │
+│                                         │
+│  ─── Monitored Platforms ─────────────  │
+│                                         │
+│  ♫ Spotify                    [══●]  ON │
+│  Connected as "Artist Name"             │
+│  Last scanned: 2h ago                   │
+│                                         │
+│  ♫ Apple Music                [══●]  ON │
+│  Connected as "Artist Name"             │
+│  Last scanned: 2h ago                   │
+│                                         │
+│  ♫ YouTube Music              [○══]  OFF│
+│  Not connected                          │
+│                                         │
+│  [View full monitoring dashboard →]     │
+└─────────────────────────────────────────┘
+```
+
+**For non-Pro users**, the section appears but all toggles are disabled with a lock icon and the description reads "Upgrade to Pro to enable catalog monitoring":
+
+```
+│  ─── Catalog Monitor ─────────────────  │
+│                                         │
+│  🔒 Monitor my profiles      [○══] OFF │
+│  Upgrade to Pro ($99/mo) to scan your   │
+│  streaming profiles for unauthorized    │
+│  releases. [Upgrade →]                  │
+```
+
+**Component**: `CatalogMonitorDrawerSection`
+- Renders inside the existing right drawer settings layout
+- Uses `SettingsToggleRow` for each toggle (same component as analytics/appearance toggles)
+- Master toggle (`catalogMonitoring`) disables all child toggles when off
+- Per-provider toggles only show for connected DSPs (checks `spotifyId`, `appleMusicId`, etc.)
+- "Last scanned" timestamp updates via the existing `useBillingStatusQuery` pattern or a new lightweight query
+- Optimistic toggle updates with rollback on error + toast feedback (existing pattern in `SettingsToggleRow`)
+- PATCH to `/api/catalog-monitor/settings` on toggle change
+
+### 9.2 Chat Carousel: Unauthorized Release Cards
+
+**Integration point**: The existing `SuggestedProfilesCarousel` in `JovieChat.tsx` (`components/jovie/JovieChat.tsx`).
+
+The carousel currently shows DSP match suggestions, social link suggestions, and avatar suggestions — each with confirm/reject action buttons ("That's me" / "Not me", "Use photo" / "Skip"). **Catalog monitoring alerts slot directly into this same carousel** as a new card type.
+
+When there are unconfirmed releases detected by the catalog scanner, they appear as cards in the carousel alongside existing suggestions:
+
+```
+┌─────────────────────────────────────────────────┐
+│                                          1 of 4 │
+│                                                 │
+│  ⚠️ SPOTIFY · New release detected              │
+│                                                 │
+│  ┌─────────────────────────────────────────┐    │
+│  │         [Album Artwork 200×200]         │    │
+│  └─────────────────────────────────────────┘    │
+│                                                 │
+│  "Midnight Dreams"                              │
+│  Single · Feb 14, 2026 · Some Records           │
+│                                                 │
+│  This appeared on your Spotify profile.         │
+│  Is this yours?                                 │
+│                                                 │
+│  ┌──────────┐  ┌───────────────────────┐        │
+│  │  ✕ Not   │  │  ✓ That's mine        │        │
+│  │   mine   │  │                       │        │
+│  └──────────┘  └───────────────────────┘        │
+│                                                 │
+│  [View on Spotify ↗]                            │
+│                                                 │
+│         ● ● ○ ○          [←]  [→]               │
+└─────────────────────────────────────────────────┘
+```
+
+**How it integrates with `SuggestedProfilesCarousel`**:
+
+The carousel already loads suggestions via an API call in `onContextLoad`. We extend the data source to also fetch unconfirmed catalog detections:
+
+```typescript
+// In SuggestedProfilesCarousel data loading:
+// Existing: DSP matches, social links, avatar candidates
+// New: Unconfirmed detected releases (from /api/catalog-monitor/status)
+
+interface CarouselCard {
+  type: 'dsp_match' | 'social_link' | 'avatar' | 'catalog_alert';  // ← new type
+  // ... existing fields
+}
+
+// For catalog_alert cards specifically:
+interface CatalogAlertCard extends CarouselCard {
+  type: 'catalog_alert';
+  detectedReleaseId: string;
+  title: string;
+  releaseType: string;         // 'single', 'album', 'ep'
+  releaseDate: string;
+  artworkUrl: string | null;
+  label: string | null;
+  provider: string;            // 'spotify', 'apple_music'
+  externalUrl: string;
+}
+```
+
+**Action handling** (follows existing carousel confirm/reject pattern):
+
+| Button | API Call | Card Transition |
+|--------|----------|-----------------|
+| "That's mine" | `POST /api/catalog-monitor/confirm` | Card slides out, shows "Confirmed ✓" briefly, advances to next |
+| "Not mine" | Opens `DisputeDialog` modal | On submit → `POST /api/catalog-monitor/dispute` → card slides out |
+
+**Ordering**: Catalog alert cards are shown **first** in the carousel (before DSP matches and social suggestions) because they're time-sensitive and security-relevant. The carousel dot indicator shows their position among all cards.
+
+**Empty state**: If there are no unconfirmed releases and no other suggestions, the carousel is hidden (existing behavior). If there are only catalog alerts and no other suggestions, the carousel shows only the alert cards.
+
+**Pro gating in carousel**: Catalog alert cards only appear when `isPro === true`. Non-Pro users never see them in the carousel (the scan doesn't run, so there's no data to show). However, if we implement the "teaser" variant (Section 11, future backlog), we could show a locked card:
+
+```
+┌─────────────────────────────────────────────────┐
+│  🔒 CATALOG MONITOR · Pro Feature               │
+│                                                 │
+│  You have 47 releases on Spotify.               │
+│  Are they all yours?                            │
+│                                                 │
+│  Catalog Monitor scans your streaming           │
+│  profiles and alerts you when unauthorized      │
+│  music appears.                                 │
+│                                                 │
+│  [Upgrade to Pro — $99/mo]                      │
+└─────────────────────────────────────────────────┘
+```
+
+### 9.3 New Route: `/dashboard/catalog-monitor`
+
+The full dedicated page for in-depth catalog monitoring management, accessible from the sidebar navigation and the "View full monitoring dashboard" link in the right drawer.
+
+### 9.4 Components
+
+#### `CatalogMonitorUpgradeGate` (for non-Pro users)
 - Full-page locked state shown to free/basic/premium users
 - Explains the feature value prop with visual mockup
 - Shows "Upgrade to Pro — $99/mo" CTA button → links to `/pricing` or Stripe checkout
 - Optionally shows a teaser: "You have X releases on Spotify — are they all yours?" (uses public DSP data to create urgency)
+
+#### `CatalogMonitorDrawerSection` (right drawer integration)
+- Renders inside the existing right drawer settings layout
+- Master monitoring toggle + email alerts toggle + per-provider toggles
+- Uses `SettingsToggleRow` for consistency with existing settings sections
+- Links to full dashboard page
+
+#### `CatalogAlertCarouselCard` (chat carousel integration)
+- New card type for `SuggestedProfilesCarousel`
+- Shows album art, title, release type, date, label, provider icon
+- "That's mine" / "Not mine" action buttons (same pattern as existing DSP match cards)
+- "View on {Provider}" external link with arrow icon
+- Loading spinner during confirm/dispute API calls
+- Slide-out animation on action (existing carousel animation: `animate-slide-out-left`)
 
 #### `CatalogMonitorOverview` (Pro users only)
 - Shows monitoring status (enabled/disabled), last scan time, next scan
@@ -837,14 +1001,15 @@ A new page in the creator dashboard, accessible from the sidebar navigation.
 - Filter by: status (all, unconfirmed, confirmed, disputed), provider
 - Sort by: detection date, release date
 
-#### `CatalogMonitorSettings`
+#### `CatalogMonitorSettings` (full settings page, linked from drawer)
 - Toggle monitoring on/off
 - Toggle email alerts on/off
 - Scan frequency selector (6h / 12h / 24h)
-- Per-provider toggles (future)
+- Per-provider toggles
+- Detailed scan history and error log
 
 #### `DisputeDialog`
-- Modal when clicking "Not mine"
+- Modal when clicking "Not mine" (from carousel card, release card, or email action)
 - Text area for optional notes
 - Shows DSP-specific reporting links
 - Provides template text for distributor communication
@@ -1110,29 +1275,44 @@ Tokens are:
 
 **Deliverable**: Artists get emails when new releases appear, can confirm/dispute via email links.
 
-### Phase 3: Dashboard UI (Week 3-4)
+### Phase 3: Right Drawer + Chat Carousel (Week 3-4)
 
-**Goal**: In-app monitoring experience
+**Goal**: Core in-app surfaces — drawer toggles and carousel alerts
 
 | Task | Est. Effort | Files |
 |------|-------------|-------|
 | API: `/api/catalog-monitor/status` | S | `app/api/catalog-monitor/status/route.ts` |
-| API: `/api/catalog-monitor/history` | S | `app/api/catalog-monitor/history/route.ts` |
 | API: `/api/catalog-monitor/settings` | S | `app/api/catalog-monitor/settings/route.ts` |
+| `CatalogMonitorDrawerSection` (right drawer toggles) | M | `components/catalog-monitor/drawer-section.tsx` |
+| Integrate drawer section into `RightDrawer` | S | `components/organisms/RightDrawer.tsx` |
+| Non-Pro locked state in drawer | S | `components/catalog-monitor/drawer-section.tsx` |
+| `CatalogAlertCarouselCard` (new card type) | M | `components/jovie/components/CatalogAlertCarouselCard.tsx` |
+| Extend `SuggestedProfilesCarousel` to fetch & render catalog alerts | M | `components/jovie/components/SuggestedProfilesCarousel.tsx` |
+| `DisputeDialog` modal (shared by carousel + dashboard) | M | `components/catalog-monitor/dispute-dialog.tsx` |
+| Pro guard wrapper (checks `isPro`, routes to upgrade gate) | S | `components/catalog-monitor/pro-guard.tsx` |
+| Statsig feature gate setup | S | Statsig dashboard |
+
+**Deliverable**: Pro users see monitoring toggles in the right drawer and unauthorized release cards in the chat carousel with confirm/reject actions.
+
+### Phase 4: Full Dashboard Page (Week 4-5)
+
+**Goal**: Dedicated monitoring dashboard for deep management
+
+| Task | Est. Effort | Files |
+|------|-------------|-------|
+| API: `/api/catalog-monitor/history` | S | `app/api/catalog-monitor/history/route.ts` |
 | Dashboard page layout | M | `app/(dashboard)/catalog-monitor/page.tsx` |
-| `CatalogMonitorUpgradeGate` (non-Pro upsell) | M | `components/catalog-monitor/upgrade-gate.tsx` |
-| Pro guard wrapper (checks `isPro`, routes to gate) | S | `components/catalog-monitor/pro-guard.tsx` |
+| `CatalogMonitorUpgradeGate` (non-Pro full-page upsell) | M | `components/catalog-monitor/upgrade-gate.tsx` |
 | `CatalogMonitorOverview` component | M | `components/catalog-monitor/overview.tsx` |
 | `UnconfirmedReleaseCard` component | M | `components/catalog-monitor/release-card.tsx` |
 | `CatalogMonitorHistory` component | M | `components/catalog-monitor/history.tsx` |
-| `CatalogMonitorSettings` component | S | `components/catalog-monitor/settings.tsx` |
-| `DisputeDialog` component | M | `components/catalog-monitor/dispute-dialog.tsx` |
+| `CatalogMonitorSettings` (full settings page) | S | `components/catalog-monitor/settings.tsx` |
 | Sidebar nav item | S | Dashboard layout |
-| Statsig feature gate setup | S | Statsig dashboard |
+| "View full monitoring dashboard →" link in drawer | S | `components/catalog-monitor/drawer-section.tsx` |
 
-**Deliverable**: Full in-app experience for viewing and managing detected releases.
+**Deliverable**: Full dedicated dashboard page with history, filtering, and settings — linked from the right drawer.
 
-### Phase 4: Apple Music + Polish (Week 4-5)
+### Phase 5: Apple Music + Polish (Week 5-6)
 
 **Goal**: Multi-provider support, admin tools, observability
 
@@ -1160,6 +1340,7 @@ Tokens are:
 - **YouTube Music, Tidal, SoundCloud** providers
 - **Weekly digest email** (summary of all monitoring activity)
 - **Unclaimed profile incentive** ("We found suspicious activity — claim your Jovie")
+- **Non-Pro carousel teaser card** (locked card in carousel showing release count to drive upgrades)
 
 ---
 
