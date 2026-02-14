@@ -66,7 +66,11 @@ export default function VenmoTipSelector({
           </div>
         </div>
 
-        <TipSelector amounts={amounts} onContinue={handleAmountSelected} />
+        <TipSelector
+          amounts={amounts}
+          onContinue={handleAmountSelected}
+          paymentLabel='Venmo'
+        />
 
         <p className='mt-4 text-center text-xs text-tertiary-token'>
           You&apos;ll be redirected to Venmo to complete your tip.
