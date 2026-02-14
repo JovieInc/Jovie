@@ -28,6 +28,7 @@ import {
 } from '@/lib/discography/config';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
+import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -35,9 +36,18 @@ import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
 
+/** Maps release type enum to schema.org MusicAlbumReleaseType values */
+const RELEASE_TYPE_SCHEMA_MAP: Record<string, string> = {
+  single: 'https://schema.org/SingleRelease',
+  ep: 'https://schema.org/EPRelease',
+  album: 'https://schema.org/AlbumRelease',
+  compilation: 'https://schema.org/CompilationAlbum',
+};
+
 /**
  * Generate JSON-LD structured data for music content SEO.
- * Implements schema.org MusicRecording/MusicAlbum schemas.
+ * Implements schema.org MusicRecording/MusicAlbum schemas with rich
+ * ImageObject artwork, albumReleaseType, and numTracks.
  */
 function generateMusicStructuredData(
   content: {
@@ -47,6 +57,10 @@ function generateMusicStructuredData(
     artworkUrl: string | null;
     releaseDate: Date | null;
     providerLinks: Array<{ providerId: string; url: string }>;
+    artworkSizes?: Record<string, string> | null;
+    releaseType?: string | null;
+    totalTracks?: number | null;
+    previewUrl?: string | null;
   },
   creator: {
     displayName: string | null;
@@ -64,13 +78,36 @@ function generateMusicStructuredData(
   const schemaType =
     content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
 
+  // Build rich image structured data with multiple sizes
+  let imageValue: Record<string, unknown> | (Record<string, unknown> | string)[] | undefined;
+  if (content.artworkUrl) {
+    const primaryImage = generateArtworkImageObject(content.artworkUrl, {
+      title: content.title,
+      artistName,
+      contentType: content.type,
+      artworkSizes: content.artworkSizes,
+    });
+
+    // Include additional artwork sizes for image search discovery
+    const additionalImages: string[] = [];
+    if (content.artworkSizes?.['1000'])
+      additionalImages.push(content.artworkSizes['1000']);
+    if (content.artworkSizes?.original)
+      additionalImages.push(content.artworkSizes.original);
+
+    imageValue =
+      additionalImages.length > 0
+        ? [primaryImage, ...additionalImages]
+        : primaryImage;
+  }
+
   const musicSchema = {
     '@context': 'https://schema.org',
     '@type': schemaType,
     '@id': `${contentUrl}#${content.type}`,
     name: content.title,
     url: contentUrl,
-    ...(content.artworkUrl && { image: content.artworkUrl }),
+    ...(imageValue && { image: imageValue }),
     ...(content.releaseDate && {
       datePublished: toDateOnlySafe(content.releaseDate),
     }),
@@ -81,6 +118,17 @@ function generateMusicStructuredData(
       url: artistUrl,
     },
     ...(sameAs.length > 0 && { sameAs }),
+    // Release-specific properties
+    ...(content.type === 'release' &&
+      content.releaseType &&
+      RELEASE_TYPE_SCHEMA_MAP[content.releaseType] && {
+        albumReleaseType: RELEASE_TYPE_SCHEMA_MAP[content.releaseType],
+      }),
+    ...(content.type === 'release' &&
+      content.totalTracks &&
+      content.totalTracks > 0 && {
+        numTracks: content.totalTracks,
+      }),
   };
 
   const breadcrumbSchema = {
@@ -128,6 +176,12 @@ interface ContentData {
   providerLinks: Array<{ providerId: string; url: string }>;
   /** Artwork size URLs from release metadata (for download context menu) */
   artworkSizes?: Record<string, string> | null;
+  /** Release type (single, ep, album, etc.) — only present for releases */
+  releaseType?: string | null;
+  /** Total track count — only present for releases */
+  totalTracks?: number | null;
+  /** Audio preview URL — only present for tracks */
+  previewUrl?: string | null;
   creator: {
     id: string;
     displayName: string | null;
@@ -197,6 +251,12 @@ interface CachedContentData {
   providerLinks: Array<{ providerId: string; url: string }>;
   /** Artwork size URLs from release metadata (for download context menu) */
   artworkSizes?: Record<string, string> | null;
+  /** Release type (single, ep, album, etc.) — only present for releases */
+  releaseType?: string | null;
+  /** Total track count — only present for releases */
+  totalTracks?: number | null;
+  /** Audio preview URL — only present for tracks */
+  previewUrl?: string | null;
 }
 
 /**
@@ -214,6 +274,8 @@ const fetchContentBySlug = async (
       slug: discogReleases.slug,
       artworkUrl: discogReleases.artworkUrl,
       releaseDate: discogReleases.releaseDate,
+      releaseType: discogReleases.releaseType,
+      totalTracks: discogReleases.totalTracks,
       metadata: discogReleases.metadata,
     })
     .from(discogReleases)
@@ -252,6 +314,8 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(release.releaseDate),
       providerLinks: links,
       artworkSizes,
+      releaseType: release.releaseType,
+      totalTracks: release.totalTracks,
     };
   }
 
@@ -262,6 +326,7 @@ const fetchContentBySlug = async (
       title: discogTracks.title,
       slug: discogTracks.slug,
       releaseId: discogTracks.releaseId,
+      previewUrl: discogTracks.previewUrl,
     })
     .from(discogTracks)
     .where(
@@ -306,6 +371,7 @@ const fetchContentBySlug = async (
       artworkUrl: releaseData?.artworkUrl ?? null,
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
+      previewUrl: track.previewUrl,
     };
   }
 
@@ -475,6 +541,10 @@ export default async function ContentSmartLinkPage({
       artworkUrl: content.artworkUrl,
       releaseDate: content.releaseDate,
       providerLinks: content.providerLinks,
+      artworkSizes: content.artworkSizes,
+      releaseType: content.releaseType,
+      totalTracks: content.totalTracks,
+      previewUrl: content.previewUrl,
     },
     creator
   );
@@ -608,6 +678,36 @@ export async function generateMetadata({
   // Determine OG type based on content type
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
 
+  // Prefer larger artwork sizes for social sharing (1000px > original > 640px default)
+  const defaultImage = `${BASE_URL}/og/default.png`;
+  const ogImageUrl =
+    content.artworkSizes?.['1000'] ??
+    content.artworkSizes?.original ??
+    content.artworkUrl ??
+    defaultImage;
+  const isDefaultImage = ogImageUrl === defaultImage;
+  const ogImageSize = content.artworkSizes?.['1000']
+    ? 1000
+    : content.artworkSizes?.original
+      ? 1200
+      : content.artworkUrl
+        ? 640
+        : 1200;
+  const ogImageHeight = isDefaultImage ? 630 : ogImageSize;
+
+  // Detect image content type from URL for og:image:type
+  const ogImageType = isDefaultImage
+    ? 'image/png'
+    : ogImageUrl.includes('.png')
+      ? 'image/png'
+      : ogImageUrl.includes('.webp')
+        ? 'image/webp'
+        : ogImageUrl.includes('.avif')
+          ? 'image/avif'
+          : 'image/jpeg';
+
+  const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
+
   return {
     title,
     description,
@@ -638,12 +738,18 @@ export async function generateMetadata({
       locale: 'en_US',
       images: [
         {
-          url: content.artworkUrl || `${BASE_URL}/og/default.png`,
-          width: content.artworkUrl ? 640 : 1200,
-          height: content.artworkUrl ? 640 : 630,
-          alt: `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`,
+          url: ogImageUrl,
+          width: ogImageSize,
+          height: ogImageHeight,
+          alt: artworkAlt,
+          type: ogImageType,
         },
       ],
+      // Include audio preview for tracks (og:audio)
+      ...(content.type === 'track' &&
+        content.previewUrl && {
+          audio: content.previewUrl,
+        }),
     },
     twitter: {
       card: 'summary_large_image',
@@ -653,14 +759,14 @@ export async function generateMetadata({
       site: '@jovieapp',
       images: [
         {
-          url: content.artworkUrl || `${BASE_URL}/og/default.png`,
-          alt: `${content.title} artwork`,
+          url: ogImageUrl,
+          alt: artworkAlt,
         },
       ],
     },
     other: {
       'music:musician': artistName,
-      'music:release_type': content.type,
+      'music:release_type': content.releaseType ?? content.type,
       ...(content.releaseDate && {
         'music:release_date': toDateOnlySafe(content.releaseDate),
       }),
