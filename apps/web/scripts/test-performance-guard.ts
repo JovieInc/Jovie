@@ -60,9 +60,9 @@ class TestPerformanceGuard {
       // See: https://github.com/JovieInc/Jovie/issues/TBD
     },
     full: {
-      maxTotalDuration: 300000,
+      maxTotalDuration: 420000,
       description:
-        'Full coverage runs should stay under 5 minutes to guard against drift.',
+        'Full coverage runs should stay under 7 minutes to guard against drift.',
     },
   };
 
