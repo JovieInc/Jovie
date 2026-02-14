@@ -14,9 +14,9 @@ const authButtonVariants = cva(
     // Mobile-optimized height (min 44px for touch targets)
     'h-11 sm:h-11 min-h-[44px]',
     // Touch-optimized transitions
-    'transition-all duration-150 ease-out',
+    'transition-colors duration-150 ease-out',
     // Active press state for mobile
-    'active:scale-[0.98] active:opacity-90',
+    'active:opacity-90',
     // Prevent text selection on touch
     'select-none touch-manipulation',
     // Smooth tap highlight removal for iOS
@@ -44,7 +44,7 @@ const authButtonVariants = cva(
         link: [
           'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799]',
           'hover:text-[#1f2023] dark:hover:text-[#e3e4e6]',
-          'active:scale-100 active:opacity-70',
+          'active:opacity-70',
         ].join(' '),
       },
     },

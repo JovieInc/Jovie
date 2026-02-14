@@ -141,7 +141,7 @@ export function ProfileEditorSection({
             ) : (
               <button
                 type='button'
-                className='min-h-[48px] w-full rounded-xl py-3 text-center text-lg font-semibold text-primary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:min-h-[44px] sm:rounded-lg sm:py-2 sm:text-base sm:font-medium'
+                className='min-h-[48px] w-full rounded-xl py-3 text-center text-lg font-semibold text-primary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:opacity-90 sm:min-h-[44px] sm:rounded-lg sm:py-2 sm:text-base sm:font-medium'
                 onClick={() => setEditingField('displayName')}
                 aria-label='Edit display name'
               >
@@ -169,7 +169,7 @@ export function ProfileEditorSection({
             ) : (
               <button
                 type='button'
-                className='min-h-[44px] w-full rounded-xl py-2.5 text-center text-sm font-medium text-secondary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:rounded-lg sm:py-2'
+                className='min-h-[44px] w-full rounded-xl py-2.5 text-center text-sm font-medium text-secondary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:opacity-90 sm:rounded-lg sm:py-2'
                 onClick={() => setEditingField('username')}
                 aria-label='Edit username'
               >

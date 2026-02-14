@@ -40,10 +40,10 @@ export function EngagementEngineLanding() {
             <div className='mt-10 flex flex-col items-center gap-3'>
               <Link
                 href='/waitlist'
-                className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg focus-ring-themed'
+                className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-colors duration-200 ease-out hover:bg-btn-primary/90 focus-ring-themed'
               >
                 Get early access
-                <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
+                <ArrowRight className='h-4 w-4' />
               </Link>
               <Link
                 href='#system'

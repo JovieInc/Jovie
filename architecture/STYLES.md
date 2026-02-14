@@ -150,24 +150,53 @@ className="bg-white dark:bg-gray-900 text-black dark:text-white"
 
 ### Standard Transitions
 ```css
-/* Standard transition for most interactions */
-transition-colors duration-200
+/* Buttons — color change only on hover */
+transition-colors duration-150 ease-out
 
-/* Hover effects */
-transition-all duration-200 ease-out
+/* Interactive cards — color change only on hover */
+transition-colors duration-200 ease-out
 
-/* Button press animation */
-active:scale-95 transition-transform duration-100
+/* Active/press feedback — opacity only (no scale, no translate) */
+active:opacity-90
 ```
+
+### Hover Patterns
+```css
+/* Buttons */
+hover:bg-btn-primary/90        /* primary buttons */
+hover:bg-surface-2             /* secondary/ghost buttons */
+
+/* Interactive cards */
+hover:bg-surface-2             /* background elevation */
+hover:border-default           /* border color upgrade */
+```
+
+### What NOT to use on buttons or cards
+```css
+hover:scale-*          /* causes layout bounce */
+hover:-translate-y-*   /* causes layout bounce */
+active:scale-*         /* causes layout bounce */
+will-change-transform  /* unnecessary without transforms */
+hover:shadow-* jumps   /* large shadow changes feel bouncy */
+```
+
+### Exception: Popout menus
+Radix popover/dropdown open/close animations may use scale:
+```css
+data-[state=open]:animate-in
+data-[state=closed]:animate-out
+```
+
+Buttons may still animate to success/error states (e.g. loading spinners, checkmarks).
 
 ### Micro-animations
 ```css
 @utility card-hover {
-  @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg;
+  @apply transition-colors duration-200 ease-out hover:bg-surface-2;
 }
 
 @utility btn-press {
-  @apply transform transition-transform duration-100 ease-out active:scale-95;
+  @apply transition-opacity duration-100 ease-out active:opacity-90;
 }
 ```
 

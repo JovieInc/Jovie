@@ -106,9 +106,9 @@ const baseStyles = cn(
   // Shape and layout
   'inline-flex items-center justify-center rounded-full',
   // Transitions
-  'transition-all duration-150 ease-out',
+  'transition-colors duration-150 ease-out',
   // Active state
-  'active:scale-95',
+  'active:opacity-90',
   // Focus ring using design system utility
   'focus-ring-themed',
   'focus-visible:ring-offset-(--color-bg-base)',

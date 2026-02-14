@@ -53,7 +53,7 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
   return (
     <div className='relative group'>
       {/* Card with glass morphism effect */}
-      <div className='relative p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-1'>
+      <div className='relative p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-subtle shadow-xl transition-colors duration-200 ease-out'>
         <div className='flex flex-col items-center'>
           {/* QR Code */}
           <div className='w-[120px] h-[120px] bg-white rounded-lg p-2 shadow-sm'>

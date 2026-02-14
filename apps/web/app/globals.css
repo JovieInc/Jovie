@@ -977,7 +977,7 @@ body {
 
   /* Micro-animations */
   .card-hover {
-    @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+    @apply transition-colors duration-200 ease-out hover:bg-surface-2;
   }
 
   .input-focus-glow {
@@ -986,7 +986,7 @@ body {
   }
 
   .btn-press {
-    @apply transform transition-transform duration-100 ease-out active:scale-95;
+    @apply transition-opacity duration-100 ease-out active:opacity-90;
   }
 }
 

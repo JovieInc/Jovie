@@ -128,7 +128,7 @@ export function OtpInput({
                   : 'border-subtle',
                 error && 'border-destructive',
                 disabled && 'opacity-50 cursor-not-allowed',
-                'active:scale-95 active:bg-surface-1'
+                'active:opacity-90 active:bg-surface-1'
               )}
             >
               <input

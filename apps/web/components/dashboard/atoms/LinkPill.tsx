@@ -110,7 +110,7 @@ export function LinkPill({
       type='button'
       aria-label={menuButtonAria}
       ref={setReferenceRef}
-      className='inline-flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2/30 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.97] -mr-2'
+      className='inline-flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2/30 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:opacity-90 -mr-2'
       {...getReferenceProps()}
     >
       <Icon name='MoreHorizontal' className='h-5 w-5 opacity-90' />
@@ -157,7 +157,7 @@ export function LinkPill({
                   }}
                   className={cn(
                     MENU_ITEM_BASE,
-                    'w-full text-left active:scale-[0.98]',
+                    'w-full text-left active:opacity-90',
                     item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
                   )}
                   {...getItemProps()}

@@ -47,7 +47,7 @@ export const AUTH_CLASSES = {
     'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out',
   /** OAuth button touch optimization for mobile */
   oauthButtonMobile:
-    'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150',
+    'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:opacity-90 transition-opacity duration-150',
 } as const;
 
 /**

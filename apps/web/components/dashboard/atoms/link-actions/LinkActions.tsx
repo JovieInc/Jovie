@@ -63,7 +63,7 @@ export const LinkActions = memo(function LinkActions({
         <button
           type='button'
           onPointerDown={onDragHandlePointerDown}
-          className='opacity-0 group-hover:opacity-70 group-focus-within:opacity-100 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-100 active:scale-[0.97]'
+          className='opacity-0 group-hover:opacity-70 group-focus-within:opacity-100 transition-opacity duration-150 ease-out hover:opacity-100 active:opacity-90'
           aria-label='Drag to reorder'
         >
           <span className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-surface-2/80 text-secondary-token ring-1 ring-subtle shadow-sm'>
@@ -82,7 +82,7 @@ export const LinkActions = memo(function LinkActions({
           aria-haspopup='menu'
           onClick={() => setOpen(!open)}
           onKeyDown={handleKeyDown}
-          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors duration-150 ease-out active:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
         >
           <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
         </button>
@@ -121,7 +121,7 @@ export const LinkActions = memo(function LinkActions({
                   }
                 }}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0',
+                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-150 ease-out active:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0',
                   item.id === 'remove' &&
                     'text-destructive hover:text-destructive/80',
                   focusedIndex === index && 'bg-surface-2'

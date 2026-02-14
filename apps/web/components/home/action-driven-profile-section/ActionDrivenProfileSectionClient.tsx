@@ -175,7 +175,7 @@ export function ActionDrivenProfileSectionClient({
 
                         <button
                           type='button'
-                          className='mt-5 w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_-18px_rgba(0,0,0,0.65)] transition-transform duration-200 btn-press focus-ring-themed motion-reduce:transition-none'
+                          className='mt-5 w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_-18px_rgba(0,0,0,0.65)] transition-opacity duration-200 btn-press focus-ring-themed motion-reduce:transition-none'
                         >
                           {ctaLabel}
                         </button>

@@ -75,16 +75,12 @@ export const cardTokens = {
     hover: tw`
       hover:bg-[var(--color-bg-surface-2)]
       hover:border-[var(--color-border-default)]
-      hover:shadow-[var(--shadow-lg)]
-      hover:-translate-y-0.5
-      transition-all ${timing.normal} ${timing.easing}
+      transition-colors ${timing.normal} ease-out
     `,
 
     active: tw`
       active:bg-[var(--color-bg-surface-3)]
-      active:shadow-[var(--shadow-sm)]
-      active:translate-y-0
-      active:scale-[0.99]
+      active:opacity-90
     `,
 
     focus: tw`
@@ -131,13 +127,10 @@ export const cardTokens = {
       p-4 sm:p-6
       shadow-[var(--shadow-sm)]
       cursor-pointer
-      transition-all ${timing.normal} ${timing.easing}
+      transition-colors ${timing.normal} ease-out
       hover:bg-[var(--color-bg-surface-2)]
       hover:border-[var(--color-border-default)]
-      hover:shadow-[var(--shadow-lg)]
-      hover:-translate-y-1
-      active:translate-y-0
-      active:shadow-[var(--shadow-md)]
+      active:opacity-90
       focus-visible:outline-none
       focus-visible:ring-2
       focus-visible:ring-[var(--color-accent)]

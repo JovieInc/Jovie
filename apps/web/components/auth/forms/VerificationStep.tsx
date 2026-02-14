@@ -185,7 +185,7 @@ export function VerificationStep({
               variant='primary'
               disabled={isLoading || code.length !== 6}
               aria-busy={isVerifying}
-              className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+              className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:opacity-90 transition-opacity duration-150'
             >
               {(() => {
                 if (isCompleting) {

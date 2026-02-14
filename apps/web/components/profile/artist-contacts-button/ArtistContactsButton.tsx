@@ -35,7 +35,6 @@ export function ArtistContactsButton({
         variant='surface'
         ariaLabel='Contacts'
         data-testid='contacts-trigger'
-        className='hover:scale-105'
         onClick={() => {
           onIconClick();
           setDrawerOpen(true);

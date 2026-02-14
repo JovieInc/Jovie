@@ -76,13 +76,10 @@ export const CTAButton = React.forwardRef<
     );
 
     const sharedClassName = cn(
-      'gap-2 rounded-lg transition-all duration-150 ease-out',
-      'active:translate-y-[1px] focus-visible:translate-y-[0.5px]',
-      'motion-reduce:transition-none motion-reduce:transform-none',
-      'will-change-transform focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
-      prefersReducedMotion
-        ? 'shadow-none active:translate-y-0 hover:shadow-none'
-        : 'shadow-[0_12px_30px_rgba(0,0,0,0.12)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.14)] hover:scale-[1.02] active:scale-[0.98]',
+      'gap-2 rounded-lg transition-colors duration-150 ease-out',
+      'active:opacity-90',
+      'motion-reduce:transition-none',
+      'focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
       className
     );
 

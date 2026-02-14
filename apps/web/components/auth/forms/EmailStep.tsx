@@ -149,7 +149,7 @@ export function EmailStep({
           variant='secondary'
           disabled={isLoading}
           aria-busy={isLoading}
-          className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+          className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:opacity-90 transition-opacity duration-150'
         >
           {isLoading ? (
             <>

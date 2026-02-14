@@ -154,7 +154,7 @@ export function UniversalLinkInputUrlMode({
             <button
               type='button'
               onClick={onClear}
-              className='flex items-center justify-center h-11 w-11 rounded-xl text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95 sm:h-8 sm:w-8 sm:rounded-full'
+              className='flex items-center justify-center h-11 w-11 rounded-xl text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:opacity-90 sm:h-8 sm:w-8 sm:rounded-full'
               aria-label='Clear input'
             >
               <X className='h-5 w-5 sm:h-4 sm:w-4' />

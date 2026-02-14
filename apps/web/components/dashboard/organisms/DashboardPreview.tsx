@@ -63,7 +63,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] rounded-4xl bg-surface-2 p-2 shadow-2xl ring-1 ring-subtle transform transition-transform hover:scale-[1.02] duration-300'>
+        <div className='relative w-[280px] rounded-4xl bg-surface-2 p-2 shadow-2xl ring-1 ring-subtle'>
           {/* Top notch */}
           <div className='absolute w-20 h-3 bg-surface-2 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
 

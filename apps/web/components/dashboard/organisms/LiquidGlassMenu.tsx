@@ -167,7 +167,7 @@ function MenuItemLink({
       href={item.href}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-        'active:scale-[0.98]',
+        'active:opacity-90',
         active
           ? 'bg-bg-surface-2 text-primary-token'
           : 'text-secondary-token hover:text-primary-token hover:bg-bg-surface-2/50'
@@ -318,7 +318,7 @@ export function LiquidGlassMenu({
                   aria-current={active ? 'page' : undefined}
                   className={cn(
                     'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
-                    'active:scale-95',
+                    'active:opacity-90',
                     active
                       ? 'bg-bg-surface-2 text-primary-token'
                       : 'text-tertiary-token hover:text-secondary-token'
@@ -342,7 +342,7 @@ export function LiquidGlassMenu({
               aria-expanded={isExpanded}
               className={cn(
                 'relative flex items-center justify-center size-11 rounded-xl transition-all duration-150',
-                'active:scale-95',
+                'active:opacity-90',
                 isExpanded
                   ? 'bg-bg-surface-2 text-primary-token'
                   : 'text-tertiary-token hover:text-secondary-token'
@@ -358,7 +358,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='flex items-center justify-center size-12 rounded-full bg-bg-surface-2 text-primary-token transition-all duration-150 active:scale-95 shadow-sm'
+              className='flex items-center justify-center size-12 rounded-full bg-bg-surface-2 text-primary-token transition-colors duration-150 ease-out active:opacity-90 shadow-sm'
             >
               <Search className='size-5' aria-hidden='true' />
             </button>

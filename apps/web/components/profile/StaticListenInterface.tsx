@@ -128,10 +128,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
               disabled={selectedDSP === dsp.key || isLoading}
               className={`
                 w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl font-medium text-[15px]
-                transition-all duration-150 ease-out will-change-transform
-                hover:scale-[1.01] hover:-translate-y-px active:scale-[0.99]
+                transition-colors duration-150 ease-out
+                active:opacity-90
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-opacity-50
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+                disabled:opacity-50 disabled:cursor-not-allowed
                 ${selectedDSP === dsp.key ? 'opacity-75 cursor-wait' : ''}
               `}
               style={{

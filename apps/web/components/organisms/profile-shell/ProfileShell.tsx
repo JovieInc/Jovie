@@ -190,7 +190,6 @@ export function ProfileShell({
                               variant='surface'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className='hover:scale-105'
                               onClick={() => setTipDrawerOpen(true)}
                             >
                               <DollarSign
@@ -213,7 +212,6 @@ export function ProfileShell({
                             variant='surface'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className='hover:scale-105'
                             asChild
                           >
                             <Link href={`/${artist.handle}?mode=tip`}>

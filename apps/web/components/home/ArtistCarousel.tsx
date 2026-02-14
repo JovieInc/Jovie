@@ -33,7 +33,7 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
             <Link
               key={artist.id}
               href={`/${artist.handle}`}
-              className={`group shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-300 hover:scale-110'}`}
+              className='group shrink-0'
             >
               <div className='relative'>
                 {/* Artist image */}

@@ -142,7 +142,7 @@ export function ReleaseLandingPage({
                     href={provider.url}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white/[0.10] hover:ring-white/[0.12]'
+                    className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-150 ease-out hover:bg-white/[0.10] hover:ring-white/[0.12]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -162,7 +162,7 @@ export function ReleaseLandingPage({
                     </span>
                     <Icon
                       name='ChevronRight'
-                      className='h-4 w-4 text-white/25 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-white/40'
+                      className='h-4 w-4 text-white/25 transition-colors duration-150 group-hover:text-white/40'
                       aria-hidden='true'
                     />
                   </a>

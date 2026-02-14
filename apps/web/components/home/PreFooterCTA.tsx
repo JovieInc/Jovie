@@ -18,7 +18,7 @@ export function PreFooterCTA() {
         <div className='mx-auto max-w-4xl text-center'>
           {/* Badge with glass morphism effect */}
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-subtle backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-all duration-300 hover:bg-gray-200/80 dark:hover:bg-white/20 hover:scale-105'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-subtle backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-colors duration-200 ease-out hover:bg-gray-200/80 dark:hover:bg-white/20'>
               <svg
                 className='w-4 h-4 text-blue-600 dark:text-blue-400'
                 fill='none'
@@ -61,7 +61,7 @@ export function PreFooterCTA() {
               asChild
               size='lg'
               variant='primary'
-              className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
+              className='text-lg px-8 py-4'
             >
               <Link href='/onboarding'>Create Your Profile</Link>
             </Button>
@@ -70,7 +70,7 @@ export function PreFooterCTA() {
               asChild
               size='lg'
               variant='secondary'
-              className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105'
+              className='text-lg px-8 py-4'
             >
               <Link href='/pricing'>View Pricing</Link>
             </Button>

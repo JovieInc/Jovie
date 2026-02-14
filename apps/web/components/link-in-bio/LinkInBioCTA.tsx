@@ -58,7 +58,7 @@ export function LinkInBioCTA() {
             asChild
             size='lg'
             variant='primary'
-            className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
+            className='text-lg px-8 py-4'
           >
             <Link href='/onboarding'>Create Your Profile</Link>
           </Button>
@@ -67,7 +67,7 @@ export function LinkInBioCTA() {
             asChild
             size='lg'
             variant='secondary'
-            className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105'
+            className='text-lg px-8 py-4'
           >
             <Link href='/pricing'>View Pricing</Link>
           </Button>

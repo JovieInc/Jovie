@@ -67,7 +67,7 @@ export default async function ArtistsPage() {
               <Link
                 key={profile.id}
                 href={`/${profile.username}`}
-                className='group block text-center transition-all duration-300 hover:scale-105'
+                className='group block text-center'
               >
                 <div className='mx-auto mb-4 h-24 w-24'>
                   <OptimizedImage
@@ -93,10 +93,7 @@ export default async function ArtistsPage() {
 
                 <div className='mt-3 inline-flex items-center text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity'>
                   <span>View Profile</span>
-                  <Icon
-                    name='ChevronRight'
-                    className='ml-1 h-4 w-4 transition-transform group-hover:translate-x-1'
-                  />
+                  <Icon name='ChevronRight' className='ml-1 h-4 w-4' />
                 </div>
               </Link>
             ))}
