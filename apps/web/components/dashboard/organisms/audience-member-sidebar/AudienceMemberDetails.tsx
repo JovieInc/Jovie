@@ -70,7 +70,9 @@ interface AudienceMemberDetailsProps {
 
 export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
   const utm = member.utmParams;
-  const hasUtm = utm && (utm.source || utm.medium || utm.campaign);
+  const hasUtm =
+    utm &&
+    (utm.source || utm.medium || utm.campaign || utm.content || utm.term);
 
   return (
     <div className='space-y-3'>

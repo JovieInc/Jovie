@@ -209,7 +209,14 @@ export async function POST(request: NextRequest) {
         resolvedGeoCountry ?? existing?.geoCountry ?? null;
 
       // Merge UTM params: new visit's UTM overwrites if present, else keep existing
-      const resolvedUtmParams = utmParams ?? existing?.utmParams ?? {};
+      const hasUtmParams =
+        !!utmParams &&
+        Object.values(utmParams).some(
+          value => typeof value === 'string' && value.length > 0
+        );
+      const resolvedUtmParams = hasUtmParams
+        ? utmParams
+        : (existing?.utmParams ?? {});
 
       if (existing) {
         await tx
