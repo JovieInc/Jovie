@@ -193,7 +193,7 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'border border-subtle px-3 py-2 text-sm font-medium',
+              'border border-subtle px-3 py-3 text-sm font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
@@ -201,9 +201,9 @@ function SuggestionCard({
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <X className='h-3.5 w-3.5' />
+              <X className='h-4 w-4' />
             )}
             {isAvatar ? 'Skip' : 'Not me'}
           </button>
@@ -213,16 +213,16 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'bg-accent px-3 py-2 text-sm font-medium text-on-accent',
+              'bg-accent px-3 py-3 text-sm font-medium text-on-accent sm:py-2',
               'transition-colors hover:bg-accent/90',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <Check className='h-3.5 w-3.5' />
+              <Check className='h-4 w-4' />
             )}
             {isAvatar ? 'Use photo' : "That's me"}
           </button>
@@ -327,26 +327,28 @@ export function SuggestedProfilesCarousel({
                 onClick={handlePrev}
                 disabled={currentIndex === 0 || isActioning}
                 className={cn(
-                  'rounded-md p-1 text-tertiary-token transition-colors',
+                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
                   'hover:bg-surface-2 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Previous suggestion'
               >
-                <ChevronLeft className='h-3.5 w-3.5' />
+                <ChevronLeft className='h-5 w-5' />
               </button>
               <button
                 type='button'
                 onClick={handleNext}
                 disabled={currentIndex === total - 1 || isActioning}
                 className={cn(
-                  'rounded-md p-1 text-tertiary-token transition-colors',
+                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
                   'hover:bg-surface-2 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Next suggestion'
               >
-                <ChevronRight className='h-3.5 w-3.5' />
+                <ChevronRight className='h-5 w-5' />
               </button>
             </div>
           )}
