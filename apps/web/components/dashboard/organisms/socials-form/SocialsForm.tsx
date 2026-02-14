@@ -139,7 +139,7 @@ PLATFORM_PLACEHOLDERS.tidal = 'https://tidal.com/browse/artist/12345';
 PLATFORM_PLACEHOLDERS.deezer = 'https://deezer.com/artist/12345';
 PLATFORM_PLACEHOLDERS.amazon_music = 'https://music.amazon.com/artists/B0xxxxx';
 PLATFORM_PLACEHOLDERS.pandora = 'https://pandora.com/artist/yourname';
-PLATFORM_PLACEHOLDERS.beatport = 'https://www.beatport.com/artist/yourname';
+PLATFORM_PLACEHOLDERS.beatport = 'https://beatport.com/artist/yourname';
 
 function getPlaceholder(platform: string): string {
   return PLATFORM_PLACEHOLDERS[platform] || 'https://...';
