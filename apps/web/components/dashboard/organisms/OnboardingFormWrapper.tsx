@@ -1,21 +1,19 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AppleStyleOnboardingForm } from './apple-style-onboarding';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
 const PENDING_CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
 
 /**
- * Read and consume the pendingClaim handle from sessionStorage.
+ * Read the pendingClaim handle from sessionStorage (pure, no side effects).
  * Returns the handle string or empty string if none found / expired.
- * Consumes the entry so it's only used once.
  */
-function consumePendingClaimHandle(): string {
+function readPendingClaimHandle(): string {
   try {
     const raw = sessionStorage.getItem('pendingClaim');
     if (!raw) return '';
-    sessionStorage.removeItem('pendingClaim');
 
     const parsed = JSON.parse(raw) as { handle?: string; ts?: number };
     if (
@@ -50,8 +48,15 @@ export function OnboardingFormWrapper({
   // fall back to the pendingClaim stored in sessionStorage by ClaimHandleForm.
   const resolvedHandle = useMemo(() => {
     if (initialHandle) return initialHandle;
-    return consumePendingClaimHandle();
+    return readPendingClaimHandle();
   }, [initialHandle]);
+
+  // Clean up sessionStorage after mount (side effect deferred from render)
+  useEffect(() => {
+    if (!initialHandle && resolvedHandle) {
+      sessionStorage.removeItem('pendingClaim');
+    }
+  }, [initialHandle, resolvedHandle]);
 
   return (
     <div data-testid='onboarding-form-wrapper'>
