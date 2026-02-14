@@ -118,7 +118,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
             <Button
               variant='ghost'
               size='sm'
-              className='text-destructive hover:text-red-600 hover:bg-red-50'
+              className='text-destructive hover:text-destructive hover:bg-destructive/10'
               disabled={disconnectingId === account.id}
               onClick={() => setAccountToDisconnect(account)}
             >

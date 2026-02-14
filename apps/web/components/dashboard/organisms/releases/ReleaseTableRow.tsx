@@ -232,8 +232,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
               }
               className={cn(
                 'inline-flex items-center text-xs transition-colors',
-                isCopied &&
-                  'bg-green-100 text-success hover:bg-green-100 dark:bg-green-900/30 dark:text-success dark:hover:bg-green-900/30'
+                isCopied && 'bg-success/10 text-success hover:bg-success/10'
               )}
             >
               <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>

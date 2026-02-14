@@ -27,7 +27,7 @@ export function getIncompleteTaskContainerClass(): string {
  * Get the indicator circle class for a completed setup task.
  */
 export function getCompletedTaskIndicatorClass(): string {
-  return `${TASK_INDICATOR_BASE} bg-green-500/10 text-success dark:bg-green-500/15`;
+  return `${TASK_INDICATOR_BASE} bg-success/10 text-success`;
 }
 
 /**

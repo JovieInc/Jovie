@@ -51,14 +51,14 @@ export function ComparisonSection() {
       </div>
 
       <div className='mx-auto max-w-5xl'>
-        <div className='bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200 dark:border-subtle rounded-2xl overflow-hidden'>
+        <div className='bg-surface-1/80 backdrop-blur-sm border border-subtle rounded-2xl overflow-hidden'>
           {/* Header */}
           <div className='grid grid-cols-3 gap-0 bg-surface-1/80'>
             <div className='p-6 font-semibold text-primary-token'>Feature</div>
-            <div className='p-6 font-semibold text-secondary-token border-l border-gray-200 dark:border-subtle'>
+            <div className='p-6 font-semibold text-secondary-token border-l border-subtle'>
               Linktree
             </div>
-            <div className='p-6 font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text border-l border-gray-200 dark:border-subtle'>
+            <div className='p-6 font-semibold text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text border-l border-subtle'>
               Jovie
             </div>
           </div>
@@ -68,18 +68,16 @@ export function ComparisonSection() {
             <div
               key={comparison.category}
               className={`grid grid-cols-3 gap-0 ${
-                index === comparisons.length - 1
-                  ? ''
-                  : 'border-b border-gray-200 dark:border-subtle'
+                index === comparisons.length - 1 ? '' : 'border-b border-subtle'
               }`}
             >
               <div className='p-6 font-medium text-primary-token'>
                 {comparison.category}
               </div>
-              <div className='p-6 text-secondary-token border-l border-gray-200 dark:border-subtle'>
+              <div className='p-6 text-secondary-token border-l border-subtle'>
                 {comparison.linktree}
               </div>
-              <div className='p-6 text-primary-token font-medium border-l border-gray-200 dark:border-subtle bg-gradient-to-r from-blue-500/5 to-purple-500/5'>
+              <div className='p-6 text-primary-token font-medium border-l border-subtle bg-gradient-to-r from-blue-500/5 to-purple-500/5'>
                 {comparison.jovie}
               </div>
             </div>
