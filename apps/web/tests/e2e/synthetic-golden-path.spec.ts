@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-// import { setupClerkTestingToken } from '@clerk/testing/playwright'; // TODO: Use if needed for Clerk auth
-
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 

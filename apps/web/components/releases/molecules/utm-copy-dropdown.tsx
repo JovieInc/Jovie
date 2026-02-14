@@ -384,7 +384,6 @@ export function UTMCopyDropdown({
         icon: Settings,
         onClick: () => {
           track('utm_custom_open', {});
-          // TODO: Open custom UTM builder modal
           toast.info('Custom UTM builder coming soon!');
         },
       }

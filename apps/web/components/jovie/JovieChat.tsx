@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
   ChatInput,
@@ -13,7 +14,7 @@ import {
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
-import { useJovieChat } from './hooks';
+import { useChatAvatarUpload, useJovieChat } from './hooks';
 import type {
   JovieChatProps,
   MessagePart,
@@ -83,11 +84,28 @@ export function JovieChat({
     handleRetry,
     handleSuggestedPrompt,
     submitMessage,
+    setChatError,
   } = useJovieChat({
     profileId,
     artistContext,
     conversationId,
     onConversationCreate,
+  });
+
+  // Profile photo upload from chat
+  const {
+    fileInputRef,
+    isUploading: isImageUploading,
+    openFilePicker,
+    handleFileChange,
+  } = useChatAvatarUpload({
+    onUploadSuccess: message => {
+      submitMessage(message);
+    },
+    onError: error => {
+      setChatError({ type: 'unknown', message: error });
+    },
+    disabled: isLoading || isSubmitting,
   });
 
   // Notify parent when the conversation title changes (e.g. after auto-generation)
@@ -155,6 +173,16 @@ export function JovieChat({
 
   return (
     <div className='flex h-full flex-col'>
+      {/* Hidden file input for profile photo upload */}
+      <input
+        ref={fileInputRef}
+        type='file'
+        accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
+        onChange={handleFileChange}
+        className='hidden'
+        tabIndex={-1}
+      />
+
       {hasMessages ? (
         // Chat view - messages + input at bottom
         <>
@@ -238,6 +266,8 @@ export function JovieChat({
                 isSubmitting={isSubmitting}
                 placeholder='Ask a follow-up...'
                 variant='compact'
+                onImageUpload={openFilePicker}
+                isImageUploading={isImageUploading}
               />
             </div>
           </div>
@@ -294,6 +324,8 @@ export function JovieChat({
               onSubmit={handleSubmit}
               isLoading={isLoading}
               isSubmitting={isSubmitting}
+              onImageUpload={openFilePicker}
+              isImageUploading={isImageUploading}
             />
           </div>
         </div>

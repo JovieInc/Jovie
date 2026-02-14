@@ -1,8 +1,13 @@
 import { redirect } from 'next/navigation';
 
 import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
+import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+import {
+  getDashboardData,
+  getProfileSocialLinks,
+} from '../../dashboard/actions';
+import { ProfilePreviewOpener } from '../../dashboard/profile/ProfilePreviewOpener';
 
 export const runtime = 'nodejs';
 
@@ -18,5 +23,16 @@ export default async function SettingsArtistProfilePage() {
     redirect('/onboarding');
   }
 
-  return <DashboardSettings focusSection='artist-profile' />;
+  const profileId = dashboardData.selectedProfile?.id;
+  const initialLinks = profileId
+    ? await getProfileSocialLinks(profileId).catch(() => [])
+    : [];
+
+  return (
+    <>
+      <ProfilePreviewOpener />
+      <PreviewDataHydrator initialLinks={initialLinks} />
+      <DashboardSettings focusSection='artist-profile' />
+    </>
+  );
 }
