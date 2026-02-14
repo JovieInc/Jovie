@@ -7,6 +7,7 @@
  * Privacy-first: All data is stored locally, never sent to server.
  */
 
+import { logger } from '@/lib/utils/logger';
 import type { UTMUsageData, UTMUsageRecord } from './types';
 
 // Storage key for UTM usage data
@@ -54,7 +55,7 @@ export function loadUsageData(): UTMUsageData {
       typeof data.version !== 'number' ||
       typeof data.records !== 'object'
     ) {
-      console.warn('[UTM Storage] Invalid data structure, resetting');
+      logger.warn('[UTM Storage] Invalid data structure, resetting');
       return getEmptyUsageData();
     }
 

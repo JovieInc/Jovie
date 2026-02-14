@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -58,6 +57,8 @@ export function JovieChat({
   onConversationCreate,
   initialQuery,
   onTitleChange,
+  displayName,
+  avatarUrl,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -171,6 +172,7 @@ export function JovieChat({
                   role={message.role}
                   parts={message.parts}
                   isStreaming={isStreaming && index === lastAssistantIndex}
+                  avatarUrl={message.role === 'user' ? avatarUrl : undefined}
                 />
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
@@ -179,11 +181,20 @@ export function JovieChat({
                     <BrandLogo size={16} tone='auto' />
                   </div>
                   <div className='rounded-2xl bg-surface-2 px-4 py-3'>
-                    <div className='flex items-center gap-2'>
-                      <Loader2 className='h-4 w-4 animate-spin motion-reduce:animate-none text-secondary-token' />
-                      <span className='text-xs text-secondary-token'>
-                        {thinkingLabel}
+                    <div className='flex items-center gap-1.5'>
+                      <span
+                        className='flex items-center gap-1'
+                        aria-hidden='true'
+                      >
+                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.3s] motion-reduce:animate-none' />
+                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.15s] motion-reduce:animate-none' />
+                        <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
                       </span>
+                      {activeToolLabel && (
+                        <span className='ml-1.5 text-xs text-tertiary-token'>
+                          {activeToolLabel}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <span className='sr-only' aria-live='polite'>
@@ -232,9 +243,25 @@ export function JovieChat({
           </div>
         </>
       ) : (
-        // Empty state - suggestions above input, pushed to bottom
-        <div className='flex flex-1 flex-col justify-end px-4 pb-6'>
-          <div className='mx-auto w-full max-w-2xl space-y-4'>
+        // Empty state - welcome hero + suggestions + input, centered
+        <div className='flex flex-1 flex-col items-center justify-center px-4 pb-6'>
+          <div className='mx-auto w-full max-w-2xl space-y-6'>
+            {/* Welcome hero */}
+            <div className='flex flex-col items-center text-center space-y-3'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-2'>
+                <BrandLogo size={20} tone='auto' />
+              </div>
+              <div className='space-y-1'>
+                <h1 className='text-lg font-semibold text-primary-token tracking-tight'>
+                  {displayName ? `Hey, ${displayName}` : 'Hey there'}
+                </h1>
+                <p className='text-sm text-secondary-token max-w-sm mx-auto'>
+                  I can help you manage your profile, analyze your stats, and
+                  plan your next move.
+                </p>
+              </div>
+            </div>
+
             {/* Error display */}
             {chatError && (
               <ErrorDisplay
@@ -253,13 +280,13 @@ export function JovieChat({
               />
             )}
 
-            {/* Suggested prompts above input */}
+            {/* Suggested prompts */}
             <SuggestedPrompts
               onSelect={handleSuggestedPrompt}
               context={starterContext}
             />
 
-            {/* Input at bottom */}
+            {/* Input */}
             <ChatInput
               ref={inputRef}
               value={input}

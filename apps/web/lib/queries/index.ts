@@ -185,6 +185,12 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Growth plan early access request
+export {
+  type GrowthAccessRequestInput,
+  type GrowthAccessRequestResponse,
+  useGrowthAccessRequestMutation,
+} from './useGrowthAccessRequestMutation';
 // Handle availability query
 export {
   type HandleAvailabilityResponse,

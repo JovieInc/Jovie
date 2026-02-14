@@ -15,6 +15,7 @@ import {
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
+import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
 /**
@@ -186,8 +187,10 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           // by the time the page loads, and the fresh_signup flag provides
           // additional protection against redirect loops
           if (!sessionReady) {
-            console.warn(
-              '[useSignUpFlow] Session polling timed out, proceeding with redirect'
+            logger.warn(
+              'Session polling timed out, proceeding with redirect',
+              undefined,
+              'useSignUpFlow'
             );
           }
 
