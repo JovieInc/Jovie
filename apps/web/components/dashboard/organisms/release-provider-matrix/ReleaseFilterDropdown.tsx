@@ -14,7 +14,7 @@ import {
   TooltipShortcut,
 } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Check, ChevronRight, Search, X } from 'lucide-react';
+import { Check, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { ReleaseType } from '@/lib/discography/types';
@@ -580,7 +580,6 @@ export function ReleaseFilterDropdown({
                           </span>
                         )}
                       </div>
-                      <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent
                       sideOffset={4}
