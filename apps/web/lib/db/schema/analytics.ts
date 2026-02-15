@@ -147,11 +147,56 @@ export const clickEvents = pgTable(
 );
 
 /**
- * Fan notification preferences for release alerts
+ * Content categories fans can subscribe to for notifications.
+ * These control *what* the fan hears about (orthogonal to *how* — email/sms).
+ */
+export type FanNotificationContentType =
+  | 'newMusic'
+  | 'tourDates'
+  | 'merch'
+  | 'general';
+
+/** All available content types, ordered for UI display. */
+export const FAN_NOTIFICATION_CONTENT_TYPES: readonly {
+  key: FanNotificationContentType;
+  label: string;
+  description: string;
+}[] = [
+  {
+    key: 'newMusic',
+    label: 'New Music',
+    description: 'New releases, singles & albums',
+  },
+  {
+    key: 'tourDates',
+    label: 'Tour Dates',
+    description: 'Shows, tours & live events',
+  },
+  { key: 'merch', label: 'Merch', description: 'Drops, restocks & exclusives' },
+  {
+    key: 'general',
+    label: 'General Updates',
+    description: 'Announcements & other news',
+  },
+] as const;
+
+/**
+ * Fan notification preferences for release alerts and content categories.
+ *
+ * Legacy fields (releasePreview, releaseDay) are preserved for backwards
+ * compatibility. New content category fields default to true on subscribe.
  */
 export interface FanNotificationPreferences {
   releasePreview?: boolean;
   releaseDay?: boolean;
+  /** Opt-in to new music release alerts */
+  newMusic?: boolean;
+  /** Opt-in to tour date / live event alerts */
+  tourDates?: boolean;
+  /** Opt-in to merch drop alerts */
+  merch?: boolean;
+  /** Opt-in to general announcements */
+  general?: boolean;
 }
 
 // Notification subscriptions table
@@ -175,6 +220,10 @@ export const notificationSubscriptions = pgTable(
       .default({
         releasePreview: true,
         releaseDay: true,
+        newMusic: true,
+        tourDates: true,
+        merch: true,
+        general: true,
       }),
     // Double opt-in: null = unconfirmed (pending), non-null = confirmed
     confirmedAt: timestamp('confirmed_at'),

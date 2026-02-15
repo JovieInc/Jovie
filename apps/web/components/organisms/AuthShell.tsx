@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
+import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
 import {
   SidebarInset,
   SidebarProvider,
@@ -11,6 +12,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { useTablePanel } from '@/contexts/TablePanelContext';
+import { useProfileData } from '@/hooks/useProfileData';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -46,6 +48,10 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
   const tablePanel = useTablePanel();
+  const isDashboardOrAdmin = section !== 'settings';
+
+  // Use shared hook for profile data (eliminates duplication with UnifiedSidebar)
+  const { profileHref } = useProfileData(isDashboardOrAdmin);
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
@@ -64,6 +70,9 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            mobileProfileSlot={
+              <MobileProfileDrawer profileHref={profileHref} />
+            }
             showDivider={isTableRoute}
           />
         )}

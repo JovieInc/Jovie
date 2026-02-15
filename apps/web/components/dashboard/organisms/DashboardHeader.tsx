@@ -11,6 +11,8 @@ export interface DashboardHeaderProps {
   readonly breadcrumbSuffix?: ReactNode;
   /** Content shown on right side */
   readonly action?: ReactNode;
+  /** Profile button slot shown on the far right of the mobile header */
+  readonly mobileProfileSlot?: ReactNode;
   readonly showDivider?: boolean;
   readonly className?: string;
 }
@@ -21,6 +23,7 @@ export function DashboardHeader({
   sidebarTrigger,
   breadcrumbSuffix,
   action,
+  mobileProfileSlot,
   showDivider = false,
   className,
 }: DashboardHeaderProps) {
@@ -31,16 +34,19 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn('z-20 border-b border-subtle', className)}
     >
-      {/* Mobile: Large page title with action buttons */}
+      {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
         <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>
           {currentLabel}
         </h1>
-        {action ? (
-          <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
-            {action}
-          </div>
-        ) : null}
+        <div className='flex items-center gap-2'>
+          {action ? (
+            <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
+              {action}
+            </div>
+          ) : null}
+          {mobileProfileSlot}
+        </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
       <div className='relative hidden h-[52px] w-full items-center gap-2 px-4 sm:flex'>
