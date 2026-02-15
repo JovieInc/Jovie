@@ -21,7 +21,10 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
-import { churnReferral, getInternalUserId } from '@/lib/referrals/service';
+import {
+  expireReferralOnChurn,
+  getInternalUserId,
+} from '@/lib/referrals/service';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -265,15 +268,16 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    // Mark referral as churned (fire-and-forget)
+    // Permanently expire referral on cancellation (fire-and-forget)
+    // If the user re-subscribes later via a new referral link, a fresh referral is created.
     getInternalUserId(userId)
       .then(internalId => {
         if (internalId) {
-          return churnReferral(internalId);
+          return expireReferralOnChurn(internalId);
         }
       })
       .catch(error => {
-        logger.warn('Failed to churn referral on subscription deletion', {
+        logger.warn('Failed to expire referral on subscription deletion', {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
       });

@@ -23,11 +23,7 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import {
-  getInternalUserId,
-  reactivateReferral,
-  recordCommission,
-} from '@/lib/referrals/service';
+import { getInternalUserId, recordCommission } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -187,17 +183,12 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       await invalidateBillingCache();
 
       // Record referral commission if applicable (fire-and-forget)
+      // Only records commission for active referrals — expired/churned referrals are ignored.
+      // If a user cancels and re-subscribes via a new referral, that new referral gets credit.
       if (userId && invoice.amount_paid > 0) {
         getInternalUserId(userId)
           .then(internalId => {
             if (!internalId) return;
-
-            // Reactivate referral if previously churned (e.g., user re-subscribed)
-            reactivateReferral(internalId).catch(err => {
-              logger.warn('Failed to reactivate referral', {
-                error: err instanceof Error ? err.message : 'Unknown error',
-              });
-            });
 
             return recordCommission({
               referredUserId: internalId,

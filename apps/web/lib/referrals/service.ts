@@ -120,15 +120,18 @@ export async function createReferral(
     return { success: false, error: 'Cannot use your own referral code' };
   }
 
-  // Check if this user was already referred
-  const existingReferral = await db
-    .select({ id: referrals.id })
+  // Check if this user already has an active or pending referral
+  const existingReferrals = await db
+    .select({ id: referrals.id, status: referrals.status })
     .from(referrals)
-    .where(eq(referrals.referredUserId, referredUserId))
-    .limit(1);
+    .where(eq(referrals.referredUserId, referredUserId));
 
-  if (existingReferral.length > 0) {
-    return { success: false, error: 'User already has a referral' };
+  const hasActiveReferral = existingReferrals.some(
+    r => r.status === 'active' || r.status === 'pending'
+  );
+
+  if (hasActiveReferral) {
+    return { success: false, error: 'User already has an active referral' };
   }
 
   // Create the referral (pending until they subscribe)
@@ -267,80 +270,38 @@ export async function recordCommission(params: {
 }
 
 /**
- * Mark a referral as churned when the referred user cancels.
+ * Permanently expire a referral when the referred user cancels.
+ * Cancellation is terminal — the referral relationship ends.
+ * If the user re-subscribes later via a new referral link, a fresh referral is created.
  * Called from the customer.subscription.deleted webhook handler.
  */
-export async function churnReferral(referredUserId: string): Promise<void> {
-  const referral = await db
-    .select({ id: referrals.id })
-    .from(referrals)
-    .where(
-      and(
-        eq(referrals.referredUserId, referredUserId),
-        eq(referrals.status, 'active')
-      )
-    )
-    .limit(1);
-
-  if (referral.length === 0) return;
-
-  await db
-    .update(referrals)
-    .set({
-      status: 'churned',
-      churnedAt: new Date(),
-    })
-    .where(eq(referrals.id, referral[0].id));
-
-  logger.info('Referral churned', {
-    referralId: referral[0].id,
-    referredUserId,
-  });
-}
-
-/**
- * Reactivate a churned referral when the referred user re-subscribes.
- * Only reactivates if the commission period hasn't expired.
- */
-export async function reactivateReferral(
+export async function expireReferralOnChurn(
   referredUserId: string
 ): Promise<void> {
-  const referral = await db
-    .select()
+  // Expire any active or pending referrals for this user
+  const activeReferrals = await db
+    .select({ id: referrals.id, status: referrals.status })
     .from(referrals)
-    .where(
-      and(
-        eq(referrals.referredUserId, referredUserId),
-        eq(referrals.status, 'churned')
-      )
-    )
-    .limit(1);
+    .where(eq(referrals.referredUserId, referredUserId));
 
-  if (referral.length === 0) return;
+  const toExpire = activeReferrals.filter(
+    r => r.status === 'active' || r.status === 'pending'
+  );
 
-  const ref = referral[0];
-
-  // Don't reactivate if commission period has expired
-  if (ref.expiresAt && new Date() > ref.expiresAt) {
+  for (const ref of toExpire) {
     await db
       .update(referrals)
-      .set({ status: 'expired' })
+      .set({
+        status: 'expired',
+        churnedAt: new Date(),
+      })
       .where(eq(referrals.id, ref.id));
-    return;
+
+    logger.info('Referral expired on cancellation', {
+      referralId: ref.id,
+      referredUserId,
+    });
   }
-
-  await db
-    .update(referrals)
-    .set({
-      status: 'active',
-      churnedAt: null,
-    })
-    .where(eq(referrals.id, ref.id));
-
-  logger.info('Referral reactivated', {
-    referralId: ref.id,
-    referredUserId,
-  });
 }
 
 /**
