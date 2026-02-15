@@ -64,8 +64,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { customCode } = body;
+    // Safely parse JSON body
+    const body: unknown = await request.json().catch(() => null);
+    const customCodeRaw =
+      body && typeof body === 'object'
+        ? (body as { customCode?: unknown }).customCode
+        : undefined;
+    const customCode =
+      typeof customCodeRaw === 'string' ? customCodeRaw.trim() : undefined;
 
     // Look up internal user ID
     const user = await db
@@ -83,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const result = await getOrCreateReferralCode(
       user[0].id,
-      typeof customCode === 'string' ? customCode : undefined
+      customCode || undefined
     );
 
     return NextResponse.json(
@@ -91,12 +97,23 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Failed to create referral code';
     logger.error('Error creating referral code:', error);
+
+    // Only expose validation error messages, not internal errors
+    if (
+      error instanceof Error &&
+      (error.message.startsWith('Code must be ') ||
+        error.message === 'This referral code is already taken')
+    ) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return NextResponse.json(
-      { error: message },
-      { status: 400, headers: NO_STORE_HEADERS }
+      { error: 'Failed to create referral code' },
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

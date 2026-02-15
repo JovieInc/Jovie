@@ -25,10 +25,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { code } = body;
+    // Safely parse JSON body
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
-    if (!code || typeof code !== 'string') {
+    const codeRaw = (body as { code?: unknown }).code;
+    const code = typeof codeRaw === 'string' ? codeRaw.trim() : '';
+
+    if (!code) {
       return NextResponse.json(
         { error: 'Referral code is required' },
         { status: 400, headers: NO_STORE_HEADERS }

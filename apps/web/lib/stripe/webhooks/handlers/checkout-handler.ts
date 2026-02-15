@@ -119,19 +119,18 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
     });
 
     // Activate referral if this user was referred (fire-and-forget)
-    if (userId) {
-      getInternalUserId(userId)
-        .then(internalId => {
-          if (internalId) {
-            return activateReferral(internalId);
-          }
-        })
-        .catch(error => {
-          logger.warn('Failed to activate referral on checkout', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+    // Note: userId is guaranteed to be truthy here due to the guard above
+    getInternalUserId(userId)
+      .then(internalId => {
+        if (internalId) {
+          return activateReferral(internalId);
+        }
+      })
+      .catch(error => {
+        logger.warn('Failed to activate referral on checkout', {
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
-    }
+      });
 
     // Invalidate client cache
     await invalidateBillingCache();

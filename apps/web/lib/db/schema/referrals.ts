@@ -16,22 +16,16 @@ import { referralCommissionStatusEnum, referralStatusEnum } from './enums';
  * Each user gets a unique referral code they can share.
  * Codes are short, URL-friendly strings (e.g., "jovie-sarah" or "MUSIC2024").
  */
-export const referralCodes = pgTable(
-  'referral_codes',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    code: text('code').notNull().unique(),
-    isActive: boolean('is_active').notNull().default(true),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  table => ({
-    userIdIdx: index('referral_codes_user_id_idx').on(table.userId),
-    codeIdx: index('referral_codes_code_idx').on(table.code),
-  })
-);
+export const referralCodes = pgTable('referral_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  code: text('code').notNull().unique(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
 
 /**
  * Referrals table
@@ -90,7 +84,7 @@ export const referralCommissions = pgTable(
     referrerUserId: uuid('referrer_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    stripeInvoiceId: text('stripe_invoice_id').notNull(),
+    stripeInvoiceId: text('stripe_invoice_id').notNull().unique(),
     amountCents: integer('amount_cents').notNull(), // Commission amount in cents
     currency: text('currency').notNull().default('usd'),
     status: referralCommissionStatusEnum('status').notNull().default('pending'),
@@ -107,9 +101,6 @@ export const referralCommissions = pgTable(
       table.referrerUserId
     ),
     statusIdx: index('referral_commissions_status_idx').on(table.status),
-    stripeInvoiceIdIdx: index('referral_commissions_stripe_invoice_id_idx').on(
-      table.stripeInvoiceId
-    ),
   })
 );
 

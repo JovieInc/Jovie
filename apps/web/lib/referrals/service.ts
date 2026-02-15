@@ -201,6 +201,7 @@ export async function activateReferral(referredUserId: string): Promise<void> {
 /**
  * Record a commission for a successful payment from a referred user.
  * Called from the invoice.payment_succeeded webhook handler.
+ * Idempotent: duplicate calls for the same invoice are safely ignored.
  */
 export async function recordCommission(params: {
   referredUserId: string;
@@ -210,6 +211,20 @@ export async function recordCommission(params: {
   periodStart?: Date;
   periodEnd?: Date;
 }): Promise<{ commissionCents: number } | null> {
+  // Idempotency check: Stripe webhooks can be retried
+  const existingCommission = await db
+    .select({ amountCents: referralCommissions.amountCents })
+    .from(referralCommissions)
+    .where(eq(referralCommissions.stripeInvoiceId, params.stripeInvoiceId))
+    .limit(1);
+
+  if (existingCommission.length > 0) {
+    logger.info('Commission already recorded for invoice', {
+      stripeInvoiceId: params.stripeInvoiceId,
+    });
+    return { commissionCents: existingCommission[0].amountCents };
+  }
+
   // Find the active referral for this user
   const referral = await db
     .select()
@@ -270,36 +285,37 @@ export async function recordCommission(params: {
 }
 
 /**
- * Permanently expire a referral when the referred user cancels.
+ * Mark referral as churned when the referred user cancels their subscription.
  * Cancellation is terminal — the referral relationship ends.
  * If the user re-subscribes later via a new referral link, a fresh referral is created.
  * Called from the customer.subscription.deleted webhook handler.
+ *
+ * Status semantics:
+ * - 'churned': User cancelled their subscription (terminal)
+ * - 'expired': Commission period ended naturally after the configured duration (terminal)
  */
 export async function expireReferralOnChurn(
   referredUserId: string
 ): Promise<void> {
-  // Expire any active or pending referrals for this user
-  const activeReferrals = await db
-    .select({ id: referrals.id, status: referrals.status })
-    .from(referrals)
-    .where(eq(referrals.referredUserId, referredUserId));
+  // Mark any active or pending referrals as churned
+  const result = await db
+    .update(referrals)
+    .set({
+      status: 'churned',
+      churnedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(referrals.referredUserId, referredUserId),
+        drizzleSql`${referrals.status} IN ('active', 'pending')`
+      )
+    )
+    .returning({ id: referrals.id });
 
-  const toExpire = activeReferrals.filter(
-    r => r.status === 'active' || r.status === 'pending'
-  );
-
-  for (const ref of toExpire) {
-    await db
-      .update(referrals)
-      .set({
-        status: 'expired',
-        churnedAt: new Date(),
-      })
-      .where(eq(referrals.id, ref.id));
-
-    logger.info('Referral expired on cancellation', {
-      referralId: ref.id,
+  if (result.length > 0) {
+    logger.info('Referral(s) marked as churned on cancellation', {
       referredUserId,
+      referralIds: result.map(r => r.id),
     });
   }
 }
@@ -399,13 +415,14 @@ function generateRandomCode(): string {
 }
 
 function validateReferralCode(code: string): string | null {
-  if (code.length < MIN_REFERRAL_CODE_LENGTH) {
+  const trimmed = code.trim();
+  if (trimmed.length < MIN_REFERRAL_CODE_LENGTH) {
     return `Code must be at least ${MIN_REFERRAL_CODE_LENGTH} characters`;
   }
-  if (code.length > MAX_REFERRAL_CODE_LENGTH) {
+  if (trimmed.length > MAX_REFERRAL_CODE_LENGTH) {
     return `Code must be at most ${MAX_REFERRAL_CODE_LENGTH} characters`;
   }
-  if (!REFERRAL_CODE_PATTERN.test(code)) {
+  if (!REFERRAL_CODE_PATTERN.test(trimmed)) {
     return 'Code must contain only letters, numbers, and hyphens';
   }
   return null;
