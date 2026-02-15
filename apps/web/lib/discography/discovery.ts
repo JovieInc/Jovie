@@ -2,9 +2,10 @@
  * Cross-platform link discovery service
  *
  * Discovers streaming platform links for releases using ISRC lookups.
- * Currently supports:
+ * Supports:
  * - Apple Music (via MusicKit API, with iTunes fallback)
  * - Deezer (via public API)
+ * - All other DSPs via Musicfetch API (supplementary)
  */
 
 import {
@@ -13,6 +14,10 @@ import {
   lookupByIsrc as musicKitLookupByIsrc,
 } from '@/lib/dsp-enrichment/providers/apple-music';
 
+import {
+  isMusicfetchAvailable,
+  lookupByIsrc as musicfetchLookupByIsrc,
+} from './musicfetch';
 import { lookupAppleMusicByIsrc, lookupDeezerByIsrc } from './provider-links';
 import { getTracksForRelease, upsertProviderLink } from './queries';
 
@@ -154,7 +159,7 @@ async function saveDiscoveredLink(opts: {
  * Strategy:
  * 1. Get tracks for the release
  * 2. Find the first track with an ISRC (usually track 1)
- * 3. Look up Apple Music and Deezer using that ISRC
+ * 3. Look up Apple Music, Deezer, and all other DSPs (via Musicfetch) using that ISRC
  * 4. Save discovered links to the database
  */
 export async function discoverLinksForRelease(
@@ -245,6 +250,41 @@ export async function discoverLinksForRelease(
         .catch(error => {
           result.errors.push(
             `Deezer lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        })
+    );
+  }
+
+  // Musicfetch lookup (supplementary — resolves all other DSPs in one call)
+  if (isMusicfetchAvailable()) {
+    lookupPromises.push(
+      musicfetchLookupByIsrc(isrc)
+        .then(async musicfetchResult => {
+          if (!musicfetchResult) return;
+
+          for (const [providerKey, url] of Object.entries(
+            musicfetchResult.links
+          )) {
+            // Skip providers already discovered by custom lookups above
+            if (existingSet.has(providerKey)) continue;
+            // Skip providers already discovered in this run
+            if (result.discovered.some(d => d.provider === providerKey))
+              continue;
+
+            await saveDiscoveredLink({
+              releaseId,
+              providerId: providerKey,
+              url,
+              externalId: null,
+              source: 'musicfetch_isrc',
+              isrc,
+              result,
+            });
+          }
+        })
+        .catch(error => {
+          result.errors.push(
+            `Musicfetch lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
         })
     );

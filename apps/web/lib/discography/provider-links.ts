@@ -1,5 +1,10 @@
 import * as Sentry from '@sentry/nextjs';
 
+import {
+  isMusicfetchAvailable,
+  lookupByIsrc as musicfetchLookupByIsrc,
+} from './musicfetch';
+
 export type ProviderKey =
   | 'apple_music'
   | 'spotify'
@@ -7,7 +12,15 @@ export type ProviderKey =
   | 'soundcloud'
   | 'deezer'
   | 'amazon_music'
-  | 'tidal';
+  | 'tidal'
+  | 'pandora'
+  | 'napster'
+  | 'audiomack'
+  | 'qobuz'
+  | 'anghami'
+  | 'boomplay'
+  | 'iheartradio'
+  | 'tiktok';
 
 export type ProviderLinkQuality =
   | 'canonical'
@@ -51,6 +64,14 @@ const DEFAULT_PROVIDERS: ProviderKey[] = [
   'deezer',
   'amazon_music',
   'tidal',
+  'pandora',
+  'napster',
+  'audiomack',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iheartradio',
+  'tiktok',
 ];
 
 const DEFAULT_APPLE_STOREFRONT = 'us';
@@ -86,6 +107,22 @@ export function buildSearchUrl(
       return `https://music.amazon.com/search/${query}`;
     case 'tidal':
       return `https://tidal.com/search?q=${query}`;
+    case 'pandora':
+      return `https://www.pandora.com/search/${query}/tracks`;
+    case 'napster':
+      return `https://web.napster.com/search?query=${query}`;
+    case 'audiomack':
+      return `https://audiomack.com/search?q=${query}`;
+    case 'qobuz':
+      return `https://www.qobuz.com/search?q=${query}`;
+    case 'anghami':
+      return `https://play.anghami.com/search/${query}`;
+    case 'boomplay':
+      return `https://www.boomplay.com/search/default/${query}`;
+    case 'iheartradio':
+      return `https://www.iheart.com/search/?query=${query}`;
+    case 'tiktok':
+      return `https://www.tiktok.com/search?q=${query}`;
     default:
       return query;
   }
@@ -277,6 +314,30 @@ async function runIsrcLookups(
             provider_id: result.albumId ?? result.trackId,
           });
           seenProviders.add('deezer');
+        }
+      })
+    );
+  }
+
+  // Musicfetch ISRC lookup (supplementary — resolves all other DSPs in one call)
+  if (isMusicfetchAvailable()) {
+    lookupPromises.push(
+      musicfetchLookupByIsrc(track.isrc).then(result => {
+        if (!result) return;
+
+        for (const [providerKey, url] of Object.entries(result.links)) {
+          const key = providerKey as ProviderKey;
+          // Only use musicfetch results for providers that are requested
+          // AND not already resolved by a custom lookup or manual override
+          if (providers.includes(key) && !seenProviders.has(key)) {
+            links.push({
+              provider: key,
+              url,
+              quality: 'canonical',
+              discovered_from: 'musicfetch_isrc',
+            });
+            seenProviders.add(key);
+          }
         }
       })
     );
