@@ -773,7 +773,7 @@ jobs:
           # Enable coverage on main branch and PRs for Codecov integration
           COVERAGE_FLAG="--coverage"
           # V8 coverage report generation needs extra heap for large codebases
-          export NODE_OPTIONS="--max-old-space-size=8192"
+          export NODE_OPTIONS="--max-old-space-size=4096"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests with coverage"
@@ -785,8 +785,10 @@ jobs:
             # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
             # Then run tests for changed files (coverage already generated above)
+            # Use --pool=forks --maxWorkers=1 to prevent OOM when --changed resolves to many files
+            # (e.g. modifying AuthShellWrapper causes all 360+ tests to be related)
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-            pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm --filter=@jovie/web run test -- --pool=forks --maxWorkers=1 --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "📦 Full suite with coverage"
             pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
