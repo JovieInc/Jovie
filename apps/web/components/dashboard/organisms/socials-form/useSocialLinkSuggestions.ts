@@ -1,8 +1,9 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
+import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
 import { queryKeys } from '@/lib/queries/keys';
 
 export interface SocialLinkSuggestion {
@@ -33,44 +34,36 @@ function toSocialLinkSuggestion(s: ProfileSuggestion): SocialLinkSuggestion {
   };
 }
 
+async function fetchSocialLinkSuggestions(
+  profileId: string,
+  signal?: AbortSignal
+): Promise<SocialLinkSuggestion[]> {
+  const res = await fetch(
+    `/api/suggestions?profileId=${encodeURIComponent(profileId)}`,
+    { signal }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  if (data.success && Array.isArray(data.suggestions)) {
+    return (data.suggestions as ProfileSuggestion[])
+      .filter(s => s.type === 'social_link')
+      .map(toSocialLinkSuggestion);
+  }
+  return [];
+}
+
 export function useSocialLinkSuggestions(
   profileId: string | undefined
 ): UseSocialLinkSuggestionsReturn {
-  const [suggestions, setSuggestions] = useState<SocialLinkSuggestion[]>([]);
-  const [isLoading, setIsLoading] = useState(!!profileId);
-  const [actioningId, setActioningId] = useState<string | null>(null);
-  const fetchedProfileIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!profileId) {
-      setIsLoading(false);
-      return;
-    }
-    if (fetchedProfileIdRef.current === profileId) return;
-    fetchedProfileIdRef.current = profileId;
-    setIsLoading(true);
-    setSuggestions([]);
-
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/suggestions?profileId=${encodeURIComponent(profileId)}`
-        );
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.success && Array.isArray(data.suggestions)) {
-          setSuggestions(
-            (data.suggestions as ProfileSuggestion[])
-              .filter(s => s.type === 'social_link')
-              .map(toSocialLinkSuggestion)
-          );
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [profileId]);
+  const { data: suggestions = [], isLoading } = useQuery({
+    queryKey: queryKeys.suggestions.list(profileId!),
+    queryFn: ({ signal }) => fetchSocialLinkSuggestions(profileId!, signal),
+    enabled: !!profileId,
+    ...STANDARD_CACHE,
+  });
 
   const confirm = useCallback(
     async (suggestion: SocialLinkSuggestion) => {
@@ -86,7 +79,11 @@ export function useSocialLinkSuggestions(
           }
         );
         if (res.ok) {
-          setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+          // Optimistically remove from cache
+          queryClient.setQueryData<SocialLinkSuggestion[]>(
+            queryKeys.suggestions.list(profileId),
+            old => old?.filter(s => s.id !== suggestion.id) ?? []
+          );
           queryClient.invalidateQueries({
             queryKey: queryKeys.dashboard.socialLinks(profileId),
           });
@@ -112,13 +109,17 @@ export function useSocialLinkSuggestions(
           }
         );
         if (res.ok) {
-          setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+          // Optimistically remove from cache
+          queryClient.setQueryData<SocialLinkSuggestion[]>(
+            queryKeys.suggestions.list(profileId),
+            old => old?.filter(s => s.id !== suggestion.id) ?? []
+          );
         }
       } finally {
         setActioningId(null);
       }
     },
-    [actioningId, profileId]
+    [actioningId, profileId, queryClient]
   );
 
   return { suggestions, isLoading, actioningId, confirm, dismiss };
