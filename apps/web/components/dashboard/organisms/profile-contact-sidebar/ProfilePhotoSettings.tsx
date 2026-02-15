@@ -8,7 +8,7 @@
  */
 
 import { Switch } from '@jovie/ui';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import {
@@ -27,6 +27,11 @@ export function ProfilePhotoSettings({
   const [allowDownloads, setAllowDownloads] = useState(initialAllowDownloads);
   const [isPending, setIsPending] = useState(false);
   const switchId = useId();
+
+  // Sync local state when the prop changes (e.g. after server refetch)
+  useEffect(() => {
+    setAllowDownloads(initialAllowDownloads);
+  }, [initialAllowDownloads]);
 
   const handleToggle = useCallback(async (checked: boolean) => {
     setAllowDownloads(checked);

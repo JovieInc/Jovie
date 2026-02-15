@@ -112,9 +112,8 @@ export function ProfileContactSidebar() {
         <div className='shrink-0 border-t border-subtle px-4 py-3'>
           <ProfilePhotoSettings
             allowDownloads={
-              (
-                selectedProfile?.settings as Record<string, unknown> | null
-              )?.allowProfilePhotoDownloads === true
+              (selectedProfile?.settings as Record<string, unknown> | null)
+                ?.allowProfilePhotoDownloads === true
             }
           />
         </div>

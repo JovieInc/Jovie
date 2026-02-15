@@ -160,6 +160,7 @@ async function requireOwnProfile() {
     .select({
       id: creatorProfiles.id,
       settings: creatorProfiles.settings,
+      usernameNormalized: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, user.id))
@@ -185,10 +186,7 @@ export async function updateAllowProfilePhotoDownloads(
   const profile = await requireOwnProfile();
 
   try {
-    const currentSettings = (profile.settings ?? {}) as Record<
-      string,
-      unknown
-    >;
+    const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
 
     await db
       .update(creatorProfiles)
@@ -200,6 +198,11 @@ export async function updateAllowProfilePhotoDownloads(
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profile.id));
+
+    // Invalidate cached public profile so visitors see the updated setting
+    if (profile.usernameNormalized) {
+      await invalidateProfileCache(profile.usernameNormalized);
+    }
   } catch (error) {
     throw new Error('Failed to update profile photo download setting', {
       cause: error,

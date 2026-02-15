@@ -48,7 +48,11 @@ export function buildAvatarSizes(
 
   if (sizesMap && Object.keys(sizesMap).length > 0) {
     if (sizesMap.original) {
-      sizes.push({ key: 'original', label: 'Original', url: sizesMap.original });
+      sizes.push({
+        key: 'original',
+        label: 'Original',
+        url: sizesMap.original,
+      });
     }
     if (sizesMap['512']) {
       sizes.push({ key: '512', label: '512 × 512', url: sizesMap['512'] });

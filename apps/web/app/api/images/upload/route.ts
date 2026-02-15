@@ -17,8 +17,8 @@ import {
   getVercelBlobUploader,
   NO_STORE_HEADERS,
   optimizeImageToAvif,
-  processAvatarToSizes,
   PROCESSING_TIMEOUT_MS,
+  processAvatarToSizes,
   UPLOAD_ERROR_CODES,
   uploadBufferToBlob,
   validateUploadedFile,
@@ -177,14 +177,18 @@ export async function POST(request: NextRequest) {
         // Upload each download size to blob storage
         const avatarSizes: Record<string, string> = {};
         for (const [sizeKey, buffer] of Object.entries(avatarSizeBuffers)) {
-          const sizeSuffix = sizeKey === 'original' ? '-original' : `-${sizeKey}`;
-          const sizeBlobPath = `avatars/users/${clerkUserId}/${seoFileName}${sizeSuffix}.avif`;
-          const sizeUrl = await uploadBufferToBlob(
-            put,
-            sizeBlobPath,
-            buffer,
-            AVIF_MIME_TYPE
+          const sizeBlobPath = buildBlobPath(
+            `${seoFileName}${sizeKey === 'original' ? '-original' : `-${sizeKey}`}`,
+            clerkUserId
           );
+          const sizeUrl = await withTimeout(
+            uploadBufferToBlob(put, sizeBlobPath, buffer, AVIF_MIME_TYPE),
+            PROCESSING_TIMEOUT_MS,
+            `Blob upload (${sizeKey})`
+          );
+          if (!sizeUrl?.startsWith('https://')) {
+            throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
+          }
           avatarSizes[sizeKey] = sizeUrl;
         }
 

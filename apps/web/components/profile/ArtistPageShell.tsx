@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfileShell } from '@/components/organisms/profile-shell';
+import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
