@@ -13,7 +13,10 @@
 
 import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema/ingestion';
-import { processDspArtistDiscoveryJob } from '@/lib/dsp-enrichment/jobs';
+import {
+  processDspArtistDiscoveryJob,
+  processMusicFetchEnrichmentJob,
+} from '@/lib/dsp-enrichment/jobs';
 import { processReleaseEnrichmentJob } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { processSendClaimInviteJob } from '@/lib/email/jobs/send-claim-invite';
 import { processBeaconsJob } from './jobs/beacons';
@@ -94,6 +97,8 @@ export async function processJob(
       return processDspArtistDiscoveryJob(tx, job.payload);
     case 'dsp_track_enrichment':
       return processReleaseEnrichmentJob(tx, job.payload);
+    case 'musicfetch_enrichment':
+      return processMusicFetchEnrichmentJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }

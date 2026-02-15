@@ -66,7 +66,7 @@ CREATE TABLE "insight_generation_runs" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "audience_members" ADD COLUMN "utm_params" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
+ALTER TABLE "audience_members" ADD COLUMN IF NOT EXISTS "utm_params" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
 ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmed_at" timestamp;--> statement-breakpoint
 ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmation_token" text;--> statement-breakpoint
 ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmation_sent_at" timestamp;--> statement-breakpoint

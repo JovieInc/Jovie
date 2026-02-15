@@ -72,7 +72,7 @@ const variantStyles: Record<CircleIconButtonVariant, string> = {
   // Surface - elevated card style with subtle border
   surface: cn(
     'bg-surface-0 text-primary-token',
-    'ring-1 ring-(--color-border-subtle)',
+    'ring-1 ring-[var(--color-border-subtle)]',
     'shadow-sm',
     'hover:bg-surface-1 hover:shadow-md'
   ),
@@ -111,7 +111,7 @@ const baseStyles = cn(
   'active:scale-95',
   // Focus ring using design system utility
   'focus-ring-themed',
-  'focus-visible:ring-offset-(--color-bg-base)',
+  'focus-visible:ring-offset-[var(--color-bg-base)]',
   // Touch optimizations
   'touch-manipulation select-none',
   '[-webkit-tap-highlight-color:transparent]',

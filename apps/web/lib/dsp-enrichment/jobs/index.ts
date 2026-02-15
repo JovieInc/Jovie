@@ -14,7 +14,12 @@ export {
   processDspArtistDiscoveryJob,
   processDspArtistDiscoveryJobStandalone,
 } from './dsp-artist-discovery';
-
+export {
+  type MusicFetchEnrichmentPayload,
+  type MusicFetchEnrichmentResult,
+  musicFetchEnrichmentPayloadSchema,
+  processMusicFetchEnrichmentJob,
+} from './musicfetch-enrichment';
 export {
   enrichProfileFromDsp,
   type ProfileEnrichmentPayload,

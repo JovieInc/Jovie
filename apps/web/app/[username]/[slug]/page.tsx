@@ -412,9 +412,7 @@ export async function generateMetadata({
   let ogImageSize = 1200;
   if (content.artworkSizes?.['1000']) {
     ogImageSize = 1000;
-  } else if (content.artworkSizes?.original) {
-    ogImageSize = 1200;
-  } else if (content.artworkUrl) {
+  } else if (!content.artworkSizes?.original && content.artworkUrl) {
     ogImageSize = 640;
   }
   const ogImageHeight = isDefaultImage ? 630 : ogImageSize;
