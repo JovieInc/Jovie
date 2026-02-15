@@ -124,11 +124,12 @@ export function SettingsTouringSection({
     }
   }, [queryClient, profileId]);
 
-  return (
-    <DashboardCard variant='settings'>
-      {isLoading ? (
-        <TouringSectionSkeleton />
-      ) : isError ? (
+  const renderContent = () => {
+    if (isLoading) {
+      return <TouringSectionSkeleton />;
+    }
+    if (isError) {
+      return (
         <div className='flex flex-col items-center gap-2 py-6'>
           <p className='text-sm text-secondary-token'>
             Failed to load connection status.
@@ -137,92 +138,93 @@ export function SettingsTouringSection({
             Try again
           </Button>
         </div>
-      ) : (
-        <div className='space-y-4'>
-          <p className='text-sm text-secondary-token'>
-            Tour dates will appear on your public profile when connected.
-          </p>
+      );
+    }
+    return (
+      <div className='space-y-4'>
+        <p className='text-sm text-secondary-token'>
+          Tour dates will appear on your public profile when connected.
+        </p>
 
-          {isConnected && connectedArtist && (
-            <div className='flex items-center gap-2 rounded-md bg-green-500/10 px-3 py-2'>
-              <CheckCircle2 className='h-4 w-4 text-green-500 shrink-0' />
-              <span className='text-sm text-primary-token'>
-                Connected as <strong>{connectedArtist}</strong>
+        {isConnected && connectedArtist && (
+          <div className='flex items-center gap-2 rounded-md bg-green-500/10 px-3 py-2'>
+            <CheckCircle2 className='h-4 w-4 text-green-500 shrink-0' />
+            <span className='text-sm text-primary-token'>
+              Connected as <strong>{connectedArtist}</strong>
+            </span>
+            {lastSyncedAt && (
+              <span className='text-xs text-tertiary-token ml-auto'>
+                Last synced{' '}
+                {new Date(lastSyncedAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}
               </span>
-              {lastSyncedAt && (
-                <span className='text-xs text-tertiary-token ml-auto'>
-                  Last synced{' '}
-                  {new Date(lastSyncedAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className='space-y-3'>
-            <div className='space-y-1.5'>
-              <Label htmlFor='bandsintown-artist' className='text-xs'>
-                Bandsintown artist name
-              </Label>
-              <Input
-                id='bandsintown-artist'
-                value={artistName}
-                onChange={e => setArtistName(e.target.value)}
-                placeholder='e.g. The Beatles'
-                disabled={isSaving}
-              />
-            </div>
-
-            <div className='space-y-1.5'>
-              <Label htmlFor='bandsintown-api-key' className='text-xs'>
-                API key{' '}
-                <span className='text-tertiary-token font-normal'>
-                  (optional)
-                </span>
-              </Label>
-              <Input
-                id='bandsintown-api-key'
-                type='password'
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder='Your Bandsintown API key'
-                disabled={isSaving}
-              />
-            </div>
-          </div>
-
-          <div className='flex items-center gap-2'>
-            <Button
-              size='sm'
-              onClick={handleSaveAndConnect}
-              disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
-            >
-              {isSaving && (
-                <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />
-              )}
-              {isConnected ? 'Update' : 'Connect'}
-            </Button>
-            {isConnected && (
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={handleDisconnect}
-                disabled={isDisconnecting}
-                className='text-destructive hover:text-destructive'
-              >
-                {isDisconnecting ? (
-                  <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />
-                ) : (
-                  <Unplug className='h-3.5 w-3.5 mr-1' />
-                )}
-                Disconnect
-              </Button>
             )}
           </div>
+        )}
+
+        <div className='space-y-3'>
+          <div className='space-y-1.5'>
+            <Label htmlFor='bandsintown-artist' className='text-xs'>
+              Bandsintown artist name
+            </Label>
+            <Input
+              id='bandsintown-artist'
+              value={artistName}
+              onChange={e => setArtistName(e.target.value)}
+              placeholder='e.g. The Beatles'
+              disabled={isSaving}
+            />
+          </div>
+
+          <div className='space-y-1.5'>
+            <Label htmlFor='bandsintown-api-key' className='text-xs'>
+              API key{' '}
+              <span className='text-tertiary-token font-normal'>
+                (optional)
+              </span>
+            </Label>
+            <Input
+              id='bandsintown-api-key'
+              type='password'
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder='Your Bandsintown API key'
+              disabled={isSaving}
+            />
+          </div>
         </div>
-      )}
-    </DashboardCard>
-  );
+
+        <div className='flex items-center gap-2'>
+          <Button
+            size='sm'
+            onClick={handleSaveAndConnect}
+            disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
+          >
+            {isSaving && <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />}
+            {isConnected ? 'Update' : 'Connect'}
+          </Button>
+          {isConnected && (
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={handleDisconnect}
+              disabled={isDisconnecting}
+              className='text-destructive hover:text-destructive'
+            >
+              {isDisconnecting ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />
+              ) : (
+                <Unplug className='h-3.5 w-3.5 mr-1' />
+              )}
+              Disconnect
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return <DashboardCard variant='settings'>{renderContent()}</DashboardCard>;
 }

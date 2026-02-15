@@ -409,24 +409,24 @@ export async function generateMetadata({
     content.artworkUrl ??
     defaultImage;
   const isDefaultImage = ogImageUrl === defaultImage;
-  const ogImageSize = content.artworkSizes?.['1000']
-    ? 1000
-    : content.artworkSizes?.original
-      ? 1200
-      : content.artworkUrl
-        ? 640
-        : 1200;
+  let ogImageSize = 1200;
+  if (content.artworkSizes?.['1000']) {
+    ogImageSize = 1000;
+  } else if (content.artworkSizes?.original) {
+    ogImageSize = 1200;
+  } else if (content.artworkUrl) {
+    ogImageSize = 640;
+  }
   const ogImageHeight = isDefaultImage ? 630 : ogImageSize;
 
-  const ogImageType = isDefaultImage
-    ? 'image/png'
-    : ogImageUrl.includes('.png')
-      ? 'image/png'
-      : ogImageUrl.includes('.webp')
-        ? 'image/webp'
-        : ogImageUrl.includes('.avif')
-          ? 'image/avif'
-          : 'image/jpeg';
+  let ogImageType = 'image/jpeg';
+  if (isDefaultImage || ogImageUrl.includes('.png')) {
+    ogImageType = 'image/png';
+  } else if (ogImageUrl.includes('.webp')) {
+    ogImageType = 'image/webp';
+  } else if (ogImageUrl.includes('.avif')) {
+    ogImageType = 'image/avif';
+  }
 
   const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
 
