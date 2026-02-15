@@ -43,12 +43,18 @@ export function SettingsTouringSection({
 
   // Sync artistName input from fetched data once on initial load
   const hasInitialized = useRef(false);
+  const lastProfileId = useRef(profileId);
   useEffect(() => {
+    // Reset when profileId changes so new profile data gets synced
+    if (lastProfileId.current !== profileId) {
+      hasInitialized.current = false;
+      lastProfileId.current = profileId;
+    }
     if (connectionStatus?.artistName && !hasInitialized.current) {
       setArtistName(connectionStatus.artistName);
       hasInitialized.current = true;
     }
-  }, [connectionStatus?.artistName]);
+  }, [connectionStatus?.artistName, profileId]);
 
   const handleSaveAndConnect = useCallback(async () => {
     setIsSaving(true);
