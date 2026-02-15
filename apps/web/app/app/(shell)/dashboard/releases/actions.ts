@@ -44,6 +44,7 @@ import { captureError } from '@/lib/error-tracking';
 import {
   enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
+  enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
 import {
   checkIsrcRescanRateLimit,
@@ -661,6 +662,15 @@ export async function connectSpotifyArtist(params: {
       creatorProfileId: profile.id,
       spotifyArtistId: params.spotifyArtistId,
       targetProviders: ['apple_music'],
+    });
+
+    // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)
+    // Fire-and-forget: enrichment runs in background via ingestion job queue
+    void enqueueMusicFetchEnrichmentJob({
+      creatorProfileId: profile.id,
+      spotifyUrl: params.spotifyArtistUrl,
+    }).catch(() => {
+      // Enrichment can be retried later; don't fail the connection
     });
 
     return {

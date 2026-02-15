@@ -131,6 +131,9 @@ export const ServerEnvSchema = z.object({
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
+  // MusicFetch.io (cross-platform DSP profiles + social links)
+  MUSICFETCH_API_TOKEN: z.string().optional(),
+
   // Jovie Marketing Pixels (for retargeting Jovie visitors)
   JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
   JOVIE_FACEBOOK_ACCESS_TOKEN: z.string().optional(),
@@ -205,6 +208,7 @@ export const ENV_KEYS = [
   'SENTRY_DSN',
   'STATSIG_SERVER_SECRET',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'MUSICFETCH_API_TOKEN',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',
   'JOVIE_GOOGLE_MEASUREMENT_ID',
