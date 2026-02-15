@@ -40,6 +40,8 @@ export * from './links';
 export * from './pixels';
 // Creator Profiles
 export * from './profiles';
+// Referral Program (Codes, Referrals, Commissions)
+export * from './referrals';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export * from './sender';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
