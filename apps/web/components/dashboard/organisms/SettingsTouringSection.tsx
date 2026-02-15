@@ -49,6 +49,7 @@ export function SettingsTouringSection({
     if (lastProfileId.current !== profileId) {
       hasInitialized.current = false;
       lastProfileId.current = profileId;
+      setArtistName('');
     }
     if (connectionStatus?.artistName && !hasInitialized.current) {
       setArtistName(connectionStatus.artistName);
