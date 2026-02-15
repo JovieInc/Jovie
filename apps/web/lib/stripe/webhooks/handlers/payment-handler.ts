@@ -182,15 +182,15 @@ export class PaymentHandler extends BaseSubscriptionHandler {
 
       await invalidateBillingCache();
 
-      // Record referral commission if applicable (fire-and-forget)
+      // Record referral commission if applicable.
+      // Awaited so failures are surfaced instead of silently dropped.
       // Only records commission for active referrals — expired/churned referrals are ignored.
       // If a user cancels and re-subscribes via a new referral, that new referral gets credit.
       if (userId && invoice.amount_paid > 0) {
-        getInternalUserId(userId)
-          .then(internalId => {
-            if (!internalId) return;
-
-            return recordCommission({
+        try {
+          const internalId = await getInternalUserId(userId);
+          if (internalId) {
+            await recordCommission({
               referredUserId: internalId,
               stripeInvoiceId: invoice.id,
               paymentAmountCents: invoice.amount_paid,
@@ -202,12 +202,15 @@ export class PaymentHandler extends BaseSubscriptionHandler {
                 ? new Date(invoice.period_end * 1000)
                 : undefined,
             });
-          })
-          .catch(error => {
-            logger.warn('Failed to record referral commission', {
-              error: error instanceof Error ? error.message : 'Unknown error',
-            });
+          }
+        } catch (error) {
+          // Log but don't fail the webhook — commission tracking is secondary
+          // to ensuring billing status is updated correctly
+          logger.warn('Failed to record referral commission', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stripeInvoiceId: invoice.id,
           });
+        }
       }
 
       // Check if this is a recovery from a failed payment (attempt_count > 1)

@@ -118,19 +118,19 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
-    // Activate referral if this user was referred (fire-and-forget)
-    // Note: userId is guaranteed to be truthy here due to the guard above
-    getInternalUserId(userId)
-      .then(internalId => {
-        if (internalId) {
-          return activateReferral(internalId);
-        }
-      })
-      .catch(error => {
-        logger.warn('Failed to activate referral on checkout', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+    // Activate referral if this user was referred.
+    // Awaited so failures are surfaced instead of silently dropped.
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (internalId) {
+        await activateReferral(internalId);
+      }
+    } catch (error) {
+      // Log but don't fail the webhook — referral activation is secondary
+      logger.warn('Failed to activate referral on checkout', {
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
 
     // Invalidate client cache
     await invalidateBillingCache();

@@ -6,11 +6,8 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { createReferral } from '@/lib/referrals/service';
+import { createReferral, getInternalUserId } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -45,20 +42,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up internal user ID
-    const user = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
+    const internalUserId = await getInternalUserId(clerkUserId);
 
-    if (user.length === 0) {
+    if (!internalUserId) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
-    const result = await createReferral(user[0].id, code);
+    const result = await createReferral(internalUserId, code);
 
     if (!result.success) {
       return NextResponse.json(

@@ -268,19 +268,20 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    // Permanently expire referral on cancellation (fire-and-forget)
+    // Mark referral as churned on cancellation.
+    // Awaited so failures are surfaced instead of silently dropped.
     // If the user re-subscribes later via a new referral link, a fresh referral is created.
-    getInternalUserId(userId)
-      .then(internalId => {
-        if (internalId) {
-          return expireReferralOnChurn(internalId);
-        }
-      })
-      .catch(error => {
-        logger.warn('Failed to expire referral on subscription deletion', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (internalId) {
+        await expireReferralOnChurn(internalId);
+      }
+    } catch (error) {
+      // Log but don't fail the webhook — referral churn tracking is secondary
+      logger.warn('Failed to expire referral on subscription deletion', {
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
 
     await invalidateBillingCache();
 

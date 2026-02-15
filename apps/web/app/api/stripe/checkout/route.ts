@@ -8,6 +8,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
+  MAX_REFERRAL_CODE_LENGTH,
+  REFERRAL_CODE_PATTERN,
+} from '@/lib/referrals/config';
+import {
   checkExistingPlanSubscription,
   getCheckoutErrorResponse,
 } from '@/lib/stripe/checkout-helpers';
@@ -33,13 +37,27 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { priceId, referralCode } = body;
+    const { priceId, referralCode: rawReferralCode } = body;
 
     if (!priceId || typeof priceId !== 'string') {
       return NextResponse.json(
         { error: 'Invalid price ID' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Validate and normalize referral code if provided
+    let referralCode: string | undefined;
+    if (typeof rawReferralCode === 'string') {
+      const trimmed = rawReferralCode.trim();
+      if (
+        trimmed.length > 0 &&
+        trimmed.length <= MAX_REFERRAL_CODE_LENGTH &&
+        REFERRAL_CODE_PATTERN.test(trimmed)
+      ) {
+        referralCode = trimmed.toLowerCase();
+      }
+      // Silently ignore invalid referral codes — they shouldn't block checkout
     }
 
     // Validate that the price ID is one of our active prices
@@ -104,7 +122,7 @@ export async function POST(request: NextRequest) {
       successUrl,
       cancelUrl,
       idempotencyKey,
-      referralCode: typeof referralCode === 'string' ? referralCode : undefined,
+      referralCode,
     });
 
     // Log successful checkout creation
