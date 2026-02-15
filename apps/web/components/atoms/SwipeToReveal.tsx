@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -48,9 +49,10 @@ export function SwipeToRevealGroup({
   readonly children: React.ReactNode;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const contextValue = useMemo(() => ({ openId, setOpenId }), [openId]);
 
   return (
-    <SwipeGroupContext.Provider value={{ openId, setOpenId }}>
+    <SwipeGroupContext.Provider value={contextValue}>
       {children}
     </SwipeGroupContext.Provider>
   );
