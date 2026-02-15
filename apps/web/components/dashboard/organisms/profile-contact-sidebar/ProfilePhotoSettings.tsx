@@ -1,19 +1,11 @@
 'use client';
 
-/**
- * ProfilePhotoSettings Component
- *
- * Toggle for enabling/disabling profile photo downloads on public pages.
- * Mirrors the ReleaseSettings pattern used for album art downloads.
- */
-
-import { Switch } from '@jovie/ui';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import {
-  DrawerPropertyRow,
   DrawerSection,
+  DrawerSettingsToggle,
 } from '@/components/molecules/drawer';
 
 interface ProfilePhotoSettingsProps {
@@ -26,7 +18,6 @@ export function ProfilePhotoSettings({
 }: ProfilePhotoSettingsProps) {
   const [allowDownloads, setAllowDownloads] = useState(initialAllowDownloads);
   const [isPending, setIsPending] = useState(false);
-  const switchId = useId();
 
   // Sync local state when the prop changes (e.g. after server refetch)
   useEffect(() => {
@@ -53,24 +44,13 @@ export function ProfilePhotoSettings({
 
   return (
     <DrawerSection title='Settings'>
-      <div className='space-y-2.5'>
-        <DrawerPropertyRow
-          label='Allow photo downloads'
-          value={
-            <Switch
-              id={switchId}
-              checked={allowDownloads}
-              onCheckedChange={handleToggle}
-              disabled={isPending}
-              aria-label='Allow profile photo downloads on public pages'
-            />
-          }
-        />
-        <p className='text-[10px] text-tertiary-token leading-relaxed'>
-          When enabled, visitors can right-click your profile photo on public
-          pages to download it in multiple sizes.
-        </p>
-      </div>
+      <DrawerSettingsToggle
+        label='Allow photo downloads'
+        checked={allowDownloads}
+        onCheckedChange={handleToggle}
+        disabled={isPending}
+        ariaLabel='Allow profile photo downloads on public pages'
+      />
     </DrawerSection>
   );
 }

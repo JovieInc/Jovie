@@ -17,11 +17,14 @@ import {
   SelectValue,
   SimpleTooltip,
 } from '@jovie/ui';
-import { Loader2, Plus, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
-import { SidebarLinkRow } from '@/components/molecules/drawer';
+import {
+  DrawerLinkSection,
+  SidebarLinkRow,
+} from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -174,50 +177,42 @@ export function ReleaseDspLinks({
     rescanTooltip = `Try again in ${formatCooldown(remainingMs)}`;
   }
 
-  return (
-    <div className='space-y-3'>
-      <div className='flex items-center justify-between'>
-        <span className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
-          DSP Links
-        </span>
-        <div className='flex items-center gap-0.5'>
-          {isEditable && onRescanIsrc && (
-            <SimpleTooltip content={rescanTooltip} side='bottom'>
-              <Button
-                type='button'
-                size='icon'
-                variant='ghost'
-                aria-label={rescanTooltip}
-                onClick={handleRescan}
-                disabled={isRescanDisabled}
-              >
-                {isRescanningIsrc ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
-                  <RefreshCw className='h-4 w-4' />
-                )}
-              </Button>
-            </SimpleTooltip>
+  const rescanButton =
+    isEditable && onRescanIsrc ? (
+      <SimpleTooltip content={rescanTooltip} side='bottom'>
+        <Button
+          type='button'
+          size='icon'
+          variant='ghost'
+          aria-label={rescanTooltip}
+          onClick={handleRescan}
+          disabled={isRescanDisabled}
+        >
+          {isRescanningIsrc ? (
+            <Loader2 className='h-4 w-4 animate-spin' />
+          ) : (
+            <RefreshCw className='h-4 w-4' />
           )}
-          {isEditable && availableProviders.length > 0 && (
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              aria-label='Add DSP link'
-              onClick={() => {
-                onSetIsAddingLink(true);
-              }}
-            >
-              <Plus className='h-4 w-4' />
-            </Button>
-          )}
-        </div>
-      </div>
+        </Button>
+      </SimpleTooltip>
+    ) : null;
 
+  return (
+    <DrawerLinkSection
+      title='DSP Links'
+      onAdd={
+        isEditable && availableProviders.length > 0
+          ? () => onSetIsAddingLink(true)
+          : undefined
+      }
+      addLabel='Add DSP link'
+      headerActions={rescanButton}
+      isEmpty={release.providers.length === 0 && !isAddingLink}
+      emptyMessage='No DSP links yet.'
+    >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='space-y-0.5'>
+        <div className='divide-y divide-subtle/50'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const dspId = PROVIDER_TO_DSP[provider.key];
@@ -248,24 +243,17 @@ export function ReleaseDspLinks({
         </div>
       )}
 
-      {/* Empty states */}
-      {release.providers.length === 0 &&
-        (isEditable && availableProviders.length > 0 ? (
-          <button
-            type='button'
-            onClick={() => onSetIsAddingLink(true)}
-            className='w-full py-3 text-sm text-sidebar-muted hover:text-sidebar-foreground text-center border border-dashed border-sidebar-border rounded-md hover:border-sidebar-foreground/50 transition-colors'
-          >
-            + Add a DSP link
-          </button>
-        ) : (
-          <p className='text-xs text-sidebar-muted py-2'>No DSP links yet.</p>
-        ))}
-
+      {/* Add link form */}
       {isEditable && isAddingLink && (
-        <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border bg-sidebar-surface p-3'>
+        <div
+          className={[
+            'mt-2 space-y-2 rounded-lg',
+            'border border-dashed border-subtle',
+            'bg-surface-1 p-3',
+          ].join(' ')}
+        >
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-sidebar-muted'>Provider</Label>
+            <Label className='text-xs text-tertiary-token'>Provider</Label>
             <Select
               value={selectedProvider ?? ''}
               onValueChange={(value: string) =>
@@ -292,7 +280,7 @@ export function ReleaseDspLinks({
             </Select>
           </div>
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-sidebar-muted'>URL</Label>
+            <Label className='text-xs text-tertiary-token'>URL</Label>
             <Input
               type='url'
               value={newLinkUrl}
@@ -334,6 +322,6 @@ export function ReleaseDspLinks({
           </div>
         </div>
       )}
-    </div>
+    </DrawerLinkSection>
   );
 }
