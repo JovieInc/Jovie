@@ -1,7 +1,6 @@
 'use client';
 
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -14,7 +13,8 @@ import type { LinkSection } from '@/components/dashboard/organisms/links/utils/l
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
 import { cn } from '@/lib/utils';
-import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { getContrastTextOnBrand } from '@/lib/utils/color';
+import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
 
@@ -107,9 +107,8 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
 
   // Get platform brand color
   const iconMeta = getPlatformIconMetadata(link.platform);
-  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const brandBg = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const handle = extractHandleFromUrl(link.url);
 
   const swipeActionsWidth = onRemove ? 132 : 88;
 
@@ -153,30 +152,37 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
       itemId={`profile-link-${link.id}`}
       actions={swipeActions}
       actionsWidth={swipeActionsWidth}
+      className='rounded-2xl'
     >
       <div
         className={cn(
-          'flex items-center justify-between lg:rounded-xl',
-          'px-3 py-2.5 bg-base transition-colors ease-out',
-          'hover:bg-surface-2',
+          'flex items-center justify-between rounded-2xl',
+          'bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
+          'transition-colors ease-out',
           !link.isVisible && 'opacity-60'
         )}
       >
-        {/* Left: Icon + Platform Name */}
+        {/* Left: Icon box + Platform Name */}
         <div className='flex items-center gap-3 min-w-0'>
-          <span
-            className='shrink-0'
-            style={
-              brandColor
-                ? { color: getContrastSafeIconColor(brandColor, isDark) }
-                : undefined
-            }
+          <div
+            className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
+            style={{
+              backgroundColor: brandBg,
+              color: getContrastTextOnBrand(brandBg),
+            }}
           >
-            <SocialIcon platform={link.platform} className='h-4 w-4' />
-          </span>
-          <span className='text-sm font-medium text-primary-token truncate'>
-            {platformName}
-          </span>
+            <SocialIcon platform={link.platform} className='h-5 w-5' />
+          </div>
+          <div className='min-w-0 flex-1'>
+            <div className='truncate text-sm font-medium text-primary-token'>
+              {platformName}
+            </div>
+            {handle && (
+              <div className='truncate text-sm text-secondary-token'>
+                @{handle}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right: Actions (visible on hover/focus - desktop only) */}
@@ -267,7 +273,7 @@ export function ProfileLinkList({
         addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
         isEmpty={false} // Early return above guarantees filteredLinks is non-empty
       >
-        <div className='divide-y divide-subtle/50'>
+        <div className='space-y-2'>
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
@@ -290,7 +296,7 @@ export function ProfileLinkList({
             onAdd={onAddLink ? () => onAddLink(section) : undefined}
             addLabel={`Add ${SECTION_LABELS[section]} link`}
           >
-            <div className='divide-y divide-subtle/50'>
+            <div className='space-y-2'>
               {sectionLinks.map(link => (
                 <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
               ))}
