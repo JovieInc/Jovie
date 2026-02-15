@@ -544,13 +544,63 @@ export async function enqueueLayloIngestionJob(params: {
 }
 
 /**
+ * Shared helper: dedup-check → atomic insert → race-fallback.
+ *
+ * All ingestion enqueue functions follow the same three-step pattern.
+ * Centralising it here eliminates duplication and keeps each public
+ * function a thin wrapper that only constructs the dedupKey + payload.
+ */
+async function enqueueIngestionJob(opts: {
+  jobType: string;
+  payload: Record<string, unknown>;
+  dedupKey: string;
+  priority: number;
+}): Promise<string | null> {
+  // Fast-path: check if a job already exists
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, opts.dedupKey))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
+  const result = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: opts.jobType,
+      payload: opts.payload,
+      dedupKey: opts.dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: opts.priority,
+      attempts: 0,
+    })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+    .returning({ id: ingestionJobs.id });
+
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  // Race condition: another concurrent insert won — return the existing job's id
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, opts.dedupKey))
+    .limit(1);
+
+  return winner?.id ?? null;
+}
+
+/**
  * Enqueue a DSP artist discovery job.
  *
  * Discovers matching artist profiles on other DSPs (like Apple Music)
  * for a creator profile using ISRC-based matching.
- *
- * @param params - Job parameters
- * @returns Job ID if created, null if deduplicated
  */
 export async function enqueueDspArtistDiscoveryJob(params: {
   creatorProfileId: string;
@@ -562,51 +612,17 @@ export async function enqueueDspArtistDiscoveryJob(params: {
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
 
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    spotifyArtistId: params.spotifyArtistId,
-    targetProviders: params.targetProviders ?? ['apple_music'],
+  return enqueueIngestionJob({
+    jobType: 'dsp_artist_discovery',
     dedupKey,
-  };
-
-  // Fast-path: check if a job already exists for this profile
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_artist_discovery',
-      payload,
+    priority: 1,
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: params.targetProviders ?? ['apple_music'],
       dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered discovery
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+    },
+  });
 }
 
 /**
@@ -614,9 +630,6 @@ export async function enqueueDspArtistDiscoveryJob(params: {
  *
  * Called after a DSP artist match is confirmed to enrich tracks with
  * links to the matched artist's profile on that provider.
- *
- * @param params - Job parameters
- * @returns Job ID if created, null if deduplicated
  */
 export async function enqueueDspTrackEnrichmentJob(params: {
   creatorProfileId: string;
@@ -624,53 +637,17 @@ export async function enqueueDspTrackEnrichmentJob(params: {
   providerId: 'apple_music' | 'deezer' | 'musicbrainz';
   externalArtistId: string;
 }): Promise<string | null> {
-  const dedupKey = `dsp_track_enrichment:${params.matchId}`;
-
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    matchId: params.matchId,
-    providerId: params.providerId,
-    externalArtistId: params.externalArtistId,
-  };
-
-  // Fast-path: check if a job already exists for this match
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_track_enrichment',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 2, // Medium priority for enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return enqueueIngestionJob({
+    jobType: 'dsp_track_enrichment',
+    dedupKey: `dsp_track_enrichment:${params.matchId}`,
+    priority: 2,
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      matchId: params.matchId,
+      providerId: params.providerId,
+      externalArtistId: params.externalArtistId,
+    },
+  });
 }
 
 /**
@@ -681,9 +658,6 @@ export async function enqueueDspTrackEnrichmentJob(params: {
  * (Instagram, TikTok, etc.) in a single API call.
  *
  * Triggered after a user connects their Spotify artist profile.
- *
- * @param params - Job parameters
- * @returns Job ID if created, null if deduplicated
  */
 export async function enqueueMusicFetchEnrichmentJob(params: {
   creatorProfileId: string;
@@ -691,48 +665,14 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
 }): Promise<string | null> {
   const dedupKey = `musicfetch_enrichment:${params.creatorProfileId}`;
 
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    spotifyUrl: params.spotifyUrl,
+  return enqueueIngestionJob({
+    jobType: 'musicfetch_enrichment',
     dedupKey,
-  };
-
-  // Fast-path: check if a job already exists for this profile
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'musicfetch_enrichment',
-      payload,
+    priority: 1,
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      spotifyUrl: params.spotifyUrl,
       dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won
-  const [mfWinner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return mfWinner?.id ?? null;
+    },
+  });
 }
