@@ -1,7 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
