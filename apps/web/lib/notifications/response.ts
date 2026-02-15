@@ -1,6 +1,7 @@
 import type {
   NotificationApiResponse,
   NotificationContactValues,
+  NotificationContentPreferences,
   NotificationErrorCode,
   NotificationStatusResponse,
   NotificationSubscribeResponse,
@@ -97,13 +98,15 @@ export const buildUnsubscribeSuccessResponse = (
  */
 export const buildStatusSuccessResponse = (
   channels: NotificationSubscriptionState,
-  details: NotificationContactValues
+  details: NotificationContactValues,
+  contentPreferences?: NotificationContentPreferences
 ): NotificationDomainResponse<NotificationStatusResponse> => ({
   status: 200,
   body: {
     success: true,
     channels,
     details,
+    ...(contentPreferences ? { contentPreferences } : {}),
   },
 });
 

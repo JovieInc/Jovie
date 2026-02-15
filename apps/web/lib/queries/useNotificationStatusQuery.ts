@@ -10,7 +10,9 @@ import {
   type NotificationSubscribePayload,
   type NotificationUnsubscribePayload,
   subscribeToNotifications,
+  type UpdateContentPreferencesPayload,
   unsubscribeFromNotifications,
+  updateContentPreferences,
 } from '@/lib/notifications/client';
 import type { NotificationStatusResponse } from '@/types/notifications';
 
@@ -117,6 +119,32 @@ export function useUnsubscribeNotificationsMutation() {
         artistId: variables.artistId,
         channel: variables.channel,
         method: variables.method,
+      });
+    },
+    retry: 1,
+    retryDelay: getRetryDelay,
+  });
+}
+
+export function useUpdateContentPreferencesMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: UpdateContentPreferencesPayload) =>
+      updateContentPreferences(input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.status({
+          artistId: variables.artistId,
+          email: variables.email ?? null,
+          phone: variables.phone ?? null,
+        }),
+      });
+    },
+    onError: (error, variables) => {
+      void captureWarning('Content preferences update mutation failed', {
+        error,
+        artistId: variables.artistId,
       });
     },
     retry: 1,

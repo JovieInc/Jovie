@@ -78,16 +78,16 @@ function ListenNowCTA({
 /**
  * Success state - shown when user has subscribed
  */
-function SubscriptionSuccess() {
+function SubscriptionSuccess({ artistName }: { artistName: string }) {
   return (
     <div className='space-y-1'>
       <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
         <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>Subscribed to notifications</span>
+        <span className='font-semibold'>You&apos;re in</span>
       </div>
       <p className='text-xs text-center text-secondary-token'>
-        You&apos;ll now receive updates from this artist. Tap the bell to add
-        another channel or unsubscribe.
+        You&apos;ll get a heads-up when {artistName} releases new music,
+        announces tours &amp; more. Tap the bell to manage your alerts.
       </p>
     </div>
   );
@@ -321,7 +321,7 @@ export function ArtistNotificationsCTA({
   }
 
   if (isSubscribed) {
-    return <SubscriptionSuccess />;
+    return <SubscriptionSuccess artistName={artist.name} />;
   }
 
   const inputConfig = getInputConfig(channel);
@@ -347,6 +347,15 @@ export function ArtistNotificationsCTA({
 
   return (
     <div className='space-y-3'>
+      <p
+        className='text-center text-sm text-secondary-token leading-snug'
+        style={noFontSynthesisStyle}
+      >
+        Get notified when{' '}
+        <span className='font-semibold text-primary-token'>{artist.name}</span>{' '}
+        drops new music, announces tours &amp; more
+      </p>
+
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
         <div className='flex items-center'>
           {shouldShowCountrySelector ? (
@@ -397,7 +406,7 @@ export function ArtistNotificationsCTA({
         className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
         style={noFontSynthesisStyle}
       >
-        {isSubmitting ? 'Subscribing…' : 'Subscribe'}
+        {isSubmitting ? 'Subscribing…' : 'Get Notified'}
       </button>
 
       <div className='flex items-center justify-center gap-2'>
