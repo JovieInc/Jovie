@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { HeroSpotifySearch } from './HeroSpotifySearch';
 
 /**
  * RedesignedHero - Linear.app style hero section
@@ -54,32 +55,13 @@ export function RedesignedHero() {
             release workflow.
           </p>
 
-          {/* CTAs - Linear style with primary button and secondary link */}
-          <div
-            className='flex flex-col sm:flex-row items-center justify-center'
-            style={{
-              marginTop: '40px',
-              gap: '16px',
-            }}
-          >
-            {/* Primary CTA */}
-            <Link
-              href='/waitlist'
-              className='inline-flex items-center justify-center transition-opacity hover:opacity-90'
-              style={{
-                height: '40px',
-                padding: '0 20px',
-                backgroundColor: 'var(--linear-btn-primary-bg)',
-                color: 'var(--linear-btn-primary-fg)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 500,
-              }}
-            >
-              Request early access
-            </Link>
+          {/* Spotify Search CTA */}
+          <div style={{ marginTop: '40px' }}>
+            <HeroSpotifySearch />
+          </div>
 
-            {/* Secondary CTA - Link style like Linear's "New: Feature" link */}
+          {/* Secondary CTA */}
+          <div style={{ marginTop: '16px' }}>
             <Link
               href='#how-it-works'
               className='inline-flex items-center transition-opacity hover:opacity-70'

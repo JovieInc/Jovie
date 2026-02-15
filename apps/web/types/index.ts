@@ -303,4 +303,5 @@ export interface UserEntitlements {
   // Limits
   analyticsRetentionDays: number;
   contactsLimit: number | null; // null = unlimited
+  smartLinksLimit: number | null; // null = unlimited, 5 for free tier
 }
