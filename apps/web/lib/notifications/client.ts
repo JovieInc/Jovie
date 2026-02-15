@@ -48,12 +48,12 @@ export const NOTIFICATION_COPY = {
   success: {
     subscribe: {
       email:
-        "You're in. We'll email you when this artist releases something new.",
-      sms: "You're in. We'll text you when this artist releases something new.",
+        "You're in. You'll get notified when new music drops, tours are announced & more.",
+      sms: "You're in. You'll get a text when new music drops, tours are announced & more.",
     },
     unsubscribe: {
-      email: 'You’re unsubscribed from email updates.',
-      sms: 'You’re unsubscribed from text updates.',
+      email: "You\u2019re unsubscribed from email notifications.",
+      sms: "You\u2019re unsubscribed from text notifications.",
     },
   },
 } as const;

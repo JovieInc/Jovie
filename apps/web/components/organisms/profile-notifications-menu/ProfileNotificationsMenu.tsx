@@ -15,13 +15,28 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Switch,
 } from '@jovie/ui';
+import { useState } from 'react';
+import {
+  FAN_NOTIFICATION_CONTENT_TYPES,
+  type FanNotificationContentType,
+} from '@/lib/db/schema/analytics';
 import type { NotificationChannel } from '@/types/notifications';
 import { formatE164PhoneForDisplay } from '../hooks/useProfileNotificationsController';
 import { ProfileNotificationsButton } from '../ProfileNotificationsButton';
 import type { ProfileNotificationsMenuProps } from './types';
 import { useNotificationConfirm } from './useNotificationConfirm';
 import { labelForChannel } from './utils';
+
+type ContentPrefs = Record<FanNotificationContentType, boolean>;
+
+const DEFAULT_CONTENT_PREFS: ContentPrefs = {
+  newMusic: true,
+  tourDates: true,
+  merch: true,
+  general: true,
+};
 
 export function ProfileNotificationsMenu({
   channelBusy,
@@ -42,6 +57,13 @@ export function ProfileNotificationsMenu({
     closeConfirmDialog,
     handleConfirm,
   } = useNotificationConfirm();
+
+  const [contentPrefs, setContentPrefs] =
+    useState<ContentPrefs>(DEFAULT_CONTENT_PREFS);
+
+  const handleContentToggle = (key: FanNotificationContentType) => {
+    setContentPrefs(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const renderChannelMenuItem = (
     targetChannel: NotificationChannel,
@@ -126,8 +148,9 @@ export function ProfileNotificationsMenu({
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
+          {/* ── Channels ─────────────────────────────── */}
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            Manage notifications
+            How you get notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {renderChannelMenuItem('sms', 'SMS')}
@@ -147,6 +170,39 @@ export function ProfileNotificationsMenu({
               …
             </span>
           </DropdownMenuItem>
+
+          {/* ── Content types ────────────────────────── */}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+            What you hear about
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {FAN_NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
+            <DropdownMenuItem
+              key={key}
+              className='flex items-center gap-3 focus-visible:outline-none'
+              onSelect={event => {
+                // Prevent menu from closing on toggle
+                event.preventDefault();
+                handleContentToggle(key);
+              }}
+            >
+              <div className='flex-1 min-w-0'>
+                <p className='text-sm font-semibold text-primary-token'>
+                  {label}
+                </p>
+                <p className='text-xs text-tertiary-token truncate'>
+                  {description}
+                </p>
+              </div>
+              <Switch
+                checked={contentPrefs[key]}
+                onCheckedChange={() => handleContentToggle(key)}
+                aria-label={`${label} notifications`}
+                className='shrink-0'
+              />
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

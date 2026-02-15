@@ -4,6 +4,7 @@ import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
+  type FanNotificationPreferences,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -502,6 +503,16 @@ export const subscribeToNotificationsDomain = async (
       normalizedEmail &&
       isDoubleOptInEnabled(artistProfile.settings);
 
+    // Default preferences: all content categories enabled
+    const defaultPreferences: FanNotificationPreferences = {
+      releasePreview: true,
+      releaseDay: true,
+      newMusic: true,
+      tourDates: true,
+      merch: true,
+      general: true,
+    };
+
     const [insertedSubscription] = await db
       .insert(notificationSubscriptions)
       .values({
@@ -513,6 +524,7 @@ export const subscribeToNotificationsDomain = async (
         city: cityValue,
         ipAddress,
         source,
+        preferences: defaultPreferences,
         // If double opt-in: leave confirmedAt null (pending). Otherwise: confirm immediately.
         confirmedAt: doubleOptIn ? null : new Date(),
       })
