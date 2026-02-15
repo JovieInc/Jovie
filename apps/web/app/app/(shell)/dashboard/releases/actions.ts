@@ -39,6 +39,7 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -171,6 +172,9 @@ function mapReleaseToViewModel(
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
     originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
       ?.originalArtworkUrl as string | undefined,
+    hasVideoLinks: release.providerLinks.some(link =>
+      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+    ),
   };
 }
 

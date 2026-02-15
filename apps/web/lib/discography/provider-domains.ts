@@ -6,7 +6,7 @@
  */
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
-import type { ProviderKey } from './types';
+import type { ProviderKey, VideoProviderKey } from './types';
 
 /**
  * Known provider domains for validation.
@@ -49,6 +49,15 @@ export const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   amazon_music: 'amazon_music',
   bandcamp: null,
   beatport: null,
+};
+
+/**
+ * Known domains for video providers (short-form "Use this sound" links).
+ */
+export const VIDEO_PROVIDER_DOMAINS: Record<VideoProviderKey, string[]> = {
+  tiktok_sound: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
+  instagram_reels: ['instagram.com', 'www.instagram.com'],
+  youtube_shorts: ['youtube.com', 'www.youtube.com', 'youtu.be'],
 };
 
 /**
