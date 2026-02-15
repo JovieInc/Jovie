@@ -73,7 +73,8 @@ async function fetchAppleMusicArtistSearch(
       // Parse API error body for user-friendly messages
       if (error.response) {
         const data = await error.response.json().catch(() => ({}));
-        throw new Error(data?.error || 'Search failed');
+        error.message = data?.error || error.message || 'Search failed';
+        throw error; // Preserve FetchError so retry policy can call isRetryable()
       }
     }
     throw error;
@@ -119,7 +120,8 @@ export function useAppleMusicArtistSearchQuery(
     ...SEARCH_CACHE,
     // Don't retry rate limit or client errors - only retry server/network errors
     retry: (failureCount, error) => {
-      if (error instanceof Error && error.name === 'RateLimitError') return false;
+      if (error instanceof Error && error.name === 'RateLimitError')
+        return false;
       if (error instanceof FetchError && !error.isRetryable()) return false;
       return failureCount < 2;
     },

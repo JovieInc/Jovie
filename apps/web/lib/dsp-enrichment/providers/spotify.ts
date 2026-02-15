@@ -154,7 +154,11 @@ const DEFAULT_BASE_DELAY_MS = 1000;
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof SpotifyNotConfiguredError) return true;
   if (error instanceof SpotifyError) {
-    return error.statusCode === 401 || error.statusCode === 404;
+    return (
+      error.statusCode === 401 ||
+      error.statusCode === 404 ||
+      error.statusCode === 429
+    );
   }
   return false;
 }
