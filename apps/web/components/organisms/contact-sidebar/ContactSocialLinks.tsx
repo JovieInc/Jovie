@@ -4,7 +4,10 @@ import { Button, Input, Label } from '@jovie/ui';
 import React, { memo } from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DrawerLinkSection, SidebarLinkRow } from '@/components/molecules/drawer';
+import {
+  DrawerLinkSection,
+  SidebarLinkRow,
+} from '@/components/molecules/drawer';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 import type { Contact, SocialLink } from './types';
@@ -83,7 +86,12 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
       )}
 
       {isAddingLink && (
-        <div className='mt-2 space-y-2 rounded-lg border border-dashed border-subtle p-3'>
+        <div
+          className={[
+            'mt-2 space-y-2 rounded-lg',
+            'border border-dashed border-subtle p-3',
+          ].join(' ')}
+        >
           <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
             <Label className='text-xs text-tertiary-token'>URL</Label>
             <Input

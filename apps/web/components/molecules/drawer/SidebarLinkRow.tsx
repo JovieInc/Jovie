@@ -5,11 +5,17 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
 
-const ACTION_BUTTON_CLASS =
-  'p-1 rounded hover:bg-sidebar-border text-sidebar-muted hover:text-sidebar-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
+const ACTION_BUTTON_CLASS = [
+  'p-1 rounded hover:bg-sidebar-border',
+  'text-sidebar-muted hover:text-sidebar-foreground',
+  'transition-colors focus-visible:outline-none',
+  'focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+].join(' ');
 
-const SWIPE_ACTION_BUTTON_CLASS =
-  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
+const SWIPE_ACTION_BUTTON_CLASS = [
+  'flex h-full items-center justify-center px-4',
+  'text-white transition-colors active:opacity-80',
+].join(' ');
 
 export interface SidebarLinkRowProps {
   readonly icon: ReactNode;
@@ -104,7 +110,9 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex items-center justify-between lg:rounded-md px-3 py-1.5 bg-base hover:bg-sidebar-surface-hover transition-colors',
+          'group flex items-center justify-between lg:rounded-md',
+          'px-3 py-1.5 bg-base hover:bg-sidebar-surface-hover',
+          'transition-colors',
           className
         )}
         data-testid={testId}
@@ -123,7 +131,13 @@ export function SidebarLinkRow({
         </div>
 
         {/* Right: Actions (visible on hover/focus - desktop only) */}
-        <div className='flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0'>
+        <div
+          className={[
+            'flex items-center gap-0.5 opacity-0',
+            'group-hover:opacity-100 group-focus:opacity-100',
+            'group-focus-within:opacity-100 transition-opacity shrink-0',
+          ].join(' ')}
+        >
           <button
             type='button'
             onClick={handleOpen}

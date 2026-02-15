@@ -30,11 +30,17 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
-const ACTION_BUTTON_CLASS =
-  'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+const ACTION_BUTTON_CLASS = [
+  'p-1.5 rounded-md text-secondary-token',
+  'hover:text-primary-token hover:bg-surface-1/60',
+  'transition-colors ease-out focus-visible:outline-none',
+  'focus-visible:ring-2 focus-visible:ring-primary-token',
+].join(' ');
 
-const SWIPE_ACTION_CLASS =
-  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
+const SWIPE_ACTION_CLASS = [
+  'flex h-full items-center justify-center px-4',
+  'text-white transition-colors active:opacity-80',
+].join(' ');
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
 
@@ -150,7 +156,9 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
     >
       <div
         className={cn(
-          'flex items-center justify-between lg:rounded-xl px-3 py-2.5 bg-base transition-colors ease-out hover:bg-surface-2',
+          'flex items-center justify-between lg:rounded-xl',
+          'px-3 py-2.5 bg-base transition-colors ease-out',
+          'hover:bg-surface-2',
           !link.isVisible && 'opacity-60'
         )}
       >

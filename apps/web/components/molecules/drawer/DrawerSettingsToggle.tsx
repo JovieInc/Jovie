@@ -37,10 +37,7 @@ export function DrawerSettingsToggle({
 
   return (
     <div
-      className={cn(
-        'flex items-center justify-between gap-3 py-1',
-        className
-      )}
+      className={cn('flex items-center justify-between gap-3 py-1', className)}
     >
       <label
         htmlFor={id}

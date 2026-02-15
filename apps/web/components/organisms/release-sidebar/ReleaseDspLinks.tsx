@@ -21,7 +21,10 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
-import { DrawerLinkSection, SidebarLinkRow } from '@/components/molecules/drawer';
+import {
+  DrawerLinkSection,
+  SidebarLinkRow,
+} from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -174,24 +177,25 @@ export function ReleaseDspLinks({
     rescanTooltip = `Try again in ${formatCooldown(remainingMs)}`;
   }
 
-  const rescanButton = isEditable && onRescanIsrc ? (
-    <SimpleTooltip content={rescanTooltip} side='bottom'>
-      <Button
-        type='button'
-        size='icon'
-        variant='ghost'
-        aria-label={rescanTooltip}
-        onClick={handleRescan}
-        disabled={isRescanDisabled}
-      >
-        {isRescanningIsrc ? (
-          <Loader2 className='h-4 w-4 animate-spin' />
-        ) : (
-          <RefreshCw className='h-4 w-4' />
-        )}
-      </Button>
-    </SimpleTooltip>
-  ) : null;
+  const rescanButton =
+    isEditable && onRescanIsrc ? (
+      <SimpleTooltip content={rescanTooltip} side='bottom'>
+        <Button
+          type='button'
+          size='icon'
+          variant='ghost'
+          aria-label={rescanTooltip}
+          onClick={handleRescan}
+          disabled={isRescanDisabled}
+        >
+          {isRescanningIsrc ? (
+            <Loader2 className='h-4 w-4 animate-spin' />
+          ) : (
+            <RefreshCw className='h-4 w-4' />
+          )}
+        </Button>
+      </SimpleTooltip>
+    ) : null;
 
   return (
     <DrawerLinkSection
@@ -246,7 +250,12 @@ export function ReleaseDspLinks({
           <button
             type='button'
             onClick={() => onSetIsAddingLink(true)}
-            className='w-full py-3 text-sm text-tertiary-token hover:text-primary-token text-center border border-dashed border-subtle rounded-md hover:border-primary-token/50 transition-colors'
+            className={[
+              'w-full py-3 text-sm text-tertiary-token',
+              'hover:text-primary-token text-center',
+              'border border-dashed border-subtle rounded-md',
+              'hover:border-primary-token/50 transition-colors',
+            ].join(' ')}
           >
             + Add a DSP link
           </button>
@@ -254,7 +263,13 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <div className='mt-2 space-y-2 rounded-lg border border-dashed border-subtle bg-surface-1 p-3'>
+        <div
+          className={[
+            'mt-2 space-y-2 rounded-lg',
+            'border border-dashed border-subtle',
+            'bg-surface-1 p-3',
+          ].join(' ')}
+        >
           <div className={FORM_ROW_CLASS}>
             <Label className='text-xs text-tertiary-token'>Provider</Label>
             <Select

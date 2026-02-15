@@ -44,7 +44,12 @@ export function DrawerLinkSection({
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
       <div className='flex items-center justify-between'>
-        <h4 className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+        <h4
+          className={[
+            'text-[11px] font-semibold uppercase',
+            'tracking-wide text-tertiary-token',
+          ].join(' ')}
+        >
           {title}
         </h4>
         <div className='flex items-center gap-0.5'>
@@ -53,7 +58,11 @@ export function DrawerLinkSection({
             <button
               type='button'
               onClick={onAdd}
-              className='p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+              className={[
+                'p-1 rounded-md text-tertiary-token',
+                'hover:text-primary-token hover:bg-surface-2',
+                'transition-colors',
+              ].join(' ')}
               aria-label={addLabel}
             >
               <Plus className='h-4 w-4' />
