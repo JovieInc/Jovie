@@ -11,10 +11,43 @@ import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
 
-// Allow-list of trusted hostnames for avatar upload API calls
-const ALLOWED_UPLOAD_HOSTNAMES = new Set<string>([
-  'localhost',
-]);
+/**
+ * Builds the set of allowed hostnames for avatar uploads.
+ * Includes:
+ * - localhost for development
+ * - The hostname from NEXT_PUBLIC_APP_URL (e.g., jov.ie)
+ * - Any configured NEXT_PUBLIC_PROFILE_HOSTNAME
+ */
+function buildAllowedHostnames(): Set<string> {
+  const allowed = new Set<string>(['localhost']);
+
+  // Add hostname from NEXT_PUBLIC_APP_URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    try {
+      const parsed = new URL(appUrl);
+      allowed.add(parsed.hostname);
+    } catch {
+      // Invalid URL, skip
+    }
+  }
+
+  // Add NEXT_PUBLIC_PROFILE_HOSTNAME if set
+  const profileHostname = process.env.NEXT_PUBLIC_PROFILE_HOSTNAME;
+  if (profileHostname) {
+    allowed.add(profileHostname);
+  }
+
+  return allowed;
+}
+
+/**
+ * Checks if a hostname is a Vercel preview deployment.
+ * Matches patterns like: project-git-branch-team.vercel.app
+ */
+function isVercelPreviewHostname(hostname: string): boolean {
+  return hostname.endsWith('.vercel.app');
+}
 
 /**
  * Returns a safe upload URL for the internal images API, based on a trusted origin.
@@ -32,7 +65,12 @@ function getSafeUploadUrl(baseUrl: string): string {
     throw new TypeError('Unsupported protocol for avatar upload URL');
   }
 
-  if (!ALLOWED_UPLOAD_HOSTNAMES.has(parsed.hostname)) {
+  const allowedHostnames = buildAllowedHostnames();
+  const isAllowed =
+    allowedHostnames.has(parsed.hostname) ||
+    isVercelPreviewHostname(parsed.hostname);
+
+  if (!isAllowed) {
     throw new TypeError('Untrusted host for avatar upload URL');
   }
 
