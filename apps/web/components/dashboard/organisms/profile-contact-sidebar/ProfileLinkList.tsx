@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import {
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
 import { cn } from '@/lib/utils';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
 
@@ -29,11 +30,17 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
-const ACTION_BUTTON_CLASS =
-  'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+const ACTION_BUTTON_CLASS = [
+  'p-1.5 rounded-md text-secondary-token',
+  'hover:text-primary-token hover:bg-surface-1/60',
+  'transition-colors ease-out focus-visible:outline-none',
+  'focus-visible:ring-2 focus-visible:ring-primary-token',
+].join(' ');
 
-const SWIPE_ACTION_CLASS =
-  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
+const SWIPE_ACTION_CLASS = [
+  'flex h-full items-center justify-center px-4',
+  'text-white transition-colors active:opacity-80',
+].join(' ');
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
 
@@ -135,7 +142,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
           className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
           aria-label={`Remove ${link.title}`}
         >
-          <X className='h-4 w-4' aria-hidden='true' />
+          <Trash2 className='h-4 w-4' aria-hidden='true' />
         </button>
       )}
     </>
@@ -146,11 +153,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
       itemId={`profile-link-${link.id}`}
       actions={swipeActions}
       actionsWidth={swipeActionsWidth}
-      className='rounded-xl'
     >
       <div
         className={cn(
-          'flex items-center justify-between rounded-xl px-3 py-2.5 bg-base transition-colors ease-out hover:bg-surface-2',
+          'flex items-center justify-between lg:rounded-xl',
+          'px-3 py-2.5 bg-base transition-colors ease-out',
+          'hover:bg-surface-2',
           !link.isVisible && 'opacity-60'
         )}
       >
@@ -200,37 +208,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
               className={ACTION_BUTTON_CLASS}
               aria-label={`Remove ${link.title}`}
             >
-              <X className='h-4 w-4' aria-hidden='true' />
+              <Trash2 className='h-4 w-4' aria-hidden='true' />
             </button>
           )}
         </div>
       </div>
     </SwipeToReveal>
-  );
-}
-
-interface SectionHeaderProps {
-  readonly section: LinkSection;
-  readonly onAdd?: (section: LinkSection) => void;
-}
-
-function SectionHeader({ section, onAdd }: SectionHeaderProps) {
-  return (
-    <div className='flex items-center justify-between mb-2'>
-      <h4 className='text-xs font-medium text-secondary-token'>
-        {SECTION_LABELS[section]} links
-      </h4>
-      {onAdd && (
-        <button
-          type='button'
-          onClick={() => onAdd(section)}
-          className='p-1 rounded hover:bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
-          aria-label={`Add ${SECTION_LABELS[section]} link`}
-        >
-          <Plus className='h-4 w-4' />
-        </button>
-      )}
-    </div>
   );
 }
 
@@ -275,21 +258,26 @@ export function ProfileLinkList({
     );
   }
 
-  // When viewing a specific category, show section header
+  // When viewing a specific category, use shared DrawerLinkSection
   if (selectedCategory !== 'all') {
     return (
-      <div className='space-y-3'>
-        <SectionHeader section={selectedCategory} onAdd={onAddLink} />
-        <div className='space-y-2'>
+      <DrawerLinkSection
+        title={`${SECTION_LABELS[selectedCategory]} links`}
+        onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
+        addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
+        isEmpty={filteredLinks.length === 0}
+        emptyMessage='No links in this category'
+      >
+        <div className='divide-y divide-subtle/50'>
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
         </div>
-      </div>
+      </DrawerLinkSection>
     );
   }
 
-  // When viewing all, group by section
+  // When viewing all, group by section using shared DrawerLinkSection
   return (
     <div className='space-y-6'>
       {SECTION_ORDER.map(section => {
@@ -297,14 +285,18 @@ export function ProfileLinkList({
         if (sectionLinks.length === 0) return null;
 
         return (
-          <div key={section} className='space-y-3'>
-            <SectionHeader section={section} onAdd={onAddLink} />
-            <div className='space-y-2'>
+          <DrawerLinkSection
+            key={section}
+            title={`${SECTION_LABELS[section]} links`}
+            onAdd={onAddLink ? () => onAddLink(section) : undefined}
+            addLabel={`Add ${SECTION_LABELS[section]} link`}
+          >
+            <div className='divide-y divide-subtle/50'>
               {sectionLinks.map(link => (
                 <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
               ))}
             </div>
-          </div>
+          </DrawerLinkSection>
         );
       })}
     </div>
