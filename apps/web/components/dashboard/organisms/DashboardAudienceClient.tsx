@@ -184,29 +184,34 @@ export function DashboardAudienceClient({
 
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
-      <div data-testid='dashboard-audience-client'>
-        <div className='px-4 pt-4 sm:px-6 sm:pt-5'>
+      <div
+        data-testid='dashboard-audience-client'
+        className='flex h-full min-h-0 flex-col'
+      >
+        <div className='shrink-0 px-4 pt-4 sm:px-6 sm:pt-5'>
           <AudienceFunnelMetrics />
         </div>
-        <DashboardAudienceTable
-          mode={mode}
-          view={view}
-          rows={initialRows}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          sort={sort}
-          direction={direction}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onSortChange={handleSortChange}
-          onViewChange={handleViewChange}
-          onFiltersChange={handleFiltersChange}
-          profileUrl={profileUrl}
-          profileId={profileId}
-          subscriberCount={subscriberCount}
-          filters={initialFilters}
-        />
+        <div className='flex-1 min-h-0'>
+          <DashboardAudienceTable
+            mode={mode}
+            view={view}
+            rows={initialRows}
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            sort={sort}
+            direction={direction}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onSortChange={handleSortChange}
+            onViewChange={handleViewChange}
+            onFiltersChange={handleFiltersChange}
+            profileUrl={profileUrl}
+            profileId={profileId}
+            subscriberCount={subscriberCount}
+            filters={initialFilters}
+          />
+        </div>
       </div>
     </QueryErrorBoundary>
   );
