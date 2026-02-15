@@ -25,6 +25,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -373,10 +374,71 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
   }, [headerBadges, headerActions]);
 
+  // Register right panel with AuthShell instead of rendering inline
+  const sidebarPanel = useMemo(
+    () =>
+      isSidebarOpen ? (
+        <Suspense
+          fallback={
+            <div
+              className='h-full animate-pulse bg-surface-2'
+              style={{ width: SIDEBAR_WIDTH }}
+            />
+          }
+        >
+          <ReleaseSidebar
+            release={editingRelease}
+            mode='admin'
+            isOpen={isSidebarOpen}
+            providerConfig={providerConfig}
+            artistName={artistName}
+            onClose={closeEditor}
+            onRefresh={
+              editingRelease
+                ? () => handleRefreshRelease(editingRelease.id)
+                : undefined
+            }
+            onAddDspLink={handleAddUrl}
+            onRescanIsrc={
+              editingRelease
+                ? () => handleRescanIsrc(editingRelease.id)
+                : undefined
+            }
+            isRescanningIsrc={isRescanningIsrc}
+            onArtworkUpload={handleArtworkUpload}
+            onArtworkRevert={handleArtworkRevert}
+            onReleaseChange={handleReleaseChange}
+            isSaving={isSaving}
+            allowDownloads={allowArtworkDownloads}
+          />
+        </Suspense>
+      ) : null,
+    [
+      isSidebarOpen,
+      editingRelease,
+      providerConfig,
+      artistName,
+      closeEditor,
+      handleRefreshRelease,
+      handleAddUrl,
+      handleRescanIsrc,
+      isRescanningIsrc,
+      handleArtworkUpload,
+      handleArtworkRevert,
+      handleReleaseChange,
+      isSaving,
+      allowArtworkDownloads,
+    ]
+  );
+
+  useRegisterTablePanel(sidebarPanel);
+
   return (
-    <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
-      {/* Main content area */}
-      <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
+    <>
+      <div
+        className='flex h-full min-h-0 min-w-0 flex-col'
+        data-testid='releases-matrix'
+      >
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col'>
           {/* Sticky subheader - outside scroll container */}
@@ -531,44 +593,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </div>
       </div>
 
-      {/* Release Sidebar - Lazy loaded to reduce initial bundle */}
-      {isSidebarOpen && (
-        <Suspense
-          fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
-            />
-          }
-        >
-          <ReleaseSidebar
-            release={editingRelease}
-            mode='admin'
-            isOpen={isSidebarOpen}
-            providerConfig={providerConfig}
-            artistName={artistName}
-            onClose={closeEditor}
-            onRefresh={
-              editingRelease
-                ? () => handleRefreshRelease(editingRelease.id)
-                : undefined
-            }
-            onAddDspLink={handleAddUrl}
-            onRescanIsrc={
-              editingRelease
-                ? () => handleRescanIsrc(editingRelease.id)
-                : undefined
-            }
-            isRescanningIsrc={isRescanningIsrc}
-            onArtworkUpload={handleArtworkUpload}
-            onArtworkRevert={handleArtworkRevert}
-            onReleaseChange={handleReleaseChange}
-            isSaving={isSaving}
-            allowDownloads={allowArtworkDownloads}
-          />
-        </Suspense>
-      )}
-
       {/* Apple Music artist search command palette */}
       <ArtistSearchCommandPalette
         open={amPaletteOpen}
@@ -576,6 +600,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         provider='apple_music'
         onArtistSelect={handleAppleMusicConnect}
       />
-    </div>
+    </>
   );
 });

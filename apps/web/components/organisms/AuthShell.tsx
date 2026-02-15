@@ -10,6 +10,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { useTablePanel } from '@/contexts/TablePanelContext';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -44,6 +45,7 @@ function AuthShellInner({
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
+  const tablePanel = useTablePanel();
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
@@ -68,11 +70,14 @@ function AuthShellInner({
         {isTableRoute ? (
           <div
             className={cn(
-              'flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto',
+              'flex-1 min-h-0 overflow-hidden flex',
               showMobileTabs && 'pb-20 lg:pb-6'
             )}
           >
-            {children}
+            <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
+              {children}
+            </div>
+            {tablePanel}
           </div>
         ) : (
           <div className='flex-1 min-h-0 overflow-hidden flex'>

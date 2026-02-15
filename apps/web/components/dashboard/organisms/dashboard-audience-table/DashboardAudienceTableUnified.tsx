@@ -24,6 +24,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
@@ -361,121 +362,123 @@ export const DashboardAudienceTableUnified = memo(
       [selectedMember]
     );
 
+    // Register right panel with AuthShell instead of rendering inline
+    const sidebarPanel = useMemo(
+      () => (
+        <AudienceMemberSidebar
+          member={selectedMember}
+          isOpen={Boolean(selectedMember)}
+          onClose={() => setSelectedMember(null)}
+          contextMenuItems={
+            selectedMember
+              ? convertToCommonDropdownItems(
+                  getContextMenuItems(selectedMember)
+                )
+              : undefined
+          }
+        />
+      ),
+      [selectedMember, getContextMenuItems, setSelectedMember]
+    );
+
+    useRegisterTablePanel(sidebarPanel);
+
     return (
       <AudienceTableProvider value={contextValue}>
         <div
-          className='flex h-full min-h-0 flex-row'
+          className='flex h-full min-h-0 flex-col overflow-hidden'
           data-testid='dashboard-audience-table'
         >
-          {/* Main table content */}
-          <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
-            <h1 className='sr-only'>
-              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-            </h1>
-            <p className='sr-only'>
-              {getSrDescription(rows.length === 0, mode)}
-            </p>
+          <h1 className='sr-only'>
+            {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+          </h1>
+          <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
 
-            {/* Subheader with filter dropdown and export */}
-            <AudienceTableSubheader
-              view={view}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              rows={rows}
-              selectedIds={selectedIds}
-              subscriberCount={subscriberCount}
-              total={total}
-            />
+          {/* Subheader with filter dropdown and export */}
+          <AudienceTableSubheader
+            view={view}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            rows={rows}
+            selectedIds={selectedIds}
+            subscriberCount={subscriberCount}
+            total={total}
+          />
 
-            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-              {/* Scrollable content area */}
-              <div className='flex-1 min-h-0 overflow-auto'>
-                {rows.length === 0 ? (
-                  <EmptyState
-                    icon={emptyStateIcon}
-                    heading={emptyStateHeading}
-                    description={emptyStateDescription}
-                    action={emptyStatePrimaryAction}
-                    secondaryAction={emptyStateSecondaryAction}
-                  />
-                ) : (
-                  <>
-                    {/* Mobile card list */}
-                    <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
-                      {rows.map(member => (
-                        <AudienceMobileCard
-                          key={member.id}
-                          member={member}
-                          mode={mode}
-                          isSelected={selectedMember?.id === member.id}
-                          onTap={setSelectedMember}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Desktop table */}
-                    <div className='hidden md:block h-full'>
-                      <UnifiedTable
-                        data={rows}
-                        columns={columns}
-                        isLoading={false}
-                        emptyState={
-                          <EmptyState
-                            icon={emptyStateIcon}
-                            heading={emptyStateHeading}
-                            description={emptyStateDescription}
-                            action={emptyStatePrimaryAction}
-                            secondaryAction={emptyStateSecondaryAction}
-                          />
-                        }
-                        getRowId={row => row.id}
-                        enableVirtualization={true}
-                        enableKeyboardNavigation={true}
-                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                        className='text-[13px]'
-                        getRowClassName={getRowClassName}
-                        onRowClick={row => setSelectedMember(row)}
-                        getContextMenuItems={getContextMenuItems}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Pagination footer — uses the shared component for consistency */}
-              <div className='shrink-0'>
-                <TablePaginationFooter
-                  currentPage={page}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalItems={total}
-                  onPageChange={onPageChange}
-                  onPageSizeChange={onPageSizeChange}
+          <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+            {/* Scrollable content area */}
+            <div className='flex-1 min-h-0 overflow-auto'>
+              {rows.length === 0 ? (
+                <EmptyState
+                  icon={emptyStateIcon}
+                  heading={emptyStateHeading}
+                  description={emptyStateDescription}
+                  action={emptyStatePrimaryAction}
+                  secondaryAction={emptyStateSecondaryAction}
                 />
-              </div>
+              ) : (
+                <>
+                  {/* Mobile card list */}
+                  <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
+                    {rows.map(member => (
+                      <AudienceMobileCard
+                        key={member.id}
+                        member={member}
+                        mode={mode}
+                        isSelected={selectedMember?.id === member.id}
+                        onTap={setSelectedMember}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Desktop table */}
+                  <div className='hidden md:block h-full'>
+                    <UnifiedTable
+                      data={rows}
+                      columns={columns}
+                      isLoading={false}
+                      emptyState={
+                        <EmptyState
+                          icon={emptyStateIcon}
+                          heading={emptyStateHeading}
+                          description={emptyStateDescription}
+                          action={emptyStatePrimaryAction}
+                          secondaryAction={emptyStateSecondaryAction}
+                        />
+                      }
+                      getRowId={row => row.id}
+                      enableVirtualization={true}
+                      enableKeyboardNavigation={true}
+                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                      className='text-[13px]'
+                      getRowClassName={getRowClassName}
+                      onRowClick={row => setSelectedMember(row)}
+                      getContextMenuItems={getContextMenuItems}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className='sr-only' aria-live='polite' aria-atomic='true'>
-              {total > 0 &&
-                `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
-              {selectedCount > 0 &&
-                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+            {/* Pagination footer — uses the shared component for consistency */}
+            <div className='shrink-0'>
+              <TablePaginationFooter
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={total}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+              />
             </div>
           </div>
 
-          {/* Right sidebar - sibling in flex-row */}
-          <AudienceMemberSidebar
-            member={selectedMember}
-            isOpen={Boolean(selectedMember)}
-            onClose={() => setSelectedMember(null)}
-            contextMenuItems={
-              selectedMember
-                ? convertToCommonDropdownItems(
-                    getContextMenuItems(selectedMember)
-                  )
-                : undefined
-            }
-          />
+          <div className='sr-only' aria-live='polite' aria-atomic='true'>
+            {total > 0 &&
+              `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
+            {selectedCount > 0 &&
+              `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+          </div>
         </div>
       </AudienceTableProvider>
     );
