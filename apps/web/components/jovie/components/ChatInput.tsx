@@ -72,6 +72,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
 
     const isCompact = variant === 'compact';
+    let paddingRight = 'pr-14';
+    if (hasImageUpload) {
+      paddingRight = isCompact ? 'pr-24' : 'pr-28';
+    }
+    const sizeClasses = isCompact
+      ? cn('px-4 py-3 max-h-32', paddingRight)
+      : cn('px-4 py-3.5 max-h-48', paddingRight);
 
     return (
       <form
@@ -92,12 +99,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               'text-primary-token placeholder:text-tertiary-token',
               'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
               'transition-colors duration-fast',
-              isCompact
-                ? cn('px-4 py-3 max-h-32', hasImageUpload ? 'pr-24' : 'pr-14')
-                : cn(
-                    'px-4 py-3.5 max-h-48',
-                    hasImageUpload ? 'pr-28' : 'pr-14'
-                  ),
+              sizeClasses,
               isOverLimit
                 ? 'border-error focus:border-error focus:ring-error/20'
                 : 'border-subtle focus:border-accent focus:ring-accent/20'
