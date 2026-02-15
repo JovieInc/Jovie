@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 
 export interface MobileProfileDrawerProps {
   readonly profileHref?: string;
+  /** When provided, the avatar trigger calls this instead of opening the built-in Sheet. */
+  readonly onOpen?: () => void;
 }
 
 /**
@@ -19,7 +21,7 @@ export interface MobileProfileDrawerProps {
  * Renders an avatar trigger button (for the header) and a Sheet that slides
  * in from the right showing the user profile card and key actions.
  */
-export function MobileProfileDrawer({ profileHref }: MobileProfileDrawerProps) {
+export function MobileProfileDrawer({ profileHref, onOpen }: MobileProfileDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const { isLoaded, user, userInfo, menuActions, billingStatus } =
@@ -44,7 +46,7 @@ export function MobileProfileDrawer({ profileHref }: MobileProfileDrawerProps) {
       <button
         type='button'
         aria-label='Open profile menu'
-        onClick={() => setIsOpen(true)}
+        onClick={() => (onOpen ? onOpen() : setIsOpen(true))}
         className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-default transition-opacity hover:opacity-80 active:scale-95 lg:hidden'
       >
         <Avatar
@@ -56,8 +58,8 @@ export function MobileProfileDrawer({ profileHref }: MobileProfileDrawerProps) {
         />
       </button>
 
-      {/* Right drawer sheet */}
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      {/* Right drawer sheet (skipped when onOpen overrides the trigger) */}
+      {!onOpen && <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
           side='right'
           className='flex flex-col gap-0 p-0 w-[280px]'
@@ -153,7 +155,7 @@ export function MobileProfileDrawer({ profileHref }: MobileProfileDrawerProps) {
             </button>
           </div>
         </SheetContent>
-      </Sheet>
+      </Sheet>}
     </>
   );
 }
