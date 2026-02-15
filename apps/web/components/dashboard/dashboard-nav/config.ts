@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  SquarePen,
   UserCircle,
   UserPlus,
   Users,
@@ -175,10 +176,18 @@ export const adminNavigation: NavItem[] = [
 // Mobile bottom-bar groupings (derived from shared items above)
 // ---------------------------------------------------------------------------
 
-/** Items shown as icons in the bottom tab bar (max 4). */
+/** Home item for mobile – starts a new chat. */
+export const mobileHome: NavItem = {
+  name: 'Home',
+  href: APP_ROUTES.CHAT,
+  id: 'home',
+  icon: SquarePen,
+  description: 'Start a new chat',
+};
+
+/** Items shown as icons in the bottom tab bar (max 3). */
 export const mobilePrimaryNavigation: NavItem[] = [
-  dashboardHome,
-  primaryNavigation.find(i => i.id === 'profile')!,
+  mobileHome,
   primaryNavigation.find(i => i.id === 'releases')!,
   primaryNavigation.find(i => i.id === 'audience')!,
 ];
