@@ -265,8 +265,7 @@ export function ProfileLinkList({
         title={`${SECTION_LABELS[selectedCategory]} links`}
         onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
         addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
-        isEmpty={filteredLinks.length === 0}
-        emptyMessage='No links in this category'
+        isEmpty={false} // Early return above guarantees filteredLinks is non-empty
       >
         <div className='divide-y divide-subtle/50'>
           {filteredLinks.map(link => (

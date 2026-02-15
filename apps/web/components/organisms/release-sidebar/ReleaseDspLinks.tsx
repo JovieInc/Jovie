@@ -243,24 +243,6 @@ export function ReleaseDspLinks({
         </div>
       )}
 
-      {/* Empty add-link CTA */}
-      {release.providers.length === 0 &&
-        isEditable &&
-        availableProviders.length > 0 && (
-          <button
-            type='button'
-            onClick={() => onSetIsAddingLink(true)}
-            className={[
-              'w-full py-3 text-sm text-tertiary-token',
-              'hover:text-primary-token text-center',
-              'border border-dashed border-subtle rounded-md',
-              'hover:border-primary-token/50 transition-colors',
-            ].join(' ')}
-          >
-            + Add a DSP link
-          </button>
-        )}
-
       {/* Add link form */}
       {isEditable && isAddingLink && (
         <div
