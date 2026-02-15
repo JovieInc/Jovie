@@ -178,7 +178,7 @@ export function extractDeezerId(url: string): string | null {
  * Format: https://tidal.com/browse/artist/{id} or https://listen.tidal.com/artist/{id}
  */
 export function extractTidalId(url: string): string | null {
-  const match = /tidal\.com\/(?:browse\/)?artist\/(\d+)/.exec(url);
+  const match = /(?:listen\.)?tidal\.com\/(?:browse\/)?artist\/(\d+)/.exec(url);
   return match?.[1] ?? null;
 }
 

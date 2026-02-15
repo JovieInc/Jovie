@@ -131,54 +131,31 @@ function mapDspFields(
   return updates;
 }
 
+/** Social platforms to extract from MusicFetch (stored as social_links, not DSP profile fields) */
+const SOCIAL_PLATFORM_MAPPINGS = [
+  { serviceKey: 'instagram', platformId: 'instagram' },
+  { serviceKey: 'tiktok', platformId: 'tiktok' },
+  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
+] as const;
+
 /**
  * Extract social links from MusicFetch services.
  * Returns links for platforms that map to social_links (not DSP profile fields).
  */
 function extractSocialLinks(result: MusicFetchArtistResult): ExtractedLink[] {
-  const links: ExtractedLink[] = [];
   const services = result.services;
 
-  // Instagram
-  if (services.instagram?.url) {
-    links.push({
-      url: services.instagram.url,
-      platformId: 'instagram',
-      sourcePlatform: 'musicfetch',
-      evidence: {
-        sources: ['musicfetch'],
-        signals: ['musicfetch_artist_lookup'],
-      },
-    });
-  }
-
-  // TikTok
-  if (services.tiktok?.url) {
-    links.push({
-      url: services.tiktok.url,
-      platformId: 'tiktok',
-      sourcePlatform: 'musicfetch',
-      evidence: {
-        sources: ['musicfetch'],
-        signals: ['musicfetch_artist_lookup'],
-      },
-    });
-  }
-
-  // Bandcamp (stored as social link, not a DSP profile field)
-  if (services.bandcamp?.url) {
-    links.push({
-      url: services.bandcamp.url,
-      platformId: 'bandcamp',
-      sourcePlatform: 'musicfetch',
-      evidence: {
-        sources: ['musicfetch'],
-        signals: ['musicfetch_artist_lookup'],
-      },
-    });
-  }
-
-  return links;
+  return SOCIAL_PLATFORM_MAPPINGS.filter(
+    ({ serviceKey }) => services[serviceKey]?.url
+  ).map(({ serviceKey, platformId }) => ({
+    url: services[serviceKey]!.url!,
+    platformId,
+    sourcePlatform: 'musicfetch' as const,
+    evidence: {
+      sources: ['musicfetch'],
+      signals: ['musicfetch_artist_lookup'],
+    },
+  }));
 }
 
 // ============================================================================
