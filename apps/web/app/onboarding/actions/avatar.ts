@@ -11,6 +11,35 @@ import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
 
+// Allow-list of trusted hostnames for avatar upload API calls
+const ALLOWED_UPLOAD_HOSTNAMES = new Set<string>([
+  'localhost',
+]);
+
+/**
+ * Returns a safe upload URL for the internal images API, based on a trusted origin.
+ * Throws if the provided baseUrl is not in the allow-list of permitted hosts.
+ */
+function getSafeUploadUrl(baseUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new TypeError('Invalid base URL for avatar upload');
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new TypeError('Unsupported protocol for avatar upload URL');
+  }
+
+  if (!ALLOWED_UPLOAD_HOSTNAMES.has(parsed.hostname)) {
+    throw new TypeError('Untrusted host for avatar upload URL');
+  }
+
+  const uploadUrl = new URL('/api/images/upload', parsed.origin);
+  return uploadUrl.toString();
+}
+
 /**
  * Fetches the remote avatar image and validates content type.
  */
@@ -63,7 +92,8 @@ async function uploadAvatarFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const upload = await fetch(`${baseUrl}/api/images/upload`, {
+  const uploadUrl = getSafeUploadUrl(baseUrl);
+  const upload = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
     headers: cookieHeader ? { cookie: cookieHeader } : undefined,
