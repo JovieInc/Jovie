@@ -1,6 +1,9 @@
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
+// Force dynamic rendering — onboarding requires Clerk auth
+export const dynamic = 'force-dynamic';
+
 export default function OnboardingLayout({
   children,
 }: Readonly<{

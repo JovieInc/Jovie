@@ -28,65 +28,83 @@ import {
 
 // Ingestion job payload schemas are now centralized in @/lib/validation/schemas/ingestion.ts
 
-export async function enqueueLinktreeIngestionJob(params: {
-  creatorProfileId: string;
-  sourceUrl: string;
-  depth?: number;
+// ============================================================================
+// Generic Ingestion Job Enqueue Helper
+// ============================================================================
+
+/**
+ * Enqueue an ingestion job with dedup-safe insert.
+ *
+ * Handles the common pattern of:
+ * 1. Check if a job with the same dedupKey already exists (migration-safe: checks both indexed column and legacy JSONB)
+ * 2. Insert with onConflictDoNothing to prevent concurrent duplicates
+ * 3. Handle race conditions by fetching the winning row
+ */
+async function enqueueJob(opts: {
+  jobType: string;
+  payload: Record<string, unknown> & {
+    creatorProfileId: string;
+    dedupKey: string;
+  };
+  dedupKey: string;
+  priority?: number;
+  useLegacyDedupCheck?: boolean;
 }): Promise<string | null> {
-  if (!isLinktreeUrl(params.sourceUrl)) {
-    return null;
-  }
-
-  const normalizedSource = normalizeUrl(params.sourceUrl);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
-  });
-
-  const payload = linktreeJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
+  const {
+    jobType,
+    payload,
     dedupKey,
-    depth: params.depth ?? 0,
-  });
+    priority = 0,
+    useLegacyDedupCheck = false,
+  } = opts;
 
-  // Migration-safe dedup check: handles both indexed column AND legacy JSONB payload
-  // During migration window, existing records may have dedup_key = NULL
-  // After migration 0008 completes, all records will have dedup_key populated
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_linktree'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          // Check indexed column (fast path after migration)
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          // Fallback: check JSONB payload for legacy records with NULL dedup_key
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+  // Check if a job already exists for this dedup key
+  if (useLegacyDedupCheck) {
+    // Migration-safe dedup: handles both indexed column AND legacy JSONB payload
+    const existing = await db
+      .select({ id: ingestionJobs.id })
+      .from(ingestionJobs)
+      .where(
+        and(
+          eq(ingestionJobs.jobType, jobType),
+          drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+          or(
+            eq(ingestionJobs.dedupKey, dedupKey),
+            and(
+              isNull(ingestionJobs.dedupKey),
+              drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${dedupKey}`
+            )
           )
         )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (existing.length > 0) {
-    return existing[0].id;
+    if (existing.length > 0) {
+      return existing[0].id;
+    }
+  } else {
+    // Fast-path: check indexed column only
+    const existing = await db
+      .select({ id: ingestionJobs.id })
+      .from(ingestionJobs)
+      .where(eq(ingestionJobs.dedupKey, dedupKey))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return existing[0].id;
+    }
   }
 
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
   const result = await db
     .insert(ingestionJobs)
     .values({
-      jobType: 'import_linktree',
+      jobType,
       payload,
-      dedupKey: payload.dedupKey,
+      dedupKey,
       status: 'pending',
       runAt: new Date(),
-      priority: 0,
+      priority,
       attempts: 0,
     })
     .onConflictDoNothing({ target: ingestionJobs.dedupKey })
@@ -100,10 +118,89 @@ export async function enqueueLinktreeIngestionJob(params: {
   const [winner] = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
     .limit(1);
 
   return winner?.id ?? null;
+}
+
+// ============================================================================
+// Platform-Specific URL Normalization Helper
+// ============================================================================
+
+/**
+ * Validate and normalize a platform URL, returning a dedup key and payload.
+ * Returns null if the URL is invalid for the given platform.
+ */
+function normalizePlatformUrl(
+  sourceUrl: string,
+  creatorProfileId: string,
+  schema: { parse: (v: unknown) => Record<string, unknown> },
+  depth: number,
+  validator?: (url: string) => string | null,
+  checker?: (url: string) => boolean
+): {
+  payload: Record<string, unknown> & {
+    creatorProfileId: string;
+    dedupKey: string;
+  };
+  dedupKey: string;
+} | null {
+  let url = sourceUrl;
+
+  if (validator) {
+    const validated = validator(url);
+    if (!validated) return null;
+    url = validated;
+  }
+
+  if (checker && !checker(url)) return null;
+
+  const normalizedSource = normalizeUrl(url);
+  const detected = detectPlatform(normalizedSource);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = schema.parse({
+    creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth,
+  }) as Record<string, unknown> & {
+    creatorProfileId: string;
+    dedupKey: string;
+  };
+
+  return { payload, dedupKey };
+}
+
+// ============================================================================
+// Platform Enqueue Functions
+// ============================================================================
+
+export async function enqueueLinktreeIngestionJob(params: {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth?: number;
+}): Promise<string | null> {
+  if (!isLinktreeUrl(params.sourceUrl)) return null;
+
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    linktreeJobPayloadSchema,
+    params.depth ?? 0
+  );
+  if (!normalized) return null;
+
+  return enqueueJob({
+    jobType: 'import_linktree',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
+  });
 }
 
 export async function enqueueInstagramIngestionJob(params: {
@@ -111,72 +208,22 @@ export async function enqueueInstagramIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  const validated = validateInstagramUrl(params.sourceUrl);
-  if (!validated || !isInstagramUrl(validated)) {
-    return null;
-  }
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    instagramJobPayloadSchema,
+    params.depth ?? 0,
+    validateInstagramUrl,
+    isInstagramUrl
+  );
+  if (!normalized) return null;
 
-  const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
+  return enqueueJob({
+    jobType: 'import_instagram',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const payload = instagramJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_instagram'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_instagram',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
 
 export async function enqueueTikTokIngestionJob(params: {
@@ -184,72 +231,22 @@ export async function enqueueTikTokIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  const validated = validateTikTokUrl(params.sourceUrl);
-  if (!validated || !isTikTokUrl(validated)) {
-    return null;
-  }
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    tiktokJobPayloadSchema,
+    params.depth ?? 0,
+    validateTikTokUrl,
+    isTikTokUrl
+  );
+  if (!normalized) return null;
 
-  const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
+  return enqueueJob({
+    jobType: 'import_tiktok',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const payload = tiktokJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_tiktok'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_tiktok',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
 
 export async function enqueueTwitterIngestionJob(params: {
@@ -257,72 +254,22 @@ export async function enqueueTwitterIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  const validated = validateTwitterUrl(params.sourceUrl);
-  if (!validated || !isTwitterUrl(validated)) {
-    return null;
-  }
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    twitterJobPayloadSchema,
+    params.depth ?? 0,
+    validateTwitterUrl,
+    isTwitterUrl
+  );
+  if (!normalized) return null;
 
-  const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
+  return enqueueJob({
+    jobType: 'import_twitter',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const payload = twitterJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_twitter'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_twitter',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
 
 export async function enqueueBeaconsIngestionJob(params: {
@@ -330,72 +277,22 @@ export async function enqueueBeaconsIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  const validated = validateBeaconsUrl(params.sourceUrl);
-  if (!validated || !isBeaconsUrl(validated)) {
-    return null;
-  }
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    beaconsJobPayloadSchema,
+    params.depth ?? 0,
+    validateBeaconsUrl,
+    isBeaconsUrl
+  );
+  if (!normalized) return null;
 
-  const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
+  return enqueueJob({
+    jobType: 'import_beacons',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const payload = beaconsJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_beacons'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_beacons',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
 
 export async function enqueueYouTubeIngestionJob(params: {
@@ -404,12 +301,9 @@ export async function enqueueYouTubeIngestionJob(params: {
   depth?: number;
 }): Promise<string | null> {
   const validated = validateYouTubeChannelUrl(params.sourceUrl);
-  if (!validated || !isYouTubeChannelUrl(validated)) {
-    return null;
-  }
+  if (!validated || !isYouTubeChannelUrl(validated)) return null;
 
-  const normalizedSource = validated;
-  const detected = detectPlatform(normalizedSource);
+  const detected = detectPlatform(validated);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -420,55 +314,17 @@ export async function enqueueYouTubeIngestionJob(params: {
     sourceUrl: detected.normalizedUrl,
     dedupKey,
     depth: params.depth ?? 0,
+  }) as Record<string, unknown> & {
+    creatorProfileId: string;
+    dedupKey: string;
+  };
+
+  return enqueueJob({
+    jobType: 'import_youtube',
+    payload,
+    dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_youtube'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_youtube',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
 
 export async function enqueueLayloIngestionJob(params: {
@@ -476,72 +332,27 @@ export async function enqueueLayloIngestionJob(params: {
   sourceUrl: string;
   depth?: number;
 }): Promise<string | null> {
-  if (!isLayloUrl(params.sourceUrl)) {
-    return null;
-  }
+  if (!isLayloUrl(params.sourceUrl)) return null;
 
-  const normalizedSource = normalizeUrl(params.sourceUrl);
-  const detected = detectPlatform(normalizedSource);
-  const dedupKey = canonicalIdentity({
-    platform: detected.platform,
-    normalizedUrl: detected.normalizedUrl,
+  const normalized = normalizePlatformUrl(
+    params.sourceUrl,
+    params.creatorProfileId,
+    layloJobPayloadSchema,
+    params.depth ?? 0
+  );
+  if (!normalized) return null;
+
+  return enqueueJob({
+    jobType: 'import_laylo',
+    payload: normalized.payload,
+    dedupKey: normalized.dedupKey,
+    useLegacyDedupCheck: true,
   });
-
-  const payload = layloJobPayloadSchema.parse({
-    creatorProfileId: params.creatorProfileId,
-    sourceUrl: detected.normalizedUrl,
-    dedupKey,
-    depth: params.depth ?? 0,
-  });
-
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(
-      and(
-        eq(ingestionJobs.jobType, 'import_laylo'),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
-        or(
-          eq(ingestionJobs.dedupKey, payload.dedupKey),
-          and(
-            isNull(ingestionJobs.dedupKey),
-            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_laylo',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
 }
+
+// ============================================================================
+// DSP Discovery & Enrichment Jobs
+// ============================================================================
 
 /**
  * Enqueue a DSP artist discovery job.
@@ -562,51 +373,17 @@ export async function enqueueDspArtistDiscoveryJob(params: {
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
 
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    spotifyArtistId: params.spotifyArtistId,
-    targetProviders: params.targetProviders ?? ['apple_music'],
-    dedupKey,
-  };
-
-  // Fast-path: check if a job already exists for this profile
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_artist_discovery',
-      payload,
+  return enqueueJob({
+    jobType: 'dsp_artist_discovery',
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      spotifyArtistId: params.spotifyArtistId,
+      targetProviders: params.targetProviders ?? ['apple_music'],
       dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered discovery
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+    },
+    dedupKey,
+    priority: 1,
+  });
 }
 
 /**
@@ -626,51 +403,18 @@ export async function enqueueDspTrackEnrichmentJob(params: {
 }): Promise<string | null> {
   const dedupKey = `dsp_track_enrichment:${params.matchId}`;
 
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    matchId: params.matchId,
-    providerId: params.providerId,
-    externalArtistId: params.externalArtistId,
-  };
-
-  // Fast-path: check if a job already exists for this match
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_track_enrichment',
-      payload,
+  return enqueueJob({
+    jobType: 'dsp_track_enrichment',
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      matchId: params.matchId,
+      providerId: params.providerId,
+      externalArtistId: params.externalArtistId,
       dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 2, // Medium priority for enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+    },
+    dedupKey,
+    priority: 2,
+  });
 }
 
 /**
@@ -691,48 +435,14 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
 }): Promise<string | null> {
   const dedupKey = `musicfetch_enrichment:${params.creatorProfileId}`;
 
-  const payload = {
-    creatorProfileId: params.creatorProfileId,
-    spotifyUrl: params.spotifyUrl,
-    dedupKey,
-  };
-
-  // Fast-path: check if a job already exists for this profile
-  const existing = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0].id;
-  }
-
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'musicfetch_enrichment',
-      payload,
+  return enqueueJob({
+    jobType: 'musicfetch_enrichment',
+    payload: {
+      creatorProfileId: params.creatorProfileId,
+      spotifyUrl: params.spotifyUrl,
       dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won
-  const [mfWinner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return mfWinner?.id ?? null;
+    },
+    dedupKey,
+    priority: 1,
+  });
 }

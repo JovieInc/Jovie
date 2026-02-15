@@ -2,6 +2,8 @@ import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
 export const runtime = 'nodejs';
+// Force dynamic rendering — waitlist uses Clerk and cannot be pre-rendered
+export const dynamic = 'force-dynamic';
 
 /**
  * Waitlist layout - NO MORE REDIRECTS!

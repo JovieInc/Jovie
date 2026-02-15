@@ -30,3 +30,11 @@ export function useDashboardData(): DashboardData {
   }
   return context;
 }
+
+/**
+ * Optional variant that returns null instead of throwing when outside the provider.
+ * Use this when the component may or may not be rendered within a DashboardDataProvider.
+ */
+export function useDashboardDataOptional(): DashboardData | null {
+  return useContext(DashboardDataContext);
+}

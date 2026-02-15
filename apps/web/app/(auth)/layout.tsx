@@ -3,8 +3,8 @@ import { ClerkAnalytics } from '@/components/providers/ClerkAnalytics';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
-// Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
-// Auth pages will still be dynamic by default
+// Force dynamic rendering — auth pages require Clerk and cannot be pre-rendered
+export const dynamic = 'force-dynamic';
 
 // Use local Inter font (no external network requests during build)
 const inter = localFont({

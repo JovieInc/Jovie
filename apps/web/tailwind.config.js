@@ -152,6 +152,8 @@ module.exports = {
 
       // Ring colors (for focus rings)
       ringColor: {
+        DEFAULT: 'var(--color-focus-ring)',
+        ring: 'var(--color-focus-ring)',
         accent: 'var(--color-accent)',
         success: 'var(--color-success)',
         error: 'var(--color-error)',
