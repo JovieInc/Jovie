@@ -794,8 +794,11 @@ jobs:
               echo "ℹ️ No test files modified in this PR (critical tests already ran)"
             fi
           else
-            echo "📦 Full suite with coverage"
-            pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🔍 Feature branch push: Running critical tests only (no base_ref available)"
+            # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
+            # so we can't determine changed files. Run critical tests only to avoid OOM
+            # from the full test suite. The PR event covers changed-file tests.
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
