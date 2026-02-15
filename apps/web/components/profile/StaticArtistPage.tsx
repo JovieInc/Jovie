@@ -2,13 +2,13 @@ import { Suspense } from 'react';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
-import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 

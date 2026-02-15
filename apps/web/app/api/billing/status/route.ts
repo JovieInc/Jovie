@@ -4,8 +4,8 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -42,14 +42,12 @@ export async function GET() {
         userId,
         error: billingResult.error,
       });
-      Sentry.captureException(
+      await captureCriticalError(
+        'Billing lookup failed — user may lose pro features',
         new Error(`Billing lookup failed: ${billingResult.error}`),
         {
-          level: 'warning',
-          tags: {
-            route: '/api/billing/status',
-            errorType: 'billing_lookup_failed',
-          },
+          route: '/api/billing/status',
+          userId,
         }
       );
       return NextResponse.json(
@@ -89,14 +87,11 @@ export async function GET() {
   } catch (error) {
     logger.error('Error getting billing status:', error);
 
-    // Capture billing errors in Sentry (revenue-critical)
-    Sentry.captureException(error, {
-      level: 'error',
-      tags: {
-        route: '/api/billing/status',
-        errorType: 'billing_error',
-      },
-    });
+    await captureCriticalError(
+      'Billing status endpoint error — revenue-critical',
+      error,
+      { route: '/api/billing/status' }
+    );
 
     return NextResponse.json(
       { error: 'Failed to get billing status' },
