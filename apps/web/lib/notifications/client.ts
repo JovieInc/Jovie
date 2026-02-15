@@ -52,8 +52,8 @@ export const NOTIFICATION_COPY = {
       sms: "You're in. You'll get a text when new music drops, tours are announced & more.",
     },
     unsubscribe: {
-      email: "You\u2019re unsubscribed from email notifications.",
-      sms: "You\u2019re unsubscribed from text notifications.",
+      email: 'You\u2019re unsubscribed from email notifications.',
+      sms: 'You\u2019re unsubscribed from text notifications.',
     },
   },
 } as const;

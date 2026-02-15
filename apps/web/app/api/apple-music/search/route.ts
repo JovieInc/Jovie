@@ -267,7 +267,11 @@ export async function GET(request: NextRequest) {
     // Probabilistic cleanup (10% of requests) to amortize cost.
     // Full cleanup on every request is O(n log n) due to sorting;
     // force cleanup when maps exceed size limits.
-    if (Math.random() < 0.1 || searchCache.size > MAX_CACHE_SIZE || rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    if (
+      Math.random() < 0.1 ||
+      searchCache.size > MAX_CACHE_SIZE ||
+      rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES
+    ) {
       cleanupSearchCache();
       cleanupRateLimitMap();
     }

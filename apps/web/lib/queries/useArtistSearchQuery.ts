@@ -157,7 +157,8 @@ export function useArtistSearchQuery(
     ...SEARCH_CACHE,
     // Don't retry rate limit or client errors - only retry server/network errors
     retry: (failureCount, error) => {
-      if (error instanceof Error && error.name === 'RateLimitError') return false;
+      if (error instanceof Error && error.name === 'RateLimitError')
+        return false;
       if (error instanceof FetchError && !error.isRetryable()) return false;
       return failureCount < 2;
     },

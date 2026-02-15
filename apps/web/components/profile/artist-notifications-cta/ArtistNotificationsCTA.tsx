@@ -352,9 +352,7 @@ export function ArtistNotificationsCTA({
         style={noFontSynthesisStyle}
       >
         Get notified when{' '}
-        <span className='font-semibold text-primary-token'>
-          {artist.name}
-        </span>{' '}
+        <span className='font-semibold text-primary-token'>{artist.name}</span>{' '}
         drops new music, announces tours &amp; more
       </p>
 

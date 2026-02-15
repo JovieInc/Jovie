@@ -58,8 +58,9 @@ export function ProfileNotificationsMenu({
     handleConfirm,
   } = useNotificationConfirm();
 
-  const [contentPrefs, setContentPrefs] =
-    useState<ContentPrefs>(DEFAULT_CONTENT_PREFS);
+  const [contentPrefs, setContentPrefs] = useState<ContentPrefs>(
+    DEFAULT_CONTENT_PREFS
+  );
 
   const handleContentToggle = (key: FanNotificationContentType) => {
     setContentPrefs(prev => ({ ...prev, [key]: !prev[key] }));
