@@ -52,19 +52,17 @@ describe('Logo', () => {
     const logo = screen.getByRole('img', { hidden: true });
     expect(logo).toHaveClass(customClass);
     expect(logo).toHaveClass('h-8', 'w-auto'); // Should still have default size
-    expect(logo).toHaveClass('text-black', 'dark:text-white'); // Should still have theme colors
+    // Color is set via inline style using CSS variable, not Tailwind classes
+    expect(logo.style.color).toContain('var(--linear-text-primary');
   });
 
   it('includes color transition classes', () => {
     render(<Logo />);
 
     const logo = screen.getByRole('img', { hidden: true });
-    expect(logo).toHaveClass(
-      'text-black',
-      'dark:text-white',
-      'transition-colors',
-      'duration-200'
-    );
+    expect(logo).toHaveClass('transition-colors', 'duration-200');
+    // Color is inherited via CSS variable instead of hard-coded theme classes
+    expect(logo.style.color).toContain('var(--linear-text-primary');
   });
 
   it('contains the Jovie logo path data', () => {
