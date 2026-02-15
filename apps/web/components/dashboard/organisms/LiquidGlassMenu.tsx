@@ -324,7 +324,7 @@ export function LiquidGlassMenu({
                 )}
               >
                 <div className='relative'>
-                  <Icon className='size-[22px]' aria-hidden='true' />
+                  <Icon className='h-5 w-5' aria-hidden='true' />
                   {item.badge !== undefined && item.badge > 0 && (
                     <span className='absolute -top-1 -right-2'>
                       <Badge count={item.badge} size='sm' />
@@ -361,7 +361,7 @@ export function LiquidGlassMenu({
                 : 'text-tertiary-token hover:text-secondary-token'
             )}
           >
-            <MoreHorizontal className='size-[22px]' aria-hidden='true' />
+            <MoreHorizontal className='h-5 w-5' aria-hidden='true' />
             <span
               className={cn(
                 'text-[10px] leading-tight',
@@ -380,7 +380,7 @@ export function LiquidGlassMenu({
               aria-label='Search'
               className='relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl text-tertiary-token hover:text-secondary-token transition-all duration-150 active:scale-95'
             >
-              <Search className='size-[22px]' aria-hidden='true' />
+              <Search className='h-5 w-5' aria-hidden='true' />
               <span className='text-[10px] leading-tight font-medium'>
                 Search
               </span>

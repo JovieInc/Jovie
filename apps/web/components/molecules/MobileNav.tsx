@@ -75,7 +75,7 @@ export function MobileNav({
           'rounded-lg border-0 bg-transparent cursor-pointer',
           'text-[var(--linear-text-primary)]',
           'transition-all duration-200 ease-out',
-          '-webkit-tap-highlight-color-transparent',
+          '[-webkit-tap-highlight-color:transparent]',
           'hover:bg-[var(--linear-bg-hover)]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--linear-accent)]'
         )}
