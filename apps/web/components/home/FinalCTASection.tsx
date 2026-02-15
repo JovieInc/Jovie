@@ -28,8 +28,8 @@ export function FinalCTASection() {
           </h2>
 
           <div className='flex justify-center lg:justify-end'>
-            <LinearButton variant='primary' href='/waitlist'>
-              Request early access
+            <LinearButton variant='primary' href='/signup'>
+              Get started free
             </LinearButton>
           </div>
         </div>

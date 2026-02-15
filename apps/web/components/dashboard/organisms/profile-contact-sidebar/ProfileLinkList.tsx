@@ -14,7 +14,8 @@ import type { LinkSection } from '@/components/dashboard/organisms/links/utils/l
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
-import type { CategoryOption } from './ProfileLinkCategorySelector';
+
+export type CategoryOption = LinkSection | 'all';
 
 export interface ProfileLinkListProps {
   readonly links: PreviewPanelLink[];
