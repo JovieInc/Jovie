@@ -90,6 +90,17 @@ function determineUserStatus(
   existingUserData: ExistingUserData | undefined
 ): UserLifecycleStatus {
   if (!waitlistEntryId) {
+    // When waitlist is disabled, skip waitlist states — treat as approved
+    if (!isWaitlistEnabled()) {
+      const hasClaimedProfile =
+        existingUserData?.profileId && existingUserData.profileClaimed;
+      if (!hasClaimedProfile) {
+        return 'waitlist_approved';
+      }
+      return existingUserData.onboardingComplete
+        ? 'active'
+        : 'onboarding_incomplete';
+    }
     return 'waitlist_pending';
   }
 

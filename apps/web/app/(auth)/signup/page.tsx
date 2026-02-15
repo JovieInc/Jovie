@@ -16,19 +16,19 @@ function SpotifyDataPersistence() {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
 
-    if (spotifyUrl) {
-      try {
+    try {
+      // Clear stale values before persisting new ones
+      sessionStorage.removeItem('jovie_signup_spotify_url');
+      sessionStorage.removeItem('jovie_signup_artist_name');
+
+      if (spotifyUrl) {
         sessionStorage.setItem('jovie_signup_spotify_url', spotifyUrl);
-      } catch {
-        // sessionStorage may be unavailable (incognito quota, etc.)
       }
-    }
-    if (artistName) {
-      try {
+      if (artistName) {
         sessionStorage.setItem('jovie_signup_artist_name', artistName);
-      } catch {
-        // sessionStorage may be unavailable
       }
+    } catch {
+      // sessionStorage may be unavailable (incognito quota, etc.)
     }
   }, [searchParams]);
 
