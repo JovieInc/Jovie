@@ -44,7 +44,8 @@ type ErrorContext = Record<string, unknown>;
  */
 function getEnvironment(): string {
   if (typeof window !== 'undefined') {
-    const host = globalThis.location.hostname;
+    const host = globalThis.location?.hostname;
+    if (!host) return nodeEnv || 'development';
     if (host === 'localhost' || host === '127.0.0.1') return 'development';
     if (host.includes('preview') || host.includes('vercel.app'))
       return 'preview';

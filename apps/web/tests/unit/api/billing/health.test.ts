@@ -23,6 +23,11 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
+vi.mock('@/lib/stripe/config', () => ({
+  validateStripeConfig: vi.fn(() => ({ isValid: true, missingVars: [] })),
+  getActivePriceIds: vi.fn(() => ['price_test_monthly', 'price_test_yearly']),
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: vi.fn(),
 }));

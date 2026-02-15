@@ -21,11 +21,7 @@ import { Download } from 'lucide-react';
 import { useCallback } from 'react';
 import { track } from '@/lib/analytics';
 
-export interface AvatarSize {
-  readonly key: string;
-  readonly label: string;
-  readonly url: string;
-}
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 
 interface ProfilePhotoContextMenuProps {
   /** The avatar element to wrap */
@@ -36,39 +32,6 @@ interface ProfilePhotoContextMenuProps {
   readonly sizes: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowDownloads: boolean;
-}
-
-/** Build avatar sizes from a URL map stored in profile settings */
-export function buildAvatarSizes(
-  sizesMap: Record<string, string> | null | undefined,
-  avatarUrl: string | null | undefined
-): AvatarSize[] {
-  if (!sizesMap && !avatarUrl) return [];
-
-  const sizes: AvatarSize[] = [];
-
-  if (sizesMap && Object.keys(sizesMap).length > 0) {
-    if (sizesMap.original) {
-      sizes.push({
-        key: 'original',
-        label: 'Original',
-        url: sizesMap.original,
-      });
-    }
-    if (sizesMap['512']) {
-      sizes.push({ key: '512', label: '512 × 512', url: sizesMap['512'] });
-    }
-    if (sizesMap['256']) {
-      sizes.push({ key: '256', label: '256 × 256', url: sizesMap['256'] });
-    }
-    if (sizesMap['128']) {
-      sizes.push({ key: '128', label: '128 × 128', url: sizesMap['128'] });
-    }
-  } else if (avatarUrl) {
-    sizes.push({ key: 'original', label: 'Original', url: avatarUrl });
-  }
-
-  return sizes;
 }
 
 function sanitizeFilename(name: string): string {
