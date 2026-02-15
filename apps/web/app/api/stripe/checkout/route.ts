@@ -9,6 +9,7 @@ import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
   MAX_REFERRAL_CODE_LENGTH,
+  MIN_REFERRAL_CODE_LENGTH,
   REFERRAL_CODE_PATTERN,
 } from '@/lib/referrals/config';
 import {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (typeof rawReferralCode === 'string') {
       const trimmed = rawReferralCode.trim();
       if (
-        trimmed.length > 0 &&
+        trimmed.length >= MIN_REFERRAL_CODE_LENGTH &&
         trimmed.length <= MAX_REFERRAL_CODE_LENGTH &&
         REFERRAL_CODE_PATTERN.test(trimmed)
       ) {

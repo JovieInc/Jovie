@@ -69,7 +69,7 @@ export async function getOrCreateReferralCode(
     }
   }
 
-  const normalizedCode = code.toLowerCase();
+  let normalizedCode = code.toLowerCase();
 
   // Retry loop: handles race conditions where a concurrent request inserts
   // between our check and insert. The UNIQUE constraints on user_id and code
@@ -110,6 +110,9 @@ export async function getOrCreateReferralCode(
       if (customCode) {
         throw new Error('This referral code is already taken');
       }
+
+      // Generate a fresh random code for the next attempt
+      normalizedCode = generateRandomCode().toLowerCase();
 
       logger.warn('Referral code collision, retrying', {
         userId,
