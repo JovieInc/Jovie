@@ -177,8 +177,10 @@ export async function POST(request: NextRequest) {
         // Upload each download size to blob storage
         const avatarSizes: Record<string, string> = {};
         for (const [sizeKey, buffer] of Object.entries(avatarSizeBuffers)) {
+          const sizeSuffix =
+            sizeKey === 'original' ? '-original' : `-${sizeKey}`;
           const sizeBlobPath = buildBlobPath(
-            `${seoFileName}${sizeKey === 'original' ? '-original' : `-${sizeKey}`}`,
+            `${seoFileName}${sizeSuffix}`,
             clerkUserId
           );
           const sizeUrl = await withTimeout(
