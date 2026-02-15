@@ -47,6 +47,8 @@ export interface PlanGateEntitlements {
   analyticsRetentionDays: number;
   /** Contact limit based on plan (100 for free, null for unlimited) */
   contactsLimit: number | null;
+  /** Smart link limit based on plan (5 for free, null for unlimited) */
+  smartLinksLimit: number | null;
 }
 
 /** Map plan string to analytics retention days */
@@ -60,6 +62,12 @@ function getRetentionDays(plan: string | null): number {
 function getContactsLimit(plan: string | null): number | null {
   if (plan === 'pro' || plan === 'growth') return null;
   return 100;
+}
+
+/** Map plan string to smart link limit (5 for free, unlimited for pro/growth) */
+function getSmartLinksLimit(plan: string | null): number | null {
+  if (plan === 'pro' || plan === 'growth') return null;
+  return 5;
 }
 
 /**
@@ -89,5 +97,6 @@ export function usePlanGate(): PlanGateEntitlements {
     canExportContacts: isPro,
     analyticsRetentionDays: getRetentionDays(plan),
     contactsLimit: getContactsLimit(plan),
+    smartLinksLimit: getSmartLinksLimit(plan),
   };
 }

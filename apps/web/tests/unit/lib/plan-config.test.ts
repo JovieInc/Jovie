@@ -20,6 +20,7 @@ describe('Plan Configuration', () => {
         aiDailyMessageLimit: 5,
         aiCanUseTools: false,
         canBeVerified: false,
+        smartLinksLimit: 5,
       });
     });
 
@@ -34,6 +35,7 @@ describe('Plan Configuration', () => {
         aiDailyMessageLimit: 100,
         aiCanUseTools: true,
         canBeVerified: true,
+        smartLinksLimit: null,
       });
     });
 
@@ -48,6 +50,7 @@ describe('Plan Configuration', () => {
         aiDailyMessageLimit: 500,
         aiCanUseTools: true,
         canBeVerified: true,
+        smartLinksLimit: null,
       });
     });
 

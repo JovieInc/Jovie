@@ -7,6 +7,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { isWaitlistEnabled } from './waitlist-config';
 
 export interface ProxyUserState {
   needsWaitlist: boolean;
@@ -149,9 +150,13 @@ function determineUserState(
       }
     | undefined
 ): ProxyUserState {
-  // No DB user → needs waitlist/signup
+  const waitlistEnabled = isWaitlistEnabled();
+
+  // No DB user → needs waitlist/signup (or onboarding if waitlist is disabled)
   if (!result?.dbUserId) {
-    return { ...DEFAULT_WAITLIST_STATE };
+    return waitlistEnabled
+      ? { ...DEFAULT_WAITLIST_STATE }
+      : { ...NEEDS_ONBOARDING_STATE };
   }
 
   // Check waitlist approval using userStatus lifecycle
@@ -160,6 +165,13 @@ function determineUserState(
   );
 
   if (!isWaitlistApproved) {
+    if (!waitlistEnabled) {
+      // Waitlist disabled: skip gate, route based on profile completeness
+      if (!result.profileId || !result.profileComplete) {
+        return { ...NEEDS_ONBOARDING_STATE };
+      }
+      return { ...ACTIVE_USER_STATE };
+    }
     return { ...DEFAULT_WAITLIST_STATE };
   }
 
