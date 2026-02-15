@@ -24,6 +24,14 @@ const PROVIDER_PLATFORM_MAP: Record<ProviderKey, string> = {
   amazon_music: 'website',
   bandcamp: 'bandcamp',
   beatport: 'website',
+  pandora: 'website',
+  napster: 'website',
+  audiomack: 'website',
+  qobuz: 'website',
+  anghami: 'website',
+  boomplay: 'website',
+  iheartradio: 'website',
+  tiktok: 'tiktok',
 };
 
 export function ProviderIcon({

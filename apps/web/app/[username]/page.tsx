@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
+import { buildAvatarSizes } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
@@ -408,6 +409,16 @@ export default async function ArtistPage({
   const showTipButton = mode === 'profile' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
+  // Read profile photo download settings
+  const profileSettings =
+    (profile.settings as Record<string, unknown> | null) ?? {};
+  const allowPhotoDownloads =
+    profileSettings.allowProfilePhotoDownloads === true;
+  const photoDownloadSizes = buildAvatarSizes(
+    profileSettings.avatarSizes as Record<string, string> | null | undefined,
+    profile.avatar_url
+  );
+
   // Generate structured data for SEO
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
     profile,
@@ -446,6 +457,8 @@ export default async function ArtistPage({
         showBackButton={showBackButton}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
+        photoDownloadSizes={photoDownloadSizes}
+        allowPhotoDownloads={allowPhotoDownloads}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

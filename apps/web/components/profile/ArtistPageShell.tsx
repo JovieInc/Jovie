@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/profile-shell';
+import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
@@ -17,6 +18,10 @@ type ArtistPageShellProps = {
   readonly showFooter?: boolean;
   readonly maxWidthClass?: string;
   readonly showNotificationButton?: boolean;
+  /** Available download sizes for profile photo */
+  readonly photoDownloadSizes?: AvatarSize[];
+  /** Whether profile photo downloads are allowed */
+  readonly allowPhotoDownloads?: boolean;
 };
 
 // Using React.memo to prevent unnecessary re-renders when only children content changes
@@ -32,6 +37,8 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
   showNotificationButton = false,
+  photoDownloadSizes = [],
+  allowPhotoDownloads = false,
 }: ArtistPageShellProps) {
   return (
     <ProfileShell
@@ -47,6 +54,8 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       maxWidthClass={maxWidthClass}
       backgroundPattern='gradient'
       showGradientBlurs={true}
+      photoDownloadSizes={photoDownloadSizes}
+      allowPhotoDownloads={allowPhotoDownloads}
     >
       {children}
     </ProfileShell>

@@ -21,6 +21,7 @@ export { errorResponse, extractPgError } from './error-response';
 export {
   fileToBuffer,
   optimizeImageToAvif,
+  processAvatarToSizes,
   withTimeout,
 } from './image-processing';
 export type {

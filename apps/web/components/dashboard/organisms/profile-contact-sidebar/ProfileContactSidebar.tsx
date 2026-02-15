@@ -2,6 +2,7 @@
 
 import { SegmentControl } from '@jovie/ui';
 import { useEffect, useMemo, useState } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -11,6 +12,7 @@ import {
   getCategoryCounts,
   ProfileLinkList,
 } from './ProfileLinkList';
+import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { ProfileSidebarHeader } from './ProfileSidebarHeader';
 
 /** Tab options for the profile link categories */
@@ -23,6 +25,7 @@ const PROFILE_TAB_OPTIONS = [
 
 export function ProfileContactSidebar() {
   const { isOpen, close, previewData } = usePreviewPanel();
+  const { selectedProfile } = useDashboardData();
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryOption>('social');
 
@@ -103,6 +106,16 @@ export function ProfileContactSidebar() {
         {/* Links List */}
         <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4'>
           <ProfileLinkList links={links} selectedCategory={resolvedCategory} />
+        </div>
+
+        {/* Profile Photo Download Settings */}
+        <div className='shrink-0 border-t border-subtle px-4 py-3'>
+          <ProfilePhotoSettings
+            allowDownloads={
+              (selectedProfile?.settings as Record<string, unknown> | null)
+                ?.allowProfilePhotoDownloads === true
+            }
+          />
         </div>
       </div>
     </RightDrawer>
