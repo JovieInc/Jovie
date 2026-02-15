@@ -773,7 +773,7 @@ jobs:
           # Enable coverage on main branch and PRs for Codecov integration
           COVERAGE_FLAG="--coverage"
           # V8 coverage report generation needs extra heap for large codebases
-          export NODE_OPTIONS="--max-old-space-size=4096"
+          export NODE_OPTIONS="--max-old-space-size=8192"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running critical tests with coverage"
