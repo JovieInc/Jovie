@@ -5,7 +5,10 @@
  * and new release detection.
  */
 
-export type { FanNotificationPreferences } from '@/lib/db/schema/analytics';
+export type {
+  FanNotificationContentType,
+  FanNotificationPreferences,
+} from '@/lib/db/schema/analytics';
 // Re-export database types
 export type {
   DspArtistEnrichment,
