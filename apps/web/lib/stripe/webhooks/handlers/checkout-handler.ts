@@ -16,7 +16,9 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { activateReferral, getInternalUserId } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
+import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import type {
@@ -115,6 +117,20 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       stripeEventTimestamp,
       eventType: 'subscription_created',
     });
+
+    // Activate referral if this user was referred.
+    // Awaited so failures are surfaced instead of silently dropped.
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (internalId) {
+        await activateReferral(internalId);
+      }
+    } catch (error) {
+      // Log but don't fail the webhook — referral activation is secondary
+      logger.warn('Failed to activate referral on checkout', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
 
     // Invalidate client cache
     await invalidateBillingCache();
