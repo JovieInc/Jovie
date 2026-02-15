@@ -369,7 +369,7 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
 }): Promise<string | null> {
   const providers = (params.targetProviders ?? ['apple_music'])
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
 

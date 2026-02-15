@@ -61,7 +61,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
             variant='outline'
             ariaLabel='Copy session ID'
             onClick={() => {
-              void handleCopyConversationId();
+              handleCopyConversationId();
             }}
           >
             <Copy aria-hidden='true' className='size-4' />
