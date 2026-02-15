@@ -41,6 +41,13 @@ export function TipSelector({
     }
   }, [selectedAmount]);
 
+  let continueLabel = `Continue with $${selectedAmount}`;
+  if (isLoading) {
+    continueLabel = 'Processing...';
+  } else if (paymentLabel) {
+    continueLabel = `Continue with ${paymentLabel}`;
+  }
+
   return (
     <div className={`space-y-5 ${className}`} data-test='tip-selector'>
       <h3 id='tip-selector-heading' className='sr-only'>
@@ -83,11 +90,7 @@ export function TipSelector({
             : `Continue with $${selectedAmount} tip`
         }
       >
-        {isLoading
-          ? 'Processing...'
-          : paymentLabel
-            ? `Continue with ${paymentLabel}`
-            : `Continue with $${selectedAmount}`}
+        {continueLabel}
       </Button>
     </div>
   );

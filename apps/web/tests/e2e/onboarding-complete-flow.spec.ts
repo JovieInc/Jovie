@@ -69,19 +69,9 @@ test.describe
     }) => {
       test.setTimeout(90_000);
 
-      const displayName = `E2E Flow ${Date.now().toString(36)}`;
       const uniqueHandle = `journey-${Date.now().toString(36)}`;
 
       await bootstrapFreshUser(page);
-
-      // Name step
-      const nameInput = page.getByLabel('Your full name');
-      await expect(nameInput).toBeVisible({ timeout: 10_000 });
-      await nameInput.fill(displayName);
-
-      const continueFromName = page.getByRole('button', { name: 'Continue' });
-      await expect(continueFromName).toBeEnabled({ timeout: 5_000 });
-      await continueFromName.click();
 
       // Handle step
       const handleInput = page.getByLabel('Enter your desired handle');

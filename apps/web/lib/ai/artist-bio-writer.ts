@@ -79,13 +79,17 @@ export function buildArtistBioDraft(
       ? `The artist profile has already drawn ${formatNumber(input.profileViews)} views, reinforcing sustained fan curiosity.`
       : 'The profile presence is in an early phase, with runway for sharper positioning and conversion.';
 
+  const bioExcerpt = existingBio
+    ? existingBio.slice(0, 180) + (existingBio.length > 180 ? '…' : '')
+    : null;
+
   const draft = [
     genreLine,
     marketSignal,
     catalogSignal,
     profileSignal,
-    existingBio
-      ? `Their current positioning emphasizes: "${existingBio.slice(0, 180)}${existingBio.length > 180 ? '…' : ''}".`
+    bioExcerpt
+      ? `Their current positioning emphasizes: "${bioExcerpt}".`
       : null,
   ]
     .filter(Boolean)

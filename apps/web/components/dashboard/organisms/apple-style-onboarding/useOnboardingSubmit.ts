@@ -117,10 +117,12 @@ export function useOnboardingSubmit({
       }));
 
       try {
-        validateDisplayName(fullName);
+        // Use fullName if provided (from Clerk identity), otherwise fall back to handle
+        const resolvedDisplayName = fullName.trim() || resolvedHandle;
+        validateDisplayName(resolvedDisplayName);
         await completeOnboarding({
           username: resolvedHandle,
-          displayName: fullName.trim(),
+          displayName: resolvedDisplayName,
           email: userEmail,
           redirectToDashboard: false,
         });

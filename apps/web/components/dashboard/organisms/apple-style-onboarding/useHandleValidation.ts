@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureWarning } from '@/lib/error-tracking';
 import { isAbortError } from '@/lib/pacer/errors';
 import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
@@ -29,6 +29,9 @@ interface ApiValidationResult {
   available: boolean;
   error?: string;
 }
+
+/** Maximum time (ms) to stay in "checking" state before resetting */
+const CHECKING_SAFETY_TIMEOUT_MS = 8000;
 
 /**
  * Hook to manage handle validation state and API checks.
@@ -102,6 +105,13 @@ export function useHandleValidation({
     },
     onError: (error: Error) => {
       if (isAbortError(error)) {
+        // Reset local checking flag. If Pacer still has a pending request,
+        // isChecking (isPending || isValidating) keeps the combined state true.
+        // If nothing is pending (e.g. timeout abort), this unblocks the UI.
+        setHandleValidation(prev => ({
+          ...prev,
+          checking: false,
+        }));
         return;
       }
 
@@ -124,6 +134,38 @@ export function useHandleValidation({
 
   // Update checking state when Pacer is pending or validating
   const isChecking = isPending || isValidating;
+
+  // Safety valve: reset checking after max duration to prevent infinite "Checking..."
+  // This catches edge cases where Pacer state or callbacks don't resolve.
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const combinedChecking = handleValidation.checking || isChecking;
+
+  useEffect(() => {
+    if (combinedChecking) {
+      safetyTimerRef.current = setTimeout(() => {
+        setHandleValidation(prev => {
+          if (prev.checking) {
+            return {
+              ...prev,
+              checking: false,
+              error: 'Unable to check handle right now. Please try again.',
+            };
+          }
+          return prev;
+        });
+      }, CHECKING_SAFETY_TIMEOUT_MS);
+    } else if (safetyTimerRef.current) {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+
+    return () => {
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+    };
+  }, [combinedChecking]);
 
   const validateHandle = useCallback(
     (input: string) => {
