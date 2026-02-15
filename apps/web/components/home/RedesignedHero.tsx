@@ -15,7 +15,8 @@ export function RedesignedHero() {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        padding: 'clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px) clamp(60px, 10vw, 120px)',
+        padding:
+          'clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px) clamp(60px, 10vw, 120px)',
       }}
     >
       <div

@@ -32,8 +32,7 @@ interface AuthLayoutProps {
   readonly logoutRedirectUrl?: string;
 }
 
-const LINK_FOCUS_CLASSES =
-  'focus-ring-themed rounded-md';
+const LINK_FOCUS_CLASSES = 'focus-ring-themed rounded-md';
 
 export function AuthLayout({
   children,

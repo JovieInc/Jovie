@@ -24,10 +24,8 @@ export function DataCard({
 }: DataCardProps) {
   const badgeClasses = {
     default: 'bg-surface-hover text-secondary',
-    success:
-      'bg-[var(--color-success-subtle)] text-[var(--color-success)]',
-    warning:
-      'bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
+    success: 'bg-[var(--color-success-subtle)] text-[var(--color-success)]',
+    warning: 'bg-[var(--color-warning-subtle)] text-[var(--color-warning)]',
     error: 'bg-[var(--color-error-subtle)] text-[var(--color-error)]',
   };
 
@@ -40,7 +38,9 @@ export function DataCard({
     >
       <div className='flex-1 min-w-0'>
         <div className='flex items-center space-x-2'>
-          <p className='font-medium truncate' title={title}>{title}</p>
+          <p className='font-medium truncate' title={title}>
+            {title}
+          </p>
           {badge && badge.trim() !== '' && (
             <span
               className={cn(
@@ -53,7 +53,9 @@ export function DataCard({
           )}
         </div>
         {subtitle && subtitle.trim() !== '' && (
-          <p className='text-sm text-secondary truncate' title={subtitle}>{subtitle}</p>
+          <p className='text-sm text-secondary truncate' title={subtitle}>
+            {subtitle}
+          </p>
         )}
         {metadata && metadata.trim() !== '' && (
           <p className='text-xs text-secondary'>{metadata}</p>
