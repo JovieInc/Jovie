@@ -108,7 +108,6 @@ export function SettingsTouringSection({
       const removeKeyResult = await removeBandsintownApiKey();
       if (!removeKeyResult.success) {
         toast.error(removeKeyResult.message ?? 'Failed to remove API key.');
-        return;
       }
 
       toast.success('Bandsintown disconnected.');
