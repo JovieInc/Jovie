@@ -39,10 +39,10 @@ export function EngagementEngineLanding() {
 
             <div className='mt-10 flex flex-col items-center gap-3'>
               <Link
-                href='/waitlist'
+                href='/signup'
                 className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg focus-ring-themed'
               >
-                Get early access
+                Get started free
                 <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
               </Link>
               <Link
@@ -159,10 +159,10 @@ export function EngagementEngineLanding() {
 
               <div className='mt-10 flex flex-col sm:flex-row gap-3'>
                 <Link
-                  href='/waitlist'
+                  href='/signup'
                   className='inline-flex items-center justify-center gap-2 h-12 px-6 rounded-md bg-btn-primary text-btn-primary-foreground text-sm font-medium transition-colors hover:opacity-95 focus-ring-themed'
                 >
-                  Request early access
+                  Get started free
                   <ArrowRight className='h-4 w-4' />
                 </Link>
                 <Link

@@ -25,7 +25,7 @@ function GetStartedContent() {
         Create your artist page in seconds.
       </p>
       <Button asChild size='lg' data-test='signup-btn'>
-        <Link href='/waitlist'>Get started</Link>
+        <Link href='/signup'>Get started</Link>
       </Button>
     </div>
   );

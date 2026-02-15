@@ -14,6 +14,7 @@ import { syncEmailFromClerk } from './clerk-sync';
 import { resolveProfileState } from './profile-state-resolver';
 // eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { checkUserStatus } from './status-checker';
+import { isWaitlistEnabled } from './waitlist-config';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -89,6 +90,17 @@ function determineUserStatus(
   existingUserData: ExistingUserData | undefined
 ): UserLifecycleStatus {
   if (!waitlistEntryId) {
+    // When waitlist is disabled, skip waitlist states — treat as approved
+    if (!isWaitlistEnabled()) {
+      const hasClaimedProfile =
+        existingUserData?.profileId && existingUserData.profileClaimed;
+      if (!hasClaimedProfile) {
+        return 'waitlist_approved';
+      }
+      return existingUserData.onboardingComplete
+        ? 'active'
+        : 'onboarding_incomplete';
+    }
     return 'waitlist_pending';
   }
 
@@ -258,25 +270,31 @@ async function handleMissingDbUser(
     throw new TypeError('Email is required for user creation');
   }
 
-  // Check waitlist status before creating user
-  const waitlistResult = await checkWaitlistAccessInternal(email);
+  // Check waitlist status before creating user (only when waitlist is enabled)
+  let waitlistEntryId: string | undefined;
 
-  if (waitlistResult.status === 'new' || !waitlistResult.status) {
-    return {
-      state: UserState.NEEDS_WAITLIST_SUBMISSION,
-      clerkUserId,
-      dbUserId: null,
-      profileId: null,
-      redirectTo: '/waitlist',
-      context: { ...baseContext, email },
-    };
+  if (isWaitlistEnabled()) {
+    const waitlistResult = await checkWaitlistAccessInternal(email);
+
+    if (waitlistResult.status === 'new' || !waitlistResult.status) {
+      return {
+        state: UserState.NEEDS_WAITLIST_SUBMISSION,
+        clerkUserId,
+        dbUserId: null,
+        profileId: null,
+        redirectTo: '/waitlist',
+        context: { ...baseContext, email },
+      };
+    }
+
+    waitlistEntryId = waitlistResult.entryId ?? undefined;
   }
 
-  // Create the user
+  // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
     clerkUserId,
     email,
-    waitlistResult.entryId ?? undefined
+    waitlistEntryId
   );
 
   if (!newUserId) {
@@ -286,7 +304,7 @@ async function handleMissingDbUser(
       {
         clerkUserId,
         email,
-        waitlistEntryId: waitlistResult.entryId,
+        waitlistEntryId,
         context: 'resolveUserState',
       }
     );

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
@@ -132,6 +133,35 @@ export function useOnboardingSubmit({
           handle: resolvedHandle,
           completion_time: new Date().toISOString(),
         });
+
+        // Auto-connect Spotify artist from homepage search (fire-and-forget)
+        try {
+          const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
+          const artistName =
+            sessionStorage.getItem('jovie_signup_artist_name') ?? '';
+
+          if (spotifyUrl) {
+            const artistMatch =
+              /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(
+                spotifyUrl
+              );
+            if (artistMatch?.[1]) {
+              const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
+              // Fire-and-forget: releases will import in the background
+              connectSpotifyArtist({
+                spotifyArtistId: artistMatch[1],
+                spotifyArtistUrl: normalizedUrl,
+                artistName,
+              }).catch(() => {
+                // Silently ignore — user can always connect manually
+              });
+            }
+            sessionStorage.removeItem('jovie_signup_spotify_url');
+            sessionStorage.removeItem('jovie_signup_artist_name');
+          }
+        } catch {
+          // sessionStorage access may fail — non-critical
+        }
 
         goToNextStep();
       } catch (error) {

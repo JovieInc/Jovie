@@ -40,6 +40,8 @@ export const PLAN_LIMITS = {
     aiCanUseTools: false,
     // Verification
     canBeVerified: false,
+    // Smart links (5 oldest releases free, rest gated)
+    smartLinksLimit: 5,
   },
   pro: {
     analyticsRetentionDays: 90,
@@ -53,6 +55,8 @@ export const PLAN_LIMITS = {
     aiCanUseTools: true,
     // Verification
     canBeVerified: true,
+    // Smart links
+    smartLinksLimit: null, // unlimited
   },
   growth: {
     analyticsRetentionDays: 365,
@@ -66,6 +70,8 @@ export const PLAN_LIMITS = {
     aiCanUseTools: true,
     // Verification
     canBeVerified: true,
+    // Smart links
+    smartLinksLimit: null, // unlimited
   },
 } as const;
 

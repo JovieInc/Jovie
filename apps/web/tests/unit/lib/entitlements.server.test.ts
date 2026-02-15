@@ -55,6 +55,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
+      smartLinksLimit: 5,
     });
   });
 
@@ -152,6 +153,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
+      smartLinksLimit: 5,
     });
   });
 
@@ -190,6 +192,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: true,
       analyticsRetentionDays: 90,
       contactsLimit: null,
+      smartLinksLimit: null,
     });
   });
 
@@ -228,6 +231,7 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: true,
       analyticsRetentionDays: 365,
       contactsLimit: null,
+      smartLinksLimit: null,
     });
   });
 

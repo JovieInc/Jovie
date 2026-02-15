@@ -205,9 +205,9 @@ export function MethodSelector({
       <p className={FORM_LAYOUT.footerHint}>
         {mode === 'signin' ? (
           <>
-            Don&apos;t have access?{' '}
-            <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
-              Join the waitlist
+            Don&apos;t have an account?{' '}
+            <Link href='/signup' className={FOOTER_LINK_CLASSES}>
+              Create an account
             </Link>
           </>
         ) : (
