@@ -558,7 +558,7 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
 }): Promise<string | null> {
   const providers = (params.targetProviders ?? ['apple_music'])
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
 
@@ -671,4 +671,68 @@ export async function enqueueDspTrackEnrichmentJob(params: {
     .limit(1);
 
   return winner?.id ?? null;
+}
+
+/**
+ * Enqueue a MusicFetch enrichment job.
+ *
+ * Looks up an artist via MusicFetch.io to discover cross-platform
+ * DSP profiles (Apple Music, Deezer, Tidal, etc.) and social links
+ * (Instagram, TikTok, etc.) in a single API call.
+ *
+ * Triggered after a user connects their Spotify artist profile.
+ *
+ * @param params - Job parameters
+ * @returns Job ID if created, null if deduplicated
+ */
+export async function enqueueMusicFetchEnrichmentJob(params: {
+  creatorProfileId: string;
+  spotifyUrl: string;
+}): Promise<string | null> {
+  const dedupKey = `musicfetch_enrichment:${params.creatorProfileId}`;
+
+  const payload = {
+    creatorProfileId: params.creatorProfileId,
+    spotifyUrl: params.spotifyUrl,
+    dedupKey,
+  };
+
+  // Fast-path: check if a job already exists for this profile
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
+  const result = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'musicfetch_enrichment',
+      payload,
+      dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 1, // Higher priority for user-triggered enrichment
+      attempts: 0,
+    })
+    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+    .returning({ id: ingestionJobs.id });
+
+  if (result.length > 0) {
+    return result[0].id;
+  }
+
+  // Race condition: another concurrent insert won
+  const [mfWinner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .limit(1);
+
+  return mfWinner?.id ?? null;
 }

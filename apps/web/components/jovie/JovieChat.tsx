@@ -40,8 +40,7 @@ function getActiveToolLabel(
       const part = msg.parts[j];
       if (
         part.type === 'tool-invocation' &&
-        part.toolInvocation &&
-        part.toolInvocation.state === 'call'
+        part.toolInvocation?.state === 'call'
       ) {
         return TOOL_LABELS[part.toolInvocation.toolName] ?? 'Working on it...';
       }

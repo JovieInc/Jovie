@@ -295,7 +295,11 @@ export async function GET(request: NextRequest) {
     // Probabilistic cleanup (10% of requests) to amortize cost.
     // Full cleanup on every request is O(n log n) due to sorting;
     // at 30 req/min this saves ~27 unnecessary cleanups per minute.
-    if (Math.random() < 0.1 || searchCache.size > MAX_CACHE_SIZE || rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    if (
+      Math.random() < 0.1 ||
+      searchCache.size > MAX_CACHE_SIZE ||
+      rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES
+    ) {
       cleanupSearchCache();
       cleanupRateLimitMap();
     }
