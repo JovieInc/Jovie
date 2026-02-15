@@ -188,7 +188,7 @@ export async function updateAllowProfilePhotoDownloads(
   try {
     const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
 
-    await db
+    const [updated] = await db
       .update(creatorProfiles)
       .set({
         settings: {
@@ -197,7 +197,12 @@ export async function updateAllowProfilePhotoDownloads(
         },
         updatedAt: new Date(),
       })
-      .where(eq(creatorProfiles.id, profile.id));
+      .where(eq(creatorProfiles.id, profile.id))
+      .returning({ id: creatorProfiles.id });
+
+    if (!updated) {
+      throw new Error('Profile update failed — profile not found');
+    }
 
     // Invalidate cached public profile so visitors see the updated setting
     if (profile.usernameNormalized) {

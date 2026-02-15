@@ -16,6 +16,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { Download } from 'lucide-react';
 import { useCallback } from 'react';
 import { track } from '@/lib/analytics';
@@ -92,7 +93,10 @@ export function ProfilePhotoContextMenu({
           size: size.key,
         });
 
-        const response = await fetch(size.url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+        const response = await fetch(size.url, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -113,7 +117,11 @@ export function ProfilePhotoContextMenu({
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
-      } catch {
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { feature: 'profile_photo_download' },
+          extra: { sizeKey: size.key, url: size.url },
+        });
         // Fallback: open in new tab
         globalThis.open(size.url, '_blank');
       }
