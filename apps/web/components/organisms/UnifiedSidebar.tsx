@@ -35,34 +35,11 @@ import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { useProfileData } from '@/hooks/useProfileData';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
-}
-
-/**
- * Extract profile data from dashboard context
- */
-function useProfileData(isDashboardOrAdmin: boolean) {
-  const dashboardDataRaw = useDashboardData();
-  const dashboardData = isDashboardOrAdmin ? dashboardDataRaw : null;
-
-  const username = dashboardData
-    ? (dashboardData.selectedProfile?.usernameNormalized ??
-      dashboardData.selectedProfile?.username)
-    : undefined;
-
-  return {
-    username,
-    profileHref: username ? `/${username}` : undefined,
-    displayName: dashboardData
-      ? dashboardData.selectedProfile?.displayName?.trim() ||
-        dashboardData.selectedProfile?.username ||
-        'Your profile'
-      : 'Your profile',
-    avatarUrl: dashboardData?.selectedProfile?.avatarUrl,
-  };
 }
 
 /** Render a group of nav items */

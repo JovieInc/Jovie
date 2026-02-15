@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from '@jovie/ui';
+import { Sheet, SheetContent, SheetTitle } from '@jovie/ui';
 import { LogOut, Settings, User } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -23,21 +19,14 @@ export interface MobileProfileDrawerProps {
  * Renders an avatar trigger button (for the header) and a Sheet that slides
  * in from the right showing the user profile card and key actions.
  */
-export function MobileProfileDrawer({
-  profileHref,
-}: MobileProfileDrawerProps) {
+export function MobileProfileDrawer({ profileHref }: MobileProfileDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const {
-    isLoaded,
-    user,
-    userInfo,
-    menuActions,
-    billingStatus,
-  } = useUserButton({
-    profileHref,
-    settingsHref: APP_ROUTES.SETTINGS,
-  });
+  const { isLoaded, user, userInfo, menuActions, billingStatus } =
+    useUserButton({
+      profileHref,
+      settingsHref: APP_ROUTES.SETTINGS,
+    });
 
   const { userImageUrl, displayName, userInitials, formattedUsername } =
     userInfo;
@@ -129,7 +118,8 @@ export function MobileProfileDrawer({
               type='button'
               onClick={() => {
                 setIsOpen(false);
-                handleSettings();
+                // Allow sheet to begin closing before navigation
+                setTimeout(handleSettings, 150);
               }}
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',

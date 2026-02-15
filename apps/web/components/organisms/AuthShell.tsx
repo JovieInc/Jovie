@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
@@ -13,6 +12,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { useTablePanel } from '@/contexts/TablePanelContext';
+import { useProfileData } from '@/hooks/useProfileData';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -48,15 +48,10 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
   const tablePanel = useTablePanel();
-  const dashboardData = useDashboardData();
   const isDashboardOrAdmin = section !== 'settings';
 
-  // Build profile link for the mobile profile drawer
-  const username = isDashboardOrAdmin
-    ? (dashboardData.selectedProfile?.usernameNormalized ??
-      dashboardData.selectedProfile?.username)
-    : undefined;
-  const profileHref = username ? `/${username}` : undefined;
+  // Use shared hook for profile data (eliminates duplication with UnifiedSidebar)
+  const { profileHref } = useProfileData(isDashboardOrAdmin);
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
