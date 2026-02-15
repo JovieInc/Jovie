@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, ExternalLink, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
@@ -89,7 +89,7 @@ export function SidebarLinkRow({
           )}
           aria-label={`Remove ${label}`}
         >
-          <X className='h-4 w-4' aria-hidden='true' />
+          <Trash2 className='h-4 w-4' aria-hidden='true' />
         </button>
       )}
     </>
@@ -100,11 +100,11 @@ export function SidebarLinkRow({
       itemId={`sidebar-${label}`}
       actions={swipeActions}
       actionsWidth={swipeActionsWidth}
-      className='rounded-md'
+      className='lg:rounded-md'
     >
       <div
         className={cn(
-          'group flex items-center justify-between rounded-md py-0.5 bg-base hover:bg-sidebar-surface-hover transition-colors',
+          'group flex items-center justify-between lg:rounded-md px-3 py-1.5 bg-base hover:bg-sidebar-surface-hover transition-colors',
           className
         )}
         data-testid={testId}
@@ -152,7 +152,7 @@ export function SidebarLinkRow({
               className={cn(ACTION_BUTTON_CLASS, 'disabled:opacity-50')}
               aria-label={`Remove ${label}`}
             >
-              <X className='h-4 w-4' aria-hidden='true' />
+              <Trash2 className='h-4 w-4' aria-hidden='true' />
             </button>
           )}
         </div>
