@@ -78,10 +78,12 @@ export function ProfileNotificationsMenu({
 
   const handleContentToggle = useCallback(
     (key: NotificationContentType) => {
+      // Guard: no subscribed channel → nothing to update
+      if (!subscriptionDetails.email && !subscriptionDetails.sms) return;
+
       setContentPrefs(prev => {
         const next = { ...prev, [key]: !prev[key] };
 
-        // Fire-and-forget persist to server
         updatePrefsMutation.mutate({
           artistId,
           email: subscriptionDetails.email,
@@ -232,9 +234,8 @@ export function ProfileNotificationsMenu({
               </div>
               <Switch
                 checked={contentPrefs[key]}
-                onCheckedChange={() => handleContentToggle(key)}
                 aria-label={`${label} notifications`}
-                className='shrink-0'
+                className='shrink-0 pointer-events-none'
               />
             </DropdownMenuItem>
           ))}
