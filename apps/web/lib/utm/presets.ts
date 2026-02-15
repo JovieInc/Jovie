@@ -75,6 +75,42 @@ const SOCIAL_PRESETS: UTMPreset[] = [
     },
   },
   {
+    id: 'tiktok-sound',
+    label: 'TikTok Sound Campaign',
+    description: 'Influencer use-this-sound link for TikTok',
+    icon: 'Music2',
+    params: {
+      utm_source: 'tiktok',
+      utm_medium: 'sound',
+      utm_campaign: '{{release_slug}}',
+      utm_content: 'use_sound',
+    },
+  },
+  {
+    id: 'reels-sound',
+    label: 'Instagram Reels Sound',
+    description: 'Influencer use-this-sound link for Reels',
+    icon: 'Instagram',
+    params: {
+      utm_source: 'instagram',
+      utm_medium: 'sound',
+      utm_campaign: '{{release_slug}}',
+      utm_content: 'use_sound',
+    },
+  },
+  {
+    id: 'shorts-sound',
+    label: 'YouTube Shorts Sound',
+    description: 'Influencer use-this-sound link for Shorts',
+    icon: 'Youtube',
+    params: {
+      utm_source: 'youtube',
+      utm_medium: 'sound',
+      utm_campaign: '{{release_slug}}',
+      utm_content: 'use_sound',
+    },
+  },
+  {
     id: 'twitter-post',
     label: 'Twitter/X Post',
     description: 'Tweet with link',
@@ -716,6 +752,7 @@ export const COMMON_UTM_MEDIUMS = [
   'discovery_mode',
   'text',
   'ad',
+  'sound',
 ] as const;
 
 /**

@@ -43,6 +43,8 @@ interface ReleaseLandingPageProps
     readonly artworkSizes?: Record<string, string> | null;
     /** Whether the artist allows artwork downloads on public pages */
     readonly allowDownloads?: boolean;
+    /** URL to the /sounds page, shown when video provider links exist */
+    readonly soundsUrl?: string | null;
   }> {}
 
 export function ReleaseLandingPage({
@@ -51,6 +53,7 @@ export function ReleaseLandingPage({
   providers,
   artworkSizes,
   allowDownloads = false,
+  soundsUrl,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -169,6 +172,25 @@ export function ReleaseLandingPage({
                 );
               })}
             </div>
+
+            {/* "Use this sound" CTA for short-form video platforms */}
+            {soundsUrl && (
+              <div className='pt-1'>
+                <Link
+                  href={soundsUrl}
+                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
+                >
+                  <Icon
+                    name='Sparkles'
+                    className='h-4 w-4 text-white/60 transition-colors group-hover:text-white/80'
+                    aria-hidden='true'
+                  />
+                  <span className='text-[14px] font-semibold text-white/80 transition-colors group-hover:text-white/95'>
+                    Use this sound
+                  </span>
+                </Link>
+              </div>
+            )}
 
             {/* Empty state if no providers */}
             {clickableProviders.length === 0 && (
