@@ -8,21 +8,25 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { publicEnv } from '@/lib/env-public';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
+
+/** Known Vercel project prefixes for this workspace. */
+const VERCEL_PROJECT_PREFIXES = ['jovie-', 'shouldimake-'] as const;
 
 /**
  * Builds the set of allowed hostnames for avatar uploads.
  * Includes:
  * - localhost for development
  * - The hostname from NEXT_PUBLIC_APP_URL (e.g., jov.ie)
- * - Any configured NEXT_PUBLIC_PROFILE_HOSTNAME
+ * - The normalized NEXT_PUBLIC_PROFILE_HOSTNAME
  */
 function buildAllowedHostnames(): Set<string> {
   const allowed = new Set<string>(['localhost']);
 
   // Add hostname from NEXT_PUBLIC_APP_URL
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
   if (appUrl) {
     try {
       const parsed = new URL(appUrl);
@@ -32,21 +36,28 @@ function buildAllowedHostnames(): Set<string> {
     }
   }
 
-  // Add NEXT_PUBLIC_PROFILE_HOSTNAME if set
-  const profileHostname = process.env.NEXT_PUBLIC_PROFILE_HOSTNAME;
+  // Add NEXT_PUBLIC_PROFILE_HOSTNAME — normalize in case it includes protocol/port
+  const profileHostname = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
   if (profileHostname) {
-    allowed.add(profileHostname);
+    try {
+      const parsed = new URL(`https://${profileHostname}`);
+      allowed.add(parsed.hostname);
+    } catch {
+      // Already a bare hostname — use as-is
+      allowed.add(profileHostname);
+    }
   }
 
   return allowed;
 }
 
 /**
- * Checks if a hostname is a Vercel preview deployment.
- * Matches patterns like: project-git-branch-team.vercel.app
+ * Checks if a hostname is a known Vercel preview deployment for this project.
+ * Only matches our specific project prefixes, not arbitrary .vercel.app domains.
  */
 function isVercelPreviewHostname(hostname: string): boolean {
-  return hostname.endsWith('.vercel.app');
+  if (!hostname.endsWith('.vercel.app')) return false;
+  return VERCEL_PROJECT_PREFIXES.some(prefix => hostname.startsWith(prefix));
 }
 
 /**
