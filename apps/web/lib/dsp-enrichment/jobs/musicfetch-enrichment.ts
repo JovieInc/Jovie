@@ -60,26 +60,48 @@ export interface MusicFetchEnrichmentResult {
 // DSP Mapping
 // ============================================================================
 
+/** DSP ID extraction mappings: serviceKey → profile field + extractor */
+const DSP_ID_MAPPINGS: Array<{
+  serviceKey: string;
+  idField: keyof DspProfileFields;
+  extractor: (url: string) => string | null;
+}> = [
+  { serviceKey: 'deezer', idField: 'deezerId', extractor: extractDeezerId },
+  { serviceKey: 'tidal', idField: 'tidalId', extractor: extractTidalId },
+  {
+    serviceKey: 'soundcloud',
+    idField: 'soundcloudId',
+    extractor: extractSoundcloudId,
+  },
+  {
+    serviceKey: 'youtubeMusic',
+    idField: 'youtubeMusicId',
+    extractor: extractYoutubeMusicId,
+  },
+];
+
+type DspProfileFields = {
+  appleMusicUrl: string | null;
+  appleMusicId: string | null;
+  youtubeUrl: string | null;
+  youtubeMusicId: string | null;
+  deezerId: string | null;
+  tidalId: string | null;
+  soundcloudId: string | null;
+};
+
 /**
  * Map MusicFetch services to creator profile DSP fields.
  * Only sets fields that are currently null — never overwrites existing values.
  */
 function mapDspFields(
   result: MusicFetchArtistResult,
-  existingProfile: {
-    appleMusicUrl: string | null;
-    appleMusicId: string | null;
-    youtubeUrl: string | null;
-    youtubeMusicId: string | null;
-    deezerId: string | null;
-    tidalId: string | null;
-    soundcloudId: string | null;
-  }
+  existingProfile: DspProfileFields
 ): Record<string, string> {
   const updates: Record<string, string> = {};
   const services = result.services;
 
-  // Apple Music
+  // Apple Music (special case: has both URL and ID fields)
   if (services.appleMusic?.url) {
     if (!existingProfile.appleMusicId) {
       const id = extractAppleMusicId(services.appleMusic.url);
@@ -92,41 +114,22 @@ function mapDspFields(
     }
   }
 
-  // Deezer
-  if (!existingProfile.deezerId && services.deezer?.url) {
-    const id = extractDeezerId(services.deezer.url);
-    if (id) {
-      updates.deezerId = id;
+  // Extract IDs for DSPs with ID-only fields (data-driven)
+  for (const mapping of DSP_ID_MAPPINGS) {
+    const service = services[mapping.serviceKey];
+    if (!existingProfile[mapping.idField] && service?.url) {
+      const id = mapping.extractor(service.url);
+      if (id) {
+        updates[mapping.idField] = id;
+      }
     }
   }
 
-  // Tidal
-  if (!existingProfile.tidalId && services.tidal?.url) {
-    const id = extractTidalId(services.tidal.url);
-    if (id) {
-      updates.tidalId = id;
-    }
-  }
-
-  // SoundCloud
-  if (!existingProfile.soundcloudId && services.soundcloud?.url) {
-    const id = extractSoundcloudId(services.soundcloud.url);
-    if (id) {
-      updates.soundcloudId = id;
-    }
-  }
-
-  // YouTube / YouTube Music
+  // YouTube URL (fallback to YouTube Music if main YouTube unavailable)
   if (!existingProfile.youtubeUrl) {
     const ytUrl = services.youtube?.url || services.youtubeMusic?.url;
     if (ytUrl) {
       updates.youtubeUrl = ytUrl;
-    }
-  }
-  if (!existingProfile.youtubeMusicId && services.youtubeMusic?.url) {
-    const id = extractYoutubeMusicId(services.youtubeMusic.url);
-    if (id) {
-      updates.youtubeMusicId = id;
     }
   }
 
