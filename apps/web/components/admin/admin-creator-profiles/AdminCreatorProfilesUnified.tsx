@@ -12,12 +12,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -338,28 +337,21 @@ export function AdminCreatorProfilesUnified({
     return cn('group', getSelectionClass());
   }, []);
 
-  // Register right panel with AuthShell instead of rendering inline
+  // Register right panel with AuthShell instead of rendering inline.
+  // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
   const sidebarPanel = useMemo(
     () => (
-      <RightDrawer
+      <ContactSidebar
+        contact={effectiveContact}
+        mode={mode}
         isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-      >
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <ContactSidebar
-            contact={effectiveContact}
-            mode={mode}
-            isOpen={sidebarOpen && Boolean(effectiveContact)}
-            onClose={handleSidebarClose}
-            onRefresh={handleSidebarRefresh}
-            onContactChange={handleContactChange}
-            onSave={saveContact}
-            isSaving={isSaving}
-            onAvatarUpload={handleAvatarUpload}
-          />
-        </div>
-      </RightDrawer>
+        onClose={handleSidebarClose}
+        onRefresh={handleSidebarRefresh}
+        onContactChange={handleContactChange}
+        onSave={saveContact}
+        isSaving={isSaving}
+        onAvatarUpload={handleAvatarUpload}
+      />
     ),
     [
       sidebarOpen,

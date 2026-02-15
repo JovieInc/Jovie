@@ -11,8 +11,13 @@ import { useSetTablePanel } from '@/contexts/TablePanelContext';
 export function useRegisterTablePanel(panel: ReactNode) {
   const setPanel = useSetTablePanel();
 
+  // Update panel content on every change
   useEffect(() => {
     setPanel(panel);
-    return () => setPanel(null);
   }, [panel, setPanel]);
+
+  // Only clear on unmount — avoids flicker when panel dependencies change
+  useEffect(() => {
+    return () => setPanel(null);
+  }, [setPanel]);
 }
