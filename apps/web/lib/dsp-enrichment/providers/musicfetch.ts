@@ -97,10 +97,10 @@ export async function fetchArtistBySpotifyUrl(
 
   const url = `${MUSICFETCH_API_BASE}/url?${params.toString()}`;
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+  try {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -109,8 +109,6 @@ export async function fetchArtistBySpotifyUrl(
       },
       signal: controller.signal,
     });
-
-    clearTimeout(timeout);
 
     if (response.status === 429) {
       logger.warn('MusicFetch rate limit hit', {
@@ -148,6 +146,8 @@ export async function fetchArtistBySpotifyUrl(
       });
     }
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -80,10 +80,12 @@ function mapDspFields(
   const services = result.services;
 
   // Apple Music
-  if (!existingProfile.appleMusicId && services.appleMusic?.url) {
-    const id = extractAppleMusicId(services.appleMusic.url);
-    if (id) {
-      updates.appleMusicId = id;
+  if (services.appleMusic?.url) {
+    if (!existingProfile.appleMusicId) {
+      const id = extractAppleMusicId(services.appleMusic.url);
+      if (id) {
+        updates.appleMusicId = id;
+      }
     }
     if (!existingProfile.appleMusicUrl) {
       updates.appleMusicUrl = services.appleMusic.url;

@@ -670,10 +670,35 @@ export async function connectSpotifyArtist(params: {
 
     // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)
     // Fire-and-forget: enrichment runs in background via ingestion job queue
+    // Normalize Spotify URL or construct from artist ID
+    const normalizedSpotifyUrl = (() => {
+      const raw = params.spotifyArtistUrl.trim();
+      try {
+        const parsed = new URL(raw);
+        const hostOk =
+          parsed.hostname === 'open.spotify.com' ||
+          parsed.hostname === 'spotify.com' ||
+          parsed.hostname.endsWith('.spotify.com');
+        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+        if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
+        return parsed.toString();
+      } catch {
+        return null;
+      }
+    })();
+
+    const spotifyUrlForEnrichment =
+      normalizedSpotifyUrl ??
+      `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+
     void enqueueMusicFetchEnrichmentJob({
       creatorProfileId: profile.id,
-      spotifyUrl: params.spotifyArtistUrl,
-    }).catch(() => {
+      spotifyUrl: spotifyUrlForEnrichment,
+    }).catch(error => {
+      void captureError('MusicFetch enrichment enqueue failed', error, {
+        action: 'connectSpotifyArtist',
+        creatorProfileId: profile.id,
+      });
       // Enrichment can be retried later; don't fail the connection
     });
 
