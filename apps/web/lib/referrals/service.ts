@@ -94,11 +94,16 @@ export async function getOrCreateReferralCode(
         throw error;
       }
 
-      // Another request won the race — re-check for the existing code
+      // Another request won the race — re-check for the existing active code
       const raceWinner = await db
         .select({ code: referralCodes.code })
         .from(referralCodes)
-        .where(eq(referralCodes.userId, userId))
+        .where(
+          and(
+            eq(referralCodes.userId, userId),
+            eq(referralCodes.isActive, true)
+          )
+        )
         .limit(1);
 
       if (raceWinner.length > 0) {
@@ -134,6 +139,7 @@ export async function getOrCreateReferralCode(
 export async function lookupReferralCode(
   code: string
 ): Promise<{ referrerUserId: string; referralCodeId: string } | null> {
+  const normalizedCode = code.trim().toLowerCase();
   const result = await db
     .select({
       userId: referralCodes.userId,
@@ -142,7 +148,7 @@ export async function lookupReferralCode(
     .from(referralCodes)
     .where(
       and(
-        eq(referralCodes.code, code.toLowerCase()),
+        eq(referralCodes.code, normalizedCode),
         eq(referralCodes.isActive, true)
       )
     )
