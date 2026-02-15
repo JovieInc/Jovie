@@ -12,6 +12,7 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -135,7 +136,11 @@ function AuthShellWrapperInner({
             showMobileTabs={config.showMobileTabs}
             isTableRoute={config.isTableRoute}
             previewPanel={
-              previewEnabled ? <ProfileContactSidebar /> : undefined
+              previewEnabled ? (
+                <ErrorBoundary fallback={null}>
+                  <ProfileContactSidebar />
+                </ErrorBoundary>
+              ) : undefined
             }
             onSidebarOpenChange={
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined

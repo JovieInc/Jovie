@@ -7,7 +7,7 @@
     "version.json"
   ],
   "ui": "tui",
-  "daemon": true,
+  "daemon": false,
   "remoteCache": {
     "enabled": true
   },

@@ -2,7 +2,7 @@
 
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
@@ -25,7 +25,8 @@ export interface ProfileLinkListProps {
   readonly onRemoveLink?: (linkId: string) => void;
 }
 
-function getLinkSection(platform: string): LinkSection {
+function getLinkSection(platform: string | undefined): LinkSection {
+  if (!platform) return 'custom';
   const category = getPlatformCategory(platform);
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
@@ -68,6 +69,7 @@ const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
 };
 
 function formatPlatformName(platform: string): string {
+  if (!platform) return 'Link';
   const lower = platform.toLowerCase();
   if (PLATFORM_DISPLAY_LABELS[lower]) {
     return PLATFORM_DISPLAY_LABELS[lower];
@@ -83,6 +85,11 @@ interface LinkItemProps {
 
 function LinkItem({ link, onRemove }: LinkItemProps) {
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -103,13 +110,15 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
     onRemove?.(link.id);
   }, [link.id, onRemove]);
 
-  const platformName = formatPlatformName(link.platform);
+  const platform = link.platform || 'unknown';
+  const platformName = formatPlatformName(platform);
 
-  // Get platform brand color
-  const iconMeta = getPlatformIconMetadata(link.platform);
+  // Get platform brand color - only apply theme-dependent styles after mount
+  // to avoid hydration mismatches (resolvedTheme is undefined during SSR)
+  const iconMeta = getPlatformIconMetadata(platform);
   const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
 
   const swipeActionsWidth = onRemove ? 132 : 88;
 
@@ -167,12 +176,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
           <span
             className='shrink-0'
             style={
-              brandColor
+              mounted && brandColor
                 ? { color: getContrastSafeIconColor(brandColor, isDark) }
                 : undefined
             }
           >
-            <SocialIcon platform={link.platform} className='h-4 w-4' />
+            <SocialIcon platform={platform} className='h-4 w-4' />
           </span>
           <span className='text-sm font-medium text-primary-token truncate'>
             {platformName}
