@@ -24,7 +24,7 @@ export function AccountDashboard() {
         <div className='bg-surface-1 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <CreditCard className='h-8 w-8 text-blue-500' />
+              <CreditCard className='h-8 w-8 text-[var(--accent-analytics)]' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-primary-token'>
@@ -46,7 +46,7 @@ export function AccountDashboard() {
         <div className='bg-surface-1 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <User className='h-8 w-8 text-green-500' />
+              <User className='h-8 w-8 text-[var(--accent-speed)]' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-primary-token'>
@@ -68,7 +68,7 @@ export function AccountDashboard() {
         <div className='bg-surface-1 shadow rounded-lg p-6'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <Settings className='h-8 w-8 text-purple-500' />
+              <Settings className='h-8 w-8 text-[var(--accent-conv)]' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-primary-token'>

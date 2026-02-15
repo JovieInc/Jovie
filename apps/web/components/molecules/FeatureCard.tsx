@@ -46,10 +46,9 @@ function getCardHoverConfig(
 ): MotionProps['whileHover'] {
   if (!interactive) return undefined;
   return reducedMotion
-    ? { boxShadow: '0 4px 6px -1px var(--shadow-color, rgba(0, 0, 0, 0.1))' }
+    ? { boxShadow: 'var(--shadow-sm)' }
     : {
-        boxShadow:
-          '0 10px 25px -5px var(--shadow-color, rgba(0, 0, 0, 0.1)), 0 10px 10px -5px var(--shadow-color, rgba(0, 0, 0, 0.04))',
+        boxShadow: 'var(--shadow-lg)',
       };
 }
 
