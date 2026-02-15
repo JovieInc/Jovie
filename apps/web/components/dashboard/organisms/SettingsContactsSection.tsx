@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AlertCircle, Loader2, Plus, UserPlus } from 'lucide-react';
+import { AlertCircle, Plus, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -11,6 +11,7 @@ import {
 } from '@/components/dashboard/hooks/useContactsManager';
 import { ContactDetailSidebar } from '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
   getContactRoleLabel,
   summarizeTerritories,
@@ -39,12 +40,7 @@ export function SettingsContactsSection({
   if (isLoading) {
     return (
       <DashboardCard variant='settings'>
-        <div className='flex items-center justify-center py-8'>
-          <Loader2 className='h-5 w-5 animate-spin text-secondary-token' />
-          <span className='ml-2 text-sm text-secondary-token'>
-            Loading contacts...
-          </span>
-        </div>
+        <ContactsSectionSkeleton />
       </DashboardCard>
     );
   }
