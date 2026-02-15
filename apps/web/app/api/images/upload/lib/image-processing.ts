@@ -63,6 +63,78 @@ export async function optimizeImageToAvif(file: File): Promise<{
   };
 }
 
+/** Avatar download size presets (square, no upscaling) */
+const AVATAR_DOWNLOAD_SIZES = [512, 256, 128] as const;
+const AVATAR_MAX_DIMENSION = 1536;
+const AVATAR_AVIF_QUALITY = 70;
+
+/**
+ * Process an avatar image into multiple download sizes, mirroring
+ * the album-art multi-size pipeline used by processArtworkToSizes.
+ *
+ * Returns a map of `{ original, '512', '256', '128' }` → Buffer.
+ */
+export async function processAvatarToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  const sharp = await getSharp();
+  const inputBuffer = await fileToBuffer(file);
+  const baseImage = sharp(inputBuffer, { failOnError: false })
+    .rotate()
+    .withMetadata({ orientation: undefined });
+
+  const metadata = await baseImage.metadata();
+  const originalWidth = metadata.width ?? AVATAR_MAX_DIMENSION;
+  const originalHeight = metadata.height ?? AVATAR_MAX_DIMENSION;
+
+  const results: Record<string, Buffer> = {};
+
+  // Original: capped at 1536px, no upscaling
+  const maxDim = Math.max(originalWidth, originalHeight);
+  const originalResize =
+    maxDim > AVATAR_MAX_DIMENSION ? AVATAR_MAX_DIMENSION : undefined;
+
+  let originalPipeline = baseImage.clone();
+  if (originalResize) {
+    originalPipeline = originalPipeline.resize({
+      width: originalResize,
+      height: originalResize,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+  const { data: originalData } = await originalPipeline
+    .toColourspace('srgb')
+    .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
+
+  results.original = originalData;
+
+  // Generate each download size (square crop, no upscaling)
+  for (const size of AVATAR_DOWNLOAD_SIZES) {
+    if (originalWidth < size && originalHeight < size) {
+      continue;
+    }
+
+    const { data } = await baseImage
+      .clone()
+      .resize({
+        width: size,
+        height: size,
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: AVATAR_AVIF_QUALITY, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+
+    results[String(size)] = data;
+  }
+
+  return results;
+}
+
 export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
