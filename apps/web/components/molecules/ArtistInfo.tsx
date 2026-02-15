@@ -88,7 +88,7 @@ export function ArtistInfo({
         {linkToProfile ? (
           <Link
             href={`/${artist.handle}`}
-            className='rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2'
+            className='rounded-full focus-ring-themed'
             aria-label={`Go to ${artist.name}'s profile`}
           >
             {avatarContent}
