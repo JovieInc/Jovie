@@ -7,7 +7,15 @@ export type ProviderKey =
   | 'tidal'
   | 'amazon_music'
   | 'bandcamp'
-  | 'beatport';
+  | 'beatport'
+  | 'pandora'
+  | 'napster'
+  | 'audiomack'
+  | 'qobuz'
+  | 'anghami'
+  | 'boomplay'
+  | 'iheartradio'
+  | 'tiktok';
 
 export type ProviderSource = 'ingested' | 'manual';
 

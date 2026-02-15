@@ -10,6 +10,7 @@
 
 import 'server-only';
 
+import { musicfetchCircuitBreaker } from '@/lib/discography/musicfetch-circuit-breaker';
 import {
   CircuitBreaker,
   type CircuitBreakerConfig,
@@ -120,6 +121,7 @@ export function getAllCircuitBreakerStats() {
     apple_music: appleMusicCircuitBreaker.getStats(),
     deezer: deezerCircuitBreaker.getStats(),
     musicbrainz: musicBrainzCircuitBreaker.getStats(),
+    musicfetch: musicfetchCircuitBreaker.getStats(),
   };
 }
 
@@ -132,4 +134,5 @@ export function resetAllCircuitBreakers() {
   appleMusicCircuitBreaker.reset();
   deezerCircuitBreaker.reset();
   musicBrainzCircuitBreaker.reset();
+  musicfetchCircuitBreaker.reset();
 }
