@@ -8,7 +8,18 @@ import { HeroSpotifySearch } from './HeroSpotifySearch';
  */
 export function RedesignedHero() {
   return (
-    <section className='relative overflow-hidden flex flex-col justify-center min-h-[calc(100dvh-56px)] pt-[clamp(40px,8vw,80px)] px-[clamp(16px,4vw,24px)] pb-[clamp(60px,10vw,120px)]'>
+    <section
+      className='relative overflow-hidden'
+      style={{
+        minHeight: 'calc(100vh - 56px)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        /* Responsive padding: tighter on mobile, spacious on desktop */
+        padding:
+          'clamp(48px, 8vh, 80px) clamp(16px, 5vw, 24px) clamp(60px, 10vh, 120px)',
+      }}
+    >
       <div
         className='relative z-10 mx-auto w-full'
         style={{ maxWidth: '1200px' }}
@@ -19,7 +30,8 @@ export function RedesignedHero() {
             className='text-balance mx-auto'
             style={{
               maxWidth: '900px',
-              fontSize: 'clamp(36px, 5.5vw, 56px)',
+              /* Responsive font-size: 28px on 375px → 40px on 768px → 56px on 1200px+ */
+              fontSize: 'clamp(28px, calc(14px + 3.5vw), 56px)',
               fontWeight: 500,
               lineHeight: 1.1,
               letterSpacing: '-0.022em',

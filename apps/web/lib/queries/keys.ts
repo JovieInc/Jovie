@@ -258,6 +258,12 @@ export const queryKeys = {
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
   },
+
+  // Ad pixel settings
+  pixels: {
+    all: ['pixels'] as const,
+    settings: () => [...queryKeys.pixels.all, 'settings'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;
