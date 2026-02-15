@@ -23,7 +23,7 @@ After the command completes, you MUST output one of the following messages:
 
 **If ALL checks passed (exit code 0):**
 
-```
+```text
 ============================================
   SHIP CHECK PASSED — This is ready to ship
 ============================================
@@ -31,7 +31,7 @@ After the command completes, you MUST output one of the following messages:
 
 **If ANY check failed (non-zero exit code):**
 
-```
+```text
 ============================================
   SHIP CHECK FAILED — Do NOT ship this
 ============================================
