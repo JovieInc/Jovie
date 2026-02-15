@@ -59,6 +59,7 @@ export type {
   DspTrackEnrichmentResult,
   // Social link types
   ExtractedSocialLink,
+  FanNotificationContentType,
   FanNotificationPreferences,
   FanReleaseNotification,
   IsrcMatchResult,

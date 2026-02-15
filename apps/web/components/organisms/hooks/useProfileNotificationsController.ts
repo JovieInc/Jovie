@@ -445,6 +445,7 @@ export function useProfileNotificationsController({
   return {
     channel,
     channelBusy,
+    contentPreferences: statusQuery.data?.contentPreferences,
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,

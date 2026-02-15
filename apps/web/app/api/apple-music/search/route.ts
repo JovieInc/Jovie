@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
 import {
   extractImageUrls,
   isAppleMusicAvailable,
@@ -226,6 +227,27 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
+    // Handle circuit breaker open error with proper 503
+    if (error instanceof CircuitOpenError) {
+      Sentry.captureException(error, {
+        tags: { source: 'apple_music_search_api' },
+        extra: { query: q, limit, circuitStats: error.stats },
+      });
+      return NextResponse.json(
+        {
+          error: 'Service temporarily unavailable',
+          code: 'SERVICE_UNAVAILABLE',
+        },
+        {
+          status: 503,
+          headers: {
+            ...rateLimitHeaders,
+            'Retry-After': RETRY_AFTER_SERVICE,
+          },
+        }
+      );
+    }
+
     Sentry.captureException(error, {
       tags: { source: 'apple_music_search_api' },
       extra: { query: q, limit },
@@ -242,7 +264,16 @@ export async function GET(request: NextRequest) {
       { status: 500, headers: rateLimitHeaders }
     );
   } finally {
-    cleanupSearchCache();
-    cleanupRateLimitMap();
+    // Probabilistic cleanup (10% of requests) to amortize cost.
+    // Full cleanup on every request is O(n log n) due to sorting;
+    // force cleanup when maps exceed size limits.
+    if (
+      Math.random() < 0.1 ||
+      searchCache.size > MAX_CACHE_SIZE ||
+      rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES
+    ) {
+      cleanupSearchCache();
+      cleanupRateLimitMap();
+    }
   }
 }

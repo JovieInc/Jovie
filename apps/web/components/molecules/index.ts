@@ -1,7 +1,6 @@
 // Atomic Design - Molecules
 // Simple combinations of atoms functioning together
 
-export { CTAButton, type CTAButtonProps } from '../atoms/CTAButton';
 export * from './ArtistCard';
 export * from './ArtistInfo';
 export * from './AuthActions';

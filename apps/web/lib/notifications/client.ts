@@ -1,6 +1,7 @@
 import type {
   NotificationApiResponse,
   NotificationChannel,
+  NotificationContentPreferences,
   NotificationErrorEnvelope,
   NotificationStatusResponse,
   NotificationSubscribeResponse,
@@ -32,6 +33,13 @@ export type NotificationStatusPayload = {
   phone?: string;
 };
 
+export type UpdateContentPreferencesPayload = {
+  artistId: string;
+  email?: string;
+  phone?: string;
+  preferences: Partial<NotificationContentPreferences>;
+};
+
 export const NOTIFICATION_COPY = {
   errors: {
     generic: 'We couldn’t update notifications. Please try again.',
@@ -48,12 +56,12 @@ export const NOTIFICATION_COPY = {
   success: {
     subscribe: {
       email:
-        "You're in. We'll email you when this artist releases something new.",
-      sms: "You're in. We'll text you when this artist releases something new.",
+        "You're in. You'll get notified when new music drops, tours are announced & more.",
+      sms: "You're in. You'll get a text when new music drops, tours are announced & more.",
     },
     unsubscribe: {
-      email: 'You’re unsubscribed from email updates.',
-      sms: 'You’re unsubscribed from text updates.',
+      email: 'You\u2019re unsubscribed from email notifications.',
+      sms: 'You\u2019re unsubscribed from text notifications.',
     },
   },
 } as const;
@@ -88,10 +96,11 @@ const requestNotifications = async <T>(
   url: string,
   payload: Record<string, unknown>,
   fallbackError: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  method: string = 'POST'
 ): Promise<T> => {
   const response = await fetch(url, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     signal,
@@ -169,3 +178,19 @@ export const getNotificationUnsubscribeSuccessMessage = (
   channel === 'sms'
     ? NOTIFICATION_COPY.success.unsubscribe.sms
     : NOTIFICATION_COPY.success.unsubscribe.email;
+
+export const updateContentPreferences = async (
+  payload: UpdateContentPreferencesPayload
+): Promise<{ success: true; updated: number }> =>
+  requestNotifications<{ success: true; updated: number }>(
+    '/api/notifications/preferences',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      phone: payload.phone,
+      preferences: payload.preferences,
+    },
+    NOTIFICATION_COPY.errors.generic,
+    undefined,
+    'PATCH'
+  );

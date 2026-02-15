@@ -131,10 +131,48 @@ export interface NotificationUnsubscribeResponse {
   message: string;
 }
 
+export interface NotificationContentPreferences {
+  newMusic?: boolean;
+  tourDates?: boolean;
+  merch?: boolean;
+  general?: boolean;
+}
+
+/**
+ * Content categories fans can subscribe to for notifications.
+ * These control *what* the fan hears about (orthogonal to *how* — email/sms).
+ */
+export type NotificationContentType = keyof NotificationContentPreferences;
+
+/** All available content types, ordered for UI display. */
+export const NOTIFICATION_CONTENT_TYPES: readonly {
+  key: NotificationContentType;
+  label: string;
+  description: string;
+}[] = [
+  {
+    key: 'newMusic',
+    label: 'New Music',
+    description: 'New releases, singles & albums',
+  },
+  {
+    key: 'tourDates',
+    label: 'Tour Dates',
+    description: 'Shows, tours & live events',
+  },
+  { key: 'merch', label: 'Merch', description: 'Drops, restocks & exclusives' },
+  {
+    key: 'general',
+    label: 'General Updates',
+    description: 'Announcements & other news',
+  },
+] as const;
+
 export interface NotificationStatusResponse {
   success: true;
   channels: NotificationSubscriptionState;
   details: NotificationContactValues;
+  contentPreferences?: NotificationContentPreferences;
 }
 
 export type NotificationApiResponse<T> = T | NotificationErrorEnvelope;

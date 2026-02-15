@@ -81,6 +81,7 @@ export function ProfileShell({
 
   const {
     channelBusy,
+    contentPreferences,
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,
@@ -102,7 +103,9 @@ export function ProfileShell({
     if (hasActiveSubscriptions) {
       return (
         <ProfileNotificationsMenu
+          artistId={artist.id}
           channelBusy={channelBusy}
+          contentPreferences={contentPreferences}
           hasActiveSubscriptions={hasActiveSubscriptions}
           notificationsState={notificationsState}
           onAddChannel={openSubscription}
