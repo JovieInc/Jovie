@@ -47,12 +47,12 @@ export async function getOrCreateReferralCode(
     return { code: existing[0].code, isNew: false };
   }
 
-  // Generate or validate custom code
-  const code = customCode?.trim() ?? generateRandomCode();
+  // Normalize customCode: treat empty/whitespace-only as no custom code
+  const trimmedCustomCode = customCode?.trim() || undefined;
+  const code = trimmedCustomCode ?? generateRandomCode();
 
-  if (customCode) {
-    const trimmed = customCode.trim();
-    const validationError = validateReferralCode(trimmed);
+  if (trimmedCustomCode) {
+    const validationError = validateReferralCode(trimmedCustomCode);
     if (validationError) {
       throw new Error(validationError);
     }
@@ -61,7 +61,7 @@ export async function getOrCreateReferralCode(
     const taken = await db
       .select({ id: referralCodes.id })
       .from(referralCodes)
-      .where(eq(referralCodes.code, trimmed.toLowerCase()))
+      .where(eq(referralCodes.code, trimmedCustomCode.toLowerCase()))
       .limit(1);
 
     if (taken.length > 0) {
@@ -112,7 +112,7 @@ export async function getOrCreateReferralCode(
 
       // If no existing code found (e.g. code collision on a different user),
       // retry with a new random code if no custom code was provided
-      if (customCode) {
+      if (trimmedCustomCode) {
         throw new Error('This referral code is already taken');
       }
 
