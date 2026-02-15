@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -20,8 +19,6 @@ import {
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
-import { Avatar } from '@/components/molecules/Avatar';
 import {
   Sidebar,
   SidebarContent,
@@ -165,62 +162,6 @@ function SettingsNavigation({
   );
 }
 
-/** Mobile profile card shown in sidebar on small screens */
-function MobileProfileCard({
-  displayName,
-  username,
-  avatarUrl,
-  profileHref,
-}: Readonly<{
-  displayName: string;
-  username: string | undefined;
-  avatarUrl: string | null | undefined;
-  profileHref: string | undefined;
-}>) {
-  return (
-    <div className='px-2 pb-3 pt-2 lg:hidden'>
-      <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-        <Avatar
-          src={avatarUrl}
-          alt={displayName}
-          name={displayName}
-          size='lg'
-          className='h-10 w-10'
-        />
-        <div className='min-w-0'>
-          <p className='truncate text-sm font-semibold text-sidebar-foreground'>
-            {displayName}
-          </p>
-          {username ? (
-            <p className='truncate text-xs text-sidebar-muted'>@{username}</p>
-          ) : null}
-        </div>
-      </div>
-      {profileHref ? (
-        <div className='mt-3 flex items-center gap-2'>
-          <Button
-            asChild
-            size='sm'
-            variant='secondary'
-            className='flex-1 min-h-[44px]'
-          >
-            <Link href={profileHref} target='_blank' rel='noopener noreferrer'>
-              View profile
-            </Link>
-          </Button>
-          <CopyToClipboardButton
-            relativePath={profileHref}
-            idleLabel='Copy link'
-            successLabel='Copied'
-            errorLabel='Copy failed'
-            className='flex-1 min-h-[44px]'
-          />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 /** Workspace button (logo + name) or back button for settings */
 function SidebarHeaderNav({
   isInSettings,
@@ -299,8 +240,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
 
-  const { username, profileHref, displayName, avatarUrl } =
-    useProfileData(isDashboardOrAdmin);
+  const { profileHref } = useProfileData(isDashboardOrAdmin);
 
   return (
     <Sidebar
@@ -319,14 +259,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
         />
-        {isDashboardOrAdmin && (
-          <MobileProfileCard
-            displayName={displayName}
-            username={username}
-            avatarUrl={avatarUrl}
-            profileHref={profileHref}
-          />
-        )}
       </SidebarHeader>
 
       <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>

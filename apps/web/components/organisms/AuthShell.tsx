@@ -1,8 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
+import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
 import {
   SidebarInset,
   SidebarProvider,
@@ -46,6 +48,15 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
   const tablePanel = useTablePanel();
+  const dashboardData = useDashboardData();
+  const isDashboardOrAdmin = section !== 'settings';
+
+  // Build profile link for the mobile profile drawer
+  const username = isDashboardOrAdmin
+    ? (dashboardData.selectedProfile?.usernameNormalized ??
+      dashboardData.selectedProfile?.username)
+    : undefined;
+  const profileHref = username ? `/${username}` : undefined;
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
@@ -64,6 +75,9 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            mobileProfileSlot={
+              <MobileProfileDrawer profileHref={profileHref} />
+            }
             showDivider={isTableRoute}
           />
         )}
