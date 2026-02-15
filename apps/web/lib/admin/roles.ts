@@ -92,22 +92,41 @@ export const isAdmin = cache(async function isAdmin(
         return cached === '1'; // '1' = admin, '0' = not admin
       }
 
-      // Cache miss - query database
-      try {
-        const isUserAdmin = await queryAdminRoleFromDB(userId);
+      // Cache miss - query database (with 1 retry for transient errors)
+      let lastDbError: unknown;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const isUserAdmin = await queryAdminRoleFromDB(userId);
 
-        // Only cache definitive DB results — never cache failure fallbacks
-        await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
-          ex: REDIS_CACHE_TTL_SECONDS,
-        });
+          // Only cache definitive DB results — never cache failure fallbacks
+          await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
+            ex: REDIS_CACHE_TTL_SECONDS,
+          });
 
-        return isUserAdmin;
-      } catch (dbError) {
-        captureError('[admin/roles] DB query failed, denying access', dbError);
-        // Fail closed but do NOT write to Redis — avoids poisoning
-        // the cache with a false negative for 60 seconds
-        return false;
+          return isUserAdmin;
+        } catch (dbError) {
+          lastDbError = dbError;
+          if (attempt === 0) {
+            await new Promise(r => setTimeout(r, 100));
+          }
+        }
       }
+
+      // Retry exhausted — check stale memory cache before hard-denying
+      const staleEntry = fallbackCache.get(userId);
+      if (staleEntry?.isAdmin) {
+        captureWarning(
+          '[admin/roles] DB query failed after retry, using stale cache',
+          { userId, expiredAt: staleEntry.expiresAt }
+        );
+        return true;
+      }
+
+      captureError(
+        '[admin/roles] DB query failed after retry, denying access',
+        lastDbError
+      );
+      return false;
     } catch (error) {
       captureWarning(
         '[admin/roles] Redis cache failed, falling back to memory',
@@ -127,25 +146,44 @@ export const isAdmin = cache(async function isAdmin(
     return memCached.isAdmin;
   }
 
-  // Query database — only cache on success
-  try {
-    const isUserAdmin = await queryAdminRoleFromDB(userId);
+  // Query database — only cache on success (with 1 retry for transient errors)
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const isUserAdmin = await queryAdminRoleFromDB(userId);
 
-    // Prune cache before adding new entry to prevent memory leaks
-    pruneFallbackCache(now);
+      // Prune cache before adding new entry to prevent memory leaks
+      pruneFallbackCache(now);
 
-    // Store in memory cache
-    fallbackCache.set(userId, {
-      isAdmin: isUserAdmin,
-      expiresAt: now + MEMORY_CACHE_TTL_MS,
-    });
+      // Store in memory cache
+      fallbackCache.set(userId, {
+        isAdmin: isUserAdmin,
+        expiresAt: now + MEMORY_CACHE_TTL_MS,
+      });
 
-    return isUserAdmin;
-  } catch (error) {
-    captureError('[admin/roles] DB query failed, denying access', error);
-    // Fail closed but do NOT write to memory cache
-    return false;
+      return isUserAdmin;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
   }
+
+  // Retry exhausted — check stale memory cache before hard-denying
+  if (memCached?.isAdmin) {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, using stale cache',
+      { userId, expiredAt: memCached.expiresAt }
+    );
+    return true;
+  }
+
+  captureError(
+    '[admin/roles] DB query failed after retry, denying access',
+    lastError
+  );
+  return false;
 });
 
 /**
