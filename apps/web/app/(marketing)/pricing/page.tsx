@@ -130,8 +130,8 @@ const PRICING_SCHEMA = JSON.stringify({
   },
 });
 
-// Shared styles for consistent structure
-const TIER_HEADER_HEIGHT = '148px'; // Consistent height for all tier headers
+// Shared styles for consistent structure - use min-height to prevent overflow on mobile
+const TIER_HEADER_MIN_HEIGHT = '148px';
 
 interface PricingTierProps {
   readonly name: string;
@@ -170,8 +170,8 @@ function PricingTier({
         boxShadow: isHighlighted ? 'var(--linear-shadow-card)' : 'none',
       }}
     >
-      {/* Header section - fixed height for alignment */}
-      <div style={{ minHeight: TIER_HEADER_HEIGHT }}>
+      {/* Header section - min-height for alignment, allows growth on mobile */}
+      <div style={{ minHeight: TIER_HEADER_MIN_HEIGHT }}>
         {/* Billing label */}
         <div
           className='mb-3 md:mb-4'
@@ -372,7 +372,7 @@ export default function PricingPage() {
               />
 
               {/* Growth Tier */}
-              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
+              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)] last:border-b-0'>
                 <PricingTier
                   name='Growth'
                   badge='Early Access'

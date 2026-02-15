@@ -11,11 +11,11 @@ export function RedesignedHero() {
     <section
       className='relative overflow-hidden'
       style={{
-        minHeight: 'calc(100vh - 56px)',
+        minHeight: 'calc(100dvh - 56px)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        padding: '80px 24px 120px',
+        padding: 'clamp(40px, 8vw, 80px) clamp(16px, 4vw, 24px) clamp(60px, 10vw, 120px)',
       }}
     >
       <div
