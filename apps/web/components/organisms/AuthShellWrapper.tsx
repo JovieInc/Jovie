@@ -20,6 +20,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
+import { TablePanelProvider } from '@/contexts/TablePanelContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -124,23 +125,27 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <PreviewPanelProvider enabled={previewEnabled}>
-        <AuthShell
-          section={config.section}
-          breadcrumbs={config.breadcrumbs}
-          headerBadge={headerBadge}
-          headerAction={headerAction}
-          showMobileTabs={config.showMobileTabs}
-          isTableRoute={config.isTableRoute}
-          previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
-          onSidebarOpenChange={
-            persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-          }
-          sidebarDefaultOpen={sidebarDefaultOpen}
-        >
-          {children}
-        </AuthShell>
-      </PreviewPanelProvider>
+      <TablePanelProvider>
+        <PreviewPanelProvider enabled={previewEnabled}>
+          <AuthShell
+            section={config.section}
+            breadcrumbs={config.breadcrumbs}
+            headerBadge={headerBadge}
+            headerAction={headerAction}
+            showMobileTabs={config.showMobileTabs}
+            isTableRoute={config.isTableRoute}
+            previewPanel={
+              previewEnabled ? <ProfileContactSidebar /> : undefined
+            }
+            onSidebarOpenChange={
+              persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+            }
+            sidebarDefaultOpen={sidebarDefaultOpen}
+          >
+            {children}
+          </AuthShell>
+        </PreviewPanelProvider>
+      </TablePanelProvider>
     </TableMetaContext.Provider>
   );
 }

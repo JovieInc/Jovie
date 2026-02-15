@@ -12,11 +12,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -241,9 +241,14 @@ export function AdminCreatorProfilesUnified({
     getId: profile => profile.id,
   });
 
-  const handleSidebarClose = () => {
+  const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
-  };
+  }, []);
+
+  const handleSidebarRefresh = useCallback(() => {
+    router.refresh();
+    refetchSocialLinks();
+  }, [router, refetchSocialLinks]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
@@ -332,9 +337,40 @@ export function AdminCreatorProfilesUnified({
     return cn('group', getSelectionClass());
   }, []);
 
+  // Register right panel with AuthShell instead of rendering inline.
+  // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
+  const sidebarPanel = useMemo(
+    () => (
+      <ContactSidebar
+        contact={effectiveContact}
+        mode={mode}
+        isOpen={sidebarOpen && Boolean(effectiveContact)}
+        onClose={handleSidebarClose}
+        onRefresh={handleSidebarRefresh}
+        onContactChange={handleContactChange}
+        onSave={saveContact}
+        isSaving={isSaving}
+        onAvatarUpload={handleAvatarUpload}
+      />
+    ),
+    [
+      sidebarOpen,
+      effectiveContact,
+      mode,
+      handleSidebarClose,
+      handleSidebarRefresh,
+      handleContactChange,
+      saveContact,
+      isSaving,
+      handleAvatarUpload,
+    ]
+  );
+
+  useRegisterTablePanel(sidebarPanel);
+
   return (
-    <div className='flex h-full min-h-0 flex-row items-stretch overflow-hidden'>
-      <div className='flex-1 min-h-0 overflow-hidden min-w-0'>
+    <>
+      <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
         <AdminTableShell
           className='rounded-none'
           scrollContainerProps={{
@@ -408,29 +444,6 @@ export function AdminCreatorProfilesUnified({
           )}
         </AdminTableShell>
       </div>
-      <RightDrawer
-        isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-        className=''
-      >
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <ContactSidebar
-            contact={effectiveContact}
-            mode={mode}
-            isOpen={sidebarOpen && Boolean(effectiveContact)}
-            onClose={handleSidebarClose}
-            onRefresh={() => {
-              router.refresh();
-              refetchSocialLinks();
-            }}
-            onContactChange={handleContactChange}
-            onSave={saveContact}
-            isSaving={isSaving}
-            onAvatarUpload={handleAvatarUpload}
-          />
-        </div>
-      </RightDrawer>
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}
@@ -468,6 +481,6 @@ export function AdminCreatorProfilesUnified({
           clearInviteProfile();
         }}
       />
-    </div>
+    </>
   );
 }

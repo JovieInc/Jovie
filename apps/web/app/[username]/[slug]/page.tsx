@@ -254,8 +254,10 @@ export default async function ContentSmartLinkPage({
   const allProviders = [...providers, ...secondaryProviders];
 
   // Check if any video provider links exist for "Use this sound"
-  const hasVideoLinks = content.providerLinks.some(link =>
-    (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+  const hasVideoLinks = content.providerLinks.some(
+    link =>
+      Boolean(link.url) &&
+      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
   );
   const soundsUrl = hasVideoLinks
     ? `/${creator.usernameNormalized}/${content.slug}/sounds`

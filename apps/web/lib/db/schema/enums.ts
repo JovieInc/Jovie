@@ -367,3 +367,21 @@ export const insightRunStatusEnum = pgEnum('insight_run_status', [
   'completed',
   'failed',
 ]);
+
+// Referral Program Enums
+export const referralStatusEnum = pgEnum('referral_status', [
+  'pending', // Referred user signed up but not yet subscribed
+  'active', // Referred user has active paid subscription
+  'churned', // Referred user cancelled their subscription
+  'expired', // Commission period ended (e.g., after 24 months)
+]);
+
+export const referralCommissionStatusEnum = pgEnum(
+  'referral_commission_status',
+  [
+    'pending', // Commission recorded, awaiting payout
+    'approved', // Commission approved for payout
+    'paid', // Commission paid out
+    'cancelled', // Commission cancelled (e.g., refund/chargeback)
+  ]
+);
