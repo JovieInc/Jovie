@@ -372,7 +372,7 @@ export default function PricingPage() {
               />
 
               {/* Growth Tier */}
-              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)] last:border-b-0'>
+              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
                 <PricingTier
                   name='Growth'
                   badge='Early Access'
