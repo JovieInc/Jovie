@@ -31,13 +31,13 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn('z-20 border-b border-subtle', className)}
     >
-      {/* Mobile: Linear-style large page title with actions */}
-      <div className='flex items-center justify-between px-4 pt-3 pb-2 sm:hidden'>
-        <h1 className='text-[22px] font-bold tracking-tight text-primary-token'>
+      {/* Mobile: Large page title with action buttons */}
+      <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
+        <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>
           {currentLabel}
         </h1>
         {action ? (
-          <div className='flex items-center gap-2 [&>button]:h-10 [&>button]:w-10 [&>button]:rounded-full [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
+          <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
             {action}
           </div>
         ) : null}

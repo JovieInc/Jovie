@@ -107,6 +107,8 @@ export {
   type ArtistThemeResponse,
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
+// Bandsintown connection status
+export { useBandsintownConnectionQuery } from './useBandsintownConnectionQuery';
 export {
   type BillingHistoryEntry,
   useBillingHistoryQuery,
