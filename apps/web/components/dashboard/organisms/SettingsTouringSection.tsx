@@ -24,8 +24,12 @@ export function SettingsTouringSection({
   profileId,
 }: SettingsTouringSectionProps) {
   const queryClient = useQueryClient();
-  const { data: connectionStatus, isLoading } =
-    useBandsintownConnectionQuery(profileId);
+  const {
+    data: connectionStatus,
+    isLoading,
+    isError,
+    refetch,
+  } = useBandsintownConnectionQuery(profileId);
 
   const [apiKey, setApiKey] = useState('');
   const [artistName, setArtistName] = useState('');
@@ -118,6 +122,15 @@ export function SettingsTouringSection({
     <DashboardCard variant='settings'>
       {isLoading ? (
         <TouringSectionSkeleton />
+      ) : isError ? (
+        <div className='flex flex-col items-center gap-2 py-6'>
+          <p className='text-sm text-secondary-token'>
+            Failed to load connection status.
+          </p>
+          <Button size='sm' variant='ghost' onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
       ) : (
         <div className='space-y-4'>
           <p className='text-sm text-secondary-token'>
