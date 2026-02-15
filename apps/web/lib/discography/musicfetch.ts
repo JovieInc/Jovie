@@ -105,10 +105,18 @@ export interface MusicfetchLookupResult {
 export class MusicfetchError extends Error {
   constructor(
     message: string,
-    public readonly statusCode?: number
+    public readonly statusCode?: number,
+    public readonly retryAfterSeconds?: number
   ) {
     super(message);
     this.name = 'MusicfetchError';
+  }
+
+  /**
+   * Whether this error is due to rate limiting (429).
+   */
+  isRateLimited(): boolean {
+    return this.statusCode === 429;
   }
 }
 
@@ -160,6 +168,26 @@ export async function lookupByIsrc(
         },
         signal: controller.signal,
       });
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const retrySeconds = retryAfter
+          ? Number.parseInt(retryAfter, 10)
+          : undefined;
+
+        Sentry.addBreadcrumb({
+          category: 'musicfetch',
+          message: `Rate limited (429), retry-after: ${retrySeconds ?? 'unknown'}s`,
+          level: 'warning',
+          data: { isrc, retryAfter: retrySeconds },
+        });
+
+        throw new MusicfetchError(
+          `Musicfetch rate limit exceeded`,
+          429,
+          Number.isNaN(retrySeconds) ? undefined : retrySeconds
+        );
+      }
 
       if (!response.ok) {
         throw new MusicfetchError(

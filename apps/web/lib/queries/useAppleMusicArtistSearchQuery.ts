@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { SEARCH_CACHE } from './cache-strategies';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface AppleMusicArtistResult {
@@ -54,21 +55,29 @@ async function fetchAppleMusicArtistSearch(
   limit: number,
   signal?: AbortSignal
 ): Promise<AppleMusicArtistResult[]> {
-  const response = await fetch(
-    `/api/apple-music/search?q=${encodeURIComponent(query)}&limit=${limit}`,
-    { signal }
-  );
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const errorCode = data?.code || 'UNKNOWN';
-    if (errorCode === 'RATE_LIMITED') {
-      throw new RangeError('Too many requests. Please wait a moment.');
+  try {
+    return await fetchWithTimeout<AppleMusicArtistResult[]>(
+      `/api/apple-music/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      { signal }
+    );
+  } catch (error) {
+    if (error instanceof FetchError) {
+      if (error.status === 429) {
+        // Non-retryable: preserve rate limit budget
+        const rateLimitError = new Error(
+          'Too many requests. Please wait a moment.'
+        );
+        rateLimitError.name = 'RateLimitError';
+        throw rateLimitError;
+      }
+      // Parse API error body for user-friendly messages
+      if (error.response) {
+        const data = await error.response.json().catch(() => ({}));
+        throw new Error(data?.error || 'Search failed');
+      }
     }
-    throw new Error(data?.error || 'Search failed');
+    throw error;
   }
-
-  return response.json();
 }
 
 export function useAppleMusicArtistSearchQuery(
@@ -108,6 +117,12 @@ export function useAppleMusicArtistSearchQuery(
       fetchAppleMusicArtistSearch(debouncedQuery, limit, signal),
     enabled: debouncedQuery.length >= minQueryLength,
     ...SEARCH_CACHE,
+    // Don't retry rate limit or client errors - only retry server/network errors
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.name === 'RateLimitError') return false;
+      if (error instanceof FetchError && !error.isRetryable()) return false;
+      return failureCount < 2;
+    },
   });
 
   const state = useMemo<AppleMusicSearchState>(() => {
