@@ -161,8 +161,6 @@ export async function lookupByIsrc(
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         throw new MusicfetchError(
           `Musicfetch API error: ${response.status}`,
@@ -195,8 +193,6 @@ export async function lookupByIsrc(
 
     return { links, raw: result.result };
   } catch (error) {
-    clearTimeout(timeoutId);
-
     Sentry.addBreadcrumb({
       category: 'musicfetch',
       message: 'ISRC lookup failed',
@@ -208,6 +204,8 @@ export async function lookupByIsrc(
     });
 
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

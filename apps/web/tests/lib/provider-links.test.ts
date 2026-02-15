@@ -22,7 +22,7 @@ describe('provider link discovery', () => {
         'https://music.apple.com/us/search?term=USUM72212345%20Taylor%20Swift%20Anti-Hero'
       );
 
-      expect(buildSearchUrl('youtube_music', baseTrack)).toBe(
+      expect(buildSearchUrl('youtube', baseTrack)).toBe(
         'https://music.youtube.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
       );
 

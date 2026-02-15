@@ -4,23 +4,7 @@ import {
   isMusicfetchAvailable,
   lookupByIsrc as musicfetchLookupByIsrc,
 } from './musicfetch';
-
-export type ProviderKey =
-  | 'apple_music'
-  | 'spotify'
-  | 'youtube_music'
-  | 'soundcloud'
-  | 'deezer'
-  | 'amazon_music'
-  | 'tidal'
-  | 'pandora'
-  | 'napster'
-  | 'audiomack'
-  | 'qobuz'
-  | 'anghami'
-  | 'boomplay'
-  | 'iheartradio'
-  | 'tiktok';
+import type { ProviderKey } from './types';
 
 export type ProviderLinkQuality =
   | 'canonical'
@@ -59,7 +43,7 @@ export interface ResolveProviderLinksOptions {
 const DEFAULT_PROVIDERS: ProviderKey[] = [
   'apple_music',
   'spotify',
-  'youtube_music',
+  'youtube',
   'soundcloud',
   'deezer',
   'amazon_music',
@@ -97,7 +81,7 @@ export function buildSearchUrl(
       return `https://music.apple.com/${storefront}/search?term=${query}`;
     case 'spotify':
       return `https://open.spotify.com/search/${query}`;
-    case 'youtube_music':
+    case 'youtube':
       return `https://music.youtube.com/search?q=${query}`;
     case 'soundcloud':
       return `https://soundcloud.com/search?q=${query}`;
