@@ -47,6 +47,8 @@ interface ReleaseTableProps {
   readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
   readonly groupByYear?: boolean;
+  /** Check if a release's smart link is locked behind the pro gate */
+  readonly isSmartLinkLocked?: (releaseId: string) => boolean;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -76,6 +78,7 @@ export function ReleaseTable({
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  isSmartLinkLocked,
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
@@ -96,8 +99,10 @@ export function ReleaseTable({
   const getContextMenuItems = useCallback(
     (release: ReleaseViewModel): ContextMenuItemType[] => {
       const menuIcon = (
-        name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink'
+        name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink' | 'Lock'
       ) => <Icon name={name} className='h-3.5 w-3.5' />;
+
+      const locked = isSmartLinkLocked?.(release.id) ?? false;
 
       const items: ContextMenuItemType[] = [
         {
@@ -106,29 +111,41 @@ export function ReleaseTable({
           icon: menuIcon('PencilLine'),
           onClick: () => onEdit(release),
         },
-        {
-          id: 'copy-smart-link',
-          label: 'Copy smart link',
-          icon: menuIcon('Link2'),
-          onClick: () => {
-            void onCopy(
-              release.smartLinkPath,
-              `${release.title} smart link`,
-              `smart-link-copy-${release.id}`
-            );
-          },
-        },
-        // UTM share presets
-        ...getUTMShareContextMenuItems({
-          smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
-          context: buildUTMContext({
-            smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
-            releaseSlug: release.slug,
-            releaseTitle: release.title,
-            artistName,
-            releaseDate: release.releaseDate,
-          }),
-        }),
+        ...(locked
+          ? [
+              {
+                id: 'copy-smart-link',
+                label: 'Smart link (Pro)',
+                icon: menuIcon('Lock'),
+                disabled: true,
+                onClick: () => {},
+              } as ContextMenuItemType,
+            ]
+          : [
+              {
+                id: 'copy-smart-link',
+                label: 'Copy smart link',
+                icon: menuIcon('Link2'),
+                onClick: () => {
+                  void onCopy(
+                    release.smartLinkPath,
+                    `${release.title} smart link`,
+                    `smart-link-copy-${release.id}`
+                  );
+                },
+              } as ContextMenuItemType,
+              // UTM share presets
+              ...getUTMShareContextMenuItems({
+                smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+                context: buildUTMContext({
+                  smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
+                  releaseSlug: release.slug,
+                  releaseTitle: release.title,
+                  artistName,
+                  releaseDate: release.releaseDate,
+                }),
+              }),
+            ]),
         { type: 'separator' },
         {
           id: 'copy-release-id',
@@ -198,7 +215,7 @@ export function ReleaseTable({
 
       return items;
     },
-    [onEdit, onCopy, artistName]
+    [onEdit, onCopy, artistName, isSmartLinkLocked]
   );
 
   // Stable callbacks for UnifiedTable props
@@ -256,14 +273,21 @@ export function ReleaseTable({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
       header: MetaHeaderCell,
-      cell: createRightMetaCellRenderer(),
+      cell: createRightMetaCellRenderer(isSmartLinkLocked),
       size: 300,
       minSize: 200,
       meta: { className: 'hidden sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];
-  }, [artistName, showTracks, isExpanded, isLoadingTracks, toggleExpansion]);
+  }, [
+    artistName,
+    showTracks,
+    isExpanded,
+    isLoadingTracks,
+    toggleExpansion,
+    isSmartLinkLocked,
+  ]);
 
   // Transform columnVisibility to TanStack format (always show release)
   const tanstackColumnVisibility = useMemo(() => {

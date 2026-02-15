@@ -29,10 +29,10 @@ export function NewHomeHero() {
           {/* CTA */}
           <div className='mt-8 flex flex-col items-center gap-3 md:items-start'>
             <Link
-              href='/waitlist'
+              href='/signup'
               className='group inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-[10px] bg-btn-primary text-btn-primary-foreground text-[15px] font-medium border border-subtle shadow-(--shadow-sm) transition-[border,background-color,color,box-shadow,opacity,filter,transform] duration-150 ease-out hover:opacity-95 focus-ring-themed'
             >
-              Request early access
+              Get started free
               <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
             </Link>
             <Link

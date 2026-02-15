@@ -28,6 +28,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
@@ -40,6 +41,7 @@ import {
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
+import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -135,6 +137,29 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return true;
     });
   }, [rows, filters]);
+
+  // Smart link gating: free tier gets 5 oldest releases unlocked
+  const { smartLinksLimit, isPro } = usePlanGate();
+
+  const freeReleaseIds = useMemo(() => {
+    if (!smartLinksLimit) return null; // null = unlimited (pro/growth)
+    const sorted = [...rows]
+      .sort((a, b) => {
+        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+        return dateA - dateB; // oldest first
+      })
+      .slice(0, smartLinksLimit);
+    return new Set(sorted.map(r => r.id));
+  }, [rows, smartLinksLimit]);
+
+  const isSmartLinkLocked = useCallback(
+    (releaseId: string) => {
+      if (!freeReleaseIds) return false; // unlimited plan
+      return !freeReleaseIds.has(releaseId);
+    },
+    [freeReleaseIds]
+  );
 
   // Empty selection for subheader export (simplified - no bulk selection)
   const selectedIds = useMemo(() => new Set<string>(), []);
@@ -437,6 +462,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
 
+            {/* Smart link gate banner for free users */}
+            {showReleasesTable &&
+              !isPro &&
+              rows.length > (smartLinksLimit ?? Infinity) && (
+                <SmartLinkGateBanner
+                  totalReleases={rows.length}
+                  smartLinksLimit={smartLinksLimit ?? 5}
+                  className='mx-4 mt-2'
+                />
+              )}
+
             {showReleasesTable && (
               <QueryErrorBoundary>
                 <ReleaseTable
@@ -449,6 +485,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  isSmartLinkLocked={isSmartLinkLocked}
                 />
               </QueryErrorBoundary>
             )}

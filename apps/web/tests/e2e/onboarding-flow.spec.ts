@@ -36,7 +36,7 @@ test.describe('Onboarding Flow', () => {
         .catch(() => false);
 
       if (isGetStartedVisible) {
-        await expect(getStartedLink).toHaveAttribute('href', '/waitlist');
+        await expect(getStartedLink).toHaveAttribute('href', '/signup');
       }
 
       console.log(

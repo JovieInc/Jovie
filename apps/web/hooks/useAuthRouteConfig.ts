@@ -12,6 +12,7 @@ export interface AuthRouteConfig {
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
+  isArtistProfileSettings: boolean;
 }
 
 /**
@@ -70,10 +71,16 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');
 
+  // Artist profile settings page gets the preview panel sidebar
+  const isArtistProfileSettings =
+    pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`);
+
   return {
     section,
     breadcrumbs,
     showMobileTabs,
     isTableRoute,
+    isArtistProfileSettings,
   };
 }
