@@ -19,7 +19,11 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
   };
 
   return (
-    <div className='inline-flex items-center rounded-lg bg-surface-2 p-1'>
+    <div
+      role='radiogroup'
+      aria-label='Billing interval'
+      className='inline-flex items-center rounded-lg bg-surface-2 p-1'
+    >
       <label
         className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 ${
           isYearly
