@@ -34,7 +34,6 @@ interface OnboardingFormWrapperProps {
   readonly initialHandle?: string;
   readonly userEmail?: string | null;
   readonly userId: string;
-  readonly skipNameStep?: boolean;
 }
 
 export function OnboardingFormWrapper({
@@ -42,7 +41,6 @@ export function OnboardingFormWrapper({
   initialHandle = '',
   userEmail = null,
   userId,
-  skipNameStep = false,
 }: OnboardingFormWrapperProps) {
   // If the server didn't provide a handle (e.g. OAuth flow stripped the query param),
   // fall back to the pendingClaim stored in sessionStorage by ClaimHandleForm.
@@ -65,7 +63,6 @@ export function OnboardingFormWrapper({
         initialHandle={resolvedHandle}
         userEmail={userEmail}
         userId={userId}
-        skipNameStep={skipNameStep}
       />
     </div>
   );

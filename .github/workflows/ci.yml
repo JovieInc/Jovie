@@ -779,15 +779,26 @@ jobs:
             # Full test suite runs in nightly CI, not on every main push
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running critical tests with coverage + tests changed since ${{ github.base_ref }}"
+            echo "🔍 PR: Running critical tests with coverage + PR-modified test files"
             # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
-            # Then run tests for changed files (coverage already generated above)
+            # Then run test files directly modified/added in this PR
+            # (avoids vitest --changed which builds full module graph and can OOM
+            #  when widely-imported files like AuthShellWrapper are modified)
             git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-            pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
+            CHANGED_TESTS=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'apps/web/**/*.test.ts' 'apps/web/**/*.test.tsx' 'apps/web/**/*.spec.ts' 'apps/web/**/*.spec.tsx' | sed 's|^apps/web/||' || true)
+            if [ -n "$CHANGED_TESTS" ]; then
+              echo "📋 Running PR-modified test files: $CHANGED_TESTS"
+              cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} $CHANGED_TESTS
+            else
+              echo "ℹ️ No test files modified in this PR (critical tests already ran)"
+            fi
           else
-            echo "📦 Full suite with coverage"
-            pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🔍 Feature branch push: Running critical tests only (no base_ref available)"
+            # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
+            # so we can't determine changed files. Run critical tests only to avoid OOM
+            # from the full test suite. The PR event covers changed-file tests.
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}

@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
+import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
@@ -79,6 +80,10 @@ interface StaticArtistPageProps {
   readonly primaryAction?: PrimaryAction;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
+  /** Available download sizes for profile photo */
+  readonly photoDownloadSizes?: AvatarSize[];
+  /** Whether profile photo downloads are allowed */
+  readonly allowPhotoDownloads?: boolean;
 }
 
 /**
@@ -211,6 +216,8 @@ export function StaticArtistPage({
   primaryAction = 'subscribe',
   enableDynamicEngagement = false,
   latestRelease,
+  photoDownloadSizes = [],
+  allowPhotoDownloads = false,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -227,6 +234,8 @@ export function StaticArtistPage({
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}
+        photoDownloadSizes={photoDownloadSizes}
+        allowPhotoDownloads={allowPhotoDownloads}
       >
         <div>
           <Suspense>

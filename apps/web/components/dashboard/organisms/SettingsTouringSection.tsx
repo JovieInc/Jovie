@@ -1,43 +1,61 @@
 'use client';
 
 import { Button, Input, Label } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Unplug } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  checkBandsintownConnection,
   connectBandsintownArtist,
   disconnectBandsintown,
   removeBandsintownApiKey,
   saveBandsintownApiKey,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-export function SettingsTouringSection() {
+import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import { queryKeys } from '@/lib/queries/keys';
+import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
+
+interface SettingsTouringSectionProps {
+  readonly profileId: string;
+}
+
+export function SettingsTouringSection({
+  profileId,
+}: SettingsTouringSectionProps) {
+  const queryClient = useQueryClient();
+  const {
+    data: connectionStatus,
+    isLoading,
+    isError,
+    refetch,
+  } = useBandsintownConnectionQuery(profileId);
+
   const [apiKey, setApiKey] = useState('');
   const [artistName, setArtistName] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectedArtist, setConnectedArtist] = useState<string | null>(null);
-  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Check connection status on mount
+  // Derive connection state from query data
+  const isConnected = connectionStatus?.connected ?? false;
+  const connectedArtist = connectionStatus?.artistName ?? null;
+  const lastSyncedAt = connectionStatus?.lastSyncedAt ?? null;
+
+  // Sync artistName input from fetched data once on initial load
+  const hasInitialized = useRef(false);
+  const lastProfileId = useRef(profileId);
   useEffect(() => {
-    checkBandsintownConnection()
-      .then(status => {
-        setIsConnected(status.connected);
-        setConnectedArtist(status.artistName);
-        setLastSyncedAt(status.lastSyncedAt);
-        if (status.artistName) {
-          setArtistName(status.artistName);
-        }
-      })
-      .catch(() => {
-        // Silently fail — shows disconnected state
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    // Reset when profileId changes so new profile data gets synced
+    if (lastProfileId.current !== profileId) {
+      hasInitialized.current = false;
+      lastProfileId.current = profileId;
+      setArtistName('');
+    }
+    if (connectionStatus?.artistName && !hasInitialized.current) {
+      setArtistName(connectionStatus.artistName);
+      hasInitialized.current = true;
+    }
+  }, [connectionStatus?.artistName, profileId]);
 
   const handleSaveAndConnect = useCallback(async () => {
     setIsSaving(true);
@@ -60,9 +78,11 @@ export function SettingsTouringSection() {
         });
         if (result.success) {
           toast.success(result.message);
-          setIsConnected(true);
-          setConnectedArtist(artistName.trim());
           setApiKey('');
+          // Refresh connection status from server
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.tourDates.connection(profileId),
+          });
         } else {
           toast.error(result.message);
         }
@@ -75,7 +95,7 @@ export function SettingsTouringSection() {
     } finally {
       setIsSaving(false);
     }
-  }, [apiKey, artistName]);
+  }, [apiKey, artistName, queryClient, profileId]);
 
   const handleDisconnect = useCallback(async () => {
     setIsDisconnecting(true);
@@ -89,36 +109,38 @@ export function SettingsTouringSection() {
       const removeKeyResult = await removeBandsintownApiKey();
       if (!removeKeyResult.success) {
         toast.error(removeKeyResult.message ?? 'Failed to remove API key.');
-        return;
       }
 
       toast.success('Bandsintown disconnected.');
-      setIsConnected(false);
-      setConnectedArtist(null);
-      setLastSyncedAt(null);
       setArtistName('');
+      // Refresh connection status from server
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.tourDates.connection(profileId),
+      });
     } catch {
       toast.error('Failed to disconnect. Please try again.');
     } finally {
       setIsDisconnecting(false);
     }
-  }, []);
+  }, [queryClient, profileId]);
 
-  if (isLoading) {
-    return (
-      <DashboardCard variant='settings'>
-        <div className='flex items-center justify-center py-8'>
-          <Loader2 className='h-5 w-5 animate-spin text-secondary-token' />
-          <span className='ml-2 text-sm text-secondary-token'>
-            Checking connection...
-          </span>
+  const renderContent = () => {
+    if (isLoading) {
+      return <TouringSectionSkeleton />;
+    }
+    if (isError) {
+      return (
+        <div className='flex flex-col items-center gap-2 py-6'>
+          <p className='text-sm text-secondary-token'>
+            Failed to load connection status.
+          </p>
+          <Button size='sm' variant='ghost' onClick={() => refetch()}>
+            Try again
+          </Button>
         </div>
-      </DashboardCard>
-    );
-  }
-
-  return (
-    <DashboardCard variant='settings'>
+      );
+    }
+    return (
       <div className='space-y-4'>
         <p className='text-sm text-secondary-token'>
           Tour dates will appear on your public profile when connected.
@@ -201,6 +223,8 @@ export function SettingsTouringSection() {
           )}
         </div>
       </div>
-    </DashboardCard>
-  );
+    );
+  };
+
+  return <DashboardCard variant='settings'>{renderContent()}</DashboardCard>;
 }

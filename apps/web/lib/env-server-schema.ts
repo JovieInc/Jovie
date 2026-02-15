@@ -101,6 +101,9 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
 
+  // Musicfetch API (cross-platform link resolution via ISRC/UPC)
+  MUSICFETCH_API_TOKEN: z.string().optional(),
+
   // Mercury (banking metrics)
   MERCURY_API_BASE_URL: z.string().url().optional(),
   MERCURY_API_TOKEN: z.string().optional(),
@@ -192,6 +195,7 @@ export const ENV_KEYS = [
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
+  'MUSICFETCH_API_TOKEN',
   'MERCURY_API_BASE_URL',
   'MERCURY_API_TOKEN',
   'MERCURY_API_KEY',

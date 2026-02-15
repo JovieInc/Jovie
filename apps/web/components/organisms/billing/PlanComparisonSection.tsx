@@ -34,6 +34,64 @@ function findPriceForPlan(
   );
 }
 
+function renderCtaButton({
+  isCurrentPlan,
+  planKey,
+  hasAvailablePrice,
+  priceOption,
+  defaultPriceId,
+  planData,
+  setGrowthModalOpen,
+}: {
+  isCurrentPlan: boolean;
+  planKey: PlanKey;
+  hasAvailablePrice: boolean;
+  priceOption: PricingOption | undefined;
+  defaultPriceId: string | undefined;
+  planData: (typeof PLAN_FEATURES)[PlanKey];
+  setGrowthModalOpen: (open: boolean) => void;
+}) {
+  if (isCurrentPlan) {
+    return (
+      <Button variant='secondary' className='w-full' disabled>
+        <Check className='mr-2 h-4 w-4' />
+        Current Plan
+      </Button>
+    );
+  }
+  if (planKey === 'growth') {
+    return (
+      <Button
+        variant='secondary'
+        className='w-full'
+        onClick={() => setGrowthModalOpen(true)}
+      >
+        <Sparkles className='mr-2 h-4 w-4' />
+        Request Early Access
+      </Button>
+    );
+  }
+  if (planKey !== 'free' && hasAvailablePrice) {
+    return (
+      <UpgradeButton
+        priceId={priceOption?.priceId ?? defaultPriceId}
+        className='w-full'
+        variant={planKey === 'pro' ? 'primary' : 'secondary'}
+      >
+        Upgrade to {planData.name}
+      </UpgradeButton>
+    );
+  }
+  if (planKey !== 'free' && !hasAvailablePrice) {
+    return (
+      <Button variant='secondary' className='w-full' disabled>
+        Coming Soon
+      </Button>
+    );
+  }
+  return null;
+}
+
 export function PlanComparisonSection({
   pricingOptions,
   currentPlan,
@@ -98,19 +156,17 @@ export function PlanComparisonSection({
             billingInterval
           );
 
-          const priceDisplay =
-            planKey === 'free'
-              ? '$0'
-              : priceOption
-                ? `$${(priceOption.amount / 100).toFixed(0)}`
-                : null;
+          let priceDisplay: string | null = '$0';
+          if (planKey !== 'free') {
+            priceDisplay = priceOption
+              ? `$${(priceOption.amount / 100).toFixed(0)}`
+              : null;
+          }
 
-          const intervalLabel =
-            planKey === 'free'
-              ? 'forever'
-              : billingInterval === 'month'
-                ? '/mo'
-                : '/yr';
+          let intervalLabel = 'forever';
+          if (planKey !== 'free') {
+            intervalLabel = billingInterval === 'month' ? '/mo' : '/yr';
+          }
 
           const hasAvailablePrice = planKey === 'free' || Boolean(priceOption);
 
@@ -161,33 +217,15 @@ export function PlanComparisonSection({
 
                 {/* CTA */}
                 <div className='mt-5'>
-                  {isCurrentPlan ? (
-                    <Button variant='secondary' className='w-full' disabled>
-                      <Check className='mr-2 h-4 w-4' />
-                      Current Plan
-                    </Button>
-                  ) : planKey === 'growth' ? (
-                    <Button
-                      variant='secondary'
-                      className='w-full'
-                      onClick={() => setGrowthModalOpen(true)}
-                    >
-                      <Sparkles className='mr-2 h-4 w-4' />
-                      Request Early Access
-                    </Button>
-                  ) : planKey !== 'free' && hasAvailablePrice ? (
-                    <UpgradeButton
-                      priceId={priceOption?.priceId ?? defaultPriceId}
-                      className='w-full'
-                      variant={planKey === 'pro' ? 'primary' : 'secondary'}
-                    >
-                      Upgrade to {planData.name}
-                    </UpgradeButton>
-                  ) : planKey !== 'free' && !hasAvailablePrice ? (
-                    <Button variant='secondary' className='w-full' disabled>
-                      Coming Soon
-                    </Button>
-                  ) : null}
+                  {renderCtaButton({
+                    isCurrentPlan,
+                    planKey,
+                    hasAvailablePrice,
+                    priceOption,
+                    defaultPriceId,
+                    planData,
+                    setGrowthModalOpen,
+                  })}
                 </div>
 
                 {/* Feature list */}

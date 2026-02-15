@@ -66,6 +66,14 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   amazon_music: 'amazon_music',
   bandcamp: null,
   beatport: null,
+  pandora: null,
+  napster: null,
+  audiomack: null,
+  qobuz: null,
+  anghami: null,
+  boomplay: null,
+  iheartradio: null,
+  tiktok: null,
 };
 
 const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';

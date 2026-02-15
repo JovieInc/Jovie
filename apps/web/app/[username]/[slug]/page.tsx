@@ -7,31 +7,23 @@
  * When a `?dsp=` query param is present, redirects directly to that provider.
  */
 
-import { and, eq } from 'drizzle-orm';
 import { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
-import { cache } from 'react';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import { UnreleasedReleaseHero } from '@/components/release';
 import { BASE_URL } from '@/constants/app';
-import { db } from '@/lib/db';
-import {
-  discogReleases,
-  discogTracks,
-  providerLinks,
-} from '@/lib/db/schema/content';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
+import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
 import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { getContentBySlug, getCreatorByUsername } from './_lib/data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
@@ -46,8 +38,6 @@ const RELEASE_TYPE_SCHEMA_MAP: Record<string, string> = {
 
 /**
  * Generate JSON-LD structured data for music content SEO.
- * Implements schema.org MusicRecording/MusicAlbum schemas with rich
- * ImageObject artwork, albumReleaseType, and numTracks.
  */
 function generateMusicStructuredData(
   content: {
@@ -71,13 +61,11 @@ function generateMusicStructuredData(
   const contentUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
   const artistUrl = `${BASE_URL}/${creator.usernameNormalized}`;
 
-  // Build sameAs array from provider links
   const sameAs = content.providerLinks.map(link => link.url);
 
   const schemaType =
     content.type === 'release' ? 'MusicAlbum' : 'MusicRecording';
 
-  // Build rich image structured data with multiple sizes
   let imageValue:
     | Record<string, unknown>
     | (Record<string, unknown> | string)[]
@@ -90,7 +78,6 @@ function generateMusicStructuredData(
       artworkSizes: content.artworkSizes,
     });
 
-    // Include additional artwork sizes for image search discovery
     const additionalImages: string[] = [];
     if (content.artworkSizes?.['1000'])
       additionalImages.push(content.artworkSizes['1000']);
@@ -120,7 +107,6 @@ function generateMusicStructuredData(
       url: artistUrl,
     },
     ...(sameAs.length > 0 && { sameAs }),
-    // Release-specific properties
     ...(content.type === 'release' &&
       content.releaseType &&
       RELEASE_TYPE_SCHEMA_MAP[content.releaseType] && {
@@ -166,263 +152,6 @@ interface PageProps {
   readonly searchParams: Promise<{ dsp?: string }>;
 }
 
-type ContentType = 'release' | 'track';
-
-interface ContentData {
-  type: ContentType;
-  id: string;
-  title: string;
-  slug: string;
-  artworkUrl: string | null;
-  releaseDate: Date | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
-  /** Artwork size URLs from release metadata (for download context menu) */
-  artworkSizes?: Record<string, string> | null;
-  /** Release type (single, ep, album, etc.) — only present for releases */
-  releaseType?: string | null;
-  /** Total track count — only present for releases */
-  totalTracks?: number | null;
-  /** Audio preview URL — only present for tracks */
-  previewUrl?: string | null;
-  creator: {
-    id: string;
-    displayName: string | null;
-    username: string;
-    usernameNormalized: string;
-    avatarUrl: string | null;
-  };
-}
-
-/**
- * Fetch creator by normalized username.
- * Uses unstable_cache for cross-request caching with targeted invalidation.
- * Wrapped in React.cache() for per-request deduplication between
- * generateMetadata and page render (same pattern as profile pages).
- */
-const fetchCreatorByUsername = async (usernameNormalized: string) => {
-  const [creator] = await db
-    .select({
-      id: creatorProfiles.id,
-      displayName: creatorProfiles.displayName,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      settings: creatorProfiles.settings,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
-    .limit(1);
-
-  return creator ?? null;
-};
-
-const getCreatorByUsername = cache(async (usernameNormalized: string) => {
-  // Skip Next.js cache in test/development (match profile page behavior)
-  if (
-    process.env.NODE_ENV === 'test' ||
-    process.env.NODE_ENV === 'development'
-  ) {
-    return fetchCreatorByUsername(usernameNormalized);
-  }
-
-  return unstable_cache(
-    () => fetchCreatorByUsername(usernameNormalized),
-    [`smartlink-creator-${usernameNormalized}`],
-    {
-      tags: [
-        'smartlink-creator',
-        `smartlink-creator:${usernameNormalized}`,
-        `public-profile:${usernameNormalized}`,
-      ],
-      revalidate: 3600, // 1 hour, matches profile page TTL
-    }
-  )();
-});
-
-/**
- * Serialized content data for JSON-safe caching.
- * Dates are stored as ISO strings and rehydrated on read.
- */
-interface CachedContentData {
-  type: ContentType;
-  id: string;
-  title: string;
-  slug: string;
-  artworkUrl: string | null;
-  releaseDate: string | null;
-  providerLinks: Array<{ providerId: string; url: string }>;
-  /** Artwork size URLs from release metadata (for download context menu) */
-  artworkSizes?: Record<string, string> | null;
-  /** Release type (single, ep, album, etc.) — only present for releases */
-  releaseType?: string | null;
-  /** Total track count — only present for releases */
-  totalTracks?: number | null;
-  /** Audio preview URL — only present for tracks */
-  previewUrl?: string | null;
-}
-
-/**
- * Fetch content (release or track) by creator and slug.
- */
-const fetchContentBySlug = async (
-  creatorProfileId: string,
-  slug: string
-): Promise<CachedContentData | null> => {
-  // Try release first
-  const [release] = await db
-    .select({
-      id: discogReleases.id,
-      title: discogReleases.title,
-      slug: discogReleases.slug,
-      artworkUrl: discogReleases.artworkUrl,
-      releaseDate: discogReleases.releaseDate,
-      releaseType: discogReleases.releaseType,
-      totalTracks: discogReleases.totalTracks,
-      metadata: discogReleases.metadata,
-    })
-    .from(discogReleases)
-    .where(
-      and(
-        eq(discogReleases.creatorProfileId, creatorProfileId),
-        eq(discogReleases.slug, slug)
-      )
-    )
-    .limit(1);
-
-  if (release) {
-    const links = await db
-      .select({
-        providerId: providerLinks.providerId,
-        url: providerLinks.url,
-      })
-      .from(providerLinks)
-      .where(
-        and(
-          eq(providerLinks.ownerType, 'release'),
-          eq(providerLinks.releaseId, release.id)
-        )
-      );
-
-    const metadata = release.metadata as Record<string, unknown> | null;
-    const artworkSizes =
-      (metadata?.artworkSizes as Record<string, string>) ?? null;
-
-    return {
-      type: 'release',
-      id: release.id,
-      title: release.title,
-      slug: release.slug,
-      artworkUrl: release.artworkUrl,
-      releaseDate: toISOStringOrNull(release.releaseDate),
-      providerLinks: links,
-      artworkSizes,
-      releaseType: release.releaseType,
-      totalTracks: release.totalTracks,
-    };
-  }
-
-  // Try track
-  const [track] = await db
-    .select({
-      id: discogTracks.id,
-      title: discogTracks.title,
-      slug: discogTracks.slug,
-      releaseId: discogTracks.releaseId,
-      previewUrl: discogTracks.previewUrl,
-    })
-    .from(discogTracks)
-    .where(
-      and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
-        eq(discogTracks.slug, slug)
-      )
-    )
-    .limit(1);
-
-  if (track) {
-    // Get release for artwork and provider links in parallel
-    const [releaseData, links] = await Promise.all([
-      db
-        .select({
-          artworkUrl: discogReleases.artworkUrl,
-          releaseDate: discogReleases.releaseDate,
-        })
-        .from(discogReleases)
-        .where(eq(discogReleases.id, track.releaseId))
-        .limit(1)
-        .then(rows => rows[0]),
-      db
-        .select({
-          providerId: providerLinks.providerId,
-          url: providerLinks.url,
-        })
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'track'),
-            eq(providerLinks.trackId, track.id)
-          )
-        ),
-    ]);
-
-    return {
-      type: 'track',
-      id: track.id,
-      title: track.title,
-      slug: track.slug,
-      artworkUrl: releaseData?.artworkUrl ?? null,
-      releaseDate: toISOStringOrNull(releaseData?.releaseDate),
-      providerLinks: links,
-      previewUrl: track.previewUrl,
-    };
-  }
-
-  return null;
-};
-
-/**
- * Rehydrate cached content data — converts ISO date strings back to Date objects.
- */
-function rehydrateContent(
-  cached: CachedContentData
-): Omit<ContentData, 'creator'> {
-  return {
-    ...cached,
-    releaseDate: cached.releaseDate ? new Date(cached.releaseDate) : null,
-  };
-}
-
-const getContentBySlug = cache(
-  async (
-    creatorProfileId: string,
-    slug: string
-  ): Promise<Omit<ContentData, 'creator'> | null> => {
-    // Skip Next.js cache in test/development
-    if (
-      process.env.NODE_ENV === 'test' ||
-      process.env.NODE_ENV === 'development'
-    ) {
-      const result = await fetchContentBySlug(creatorProfileId, slug);
-      return result ? rehydrateContent(result) : null;
-    }
-
-    const cached = await unstable_cache(
-      () => fetchContentBySlug(creatorProfileId, slug),
-      [`smartlink-content-${creatorProfileId}-${slug}`],
-      {
-        tags: [
-          'smartlink-content',
-          `smartlink-content:${creatorProfileId}`,
-          `smartlink-content:${creatorProfileId}:${slug}`,
-        ],
-        revalidate: 300, // 5 minutes, matches ISR
-      }
-    )();
-
-    return cached ? rehydrateContent(cached) : null;
-  }
-);
-
 /**
  * Pick the best provider URL based on priority.
  */
@@ -430,7 +159,6 @@ function pickProviderUrl(
   links: Array<{ providerId: string; url: string }>,
   forcedProvider?: ProviderKey | null
 ): string | null {
-  // When a provider is explicitly requested (?dsp=), do not fall back to others.
   if (forcedProvider) {
     return links.find(link => link.providerId === forcedProvider)?.url ?? null;
   }
@@ -440,7 +168,6 @@ function pickProviderUrl(
     if (match?.url) return match.url;
   }
 
-  // Fallback to any available provider
   const fallback = links.find(link => link.url);
   return fallback?.url ?? null;
 }
@@ -456,23 +183,18 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  // Normalize username for lookup
   const normalizedUsername = username.toLowerCase();
 
-  // Get creator
   const creator = await getCreatorByUsername(normalizedUsername);
   if (!creator) {
     notFound();
   }
 
-  // Get content
   const content = await getContentBySlug(creator.id, slug);
 
-  // If content not found, check for redirect
   if (!content) {
     const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
     if (redirectInfo) {
-      // Permanent redirect to the new slug
       const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
       permanentRedirect(
         `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
@@ -485,7 +207,6 @@ export default async function ContentSmartLinkPage({
   if (dsp) {
     const providerKey = dsp as ProviderKey;
 
-    // Validate provider
     if (!PROVIDER_CONFIG[providerKey]) {
       notFound();
     }
@@ -495,7 +216,6 @@ export default async function ContentSmartLinkPage({
       notFound();
     }
 
-    // Track the click (fire-and-forget, don't block redirect)
     void trackServerEvent('smart_link_clicked', {
       contentType: content.type,
       contentId: content.id,
@@ -518,7 +238,6 @@ export default async function ContentSmartLinkPage({
     };
   }).filter(p => p.url);
 
-  // Also include secondary providers that have URLs
   const secondaryProviders = (Object.keys(PROVIDER_CONFIG) as ProviderKey[])
     .filter(key => !PRIMARY_PROVIDER_KEYS.includes(key))
     .map(key => {
@@ -533,6 +252,16 @@ export default async function ContentSmartLinkPage({
     .filter(p => p.url);
 
   const allProviders = [...providers, ...secondaryProviders];
+
+  // Check if any video provider links exist for "Use this sound"
+  const hasVideoLinks = content.providerLinks.some(
+    link =>
+      Boolean(link.url) &&
+      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+  );
+  const soundsUrl = hasVideoLinks
+    ? `/${creator.usernameNormalized}/${content.slug}/sounds`
+    : null;
 
   // Generate structured data for SEO
   const { musicSchema, breadcrumbSchema } = generateMusicStructuredData(
@@ -550,13 +279,11 @@ export default async function ContentSmartLinkPage({
     creator
   );
 
-  // Check if release is unreleased (releaseDate > now)
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();
 
   return (
     <>
-      {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
       <script
         type='application/ld+json'
         // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
@@ -604,6 +331,7 @@ export default async function ContentSmartLinkPage({
             (creator.settings as Record<string, unknown> | null)
               ?.allowArtworkDownloads === true
           }
+          soundsUrl={soundsUrl}
         />
       )}
     </>
@@ -634,16 +362,13 @@ export async function generateMetadata({
   const contentType = content.type === 'release' ? 'album' : 'song';
   const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${content.slug}`;
 
-  // Check if release is unreleased
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();
 
-  // Build SEO-optimized title based on release status
   const title = isUnreleased
     ? `${content.title} by ${artistName} - Coming Soon`
     : `${content.title} by ${artistName} - Stream Now`;
 
-  // Build rich description based on release status
   const releaseYear = content.releaseDate
     ? ` (${content.releaseDate.getFullYear()})`
     : '';
@@ -663,7 +388,6 @@ export async function generateMetadata({
     ? `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`
     : `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
 
-  // Build dynamic keywords
   const keywords = [
     content.title,
     artistName,
@@ -676,10 +400,8 @@ export async function generateMetadata({
     'music links',
   ];
 
-  // Determine OG type based on content type
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
 
-  // Prefer larger artwork sizes for social sharing (1000px > original > 640px default)
   const defaultImage = `${BASE_URL}/og/default.png`;
   const ogImageUrl =
     content.artworkSizes?.['1000'] ??
@@ -687,25 +409,24 @@ export async function generateMetadata({
     content.artworkUrl ??
     defaultImage;
   const isDefaultImage = ogImageUrl === defaultImage;
-  const ogImageSize = content.artworkSizes?.['1000']
-    ? 1000
-    : content.artworkSizes?.original
-      ? 1200
-      : content.artworkUrl
-        ? 640
-        : 1200;
+  let ogImageSize = 1200;
+  if (content.artworkSizes?.['1000']) {
+    ogImageSize = 1000;
+  } else if (content.artworkSizes?.original) {
+    ogImageSize = 1200;
+  } else if (content.artworkUrl) {
+    ogImageSize = 640;
+  }
   const ogImageHeight = isDefaultImage ? 630 : ogImageSize;
 
-  // Detect image content type from URL for og:image:type
-  const ogImageType = isDefaultImage
-    ? 'image/png'
-    : ogImageUrl.includes('.png')
-      ? 'image/png'
-      : ogImageUrl.includes('.webp')
-        ? 'image/webp'
-        : ogImageUrl.includes('.avif')
-          ? 'image/avif'
-          : 'image/jpeg';
+  let ogImageType = 'image/jpeg';
+  if (isDefaultImage || ogImageUrl.includes('.png')) {
+    ogImageType = 'image/png';
+  } else if (ogImageUrl.includes('.webp')) {
+    ogImageType = 'image/webp';
+  } else if (ogImageUrl.includes('.avif')) {
+    ogImageType = 'image/avif';
+  }
 
   const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
 
@@ -746,7 +467,6 @@ export async function generateMetadata({
           type: ogImageType,
         },
       ],
-      // Include audio preview for tracks (og:audio)
       ...(content.type === 'track' &&
         content.previewUrl && {
           audio: content.previewUrl,

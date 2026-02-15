@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  isCodeExpired,
   isSessionExists,
   isSignUpSuggested,
   parseClerkError,
@@ -139,6 +140,11 @@ export function useSignInFlow(): UseSignInFlowReturn {
     async (verificationCode: string): Promise<boolean> => {
       if (!signIn || !isLoaded) return false;
 
+      // Prevent double-submission (auto-submit + manual submit can race)
+      if (base.loadingState.type === 'verifying') {
+        return false;
+      }
+
       clearError();
       base.setLoadingState({ type: 'verifying' });
       base.setCode(verificationCode);
@@ -169,8 +175,11 @@ export function useSignInFlow(): UseSignInFlowReturn {
         base.setError(message);
         base.handleCodeExpiredError(err);
 
-        // Clear the code on error so user can re-enter
-        base.setCode('');
+        // Keep the entered code visible so the user can see what they typed.
+        // Only clear if the code expired (user needs a fresh one anyway).
+        if (isCodeExpired(err)) {
+          base.setCode('');
+        }
         base.setLoadingState({ type: 'idle' });
         return false;
       }

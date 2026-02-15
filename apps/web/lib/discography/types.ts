@@ -7,7 +7,24 @@ export type ProviderKey =
   | 'tidal'
   | 'amazon_music'
   | 'bandcamp'
-  | 'beatport';
+  | 'beatport'
+  | 'pandora'
+  | 'napster'
+  | 'audiomack'
+  | 'qobuz'
+  | 'anghami'
+  | 'boomplay'
+  | 'iheartradio'
+  | 'tiktok';
+
+/** Short-form video provider keys for "Use this sound" feature */
+export type VideoProviderKey =
+  | 'tiktok_sound'
+  | 'instagram_reels'
+  | 'youtube_shorts';
+
+/** Union of all provider key types (music streaming + video) */
+export type AnyProviderKey = ProviderKey | VideoProviderKey;
 
 export type ProviderSource = 'ingested' | 'manual';
 
@@ -76,6 +93,8 @@ export interface ReleaseViewModel {
   canvasStatus?: CanvasStatus;
   /** Original DSP-ingested artwork URL (available when user has uploaded custom art) */
   originalArtworkUrl?: string;
+  /** Whether this release has short-form video provider links (TikTok, Reels, Shorts) */
+  hasVideoLinks?: boolean;
 }
 
 /** Track view model for display in expandable release rows */

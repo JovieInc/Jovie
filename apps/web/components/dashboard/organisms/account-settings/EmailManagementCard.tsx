@@ -44,6 +44,13 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
     handleRemoveEmail,
   } = useEmailManagement(user);
 
+  let emailButtonLabel = 'Add';
+  if (pendingEmail) {
+    emailButtonLabel = emailStatus === 'verifying' ? 'Verifying…' : 'Confirm';
+  } else if (emailStatus === 'sending') {
+    emailButtonLabel = 'Sending…';
+  }
+
   return (
     <DashboardCard
       variant='settings'
@@ -169,13 +176,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 emailStatus === 'sending' || emailStatus === 'verifying'
               }
             >
-              {pendingEmail
-                ? emailStatus === 'verifying'
-                  ? 'Verifying…'
-                  : 'Confirm'
-                : emailStatus === 'sending'
-                  ? 'Sending…'
-                  : 'Add'}
+              {emailButtonLabel}
             </Button>
             {pendingEmail && (
               <Button

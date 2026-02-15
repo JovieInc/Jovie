@@ -3,18 +3,24 @@ import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardAudienceTable } from '@/components/dashboard/organisms/dashboard-audience-table';
+import { TablePanelProvider } from '@/contexts/TablePanelContext';
 import type { AudienceMember } from '@/types';
 
 /**
- * Custom render that wraps UI in TooltipProvider, required because
- * AudienceFilterDropdown uses TooltipShortcut which depends on the provider.
+ * Custom render that wraps UI in required providers:
+ * - TooltipProvider: AudienceFilterDropdown uses TooltipShortcut
+ * - TablePanelProvider: DashboardAudienceTableUnified uses useRegisterTablePanel
  */
 function renderWithProviders(
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ) {
   return render(ui, {
-    wrapper: ({ children }) => <TooltipProvider>{children}</TooltipProvider>,
+    wrapper: ({ children }) => (
+      <TooltipProvider>
+        <TablePanelProvider>{children}</TablePanelProvider>
+      </TooltipProvider>
+    ),
     ...options,
   });
 }

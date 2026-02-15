@@ -6,7 +6,7 @@
  */
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
-import type { ProviderKey } from './types';
+import type { ProviderKey, VideoProviderKey } from './types';
 
 /**
  * Known provider domains for validation.
@@ -33,6 +33,14 @@ export const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
   amazon_music: ['music.amazon.com', 'amazon.com'],
   bandcamp: ['bandcamp.com'],
   beatport: ['beatport.com'],
+  pandora: ['pandora.com', 'www.pandora.com'],
+  napster: ['web.napster.com', 'napster.com', 'us.napster.com'],
+  audiomack: ['audiomack.com', 'www.audiomack.com'],
+  qobuz: ['qobuz.com', 'www.qobuz.com', 'open.qobuz.com', 'play.qobuz.com'],
+  anghami: ['anghami.com', 'play.anghami.com'],
+  boomplay: ['boomplay.com', 'www.boomplay.com'],
+  iheartradio: ['iheart.com', 'www.iheart.com'],
+  tiktok: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
 };
 
 /**
@@ -49,6 +57,23 @@ export const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   amazon_music: 'amazon_music',
   bandcamp: null,
   beatport: null,
+  pandora: null,
+  napster: null,
+  audiomack: null,
+  qobuz: null,
+  anghami: null,
+  boomplay: null,
+  iheartradio: null,
+  tiktok: null,
+};
+
+/**
+ * Known domains for video providers (short-form "Use this sound" links).
+ */
+export const VIDEO_PROVIDER_DOMAINS: Record<VideoProviderKey, string[]> = {
+  tiktok_sound: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
+  instagram_reels: ['instagram.com', 'www.instagram.com'],
+  youtube_shorts: ['youtube.com', 'www.youtube.com', 'youtu.be'],
 };
 
 /**
