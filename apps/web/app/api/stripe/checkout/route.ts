@@ -4,6 +4,7 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -63,6 +64,32 @@ export async function POST(request: NextRequest) {
 
     // Validate that the price ID is one of our active prices
     const activePriceIds = getActivePriceIds();
+
+    Sentry.addBreadcrumb({
+      category: 'billing',
+      message: 'Price validation',
+      level: 'info',
+      data: {
+        requestedPriceId: priceId,
+        activePriceIdCount: activePriceIds.length,
+      },
+    });
+
+    if (activePriceIds.length === 0) {
+      // Zero active prices is a config problem, not a user error
+      await captureCriticalError(
+        'Checkout rejected: no active price IDs configured',
+        new Error(
+          'getActivePriceIds() returned empty — STRIPE_PRICE_PRO_MONTHLY/YEARLY likely missing'
+        ),
+        { route: '/api/stripe/checkout', requestedPriceId: priceId }
+      );
+      return NextResponse.json(
+        { error: 'Billing is temporarily unavailable' },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
     if (!activePriceIds.includes(priceId)) {
       return NextResponse.json(
         { error: 'Invalid price ID' },

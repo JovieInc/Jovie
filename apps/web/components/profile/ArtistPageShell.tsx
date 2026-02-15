@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/profile-shell';
-import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
