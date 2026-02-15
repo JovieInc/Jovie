@@ -46,6 +46,8 @@ export function HeaderNav({
         WebkitBackdropFilter: `blur(var(--linear-blur-header))`,
         minWidth: 0,
         minHeight: 0,
+        /* iOS safe area: push header content below the notch/Dynamic Island */
+        paddingTop: 'env(safe-area-inset-top)',
         ...style,
       }}
     >
