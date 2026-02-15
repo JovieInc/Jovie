@@ -183,6 +183,10 @@ export async function updateAllowProfilePhotoDownloads(
 ): Promise<void> {
   noStore();
 
+  if (typeof allowDownloads !== 'boolean') {
+    throw new TypeError('allowDownloads must be a boolean');
+  }
+
   const profile = await requireOwnProfile();
 
   try {
