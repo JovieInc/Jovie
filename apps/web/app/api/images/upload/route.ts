@@ -17,6 +17,7 @@ import {
   getVercelBlobUploader,
   NO_STORE_HEADERS,
   optimizeImageToAvif,
+  processAvatarToSizes,
   PROCESSING_TIMEOUT_MS,
   UPLOAD_ERROR_CODES,
   uploadBufferToBlob,
@@ -143,6 +144,13 @@ export async function POST(request: NextRequest) {
           'Image processing'
         );
 
+        // Process into multiple download sizes (original, 512, 256, 128)
+        const avatarSizeBuffers = await withTimeout(
+          processAvatarToSizes(file),
+          PROCESSING_TIMEOUT_MS,
+          'Avatar size processing'
+        );
+
         const seoFileName = buildSeoFilename({
           originalFilename: file.name,
           photoId: photoRecord.id,
@@ -166,14 +174,28 @@ export async function POST(request: NextRequest) {
           throw new TypeError('Invalid blob URL returned from storage');
         }
 
+        // Upload each download size to blob storage
+        const avatarSizes: Record<string, string> = {};
+        for (const [sizeKey, buffer] of Object.entries(avatarSizeBuffers)) {
+          const sizeSuffix = sizeKey === 'original' ? '-original' : `-${sizeKey}`;
+          const sizeBlobPath = `avatars/users/${clerkUserId}/${seoFileName}${sizeSuffix}.avif`;
+          const sizeUrl = await uploadBufferToBlob(
+            put,
+            sizeBlobPath,
+            buffer,
+            AVIF_MIME_TYPE
+          );
+          avatarSizes[sizeKey] = sizeUrl;
+        }
+
         // Update record with optimized URLs
         await tx
           .update(profilePhotos)
           .set({
             blobUrl: avatarUrl,
-            smallUrl: avatarUrl,
-            mediumUrl: avatarUrl,
-            largeUrl: avatarUrl,
+            smallUrl: avatarSizes['128'] ?? avatarUrl,
+            mediumUrl: avatarSizes['256'] ?? avatarUrl,
+            largeUrl: avatarSizes['512'] ?? avatarUrl,
             status: 'ready',
             mimeType: AVIF_MIME_TYPE,
             fileSize:
@@ -185,12 +207,34 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        // Get the user's profile username for cache invalidation
+        // Get the user's profile for cache invalidation and settings update
         const [profile] = await tx
-          .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+          .select({
+            id: creatorProfiles.id,
+            usernameNormalized: creatorProfiles.usernameNormalized,
+            settings: creatorProfiles.settings,
+          })
           .from(creatorProfiles)
           .where(eq(creatorProfiles.userId, dbUser.id))
           .limit(1);
+
+        // Store avatar download sizes on the creator profile settings
+        if (profile) {
+          const currentSettings = (profile.settings ?? {}) as Record<
+            string,
+            unknown
+          >;
+          await tx
+            .update(creatorProfiles)
+            .set({
+              settings: {
+                ...currentSettings,
+                avatarSizes,
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, profile.id));
+        }
 
         // Invalidate avatar caches so profile shows updated image
         await invalidateAvatarCache(
@@ -205,9 +249,10 @@ export async function POST(request: NextRequest) {
             status: 'ready',
             avatarUrl,
             blobUrl: avatarUrl,
-            largeUrl: avatarUrl,
-            mediumUrl: avatarUrl,
-            smallUrl: avatarUrl,
+            largeUrl: avatarSizes['512'] ?? avatarUrl,
+            mediumUrl: avatarSizes['256'] ?? avatarUrl,
+            smallUrl: avatarSizes['128'] ?? avatarUrl,
+            avatarSizes,
           },
           { status: 202, headers: NO_STORE_HEADERS }
         );

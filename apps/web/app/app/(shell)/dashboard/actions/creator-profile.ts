@@ -135,3 +135,74 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
     isPublic: true,
   });
 }
+
+/**
+ * Resolves the creator profile for the current user.
+ * Shared helper for settings-style server actions.
+ */
+async function requireOwnProfile() {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+
+  if (!user) {
+    throw new TypeError('User not found');
+  }
+
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      settings: creatorProfiles.settings,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, user.id))
+    .limit(1);
+
+  if (!profile) {
+    throw new TypeError('Profile not found');
+  }
+
+  return profile;
+}
+
+/**
+ * Update the "allow profile photo downloads" setting for a creator profile.
+ * Stored in the profile's settings JSONB field, mirroring the
+ * allowArtworkDownloads pattern used for album art.
+ */
+export async function updateAllowProfilePhotoDownloads(
+  allowDownloads: boolean
+): Promise<void> {
+  noStore();
+
+  const profile = await requireOwnProfile();
+
+  try {
+    const currentSettings = (profile.settings ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...currentSettings,
+          allowProfilePhotoDownloads: allowDownloads,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    throw new Error('Failed to update profile photo download setting', {
+      cause: error,
+    });
+  }
+}

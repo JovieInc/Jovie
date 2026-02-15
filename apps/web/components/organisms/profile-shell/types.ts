@@ -2,6 +2,7 @@ import type {
   ProfileNotificationsHydrationStatus,
   ProfileNotificationsState,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
+import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type {
@@ -45,6 +46,10 @@ export interface ProfileShellProps {
   readonly maxWidthClass?: string;
   readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   readonly showGradientBlurs?: boolean;
+  /** Available download sizes for profile photo */
+  readonly photoDownloadSizes?: AvatarSize[];
+  /** Whether profile photo downloads are allowed */
+  readonly allowPhotoDownloads?: boolean;
 }
 
 export const SOCIAL_NETWORK_PLATFORMS = [

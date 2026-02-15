@@ -50,6 +50,8 @@ export function ProfileShell({
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
+  photoDownloadSizes = [],
+  allowPhotoDownloads = false,
 }: ProfileShellProps) {
   const {
     notificationsEnabled,
@@ -157,7 +159,12 @@ export function ProfileShell({
           <div className='relative z-10 flex min-h-screen flex-col py-12'>
             <div className='flex flex-1 flex-col items-center justify-start px-4'>
               <div className={`${maxWidthClass} space-y-6 md:space-y-8`}>
-                <ArtistInfo artist={artist} subtitle={subtitle} />
+                <ArtistInfo
+                  artist={artist}
+                  subtitle={subtitle}
+                  photoDownloadSizes={photoDownloadSizes}
+                  allowPhotoDownloads={allowPhotoDownloads}
+                />
                 {children}
                 {/* Social bar with contacts and tip buttons inline */}
                 {(showSocialBar || hasTipSupport || hasActiveSubscriptions) && (
