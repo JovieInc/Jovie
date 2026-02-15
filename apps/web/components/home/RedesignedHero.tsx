@@ -8,16 +8,7 @@ import { HeroSpotifySearch } from './HeroSpotifySearch';
  */
 export function RedesignedHero() {
   return (
-    <section
-      className='relative overflow-hidden'
-      style={{
-        minHeight: 'calc(100vh - 56px)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '80px 24px 120px',
-      }}
-    >
+    <section className='relative overflow-hidden flex flex-col justify-center min-h-[calc(100dvh-56px)] pt-[clamp(40px,8vw,80px)] px-[clamp(16px,4vw,24px)] pb-[clamp(60px,10vw,120px)]'>
       <div
         className='relative z-10 mx-auto w-full'
         style={{ maxWidth: '1200px' }}
