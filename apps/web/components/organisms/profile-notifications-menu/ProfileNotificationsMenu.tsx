@@ -17,19 +17,20 @@ import {
   DropdownMenuTrigger,
   Switch,
 } from '@jovie/ui';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useUpdateContentPreferencesMutation } from '@/lib/queries';
 import {
-  FAN_NOTIFICATION_CONTENT_TYPES,
-  type FanNotificationContentType,
-} from '@/lib/db/schema/analytics';
-import type { NotificationChannel } from '@/types/notifications';
+  NOTIFICATION_CONTENT_TYPES,
+  type NotificationChannel,
+  type NotificationContentType,
+} from '@/types/notifications';
 import { formatE164PhoneForDisplay } from '../hooks/useProfileNotificationsController';
 import { ProfileNotificationsButton } from '../ProfileNotificationsButton';
 import type { ProfileNotificationsMenuProps } from './types';
 import { useNotificationConfirm } from './useNotificationConfirm';
 import { labelForChannel } from './utils';
 
-type ContentPrefs = Record<FanNotificationContentType, boolean>;
+type ContentPrefs = Record<NotificationContentType, boolean>;
 
 const DEFAULT_CONTENT_PREFS: ContentPrefs = {
   newMusic: true,
@@ -39,7 +40,9 @@ const DEFAULT_CONTENT_PREFS: ContentPrefs = {
 };
 
 export function ProfileNotificationsMenu({
+  artistId,
   channelBusy,
+  contentPreferences,
   hasActiveSubscriptions,
   notificationsState,
   onAddChannel,
@@ -58,12 +61,44 @@ export function ProfileNotificationsMenu({
     handleConfirm,
   } = useNotificationConfirm();
 
-  const [contentPrefs, setContentPrefs] =
-    useState<ContentPrefs>(DEFAULT_CONTENT_PREFS);
+  const updatePrefsMutation = useUpdateContentPreferencesMutation();
 
-  const handleContentToggle = (key: FanNotificationContentType) => {
-    setContentPrefs(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  // Initialize from server-provided preferences, falling back to defaults
+  const [contentPrefs, setContentPrefs] = useState<ContentPrefs>(() => ({
+    ...DEFAULT_CONTENT_PREFS,
+    ...contentPreferences,
+  }));
+
+  // Sync when server preferences change (e.g. after status re-fetch)
+  useEffect(() => {
+    if (contentPreferences) {
+      setContentPrefs(prev => ({ ...prev, ...contentPreferences }));
+    }
+  }, [contentPreferences]);
+
+  const handleContentToggle = useCallback(
+    (key: NotificationContentType) => {
+      setContentPrefs(prev => {
+        const next = { ...prev, [key]: !prev[key] };
+
+        // Fire-and-forget persist to server
+        updatePrefsMutation.mutate({
+          artistId,
+          email: subscriptionDetails.email,
+          phone: subscriptionDetails.sms,
+          preferences: { [key]: next[key] },
+        });
+
+        return next;
+      });
+    },
+    [
+      artistId,
+      subscriptionDetails.email,
+      subscriptionDetails.sms,
+      updatePrefsMutation,
+    ]
+  );
 
   const renderChannelMenuItem = (
     targetChannel: NotificationChannel,
@@ -177,7 +212,7 @@ export function ProfileNotificationsMenu({
             What you hear about
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {FAN_NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
+          {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
             <DropdownMenuItem
               key={key}
               className='flex items-center gap-3 focus-visible:outline-none'

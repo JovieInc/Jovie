@@ -52,6 +52,7 @@ import {
   statusSchema,
   subscribeSchema,
   unsubscribeSchema,
+  updateContentPreferencesSchema,
 } from '@/lib/validation/schemas';
 import type {
   NotificationChannel,
@@ -764,6 +765,7 @@ export const getNotificationStatusDomain = async (
         channel: notificationSubscriptions.channel,
         email: notificationSubscriptions.email,
         phone: notificationSubscriptions.phone,
+        preferences: notificationSubscriptions.preferences,
       })
       .from(notificationSubscriptions)
       .where(
@@ -773,6 +775,9 @@ export const getNotificationStatusDomain = async (
         )
       )
       .limit(2);
+
+    // Merge preferences across all subscription rows (email + sms)
+    let mergedPrefs: FanNotificationPreferences | undefined;
 
     for (const row of rows) {
       if (row.channel === 'email' && row.email) {
@@ -784,9 +789,14 @@ export const getNotificationStatusDomain = async (
         channels.sms = true;
         details.sms = row.phone;
       }
+
+      // Use the first non-null preferences found (they should be identical across channels)
+      if (!mergedPrefs && row.preferences) {
+        mergedPrefs = row.preferences;
+      }
     }
 
-    return buildStatusSuccessResponse(channels, details);
+    return buildStatusSuccessResponse(channels, details, mergedPrefs);
   } catch (error) {
     captureError('Notifications Status Domain Error', error);
     return buildServerErrorResponse();
@@ -798,6 +808,85 @@ export const updateNotificationPreferencesDomain = async (
   updates: Partial<NotificationPreferences>
 ) => {
   await updateNotificationPreferences(target, updates);
+};
+
+/**
+ * Update content notification preferences for a subscription.
+ * Merges new preferences into the existing JSONB preferences column.
+ */
+export const updateContentPreferencesDomain = async (
+  payload: unknown
+): Promise<NotificationDomainResponse<{ success: true; updated: number }>> => {
+  try {
+    const result = updateContentPreferencesSchema.safeParse(payload);
+
+    if (!result.success) {
+      return buildValidationErrorResponse('Invalid request data');
+    }
+
+    const { artist_id, email, phone, preferences } = result.data;
+    const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
+    const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
+
+    if (!normalizedEmail && !normalizedPhone) {
+      return buildMissingIdentifierResponse(
+        'Contact required to update preferences'
+      );
+    }
+
+    // Build WHERE clause to find all matching subscriptions for this artist
+    const contactClauses: Array<ReturnType<typeof eq>> = [];
+    if (normalizedEmail) {
+      contactClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
+    }
+    if (normalizedPhone) {
+      contactClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
+    }
+
+    // First read existing preferences so we can merge
+    const existing = await db
+      .select({
+        id: notificationSubscriptions.id,
+        preferences: notificationSubscriptions.preferences,
+      })
+      .from(notificationSubscriptions)
+      .where(
+        and(
+          eq(notificationSubscriptions.creatorProfileId, artist_id),
+          or(...contactClauses)
+        )
+      )
+      .limit(2);
+
+    if (existing.length === 0) {
+      return buildValidationErrorResponse('No subscription found');
+    }
+
+    // Merge new preferences into each subscription row
+    let totalUpdated = 0;
+    for (const row of existing) {
+      const merged: FanNotificationPreferences = {
+        ...(row.preferences ?? {}),
+        ...preferences,
+      };
+
+      const [updated] = await db
+        .update(notificationSubscriptions)
+        .set({ preferences: merged })
+        .where(eq(notificationSubscriptions.id, row.id))
+        .returning({ id: notificationSubscriptions.id });
+
+      if (updated) totalUpdated++;
+    }
+
+    return {
+      status: 200,
+      body: { success: true, updated: totalUpdated },
+    };
+  } catch (error) {
+    captureError('Content preferences update error', error);
+    return buildServerErrorResponse();
+  }
 };
 
 export const AUDIENCE_COOKIE_NAME = AUDIENCE_IDENTIFIED_COOKIE;
