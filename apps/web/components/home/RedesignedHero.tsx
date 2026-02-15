@@ -15,7 +15,9 @@ export function RedesignedHero() {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        padding: '80px 24px 120px',
+        /* Responsive padding: tighter on mobile, spacious on desktop */
+        padding:
+          'clamp(48px, 8vh, 80px) clamp(16px, 5vw, 24px) clamp(60px, 10vh, 120px)',
       }}
     >
       <div
@@ -28,7 +30,8 @@ export function RedesignedHero() {
             className='text-balance mx-auto'
             style={{
               maxWidth: '900px',
-              fontSize: 'clamp(36px, 5.5vw, 56px)',
+              /* Responsive font-size: 28px on 375px → 40px on 768px → 56px on 1200px+ */
+              fontSize: 'clamp(28px, calc(14px + 3.5vw), 56px)',
               fontWeight: 500,
               lineHeight: 1.1,
               letterSpacing: '-0.022em',
