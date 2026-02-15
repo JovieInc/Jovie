@@ -63,6 +63,9 @@ export const APP_ROUTES = {
   BILLING: '/billing',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
+
+  // Referrals
+  REFERRALS: '/app/referrals',
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];

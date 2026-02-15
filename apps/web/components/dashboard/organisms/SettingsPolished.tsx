@@ -157,7 +157,7 @@ export function SettingsPolished({
         title: 'Touring',
         description:
           'Connect Bandsintown to display tour dates on your profile.',
-        render: () => <SettingsTouringSection />,
+        render: () => <SettingsTouringSection profileId={artist.id} />,
       },
       {
         id: 'branding',
