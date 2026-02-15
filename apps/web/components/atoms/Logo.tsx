@@ -113,9 +113,10 @@ export function Logo({
       data-testid={testId}
       className={cn(
         sizeClasses[size],
-        'text-black dark:text-white transition-colors duration-200',
+        'transition-colors duration-200',
         wordmarkClassName
       )}
+      style={{ color: 'var(--linear-text-primary, currentColor)' }}
       fill='currentColor'
     >
       <path

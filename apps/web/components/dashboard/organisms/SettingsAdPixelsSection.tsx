@@ -6,6 +6,7 @@ import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { usePixelSettingsMutation } from '@/lib/queries';
+import { queryKeys } from '@/lib/queries/keys';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
@@ -141,7 +142,7 @@ export function SettingsAdPixelsSection() {
 
   // Fetch existing pixel settings on mount
   const { data: existingSettings } = useQuery<PixelSettingsResponse>({
-    queryKey: ['pixelSettings'],
+    queryKey: queryKeys.pixels.settings(),
     queryFn: async ({ signal }) => {
       const res = await fetch('/api/dashboard/pixels', { signal });
       if (!res.ok) throw new Error('Failed to fetch pixel settings');
