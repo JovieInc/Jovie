@@ -38,7 +38,10 @@ export function RedesignedHero() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            The link in bio built for artists who want real fan relationships
+            Your entire music career.{' '}
+            <span style={{ color: 'var(--linear-text-secondary)' }}>
+              One intelligent link.
+            </span>
           </h1>
 
           {/* Subheading - matches Linear's lead paragraph */}
@@ -53,9 +56,8 @@ export function RedesignedHero() {
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Capture fan contacts, guide visitors to the right listening link,
-            and grow your owned audience without adding complexity to your
-            release workflow.
+            Import your Spotify, get smart links for every release, and a
+            link-in-bio that converts listeners into fans.
           </p>
 
           {/* Spotify Search CTA */}
