@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type SpotifyArtistResult,
   useArtistSearchQuery,
@@ -86,7 +87,7 @@ export function HeroSpotifySearch() {
       if (artistName) {
         params.set('artist_name', artistName);
       }
-      router.push(`/signup?${params.toString()}`);
+      router.push(`${APP_ROUTES.SIGNUP}?${params.toString()}`);
     },
     [router]
   );
@@ -115,6 +116,37 @@ export function HeroSpotifySearch() {
     },
     [handleNavigateToSignup]
   );
+
+  const handleContinue = useCallback(() => {
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    if (isSpotifyUrl(query)) {
+      handleNavigateToSignup(query);
+      return;
+    }
+
+    const activeArtist =
+      activeIndex >= 0 && activeIndex < results.length
+        ? results[activeIndex]
+        : undefined;
+    const fallbackArtist = results[0];
+    const nextArtist = activeArtist ?? fallbackArtist;
+
+    if (nextArtist) {
+      handleArtistSelect(nextArtist);
+      return;
+    }
+
+    setShowResults(true);
+    inputRef.current?.focus();
+  }, [
+    searchQuery,
+    activeIndex,
+    results,
+    handleNavigateToSignup,
+    handleArtistSelect,
+  ]);
 
   const handlePasteUrlClick = useCallback(() => {
     // Focus input and hint user to paste their URL
@@ -186,6 +218,9 @@ export function HeroSpotifySearch() {
     if (results.length > 0) return true;
     return searchQuery.length >= 1;
   }, [showResults, state, results.length, searchQuery.length]);
+  const trimmedQuery = searchQuery.trim();
+  const showContinueAction =
+    Boolean(trimmedQuery) && (isSpotifyUrl(trimmedQuery) || results.length > 0);
 
   return (
     <div className='relative mx-auto w-full' style={{ maxWidth: '480px' }}>
@@ -197,8 +232,8 @@ export function HeroSpotifySearch() {
           'w-full flex items-center gap-3 rounded-xl border px-4 py-3',
           'transition-all duration-200',
           shouldShowDropdown
-            ? 'border-[var(--linear-border-focus)] ring-2 ring-[var(--linear-btn-primary-bg)]/20'
-            : 'border-[var(--linear-border-default)] hover:border-[var(--linear-border-focus)]'
+            ? 'border-(--linear-border-focus) ring-2 ring-(--linear-btn-primary-bg)/20'
+            : 'border-(--linear-border-default) hover:border-(--linear-border-focus)'
         )}
         style={{
           backgroundColor: 'var(--linear-bg-surface-0)',
@@ -247,6 +282,18 @@ export function HeroSpotifySearch() {
               borderTopColor: 'transparent',
             }}
           />
+        ) : showContinueAction ? (
+          <button
+            type='button'
+            onClick={handleContinue}
+            className='shrink-0 inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed'
+            style={{
+              backgroundColor: 'var(--linear-btn-primary-bg)',
+              color: 'var(--linear-btn-primary-fg)',
+            }}
+          >
+            Continue
+          </button>
         ) : (
           <Search
             className='w-4 h-4 shrink-0'
@@ -254,6 +301,15 @@ export function HeroSpotifySearch() {
           />
         )}
       </div>
+
+      <p
+        className='mt-2 text-center'
+        style={{ fontSize: '12px', color: 'var(--linear-text-secondary)' }}
+      >
+        {isSpotifyUrl(trimmedQuery)
+          ? 'Detected a Spotify URL — Continue to import your artist.'
+          : 'Pick a result or paste a Spotify artist URL, then continue.'}
+      </p>
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
@@ -492,12 +548,12 @@ export function HeroSpotifySearch() {
 
       {/* Fallback: sign up without Spotify */}
       <p
-        className='mt-3 text-center'
+        className='mt-2 text-center'
         style={{ fontSize: '13px', color: 'var(--linear-text-tertiary)' }}
       >
         or{' '}
         <Link
-          href='/signup'
+          href={APP_ROUTES.SIGNUP}
           className='underline transition-colors'
           style={{ color: 'var(--linear-text-secondary)' }}
         >

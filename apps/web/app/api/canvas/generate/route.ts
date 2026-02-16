@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import {
   buildCanvasMetadata,
@@ -14,6 +15,7 @@ import {
   startCanvasGeneration,
   validateArtworkForCanvas,
 } from '@/lib/services/canvas/service';
+import { getPlanLimits } from '@/lib/stripe/config';
 
 export const maxDuration = 30;
 
@@ -43,6 +45,25 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: CORS_HEADERS }
+    );
+  }
+
+  // Canvas generation requires AI tools (pro/growth plan)
+  try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!getPlanLimits(entitlements.plan).aiCanUseTools) {
+      return NextResponse.json(
+        {
+          error:
+            'Canvas generation requires a Pro plan. Upgrade to unlock this feature.',
+        },
+        { status: 403, headers: CORS_HEADERS }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: 'Unable to verify plan status. Please try again.' },
+      { status: 503, headers: CORS_HEADERS }
     );
   }
 

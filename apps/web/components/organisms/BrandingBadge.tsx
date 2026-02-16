@@ -1,27 +1,21 @@
 'use client';
 
-import { useUserSafe } from '@/hooks/useClerkSafe';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 
 /**
- * Branding badge that shows "Made with Jovie" for free plan users
- * Hidden for Pro plan users
+ * Branding badge that shows "Made with Jovie" for free plan users.
+ * Hidden for Pro and Growth plan users.
  */
 export function BrandingBadge() {
-  const { user, isLoaded } = useUserSafe();
+  const { canRemoveBranding, isLoading } = usePlanGate();
 
-  // Show a placeholder while loading to avoid layout shift
-  if (!isLoaded) {
+  if (isLoading) {
     return (
       <div className='h-3 w-24 rounded-sm skeleton motion-reduce:animate-none' />
     );
   }
 
-  // Check if user has Pro plan
-  // Since Clerk billing integration varies, we'll check for the plan in publicMetadata
-  const userPlan = user?.publicMetadata?.plan || 'free';
-
-  // Hide branding for paid users
-  if (userPlan === 'standard' || userPlan === 'pro') {
+  if (canRemoveBranding) {
     return null;
   }
 
