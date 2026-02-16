@@ -161,7 +161,7 @@ export default async function RootLayout({
       {/* DNS Prefetch and Preconnect for critical external resources */}
       {/* Spotify CDN - artist images */}
       <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
+      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='anonymous' />
       {/* Note: Font preloading is handled automatically by Next.js localFont */}
       {/* Spotify API */}
       <link rel='dns-prefetch' href='https://api.spotify.com' />
@@ -170,19 +170,45 @@ export default async function RootLayout({
       <link
         rel='preconnect'
         href='https://public.blob.vercel-storage.com'
-        crossOrigin=''
+        crossOrigin='anonymous'
       />
       {/* Clerk Auth - authentication */}
       <link rel='dns-prefetch' href='https://clerk.jov.ie' />
-      <link rel='preconnect' href='https://clerk.jov.ie' crossOrigin='' />
+      <link
+        rel='preconnect'
+        href='https://clerk.jov.ie'
+        crossOrigin='anonymous'
+      />
       <link rel='dns-prefetch' href='https://img.clerk.com' />
-      <link rel='preconnect' href='https://img.clerk.com' crossOrigin='' />
+      <link
+        rel='preconnect'
+        href='https://img.clerk.com'
+        crossOrigin='anonymous'
+      />
+      {/* Cloudinary - media assets */}
+      <link rel='dns-prefetch' href='https://res.cloudinary.com' />
+      <link
+        rel='preconnect'
+        href='https://res.cloudinary.com'
+        crossOrigin='anonymous'
+      />
+      {/* Clerk Auth API */}
+      <link
+        rel='preconnect'
+        href='https://api.clerk.com'
+        crossOrigin='anonymous'
+      />
+      <link
+        rel='preconnect'
+        href='https://images.clerk.dev'
+        crossOrigin='anonymous'
+      />
       {/* Unsplash - fallback images */}
       <link rel='dns-prefetch' href='https://images.unsplash.com' />
       <link
         rel='preconnect'
         href='https://images.unsplash.com'
-        crossOrigin=''
+        crossOrigin='anonymous'
       />
 
       {/* Structured Data for Organization */}

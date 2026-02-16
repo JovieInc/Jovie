@@ -341,9 +341,8 @@ export default function LaunchPage() {
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
             <span className='text-secondary-token'>
-              One Spotify link imports your entire career. AI handles the rest.
-              Smart links, fan capture, and a link-in-bio that actually converts
-              &mdash; not just another list of links.
+              Paste one Spotify link. Get smart links, fan capture, and a
+              link-in-bio that converts &mdash; all in seconds.
             </span>
           </h2>
         </div>
@@ -356,17 +355,17 @@ export default function LaunchPage() {
             {
               num: 'FIG 0.1',
               title: 'One-click import',
-              desc: 'Paste a Spotify URL. Jovie ingests your discography, photo, bio, socials, and every release — matched across all streaming platforms automatically.',
+              desc: 'Paste a Spotify URL. Jovie imports your discography, matches every release across platforms, and builds your profile automatically.',
             },
             {
               num: 'FIG 0.2',
               title: 'AI-native from day one',
-              desc: 'An AI assistant with deep context on your catalog, streaming data, and career timeline. It writes bios, generates Spotify Canvases, alerts you to impersonators, and surfaces insights grounded in your real data.',
+              desc: 'An AI assistant grounded in your catalog, streaming data, and career. It writes bios, generates Canvases, and surfaces real insights.',
             },
             {
               num: 'FIG 0.3',
               title: 'Obsessively crafted',
-              desc: "Every pixel is intentional. Your link-in-bio should feel like a product you're proud to share, not a parking lot of links with someone else's logo on it.",
+              desc: "Your link-in-bio should feel like a product you're proud to share — not a parking lot of links with someone else's logo.",
             },
           ].map((item, i) => (
             <div
@@ -406,11 +405,9 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Most link-in-bio pages are a graveyard of links. Yours has one
-              job: grow your audience. First-time visitors see a single CTA to
-              subscribe. Return visitors see a single CTA to listen &mdash;
-              opening your latest release on their preferred streaming platform.
-              Every visit has a purpose.
+              Most link-in-bio pages are a graveyard of links. Yours adapts: new
+              visitors get a subscribe CTA, returning fans get a listen CTA
+              routed to their preferred platform.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -470,10 +467,9 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              When you connect Spotify, Jovie creates a smart link for every
-              release in your catalog &mdash; automatically. Each one detects
-              the listener&apos;s preferred streaming platform and routes them
-              there. No manual setup, no broken links, no maintenance.
+              Connect Spotify and Jovie creates a smart link for every release
+              &mdash; automatically matched across platforms. No manual setup.
+              No maintenance.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -745,16 +741,13 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Your Jovie profile adapts to every visitor. But sometimes you want
-              a specific action &mdash; a tip jar at a show, a contact page for
-              industry, tour dates in your Instagram bio. Jovie Deeplinks let
-              you override the adaptive CTA and link directly to any version of
-              your profile.
+              Sometimes you want a specific action &mdash; a tip jar at shows, a
+              contact page for industry, tour dates in your bio. Deeplinks point
+              directly to any view of your profile.
             </p>
             <p className='marketing-lead-linear mt-4 max-w-[480px] !text-[0.95rem]'>
-              Instagram now lets you add 5 links. With deeplinks, those become a
-              native navigation menu for your entire Jovie profile &mdash; not
-              one Linktree link with extra friction.
+              Instagram allows 5 links. With deeplinks, each one goes straight
+              to a specific view &mdash; zero friction.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1216,17 +1209,16 @@ export default function LaunchPage() {
         >
           <div>
             <h2 id='ai-heading' className='marketing-h2-linear max-w-[440px]'>
-              AI that actually knows{' '}
+              AI that knows{' '}
               <span className='text-secondary-token'>your music</span>
             </h2>
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Not a generic chatbot. Jovie&apos;s AI has ingested your full
-              discography, streaming data, and career history. Ask it to write a
-              bio, generate a press release, turn your album art into a Spotify
-              Canvas, or format lyrics for Apple Music &mdash; it&apos;s
-              grounded in your real catalog.
+              Not a generic chatbot. Jovie&apos;s AI knows your full
+              discography, streaming data, and career history. Write bios,
+              generate press releases, create Spotify Canvases &mdash; grounded
+              in your real catalog.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1413,11 +1405,9 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Most artists have zero data on who visits their link-in-bio. Jovie
-              captures every interaction &mdash; who subscribed, who listened,
-              who tipped, where they came from &mdash; and scores each visitor
-              by engagement so you know who your real fans are, not just your
-              traffic.
+              Most artists have zero data on their visitors. Jovie captures
+              every interaction and scores each fan by engagement &mdash; so you
+              know who your real fans are.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1757,10 +1747,8 @@ export default function LaunchPage() {
             <span className='text-secondary-token'>More noise than ever.</span>
           </h2>
           <p className='marketing-lead-linear mt-4 max-w-[600px]'>
-            AI tools like Suno and Udio are creating an explosion of new music
-            creators. That&apos;s great for music &mdash; but it means the
-            competition for fan attention has never been fiercer. Jovie is your
-            competitive advantage.
+            AI is creating an explosion of new music. Competition for fan
+            attention has never been fiercer. Jovie is your edge.
           </p>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-12 mt-8'>
             {[
@@ -1815,10 +1803,9 @@ export default function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Every artist who connects Spotify adds catalog data, streaming
-              patterns, and fan behavior to Jovie&apos;s model. That means
-              better platform matching, smarter routing, and better AI for
-              everyone. Linktree has links. Jovie has a data flywheel.
+              Every artist who connects adds data to Jovie&apos;s model &mdash;
+              better matching, smarter routing, better AI for everyone. Linktree
+              has links. Jovie has a flywheel.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1848,8 +1835,7 @@ export default function LaunchPage() {
           >
             What you get for free.{' '}
             <span className='text-secondary-token'>
-              Compare Jovie&apos;s free plan to what you&apos;re probably using
-              right now.
+              Versus what you&apos;re probably using now.
             </span>
           </h2>
         </div>

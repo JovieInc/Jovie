@@ -1,483 +1,156 @@
 {
-  "generated_at": "2026-02-01T00:00:00.000Z",
+  "generated_at": "2026-02-16T07:36:08.326465Z",
   "scope": "apps/web",
   "ideas": [
     {
       "id": "qual-001",
-      "title": "Split UnifiedTable component into focused sub-components",
-      "description": "UnifiedTable.tsx is 943 lines with a ~540 line main component containing complex virtualization logic, multiple nested conditional renders, and 4-5 levels of nesting",
-      "rationale": "Violates Single Responsibility Principle. The component handles table rendering, virtualization, filtering, sorting, row selection, and multiple view modes. This makes it extremely difficult to test, understand, and maintain.",
+      "title": "Split massive launch page into discrete components",
+      "description": "The launch page is 1,943 lines - nearly 2x the recommended maximum for a page component. It contains 97 inline style attributes, multiple large JSON-LD schemas, and extensive marketing sections that should be extracted to reusable components.",
+      "rationale": "Large page files are harder to maintain, test, and modify. The launch page mixes concerns (routing, metadata, content, styling) and has significant duplication of className patterns. Moving sections to separate components improves testability and reusability.",
       "category": "large_files",
-      "severity": "major",
+      "severity": "critical",
       "affected_files": [
-        "apps/web/components/UnifiedTable.tsx"
+        "apps/web/app/(marketing)/launch/page.tsx"
       ],
-      "current_state": "Single 943-line component with ~540 line main function handling all table concerns including virtualization, sorting, filtering, selection, and multiple rendering modes",
-      "proposed_change": "Extract into focused components:\n1. TableVirtualization.tsx - Virtual scrolling logic\n2. TableFilters.tsx - Filter UI and state\n3. TableRow.tsx - Row rendering with selection\n4. TableHeader.tsx - Column headers with sorting\n5. UnifiedTable.tsx - Orchestration component (< 150 lines)\n\nMove complex conditional logic into dedicated hooks:\n- useTableVirtualization\n- useTableSelection\n- useTableSorting",
-      "best_practice": "Single Responsibility Principle (SRP), Component Composition",
+      "current_state": "Single 1,943 line file with embedded sections, 97 inline styles, repeated className patterns (11 instances of 'text-secondary-token'), and three large JSON-LD schemas inline",
+      "proposed_change": "Extract to components: HeroSection, HowItWorksSection, FeaturesSection, BenefitsSection, TestimonialsSection, PricingSection, FAQSection. Move JSON-LD schemas to separate schema utility file. Extract repeated classNames to const variables or Tailwind classes.",
+      "best_practice": "Page components should orchestrate layout and data fetching, not contain presentation logic. Aim for <300 lines per page file. Extract reusable sections to components in /components/marketing/.",
       "metrics": {
-        "line_count": 943,
-        "main_function_lines": 540,
-        "nesting_depth": 5,
-        "complexity": null,
-        "duplicate_lines": null
+        "line_count": 1943,
+        "inline_styles": 97,
+        "estimated_component_count": 7
       },
       "effort": "large",
       "priority": "high",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// UnifiedTable.tsx (943 lines)\nexport function UnifiedTable() {\n  // 540 lines of logic including:\n  // - Virtualization setup\n  // - Filter state\n  // - Sort state\n  // - Selection state\n  // - Rendering logic\n  // - 4-5 levels of nested conditions\n  return (\n    <div>\n      {/* Complex nested JSX */}\n    </div>\n  )\n}",
-        "after": "// UnifiedTable.tsx (< 150 lines)\nexport function UnifiedTable() {\n  const virtualization = useTableVirtualization()\n  const selection = useTableSelection()\n  const sorting = useTableSorting()\n  \n  return (\n    <div>\n      <TableFilters />\n      <TableHeader sorting={sorting} />\n      <TableVirtualization {...virtualization}>\n        {rows.map(row => <TableRow key={row.id} {...row} />)}\n      </TableVirtualization>\n    </div>\n  )\n}\n\n// TableVirtualization.tsx\n// TableFilters.tsx\n// TableRow.tsx\n// TableHeader.tsx"
-      }
+      "breaking_change": false
     },
     {
       "id": "qual-002",
-      "title": "Refactor ReleaseFilterDropdown into reusable FilterSubmenu components",
-      "description": "ReleaseFilterDropdown.tsx is 844 lines with repetitive submenu patterns and deeply nested conditional logic",
-      "rationale": "The component duplicates the same filter submenu pattern multiple times. Extracting a reusable FilterSubmenu component would reduce duplication, improve maintainability, and make it easier to add new filter types.",
-      "category": "large_files",
+      "title": "Refactor 707-line useFormState hook - violates single responsibility",
+      "description": "The useFormState hook in lib/hooks/useFormState.ts is 707 lines - far too large for a single hook. It combines state management, retry logic with exponential backoff, abort controller management, timeout handling, and error/success state.",
+      "rationale": "Large hooks are hard to test, debug, and reuse. The hook mixes multiple concerns: state management (loading/error/success), retry logic, cancellation, and timeout handling. Each concern should be its own composable hook.",
+      "category": "complexity",
       "severity": "major",
       "affected_files": [
-        "apps/web/components/ReleaseFilterDropdown.tsx"
+        "apps/web/lib/hooks/useFormState.ts"
       ],
-      "current_state": "844-line component with repeated submenu patterns for different filter types (release type, label, genre, etc.). Each submenu has similar structure but duplicated code.",
-      "proposed_change": "1. Extract FilterSubmenu.tsx component accepting:\n   - title: string\n   - options: Array<{value, label, count}>\n   - selected: Set<string>\n   - onChange: (value: string) => void\n   - searchable?: boolean\n\n2. Extract FilterOption.tsx for individual filter items\n\n3. Reduce ReleaseFilterDropdown.tsx to < 200 lines by using FilterSubmenu for each filter type",
-      "best_practice": "Don't Repeat Yourself (DRY), Component Reusability",
+      "current_state": "Single 707-line hook managing: loading state, error/success messages, retry logic with exponential backoff, abort controller, timeout handling, and manual retry capability",
+      "proposed_change": "Split into: useLoadingState (loading/error/success), useRetryLogic (exponential backoff, retry attempts), useAbortController (cancellation), useAsyncHandler (orchestration). Each hook should be <150 lines and testable in isolation.",
+      "best_practice": "Hooks should follow single responsibility principle. Complex hooks should compose smaller hooks. Aim for <200 lines per hook file.",
       "metrics": {
-        "line_count": 844,
-        "complexity": null,
-        "duplicate_lines": null
+        "line_count": 707,
+        "exported_functions": 3,
+        "state_variables": 7
       },
       "effort": "medium",
       "priority": "high",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// Repeated for each filter type:\n<DropdownMenuSub>\n  <DropdownMenuSubTrigger>Release Type</DropdownMenuSubTrigger>\n  <DropdownMenuSubContent>\n    {releaseTypes.map(type => (\n      <DropdownMenuCheckboxItem\n        key={type.value}\n        checked={selected.has(type.value)}\n        onCheckedChange={() => onChange(type.value)}\n      >\n        {type.label} ({type.count})\n      </DropdownMenuCheckboxItem>\n    ))}\n  </DropdownMenuSubContent>\n</DropdownMenuSub>\n// ... repeated 5+ times for different filter types",
-        "after": "// Reusable component:\n<FilterSubmenu\n  title=\"Release Type\"\n  options={releaseTypes}\n  selected={selectedTypes}\n  onChange={handleTypeChange}\n  searchable={false}\n/>\n<FilterSubmenu\n  title=\"Label\"\n  options={labels}\n  selected={selectedLabels}\n  onChange={handleLabelChange}\n  searchable={true}\n/>"
-      }
+      "breaking_change": false
     },
     {
       "id": "qual-003",
-      "title": "Extract retry logic from useFormState into reusable utility",
-      "description": "useFormState hook contains ~289 lines including complex retry logic with exponential backoff that could be reused across other hooks",
-      "rationale": "The retry logic is a general-purpose concern that shouldn't be embedded in the form state hook. Extracting it improves testability and allows reuse in other contexts (API calls, background jobs, etc.).",
+      "title": "Replace 97 inline styles in launch page with design tokens",
+      "description": "The launch page uses 97 inline style attributes with hardcoded values instead of design system tokens.",
+      "rationale": "Inline styles bypass the design system and Tailwind utilities. Should be applied via Tailwind classes in globals.css @theme block for consistency and optimization.",
       "category": "code_smells",
-      "severity": "minor",
+      "severity": "major",
       "affected_files": [
-        "apps/web/hooks/useFormState.ts"
+        "apps/web/app/(marketing)/launch/page.tsx"
       ],
-      "current_state": "289-line hook with embedded retry logic including exponential backoff, max attempts, and error handling",
-      "proposed_change": "1. Create lib/retry.ts with:\n   - createRetryHandler(options: { maxAttempts, backoff, onError })\n   - useRetry() hook\n\n2. Refactor useFormState to use the extracted retry utility\n\n3. Make retry logic available for other hooks and utilities",
-      "best_practice": "Separation of Concerns, Reusability",
+      "current_state": "97 style={{}} attributes with direct CSS variables like 'var(--linear-border-subtle)', hardcoded colors like '#2a2a2a'",
+      "proposed_change": "Replace inline styles with Tailwind classes: 'border-subtle', 'text-tertiary-token', etc. For truly one-off styles, extract to component-scoped CSS modules or create design tokens in design-system.css.",
+      "best_practice": "Avoid inline styles. Use Tailwind utilities for common patterns, design tokens for brand colors/spacing, and CSS modules for component-specific styles.",
       "metrics": {
-        "line_count": 289,
-        "complexity": null,
-        "duplicate_lines": null
+        "inline_styles": 97,
+        "hardcoded_colors": 12
       },
       "effort": "medium",
       "priority": "medium",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// useFormState.ts (289 lines)\nexport function useFormState() {\n  // ... form logic ...\n  \n  // Embedded retry logic\n  const retryWithBackoff = async () => {\n    let attempts = 0\n    while (attempts < maxAttempts) {\n      try {\n        return await action()\n      } catch (error) {\n        attempts++\n        await sleep(Math.pow(2, attempts) * 1000)\n      }\n    }\n  }\n  \n  // ... more form logic ...\n}",
-        "after": "// lib/retry.ts\nexport function createRetryHandler<T>(options: RetryOptions) {\n  return async (fn: () => Promise<T>): Promise<T> => {\n    let attempts = 0\n    while (attempts < options.maxAttempts) {\n      try {\n        return await fn()\n      } catch (error) {\n        attempts++\n        if (attempts >= options.maxAttempts) throw error\n        await sleep(options.backoff(attempts))\n      }\n    }\n  }\n}\n\n// useFormState.ts (reduced)\nexport function useFormState() {\n  const retry = createRetryHandler({ maxAttempts: 3, backoff: exponentialBackoff })\n  // ... form logic using retry() ...\n}"
-      }
+      "breaking_change": false
     },
     {
       "id": "qual-004",
-      "title": "Consolidate size mapping utility across Button components",
-      "description": "Size-to-pixel mapping pattern is duplicated 3× across Button, IconButton, and LoadingButton components",
-      "rationale": "Duplicate code leads to inconsistencies and maintenance burden. A single source of truth ensures consistent sizing across all button variants.",
-      "category": "duplication",
-      "severity": "minor",
+      "title": "Reduce console.* usage - 1,358 occurrences across 181 files",
+      "description": "Found 1,358 console.log/error/warn/info/debug calls. The project has Sentry integration but still uses console extensively.",
+      "rationale": "Console logs are not captured in production monitoring. Sentry provides structured error tracking, breadcrumbs, and user context. This was identified as high-priority in previous ideation (228+ occurrences).",
+      "category": "code_smells",
+      "severity": "major",
       "affected_files": [
-        "apps/web/components/ui/Button.tsx",
-        "apps/web/components/ui/IconButton.tsx",
-        "apps/web/components/ui/LoadingButton.tsx"
+        "apps/web/instrumentation.ts",
+        "apps/web/scripts/linear-compare/compare-dashboards.ts",
+        "apps/web/lib/error-tracking.ts"
       ],
-      "current_state": "Each button component has its own size mapping:\nconst sizeMap = { sm: 32, md: 40, lg: 48 }",
-      "proposed_change": "1. Create lib/ui/button-sizes.ts:\n   export const BUTTON_SIZE_MAP = { sm: 32, md: 40, lg: 48 } as const\n   export type ButtonSize = keyof typeof BUTTON_SIZE_MAP\n\n2. Import and use in all three button components",
-      "best_practice": "Don't Repeat Yourself (DRY), Single Source of Truth",
+      "current_state": "1,358 console.* calls across 181 files. Mix of scripts (legitimate), test files (ok), and production code (should use Sentry)",
+      "proposed_change": "Replace production console.error with captureException, console.warn with captureMessage(level: warning), console.log with addBreadcrumb. Keep console in scripts/ and tests/. Add ESLint rule to prevent new console usage.",
+      "best_practice": "Use structured logging (Sentry) in production code. Console is acceptable in: scripts, tests, and local dev utilities.",
       "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": 9
+        "console_usages": 1358,
+        "files_affected": 181,
+        "production_files_estimate": 80
       },
-      "effort": "trivial",
+      "effort": "large",
       "priority": "medium",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// Button.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }\n\n// IconButton.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }\n\n// LoadingButton.tsx\nconst sizeMap = { sm: 32, md: 40, lg: 48 }",
-        "after": "// lib/ui/button-sizes.ts\nexport const BUTTON_SIZE_MAP = {\n  sm: 32,\n  md: 40,\n  lg: 48\n} as const\n\nexport type ButtonSize = keyof typeof BUTTON_SIZE_MAP\n\n// All button components:\nimport { BUTTON_SIZE_MAP } from '@/lib/ui/button-sizes'\nconst height = BUTTON_SIZE_MAP[size]"
-      }
+      "breaking_change": false
     },
     {
       "id": "qual-005",
-      "title": "Standardize error message extraction utility",
-      "description": "Error message extraction pattern is duplicated 3× across different components with slight variations",
-      "rationale": "Inconsistent error handling makes debugging harder and can lead to different error message formats in different parts of the app. A standard utility ensures consistent error reporting.",
-      "category": "duplication",
-      "severity": "minor",
+      "title": "Split 1,247-line chat API route handler",
+      "description": "The /api/chat/route.ts file is 1,247 lines - one of the largest files in the codebase. It handles authentication, rate limiting, streaming, message history, AI integration, and error handling.",
+      "rationale": "Large API route handlers are difficult to test, maintain, and debug. Should be split into smaller modules.",
+      "category": "large_files",
+      "severity": "critical",
       "affected_files": [
-        "apps/web/components/forms/ContactForm.tsx",
-        "apps/web/components/forms/SettingsForm.tsx",
-        "apps/web/lib/api/error-handler.ts"
+        "apps/web/app/api/chat/route.ts"
       ],
-      "current_state": "Three different implementations of extracting error messages from Error objects, API responses, and unknown values",
-      "proposed_change": "1. Enhance lib/utils/errors.ts with standard extractErrorMessage(error: unknown): string\n\n2. Replace all instances with the standard utility\n\n3. Add tests for edge cases (null, undefined, non-Error objects)",
-      "best_practice": "Don't Repeat Yourself (DRY), Consistent Error Handling",
+      "current_state": "1,247-line route handler managing: auth, rate limits, message validation, AI streaming, history persistence, error handling, and response formatting",
+      "proposed_change": "Split into modules: lib/chat/auth.ts, lib/chat/rate-limit.ts, lib/chat/stream-handler.ts, lib/chat/message-handler.ts, lib/chat/ai-client.ts. Route file should orchestrate <100 lines.",
+      "best_practice": "API routes should be thin orchestration layers. Extract business logic to lib/ modules. Aim for <200 lines per route file.",
       "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": 15
-      },
-      "effort": "trivial",
-      "priority": "medium",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// Component 1\nconst msg = error instanceof Error ? error.message : 'Unknown error'\n\n// Component 2\nconst msg = error?.message ?? String(error)\n\n// Component 3\nconst msg = typeof error === 'string' ? error : error?.message || 'Error'",
-        "after": "// lib/utils/errors.ts\nexport function extractErrorMessage(error: unknown): string {\n  if (error instanceof Error) return error.message\n  if (typeof error === 'string') return error\n  if (error && typeof error === 'object' && 'message' in error) {\n    return String(error.message)\n  }\n  return 'An unknown error occurred'\n}\n\n// All components:\nimport { extractErrorMessage } from '@/lib/utils/errors'\nconst msg = extractErrorMessage(error)"
-      }
-    },
-    {
-      "id": "qual-006",
-      "title": "Replace console.warn with logger.warn",
-      "description": "One instance of console.warn found in codebase, should use Sentry logger instead",
-      "rationale": "Direct console usage bypasses the logging infrastructure and won't be captured in production error monitoring. Using the logger ensures consistent logging and Sentry integration.",
-      "category": "best_practices",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/lib/api/client.ts"
-      ],
-      "current_state": "console.warn('API request failed:', error)",
-      "proposed_change": "Replace with: logger.warn('API request failed', { error })",
-      "best_practice": "Centralized Logging, Production Observability",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "trivial",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "console.warn('API request failed:', error)",
-        "after": "import { logger } from '@/lib/logger'\nlogger.warn('API request failed', { error })"
-      }
-    },
-    {
-      "id": "qual-007",
-      "title": "Add explicit return types to exported functions in discography.ts",
-      "description": "5-8 exported functions in lib/music/discography.ts lack explicit return type annotations",
-      "rationale": "Explicit return types improve type safety, catch errors at compile time, make the API contract clear, and improve IDE autocomplete. This is especially important for exported functions that form public APIs.",
-      "category": "type_safety",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/lib/music/discography.ts"
-      ],
-      "current_state": "Functions like parseDiscography(), formatReleaseDate(), etc. infer return types instead of declaring them explicitly",
-      "proposed_change": "Add explicit return type annotations to all exported functions:\n- parseDiscography(): ParsedDiscography\n- formatReleaseDate(): string\n- groupByYear(): Record<number, Release[]>\netc.",
-      "best_practice": "Explicit Type Contracts, Type Safety",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "trivial",
-      "priority": "medium",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "export function parseDiscography(data) {\n  return data.map(item => ({\n    title: item.title,\n    year: item.year\n  }))\n}\n\nexport function formatReleaseDate(date) {\n  return new Date(date).toLocaleDateString()\n}",
-        "after": "export function parseDiscography(data: RawDiscography[]): ParsedDiscography[] {\n  return data.map(item => ({\n    title: item.title,\n    year: item.year\n  }))\n}\n\nexport function formatReleaseDate(date: string | Date): string {\n  return new Date(date).toLocaleDateString()\n}"
-      }
-    },
-    {
-      "id": "qual-008",
-      "title": "Add type annotations to exported constants",
-      "description": "~15 exported constants lack explicit type annotations (using const assertion or type annotation)",
-      "rationale": "Explicit types on exported constants prevent accidental type widening, make the API contract clear, and improve type safety for consumers.",
-      "category": "type_safety",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/lib/constants/routes.ts",
-        "apps/web/lib/constants/analytics.ts",
-        "apps/web/lib/constants/validation.ts"
-      ],
-      "current_state": "Constants like export const ROUTES = { home: '/', about: '/about' } infer types instead of using 'as const' or explicit annotations",
-      "proposed_change": "Add 'as const' assertions or explicit type annotations:\n- export const ROUTES = { home: '/', about: '/about' } as const\n- export const MAX_FILE_SIZE: number = 5_000_000\n- export const ALLOWED_TYPES: readonly string[] = ['image/png', 'image/jpeg'] as const",
-      "best_practice": "Type Safety, Immutable Constants",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "trivial",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "export const ROUTES = {\n  home: '/',\n  about: '/about',\n  contact: '/contact'\n}\n\nexport const MAX_FILE_SIZE = 5_000_000",
-        "after": "export const ROUTES = {\n  home: '/',\n  about: '/about',\n  contact: '/contact'\n} as const\n\nexport const MAX_FILE_SIZE: number = 5_000_000"
-      }
-    },
-    {
-      "id": "qual-009",
-      "title": "Document or implement TODOs in codebase",
-      "description": "4 TODO comments found: UTM builder implementation, ContactDrawer Phase 2, auth tests performance, Clerk import cleanup",
-      "rationale": "TODO comments represent incomplete work or technical debt. They should either be completed or converted into tracked issues so they don't get forgotten.",
-      "category": "dead_code",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/lib/analytics/utm.ts",
-        "apps/web/components/ContactDrawer.tsx",
-        "apps/web/tests/auth.test.ts",
-        "apps/web/lib/auth/clerk.ts"
-      ],
-      "current_state": "TODO comments in code:\n1. 'TODO: Implement UTM parameter builder'\n2. 'TODO: Phase 2 - Add file upload support'\n3. 'TODO: Improve test performance'\n4. 'TODO: Remove deprecated Clerk import'",
-      "proposed_change": "For each TODO:\n1. Create Linear issue if work is significant\n2. Link issue in comment: // TODO(JOV-123): Description\n3. Or complete the work immediately if trivial\n4. Remove TODO if no longer relevant",
-      "best_practice": "Technical Debt Management, Issue Tracking",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "small",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// TODO: Implement UTM parameter builder\nexport function buildUTMParams() {\n  throw new Error('Not implemented')\n}",
-        "after": "// Option 1: Link to issue\n// TODO(JOV-456): Implement UTM parameter builder\n// See: https://linear.app/jovie/issue/JOV-456\n\n// Option 2: Implement immediately if trivial\nexport function buildUTMParams(params: UTMParams): string {\n  return new URLSearchParams(params).toString()\n}\n\n// Option 3: Remove if no longer needed\n// (delete the TODO and unused function)"
-      }
-    },
-    {
-      "id": "qual-010",
-      "title": "Remove or document dead API routes",
-      "description": "2 dead routes found: unused Cloudinary endpoint and disabled rate limiting middleware",
-      "rationale": "Dead code creates confusion about what's actually used in production, makes the codebase harder to navigate, and can pose security risks if accidentally enabled.",
-      "category": "dead_code",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/app/api/cloudinary/route.ts",
-        "apps/web/middleware/rate-limit.ts"
-      ],
-      "current_state": "1. Cloudinary route exists but is not called from any frontend code\n2. Rate limiting middleware is defined but commented out in middleware.ts",
-      "proposed_change": "1. If truly unused, delete the files\n2. If kept for future use, add clear documentation:\n   - Why it's disabled\n   - When it will be re-enabled\n   - Link to Linear issue\n3. Consider moving to a 'legacy' or 'disabled' directory",
-      "best_practice": "Clean Codebase, Clear Intent",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "trivial",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// app/api/cloudinary/route.ts\n// Unused endpoint, no references\nexport async function POST(request: Request) {\n  // ... implementation ...\n}\n\n// middleware.ts\n// export { default } from './middleware/rate-limit'\n// Commented out for now",
-        "after": "// Option 1: Delete if truly unused\n// (remove the files entirely)\n\n// Option 2: Document if keeping for future\n/**\n * DISABLED: Cloudinary direct upload endpoint\n * \n * This was replaced by client-side uploads in JOV-234.\n * Keeping for reference until migration is complete.\n * TODO(JOV-567): Remove after Q2 2026\n */\n\n// Option 3: Move to legacy directory\n// apps/web/app/api/_legacy/cloudinary/route.ts"
-      }
-    },
-    {
-      "id": "qual-011",
-      "title": "Migrate hardcoded classNames to cn() utility",
-      "description": "5,292+ instances of hardcoded className strings that should use the cn() utility for better composition",
-      "rationale": "While not all classNames need cn(), many conditional or composed classNames would benefit from it. This improves maintainability, prevents className conflicts, and enables better conditional styling.",
-      "category": "best_practices",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/components/**/*.tsx"
-      ],
-      "current_state": "Many components use string concatenation or template literals for conditional classes instead of cn() utility",
-      "proposed_change": "1. Audit className usage for conditional/composed cases\n2. Convert to cn() where beneficial:\n   - className={`base ${isActive ? 'active' : ''}`} → className={cn('base', isActive && 'active')}\n   - Composed styles from multiple sources\n   - Conditional variants\n3. Keep simple static classNames as strings",
-      "best_practice": "Utility Usage, Consistent Styling",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": null
+        "line_count": 1247,
+        "concerns_count": 6
       },
       "effort": "large",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// Conditional classes with template literals\n<div className={`flex items-center ${isActive ? 'bg-blue-500' : 'bg-gray-500'} ${isDisabled ? 'opacity-50' : ''}`}>\n\n// String concatenation\n<button className={'btn ' + variant + ' ' + size}>",
-        "after": "// Using cn() utility\nimport { cn } from '@/lib/utils'\n\n<div className={cn(\n  'flex items-center',\n  isActive ? 'bg-blue-500' : 'bg-gray-500',\n  isDisabled && 'opacity-50'\n)}>\n\n<button className={cn('btn', variant, size)}>"
-      }
-    },
-    {
-      "id": "qual-012",
-      "title": "Break down tour-dates actions file into domain modules",
-      "description": "app/actions/tour-dates.ts is 740 lines handling multiple distinct responsibilities (CRUD, filtering, analytics, export)",
-      "rationale": "Large action files with multiple responsibilities are harder to test, maintain, and reason about. Splitting by domain makes the codebase more modular and testable.",
-      "category": "large_files",
-      "severity": "major",
-      "affected_files": [
-        "apps/web/app/actions/tour-dates.ts"
-      ],
-      "current_state": "Single 740-line file containing:\n- CRUD operations (create, update, delete)\n- Filtering and search logic\n- Analytics and reporting\n- Export functionality\n- Validation logic",
-      "proposed_change": "Split into focused modules:\n1. tour-dates/crud.ts - Create, read, update, delete operations\n2. tour-dates/filters.ts - Filtering and search logic\n3. tour-dates/analytics.ts - Analytics and reporting\n4. tour-dates/export.ts - Export functionality\n5. tour-dates/validation.ts - Shared validation logic\n6. tour-dates/index.ts - Re-exports for backward compatibility",
-      "best_practice": "Single Responsibility Principle (SRP), Modular Architecture",
-      "metrics": {
-        "line_count": 740,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "medium",
       "priority": "high",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// app/actions/tour-dates.ts (740 lines)\nexport async function createTourDate() { ... }\nexport async function updateTourDate() { ... }\nexport async function deleteTourDate() { ... }\nexport async function filterTourDates() { ... }\nexport async function exportTourDates() { ... }\nexport async function getTourDateAnalytics() { ... }",
-        "after": "// app/actions/tour-dates/crud.ts\nexport async function createTourDate() { ... }\nexport async function updateTourDate() { ... }\nexport async function deleteTourDate() { ... }\n\n// app/actions/tour-dates/filters.ts\nexport async function filterTourDates() { ... }\n\n// app/actions/tour-dates/export.ts\nexport async function exportTourDates() { ... }\n\n// app/actions/tour-dates/analytics.ts\nexport async function getTourDateAnalytics() { ... }\n\n// app/actions/tour-dates/index.ts\nexport * from './crud'\nexport * from './filters'\nexport * from './export'\nexport * from './analytics'"
-      }
-    },
-    {
-      "id": "qual-013",
-      "title": "Break down onboarding actions file into step modules",
-      "description": "app/actions/onboarding.ts is 676 lines with multiple onboarding steps mixed together",
-      "rationale": "Each onboarding step is a distinct concern. Separating them makes it easier to modify individual steps, test in isolation, and potentially reorder or disable steps.",
-      "category": "large_files",
-      "severity": "major",
-      "affected_files": [
-        "apps/web/app/actions/onboarding.ts"
-      ],
-      "current_state": "Single 676-line file containing logic for all onboarding steps: profile setup, music preferences, social connections, notifications, and completion",
-      "proposed_change": "Split into step-based modules:\n1. onboarding/profile-setup.ts - Profile information collection\n2. onboarding/music-preferences.ts - Genre and artist preferences\n3. onboarding/social-connections.ts - Connect social accounts\n4. onboarding/notifications.ts - Notification preferences\n5. onboarding/completion.ts - Finalize onboarding\n6. onboarding/navigation.ts - Step navigation logic\n7. onboarding/index.ts - Orchestration and re-exports",
-      "best_practice": "Single Responsibility Principle (SRP), Step-based Architecture",
-      "metrics": {
-        "line_count": 676,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "medium",
-      "priority": "high",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// app/actions/onboarding.ts (676 lines)\nexport async function setupProfile() { ... }\nexport async function setMusicPreferences() { ... }\nexport async function connectSocial() { ... }\nexport async function setNotificationPrefs() { ... }\nexport async function completeOnboarding() { ... }\nexport function getNextStep() { ... }\nexport function getPreviousStep() { ... }",
-        "after": "// app/actions/onboarding/profile-setup.ts\nexport async function setupProfile() { ... }\n\n// app/actions/onboarding/music-preferences.ts\nexport async function setMusicPreferences() { ... }\n\n// app/actions/onboarding/social-connections.ts\nexport async function connectSocial() { ... }\n\n// app/actions/onboarding/navigation.ts\nexport function getNextStep() { ... }\nexport function getPreviousStep() { ... }\n\n// app/actions/onboarding/index.ts\nexport * from './profile-setup'\nexport * from './music-preferences'\nexport * from './social-connections'\nexport * from './navigation'"
-      }
-    },
-    {
-      "id": "qual-014",
-      "title": "Extract loading state pattern into reusable hook",
-      "description": "Loading state pattern with mutation status checks is duplicated across multiple mutation consumers",
-      "rationale": "The pattern of managing loading states for TanStack Query mutations (isPending, isSuccess, isError) is repeated. A custom hook would reduce boilerplate and ensure consistent UX.",
-      "category": "duplication",
-      "severity": "suggestion",
-      "affected_files": [
-        "apps/web/components/forms/ContactForm.tsx",
-        "apps/web/components/forms/ProfileForm.tsx",
-        "apps/web/components/forms/SettingsForm.tsx"
-      ],
-      "current_state": "Each form component manually tracks:\n- isPending state for loading indicators\n- isSuccess for success messages\n- isError for error messages\n- Reset logic on component unmount",
-      "proposed_change": "Create hooks/useMutationState.ts:\n\nexport function useMutationState(mutation: UseMutationResult) {\n  const [showSuccess, setShowSuccess] = useState(false)\n  const [showError, setShowError] = useState(false)\n  \n  useEffect(() => {\n    if (mutation.isSuccess) {\n      setShowSuccess(true)\n      setTimeout(() => setShowSuccess(false), 3000)\n    }\n    if (mutation.isError) setShowError(true)\n  }, [mutation.isSuccess, mutation.isError])\n  \n  return {\n    isLoading: mutation.isPending,\n    showSuccess,\n    showError,\n    error: mutation.error,\n    reset: () => { setShowSuccess(false); setShowError(false) }\n  }\n}",
-      "best_practice": "Don't Repeat Yourself (DRY), Custom Hooks",
-      "metrics": {
-        "line_count": null,
-        "complexity": null,
-        "duplicate_lines": 45
-      },
-      "effort": "small",
-      "priority": "low",
-      "breaking_change": false,
-      "prerequisites": [],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "// Repeated in multiple components:\nconst mutation = useMutation(...)\nconst [showSuccess, setShowSuccess] = useState(false)\nconst [showError, setShowError] = useState(false)\n\nuseEffect(() => {\n  if (mutation.isSuccess) {\n    setShowSuccess(true)\n    setTimeout(() => setShowSuccess(false), 3000)\n  }\n}, [mutation.isSuccess])\n\nreturn (\n  <>\n    {mutation.isPending && <Spinner />}\n    {showSuccess && <SuccessMessage />}\n    {showError && <ErrorMessage />}\n  </>\n)",
-        "after": "// Reusable hook:\nconst mutation = useMutation(...)\nconst { isLoading, showSuccess, showError, error } = useMutationState(mutation)\n\nreturn (\n  <>\n    {isLoading && <Spinner />}\n    {showSuccess && <SuccessMessage />}\n    {showError && <ErrorMessage error={error} />}\n  </>\n)"
-      }
-    },
-    {
-      "id": "qual-015",
-      "title": "Reduce nesting depth in UnifiedTable virtualization logic",
-      "description": "UnifiedTable contains 4-5 levels of nested conditionals in virtualization logic, making it hard to follow control flow",
-      "rationale": "Deep nesting reduces readability and makes code harder to test. Early returns and guard clauses can flatten the structure and improve comprehension.",
-      "category": "code_smells",
-      "severity": "minor",
-      "affected_files": [
-        "apps/web/components/UnifiedTable.tsx"
-      ],
-      "current_state": "Virtualization logic has deeply nested structure:\nif (condition1) {\n  if (condition2) {\n    if (condition3) {\n      if (condition4) {\n        // core logic\n      }\n    }\n  }\n}",
-      "proposed_change": "1. Use early returns for error/edge cases\n2. Extract nested logic into separate functions\n3. Use guard clauses to reduce nesting\n4. Invert conditions where appropriate\n\nTarget: Reduce max nesting from 5 levels to 2-3 levels",
-      "best_practice": "Cyclomatic Complexity Reduction, Guard Clauses",
-      "metrics": {
-        "line_count": null,
-        "nesting_depth": 5,
-        "complexity": null,
-        "duplicate_lines": null
-      },
-      "effort": "small",
-      "priority": "medium",
-      "breaking_change": false,
-      "prerequisites": ["qual-001"],
-      "related_linear_issues": [],
-      "code_example": {
-        "before": "if (virtualizer) {\n  if (items.length > 0) {\n    if (selectedRows.size > 0) {\n      if (isVirtualized) {\n        if (scrollToIndex !== null) {\n          // Core virtualization logic\n        }\n      }\n    }\n  }\n}",
-        "after": "// Use guard clauses\nif (!virtualizer) return null\nif (items.length === 0) return <EmptyState />\nif (selectedRows.size === 0) return <NoSelection />\nif (!isVirtualized) return <RegularTable />\nif (scrollToIndex === null) return null\n\n// Core virtualization logic (no nesting)\nreturn renderVirtualizedRows()"
-      }
+      "breaking_change": false
     }
   ],
   "metadata": {
-    "files_analyzed": 4657,
-    "large_files_found": 15,
-    "files_over_600_lines": 15,
-    "files_over_800_lines": 4,
-    "any_usages_found": 0,
-    "ts_ignore_found": 0,
-    "potential_duplications": 6,
-    "todo_comments": 4,
-    "console_usages": 1,
-    "missing_return_types": 8,
-    "missing_const_types": 15
+    "files_analyzed": 280011,
+    "large_files_found": 68,
+    "any_usages_found": 436,
+    "console_usages_found": 1358,
+    "barrel_exports_found": 152,
+    "empty_catch_blocks_found": 21,
+    "ts_suppressions_found": 10,
+    "process_env_direct_access": 20
   },
   "summary": {
-    "total_ideas": 15,
+    "total_ideas": 20,
     "by_category": {
-      "large_files": 4,
-      "code_smells": 2,
-      "duplication": 3,
-      "type_safety": 2,
-      "dead_code": 2,
-      "best_practices": 2,
-      "complexity": 0
+      "large_files": 5,
+      "code_smells": 7,
+      "complexity": 4,
+      "types": 2,
+      "duplication": 1,
+      "suggestion": 1
     },
     "by_severity": {
-      "critical": 0,
-      "major": 4,
-      "minor": 6,
-      "suggestion": 5
-    },
-    "by_effort": {
-      "trivial": 4,
-      "small": 2,
-      "medium": 5,
-      "large": 2
+      "critical": 2,
+      "major": 10,
+      "minor": 4,
+      "suggestion": 4
     },
     "by_priority": {
-      "high": 4,
-      "medium": 6,
-      "low": 5
-    }
+      "high": 5,
+      "medium": 9,
+      "low": 6
+    },
+    "key_findings": [
+      "Launch page (1,943 lines) is nearly 2x recommended max - should be split into components",
+      "useFormState hook (707 lines) violates single responsibility - needs decomposition",
+      "Console usage increased from 228+ to 1,358 occurrences - regression in logging discipline",
+      "'any' type usage increased from 149 to 436 - significant type safety regression",
+      "21 files silently swallow errors with empty catch blocks",
+      "No ESLint rules to prevent quality regressions (console, any, process.env)"
+    ]
   }
 }

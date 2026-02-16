@@ -375,7 +375,7 @@ export function HeroSpotifySearch() {
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
+                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-inset',
                     index === activeIndex && 'bg-surface-1'
                   )}
                   onClick={() => handleArtistSelect(artist)}
@@ -430,7 +430,7 @@ export function HeroSpotifySearch() {
             type='button'
             tabIndex={0}
             className={cn(
-              'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle',
+              'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-inset',
               activeIndex === pasteUrlIndex && 'bg-surface-1'
             )}
             onClick={handlePasteUrlClick}
