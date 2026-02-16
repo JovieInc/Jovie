@@ -4,7 +4,7 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, CommonDropdown, Input } from '@jovie/ui';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
@@ -197,7 +197,11 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     dismiss: dismissSuggestion,
   } = useSocialLinkSuggestions(artist.id);
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
   const urlInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const focusUrlField = useCallback((index: number) => {

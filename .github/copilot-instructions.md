@@ -396,13 +396,38 @@ After making changes, **ALWAYS test these user scenarios manually**:
 - Error handling improvements for user-facing features
 - Consistent styling and design token usage across components
 
+## Infrastructure & Cost Guardrails (CRITICAL)
+
+**Before creating any cron job, scheduled task, background worker, or polling loop, you MUST walk through this hierarchy in order:**
+
+1. **Webhook / Event handler** — Can an external service notify you when state changes? This is almost always the right answer.
+2. **Inline after-action** — Can the work happen synchronously after the triggering action?
+3. **On-demand / lazy evaluation** — Can the work happen when the data is next accessed?
+4. **Add to existing scheduled job** — If a nightly/periodic job exists, add your logic there.
+5. **New scheduled job** — Only if all above fail, with explicit PR justification.
+
+**Hard Rules:**
+- **NEVER create a new Vercel cron entry** without explicit human approval
+- **NEVER iterate over all users to call an external API** — O(users) calls per run scales linearly. At 1,000 users hourly = 24,000 API calls/day
+- **NEVER poll external APIs for state you can receive via webhook** — Stripe, Clerk, Resend all have webhooks
+- **NEVER add new job queue libraries** (Bull, Agenda, BullMQ) — use the existing in-database job queue
+- **NEVER use `setInterval`/`setTimeout` in server code** — serverless functions terminate before timers fire
+- Always calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If >1,000/month, justify it.
+- PRs with recurring external API calls MUST include a **Cost Impact** section
+
+**Full details**: See `agents.md` → "Infrastructure & Scheduling Guardrails" at the repo root.
+
+---
+
 ## Non-Goals for Copilot (require human review)
 
 ### High-Risk Changes
+
 - **Database schema changes**: Migrations, RLS policy changes, new tables
 - **Authentication flow modifications**: Clerk configuration, JWT handling, session management
 - **Billing/payment logic**: Stripe integration, subscription management, pricing changes
 - **Performance-critical paths**: Core routing, middleware, authentication middleware
+- **Cron jobs / scheduled tasks**: Any new recurring background work (see guardrails above)
 
 ### Complex Business Logic
 - **Onboarding flow changes**: User signup, profile creation, handle claiming
