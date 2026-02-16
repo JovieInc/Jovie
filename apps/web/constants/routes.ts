@@ -53,6 +53,9 @@ export const APP_ROUTES = {
   ADMIN_ACTIVITY: '/app/admin/activity',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
+  // Marketing
+  PRICING: '/pricing',
+
   // Auth & Onboarding
   SIGNIN: '/signin',
   SIGNUP: '/signup',
