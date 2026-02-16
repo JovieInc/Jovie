@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
-import { buildAvatarSizes } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
@@ -17,6 +16,7 @@ import type {
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
+import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {

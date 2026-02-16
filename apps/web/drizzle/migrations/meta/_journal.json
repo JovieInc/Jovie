@@ -239,6 +239,13 @@
       "when": 1771182092653,
       "tag": "0033_strange_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1771195048104,
+      "tag": "0034_aspiring_proemial_gods",
+      "breakpoints": true
     }
   ]
 }

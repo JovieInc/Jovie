@@ -20,6 +20,7 @@ import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { captureWarning } from '@/lib/error-tracking';
 import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import { stripe } from '@/lib/stripe/client';
+import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -35,6 +36,7 @@ interface HealthCheckResult {
   healthy: boolean;
   timestamp: string;
   checks: {
+    stripeConfig: HealthCheck;
     webhooksProcessing: HealthCheck;
     noStuckWebhooks: HealthCheck;
     recentReconciliation: HealthCheck;
@@ -130,6 +132,7 @@ export async function GET() {
     const lastBillingEventAt = lastBillingEvent[0]?.lastBillingEventAt ?? null;
 
     // Perform health checks
+    const stripeConfig = checkStripeConfig();
     const webhooksProcessing = checkWebhooksProcessing(recentWebhookCount);
     const noStuckWebhooks = checkNoStuckWebhooks(unprocessedWebhookCount);
     const recentReconciliation = checkRecentReconciliation(
@@ -143,6 +146,7 @@ export async function GET() {
 
     // Determine overall health
     const allChecks = [
+      stripeConfig,
       webhooksProcessing,
       noStuckWebhooks,
       recentReconciliation,
@@ -155,6 +159,7 @@ export async function GET() {
       healthy: !hasCritical,
       timestamp: now.toISOString(),
       checks: {
+        stripeConfig,
         webhooksProcessing,
         noStuckWebhooks,
         recentReconciliation,
@@ -283,6 +288,39 @@ async function countSubscriptionsWithStatus(
   }
 
   return count;
+}
+
+/**
+ * Check that Stripe env vars and at least one price ID are configured
+ */
+function checkStripeConfig(): HealthCheck {
+  const configResult = validateStripeConfig();
+  const activePriceIds = getActivePriceIds();
+  const issues: string[] = [];
+
+  if (!configResult.isValid) {
+    issues.push(`Missing env vars: ${configResult.missingVars.join(', ')}`);
+  }
+  if (activePriceIds.length === 0) {
+    issues.push('No price IDs configured — checkout will reject all requests');
+  }
+
+  if (issues.length > 0) {
+    return {
+      status: 'critical',
+      message: issues.join('; '),
+      details: {
+        missingVars: configResult.missingVars,
+        activePriceIdCount: activePriceIds.length,
+      },
+    };
+  }
+
+  return {
+    status: 'healthy',
+    message: `Stripe config valid, ${activePriceIds.length} active price(s)`,
+    details: { activePriceIdCount: activePriceIds.length },
+  };
 }
 
 /**

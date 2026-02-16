@@ -14,6 +14,10 @@
     {
       "path": "/api/cron/billing-reconciliation",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/data-retention",
+      "schedule": "0 2 * * *"
     }
   ],
   "functions": {
@@ -21,7 +25,7 @@
       "maxDuration": 30
     },
     "app/api/cron/**/*.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [

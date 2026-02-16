@@ -22,10 +22,10 @@
  * - Handlers are registered in lib/stripe/webhooks/registry.ts
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
-
 import { db } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
@@ -47,8 +47,14 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
+    Sentry.addBreadcrumb({
+      category: 'billing',
+      message:
+        'Webhook received but STRIPE_WEBHOOK_SECRET is missing — all webhooks will fail',
+      level: 'fatal',
+    });
     await captureCriticalError(
-      'STRIPE_WEBHOOK_SECRET is not configured',
+      'STRIPE_WEBHOOK_SECRET is not configured — production webhooks are broken',
       new Error('Missing STRIPE_WEBHOOK_SECRET environment variable'),
       { route: '/api/stripe/webhooks' }
     );

@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ArtistName } from '@/components/atoms/ArtistName';
 import { Avatar } from '@/components/molecules/Avatar';
-import type { AvatarSize } from '@/components/profile/ProfilePhotoContextMenu';
 import { ProfilePhotoContextMenu } from '@/components/profile/ProfilePhotoContextMenu';
 import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { Artist } from '@/types/db';
 
 interface ArtistInfoProps {
