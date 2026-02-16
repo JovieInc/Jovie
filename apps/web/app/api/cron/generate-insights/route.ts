@@ -106,29 +106,28 @@ export async function GET(request: Request) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // Find profiles with enough data that haven't been processed recently
+    // Find profiles with enough data that haven't been processed recently.
+    // Uses a CTE to pre-aggregate click stats in a single pass over clickEvents
+    // instead of correlated subqueries per profile row.
     const eligibleProfiles = await db
       .execute<{ profile_id: string }>(
         drizzleSql`
+          WITH click_stats AS (
+            SELECT
+              ce.creator_profile_id,
+              count(*) AS total_clicks,
+              min(ce.created_at) AS first_click
+            FROM ${clickEvents} ce
+            WHERE ce.is_bot = false OR ce.is_bot IS NULL
+            GROUP BY ce.creator_profile_id
+            HAVING count(*) >= ${MIN_TOTAL_CLICKS}
+          )
           SELECT cp.id as profile_id
           FROM ${creatorProfiles} cp
+          INNER JOIN click_stats cs ON cs.creator_profile_id = cp.id
           WHERE cp.is_claimed = true
             AND cp.user_id IS NOT NULL
-            -- Has minimum click activity
-            AND (
-              SELECT count(*)
-              FROM ${clickEvents} ce
-              WHERE ce.creator_profile_id = cp.id
-                AND (ce.is_bot = false OR ce.is_bot IS NULL)
-            ) >= ${MIN_TOTAL_CLICKS}
-            -- Has data spanning at least 7 days
-            AND (
-              SELECT min(ce.created_at)
-              FROM ${clickEvents} ce
-              WHERE ce.creator_profile_id = cp.id
-                AND (ce.is_bot = false OR ce.is_bot IS NULL)
-            ) <= ${sevenDaysAgo.toISOString()}::timestamp
-            -- No recent generation run
+            AND cs.first_click <= ${sevenDaysAgo.toISOString()}::timestamp
             AND NOT EXISTS (
               SELECT 1 FROM ${insightGenerationRuns} igr
               WHERE igr.creator_profile_id = cp.id
@@ -149,8 +148,16 @@ export async function GET(request: Request) {
     let insightsTotal = 0;
     const errors: string[] = [];
 
-    // 3. Process each profile
+    // 3. Process each profile with timeout guard (4 min safety margin on 5 min max)
+    const MAX_RUNTIME_MS = 240_000;
     for (const { profile_id: profileId } of eligibleProfiles) {
+      if (Date.now() - startTime > MAX_RUNTIME_MS) {
+        logger.warn(
+          `[insights-cron] Approaching timeout after ${processed} profiles, stopping early`
+        );
+        break;
+      }
+
       try {
         const result = await processProfile(profileId);
         insightsTotal += result.insightsGenerated;

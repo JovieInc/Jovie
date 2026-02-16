@@ -5,7 +5,6 @@ import { profilePhotos } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
-  buildCleanupDetails,
   buildOrphanedRecordsWhereClause,
   collectBlobUrls,
   deleteBlobsIfConfigured,
@@ -22,18 +21,13 @@ const FAILED_RECORD_MAX_AGE_HOURS = 24;
 const UPLOADING_RECORD_MAX_AGE_HOURS = 1; // Stuck uploads older than 1 hour
 
 /**
- * Cron job to clean up orphaned profile_photos records:
- * - Failed uploads older than 24 hours
- * - Stuck "uploading" or "processing" records older than 1 hour
- *
- * Also attempts to delete associated blob storage files.
- *
- * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
+ * Core logic for cleaning up orphaned photos.
+ * Exported for use by the consolidated /api/cron/daily-maintenance handler.
  */
-export async function GET(request: Request) {
-  const authError = verifyCronAuth(request, process.env.CRON_SECRET);
-  if (authError) return authError;
-
+export async function cleanupOrphanedPhotos(): Promise<{
+  deleted: number;
+  blobsDeleted: number;
+}> {
   const now = new Date();
   const failedCutoff = new Date(
     now.getTime() - FAILED_RECORD_MAX_AGE_HOURS * 60 * 60 * 1000
@@ -42,75 +36,68 @@ export async function GET(request: Request) {
     now.getTime() - UPLOADING_RECORD_MAX_AGE_HOURS * 60 * 60 * 1000
   );
 
-  try {
-    const orphanedRecords = await db
-      .select({
-        id: profilePhotos.id,
-        status: profilePhotos.status,
-        blobUrl: profilePhotos.blobUrl,
-        smallUrl: profilePhotos.smallUrl,
-        mediumUrl: profilePhotos.mediumUrl,
-        largeUrl: profilePhotos.largeUrl,
-        createdAt: profilePhotos.createdAt,
-      })
-      .from(profilePhotos)
-      .where(buildOrphanedRecordsWhereClause(failedCutoff, stuckCutoff))
-      .limit(100);
+  const orphanedRecords = await db
+    .select({
+      id: profilePhotos.id,
+      status: profilePhotos.status,
+      blobUrl: profilePhotos.blobUrl,
+      smallUrl: profilePhotos.smallUrl,
+      mediumUrl: profilePhotos.mediumUrl,
+      largeUrl: profilePhotos.largeUrl,
+      createdAt: profilePhotos.createdAt,
+    })
+    .from(profilePhotos)
+    .where(buildOrphanedRecordsWhereClause(failedCutoff, stuckCutoff))
+    .limit(100);
 
-    if (orphanedRecords.length === 0) {
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'No orphaned records found',
-          deleted: 0,
-          blobsDeleted: 0,
-        },
-        { headers: NO_STORE_HEADERS }
-      );
-    }
+  if (orphanedRecords.length === 0) {
+    return { deleted: 0, blobsDeleted: 0 };
+  }
 
-    const blobUrlsToDelete = collectBlobUrls(orphanedRecords);
-    const blobsDeleted = await deleteBlobsIfConfigured(blobUrlsToDelete);
+  const blobUrlsToDelete = collectBlobUrls(orphanedRecords);
+  const blobsDeleted = await deleteBlobsIfConfigured(blobUrlsToDelete);
 
-    // If blob deletion failed (-1), skip DB record deletion to avoid orphaning blobs.
-    // The next cron run will retry both blob and DB cleanup.
-    if (blobsDeleted < 0 && blobUrlsToDelete.length > 0) {
-      logger.warn(
-        `[cleanup-photos] Skipping DB record deletion — blob cleanup failed for ${blobUrlsToDelete.length} URLs`
-      );
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            'Blob deletion failed; DB records preserved to avoid orphaning blobs',
-          deleted: 0,
-          blobsDeleted: 0,
-          blobsFailed: blobUrlsToDelete.length,
-          details: buildCleanupDetails(orphanedRecords),
-        },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Delete database records in a single batch operation
-    const recordIds = orphanedRecords.map(r => r.id);
-    if (recordIds.length > 0) {
-      await db
-        .delete(profilePhotos)
-        .where(inArray(profilePhotos.id, recordIds));
-    }
-
-    logger.info(
-      `[cleanup-photos] Deleted ${recordIds.length} orphaned records, ${blobsDeleted} blobs`
+  // If blob deletion failed, skip DB record deletion to avoid orphaning blobs
+  if (blobsDeleted < 0 && blobUrlsToDelete.length > 0) {
+    logger.warn(
+      `[cleanup-photos] Skipping DB record deletion — blob cleanup failed for ${blobUrlsToDelete.length} URLs`
     );
+    throw new Error(`Blob deletion failed for ${blobUrlsToDelete.length} URLs`);
+  }
+
+  const recordIds = orphanedRecords.map(r => r.id);
+  if (recordIds.length > 0) {
+    await db.delete(profilePhotos).where(inArray(profilePhotos.id, recordIds));
+  }
+
+  logger.info(
+    `[cleanup-photos] Deleted ${recordIds.length} orphaned records, ${blobsDeleted} blobs`
+  );
+
+  return { deleted: recordIds.length, blobsDeleted };
+}
+
+/**
+ * Cron job to clean up orphaned profile_photos records.
+ *
+ * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
+ */
+export async function GET(request: Request) {
+  const authError = verifyCronAuth(request, process.env.CRON_SECRET);
+  if (authError) return authError;
+
+  try {
+    const result = await cleanupOrphanedPhotos();
 
     return NextResponse.json(
       {
         success: true,
-        message: `Cleaned up ${recordIds.length} orphaned photo records`,
-        deleted: recordIds.length,
-        blobsDeleted,
-        details: buildCleanupDetails(orphanedRecords),
+        message:
+          result.deleted === 0
+            ? 'No orphaned records found'
+            : `Cleaned up ${result.deleted} orphaned photo records`,
+        deleted: result.deleted,
+        blobsDeleted: result.blobsDeleted,
       },
       { headers: NO_STORE_HEADERS }
     );
