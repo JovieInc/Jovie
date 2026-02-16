@@ -526,7 +526,8 @@ When a PR introduces or modifies any of the following, the PR description MUST i
 - New third-party service integrations
 
 **Cost Impact template:**
-```
+
+```markdown
 ## Cost Impact
 - **External API calls**: ~X calls/day to [Service] (X calls/run × Y runs/day)
 - **Monthly projection**: ~X calls/month at current user count

@@ -422,6 +422,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 ## Non-Goals for Copilot (require human review)
 
 ### High-Risk Changes
+
 - **Database schema changes**: Migrations, RLS policy changes, new tables
 - **Authentication flow modifications**: Clerk configuration, JWT handling, session management
 - **Billing/payment logic**: Stripe integration, subscription management, pricing changes

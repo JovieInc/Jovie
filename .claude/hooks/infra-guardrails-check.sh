@@ -5,6 +5,9 @@
 # - Detect polling patterns (setInterval/setTimeout in server code)
 # - Warn on new external API client usage in scheduled contexts
 
+# Resolve paths against repo root
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
 # Get file path and content from tool input
 if command -v jq &> /dev/null; then
   file_path=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty' 2>/dev/null)
@@ -22,7 +25,7 @@ fi
 # Check if creating a NEW file under app/api/cron/
 if [[ "$file_path" =~ app/api/cron/ ]] && [[ "$file_path" =~ route\.ts$ ]]; then
   # Check if this is a new file (doesn't exist yet)
-  if [ ! -f "$file_path" ]; then
+  if [ ! -f "$REPO_ROOT/$file_path" ]; then
     echo "🚨 BLOCKED: Creating new cron job requires explicit approval"
     echo "File: $file_path"
     echo ""
