@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { TipSelector } from '@/components/molecules/TipSelector';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
@@ -50,32 +49,11 @@ export default function VenmoTipSelector({
 
   return (
     <section className={className} aria-label='Venmo Tipping'>
-      <div className='rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-        <div className='mb-5 flex items-center gap-3'>
-          <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#008CFF]/10'>
-            <SocialIcon
-              platform='venmo'
-              className='h-4.5 w-4.5 text-[#008CFF]'
-            />
-          </div>
-          <div>
-            <h2 className='text-[15px] font-semibold tracking-tight text-primary-token'>
-              Send a Tip
-            </h2>
-            <p className='text-xs text-secondary-token'>via Venmo</p>
-          </div>
-        </div>
-
-        <TipSelector
-          amounts={amounts}
-          onContinue={handleAmountSelected}
-          paymentLabel='Venmo'
-        />
-
-        <p className='mt-4 text-center text-xs text-tertiary-token'>
-          You&apos;ll be redirected to Venmo to complete your tip.
-        </p>
-      </div>
+      <TipSelector
+        amounts={amounts}
+        onContinue={handleAmountSelected}
+        paymentLabel='Venmo'
+      />
     </section>
   );
 }
