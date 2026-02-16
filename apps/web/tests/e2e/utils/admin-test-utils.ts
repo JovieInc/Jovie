@@ -13,6 +13,11 @@ import type { Page } from '@playwright/test';
 // Admin Credentials
 // ============================================================================
 
+interface AdminCredentials {
+  username: string;
+  password: string;
+}
+
 /**
  * Check if admin Clerk credentials are available.
  * Supports passwordless Clerk test emails (containing +clerk_test)
@@ -48,7 +53,7 @@ export function hasAdminCredentials(): boolean {
 /**
  * Get admin credentials (admin-specific or fallback to regular)
  */
-export function getAdminCredentials(): { username: string; password: string } {
+export function getAdminCredentials(): AdminCredentials {
   const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
   const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
   const isClerkTestEmail = adminUsername.includes('+clerk_test');
@@ -114,12 +119,17 @@ export async function waitForTransientErrorToResolve(
   );
 }
 
+interface ClientErrorResult {
+  hasError: boolean;
+  errorText?: string;
+}
+
 /**
  * Check if the page has a client-side error (after waiting for transient errors to resolve)
  */
 export async function checkForClientError(
   page: Page
-): Promise<{ hasError: boolean; errorText?: string }> {
+): Promise<ClientErrorResult> {
   // First wait for any transient React 19 errors to resolve
   try {
     await waitForTransientErrorToResolve(page);
@@ -143,20 +153,27 @@ export async function checkForClientError(
 // Admin Nav Helpers
 // ============================================================================
 
+interface WaitForAdminNavOptions {
+  maxAttempts?: number;
+  delayMs?: number;
+}
+
 /**
  * Wait for admin nav to become visible with retries.
  * Returns true if admin nav is visible, false if user doesn't have admin access.
  */
 export async function waitForAdminNav(
   page: Page,
-  options?: { maxAttempts?: number; delayMs?: number }
+  options?: WaitForAdminNavOptions
 ): Promise<boolean> {
   const maxAttempts = options?.maxAttempts ?? 5;
   const delayMs = options?.delayMs ?? 1000;
 
   const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 
-  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  // Short hydration pause to let client-side JS settle
+  await page.waitForTimeout(500);
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     await page.waitForTimeout(delayMs);

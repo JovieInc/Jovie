@@ -136,11 +136,13 @@ test.describe('Admin Page Content @smoke', () => {
       return;
     }
 
-    const results: Array<{
+    interface AdminPageCheckResult {
       name: string;
       status: 'OK' | 'ERROR' | 'CONTENT_MISSING' | 'SKIP_404';
       error?: string;
-    }> = [];
+    }
+
+    const results: AdminPageCheckResult[] = [];
 
     for (const adminPage of ADMIN_PAGES) {
       // Navigate to the page
