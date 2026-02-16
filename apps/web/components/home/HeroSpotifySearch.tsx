@@ -223,30 +223,23 @@ export function HeroSpotifySearch() {
     Boolean(trimmedQuery) && (isSpotifyUrl(trimmedQuery) || results.length > 0);
 
   return (
-    <div className='relative mx-auto w-full' style={{ maxWidth: '480px' }}>
+    <div className='relative mx-auto w-full max-w-[480px]'>
       <label htmlFor='hero-spotify-search' className='sr-only'>
         Search Spotify artists or paste a link
       </label>
       <div
         className={cn(
-          'w-full flex items-center gap-3 rounded-xl border px-4 py-3',
+          'w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
           'transition-all duration-200',
           shouldShowDropdown
-            ? 'border-(--linear-border-focus) ring-2 ring-(--linear-btn-primary-bg)/20'
-            : 'border-(--linear-border-default) hover:border-(--linear-border-focus)'
+            ? 'border-focus ring-2 ring-focus/20'
+            : 'border-strong hover:border-focus'
         )}
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          minHeight: '48px',
-        }}
       >
-        <div
-          className='flex items-center justify-center w-6 h-6 rounded-full shrink-0'
-          style={{ backgroundColor: 'rgba(30, 215, 96, 0.15)' }}
-        >
+        <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
           <SocialIcon
             platform='spotify'
-            className='w-3.5 h-3.5 text-[#1DB954]'
+            className='w-3.5 h-3.5 text-brand-spotify'
           />
         </div>
         <input
@@ -262,11 +255,7 @@ export function HeroSpotifySearch() {
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
-          className='min-w-0 flex-1 bg-transparent focus-visible:outline-none'
-          style={{
-            fontSize: '14px',
-            color: 'var(--linear-text-primary)',
-          }}
+          className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
           role='combobox'
           aria-expanded={shouldShowDropdown}
           aria-controls='hero-spotify-results'
@@ -275,53 +264,29 @@ export function HeroSpotifySearch() {
           }
         />
         {state === 'loading' ? (
-          <div
-            className='w-4 h-4 border-2 border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0'
-            style={{
-              borderColor: 'var(--linear-text-tertiary)',
-              borderTopColor: 'transparent',
-            }}
-          />
+          <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0' />
         ) : showContinueAction ? (
           <button
             type='button'
             onClick={handleContinue}
-            className='shrink-0 inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed'
-            style={{
-              backgroundColor: 'var(--linear-btn-primary-bg)',
-              color: 'var(--linear-btn-primary-fg)',
-            }}
+            className='shrink-0 inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed bg-btn-primary text-btn-primary-foreground'
           >
             Continue
           </button>
         ) : (
-          <Search
-            className='w-4 h-4 shrink-0'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          />
+          <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
         )}
       </div>
 
-      <p
-        className='mt-2 text-center'
-        style={{ fontSize: '12px', color: 'var(--linear-text-secondary)' }}
-      >
+      <p className='mt-2 text-center text-xs text-tertiary-token'>
         {isSpotifyUrl(trimmedQuery)
-          ? 'Detected a Spotify URL — Continue to import your artist.'
-          : 'Pick a result or paste a Spotify artist URL, then continue.'}
+          ? 'Spotify URL detected — press Continue to import.'
+          : 'Search by name or paste a Spotify URL.'}
       </p>
 
       {/* Dropdown results */}
       {shouldShowDropdown && (
-        <div
-          className='absolute z-50 w-full mt-2 rounded-xl border overflow-hidden'
-          style={{
-            top: '100%',
-            backgroundColor: 'var(--linear-bg-surface-0)',
-            borderColor: 'var(--linear-border-default)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
-          }}
-        >
+        <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg'>
           <select
             id='hero-spotify-results'
             className='sr-only'
@@ -373,19 +338,10 @@ export function HeroSpotifySearch() {
                   key={key}
                   className='flex items-center gap-3 animate-pulse'
                 >
-                  <div
-                    className='w-10 h-10 rounded-full'
-                    style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-                  />
+                  <div className='w-10 h-10 rounded-full bg-surface-1' />
                   <div className='flex-1 space-y-1'>
-                    <div
-                      className='h-4 w-32 rounded'
-                      style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-                    />
-                    <div
-                      className='h-3 w-20 rounded'
-                      style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-                    />
+                    <div className='h-4 w-32 rounded bg-surface-1' />
+                    <div className='h-3 w-20 rounded bg-surface-1' />
                   </div>
                 </div>
               ))}
@@ -395,21 +351,14 @@ export function HeroSpotifySearch() {
           {/* Empty state */}
           {state === 'empty' && (
             <div className='p-4 text-center'>
-              <p
-                className='text-sm'
-                style={{ color: 'var(--linear-text-secondary)' }}
-              >
-                No artists found
-              </p>
+              <p className='text-sm text-secondary-token'>No artists found</p>
             </div>
           )}
 
           {/* Error state */}
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm' style={{ color: 'var(--linear-error)' }}>
-                Search failed. Try again.
-              </p>
+              <p className='text-sm text-error'>Search failed. Try again.</p>
             </div>
           )}
 
@@ -426,14 +375,9 @@ export function HeroSpotifySearch() {
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left'
+                    'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
+                    index === activeIndex && 'bg-surface-1'
                   )}
-                  style={{
-                    backgroundColor:
-                      index === activeIndex
-                        ? 'var(--linear-bg-surface-1)'
-                        : 'transparent',
-                  }}
                   onClick={() => handleArtistSelect(artist)}
                   onKeyDown={event =>
                     handleActivationKeyDown(event, () =>
@@ -442,10 +386,7 @@ export function HeroSpotifySearch() {
                   }
                   onMouseEnter={() => setActiveIndex(index)}
                 >
-                  <div
-                    className='w-10 h-10 rounded-full overflow-hidden shrink-0 relative'
-                    style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-                  >
+                  <div className='w-10 h-10 rounded-full overflow-hidden shrink-0 relative bg-surface-1'>
                     {artist.imageUrl ? (
                       <Image
                         src={artist.imageUrl}
@@ -465,28 +406,17 @@ export function HeroSpotifySearch() {
                     )}
                   </div>
                   <div className='flex-1 min-w-0'>
-                    <div
-                      className='font-medium truncate'
-                      style={{
-                        color: 'var(--linear-text-primary)',
-                        fontSize: '14px',
-                      }}
-                    >
+                    <div className='font-medium truncate text-sm text-primary-token'>
                       {artist.name}
                     </div>
                     {artist.followers && (
-                      <div
-                        style={{
-                          color: 'var(--linear-text-tertiary)',
-                          fontSize: '12px',
-                        }}
-                      >
+                      <div className='text-xs text-tertiary-token'>
                         {formatFollowers(artist.followers)}
                       </div>
                     )}
                   </div>
                   {artist.verified && (
-                    <div className='shrink-0' style={{ color: '#1DB954' }}>
+                    <div className='shrink-0 text-brand-spotify'>
                       <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                     </div>
                   )}
@@ -499,46 +429,27 @@ export function HeroSpotifySearch() {
           <button
             type='button'
             tabIndex={0}
-            className='flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left'
-            style={{
-              borderTop: '1px solid var(--linear-border-subtle)',
-              backgroundColor:
-                activeIndex === pasteUrlIndex
-                  ? 'var(--linear-bg-surface-1)'
-                  : 'transparent',
-            }}
+            className={cn(
+              'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle',
+              activeIndex === pasteUrlIndex && 'bg-surface-1'
+            )}
             onClick={handlePasteUrlClick}
             onKeyDown={event =>
               handleActivationKeyDown(event, () => handlePasteUrlClick())
             }
             onMouseEnter={() => setActiveIndex(pasteUrlIndex)}
           >
-            <div
-              className='w-10 h-10 rounded-full flex items-center justify-center'
-              style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-            >
+            <div className='w-10 h-10 rounded-full flex items-center justify-center bg-surface-1'>
               <Link2
-                className='h-5 w-5'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                className='h-5 w-5 text-tertiary-token'
                 aria-hidden='true'
               />
             </div>
             <div className='flex-1'>
-              <div
-                className='font-medium'
-                style={{
-                  color: 'var(--linear-text-primary)',
-                  fontSize: '14px',
-                }}
-              >
+              <div className='font-medium text-sm text-primary-token'>
                 Paste a Spotify URL instead
               </div>
-              <div
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                  fontSize: '12px',
-                }}
-              >
+              <div className='text-xs text-tertiary-token'>
                 open.spotify.com/artist/...
               </div>
             </div>
@@ -547,15 +458,11 @@ export function HeroSpotifySearch() {
       )}
 
       {/* Fallback: sign up without Spotify */}
-      <p
-        className='mt-2 text-center'
-        style={{ fontSize: '13px', color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mt-2 text-center text-[13px] text-tertiary-token'>
         or{' '}
         <Link
           href={APP_ROUTES.SIGNUP}
-          className='underline transition-colors'
-          style={{ color: 'var(--linear-text-secondary)' }}
+          className='underline transition-colors text-secondary-token'
         >
           sign up without Spotify
         </Link>

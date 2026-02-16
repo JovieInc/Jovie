@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { usePixelSettingsMutation } from '@/lib/queries';
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -136,7 +137,13 @@ interface PixelSettingsResponse {
   };
 }
 
-export function SettingsAdPixelsSection() {
+export interface SettingsAdPixelsSectionProps {
+  readonly isPro?: boolean;
+}
+
+export function SettingsAdPixelsSection({
+  isPro = true,
+}: SettingsAdPixelsSectionProps) {
   const { mutate: savePixels, isPending: isPixelSaving } =
     usePixelSettingsMutation();
 
@@ -148,6 +155,7 @@ export function SettingsAdPixelsSection() {
       if (!res.ok) throw new Error('Failed to fetch pixel settings');
       return res.json();
     },
+    enabled: isPro,
     staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
   });
 
@@ -170,6 +178,7 @@ export function SettingsAdPixelsSection() {
 
   // Populate form with existing settings when fetched
   useEffect(() => {
+    if (!isPro) return;
     if (existingSettings?.pixels) {
       setPixelData(prev => ({
         ...prev,
@@ -191,7 +200,7 @@ export function SettingsAdPixelsSection() {
       // Reset token modified flags when settings are loaded
       setTokenModified({ facebook: false, google: false, tiktok: false });
     }
-  }, [existingSettings]);
+  }, [existingSettings, isPro]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setPixelData(prev => ({ ...prev, [field]: value }));
@@ -237,6 +246,21 @@ export function SettingsAdPixelsSection() {
     },
     [savePixels, pixelData.enabled, tokenModified]
   );
+
+  if (!isPro) {
+    return (
+      <DashboardCard variant='settings'>
+        <SettingsToggleRow
+          title='Pixel tracking'
+          description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+          checked={false}
+          onCheckedChange={() => {}}
+          ariaLabel='Pixel tracking'
+          gated
+        />
+      </DashboardCard>
+    );
+  }
 
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>

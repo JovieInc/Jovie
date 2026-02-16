@@ -232,18 +232,12 @@ function MockBar({ url }: { url: string }) {
 
 /* ─── Divider ─── */
 function Divider() {
-  return <hr className='border-t border-[var(--linear-border-subtle)]' />;
+  return <hr className='border-t border-subtle' />;
 }
 
 export default function LaunchPage() {
   return (
-    <div
-      className='relative min-h-screen'
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        color: 'var(--linear-text-primary)',
-      }}
-    >
+    <div className='relative min-h-screen'>
       <AuthRedirectHandler />
 
       {/* Structured Data */}
@@ -264,45 +258,71 @@ export default function LaunchPage() {
       />
 
       {/* ═══ 1. HERO ═══ */}
-      <section aria-labelledby='hero-heading' className='pt-44 pb-16'>
-        <div className={WRAP}>
-          <h1 id='hero-heading' className='marketing-h1-linear max-w-[780px]'>
-            Your entire music career.{' '}
-            <span className='text-[var(--linear-text-secondary)]'>
-              One intelligent link.
-            </span>
-          </h1>
+      <section
+        aria-labelledby='hero-heading'
+        className='relative pt-40 md:pt-48 lg:pt-52 pb-16 md:pb-20 lg:pb-24 overflow-hidden'
+      >
+        <div
+          className='hero-glow pointer-events-none absolute inset-0'
+          aria-hidden='true'
+        />
 
-          <p className='marketing-lead-linear mt-7 max-w-[520px]'>
-            Paste your Spotify. Jovie imports your discography, creates smart
-            links for every release, and builds a link-in-bio that turns
-            listeners into fans you actually own.
-          </p>
+        <div className={`${WRAP} relative`}>
+          <div className='flex flex-col items-center text-center'>
+            <h1 id='hero-heading' className='marketing-h1-linear max-w-[780px]'>
+              Your entire music career.{' '}
+              <span className='text-secondary-token'>
+                One intelligent link.
+              </span>
+            </h1>
 
-          <div className='mt-10 max-w-[480px]'>
-            <HeroSpotifySearch />
-          </div>
+            <p className='marketing-lead-linear mt-6 max-w-[520px] text-secondary-token'>
+              Import your Spotify, get smart links for every release, and a
+              link-in-bio that converts listeners into fans.
+            </p>
 
-          <p className='mt-3 text-sm text-[var(--linear-text-tertiary)]'>
-            Free forever for one artist. No credit card.{' '}
+            <p className='mt-6 text-sm text-tertiary-token'>
+              Free forever. No credit card.
+            </p>
+
+            <div className='mt-4 w-full max-w-[520px]'>
+              <HeroSpotifySearch />
+            </div>
+
             <a
               href='#how-it-works'
-              className='hover:underline focus-ring rounded text-[var(--linear-text-secondary)]'
+              className='mt-6 inline-flex items-center gap-1.5 text-sm text-tertiary-token hover:text-secondary-token transition-colors focus-ring rounded'
             >
-              See how it works &darr;
+              See how it works
+              <svg
+                width='12'
+                height='12'
+                viewBox='0 0 12 12'
+                fill='none'
+                className='mt-px'
+                aria-hidden='true'
+              >
+                <path
+                  d='M6 2.5v7M3 7l3 3 3-3'
+                  stroke='currentColor'
+                  strokeWidth='1.5'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+              </svg>
             </a>
-          </p>
+          </div>
         </div>
       </section>
 
       {/* ═══ 2. LOGOS ═══ */}
-      <div className='py-14 border-b border-[var(--linear-border-subtle)]'>
+      <div className='py-14 border-b border-subtle'>
         <div className={WRAP}>
           <div className='flex items-center justify-between flex-wrap gap-6'>
             {LOGOS.map(name => (
               <span
                 key={name}
-                className='text-sm font-medium text-[var(--linear-text-secondary)] opacity-55'
+                className='text-sm font-medium text-secondary-token opacity-55'
               >
                 {name}
               </span>
@@ -320,7 +340,7 @@ export default function LaunchPage() {
         <div className={WRAP}>
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
-            <span className='text-[var(--linear-text-secondary)]'>
+            <span className='text-secondary-token'>
               One Spotify link imports your entire career. AI handles the rest.
               Smart links, fan capture, and a link-in-bio that actually converts
               &mdash; not just another list of links.
@@ -331,7 +351,7 @@ export default function LaunchPage() {
 
       {/* ═══ 4. PILLARS ═══ */}
       <div className={WRAP}>
-        <div className='grid grid-cols-1 md:grid-cols-3 border-t border-[var(--linear-border-subtle)]'>
+        <div className='grid grid-cols-1 md:grid-cols-3 border-t border-subtle'>
           {[
             {
               num: 'FIG 0.1',
@@ -351,15 +371,15 @@ export default function LaunchPage() {
           ].map((item, i) => (
             <div
               key={item.num}
-              className={`py-10 pr-8 ${i < 2 ? 'md:border-r md:border-[var(--linear-border-subtle)]' : ''}`}
+              className={`py-10 pr-8 ${i < 2 ? 'md:border-r md:border-subtle' : ''}`}
             >
-              <div className='mb-4 font-mono tracking-wide text-xs text-[var(--linear-text-tertiary)]'>
+              <div className='mb-4 font-mono tracking-wide text-xs text-tertiary-token'>
                 {item.num}
               </div>
               <h3 className='font-medium mb-3 text-base tracking-tight leading-snug'>
                 {item.title}
               </h3>
-              <p className='text-sm leading-relaxed text-[var(--linear-text-secondary)]'>
+              <p className='text-sm leading-relaxed text-secondary-token'>
                 {item.desc}
               </p>
             </div>
@@ -381,9 +401,7 @@ export default function LaunchPage() {
               className='marketing-h2-linear max-w-[440px]'
             >
               A link-in-bio built to convert,{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                not just display
-              </span>
+              <span className='text-secondary-token'>not just display</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -394,7 +412,7 @@ export default function LaunchPage() {
               opening your latest release on their preferred streaming platform.
               Every visit has a purpose.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '1.1', title: 'Adaptive CTA' },
                 { num: '1.2', title: 'Email + SMS Capture' },
@@ -402,7 +420,7 @@ export default function LaunchPage() {
                 { num: '1.4', title: 'Custom Domains' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -410,17 +428,17 @@ export default function LaunchPage() {
               ))}
             </div>
             {/* Stat callout */}
-            <div className='flex flex-col sm:flex-row items-baseline gap-4 pt-8 mt-8 border-t border-[var(--linear-border-subtle)]'>
+            <div className='flex flex-col sm:flex-row items-baseline gap-4 pt-8 mt-8 border-t border-subtle'>
               <div className='font-medium shrink-0 text-[2.5rem] tracking-tight leading-none'>
                 371%
               </div>
               <div>
-                <div className='text-sm text-[var(--linear-text-secondary)] leading-normal max-w-[380px]'>
+                <div className='text-sm text-secondary-token leading-normal max-w-[380px]'>
                   more clicks when a page has one CTA instead of many. Pages
                   with a single action convert at 13.5% vs 10.5% for pages with
                   5+ links.
                 </div>
-                <div className='text-[0.7rem] text-[var(--linear-text-tertiary)] mt-1'>
+                <div className='text-[0.7rem] text-tertiary-token mt-1'>
                   Source: WordStream, Omnisend
                 </div>
               </div>
@@ -447,9 +465,7 @@ export default function LaunchPage() {
               className='marketing-h2-linear max-w-[440px]'
             >
               Every release, every platform,{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                one link
-              </span>
+              <span className='text-secondary-token'>one link</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -459,7 +475,7 @@ export default function LaunchPage() {
               the listener&apos;s preferred streaming platform and routes them
               there. No manual setup, no broken links, no maintenance.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '2.1', title: 'Auto-Created Links' },
                 { num: '2.2', title: 'Platform Auto-Matching' },
@@ -467,7 +483,7 @@ export default function LaunchPage() {
                 { num: '2.4', title: 'Click Analytics' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -724,9 +740,7 @@ export default function LaunchPage() {
               className='marketing-h2-linear max-w-[440px]'
             >
               One profile.{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                Infinite deeplinks.
-              </span>
+              <span className='text-secondary-token'>Infinite deeplinks.</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -742,7 +756,7 @@ export default function LaunchPage() {
               native navigation menu for your entire Jovie profile &mdash; not
               one Linktree link with extra friction.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '3.1', title: '/tip' },
                 { num: '3.2', title: '/tour' },
@@ -750,7 +764,7 @@ export default function LaunchPage() {
                 { num: '3.4', title: '/listen' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -1203,9 +1217,7 @@ export default function LaunchPage() {
           <div>
             <h2 id='ai-heading' className='marketing-h2-linear max-w-[440px]'>
               AI that actually knows{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                your music
-              </span>
+              <span className='text-secondary-token'>your music</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -1216,7 +1228,7 @@ export default function LaunchPage() {
               Canvas, or format lyrics for Apple Music &mdash; it&apos;s
               grounded in your real catalog.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '4.1', title: 'Bio & Press Releases' },
                 { num: '4.2', title: 'Spotify Canvas Generator' },
@@ -1224,7 +1236,7 @@ export default function LaunchPage() {
                 { num: '4.4', title: 'Impersonation Alerts' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -1396,9 +1408,7 @@ export default function LaunchPage() {
               className='marketing-h2-linear max-w-[440px]'
             >
               Know every fan{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                by name
-              </span>
+              <span className='text-secondary-token'>by name</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -1409,7 +1419,7 @@ export default function LaunchPage() {
               by engagement so you know who your real fans are, not just your
               traffic.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '5.1', title: 'Fan Engagement Scoring' },
                 { num: '5.2', title: 'Source Attribution' },
@@ -1417,7 +1427,7 @@ export default function LaunchPage() {
                 { num: '5.4', title: 'Export & Sync' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -1611,7 +1621,7 @@ export default function LaunchPage() {
                       <th
                         key={th}
                         scope='col'
-                        className='text-left font-medium uppercase tracking-wide px-3 py-2 text-[0.7rem] text-[var(--linear-text-tertiary)] border-b border-[var(--linear-border-subtle)]'
+                        className='text-left font-medium uppercase tracking-wide px-3 py-2 text-[0.7rem] text-tertiary-token border-b border-subtle'
                       >
                         {th}
                       </th>
@@ -1740,13 +1750,11 @@ export default function LaunchPage() {
       <div className={WRAP}>
         <section
           aria-labelledby='whynow-heading'
-          className='py-16 border-y border-[var(--linear-border-subtle)]'
+          className='py-16 border-y border-subtle'
         >
           <h2 id='whynow-heading' className='marketing-h2-linear'>
             More creators than ever.{' '}
-            <span className='text-[var(--linear-text-secondary)]'>
-              More noise than ever.
-            </span>
+            <span className='text-secondary-token'>More noise than ever.</span>
           </h2>
           <p className='marketing-lead-linear mt-4 max-w-[600px]'>
             AI tools like Suno and Udio are creating an explosion of new music
@@ -1777,10 +1785,10 @@ export default function LaunchPage() {
                 <div className='font-medium text-[2rem] tracking-tight'>
                   {s.val}
                 </div>
-                <div className='mt-1.5 text-sm text-[var(--linear-text-secondary)] leading-snug'>
+                <div className='mt-1.5 text-sm text-secondary-token leading-snug'>
                   {s.label}
                 </div>
-                <div className='mt-1 text-[0.7rem] text-[var(--linear-text-tertiary)]'>
+                <div className='mt-1 text-[0.7rem] text-tertiary-token'>
                   {s.source}
                 </div>
               </div>
@@ -1802,9 +1810,7 @@ export default function LaunchPage() {
               className='marketing-h2-linear max-w-[440px]'
             >
               Gets smarter{' '}
-              <span className='text-[var(--linear-text-secondary)]'>
-                with every artist
-              </span>
+              <span className='text-secondary-token'>with every artist</span>
             </h2>
           </div>
           <div className='pt-1'>
@@ -1814,7 +1820,7 @@ export default function LaunchPage() {
               better platform matching, smarter routing, and better AI for
               everyone. Linktree has links. Jovie has a data flywheel.
             </p>
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-[var(--linear-border-subtle)]'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '6.1', title: 'Catalog Intelligence' },
                 { num: '6.2', title: 'Cross-Artist Patterns' },
@@ -1822,7 +1828,7 @@ export default function LaunchPage() {
                 { num: '6.4', title: 'Smart Routing Model' },
               ].map(sf => (
                 <div key={sf.num} className='py-2'>
-                  <div className='font-mono text-xs text-[var(--linear-text-tertiary)] mb-1'>
+                  <div className='font-mono text-xs text-tertiary-token mb-1'>
                     {sf.num}
                   </div>
                   <div className='text-sm font-medium'>{sf.title}</div>
@@ -1841,16 +1847,16 @@ export default function LaunchPage() {
             className='marketing-h2-linear max-w-[680px]'
           >
             What you get for free.{' '}
-            <span className='text-[var(--linear-text-secondary)]'>
+            <span className='text-secondary-token'>
               Compare Jovie&apos;s free plan to what you&apos;re probably using
               right now.
             </span>
           </h2>
         </div>
-        <div className='grid grid-cols-1 md:grid-cols-2 border-t border-[var(--linear-border-subtle)]'>
+        <div className='grid grid-cols-1 md:grid-cols-2 border-t border-subtle'>
           {/* Linktree */}
-          <div className='py-10 md:pr-12 md:border-r md:border-[var(--linear-border-subtle)]'>
-            <div className='uppercase tracking-wide font-medium mb-6 text-xs text-[var(--linear-text-tertiary)] tracking-widest'>
+          <div className='py-10 md:pr-12 md:border-r md:border-subtle'>
+            <div className='uppercase tracking-wide font-medium mb-6 text-xs text-tertiary-token tracking-widest'>
               Free Linktree + nothing else
             </div>
             <ul className='list-none'>
@@ -1864,10 +1870,10 @@ export default function LaunchPage() {
               ].map(item => (
                 <li
                   key={item}
-                  className='flex items-start gap-3 py-2.5 text-sm text-[var(--linear-text-secondary)] border-b border-white/[0.04]'
+                  className='flex items-start gap-3 py-2.5 text-sm text-secondary-token border-b border-white/[0.04]'
                 >
                   <span
-                    className='shrink-0 mt-0.5 text-xs text-[var(--linear-text-tertiary)]'
+                    className='shrink-0 mt-0.5 text-xs text-tertiary-token'
                     aria-hidden='true'
                   >
                     &times;
@@ -1894,7 +1900,7 @@ export default function LaunchPage() {
               ].map(item => (
                 <li
                   key={item}
-                  className='flex items-start gap-3 py-2.5 text-sm text-[var(--linear-text-secondary)] border-b border-white/[0.04]'
+                  className='flex items-start gap-3 py-2.5 text-sm text-secondary-token border-b border-white/[0.04]'
                 >
                   <span className='shrink-0 mt-0.5 text-xs' aria-hidden='true'>
                     &check;
@@ -1911,9 +1917,7 @@ export default function LaunchPage() {
       <section className={`${WRAP} pt-32 text-center`}>
         <h2 className='marketing-h2-linear max-w-[680px] mx-auto'>
           Simple pricing.{' '}
-          <span className='text-[var(--linear-text-secondary)]'>
-            No credits. No per-message fees. No surprises.
-          </span>
+          <span className='text-secondary-token'>No surprises.</span>
         </h2>
         <Link
           href='/launch/pricing'
@@ -1941,7 +1945,7 @@ export default function LaunchPage() {
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)] hover:bg-white/[0.04]'
+              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-[var(--linear-bg-surface-1)] border border-subtle hover:bg-white/[0.04]'
             >
               Contact us
             </a>
