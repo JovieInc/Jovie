@@ -263,6 +263,29 @@ useEffect(() => {
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 
+## Infrastructure & Cost Guardrails (CRITICAL)
+
+**Before creating any cron job, scheduled task, or polling loop:**
+
+1. **Webhook first** — Can an external service notify you? (Stripe, Clerk, Resend all have webhooks)
+2. **Inline after-action** — Can it happen right after the triggering action?
+3. **Lazy evaluation** — Can it happen when data is next accessed?
+4. **Add to existing job** — Can you extend an existing cron?
+5. **New job (last resort)** — Only with explicit human approval and PR justification.
+
+**NEVER:**
+- Create a new Vercel cron entry without human approval
+- Iterate over all users to call an external API (24,000+ calls/day at 1k users hourly)
+- Poll external APIs for state available via webhook
+- Add job queue libraries (Bull, Agenda, etc.)
+- Use `setInterval`/`setTimeout` in server code (serverless functions terminate)
+
+**ALWAYS** include a Cost Impact section in PRs with recurring external API calls.
+
+See `agents.md` at repo root for full infrastructure guardrails.
+
+---
+
 ## AI Tool Verification
 
 Before suggesting code changes, verify:
@@ -273,3 +296,5 @@ Before suggesting code changes, verify:
 4. ✅ Uses TypeScript types
 5. ✅ Follows existing patterns
 6. ✅ Maintains security best practices
+7. ✅ No unnecessary cron jobs or scheduled tasks (see guardrails above)
+8. ✅ No excessive external API calls in loops

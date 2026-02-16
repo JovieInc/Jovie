@@ -28,6 +28,11 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/file-protection-check.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/infra-guardrails-check.sh",
+            "timeout": 5
           }
         ]
       }
@@ -352,6 +357,7 @@
       "**/.env*",
       "**/prisma/schema.prisma",
       "**/next.config.*",
+      "**/vercel.json",
       "**/vercel.*.json",
       "**/posthog.*",
       "**/sentry.*"
