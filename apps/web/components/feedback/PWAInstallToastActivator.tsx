@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const TOAST_ID = 'pwa-install';
+
+// Module-level flag so the toast only shows once per page load, surviving
+// component remounts during client-side navigation.
+let shownThisSession = false;
 
 /**
  * Activates PWA install prompt as a Sonner toast.
@@ -17,11 +21,10 @@ const TOAST_ID = 'pwa-install';
  */
 export function PWAInstallToastActivator() {
   const { canPrompt, isIOS, install, dismiss } = usePWAInstall();
-  const hasShown = useRef(false);
 
   useEffect(() => {
-    if (!canPrompt || hasShown.current) return;
-    hasShown.current = true;
+    if (!canPrompt || shownThisSession) return;
+    shownThisSession = true;
 
     const description = isIOS
       ? 'Tap the Share button, then "Add to Home Screen" to install.'
@@ -36,7 +39,10 @@ export function PWAInstallToastActivator() {
         : {
             action: {
               label: 'Install',
-              onClick: () => install(),
+              onClick: () => {
+                install();
+                dismiss();
+              },
             },
           }),
       onDismiss: () => dismiss(),
@@ -45,7 +51,7 @@ export function PWAInstallToastActivator() {
 
   // When canPrompt becomes false (app installed or dismissed via hook), dismiss the toast
   useEffect(() => {
-    if (!canPrompt && hasShown.current) {
+    if (!canPrompt && shownThisSession) {
       toast.dismiss(TOAST_ID);
     }
   }, [canPrompt]);
