@@ -482,11 +482,17 @@ body {
     min-height: 0;
     transition:
       color var(--linear-duration-fast) var(--linear-ease),
-      background var(--linear-duration-fast) var(--linear-ease);
+      background var(--linear-duration-fast) var(--linear-ease),
+      box-shadow var(--linear-duration-fast) var(--linear-ease);
 
     &:hover {
       background-color: var(--linear-bg-hover);
       color: var(--linear-text-primary);
+    }
+
+    &.is-active {
+      color: var(--linear-text-primary);
+      box-shadow: inset 0 -1px 0 0 var(--linear-border-strong);
     }
   }
 

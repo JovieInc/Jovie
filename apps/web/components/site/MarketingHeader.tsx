@@ -41,6 +41,16 @@ export function MarketingHeader({
   // Show pricing link on all pages including homepage (was hidden as pseudo feature flag)
   const hidePricingLink = false;
 
+  // Anchor nav links for the /launch landing page
+  const launchNavLinks =
+    pathname === '/launch'
+      ? [
+          { href: '#how-it-works', label: 'How it works' },
+          { href: '#features', label: 'Features' },
+          { href: '#pricing', label: 'Pricing' },
+        ]
+      : undefined;
+
   return (
     <Header
       sticky={false}
@@ -50,6 +60,7 @@ export function MarketingHeader({
       hidePricingLink={hidePricingLink}
       containerSize='homepage'
       className='border-b'
+      navLinks={launchNavLinks}
       style={{
         backgroundColor: 'var(--linear-bg-header)',
         borderBottomColor: 'var(--linear-border-subtle)',

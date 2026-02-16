@@ -14,8 +14,10 @@ import { cn } from '@/lib/utils';
 
 export function MobileNav({
   hidePricingLink = false,
+  navLinks: customNavLinks,
 }: {
   readonly hidePricingLink?: boolean;
+  readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -57,12 +59,19 @@ export function MobileNav({
     }
   }, [isOpen, close]);
 
-  const navLinks = [
-    ...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : []),
-    ...(showAuthenticatedAction
-      ? []
-      : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
-  ];
+  const navLinks = customNavLinks
+    ? [
+        ...customNavLinks,
+        ...(showAuthenticatedAction
+          ? []
+          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
+      ]
+    : [
+        ...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : []),
+        ...(showAuthenticatedAction
+          ? []
+          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
+      ];
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document !== 'undefined' ? document.body : null;
