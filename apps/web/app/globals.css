@@ -127,6 +127,14 @@ body {
   --color-subtle: var(--color-border-subtle);
   --color-default: var(--color-border-default);
   --color-strong: var(--color-border-strong);
+
+  /* Transition durations — Linear timing tokens for duration-* utilities in @apply */
+  --transition-duration-instant: var(--duration-instant);
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-normal: var(--duration-normal);
+  --transition-duration-slow: var(--duration-slow);
+  --transition-duration-slower: var(--duration-slower);
+  --transition-duration-slowest: var(--duration-slowest);
 }
 
 /* ============================================

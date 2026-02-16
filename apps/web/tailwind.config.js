@@ -28,12 +28,12 @@ module.exports = {
     extend: {
       // Font weights - Inter variable font precise weights (Linear-extracted)
       fontWeight: {
-        normal: 'var(--font-weight-normal)',   // 400
-        book: 'var(--font-weight-book)',       // 450 — Linear's UI default
-        medium: 'var(--font-weight-medium)',   // 500
+        normal: 'var(--font-weight-normal)', // 400
+        book: 'var(--font-weight-book)', // 450 — Linear's UI default
+        medium: 'var(--font-weight-medium)', // 500
         semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
-        bold: 'var(--font-weight-bold)',       // 590 — Linear-specific
-        heavy: 'var(--font-weight-heavy)',     // 700
+        bold: 'var(--font-weight-bold)', // 590 — Linear-specific
+        heavy: 'var(--font-weight-heavy)', // 700
         // Legacy linear-prefixed aliases
         'linear-normal': 'var(--linear-font-weight-normal)',
         'linear-medium': 'var(--linear-font-weight-medium)',
@@ -43,8 +43,8 @@ module.exports = {
 
       // Font sizes - including Linear's 13px app UI size
       fontSize: {
-        '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }],   // 11px
-        app: ['var(--text-app)', { lineHeight: '1.4' }],       // 13px — Linear's default
+        '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }], // 11px
+        app: ['var(--text-app)', { lineHeight: '1.4' }], // 13px — Linear's default
       },
 
       // Linear spacing tokens
@@ -59,11 +59,11 @@ module.exports = {
 
       // Border radius - Linear-extracted values
       borderRadius: {
-        xs: 'var(--radius-xs)',           // 3px — tags, tiny elements
+        xs: 'var(--radius-xs)', // 3px — tags, tiny elements
         DEFAULT: 'var(--radius-default)', // 6px — buttons, dropdowns
-        xl: 'var(--radius-xl)',           // 10px — large cards
-        '3xl': 'var(--radius-3xl)',       // 14px — large modals
-        pill: 'var(--radius-pill)',       // 48px — pill buttons
+        xl: 'var(--radius-xl)', // 10px — large cards
+        '3xl': 'var(--radius-3xl)', // 14px — large modals
+        pill: 'var(--radius-pill)', // 48px — pill buttons
         // Legacy linear-prefixed aliases
         'linear-sm': 'var(--linear-radius-sm)',
         'linear-md': 'var(--linear-radius-md)',
@@ -185,12 +185,12 @@ module.exports = {
 
       // Transition duration - Linear's precise timing
       transitionDuration: {
-        instant: 'var(--duration-instant)',  // 50ms
-        fast: 'var(--duration-fast)',        // 100ms
-        normal: 'var(--duration-normal)',    // 150ms — THE standard
-        slow: 'var(--duration-slow)',        // 200ms
-        slower: 'var(--duration-slower)',    // 250ms
-        slowest: 'var(--duration-slowest)',  // 300ms
+        instant: 'var(--duration-instant)', // 50ms
+        fast: 'var(--duration-fast)', // 100ms
+        normal: 'var(--duration-normal)', // 150ms — THE standard
+        slow: 'var(--duration-slow)', // 200ms
+        slower: 'var(--duration-slower)', // 250ms
+        slowest: 'var(--duration-slowest)', // 300ms
       },
 
       // Ring colors (for focus rings)

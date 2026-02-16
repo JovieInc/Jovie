@@ -66,12 +66,12 @@
        bg-secondary:  lch(93.75% 0 282.863)    — cards, panels
        bg-tertiary:   lch(91.417% 0 282.863)   — nested surfaces
        bg-quaternary: lch(97.542% 0 282.863)   — HOVER STATE BG (critical!) */
-  --color-bg-page: oklch(97% 0 283);            /* Page-level bg */
-  --color-bg-hover: oklch(97.5% 0 283);         /* Row/item hover */
-  --color-bg-elevated: oklch(92% 0 283);         /* Extra elevation */
-  --color-bg-input: oklch(100% 0 0);             /* Input backgrounds */
-  --color-bg-active: oklch(95% 0 283);           /* Active/selected */
-  --color-bg-button: oklch(93% 0 283);           /* Button backgrounds */
+  --color-bg-page: oklch(97% 0 283); /* Page-level bg */
+  --color-bg-hover: oklch(97.5% 0 283); /* Row/item hover */
+  --color-bg-elevated: oklch(92% 0 283); /* Extra elevation */
+  --color-bg-input: oklch(100% 0 0); /* Input backgrounds */
+  --color-bg-active: oklch(95% 0 283); /* Active/selected */
+  --color-bg-button: oklch(93% 0 283); /* Button backgrounds */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -130,7 +130,8 @@
   /* Shadows — Linear uses ring-border pattern (1px solid ring via box-shadow)
      Extracted from Linear.app live (2026-02-15) */
   --shadow-color: 240 10% 3.9%;
-  --shadow-sm: rgba(0, 0, 0, 0.04) 0px 1px 2px 0px, rgba(0, 0, 0, 0.04) 0px 2px 4px 0px;
+  --shadow-sm:
+    rgba(0, 0, 0, 0.04) 0px 1px 2px 0px, rgba(0, 0, 0, 0.04) 0px 2px 4px 0px;
   --shadow-md: 0 4px 6px oklch(0% 0 0 / 4%), 0 2px 4px oklch(0% 0 0 / 6%);
   --shadow-lg: 0 10px 20px oklch(0% 0 0 / 5%), 0 6px 6px oklch(0% 0 0 / 6%);
   --shadow-xl: rgba(0, 0, 0, 0.15) 0px 40px 80px 0px;
@@ -141,16 +142,14 @@
     oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
     oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
   --shadow-card-elevated:
-    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
-    oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
 
   /* Inset divider shadow (used for section separators) */
   --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
 
   /* Button inset shadow */
   --shadow-button-inset:
-    0px 4px 4px -1px oklch(0% 0 0 / 6%),
-    0px 1px 1px 0px oklch(0% 0 0 / 12%);
+    0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -175,19 +174,31 @@
        bg-quaternary: lch(7.133% 1.867 272)
        bg-secondary: lch(10.633% 3.033 272)
        bg-tertiary:  lch(14.133% 4.2 272) */
-  /* prettier-ignore */ --color-bg-base: oklch(5% 0.005 272); /* sidebar & page bg — was #111111 */
-  /* prettier-ignore */ --color-bg-surface-0: oklch(5% 0.005 272); /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: oklch(11% 0.015 272); /* main content — elevated */
-  /* prettier-ignore */ --color-bg-surface-2: oklch(14.5% 0.018 272); /* cards, drawer */
-  /* prettier-ignore */ --color-bg-surface-3: oklch(18% 0.02 272); /* Modals, tooltips */
+  /* prettier-ignore */ --color-bg-base: oklch(
+    5% 0.005 272
+  ); /* sidebar & page bg — was #111111 */
+  /* prettier-ignore */ --color-bg-surface-0: oklch(
+    5% 0.005 272
+  ); /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: oklch(
+    11% 0.015 272
+  ); /* main content — elevated */
+  /* prettier-ignore */ --color-bg-surface-2: oklch(
+    14.5% 0.018 272
+  ); /* cards, drawer */
+  /* prettier-ignore */ --color-bg-surface-3: oklch(
+    18% 0.02 272
+  ); /* Modals, tooltips */
 
   /* Additional dark surface levels (Linear has ~8 distinct levels) */
-  --color-bg-page: oklch(3% 0 272);           /* Deepest page bg */
-  --color-bg-hover: oklch(7.5% 0.01 272);     /* Row/item hover (Linear bg-quaternary) */
-  --color-bg-elevated: oklch(8.5% 0.01 272);  /* Slightly elevated */
-  --color-bg-input: oklch(12% 0.012 272);      /* Input backgrounds */
-  --color-bg-active: oklch(13% 0.018 272);     /* Active/selected items */
-  --color-bg-button: oklch(17% 0.015 272);     /* Button backgrounds */
+  --color-bg-page: oklch(3% 0 272); /* Deepest page bg */
+  --color-bg-hover: oklch(
+    7.5% 0.01 272
+  ); /* Row/item hover (Linear bg-quaternary) */
+  --color-bg-elevated: oklch(8.5% 0.01 272); /* Slightly elevated */
+  --color-bg-input: oklch(12% 0.012 272); /* Input backgrounds */
+  --color-bg-active: oklch(13% 0.018 272); /* Active/selected items */
+  --color-bg-button: oklch(17% 0.015 272); /* Button backgrounds */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
@@ -252,12 +263,10 @@
     oklch(0% 0 0 / 15%) 0px 3px 6px -2px,
     oklch(0% 0 0 / 20%) 0px 1px 1px 0px;
   --shadow-card-elevated:
-    oklch(0% 0 0 / 20%) 0px 3px 6px -2px,
-    oklch(0% 0 0 / 25%) 0px 1px 1px 0px;
+    oklch(0% 0 0 / 20%) 0px 3px 6px -2px, oklch(0% 0 0 / 25%) 0px 1px 1px 0px;
   --shadow-divider: oklch(20% 0.02 272) 0px -0.5px 0px 0px inset;
   --shadow-button-inset:
-    0px 4px 4px -1px oklch(0% 0 0 / 10%),
-    0px 1px 1px 0px oklch(0% 0 0 / 18%);
+    0px 4px 4px -1px oklch(0% 0 0 / 10%), 0px 1px 1px 0px oklch(0% 0 0 / 18%);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -505,10 +514,10 @@
      400 = normal, 450 = book (sidebar/tabs/issues!), 500 = medium,
      538 = semibold, 590 = bold, 700 = heavy */
   --font-weight-normal: 400;
-  --font-weight-book: 450;       /* KEY: Linear's default UI weight */
+  --font-weight-book: 450; /* KEY: Linear's default UI weight */
   --font-weight-medium: 500;
-  --font-weight-semibold: 538;   /* Linear-specific, not standard 600 */
-  --font-weight-bold: 590;       /* Linear-specific, not standard 700 */
+  --font-weight-semibold: 538; /* Linear-specific, not standard 600 */
+  --font-weight-bold: 590; /* Linear-specific, not standard 700 */
   --font-weight-heavy: 700;
 
   /* Type scale - based on 16px base
@@ -593,16 +602,16 @@
    ============================================ */
 :root {
   --radius-none: 0;
-  --radius-xs: 3px;      /* Tags, tiny elements (observed in Linear) */
-  --radius-sm: 4px;       /* Sidebar items, badges */
-  --radius-md: 5px;       /* Input fields — Linear uses 5px, not 6px */
-  --radius-default: 6px;  /* Buttons, dropdowns */
-  --radius-lg: 8px;       /* Cards, modals */
-  --radius-xl: 10px;      /* Large cards (observed in Linear) */
-  --radius-2xl: 12px;     /* Panels, sheets */
-  --radius-3xl: 14px;     /* Large modals (observed in Linear) */
-  --radius-pill: 48px;    /* Pill buttons (observed in Linear) */
-  --radius-full: 9999px;  /* Circles, tags */
+  --radius-xs: 3px; /* Tags, tiny elements (observed in Linear) */
+  --radius-sm: 4px; /* Sidebar items, badges */
+  --radius-md: 5px; /* Input fields — Linear uses 5px, not 6px */
+  --radius-default: 6px; /* Buttons, dropdowns */
+  --radius-lg: 8px; /* Cards, modals */
+  --radius-xl: 10px; /* Large cards (observed in Linear) */
+  --radius-2xl: 12px; /* Panels, sheets */
+  --radius-3xl: 14px; /* Large modals (observed in Linear) */
+  --radius-pill: 48px; /* Pill buttons (observed in Linear) */
+  --radius-full: 9999px; /* Circles, tags */
 }
 
 /* ============================================
@@ -613,7 +622,7 @@
      80%+ of their 33 unique transition rules use 150ms */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
-  --duration-normal: 150ms;    /* THE Linear default */
+  --duration-normal: 150ms; /* THE Linear default */
   --duration-slow: 200ms;
   --duration-slower: 250ms;
   --duration-slowest: 300ms;
@@ -622,26 +631,39 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-linear: cubic-bezier(0.25, 0.46, 0.45, 0.94);  /* Linear's marketing ease */
+  --ease-linear: cubic-bezier(
+    0.25,
+    0.46,
+    0.45,
+    0.94
+  ); /* Linear's marketing ease */
 
-  /* Pre-composed transition patterns (extracted from Linear) */
-  --transition-colors: border 150ms, background-color 150ms, color 150ms, opacity 150ms;
-  --transition-bg: background-color 150ms;
-  --transition-opacity: opacity 150ms;
-  --transition-opacity-fast: opacity 50ms ease-in-out;
-  --transition-fill: fill 150ms, stroke 150ms;
-  --transition-transform: transform 150ms;
-  --transition-collapse: height 200ms ease-out, min-height 200ms ease-out;
-  --transition-shadow: box-shadow 150ms, background-color 150ms;
+  /* Pre-composed transition patterns (extracted from Linear)
+     Use duration custom properties so prefers-reduced-motion overrides work */
+  --transition-colors:
+    border var(--duration-normal), background-color var(--duration-normal),
+    color var(--duration-normal), opacity var(--duration-normal);
+  --transition-bg: background-color var(--duration-normal);
+  --transition-opacity: opacity var(--duration-normal);
+  --transition-opacity-fast: opacity var(--duration-instant) ease-in-out;
+  --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
+  --transition-transform: transform var(--duration-normal);
+  --transition-collapse:
+    height var(--duration-slow) ease-out,
+    min-height var(--duration-slow) ease-out;
+  --transition-shadow:
+    box-shadow var(--duration-normal), background-color var(--duration-normal);
 }
 
-/* Reduced motion */
+/* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
     --duration-slow: 0ms;
     --duration-slower: 0ms;
+    --duration-slowest: 0ms;
   }
 }
 
