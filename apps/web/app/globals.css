@@ -123,10 +123,11 @@ body {
   --color-surface-2: var(--color-bg-surface-2);
   --color-surface-3: var(--color-bg-surface-3);
 
-  /* Border tokens — generates border-subtle, border-default, border-strong */
+  /* Border tokens — generates border-subtle, border-default, border-strong, border-focus */
   --color-subtle: var(--color-border-subtle);
   --color-default: var(--color-border-default);
   --color-strong: var(--color-border-strong);
+  --color-focus: var(--color-border-focus);
 
   /* Transition durations — Linear timing tokens for duration-* utilities in @apply */
   --transition-duration-instant: var(--duration-instant);
@@ -371,6 +372,21 @@ body {
     text-wrap: balance;
   }
 
+  /* Hero radial glow — subtle depth cue behind heading */
+  .hero-glow {
+    background: radial-gradient(
+      ellipse 80% 50% at 50% 40%,
+      oklch(30% 0.03 260 / 0.15),
+      transparent 70%
+    );
+  }
+
+  @media (prefers-contrast: more) {
+    .hero-glow {
+      display: none;
+    }
+  }
+
   .marketing-lead-linear {
     font-size: clamp(
       var(--linear-body-lg-size-sm),
@@ -408,61 +424,6 @@ body {
 
 /* scrollbar-hide - MIGRATED TO PLUGIN
    Now in lib/tailwind/utilities-plugin.js */
-
-@layer base {
-  .marketing-mono {
-    /* Linear uses normal letter-spacing */
-    letter-spacing: normal;
-
-    /* Light mode - Linear-inspired minimal aesthetic */
-    --color-bg-base: #ffffff;
-    --color-bg-surface-0: #fafbfc;
-    --color-bg-surface-1: #f6f7f8;
-    --color-bg-surface-2: #eef0f2;
-    --color-bg-surface-3: #e5e7eb;
-
-    /* Light mode text hierarchy */
-    --color-text-primary-token: #0c0c0c;
-    --color-text-secondary-token: #3f3f46;
-    --color-text-tertiary-token: #52525b;
-    --color-text-quaternary-token: #a1a1aa;
-
-    /* Light mode borders */
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-border-default: rgba(0, 0, 0, 0.1);
-    --color-border-strong: rgba(0, 0, 0, 0.18);
-
-    /* Light mode buttons */
-    --color-btn-primary-bg: #0c0c0c;
-    --color-btn-primary-fg: #ffffff;
-  }
-
-  /* Dark mode variant */
-  :root.dark .marketing-mono,
-  .dark .marketing-mono {
-    /* Linear's dark-8a equivalent */
-    --color-bg-base: #0a0a0f; /* Warmer off-black */
-    --color-bg-surface-0: #0f0f12;
-    --color-bg-surface-1: #141419;
-    --color-bg-surface-2: #18181f;
-    --color-bg-surface-3: #1e1e27;
-
-    /* Dark mode text hierarchy */
-    --color-text-primary-token: #f4f4f5;
-    --color-text-secondary-token: #d4d4d8;
-    --color-text-tertiary-token: #a1a1aa;
-    --color-text-quaternary-token: #737378;
-
-    /* Dark mode borders */
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-border-default: rgba(255, 255, 255, 0.1);
-    --color-border-strong: rgba(255, 255, 255, 0.18);
-
-    /* Dark mode buttons */
-    --color-btn-primary-bg: #ffffff;
-    --color-btn-primary-fg: #0a0a0f;
-  }
-}
 
 /* ============================================
    LINEAR-STYLE COMPONENTS

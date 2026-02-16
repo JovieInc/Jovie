@@ -6,6 +6,7 @@ import {
 } from '@/lib/entitlements/server';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({
   children,

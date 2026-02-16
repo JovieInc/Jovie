@@ -93,6 +93,9 @@
   /* Strong border - rgba(255, 255, 255, 0.18) */
   --linear-border-strong: oklch(100% 0 0 / 0.18);
 
+  /* Focus border - brighter ring for interactive elements */
+  --linear-border-focus: oklch(60% 0.12 260);
+
   /* ============================================
      BUTTON COLORS
      ============================================ */

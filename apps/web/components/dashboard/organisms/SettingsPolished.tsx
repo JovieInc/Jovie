@@ -1,8 +1,7 @@
 'use client';
 
-import { BarChart3, Rocket, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
@@ -11,14 +10,12 @@ import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/Setti
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
-import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
 import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 
-import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
@@ -29,23 +26,14 @@ interface SettingsPolishedProps {
   readonly focusSection?: string;
 }
 
-const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
-
 export function SettingsPolished({
   artist,
   onArtistUpdate,
   focusSection,
 }: SettingsPolishedProps) {
   const router = useRouter();
-  const { data: billingData, isLoading: billingLoading } =
-    useBillingStatusQuery();
+  const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
-  const [isBillingLoading, setIsBillingLoading] = useState(false);
-
-  const handleBilling = useCallback(async () => {
-    setIsBillingLoading(true);
-    await router.push(APP_ROUTES.SETTINGS_BILLING);
-  }, [router]);
 
   const renderAccountSection = useCallback(
     () => (
@@ -68,24 +56,6 @@ export function SettingsPolished({
       </div>
     ),
     []
-  );
-
-  const renderProUpgradeCard = useCallback(
-    (
-      title: string,
-      description: string,
-      icon: React.ComponentType<{ className?: string }>
-    ) => (
-      <SettingsProGateCard
-        title={title}
-        description={description}
-        icon={icon}
-        onUpgrade={handleBilling}
-        loading={isBillingLoading || billingLoading}
-        buttonClassName={SETTINGS_BUTTON_CLASS}
-      />
-    ),
-    [handleBilling, isBillingLoading, billingLoading]
   );
 
   // -- General (user-level) settings --
@@ -163,55 +133,34 @@ export function SettingsPolished({
         id: 'branding',
         title: 'Branding',
         description: 'Custom branding for your profile page.',
-        render: () =>
-          isPro ? (
-            <SettingsBrandingSection
-              artist={artist}
-              onArtistUpdate={onArtistUpdate}
-            />
-          ) : (
-            renderProUpgradeCard(
-              'Professional Appearance',
-              'Remove Jovie branding to create a fully custom experience for your fans.',
-              Sparkles
-            )
-          ),
+        render: () => (
+          <SettingsBrandingSection
+            artist={artist}
+            onArtistUpdate={onArtistUpdate}
+            isPro={isPro}
+          />
+        ),
       },
       {
         id: 'ad-pixels',
         title: 'Ad Pixels',
         description: 'Facebook, Google, and TikTok conversion tracking.',
-        render: () =>
-          isPro ? (
-            <SettingsAdPixelsSection />
-          ) : (
-            renderProUpgradeCard(
-              'Unlock Growth Tracking',
-              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-              Rocket
-            )
-          ),
+        render: () => <SettingsAdPixelsSection isPro={isPro} />,
       },
       {
         id: 'analytics',
         title: 'Analytics',
         description: 'Control how your visits appear in analytics.',
-        render: () =>
-          isPro ? (
-            <SettingsAnalyticsSection
-              artist={artist}
-              onArtistUpdate={onArtistUpdate}
-            />
-          ) : (
-            renderProUpgradeCard(
-              'Pro Analytics Filtering',
-              'Exclude your own visits from analytics to get cleaner data about your real audience.',
-              BarChart3
-            )
-          ),
+        render: () => (
+          <SettingsAnalyticsSection
+            artist={artist}
+            onArtistUpdate={onArtistUpdate}
+            isPro={isPro}
+          />
+        ),
       },
     ],
-    [artist, isPro, onArtistUpdate, router, renderProUpgradeCard]
+    [artist, isPro, onArtistUpdate, router]
   );
 
   const allSections = [...userSections, ...artistSections];

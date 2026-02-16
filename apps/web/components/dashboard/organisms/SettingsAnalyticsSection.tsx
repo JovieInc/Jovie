@@ -10,11 +10,13 @@ import type { Artist } from '@/types/db';
 export interface SettingsAnalyticsSectionProps {
   readonly artist: Artist;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
+  readonly isPro?: boolean;
 }
 
 export function SettingsAnalyticsSection({
   artist,
   onArtistUpdate,
+  isPro = true,
 }: SettingsAnalyticsSectionProps) {
   const [excludeSelf, setExcludeSelf] = useState(
     artist.settings?.exclude_self_from_analytics ?? false
@@ -65,9 +67,10 @@ export function SettingsAnalyticsSection({
         onCheckedChange={handleToggle}
         disabled={isPending}
         ariaLabel='Exclude yourself from analytics'
+        gated={!isPro}
       />
 
-      {excludeSelf && (
+      {isPro && excludeSelf && (
         <div className='mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg'>
           <div className='flex items-start gap-3'>
             <BarChart3 className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0' />

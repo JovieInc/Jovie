@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { usePixelSettingsMutation } from '@/lib/queries';
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -136,7 +137,13 @@ interface PixelSettingsResponse {
   };
 }
 
-export function SettingsAdPixelsSection() {
+export interface SettingsAdPixelsSectionProps {
+  readonly isPro?: boolean;
+}
+
+export function SettingsAdPixelsSection({
+  isPro = true,
+}: SettingsAdPixelsSectionProps) {
   const { mutate: savePixels, isPending: isPixelSaving } =
     usePixelSettingsMutation();
 
@@ -237,6 +244,21 @@ export function SettingsAdPixelsSection() {
     },
     [savePixels, pixelData.enabled, tokenModified]
   );
+
+  if (!isPro) {
+    return (
+      <DashboardCard variant='settings'>
+        <SettingsToggleRow
+          title='Pixel tracking'
+          description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+          checked={false}
+          onCheckedChange={() => {}}
+          ariaLabel='Pixel tracking'
+          gated
+        />
+      </DashboardCard>
+    );
+  }
 
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>

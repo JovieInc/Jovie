@@ -191,7 +191,7 @@ export function DashboardAudienceClient({
         <div className='shrink-0 px-4 pt-4 sm:px-6 sm:pt-5'>
           <AudienceFunnelMetrics />
         </div>
-        <div className='flex-1 min-h-0'>
+        <div className='flex-1 min-h-0 flex flex-col'>
           <DashboardAudienceTable
             mode={mode}
             view={view}
