@@ -8,14 +8,14 @@
       "description": "Create a TanStack Query hook for fetching contacts list. The contacts domain exists in queryKeys but no query hook is exported from lib/queries/index.ts.",
       "rationale": "The queryKeys.contacts domain is defined in keys.ts with list() factory method, but there's no corresponding useContactsQuery hook. This follows the same pattern as other list queries (releases, insights, tour dates).",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 184-189)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useReleasesQuery.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useInsightsQuery.ts"
+        "apps/web/lib/queries/keys.ts (lines 184-189)",
+        "apps/web/lib/queries/useReleasesQuery.ts",
+        "apps/web/lib/queries/useInsightsQuery.ts"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useContactsQuery.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts"
+        "apps/web/lib/queries/useContactsQuery.ts (new)",
+        "apps/web/lib/queries/index.ts"
       ],
       "existing_patterns": [
         "queryKeys.contacts.list() factory exists",
@@ -32,14 +32,14 @@
       "description": "Create a TanStack Query hook for fetching tour dates list. The tour dates domain has a comprehensive queryKeys structure but no query hook is exported.",
       "rationale": "queryKeys.tourDates includes list(), upcoming(), detail(), and connection() factories. Only mutations exist (useTourDateMutations.ts) but no query hook for fetching. This is inconsistent with other domains that have both queries and mutations.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 192-201)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useTourDateMutations.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useReleasesQuery.ts"
+        "apps/web/lib/queries/keys.ts (lines 192-201)",
+        "apps/web/lib/queries/useTourDateMutations.ts",
+        "apps/web/lib/queries/useReleasesQuery.ts"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useTourDatesQuery.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts"
+        "apps/web/lib/queries/useTourDatesQuery.ts (new)",
+        "apps/web/lib/queries/index.ts"
       ],
       "existing_patterns": [
         "queryKeys.tourDates with list(), upcoming(), detail(), connection()",
@@ -56,12 +56,12 @@
       "description": "Add a /launch/features page as a sibling to /launch/pricing, following the same pattern of extracted marketing pages with Linear design tokens.",
       "rationale": "The launch page was refactored to extract /launch/pricing as a separate page. A features page would follow this pattern and allow deeper exploration of individual features without bloating the main launch page.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/pricing/page.tsx"
+        "apps/web/app/(marketing)/launch/page.tsx",
+        "apps/web/app/(marketing)/launch/pricing/page.tsx"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/features/page.tsx (new)"
+        "apps/web/app/(marketing)/launch/features/page.tsx (new)"
       ],
       "existing_patterns": [
         "Launch page has sections for smart links, AI, audience, deeplinks",
@@ -78,13 +78,13 @@
       "description": "Create useAppleMusicArtistSearchQuery hook following the Spotify search pattern. The file exists but may not be complete or exported.",
       "rationale": "useAppleMusicArtistSearchQuery.ts exists in lib/queries/ and is referenced in index.ts, but the implementation may be incomplete compared to useArtistSearchQuery (Spotify). Both should follow identical patterns for consistency.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useArtistSearchQuery.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useAppleMusicArtistSearchQuery.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 138-143)"
+        "apps/web/lib/queries/useArtistSearchQuery.ts",
+        "apps/web/lib/queries/useAppleMusicArtistSearchQuery.ts",
+        "apps/web/lib/queries/keys.ts (lines 138-143)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useAppleMusicArtistSearchQuery.ts"
+        "apps/web/lib/queries/useAppleMusicArtistSearchQuery.ts"
       ],
       "existing_patterns": [
         "useArtistSearchQuery (Spotify) with debouncing, SEARCH_CACHE strategy",
@@ -101,13 +101,13 @@
       "description": "Build a utility that generates documentation from cache-strategies.ts showing which hooks use which cache strategies, with rationale.",
       "rationale": "cache-strategies.ts defines 7 cache presets (REALTIME, FREQUENT, STANDARD, STABLE, STATIC, PAGINATED, SEARCH) but there's no inventory of which hooks use which strategies. This would help maintain consistency and catch outliers.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/cache-strategies.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/*.ts (51 query hook files)"
+        "apps/web/lib/queries/cache-strategies.ts",
+        "apps/web/lib/queries/*.ts (51 query hook files)"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/scripts/generate-cache-strategy-docs.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/docs/CACHE_STRATEGY_USAGE.md (new)"
+        "apps/web/lib/queries/scripts/generate-cache-strategy-docs.ts (new)",
+        "docs/CACHE_STRATEGY_USAGE.md (new)"
       ],
       "existing_patterns": [
         "Similar pattern to TANSTACK_QUERY_INVENTORY.md documentation",
@@ -123,14 +123,14 @@
       "description": "Create a CSV export utility specifically for audience/subscriber data, extending the existing csv.ts utility with audience-specific formatters.",
       "rationale": "lib/utils/csv.ts provides generic CSV export utilities. The audience page shows subscribers with engagement scoring, source attribution, etc. A specialized export would format this data appropriately for analysis.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/csv.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/audience.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/download.ts"
+        "apps/web/lib/utils/csv.ts",
+        "apps/web/lib/utils/audience.ts",
+        "apps/web/lib/utils/download.ts"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/csv-audience.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/csv.ts"
+        "apps/web/lib/utils/csv-audience.ts (new)",
+        "apps/web/lib/utils/csv.ts"
       ],
       "existing_patterns": [
         "csv.ts has toCsv(), downloadCsv() utilities",
@@ -147,14 +147,14 @@
       "description": "Add API_ROUTES constant object alongside APP_ROUTES to centralize API endpoint paths and avoid string duplication.",
       "rationale": "APP_ROUTES in constants/routes.ts centralizes app navigation paths. API routes are currently hardcoded strings scattered across query hooks and mutations. Centralizing them would improve maintainability and type safety.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/constants/routes.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/**/*.ts (100+ API routes)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/*.ts (query hooks with hardcoded API paths)"
+        "apps/web/constants/routes.ts",
+        "apps/web/app/api/**/*.ts (100+ API routes)",
+        "apps/web/lib/queries/*.ts (query hooks with hardcoded API paths)"
       ],
       "category": "architecture",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/constants/routes.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/*.ts (many files)"
+        "apps/web/constants/routes.ts",
+        "apps/web/lib/queries/*.ts (many files)"
       ],
       "existing_patterns": [
         "APP_ROUTES object with typed routes",
@@ -170,14 +170,14 @@
       "description": "Create a query hook for fetching runtime metadata/feature flags, following the pattern of useBuildInfoQuery for version monitoring.",
       "rationale": "useBuildInfoQuery exists for version monitoring. A similar pattern could be used for runtime feature flags, A/B test assignments, or dynamic configuration that needs client-side access.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useBuildInfoQuery.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (health domain)"
+        "apps/web/lib/queries/useBuildInfoQuery.ts",
+        "apps/web/lib/queries/keys.ts (health domain)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useMetadataQuery.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/metadata/route.ts (new)"
+        "apps/web/lib/queries/useMetadataQuery.ts (new)",
+        "apps/web/lib/queries/index.ts",
+        "apps/web/app/api/metadata/route.ts (new)"
       ],
       "existing_patterns": [
         "useBuildInfoQuery uses STABLE_CACHE for rarely-changing data",
@@ -194,14 +194,14 @@
       "description": "Create a generateMarketingMetadata() utility to share metadata generation logic across /launch, /launch/pricing, and future marketing pages.",
       "rationale": "Both launch/page.tsx and launch/pricing/page.tsx have nearly identical generateMetadata() implementations. Extracting to a shared utility would reduce duplication and ensure consistency.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx (lines 13-112)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/pricing/page.tsx (lines 9-27)"
+        "apps/web/app/(marketing)/launch/page.tsx (lines 13-112)",
+        "apps/web/app/(marketing)/launch/pricing/page.tsx (lines 9-27)"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/marketing-metadata.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/pricing/page.tsx"
+        "apps/web/lib/utils/marketing-metadata.ts (new)",
+        "apps/web/app/(marketing)/launch/page.tsx",
+        "apps/web/app/(marketing)/launch/pricing/page.tsx"
       ],
       "existing_patterns": [
         "Both pages use APP_NAME, APP_URL constants",
@@ -218,14 +218,14 @@
       "description": "Create a query hook for fetching admin creators list with filters. The queryKeys.creators domain exists but no query hook is exported.",
       "rationale": "queryKeys.creators has list(), detail(), featured(), socialLinks() factories but no corresponding query hooks are exported from index.ts. Admin mutations exist (useCreatorMutations.ts) but queries are missing.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 62-75)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useCreatorMutations.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useReleasesQuery.ts"
+        "apps/web/lib/queries/keys.ts (lines 62-75)",
+        "apps/web/lib/queries/useCreatorMutations.ts",
+        "apps/web/lib/queries/useReleasesQuery.ts"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useAdminCreatorsQuery.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts"
+        "apps/web/lib/queries/useAdminCreatorsQuery.ts (new)",
+        "apps/web/lib/queries/index.ts"
       ],
       "existing_patterns": [
         "queryKeys.creators with list(filters), detail(id), featured()",
@@ -242,12 +242,12 @@
       "description": "Extract the feature card pattern used across launch page sections into a reusable FeatureCard component.",
       "rationale": "Launch page repeats similar feature card patterns in multiple sections (pillars, features grid, AI features grid). A shared component would reduce duplication and ensure consistent styling.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx (lines 370-387, 1251-1387)"
+        "apps/web/app/(marketing)/launch/page.tsx (lines 370-387, 1251-1387)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/marketing/FeatureCard.tsx (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx"
+        "apps/web/components/marketing/FeatureCard.tsx (new)",
+        "apps/web/app/(marketing)/launch/page.tsx"
       ],
       "existing_patterns": [
         "Feature cards with num/title/desc pattern (FIG 0.1, FIG 0.2, etc.)",
@@ -264,13 +264,13 @@
       "description": "Export useCampaignInvitesQuery hook from index.ts. The file exists but is not exported in the barrel export.",
       "rationale": "useCampaignInvites.ts exists in lib/queries/ with preview and stats queries, but it's not exported from index.ts. This breaks the convention that all query hooks are exported from the barrel.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useCampaignInvites.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 228-234)"
+        "apps/web/lib/queries/useCampaignInvites.ts",
+        "apps/web/lib/queries/index.ts",
+        "apps/web/lib/queries/keys.ts (lines 228-234)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts"
+        "apps/web/lib/queries/index.ts"
       ],
       "existing_patterns": [
         "All other query hooks are exported from index.ts",
@@ -287,13 +287,13 @@
       "description": "Extract JSON-LD generation logic into a reusable utility following the pattern established in launch/page.tsx.",
       "rationale": "Launch page has comprehensive JSON-LD schema generation (WebSite, SoftwareApplication, Organization) with XSS protection. This pattern should be reusable for other marketing pages that need structured data.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx (lines 114-198)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/json-ld.ts"
+        "apps/web/app/(marketing)/launch/page.tsx (lines 114-198)",
+        "apps/web/lib/utils/json-ld.ts"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/json-ld.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx"
+        "apps/web/lib/utils/json-ld.ts",
+        "apps/web/app/(marketing)/launch/page.tsx"
       ],
       "existing_patterns": [
         "jsonLd() helper with XSS protection via replaceAll('<', '\\u003c')",
@@ -310,13 +310,13 @@
       "description": "Export useWaitlistStatusQuery hook from index.ts. The file exists but is not in the barrel export.",
       "rationale": "useWaitlistStatusQuery.ts exists in lib/queries/ but is not exported from index.ts. This creates an inconsistency where some hooks must be imported directly while others use the barrel export.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useWaitlistStatusQuery.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/keys.ts (lines 91-101)"
+        "apps/web/lib/queries/useWaitlistStatusQuery.ts",
+        "apps/web/lib/queries/index.ts",
+        "apps/web/lib/queries/keys.ts (lines 91-101)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/index.ts"
+        "apps/web/lib/queries/index.ts"
       ],
       "existing_patterns": [
         "useWaitlistMutations is already exported from index.ts",
@@ -333,13 +333,13 @@
       "description": "Extract reusable auth flow utilities from SignUpForm.tsx: redirect URL building, email prefill, sanitization helpers.",
       "rationale": "SignUpForm.tsx has buildSignInUrl() helper and redirect URL sanitization logic that could be useful in other auth flows (sign-in, password reset, etc.). Extracting to lib/auth/ would enable reuse.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/SignUpForm.tsx (lines 53-69)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/auth/constants.ts"
+        "apps/web/components/auth/forms/SignUpForm.tsx (lines 53-69)",
+        "apps/web/lib/auth/constants.ts"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/auth/url-builders.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/SignUpForm.tsx"
+        "apps/web/lib/auth/url-builders.ts (new)",
+        "apps/web/components/auth/forms/SignUpForm.tsx"
       ],
       "existing_patterns": [
         "buildSignInUrl() with email and redirect_url preservation",
@@ -356,13 +356,13 @@
       "description": "Create a pagination/cursor utility specifically for TanStack Query infinite queries, extending the PAGINATED_CACHE pattern.",
       "rationale": "PAGINATED_CACHE strategy exists in cache-strategies.ts for infinite queries, but there's no shared utility for cursor-based pagination logic. Many API endpoints likely follow the same cursor/limit pattern.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/cache-strategies.ts (lines 112-124)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/pagination-parser.ts"
+        "apps/web/lib/queries/cache-strategies.ts (lines 112-124)",
+        "apps/web/lib/utils/pagination-parser.ts"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/infinite-scroll.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/*.ts (query hooks that use pagination)"
+        "apps/web/lib/utils/infinite-scroll.ts (new)",
+        "apps/web/lib/queries/*.ts (query hooks that use pagination)"
       ],
       "existing_patterns": [
         "PAGINATED_CACHE strategy for infinite queries",
@@ -379,12 +379,12 @@
       "description": "Extract the MockBar browser chrome component from launch page into a shared marketing component.",
       "rationale": "MockBar (lines 215-231 in launch/page.tsx) is used multiple times on the launch page for mockup screenshots. It could be reused in other marketing pages or documentation.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx (lines 215-231)"
+        "apps/web/app/(marketing)/launch/page.tsx (lines 215-231)"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/marketing/MockBar.tsx (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx"
+        "apps/web/components/marketing/MockBar.tsx (new)",
+        "apps/web/app/(marketing)/launch/page.tsx"
       ],
       "existing_patterns": [
         "Used 4+ times on launch page with different URLs",
@@ -401,12 +401,12 @@
       "description": "Create a server-side API route that generates and streams CSV exports of audience data, complementing code-006's client-side utility.",
       "rationale": "CSV export for large datasets (1000+ subscribers) should be server-generated to avoid client memory issues. This follows the pattern of existing API routes and can be triggered by the client-side download utility.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/utils/csv.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/dashboard/audience/subscribers/route.ts"
+        "apps/web/lib/utils/csv.ts",
+        "apps/web/app/api/dashboard/audience/subscribers/route.ts"
       ],
       "category": "pattern_extension",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/dashboard/audience/export/route.ts (new)"
+        "apps/web/app/api/dashboard/audience/export/route.ts (new)"
       ],
       "existing_patterns": [
         "Existing /api/dashboard/audience/subscribers route",
@@ -423,13 +423,13 @@
       "description": "Build a utility that scans design-system.css and globals.css to generate documentation of all available design tokens and their usage.",
       "rationale": "The Linear-Match workflow involved extensive design token work. A documentation generator would catalog all --linear-* and --color-* tokens, show their values, and track which components use which tokens.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/globals.css",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/packages/ui/src/design-system.css"
+        "apps/web/app/globals.css",
+        "packages/ui/src/design-system.css"
       ],
       "category": "utility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/scripts/generate-token-docs.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/docs/DESIGN_TOKENS.md (new)"
+        "scripts/generate-token-docs.ts (new)",
+        "docs/DESIGN_TOKENS.md (new)"
       ],
       "existing_patterns": [
         "Tokens defined in :root of design-system.css",
@@ -446,13 +446,13 @@
       "description": "Create a server action for release mutations following the pattern of existing server actions, as an alternative to the REST API approach.",
       "rationale": "Tour dates and other mutations use server actions (mentioned in MEMORY.md), but releases use REST API mutations (useReleaseMutations.ts). Server actions would provide type safety and reduce boilerplate.",
       "builds_upon": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useReleaseMutations.ts",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/actions/spotify.ts"
+        "apps/web/lib/queries/useReleaseMutations.ts",
+        "apps/web/app/actions/spotify.ts"
       ],
       "category": "architecture",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/actions/releases.ts (new)",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/lib/queries/useReleaseMutations.ts"
+        "apps/web/app/actions/releases.ts (new)",
+        "apps/web/lib/queries/useReleaseMutations.ts"
       ],
       "existing_patterns": [
         "Server actions used for tour dates (per MEMORY.md)",
@@ -467,8 +467,8 @@
   "summary": {
     "total_ideas": 20,
     "by_category": {
-      "pattern_extension": 12,
-      "utility": 6,
+      "pattern_extension": 11,
+      "utility": 7,
       "architecture": 2
     },
     "by_effort": {
@@ -479,8 +479,8 @@
     },
     "by_priority": {
       "high": 3,
-      "medium": 10,
-      "low": 7
+      "medium": 8,
+      "low": 9
     }
   }
 }

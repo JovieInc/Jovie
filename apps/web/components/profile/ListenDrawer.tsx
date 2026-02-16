@@ -96,7 +96,7 @@ export function ListenDrawer({
           <button
             type='button'
             onClick={() => handleOpenChange(false)}
-            className='absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/10'
+            className='absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
             aria-label='Close'
           >
             <X size={18} />

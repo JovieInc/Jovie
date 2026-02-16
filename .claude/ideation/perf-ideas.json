@@ -76,7 +76,9 @@
       "implementation": "Add to layout head:\n<link rel=\"dns-prefetch\" href=\"https://i.scdn.co\" />\n<link rel=\"dns-prefetch\" href=\"https://res.cloudinary.com\" />\n<link rel=\"preconnect\" href=\"https://api.clerk.com\" crossOrigin=\"anonymous\" />\n<link rel=\"preconnect\" href=\"https://images.clerk.dev\" crossOrigin=\"anonymous\" />",
       "tradeoffs": "Browser makes early connections that may not be used (minimal cost)",
       "effort": "trivial",
-      "priority": "high"
+      "priority": "high",
+      "status": "completed",
+      "status_note": "Implemented in PR #3505 — added dns-prefetch and preconnect for Spotify CDN, Spotify API, Vercel Blob, Cloudinary, Clerk auth, Clerk images, and Unsplash"
     },
     {
       "id": "perf-019",
@@ -321,27 +323,27 @@
     "new_ideas_count": 14,
     "by_category": {
       "bundle_size": 6,
-      "caching": 3,
+      "caching": 2,
       "runtime": 3,
       "network": 1,
       "database": 1,
       "rendering": 1
     },
     "by_impact": {
-      "high": 3,
-      "medium": 6,
-      "low": 5
+      "high": 2,
+      "medium": 4,
+      "low": 8
     },
     "by_effort": {
-      "trivial": 3,
-      "small": 5,
-      "medium": 5,
-      "large": 1
+      "trivial": 4,
+      "small": 4,
+      "medium": 4,
+      "large": 2
     },
     "by_priority": {
       "high": 3,
-      "medium": 6,
-      "low": 5
+      "medium": 4,
+      "low": 7
     },
     "potential_improvements": {
       "bundle_savings": "~155-210KB from WebP conversion + launch page extraction",

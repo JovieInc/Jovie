@@ -9,7 +9,7 @@
       "rationale": "Bottom drawers opened via button click should return focus to the trigger button on close and provide a keyboard-accessible close mechanism. The drag handle is visual only, not interactive.",
       "category": "accessibility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/profile/ListenDrawer.tsx:72-111"
+        "apps/web/components/profile/ListenDrawer.tsx:72-111"
       ],
       "current_state": "Drawer has no visible close button. Escape key and hardware back button work, but there's no explicit interactive close element for keyboard navigation.",
       "proposed_change": "Add a visually hidden or icon-only close button in the header area with aria-label='Close'. Ensure Escape key closes drawer AND returns focus to the trigger button that opened it.",
@@ -24,7 +24,7 @@
       "rationale": "User actions like opening the notifications CTA could fail silently. Error states should be visible and actionable.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/profile/ProfilePrimaryCTA.tsx:88-112"
+        "apps/web/components/profile/ProfilePrimaryCTA.tsx:88-112"
       ],
       "current_state": "Component renders ArtistNotificationsCTA with loading skeleton but no error fallback. If subscription status query fails, user sees stale UI or nothing.",
       "proposed_change": "Add error state UI with retry button when subscription hydration fails. Show inline error message with 'Try again' action.",
@@ -39,8 +39,8 @@
       "rationale": "Hardcoded colors create visual inconsistencies, break theming, and make design updates labor-intensive. Memory notes emphasize token usage for consistency.",
       "category": "visual",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx:220-740",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx:920-975"
+        "apps/web/app/(marketing)/launch/page.tsx:220-740",
+        "apps/web/app/(marketing)/launch/page.tsx:920-975"
       ],
       "current_state": "Multiple inline style blocks use hardcoded values like `background: '#2a2a2a'`, `color: 'rgb(52 211 153)'`, `border: '1px solid var(--linear-border-subtle)'` (mixing approaches). Found 24 rgb() usages across launch pages.",
       "proposed_change": "Extract hardcoded colors to CSS variables or Tailwind classes. Use design-system.css tokens (`var(--linear-bg-surface-*)`, `var(--linear-text-*)`) consistently. Consider creating mockup-specific token aliases if needed.",
@@ -55,7 +55,7 @@
       "rationale": "Most fans view artist profiles on mobile. Artists should preview how changes look on mobile before publishing.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/DashboardPreview.tsx"
+        "apps/web/components/dashboard/organisms/DashboardPreview.tsx"
       ],
       "current_state": "Profile preview likely shows desktop layout only (file not read, inferred from common patterns).",
       "proposed_change": "Add mobile/desktop toggle to profile preview. Show iPhone-sized frame with actual mobile layout rendering. Use CSS container queries or responsive iframe.",
@@ -70,7 +70,7 @@
       "rationale": "Empty states are critical onboarding moments. Without clear CTAs, users abandon features.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/organisms/EmptyState.tsx"
+        "apps/web/components/organisms/EmptyState.tsx"
       ],
       "current_state": "EmptyState component is well-structured with action/secondaryAction props and keyboard shortcuts support. Implementation is solid.",
       "proposed_change": "Audit all EmptyState usages to ensure every instance has a primary action. Add variant-specific default actions (e.g., 'search' variant should default to showing search suggestions, 'permission' should link to settings).",
@@ -85,8 +85,8 @@
       "rationale": "Users lose context mid-flow and don't know how many steps remain. Visual progress indicators reduce abandonment.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/SignUpForm.tsx:116-156",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/SignInForm.tsx"
+        "apps/web/components/auth/forms/SignUpForm.tsx:116-156",
+        "apps/web/components/auth/forms/SignInForm.tsx"
       ],
       "current_state": "AccessibleStepWrapper announces step count for screen readers but provides no visual indicator. Users see form transitions but no progress dots or breadcrumbs.",
       "proposed_change": "Add horizontal step indicator UI (e.g., dots or numbered badges) above form content. Show 'Step 1 of 2' visually, not just in aria-labels. Highlight current step, gray out future steps.",
@@ -101,7 +101,7 @@
       "rationale": "Modern auth UX expectations include passkeys, Face ID, Touch ID. Clerk supports these but Jovie doesn't expose them.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/MethodSelector.tsx:60-230"
+        "apps/web/components/auth/forms/MethodSelector.tsx:60-230"
       ],
       "current_state": "Auth shows Google/Spotify OAuth and email options only. No passkey or biometric options visible.",
       "proposed_change": "Add 'Sign in with passkey' option if user has saved credentials. Show Face ID/Touch ID icon on supported devices. Use Clerk's passkey APIs.",
@@ -116,7 +116,7 @@
       "rationale": "Users need confirmation their action succeeded. Without feedback, they may click multiple times or paste wrong content.",
       "category": "interaction",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/links"
+        "apps/web/components/dashboard/organisms/links"
       ],
       "current_state": "Inferred from typical patterns — clipboard actions may show no visual feedback.",
       "proposed_change": "Add toast notification or inline 'Copied!' message on successful copy. Change button icon from copy → checkmark for 2 seconds. Use subtle animation.",
@@ -131,7 +131,7 @@
       "rationale": "If user wants to switch from sign-in to waitlist during verification step, they can't access the footer link while keyboard is visible.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/AuthLayout.tsx:218"
+        "apps/web/components/auth/AuthLayout.tsx:218"
       ],
       "current_state": "Line 218 conditionally hides footer when `isKeyboardVisible`. Footer contains actionable links that become inaccessible.",
       "proposed_change": "Keep footer visible but reduce padding/size when keyboard open. Or add sticky navigation bar at top with back/alternative action buttons that remain visible.",
@@ -146,7 +146,7 @@
       "rationale": "Decision paralysis is real. Highlighting the intended tier guides users toward optimal choice.",
       "category": "visual",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/pricing/page.tsx:121"
+        "apps/web/app/(marketing)/launch/pricing/page.tsx:121"
       ],
       "current_state": "Pro plan has `border-strong` and `hover:border-white/[0.12]` but no badge or scale emphasis.",
       "proposed_change": "Add 'Most Popular' badge to Pro plan header. Optionally increase scale (105%) or add subtle glow effect. Use accent color for badge.",
@@ -161,7 +161,7 @@
       "rationale": "Common iOS bug where body scroll isn't prevented when modal/drawer opens. Causes jarring UX and accidental dismissals.",
       "category": "interaction",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/profile/ListenDrawer.tsx:72-111"
+        "apps/web/components/profile/ListenDrawer.tsx:72-111"
       ],
       "current_state": "Drawer uses `overscroll-contain` on content div but may not lock body scroll on iOS Safari.",
       "proposed_change": "Add `overflow: hidden` to document.body when drawer opens. Use useEffect to toggle on mount/unmount. Preserve scroll position to prevent jump.",
@@ -176,9 +176,9 @@
       "rationale": "Accessibility requirement: users with vestibular disorders must be able to disable animations.",
       "category": "accessibility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/ProfileMockup.tsx",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/AiDemo.tsx",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/AuthLayout.tsx:180"
+        "apps/web/components/home/ProfileMockup.tsx",
+        "apps/web/components/home/AiDemo.tsx",
+        "apps/web/components/auth/AuthLayout.tsx:180"
       ],
       "current_state": "Some components have motion-reduce support (line 267 in HeroSpotifySearch uses `motion-reduce:animate-none`), but logo spin animation in AuthLayout and marketing page animations may not respect preference.",
       "proposed_change": "Audit all CSS animations and framer-motion usages. Add `@media (prefers-reduced-motion: reduce)` overrides or `motion-reduce:` Tailwind classes. Use useReducedMotion hook consistently.",
@@ -193,7 +193,7 @@
       "rationale": "Mobile viewports are short. Tall dropdowns push action buttons off-screen and cause nested scroll confusion.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/HeroSpotifySearch.tsx:369"
+        "apps/web/components/home/HeroSpotifySearch.tsx:369"
       ],
       "current_state": "Dropdown div has `max-h-64` (256px) which fits ~6 results. May overflow on small mobile screens.",
       "proposed_change": "Use dynamic max-height based on viewport: `max-h-[40vh]` or `max-h-[min(16rem,40vh)]` to adapt to device height. Ensure clear scroll affordance.",
@@ -208,7 +208,7 @@
       "rationale": "Network failures happen. Users should be able to retry or bypass the failed step without abandoning signup.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/HeroSpotifySearch.tsx:352-363"
+        "apps/web/components/home/HeroSpotifySearch.tsx:352-363"
       ],
       "current_state": "Search shows 'error' state with 'Search failed. Try again.' message but no retry button. User must re-type query.",
       "proposed_change": "Add 'Retry' button in error state that re-executes last query. Provide 'Skip Spotify import' option to proceed manually. Preserve user's progress.",
@@ -223,7 +223,7 @@
       "rationale": "Screen reader users hear generic 'loading skeleton' but don't know what's being loaded (metrics? tasks? profile?).",
       "category": "accessibility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx:1-56"
+        "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx:1-56"
       ],
       "current_state": "Skeleton has `aria-busy='true'` and `aria-live='polite'` on container, but inner sections lack aria-labels to describe content type.",
       "proposed_change": "Add `aria-label='Loading metrics'` to metrics section, `aria-label='Loading tasks'` to task section. Use `<section>` with labels instead of generic divs.",
@@ -238,7 +238,7 @@
       "rationale": "Haptic should sync with visual press state for cohesive tactile experience.",
       "category": "interaction",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/atoms/AuthButton.tsx:19"
+        "apps/web/components/auth/atoms/AuthButton.tsx:19"
       ],
       "current_state": "Button has `active:scale-[0.98]` CSS and `haptic.light()` call in onClick. Transform is instant, haptic may lag on slow devices.",
       "proposed_change": "Trigger haptic in onTouchStart or onPointerDown instead of onClick to sync with visual transform. Test on low-end Android devices.",
@@ -253,7 +253,7 @@
       "rationale": "Mobile keyboards auto-suggest OTP codes. Paste support is table stakes for modern auth UX.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/VerificationStep.tsx"
+        "apps/web/components/auth/forms/VerificationStep.tsx"
       ],
       "current_state": "File not fully read, but VerificationStep exists. Likely uses OTP input component.",
       "proposed_change": "Ensure OTP input supports paste. When user pastes 6-digit code, auto-distribute across inputs and submit. Use `autocomplete='one-time-code'` for iOS autofill.",
@@ -268,7 +268,7 @@
       "rationale": "WCAG 2.4.1 requires bypass blocks. Long marketing pages force keyboard users to tab through entire hero and nav every time.",
       "category": "accessibility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/(marketing)/launch/page.tsx:238-316"
+        "apps/web/app/(marketing)/launch/page.tsx:238-316"
       ],
       "current_state": "Page has multiple sections but no skip-to-main-content link. AuthLayout has one (line 132-138), but marketing pages don't.",
       "proposed_change": "Add `<a href='#main-content' class='sr-only focus:not-sr-only ...'>Skip to main content</a>` at top of page. Ensure #main-content target exists.",
@@ -283,7 +283,7 @@
       "rationale": "WCAG 2.4.7 requires visible focus indicators. Users need to see which result is focused when arrowing through list.",
       "category": "accessibility",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/home/HeroSpotifySearch.tsx:372-424"
+        "apps/web/components/home/HeroSpotifySearch.tsx:372-424"
       ],
       "current_state": "Dropdown results use `tabIndex={0}` and highlight on `activeIndex`, but no explicit focus-visible ring. Uses hover background only.",
       "proposed_change": "Add `focus-visible:ring-2 focus-visible:ring-focus` to result buttons. Ensure hover state and focus state are distinct (different colors or ring vs background).",
@@ -298,8 +298,8 @@
       "rationale": "iOS and Android guidelines require 44-48px touch targets. Inconsistent sizing causes missed taps.",
       "category": "usability",
       "affected_files": [
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/atoms/AuthButton.tsx:15",
-        "/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/components/auth/forms/MethodSelector.tsx"
+        "apps/web/components/auth/atoms/AuthButton.tsx:15",
+        "apps/web/components/auth/forms/MethodSelector.tsx"
       ],
       "current_state": "AuthButton uses `h-11 min-h-[44px]` which is correct. Other buttons/links in auth may use smaller heights.",
       "proposed_change": "Audit all clickable elements in auth flow. Ensure links, text buttons, icon buttons all meet 44px minimum. Add padding if needed.",
@@ -311,15 +311,15 @@
   "summary": {
     "total_ideas": 20,
     "by_category": {
-      "accessibility": 6,
-      "usability": 11,
+      "accessibility": 5,
+      "usability": 10,
       "visual": 2,
       "interaction": 3
     },
     "by_priority": {
-      "high": 7,
-      "medium": 10,
-      "low": 3
+      "high": 6,
+      "medium": 9,
+      "low": 5
     },
     "key_themes": [
       "Accessibility gaps: missing focus management, reduced motion support, screen reader context",

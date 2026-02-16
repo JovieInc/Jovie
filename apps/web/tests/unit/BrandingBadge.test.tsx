@@ -31,9 +31,9 @@ describe('BrandingBadge', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows branding for users without plan metadata (defaults to free)', () => {
+  it('shows branding when canRemoveBranding is undefined (defaults to showing)', () => {
     mockUsePlanGate.mockReturnValue({
-      canRemoveBranding: false,
+      canRemoveBranding: undefined,
       isLoading: false,
     });
     render(<BrandingBadge />);
