@@ -25,8 +25,7 @@ export interface ProfileLinkListProps {
   readonly onRemoveLink?: (linkId: string) => void;
 }
 
-function getLinkSection(platform: string | undefined): LinkSection {
-  if (!platform) return 'custom';
+function getLinkSection(platform: string): LinkSection {
   const category = getPlatformCategory(platform);
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
@@ -69,7 +68,6 @@ const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
 };
 
 function formatPlatformName(platform: string): string {
-  if (!platform) return 'Link';
   const lower = platform.toLowerCase();
   if (PLATFORM_DISPLAY_LABELS[lower]) {
     return PLATFORM_DISPLAY_LABELS[lower];
@@ -105,8 +103,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
     onRemove?.(link.id);
   }, [link.id, onRemove]);
 
-  const platform = link.platform || 'unknown';
-  const platformName = formatPlatformName(platform);
+  const platformName = formatPlatformName(link.platform);
 
   // Get platform brand color
   const iconMeta = getPlatformIconMetadata(link.platform);
