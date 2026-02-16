@@ -58,7 +58,11 @@ const TEAM_FEATURES = [
   'Bulk import tools',
 ];
 
-function FeatureList({ features }: { features: string[] }) {
+interface FeatureListProps {
+  readonly features: string[];
+}
+
+function FeatureList({ features }: FeatureListProps) {
   return (
     <ul className='space-y-1.5'>
       {features.map(feat => (

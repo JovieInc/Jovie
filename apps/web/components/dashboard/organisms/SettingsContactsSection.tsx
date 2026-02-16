@@ -164,7 +164,7 @@ function ContactsListInner({
 
   return (
     <>
-      <div className='flex gap-0 items-stretch'>
+      <div className='flex items-stretch'>
         <DashboardCard variant='settings' className='flex-1 min-w-0'>
           <div className='space-y-3'>
             <div className='flex items-center justify-between'>
@@ -178,7 +178,7 @@ function ContactsListInner({
                 onClick={handleAddContact}
                 className='gap-1.5 text-secondary-token hover:text-primary-token'
               >
-                <Plus className='h-3.5 w-3.5' />
+                <Plus className='h-4 w-4' />
                 Add contact
               </Button>
             </div>

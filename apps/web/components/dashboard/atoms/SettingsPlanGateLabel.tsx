@@ -1,8 +1,10 @@
+interface SettingsPlanGateLabelProps {
+  readonly planName?: string;
+}
+
 export function SettingsPlanGateLabel({
   planName = 'Pro',
-}: {
-  readonly planName?: string;
-}) {
+}: SettingsPlanGateLabelProps) {
   return (
     <span className='text-sm text-tertiary-token'>Available on {planName}</span>
   );

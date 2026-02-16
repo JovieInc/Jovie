@@ -13,8 +13,7 @@ export default function MarketingLayout({
       <MarketingHeader logoSize='xs' />
       <main
         id='main-content'
-        className='flex flex-1 flex-col'
-        style={{ paddingTop: 'var(--linear-header-height)' }}
+        className='flex flex-1 flex-col pt-[var(--linear-header-height)]'
       >
         {children}
       </main>

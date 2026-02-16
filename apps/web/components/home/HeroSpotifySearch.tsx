@@ -236,13 +236,10 @@ export function HeroSpotifySearch() {
             : 'border-strong hover:border-focus'
         )}
       >
-        <div
-          className='flex items-center justify-center w-6 h-6 rounded-full shrink-0'
-          style={{ backgroundColor: 'rgba(30, 215, 96, 0.15)' }}
-        >
+        <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
           <SocialIcon
             platform='spotify'
-            className='w-3.5 h-3.5 text-[#1DB954]'
+            className='w-3.5 h-3.5 text-brand-spotify'
           />
         </div>
         <input
@@ -361,7 +358,7 @@ export function HeroSpotifySearch() {
           {/* Error state */}
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm text-red-400'>Search failed. Try again.</p>
+              <p className='text-sm text-error'>Search failed. Try again.</p>
             </div>
           )}
 
@@ -419,7 +416,7 @@ export function HeroSpotifySearch() {
                     )}
                   </div>
                   {artist.verified && (
-                    <div className='shrink-0' style={{ color: '#1DB954' }}>
+                    <div className='shrink-0 text-brand-spotify'>
                       <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                     </div>
                   )}

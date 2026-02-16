@@ -155,6 +155,7 @@ export function SettingsAdPixelsSection({
       if (!res.ok) throw new Error('Failed to fetch pixel settings');
       return res.json();
     },
+    enabled: isPro,
     staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
   });
 
@@ -177,6 +178,7 @@ export function SettingsAdPixelsSection({
 
   // Populate form with existing settings when fetched
   useEffect(() => {
+    if (!isPro) return;
     if (existingSettings?.pixels) {
       setPixelData(prev => ({
         ...prev,
@@ -198,7 +200,7 @@ export function SettingsAdPixelsSection({
       // Reset token modified flags when settings are loaded
       setTokenModified({ facebook: false, google: false, tiktok: false });
     }
-  }, [existingSettings]);
+  }, [existingSettings, isPro]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setPixelData(prev => ({ ...prev, [field]: value }));

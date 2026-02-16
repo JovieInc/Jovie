@@ -116,6 +116,9 @@ body {
   --color-brand-youtube-hover: var(--color-brand-youtube-hover);
   --color-brand-youtube-subtle: var(--color-brand-youtube-subtle);
 
+  /* Error token — generates text-error, bg-error, border-error */
+  --color-error: var(--color-error);
+
   /* Surface backgrounds — generates bg-base, bg-surface-0, bg-surface-1, etc. */
   --color-base: var(--color-bg-base);
   --color-surface-0: var(--color-bg-surface-0);

@@ -843,6 +843,6 @@
   --color-interactive-hover: var(--linear-bg-hover);
 
   /* Map Linear page bg and focus ring */
-  --color-bg-page: var(--linear-bg-footer);
+  --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
 }
