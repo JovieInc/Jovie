@@ -56,12 +56,29 @@ export interface RetentionCleanupResult {
  * Delete click events older than retention period
  */
 export async function cleanupClickEvents(cutoffDate: Date): Promise<number> {
-  const result = await db
-    .delete(clickEvents)
-    .where(lt(clickEvents.createdAt, cutoffDate))
-    .returning({ id: clickEvents.id });
+  let totalDeleted = 0;
+  const BATCH_SIZE = 5000;
 
-  return result.length;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await db.execute<{ id: string }>(
+      drizzleSql`
+        DELETE FROM ${clickEvents}
+        WHERE id IN (
+          SELECT id FROM ${clickEvents}
+          WHERE ${clickEvents.createdAt} < ${sqlTimestamp(cutoffDate)}
+          LIMIT ${BATCH_SIZE}
+        )
+      `
+    );
+
+    const batchDeleted = result.rowCount ?? 0;
+    totalDeleted += batchDeleted;
+
+    if (batchDeleted < BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
 }
 
 /**
@@ -71,17 +88,32 @@ export async function cleanupClickEvents(cutoffDate: Date): Promise<number> {
 export async function cleanupAudienceMembers(
   cutoffDate: Date
 ): Promise<number> {
-  const result = await db
-    .delete(audienceMembers)
-    .where(
-      drizzleSql`${audienceMembers.lastSeenAt} < ${sqlTimestamp(cutoffDate)}
-        AND ${audienceMembers.type} = 'anonymous'
-        AND ${audienceMembers.email} IS NULL
-        AND ${audienceMembers.phone} IS NULL`
-    )
-    .returning({ id: audienceMembers.id });
+  let totalDeleted = 0;
+  const BATCH_SIZE = 5000;
 
-  return result.length;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await db.execute<{ id: string }>(
+      drizzleSql`
+        DELETE FROM ${audienceMembers}
+        WHERE id IN (
+          SELECT id FROM ${audienceMembers}
+          WHERE ${audienceMembers.lastSeenAt} < ${sqlTimestamp(cutoffDate)}
+            AND ${audienceMembers.type} = 'anonymous'
+            AND ${audienceMembers.email} IS NULL
+            AND ${audienceMembers.phone} IS NULL
+          LIMIT ${BATCH_SIZE}
+        )
+      `
+    );
+
+    const batchDeleted = result.rowCount ?? 0;
+    totalDeleted += batchDeleted;
+
+    if (batchDeleted < BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
 }
 
 /**
@@ -91,12 +123,29 @@ export async function cleanupAudienceMembers(
 export async function cleanupNotificationSubscriptions(
   cutoffDate: Date
 ): Promise<number> {
-  const result = await db
-    .delete(notificationSubscriptions)
-    .where(lt(notificationSubscriptions.createdAt, cutoffDate))
-    .returning({ id: notificationSubscriptions.id });
+  let totalDeleted = 0;
+  const BATCH_SIZE = 5000;
 
-  return result.length;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const result = await db.execute<{ id: string }>(
+      drizzleSql`
+        DELETE FROM ${notificationSubscriptions}
+        WHERE id IN (
+          SELECT id FROM ${notificationSubscriptions}
+          WHERE ${notificationSubscriptions.createdAt} < ${sqlTimestamp(cutoffDate)}
+          LIMIT ${BATCH_SIZE}
+        )
+      `
+    );
+
+    const batchDeleted = result.rowCount ?? 0;
+    totalDeleted += batchDeleted;
+
+    if (batchDeleted < BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
 }
 
 /**
@@ -155,16 +204,11 @@ export async function runDataRetentionCleanup(options?: {
     audienceMembersDeleted = audienceCount;
     notificationSubscriptionsDeleted = subscriptionCount;
   } else {
-    // Actually delete the records
-    [
-      clickEventsDeleted,
-      audienceMembersDeleted,
-      notificationSubscriptionsDeleted,
-    ] = await Promise.all([
-      cleanupClickEvents(cutoffDate),
-      cleanupAudienceMembers(cutoffDate),
-      cleanupNotificationSubscriptions(cutoffDate),
-    ]);
+    // Delete records sequentially to avoid overwhelming the database
+    clickEventsDeleted = await cleanupClickEvents(cutoffDate);
+    audienceMembersDeleted = await cleanupAudienceMembers(cutoffDate);
+    notificationSubscriptionsDeleted =
+      await cleanupNotificationSubscriptions(cutoffDate);
   }
 
   const duration = Date.now() - startTime;

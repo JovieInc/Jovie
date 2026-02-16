@@ -4,12 +4,16 @@
  * Orchestrates server-side forwarding of pixel events to:
  * 1. Jovie's own marketing pixels (always)
  * 2. Creator's configured pixels (when configured)
+ *
+ * Primary forwarding happens inline via after() in /api/px.
+ * The cron job handles retries for failed forwarding only.
  */
 
-import { and, sql as drizzleSql, eq, lte, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   creatorPixels,
+  type CreatorPixel,
   type PixelEvent,
   type PixelForwardingStatus,
   pixelEvents,
@@ -55,28 +59,49 @@ const joviePlatformMap: Record<Platform, JoviePlatform> = {
 };
 
 /**
- * Forward event to all configured platforms
+ * Forward event to all configured platforms in parallel
  */
 async function forwardToPlatforms(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   configs: Partial<Record<Platform, PlatformConfig | null>>,
   isJovie = false
 ): Promise<ForwardingResult[]> {
-  const results: ForwardingResult[] = [];
+  const tasks: Array<{
+    platform: Platform;
+    config: PlatformConfig;
+  }> = [];
 
   for (const [platform, config] of Object.entries(configs) as [
     Platform,
     PlatformConfig | null,
   ][]) {
     if (config) {
-      const forwarder = platformForwarders[platform];
-      const result = await forwarder(normalizedEvent, config);
-      const platformName = isJovie ? joviePlatformMap[platform] : platform;
-      results.push({ ...result, platform: platformName });
+      tasks.push({ platform, config });
     }
   }
 
-  return results;
+  if (tasks.length === 0) return [];
+
+  const settled = await Promise.allSettled(
+    tasks.map(async ({ platform, config }) => {
+      const forwarder = platformForwarders[platform];
+      const result = await forwarder(normalizedEvent, config);
+      const platformName = isJovie ? joviePlatformMap[platform] : platform;
+      return { ...result, platform: platformName };
+    })
+  );
+
+  return settled.map((result, i) => {
+    if (result.status === 'fulfilled') return result.value;
+    const platformName = isJovie
+      ? joviePlatformMap[tasks[i].platform]
+      : tasks[i].platform;
+    return {
+      success: false,
+      platform: platformName,
+      error: result.reason instanceof Error ? result.reason.message : 'Unknown error',
+    };
+  });
 }
 
 /**
@@ -147,23 +172,11 @@ async function forwardToJoviePixels(
 }
 
 /**
- * Forward event to creator's configured pixels
+ * Decrypt and extract platform configs from a creator pixel record
  */
-async function forwardToCreatorPixels(
-  normalizedEvent: ReturnType<typeof normalizeEvent>,
-  profileId: string
-): Promise<ForwardingResult[]> {
-  const [creatorConfig] = await db
-    .select()
-    .from(creatorPixels)
-    .where(eq(creatorPixels.profileId, profileId))
-    .limit(1);
-
-  if (!creatorConfig?.enabled) {
-    return [];
-  }
-
-  // Decrypt access tokens (guard against null values)
+function decryptCreatorConfig(
+  creatorConfig: CreatorPixel
+): Partial<Record<Platform, PlatformConfig | null>> {
   const decryptedConfig = {
     ...creatorConfig,
     facebookAccessToken: creatorConfig.facebookAccessToken
@@ -177,10 +190,38 @@ async function forwardToCreatorPixels(
       : null,
   };
 
-  const platformConfigs = extractPlatformConfigs(
+  return extractPlatformConfigs(
     decryptedConfig as typeof creatorConfig
   );
+}
 
+/**
+ * Forward event to creator's configured pixels.
+ * Accepts an optional pre-fetched config map (used by batch processing).
+ */
+async function forwardToCreatorPixels(
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  profileId: string,
+  creatorConfigMap?: Map<string, CreatorPixel>
+): Promise<ForwardingResult[]> {
+  let creatorConfig: CreatorPixel | undefined;
+
+  if (creatorConfigMap) {
+    creatorConfig = creatorConfigMap.get(profileId);
+  } else {
+    const [result] = await db
+      .select()
+      .from(creatorPixels)
+      .where(eq(creatorPixels.profileId, profileId))
+      .limit(1);
+    creatorConfig = result;
+  }
+
+  if (!creatorConfig?.enabled) {
+    return [];
+  }
+
+  const platformConfigs = decryptCreatorConfig(creatorConfig);
   return forwardToPlatforms(normalizedEvent, platformConfigs);
 }
 
@@ -213,10 +254,20 @@ function buildForwardingStatus(
 }
 
 /**
- * Forward a single event to all configured platforms
+ * Check if forwarding status has any failed platforms
+ */
+function hasFailedForwarding(status: PixelForwardingStatus): boolean {
+  return Object.values(status).some(platform => platform?.status === 'failed');
+}
+
+/**
+ * Forward a single event to all configured platforms.
+ * Called inline via after() for immediate forwarding, or by the retry cron.
+ * Accepts an optional creator config map for batch processing efficiency.
  */
 export async function forwardEvent(
-  event: PixelEvent
+  event: PixelEvent,
+  creatorConfigMap?: Map<string, CreatorPixel>
 ): Promise<ForwardingResult[]> {
   const normalizedEvent = normalizeEvent(event);
 
@@ -229,12 +280,11 @@ export async function forwardEvent(
     return [];
   }
 
-  // Forward to all configured platforms
-  const jovieResults = await forwardToJoviePixels(normalizedEvent);
-  const creatorResults = await forwardToCreatorPixels(
-    normalizedEvent,
-    event.profileId
-  );
+  // Forward to all configured platforms in parallel
+  const [jovieResults, creatorResults] = await Promise.all([
+    forwardToJoviePixels(normalizedEvent),
+    forwardToCreatorPixels(normalizedEvent, event.profileId, creatorConfigMap),
+  ]);
   const results = [...jovieResults, ...creatorResults];
 
   // Update event with forwarding status
@@ -248,19 +298,11 @@ export async function forwardEvent(
 }
 
 /**
- * Check if an event has any failed platform forwarding that needs retry
- */
-function hasFailedForwarding(status: PixelForwardingStatus): boolean {
-  return Object.values(status).some(platform => platform?.status === 'failed');
-}
-
-/**
- * Process a batch of events for forwarding
- * Called by cron job
+ * Process a batch of events that need retry.
+ * Called by the consolidated cron job.
  *
- * Selects events that:
- * 1. Have never been forwarded (empty forwardingStatus)
- * 2. Have failed forwarding and are due for retry (forwardAt <= now)
+ * Now that primary forwarding happens inline via after(),
+ * this only processes events that failed or were missed.
  */
 export async function processPendingEvents(limit = 100): Promise<{
   processed: number;
@@ -273,7 +315,7 @@ export async function processPendingEvents(limit = 100): Promise<{
 
   try {
     // Get events that need forwarding:
-    // - New events with empty forwardingStatus
+    // - New events with empty forwardingStatus (missed by after())
     // - Failed events that are due for retry (forwardAt <= now)
     const pendingEvents = await db
       .select()
@@ -294,9 +336,28 @@ export async function processPendingEvents(limit = 100): Promise<{
       )
       .limit(limit);
 
+    if (pendingEvents.length === 0) {
+      return { processed, successful, failed };
+    }
+
+    // Batch-fetch all creator pixel configs upfront (eliminates N+1)
+    const profileIds = [...new Set(pendingEvents.map(e => e.profileId))];
+    const creatorConfigs = await db
+      .select()
+      .from(creatorPixels)
+      .where(
+        and(
+          inArray(creatorPixels.profileId, profileIds),
+          eq(creatorPixels.enabled, true)
+        )
+      );
+    const creatorConfigMap = new Map(
+      creatorConfigs.map(c => [c.profileId, c])
+    );
+
     for (const event of pendingEvents) {
       try {
-        const results = await forwardEvent(event);
+        const results = await forwardEvent(event, creatorConfigMap);
         processed++;
 
         const allSuccessful = results.every(r => r.success);
@@ -304,13 +365,19 @@ export async function processPendingEvents(limit = 100): Promise<{
           successful++;
         } else {
           failed++;
-          // Schedule retry with exponential backoff (5 min, 15 min, 45 min, etc.)
-          // Count existing retries by checking for failed status
-          const retryCount = hasFailedForwarding(event.forwardingStatus || {})
-            ? 1
-            : 0;
-          const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
-          const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+          // Schedule retry with exponential backoff
+          // Count retries by number of existing failed statuses
+          const failedCount = Object.values(
+            event.forwardingStatus || {}
+          ).filter(p => p?.status === 'failed').length;
+          const retryCount = failedCount > 0 ? Math.min(failedCount, 5) : 0;
+          const backoffMinutes = Math.min(
+            5 * Math.pow(3, retryCount),
+            180
+          ); // Max 3 hours
+          const nextRetry = new Date(
+            Date.now() + backoffMinutes * 60 * 1000
+          );
 
           await db
             .update(pixelEvents)

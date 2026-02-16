@@ -4,24 +4,30 @@
   "ignoreCommand": "cd ../.. && npx turbo-ignore @jovie/web",
   "crons": [
     {
-      "path": "/api/cron/cleanup-photos",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/frequent",
+      "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/cleanup-idempotency-keys",
-      "schedule": "0 4 * * *"
+      "path": "/api/cron/daily-maintenance",
+      "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/billing-reconciliation",
-      "schedule": "0 * * * *"
+      "path": "/api/cron/generate-insights",
+      "schedule": "0 5 * * *"
     }
   ],
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30
     },
-    "app/api/cron/**/*.ts": {
+    "app/api/cron/frequent/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/daily-maintenance/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/generate-insights/route.ts": {
+      "maxDuration": 300
     }
   },
   "rewrites": [

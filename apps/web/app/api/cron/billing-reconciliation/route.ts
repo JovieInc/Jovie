@@ -14,8 +14,10 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import {
   BATCH_SIZE,
+  fetchAllSubscriptionsMap,
   fetchUserBatch,
   processSingleUser,
   type ReconciliationStats,
@@ -33,6 +35,11 @@ import { logger } from '@/lib/utils/logger';
 // Safety limit: process max 5000 users per run
 const MAX_BATCHES = 50;
 
+// Populated by reconcileUsersWithSubscriptions(), consumed by
+// reconcileProUsersWithoutSubscription() within the same request.
+let _customerSubscriptionsMap: Map<string, Stripe.Subscription[]> | null =
+  null;
+
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
 
@@ -49,21 +56,11 @@ interface ReconciliationResult {
 }
 
 /**
- * GET /api/cron/billing-reconciliation
- *
- * Hourly cron job to reconcile billing status between DB and Stripe
+ * Core logic for billing reconciliation.
+ * Exported for use by the consolidated /api/cron/daily-maintenance handler.
  */
-export async function GET(request: Request) {
+export async function runReconciliation(): Promise<ReconciliationResult> {
   const startTime = Date.now();
-
-  // Verify cron secret in all environments
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
 
   const stats: ReconciliationStats = {
     usersChecked: 0,
@@ -75,49 +72,55 @@ export async function GET(request: Request) {
   };
   const errors: string[] = [];
 
-  try {
-    // 1. Check users with subscription IDs - verify they match Stripe
-    await reconcileUsersWithSubscriptions(stats, errors);
+  await reconcileUsersWithSubscriptions(stats, errors);
+  await reconcileProUsersWithoutSubscription(stats, errors);
+  await checkStaleCustomers(stats);
 
-    // 2. Check users marked as Pro but without subscription ID
-    await reconcileProUsersWithoutSubscription(stats, errors);
+  const duration = Date.now() - startTime;
 
-    // 3. Check for stale Stripe customers (customer exists but user deleted)
-    await checkStaleCustomers(stats);
+  const result: ReconciliationResult = {
+    success: stats.errors === 0,
+    stats,
+    errors,
+    duration,
+  };
 
-    const duration = Date.now() - startTime;
+  logger.info('[billing-reconciliation] Completed:', result);
 
-    const result: ReconciliationResult = {
-      success: stats.errors === 0,
+  if (stats.mismatches > 0 || stats.errors > 0) {
+    await captureWarning('Billing reconciliation found issues', undefined, {
       stats,
-      errors,
-      duration,
-    };
+      errors: errors.slice(0, 5),
+    });
+  }
 
-    logger.info('[billing-reconciliation] Completed:', result);
+  return result;
+}
 
-    // Report any issues to error tracking
-    if (stats.mismatches > 0 || stats.errors > 0) {
-      await captureWarning('Billing reconciliation found issues', undefined, {
-        stats,
-        errors: errors.slice(0, 5), // Limit to first 5 errors
-      });
-    }
+/**
+ * GET /api/cron/billing-reconciliation
+ *
+ * Daily cron job to reconcile billing status between DB and Stripe
+ */
+export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
 
+  try {
+    const result = await runReconciliation();
     return NextResponse.json(result, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    const duration = Date.now() - startTime;
-    await captureCriticalError('Billing reconciliation failed', error, {
-      stats,
-      duration,
-    });
+    await captureCriticalError('Billing reconciliation failed', error, {});
 
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Reconciliation failed',
-        stats,
-        duration,
       },
       { status: 500, headers: NO_STORE_HEADERS }
     );
@@ -125,13 +128,45 @@ export async function GET(request: Request) {
 }
 
 /**
+ * Build a secondary index from the subscriptions map keyed by customer ID.
+ * Each customer may have multiple subscriptions.
+ */
+function buildCustomerSubscriptionsMap(
+  subscriptionsMap: Map<string, Stripe.Subscription>
+): Map<string, Stripe.Subscription[]> {
+  const customerMap = new Map<string, Stripe.Subscription[]>();
+
+  for (const subscription of subscriptionsMap.values()) {
+    const customerId =
+      typeof subscription.customer === 'string'
+        ? subscription.customer
+        : subscription.customer.id;
+
+    const existing = customerMap.get(customerId);
+    if (existing) {
+      existing.push(subscription);
+    } else {
+      customerMap.set(customerId, [subscription]);
+    }
+  }
+
+  return customerMap;
+}
+
+/**
  * Reconcile users who have a subscription ID stored in DB
- * Uses cursor-based pagination to handle >100 users
+ * Uses cursor-based pagination to handle >100 users.
+ *
+ * A single bulk Stripe API call fetches all subscriptions up-front so that
+ * individual user processing only requires an in-memory map lookup.
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
   errors: string[]
 ): Promise<void> {
+  // Fetch ALL subscriptions from Stripe once
+  const subscriptionsMap = await fetchAllSubscriptionsMap(stripe);
+
   let lastUserId: string | null = null;
   let batchCount = 0;
 
@@ -146,7 +181,12 @@ async function reconcileUsersWithSubscriptions(
       lastUserId = user.id;
 
       try {
-        const result = await processSingleUser(db, stripe, user);
+        const result = await processSingleUser(
+          db,
+          stripe,
+          user,
+          subscriptionsMap
+        );
         updateStatsFromResult(stats, errors, user.id, result);
       } catch (error) {
         stats.errors++;
@@ -164,11 +204,18 @@ async function reconcileUsersWithSubscriptions(
       usersChecked: stats.usersChecked,
     });
   }
+
+  // Build customer-keyed index and attach to module-level variable so that
+  // reconcileProUsersWithoutSubscription() can reuse the same data.
+  _customerSubscriptionsMap = buildCustomerSubscriptionsMap(subscriptionsMap);
 }
 
 /**
  * Reconcile users marked as Pro but without a subscription ID
- * This shouldn't happen normally but could due to bugs or manual edits
+ * This shouldn't happen normally but could due to bugs or manual edits.
+ *
+ * Uses the customer-keyed subscriptions map built during
+ * reconcileUsersWithSubscriptions() to avoid per-user Stripe API calls.
  */
 async function reconcileProUsersWithoutSubscription(
   stats: ReconciliationStats,
@@ -188,27 +235,28 @@ async function reconcileProUsersWithoutSubscription(
     )
     .limit(50);
 
+  const customerMap = _customerSubscriptionsMap;
+
   for (const user of proUsersWithoutSub) {
     stats.usersChecked++;
 
     try {
       // If they have a customer ID, check for active subscriptions
       if (user.stripeCustomerId) {
-        const subscriptions = await stripe.subscriptions.list({
-          customer: user.stripeCustomerId,
-          status: 'active',
-          limit: 1,
-        });
+        // Look up subscriptions from the pre-fetched customer map
+        const customerSubs = customerMap?.get(user.stripeCustomerId);
+        const activeSubscription = customerSubs?.find(
+          (s) => s.status === 'active'
+        );
 
-        if (subscriptions.data.length > 0) {
+        if (activeSubscription) {
           // They have an active subscription - link it
-          const subscription = subscriptions.data[0];
           stats.mismatches++;
 
           await db
             .update(users)
             .set({
-              stripeSubscriptionId: subscription.id,
+              stripeSubscriptionId: activeSubscription.id,
               billingUpdatedAt: new Date(),
               billingVersion: drizzleSql`${users.billingVersion} + 1`,
             })
@@ -219,7 +267,7 @@ async function reconcileProUsersWithoutSubscription(
             userId: user.id,
             eventType: 'reconciliation_fix',
             previousState: { stripeSubscriptionId: null },
-            newState: { stripeSubscriptionId: subscription.id },
+            newState: { stripeSubscriptionId: activeSubscription.id },
             source: 'reconciliation',
             metadata: {
               reason: 'linked_active_subscription',
