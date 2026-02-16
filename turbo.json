@@ -1,5 +1,5 @@
 {
-  "$schema": "https://turbo.build/schema.json",
+  "$schema": "https://turborepo.dev/schema.json",
   "globalDependencies": [
     "**/.env.*local",
     ".nvmrc",
@@ -20,6 +20,7 @@
   ],
   "tasks": {
     "build": {
+      "description": "Compiles TypeScript and bundles the Next.js application for production deployment",
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -64,6 +65,7 @@
       ]
     },
     "lint": {
+      "description": "Runs Biome and ESLint to enforce code quality rules across the workspace",
       "dependsOn": ["^lint"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -74,6 +76,7 @@
       "outputs": [".cache/eslint/**"]
     },
     "lint:fix": {
+      "description": "Runs Biome and ESLint with auto-fix to automatically correct lint violations",
       "dependsOn": ["^lint:fix"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -85,63 +88,75 @@
       "cache": false
     },
     "typecheck": {
+      "description": "Runs TypeScript compiler in noEmit mode to verify type correctness across the workspace",
       "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "tsconfig.*.json"],
       "outputs": [".cache/tsbuildinfo"]
     },
     "dev": {
+      "description": "Starts the development server with hot module replacement (persistent, not cached)",
       "cache": false,
       "persistent": true,
       "interruptible": true
     },
     "test": {
+      "description": "Runs the full Vitest unit/integration test suite with coverage output",
       "dependsOn": [],
       "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
       "outputs": ["coverage/**"],
       "env": ["NODE_ENV", "CI"]
     },
     "test:fast": {
+      "description": "Runs Vitest in fast mode (no coverage) for quick feedback during development",
       "dependsOn": [],
       "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
       "outputs": [],
       "env": ["NODE_ENV", "CI"]
     },
     "test:e2e": {
+      "description": "Runs Playwright end-to-end browser tests (requires build to complete first)",
       "dependsOn": ["build"],
       "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*", "BASE_URL"]
     },
     "e2e:smoke": {
+      "description": "Runs Playwright @smoke tests for quick production validation",
       "dependsOn": ["build"],
       "inputs": ["$TURBO_DEFAULT$", "playwright.config.*", "tests/e2e/**"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
     },
     "format": {
+      "description": "Formats source files using Biome (modifies in-place, not cached)",
       "inputs": ["$TURBO_DEFAULT$", "biome.json"],
       "outputs": [],
       "cache": false
     },
     "format:check": {
+      "description": "Checks formatting compliance using Biome without modifying files",
       "inputs": ["$TURBO_DEFAULT$", "biome.json"],
       "outputs": []
     },
     "drizzle:generate": {
+      "description": "Generates Drizzle ORM migration files from schema changes",
       "inputs": ["drizzle/**", "lib/db/schema/**"],
       "outputs": ["drizzle/migrations/**"],
       "cache": false
     },
     "drizzle:check": {
+      "description": "Verifies Drizzle schema consistency with generated migration state",
       "inputs": ["drizzle/**", "lib/db/schema/**"],
       "outputs": []
     },
     "storybook": {
+      "description": "Starts Storybook dev server for interactive component development (persistent)",
       "cache": false,
       "persistent": true,
       "interruptible": true
     },
     "build-storybook": {
+      "description": "Builds a static Storybook site for deployment and visual regression testing",
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",

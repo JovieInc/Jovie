@@ -12,7 +12,7 @@
 |------|------------------|-------------|
 | **Node.js** | **24.x** (24.0.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
-| **Turbo** | 2.7.4+ | Root devDependencies |
+| **Turbo** | 2.8+ | Root devDependencies |
 
 ### Why This Matters
 
@@ -71,6 +71,51 @@ pnpm --filter web drizzle:generate   # Generate migrations
 pnpm --filter web drizzle:migrate    # Apply migrations
 pnpm --filter web drizzle:studio     # Open Drizzle Studio
 ```
+
+---
+
+### Turborepo 2.8 Features
+
+All tasks in `turbo.json` have `description` fields that explain their purpose. These are readable by AI agents and help with onboarding. Run `pnpm turbo build --dry` to see task descriptions and the execution plan.
+
+**Search Turborepo docs from the terminal:**
+
+```bash
+turbo docs "task configuration"     # Search for any topic
+turbo docs "remote caching setup"   # Caching documentation
+turbo docs "environment variables"  # Env var handling
+```
+
+Machine-readable docs: append `.md` to any URL at `turborepo.dev` (e.g., `turborepo.dev/docs/reference/configuration.md`). Full sitemap: `turborepo.dev/sitemap.md`.
+
+### Git Worktrees for Parallel Agents
+
+Turbo 2.8 automatically shares local cache across Git worktrees. Use worktrees to run multiple agents in parallel on the same repo:
+
+```bash
+# Create a worktree for parallel work
+git worktree add ../Jovie-agent-1 -b agent/task-name
+
+# Each worktree needs its own node_modules but shares turbo cache
+cd ../Jovie-agent-1 && pnpm install && pnpm turbo build
+
+# Clean up when done
+git worktree remove ../Jovie-agent-1
+```
+
+No configuration is needed -- Turbo detects worktrees automatically and shares the local cache. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
+
+### Affected Builds (CI Optimization)
+
+Use `--affected` to run tasks only for packages that changed relative to the base branch:
+
+```bash
+pnpm turbo build --affected    # Build only changed packages
+pnpm turbo test --affected     # Test only changed packages
+pnpm turbo lint --affected     # Lint only changed packages
+```
+
+This is particularly useful in CI to avoid rebuilding the entire monorepo on every PR. For non-standard setups, set `TURBO_SCM_BASE` and `TURBO_SCM_HEAD` explicitly.
 
 ---
 
@@ -618,6 +663,21 @@ pnpm turbo clean
 rm -rf node_modules/.cache
 ```
 
+### "Test OOM / Out of Memory"
+```bash
+# Run tests with reduced concurrency to lower memory pressure
+pnpm turbo test --concurrency=1
+
+# Run only tests for changed packages
+pnpm turbo test --affected
+
+# Combine both for maximum memory savings
+pnpm turbo test --affected --concurrency=1
+
+# The web app already uses NODE_OPTIONS=--max-old-space-size=4096
+# and --pool=forks --maxWorkers=2 for memory safety.
+```
+
 ### "Type errors after pull"
 ```bash
 pnpm install  # Ensure deps are synced
@@ -631,6 +691,40 @@ pnpm typecheck  # Re-run type check
 - **Copilot-specific**: `.github/copilot-instructions.md`
 - **Cursor-specific**: `apps/web/.cursorrules`
 - **Hooks documentation**: `.claude/hooks/README.md` (if exists)
+
+---
+
+## Turborepo Quick Reference (Agent Index)
+
+Compressed documentation index for AI agents. Use `turbo docs "topic"` or the `/turbo-docs` command for full details.
+
+```
+topic|config/command|notes
+task-deps|dependsOn: ["^build"]|^ = topological (upstream first), no prefix = same-package
+task-inputs|inputs: ["$TURBO_DEFAULT$", "!**/*.test.ts"]|narrow cache key, exclude tests from build
+task-outputs|outputs: [".next/**", "dist/**"]|what turbo caches and restores on hit
+task-description|description: "what this task does"|human/agent-readable, no execution effect (2.8+)
+env-vars|env: ["NODE_ENV", "NEXT_PUBLIC_*"]|wildcards supported, affects cache hash
+global-deps|globalDependencies: [".env.*local"]|changes invalidate ALL task caches
+pass-through-env|globalPassThroughEnv: ["SENTRY_AUTH_TOKEN"]|available at runtime but doesn't affect cache
+persistent|"persistent": true|long-running (dev servers), can't be depended on
+interruptible|"interruptible": true|turbo watch can restart if inputs change
+no-cache|"cache": false|always re-runs (dev, format, lint:fix, drizzle:generate)
+remote-cache|remoteCache.enabled: true|share cache across CI and local machines
+affected|--affected|run only changed packages vs base branch (CI optimization)
+concurrency|--concurrency=N or --concurrency=50%|limit parallel tasks (OOM mitigation)
+dry-run|--dry / --dry=json|preview execution plan without running
+filter|--filter=@jovie/web|run task for specific package only
+graph|--graph|visualize task dependency graph (svg, png, json, html)
+force|--force|ignore cache, re-execute all tasks
+output-logs|outputLogs: "errors-only"|reduce log noise (full, hash-only, new-only, errors-only, none)
+summarize|--summarize|generate JSON metadata for timing/cache analysis
+turbo-clean|pnpm turbo clean|clear local cache when debugging
+turbo-docs|turbo docs "query"|search turborepo.dev documentation from terminal (2.8+)
+worktrees|git worktree add ../dir -b branch|cache shared automatically across worktrees (2.8+)
+schema|$schema: turborepo.dev/schema.json|validates turbo.json in editors, use turborepo.dev domain
+daemon|daemon: false|background process for optimization (disabled in Jovie due to gRPC issues)
+```
 
 ---
 
