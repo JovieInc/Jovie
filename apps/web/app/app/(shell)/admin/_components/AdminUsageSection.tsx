@@ -12,7 +12,7 @@ export async function AdminUsageSection() {
   ]);
 
   return (
-    <section id='usage' className='grid gap-6 lg:grid-cols-3'>
+    <section id='usage' className='grid gap-6 lg:grid-cols-3' data-testid='admin-usage-section'>
       <div className='lg:col-span-2'>
         <MetricsChartClient points={usageSeries} />
       </div>

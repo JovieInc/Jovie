@@ -113,7 +113,7 @@ export function InviteCampaignManager() {
     (stats?.jobQueue?.processing ?? 0) > 0;
 
   return (
-    <div className='space-y-8'>
+    <div className='space-y-8' data-testid='admin-campaigns-content'>
       {/* Campaign Results Dashboard */}
       <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
         <div className='flex items-center justify-between mb-4'>

@@ -212,6 +212,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
+        testId='admin-waitlist-table'
         toolbar={
           <>
             {/* Bulk actions toolbar (shows when rows selected) */}
