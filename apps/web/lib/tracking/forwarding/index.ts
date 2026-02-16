@@ -12,8 +12,8 @@
 import { and, sql as drizzleSql, eq, inArray, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
-  creatorPixels,
   type CreatorPixel,
+  creatorPixels,
   type PixelEvent,
   type PixelForwardingStatus,
   pixelEvents,
@@ -99,7 +99,10 @@ async function forwardToPlatforms(
     return {
       success: false,
       platform: platformName,
-      error: result.reason instanceof Error ? result.reason.message : 'Unknown error',
+      error:
+        result.reason instanceof Error
+          ? result.reason.message
+          : 'Unknown error',
     };
   });
 }
@@ -190,9 +193,7 @@ function decryptCreatorConfig(
       : null,
   };
 
-  return extractPlatformConfigs(
-    decryptedConfig as typeof creatorConfig
-  );
+  return extractPlatformConfigs(decryptedConfig as typeof creatorConfig);
 }
 
 /**
@@ -256,7 +257,7 @@ function buildForwardingStatus(
 /**
  * Check if forwarding status has any failed platforms
  */
-function hasFailedForwarding(status: PixelForwardingStatus): boolean {
+function _hasFailedForwarding(status: PixelForwardingStatus): boolean {
   return Object.values(status).some(platform => platform?.status === 'failed');
 }
 
@@ -351,9 +352,7 @@ export async function processPendingEvents(limit = 100): Promise<{
           eq(creatorPixels.enabled, true)
         )
       );
-    const creatorConfigMap = new Map(
-      creatorConfigs.map(c => [c.profileId, c])
-    );
+    const creatorConfigMap = new Map(creatorConfigs.map(c => [c.profileId, c]));
 
     for (const event of pendingEvents) {
       try {
@@ -371,13 +370,8 @@ export async function processPendingEvents(limit = 100): Promise<{
             event.forwardingStatus || {}
           ).filter(p => p?.status === 'failed').length;
           const retryCount = failedCount > 0 ? Math.min(failedCount, 5) : 0;
-          const backoffMinutes = Math.min(
-            5 * Math.pow(3, retryCount),
-            180
-          ); // Max 3 hours
-          const nextRetry = new Date(
-            Date.now() + backoffMinutes * 60 * 1000
-          );
+          const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
+          const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
 
           await db
             .update(pixelEvents)

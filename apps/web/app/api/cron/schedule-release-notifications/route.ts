@@ -50,9 +50,7 @@ export async function scheduleReleaseNotifications(): Promise<{
     );
 
   if (upcomingReleases.length === 0) {
-    logger.info(
-      '[schedule-release-notifications] No upcoming releases found'
-    );
+    logger.info('[schedule-release-notifications] No upcoming releases found');
     return { scheduled: 0, releasesFound: 0 };
   }
 
@@ -74,10 +72,7 @@ export async function scheduleReleaseNotifications(): Promise<{
     .from(notificationSubscriptions)
     .where(
       and(
-        inArray(
-          notificationSubscriptions.creatorProfileId,
-          creatorProfileIds
-        ),
+        inArray(notificationSubscriptions.creatorProfileId, creatorProfileIds),
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
         drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
@@ -184,9 +179,10 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: result.releasesFound === 0
-          ? 'No upcoming releases in the next 24 hours'
-          : `Processed ${result.scheduled} notifications`,
+        message:
+          result.releasesFound === 0
+            ? 'No upcoming releases in the next 24 hours'
+            : `Processed ${result.scheduled} notifications`,
         scheduled: result.scheduled,
         releasesFound: result.releasesFound,
         timestamp: new Date().toISOString(),

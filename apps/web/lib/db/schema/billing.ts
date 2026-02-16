@@ -10,17 +10,25 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { users } from './auth';
 
 // Stripe webhook events table
-export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  stripeEventId: text('stripe_event_id').notNull().unique(),
-  type: text('type').notNull(),
-  stripeObjectId: text('stripe_object_id'),
-  userClerkId: text('user_clerk_id'),
-  payload: jsonb('payload').$type<Record<string, unknown>>().default({}),
-  processedAt: timestamp('processed_at'),
-  stripeCreatedAt: timestamp('stripe_created_at'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const stripeWebhookEvents = pgTable(
+  'stripe_webhook_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    stripeEventId: text('stripe_event_id').notNull().unique(),
+    type: text('type').notNull(),
+    stripeObjectId: text('stripe_object_id'),
+    userClerkId: text('user_clerk_id'),
+    payload: jsonb('payload').$type<Record<string, unknown>>().default({}),
+    processedAt: timestamp('processed_at'),
+    stripeCreatedAt: timestamp('stripe_created_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    createdAtIdx: index('stripe_webhook_events_created_at_idx').on(
+      table.createdAt
+    ),
+  })
+);
 
 // Billing audit log for tracking subscription state changes
 export const billingAuditLog = pgTable(

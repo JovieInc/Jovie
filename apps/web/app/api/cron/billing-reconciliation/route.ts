@@ -37,8 +37,7 @@ const MAX_BATCHES = 50;
 
 // Populated by reconcileUsersWithSubscriptions(), consumed by
 // reconcileProUsersWithoutSubscription() within the same request.
-let _customerSubscriptionsMap: Map<string, Stripe.Subscription[]> | null =
-  null;
+let _customerSubscriptionsMap: Map<string, Stripe.Subscription[]> | null = null;
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -246,7 +245,7 @@ async function reconcileProUsersWithoutSubscription(
         // Look up subscriptions from the pre-fetched customer map
         const customerSubs = customerMap?.get(user.stripeCustomerId);
         const activeSubscription = customerSubs?.find(
-          (s) => s.status === 'active'
+          s => s.status === 'active'
         );
 
         if (activeSubscription) {

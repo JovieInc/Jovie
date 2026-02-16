@@ -133,14 +133,7 @@ export async function GET(request: Request) {
       const retentionResult = await runDataRetentionCleanup();
       results.dataRetention = {
         success: true,
-        data: {
-          clickEventsDeleted: retentionResult.clickEventsDeleted,
-          audienceMembersDeleted: retentionResult.audienceMembersDeleted,
-          notificationSubscriptionsDeleted:
-            retentionResult.notificationSubscriptionsDeleted,
-          retentionDays: retentionResult.retentionDays,
-          duration: retentionResult.duration,
-        },
+        data: retentionResult as unknown as Record<string, unknown>,
       };
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';

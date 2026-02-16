@@ -20,13 +20,7 @@
     "app/api/**/*.ts": {
       "maxDuration": 30
     },
-    "app/api/cron/frequent/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/cron/daily-maintenance/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/cron/generate-insights/route.ts": {
+    "app/api/cron/**/*.ts": {
       "maxDuration": 300
     }
   },

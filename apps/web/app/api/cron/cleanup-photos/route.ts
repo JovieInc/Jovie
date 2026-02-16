@@ -5,7 +5,6 @@ import { profilePhotos } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
-  buildCleanupDetails,
   buildOrphanedRecordsWhereClause,
   collectBlobUrls,
   deleteBlobsIfConfigured,
@@ -63,16 +62,12 @@ export async function cleanupOrphanedPhotos(): Promise<{
     logger.warn(
       `[cleanup-photos] Skipping DB record deletion — blob cleanup failed for ${blobUrlsToDelete.length} URLs`
     );
-    throw new Error(
-      `Blob deletion failed for ${blobUrlsToDelete.length} URLs`
-    );
+    throw new Error(`Blob deletion failed for ${blobUrlsToDelete.length} URLs`);
   }
 
   const recordIds = orphanedRecords.map(r => r.id);
   if (recordIds.length > 0) {
-    await db
-      .delete(profilePhotos)
-      .where(inArray(profilePhotos.id, recordIds));
+    await db.delete(profilePhotos).where(inArray(profilePhotos.id, recordIds));
   }
 
   logger.info(
@@ -97,9 +92,10 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: result.deleted === 0
-          ? 'No orphaned records found'
-          : `Cleaned up ${result.deleted} orphaned photo records`,
+        message:
+          result.deleted === 0
+            ? 'No orphaned records found'
+            : `Cleaned up ${result.deleted} orphaned photo records`,
         deleted: result.deleted,
         blobsDeleted: result.blobsDeleted,
       },

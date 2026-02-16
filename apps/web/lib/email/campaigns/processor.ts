@@ -5,7 +5,16 @@
  * Should be called periodically (e.g., every 15 minutes via cron).
  */
 
-import { and, sql as drizzleSql, eq, inArray, isNull, lte, or, gt } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  or,
+} from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import {
@@ -17,8 +26,8 @@ import {
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { emailSuppressions } from '@/lib/db/schema/suppression';
 import { enqueueBulkClaimInviteJobs } from '@/lib/email/jobs/enqueue';
-import { hashEmail } from '@/lib/notifications/suppression';
 import type { SuppressionReason } from '@/lib/notifications/suppression';
+import { hashEmail } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -608,10 +617,7 @@ async function advanceEnrollment(
     .where(eq(campaignEnrollments.id, enrollment.id));
 }
 
-async function sendFollowUp(
-  inviteData: ClaimInviteData,
-  subjectId: string
-) {
+async function sendFollowUp(inviteData: ClaimInviteData, subjectId: string) {
   await enqueueBulkClaimInviteJobs(
     db,
     [
