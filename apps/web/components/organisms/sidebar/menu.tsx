@@ -35,8 +35,8 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout and typography
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-[13px] font-normal leading-tight outline-none',
+    // Base layout and typography — 13px + weight 450 (book) matching Linear
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-app font-book leading-tight outline-none',
     // Transitions
     'transition-all duration-150 ease-out active:duration-50',
     // Default text color - muted sidebar tokens matching Linear
@@ -187,7 +187,7 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar='menu-action'
       className={cn(
-        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-colors duration-150 ease-out',
+        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-colors duration-normal ease-out',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
         'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none',
         '[&>svg]:size-4 [&>svg]:shrink-0',
@@ -305,7 +305,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-[13px] text-sidebar-item-foreground outline-none transition-colors duration-150',
+        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-app text-sidebar-item-foreground outline-none transition-colors duration-normal',
         'hover:bg-sidebar-accent hover:text-sidebar-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-foreground',
