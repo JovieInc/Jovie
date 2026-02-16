@@ -127,6 +127,14 @@ body {
   --color-subtle: var(--color-border-subtle);
   --color-default: var(--color-border-default);
   --color-strong: var(--color-border-strong);
+
+  /* Transition durations — Linear timing tokens for duration-* utilities in @apply */
+  --transition-duration-instant: var(--duration-instant);
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-normal: var(--duration-normal);
+  --transition-duration-slow: var(--duration-slow);
+  --transition-duration-slower: var(--duration-slower);
+  --transition-duration-slowest: var(--duration-slowest);
 }
 
 /* ============================================
@@ -147,7 +155,7 @@ body {
 /* Typography utilities - component-like, moved to @layer components */
 @layer components {
   .dashboard-heading {
-    font-weight: 590;
+    font-weight: var(--font-weight-bold); /* 590 — Linear bold */
     letter-spacing: -0.025em;
     font-feature-settings:
       "cv01",
@@ -157,8 +165,8 @@ body {
   }
 
   .dashboard-label {
-    font-size: 0.6875rem; /* 11px */
-    font-weight: 600;
+    font-size: var(--text-2xs); /* 11px */
+    font-weight: var(--font-weight-semibold); /* 538 — Linear semibold */
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
@@ -210,7 +218,7 @@ body {
 
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded text-sm font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
 
@@ -394,7 +402,7 @@ body {
   }
 
   .marketing-cta {
-    @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
+    @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors duration-normal;
   }
 }
 
@@ -1170,6 +1178,14 @@ body {
   --color-sidebar-item-foreground: rgb(var(--sidebar-item-foreground));
   --color-sidebar-item-icon: rgb(var(--sidebar-item-icon));
   --color-sidebar-accent-active: rgb(var(--sidebar-accent-active));
+
+  /* Additional surface tokens — generates bg-surface-page, bg-surface-hover, etc. */
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-surface-button: var(--color-bg-button);
 
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);

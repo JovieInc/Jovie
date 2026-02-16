@@ -6,13 +6,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded text-sm font-medium transition-colors duration-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        // Core variants
+        // Core variants — Linear-aligned shadows and radii
         primary:
-          'bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90',
+          'bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:bg-btn-primary/90',
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
         secondary: 'bg-surface-1 text-primary-token hover:bg-surface-2',
         ghost: 'hover:bg-surface-2',

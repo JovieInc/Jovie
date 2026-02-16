@@ -26,12 +26,25 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
-      // Linear font weights - Inter variable font precise weights
+      // Font weights - Inter variable font precise weights (Linear-extracted)
       fontWeight: {
+        normal: 'var(--font-weight-normal)', // 400
+        book: 'var(--font-weight-book)', // 450 — Linear's UI default
+        medium: 'var(--font-weight-medium)', // 500
+        semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
+        bold: 'var(--font-weight-bold)', // 590 — Linear-specific
+        heavy: 'var(--font-weight-heavy)', // 700
+        // Legacy linear-prefixed aliases
         'linear-normal': 'var(--linear-font-weight-normal)',
         'linear-medium': 'var(--linear-font-weight-medium)',
         'linear-semibold': 'var(--linear-font-weight-semibold)',
         'linear-bold': 'var(--linear-font-weight-bold)',
+      },
+
+      // Font sizes - including Linear's 13px app UI size
+      fontSize: {
+        '2xs': ['var(--text-2xs)', { lineHeight: '1.25' }], // 11px
+        app: ['var(--text-app)', { lineHeight: '1.4' }], // 13px — Linear's default
       },
 
       // Linear spacing tokens
@@ -44,8 +57,14 @@ module.exports = {
         'linear-8': 'var(--linear-space-8)',
       },
 
-      // Linear border radius
+      // Border radius - Linear-extracted values
       borderRadius: {
+        xs: 'var(--radius-xs)', // 3px — tags, tiny elements
+        DEFAULT: 'var(--radius-default)', // 6px — buttons, dropdowns
+        xl: 'var(--radius-xl)', // 10px — large cards
+        '3xl': 'var(--radius-3xl)', // 14px — large modals
+        pill: 'var(--radius-pill)', // 48px — pill buttons
+        // Legacy linear-prefixed aliases
         'linear-sm': 'var(--linear-radius-sm)',
         'linear-md': 'var(--linear-radius-md)',
         'linear-lg': 'var(--linear-radius-lg)',
@@ -86,6 +105,12 @@ module.exports = {
           1: 'var(--color-bg-surface-1)',
           2: 'var(--color-bg-surface-2)',
           3: 'var(--color-bg-surface-3)',
+          page: 'var(--color-bg-page)',
+          hover: 'var(--color-bg-hover)',
+          elevated: 'var(--color-bg-elevated)',
+          input: 'var(--color-bg-input)',
+          active: 'var(--color-bg-active)',
+          button: 'var(--color-bg-button)',
         },
 
         // Base colors
@@ -148,6 +173,24 @@ module.exports = {
         'interactive-hover': 'var(--color-interactive-hover)',
         'interactive-active': 'var(--color-interactive-active)',
         'cell-hover': 'var(--color-cell-hover)',
+      },
+
+      // Box shadows - Linear-extracted tokens
+      boxShadow: {
+        card: 'var(--shadow-card)',
+        'card-elevated': 'var(--shadow-card-elevated)',
+        divider: 'var(--shadow-divider)',
+        'button-inset': 'var(--shadow-button-inset)',
+      },
+
+      // Transition duration - Linear's precise timing
+      transitionDuration: {
+        instant: 'var(--duration-instant)', // 50ms
+        fast: 'var(--duration-fast)', // 100ms
+        normal: 'var(--duration-normal)', // 150ms — THE standard
+        slow: 'var(--duration-slow)', // 200ms
+        slower: 'var(--duration-slower)', // 250ms
+        slowest: 'var(--duration-slowest)', // 300ms
       },
 
       // Ring colors (for focus rings)

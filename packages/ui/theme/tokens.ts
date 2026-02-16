@@ -12,6 +12,7 @@
 
 // ============================================
 // SURFACE COLORS (Layered elevation)
+// Now with additional levels matching Linear's ~8 dark surface stops
 // ============================================
 export const surfaces = {
   base: 'var(--color-bg-base)',
@@ -19,6 +20,12 @@ export const surfaces = {
   'surface-1': 'var(--color-bg-surface-1)',
   'surface-2': 'var(--color-bg-surface-2)',
   'surface-3': 'var(--color-bg-surface-3)',
+  page: 'var(--color-bg-page)',
+  hover: 'var(--color-bg-hover)',
+  elevated: 'var(--color-bg-elevated)',
+  input: 'var(--color-bg-input)',
+  active: 'var(--color-bg-active)',
+  button: 'var(--color-bg-button)',
 } as const;
 
 // ============================================
@@ -143,19 +150,27 @@ export const shadows = {
   md: 'var(--shadow-md)',
   lg: 'var(--shadow-lg)',
   xl: 'var(--shadow-xl)',
+  card: 'var(--shadow-card)',
+  cardElevated: 'var(--shadow-card-elevated)',
+  divider: 'var(--shadow-divider)',
+  buttonInset: 'var(--shadow-button-inset)',
 } as const;
 
 // ============================================
-// BORDER RADIUS
+// BORDER RADIUS (expanded to match Linear's observed values)
 // ============================================
 export const radii = {
   none: 'var(--radius-none)',
-  sm: 'var(--radius-sm)',
-  md: 'var(--radius-md)',
-  lg: 'var(--radius-lg)',
-  xl: 'var(--radius-xl)',
-  '2xl': 'var(--radius-2xl)',
-  full: 'var(--radius-full)',
+  xs: 'var(--radius-xs)', // 3px — tags, tiny elements
+  sm: 'var(--radius-sm)', // 4px — sidebar items, badges
+  md: 'var(--radius-md)', // 5px — inputs (Linear uses 5px not 6px)
+  default: 'var(--radius-default)', // 6px — buttons, dropdowns
+  lg: 'var(--radius-lg)', // 8px — cards, modals
+  xl: 'var(--radius-xl)', // 10px — large cards
+  '2xl': 'var(--radius-2xl)', // 12px — panels, sheets
+  '3xl': 'var(--radius-3xl)', // 14px — large modals
+  pill: 'var(--radius-pill)', // 48px — pill buttons
+  full: 'var(--radius-full)', // 9999px — circles
 } as const;
 
 // ============================================
@@ -189,15 +204,25 @@ export const typography = {
   fontMono: 'var(--font-mono)',
   fontFeatures: 'var(--font-features)',
   size: {
-    xs: 'var(--text-xs)',
-    sm: 'var(--text-sm)',
-    base: 'var(--text-base)',
-    lg: 'var(--text-lg)',
-    xl: 'var(--text-xl)',
-    '2xl': 'var(--text-2xl)',
-    '3xl': 'var(--text-3xl)',
-    '4xl': 'var(--text-4xl)',
-    '5xl': 'var(--text-5xl)',
+    '2xs': 'var(--text-2xs)', // 11px — tiny labels
+    xs: 'var(--text-xs)', // 12px
+    app: 'var(--text-app)', // 13px — LINEAR'S DEFAULT APP UI SIZE
+    sm: 'var(--text-sm)', // 14px
+    base: 'var(--text-base)', // 16px
+    lg: 'var(--text-lg)', // 18px
+    xl: 'var(--text-xl)', // 20px
+    '2xl': 'var(--text-2xl)', // 24px
+    '3xl': 'var(--text-3xl)', // 30px
+    '4xl': 'var(--text-4xl)', // 36px
+    '5xl': 'var(--text-5xl)', // 48px
+  },
+  weight: {
+    normal: 'var(--font-weight-normal)', // 400
+    book: 'var(--font-weight-book)', // 450 — Linear's UI default!
+    medium: 'var(--font-weight-medium)', // 500
+    semibold: 'var(--font-weight-semibold)', // 538 — Linear-specific
+    bold: 'var(--font-weight-bold)', // 590 — Linear-specific
+    heavy: 'var(--font-weight-heavy)', // 700
   },
   leading: {
     none: 'var(--leading-none)',
@@ -219,14 +244,28 @@ export const typography = {
 // ============================================
 export const animation = {
   duration: {
+    instant: 'var(--duration-instant)',
     fast: 'var(--duration-fast)',
-    normal: 'var(--duration-normal)',
+    normal: 'var(--duration-normal)', // 150ms — THE Linear standard
     slow: 'var(--duration-slow)',
     slower: 'var(--duration-slower)',
+    slowest: 'var(--duration-slowest)',
   },
   easing: {
     out: 'var(--ease-out)',
     inOut: 'var(--ease-in-out)',
     spring: 'var(--ease-spring)',
+    linear: 'var(--ease-linear)',
+  },
+  // Pre-composed transitions (extracted from Linear's 33 unique transition rules)
+  transition: {
+    colors: 'var(--transition-colors)',
+    bg: 'var(--transition-bg)',
+    opacity: 'var(--transition-opacity)',
+    opacityFast: 'var(--transition-opacity-fast)',
+    fill: 'var(--transition-fill)',
+    transform: 'var(--transition-transform)',
+    collapse: 'var(--transition-collapse)',
+    shadow: 'var(--transition-shadow)',
   },
 } as const;

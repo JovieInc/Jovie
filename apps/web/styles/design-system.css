@@ -60,6 +60,19 @@
   /* prettier-ignore */ --color-bg-surface-2: #ffffff; /* Cards / elevated */
   /* prettier-ignore */ --color-bg-surface-3: #f0f0f0; /* Modals / tooltips */
 
+  /* Additional light surface levels (matching Linear's semantic bg tokens)
+     Linear live values:
+       bg-primary:    lch(99% 0 282.863)       — main content
+       bg-secondary:  lch(93.75% 0 282.863)    — cards, panels
+       bg-tertiary:   lch(91.417% 0 282.863)   — nested surfaces
+       bg-quaternary: lch(97.542% 0 282.863)   — HOVER STATE BG (critical!) */
+  --color-bg-page: oklch(97% 0 283); /* Page-level bg */
+  --color-bg-hover: oklch(97.5% 0 283); /* Row/item hover */
+  --color-bg-elevated: oklch(92% 0 283); /* Extra elevation */
+  --color-bg-input: oklch(100% 0 0); /* Input backgrounds */
+  --color-bg-active: oklch(95% 0 283); /* Active/selected */
+  --color-bg-button: oklch(93% 0 283); /* Button backgrounds */
+
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
   --color-text-secondary-token: oklch(
@@ -114,12 +127,29 @@
   /* Table cell hover */
   --color-cell-hover: #f0f0f0;
 
-  /* Shadows - subtle in light mode */
+  /* Shadows — Linear uses ring-border pattern (1px solid ring via box-shadow)
+     Extracted from Linear.app live (2026-02-15) */
   --shadow-color: 240 10% 3.9%;
-  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 3%), 0 1px 3px oklch(0% 0 0 / 6%);
+  --shadow-sm:
+    rgba(0, 0, 0, 0.04) 0px 1px 2px 0px, rgba(0, 0, 0, 0.04) 0px 2px 4px 0px;
   --shadow-md: 0 4px 6px oklch(0% 0 0 / 4%), 0 2px 4px oklch(0% 0 0 / 6%);
   --shadow-lg: 0 10px 20px oklch(0% 0 0 / 5%), 0 6px 6px oklch(0% 0 0 / 6%);
-  --shadow-xl: 0 20px 40px oklch(0% 0 0 / 8%), 0 12px 12px oklch(0% 0 0 / 6%);
+  --shadow-xl: rgba(0, 0, 0, 0.15) 0px 40px 80px 0px;
+
+  /* Linear card shadow — ring border + soft depth (the signature look) */
+  --shadow-card:
+    oklch(80% 0 283) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+  --shadow-card-elevated:
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+
+  /* Inset divider shadow (used for section separators) */
+  --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
+
+  /* Button inset shadow */
+  --shadow-button-inset:
+    0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -135,24 +165,53 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces - progressively lighter (Linear-style contrast) */
-  /* prettier-ignore */ --color-bg-base: #111111; /* sidebar & page bg */
-  /* prettier-ignore */ --color-bg-surface-0: #111111; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #191a1c; /* main content — elevated for card definition */
-  /* prettier-ignore */ --color-bg-surface-2: #1b1d21; /* contact sidebar/drawer */
-  /* prettier-ignore */ --color-bg-surface-3: #21242a; /* Modals, tooltips */
+  /* Dark mode surfaces - progressively lighter with CHROMATIC TINT
+     Linear uses lch() with hue 272 and increasing chroma (0.7-4.2)
+     This gives darks a subtle blue warmth — critical for matching Linear.
+     Converted from Linear's live LCH values:
+       bg-page:      lch(2.467% 0 272)
+       bg-primary:   lch(4.8% 0.7 272)
+       bg-quaternary: lch(7.133% 1.867 272)
+       bg-secondary: lch(10.633% 3.033 272)
+       bg-tertiary:  lch(14.133% 4.2 272) */
+  /* prettier-ignore */ --color-bg-base: oklch(
+    5% 0.005 272
+  ); /* sidebar & page bg — was #111111 */
+  /* prettier-ignore */ --color-bg-surface-0: oklch(
+    5% 0.005 272
+  ); /* Same as base */
+  /* prettier-ignore */ --color-bg-surface-1: oklch(
+    11% 0.015 272
+  ); /* main content — elevated */
+  /* prettier-ignore */ --color-bg-surface-2: oklch(
+    14.5% 0.018 272
+  ); /* cards, drawer */
+  /* prettier-ignore */ --color-bg-surface-3: oklch(
+    18% 0.02 272
+  ); /* Modals, tooltips */
 
-  /* Text hierarchy - inverted for dark mode (Linear settings-aligned)
-     Primary: headings & row titles — bright white (Linear uses ~97%)
-     Secondary: badges, meta text — medium gray
-     Tertiary: descriptions, helper text — muted gray (Linear descriptions)
-     Quaternary: placeholders
-     Disabled: fully de-emphasized */
-  --color-text-primary-token: oklch(97% 0.003 260);
-  --color-text-secondary-token: oklch(65% 0.01 260);
-  --color-text-tertiary-token: oklch(55% 0.01 260);
-  --color-text-quaternary-token: oklch(40% 0.01 260);
-  --color-text-disabled-token: oklch(32% 0.008 260);
+  /* Additional dark surface levels (Linear has ~8 distinct levels) */
+  --color-bg-page: oklch(3% 0 272); /* Deepest page bg */
+  --color-bg-hover: oklch(
+    7.5% 0.01 272
+  ); /* Row/item hover (Linear bg-quaternary) */
+  --color-bg-elevated: oklch(8.5% 0.01 272); /* Slightly elevated */
+  --color-bg-input: oklch(12% 0.012 272); /* Input backgrounds */
+  --color-bg-active: oklch(13% 0.018 272); /* Active/selected items */
+  --color-bg-button: oklch(17% 0.015 272); /* Button backgrounds */
+
+  /* Text hierarchy - inverted for dark mode
+     Extracted from Linear.app live (2026-02-15):
+       Primary:   lch(100% 0 272)     → oklch ~100% — pure white headings
+       Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
+       Tertiary:  lch(62.6% 1.35 272)  → oklch ~63% — descriptions, meta
+       Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
+     Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
+  --color-text-primary-token: oklch(100% 0 272);
+  --color-text-secondary-token: oklch(91% 0.008 272);
+  --color-text-tertiary-token: oklch(63% 0.008 272);
+  --color-text-quaternary-token: oklch(38% 0.008 272);
+  --color-text-disabled-token: oklch(28% 0.006 272);
 
   /* Border system - semi-transparent white for dark mode (Linear-style) */
   --color-border-subtle: oklch(100% 0 0 / 6%);
@@ -192,11 +251,22 @@
   /* Table cell hover - #151618 (21, 22, 24) */
   --color-cell-hover: #151618;
 
-  /* Shadows - deeper in dark mode */
+  /* Shadows - deeper in dark mode, with dark ring borders */
   --shadow-sm: 0 1px 2px oklch(0% 0 0 / 20%), 0 1px 3px oklch(0% 0 0 / 25%);
   --shadow-md: 0 4px 8px oklch(0% 0 0 / 30%), 0 2px 4px oklch(0% 0 0 / 25%);
   --shadow-lg: 0 12px 24px oklch(0% 0 0 / 40%), 0 6px 8px oklch(0% 0 0 / 30%);
   --shadow-xl: 0 24px 48px oklch(0% 0 0 / 50%), 0 12px 16px oklch(0% 0 0 / 35%);
+
+  /* Dark mode card shadow — ring with dark border */
+  --shadow-card:
+    oklch(20% 0.02 272) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 15%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 20%) 0px 1px 1px 0px;
+  --shadow-card-elevated:
+    oklch(0% 0 0 / 20%) 0px 3px 6px -2px, oklch(0% 0 0 / 25%) 0px 1px 1px 0px;
+  --shadow-divider: oklch(20% 0.02 272) 0px -0.5px 0px 0px inset;
+  --shadow-button-inset:
+    0px 4px 4px -1px oklch(0% 0 0 / 10%), 0px 1px 1px 0px oklch(0% 0 0 / 18%);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -427,10 +497,11 @@
    TYPOGRAPHY SYSTEM
    ============================================ */
 :root {
-  /* Font stack */
+  /* Font stack — matches Linear.app exactly (extracted 2026-02-15) */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI", Roboto, Arial, sans-serif;
+    "Inter Variable", "Inter", "SF Pro Display", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    "Open Sans", "Helvetica Neue", sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
@@ -439,9 +510,24 @@
   --font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
   --font-optical-sizing: 28;
 
-  /* Type scale - based on 16px base */
+  /* Font weights — Linear uses Inter Variable axis with non-standard stops
+     400 = normal, 450 = book (sidebar/tabs/issues!), 500 = medium,
+     538 = semibold, 590 = bold, 700 = heavy */
+  --font-weight-normal: 400;
+  --font-weight-book: 450; /* KEY: Linear's default UI weight */
+  --font-weight-medium: 500;
+  --font-weight-semibold: 538; /* Linear-specific, not standard 600 */
+  --font-weight-bold: 590; /* Linear-specific, not standard 700 */
+  --font-weight-heavy: 700;
+
+  /* Type scale - based on 16px base
+     KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
+  --text-2xs: 0.6875rem;
+  /* 11px — tiny labels, badges */
   --text-xs: 0.75rem;
   /* 12px */
+  --text-app: 0.8125rem;
+  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
   --text-sm: 0.875rem;
   /* 14px */
   --text-base: 1rem;
@@ -516,37 +602,68 @@
    ============================================ */
 :root {
   --radius-none: 0;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-full: 9999px;
+  --radius-xs: 3px; /* Tags, tiny elements (observed in Linear) */
+  --radius-sm: 4px; /* Sidebar items, badges */
+  --radius-md: 5px; /* Input fields — Linear uses 5px, not 6px */
+  --radius-default: 6px; /* Buttons, dropdowns */
+  --radius-lg: 8px; /* Cards, modals */
+  --radius-xl: 10px; /* Large cards (observed in Linear) */
+  --radius-2xl: 12px; /* Panels, sheets */
+  --radius-3xl: 14px; /* Large modals (observed in Linear) */
+  --radius-pill: 48px; /* Pill buttons (observed in Linear) */
+  --radius-full: 9999px; /* Circles, tags */
 }
 
 /* ============================================
    ANIMATION SYSTEM
    ============================================ */
 :root {
-  /* Durations */
+  /* Durations — Linear uses 0.15s (150ms) as THE standard
+     80%+ of their 33 unique transition rules use 150ms */
+  --duration-instant: 50ms;
   --duration-fast: 100ms;
-  --duration-normal: 150ms;
-  --duration-slow: 300ms;
-  --duration-slower: 500ms;
+  --duration-normal: 150ms; /* THE Linear default */
+  --duration-slow: 200ms;
+  --duration-slower: 250ms;
+  --duration-slowest: 300ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-linear: cubic-bezier(
+    0.25,
+    0.46,
+    0.45,
+    0.94
+  ); /* Linear's marketing ease */
+
+  /* Pre-composed transition patterns (extracted from Linear)
+     Use duration custom properties so prefers-reduced-motion overrides work */
+  --transition-colors:
+    border var(--duration-normal), background-color var(--duration-normal),
+    color var(--duration-normal), opacity var(--duration-normal);
+  --transition-bg: background-color var(--duration-normal);
+  --transition-opacity: opacity var(--duration-normal);
+  --transition-opacity-fast: opacity var(--duration-instant) ease-in-out;
+  --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
+  --transition-transform: transform var(--duration-normal);
+  --transition-collapse:
+    height var(--duration-slow) ease-out,
+    min-height var(--duration-slow) ease-out;
+  --transition-shadow:
+    box-shadow var(--duration-normal), background-color var(--duration-normal);
 }
 
-/* Reduced motion */
+/* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
     --duration-slow: 0ms;
     --duration-slower: 0ms;
+    --duration-slowest: 0ms;
   }
 }
 
