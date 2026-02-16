@@ -177,6 +177,19 @@ export default async function RootLayout({
       <link rel='preconnect' href='https://clerk.jov.ie' crossOrigin='' />
       <link rel='dns-prefetch' href='https://img.clerk.com' />
       <link rel='preconnect' href='https://img.clerk.com' crossOrigin='' />
+      {/* Cloudinary - media assets */}
+      <link rel='dns-prefetch' href='https://res.cloudinary.com' />
+      {/* Clerk Auth API */}
+      <link
+        rel='preconnect'
+        href='https://api.clerk.com'
+        crossOrigin='anonymous'
+      />
+      <link
+        rel='preconnect'
+        href='https://images.clerk.dev'
+        crossOrigin='anonymous'
+      />
       {/* Unsplash - fallback images */}
       <link rel='dns-prefetch' href='https://images.unsplash.com' />
       <link

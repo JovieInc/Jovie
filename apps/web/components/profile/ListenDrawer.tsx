@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
@@ -91,6 +92,15 @@ export function ListenDrawer({
 
           {/* Drag handle */}
           <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+
+          <button
+            type='button'
+            onClick={() => handleOpenChange(false)}
+            className='absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/10'
+            aria-label='Close'
+          >
+            <X size={18} />
+          </button>
 
           <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
             Listen on
