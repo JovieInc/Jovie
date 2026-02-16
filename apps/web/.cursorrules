@@ -19,6 +19,28 @@ See `agents.md` at repo root for full AI agent guidelines.
 
 ---
 
+## ⚠️ CRITICAL: Infrastructure & Cost Guardrails
+
+**Before creating any cron job, scheduled task, or polling loop, walk through this hierarchy IN ORDER. Use the first option that works:**
+
+1. **Webhook / Event handler** — Can an external service (Stripe, Clerk, etc.) notify you? This is almost always the answer.
+2. **Inline after-action** — Can the work happen right after the triggering action?
+3. **On-demand / lazy eval** — Can the work happen when data is next accessed?
+4. **Add to existing job** — Can you add logic to an existing cron/scheduled task?
+5. **New scheduled job** — ONLY if all above fail, with explicit approval and PR justification.
+
+**Hard Rules:**
+- NEVER create a new Vercel cron entry without explicit human approval
+- NEVER iterate over all users to call an external API (O(users) × runs/day = budget burn)
+- NEVER poll external APIs for state you can receive via webhook
+- NEVER add new job queue libraries (Bull, Agenda, etc.) — use the existing in-database queue
+- Always calculate API call volume: `(calls/run) × (runs/day) × 30 = monthly calls`
+- Include a **Cost Impact** section in PR description for any recurring external API calls
+
+See `agents.md` → "Infrastructure & Scheduling Guardrails" for full details.
+
+---
+
 ## ⚠️ CRITICAL: BRANCH PROTECTION RULES
 
 ### **NEVER PUSH TO PREVIEW OR MAIN**
