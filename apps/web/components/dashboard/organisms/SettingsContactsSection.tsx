@@ -164,53 +164,56 @@ function ContactsListInner({
 
   return (
     <>
-      <DashboardCard variant='settings'>
-        <div className='space-y-3'>
-          <div className='flex items-center justify-between'>
-            <p className='text-sm text-secondary-token'>
-              Manage bookings, management, and press contacts for {artistName}.
-            </p>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={handleAddContact}
-              className='gap-1.5 text-secondary-token hover:text-primary-token'
-            >
-              <Plus className='h-3.5 w-3.5' />
-              Add contact
-            </Button>
-          </div>
-
-          {isEmpty ? (
-            <div className='text-center py-6'>
-              <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
+      <div className='flex items-stretch'>
+        <DashboardCard variant='settings' className='flex-1 min-w-0'>
+          <div className='space-y-3'>
+            <div className='flex items-center justify-between'>
               <p className='text-sm text-secondary-token'>
-                No contacts yet. Add your first contact to get started.
+                Manage bookings, management, and press contacts for {artistName}
+                .
               </p>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={handleAddContact}
+                className='gap-1.5 text-secondary-token hover:text-primary-token'
+              >
+                <Plus className='h-4 w-4' />
+                Add contact
+              </Button>
             </div>
-          ) : (
-            <div className='divide-y divide-subtle'>
-              {contacts.map(contact => (
-                <ContactRow
-                  key={contact.id}
-                  contact={contact}
-                  isSelected={selectedContactId === contact.id}
-                  onClick={() => handleRowClick(contact)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </DashboardCard>
 
-      <ContactDetailSidebar
-        contact={selectedContact}
-        isOpen={Boolean(selectedContact)}
-        onClose={handleClose}
-        onUpdate={handleUpdate}
-        onSave={handleSaveSelected}
-        onDelete={handleDeleteSelected}
-      />
+            {isEmpty ? (
+              <div className='text-center py-6'>
+                <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
+                <p className='text-sm text-secondary-token'>
+                  No contacts yet. Add your first contact to get started.
+                </p>
+              </div>
+            ) : (
+              <div className='divide-y divide-subtle'>
+                {contacts.map(contact => (
+                  <ContactRow
+                    key={contact.id}
+                    contact={contact}
+                    isSelected={selectedContactId === contact.id}
+                    onClick={() => handleRowClick(contact)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </DashboardCard>
+
+        <ContactDetailSidebar
+          contact={selectedContact}
+          isOpen={Boolean(selectedContact)}
+          onClose={handleClose}
+          onUpdate={handleUpdate}
+          onSave={handleSaveSelected}
+          onDelete={handleDeleteSelected}
+        />
+      </div>
 
       <ConfirmDialog
         open={Boolean(pendingDeleteContact)}
