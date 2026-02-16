@@ -111,7 +111,16 @@ export function usePWAInstall() {
 
     try {
       await prompt.prompt();
-      await prompt.userChoice;
+      const { outcome } = await prompt.userChoice;
+      // If user declined the native prompt, persist dismissal so the banner
+      // doesn't reappear on the next page load.
+      if (outcome === 'dismissed') {
+        try {
+          localStorage.setItem(DISMISSED_KEY, String(Date.now()));
+        } catch {
+          // ignore
+        }
+      }
     } catch {
       // prompt() can throw if the event was already consumed or invalidated
     } finally {
