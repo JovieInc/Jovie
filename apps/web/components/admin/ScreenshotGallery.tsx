@@ -62,7 +62,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
   return (
     <>
-      <div className='space-y-8'>
+      <div className='space-y-8' data-testid='admin-screenshots-content'>
         {[...grouped.entries()].map(([sourceLabel, items]) => (
           <section key={sourceLabel}>
             <h2 className='text-sm font-semibold text-primary-token mb-3'>

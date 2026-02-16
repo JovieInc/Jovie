@@ -277,6 +277,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
+        testId='admin-users-content'
         toolbar={
           <>
             {/* Bulk actions toolbar (shows when rows selected) */}

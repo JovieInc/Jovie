@@ -372,6 +372,7 @@ export function AdminCreatorProfilesUnified({
     <>
       <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
         <AdminTableShell
+          testId='admin-creators-content'
           className='rounded-none'
           scrollContainerProps={{
             tabIndex: 0,

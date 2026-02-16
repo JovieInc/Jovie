@@ -14,6 +14,7 @@ export interface AdminTableShellProps {
   readonly footer?: React.ReactNode;
   readonly children: (props: AdminTableShellRenderProps) => React.ReactNode;
   readonly className?: string;
+  readonly testId?: string;
   readonly scrollContainerProps?: Readonly<
     Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'ref'>
   >;
@@ -33,6 +34,7 @@ export function AdminTableShell({
   footer,
   children,
   className,
+  testId,
   scrollContainerProps,
   scrollContainerRef: externalRef,
 }: Readonly<AdminTableShellProps>) {
@@ -94,6 +96,7 @@ export function AdminTableShell({
         'flex h-full min-h-0 flex-col rounded-xl border border-subtle bg-surface-1 contain-layout',
         className
       )}
+      data-testid={testId}
     >
       <div
         ref={tableContainerRef}
