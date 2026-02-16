@@ -11,6 +11,65 @@ const THEME_OPTIONS = [
   { value: 'system', label: 'System', description: 'Match device settings.' },
 ] as const;
 
+/* Hardcoded preview colors from design-system.css — these don't use CSS variables
+   so the previews render correctly regardless of the current active theme. */
+const PREVIEW_COLORS = {
+  light: {
+    surface1: '#ffffff',
+    surface2: '#ffffff',
+    surface3: '#f0f0f0',
+  },
+  dark: {
+    surface1: 'oklch(11% 0.015 272)',
+    surface2: 'oklch(14.5% 0.018 272)',
+    surface3: 'oklch(18% 0.02 272)',
+  },
+} as const;
+
+function ThemePreview({
+  colors,
+  compact = false,
+  className,
+}: {
+  colors: { surface1: string; surface2: string; surface3: string };
+  compact?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn('relative w-full h-full', className)}
+      style={{ backgroundColor: colors.surface1 }}
+    >
+      <div
+        className={cn(
+          'absolute left-0 top-0 h-full rounded-r',
+          compact ? 'w-3.5' : 'w-6'
+        )}
+        style={{ backgroundColor: colors.surface2 }}
+      />
+      <div
+        className={cn(
+          'absolute top-2 right-2 bottom-2 space-y-1',
+          compact ? 'left-5' : 'left-8'
+        )}
+      >
+        <div
+          className='h-2 rounded w-1/3'
+          style={{ backgroundColor: colors.surface3 }}
+        />
+        <div
+          className='h-1.5 rounded w-1/2 opacity-60'
+          style={{ backgroundColor: colors.surface3 }}
+        />
+        <div
+          className='h-1.5 rounded w-2/3 opacity-40'
+          style={{ backgroundColor: colors.surface3 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function SettingsAppearanceSection() {
   const { theme, setTheme } = useTheme();
   const { updateTheme, isPending } = useThemeMutation();
@@ -43,43 +102,21 @@ export function SettingsAppearanceSection() {
               <div className='relative w-full h-14 sm:h-20 rounded-md sm:rounded-lg overflow-hidden mb-1.5 sm:mb-3'>
                 {option.value === 'system' ? (
                   <div className='flex w-full h-full'>
-                    <div className='relative flex-1 bg-surface-1'>
-                      {/* Sidebar */}
-                      <div className='absolute left-0 top-0 w-3.5 h-full bg-surface-2 rounded-r' />
-                      {/* Content area with some mock elements */}
-                      <div className='absolute left-5 top-2 right-2 bottom-2 space-y-1'>
-                        <div className='h-2 bg-surface-3 rounded w-1/3' />
-                        <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
-                        <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
-                      </div>
-                    </div>
-                    <div className='dark relative flex-1 bg-surface-1'>
-                      {/* Sidebar */}
-                      <div className='absolute left-0 top-0 w-3.5 h-full bg-surface-2 rounded-r' />
-                      {/* Content area with some mock elements */}
-                      <div className='absolute left-5 top-2 right-2 bottom-2 space-y-1'>
-                        <div className='h-2 bg-surface-3 rounded w-1/3' />
-                        <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
-                        <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
-                      </div>
-                    </div>
+                    <ThemePreview
+                      colors={PREVIEW_COLORS.light}
+                      compact
+                      className='flex-1'
+                    />
+                    <ThemePreview
+                      colors={PREVIEW_COLORS.dark}
+                      compact
+                      className='flex-1'
+                    />
                   </div>
                 ) : (
-                  <div
-                    className={cn(
-                      'relative w-full h-full bg-surface-1',
-                      option.value === 'dark' && 'dark'
-                    )}
-                  >
-                    {/* Sidebar */}
-                    <div className='absolute left-0 top-0 w-6 h-full bg-surface-2 rounded-r' />
-                    {/* Content area with some mock elements */}
-                    <div className='absolute left-8 top-2 right-2 bottom-2 space-y-1'>
-                      <div className='h-2 bg-surface-3 rounded w-1/3' />
-                      <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
-                      <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
-                    </div>
-                  </div>
+                  <ThemePreview
+                    colors={PREVIEW_COLORS[option.value as 'light' | 'dark']}
+                  />
                 )}
               </div>
 
