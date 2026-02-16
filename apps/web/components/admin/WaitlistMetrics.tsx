@@ -47,7 +47,10 @@ interface WaitlistMetricsProps
 
 export function WaitlistMetrics({ metrics }: Readonly<WaitlistMetricsProps>) {
   return (
-    <div className='grid grid-cols-1 border-b border-subtle sm:grid-cols-3' data-testid='admin-waitlist-content'>
+    <div
+      className='grid grid-cols-1 border-b border-subtle sm:grid-cols-3'
+      data-testid='admin-waitlist-content'
+    >
       <div className='border-b border-subtle sm:border-b-0 sm:border-r'>
         <MetricCard
           label='New'

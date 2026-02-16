@@ -118,7 +118,10 @@ export function ActivityTableUnified({
   );
 
   return (
-    <Card className='h-full border-subtle bg-surface-1/80' data-testid='admin-activity-content'>
+    <Card
+      className='h-full border-subtle bg-surface-1/80'
+      data-testid='admin-activity-content'
+    >
       <CardHeader className='space-y-1'>
         <CardTitle className='text-lg'>Recent activity</CardTitle>
         <p className='text-xs text-secondary-token'>Last 7 days.</p>
