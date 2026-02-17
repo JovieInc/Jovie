@@ -34,6 +34,13 @@ export function ChatMessage({
   const { copy, isSuccess } = useClipboard();
   const messageText = getMessageText(parts);
   const shouldReduceMotion = useReducedMotion();
+  const fileParts = parts.filter(
+    (p): p is MessagePart & { url: string; mediaType: string } =>
+      p.type === 'file' &&
+      typeof p.url === 'string' &&
+      typeof p.mediaType === 'string' &&
+      p.mediaType.startsWith('image/')
+  );
 
   return (
     <motion.div
@@ -50,9 +57,29 @@ export function ChatMessage({
       )}
       {isUser ? (
         <div className='max-w-[80%] rounded-2xl px-4 py-3 bg-accent text-accent-foreground'>
-          <div className='whitespace-pre-wrap text-sm leading-relaxed'>
-            {messageText}
-          </div>
+          {fileParts.length > 0 && (
+            <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
+              {fileParts.map(file => (
+                <div
+                  key={file.url}
+                  className='relative h-32 w-32 overflow-hidden rounded-lg'
+                >
+                  <Image
+                    src={file.url}
+                    alt='Attached image'
+                    fill
+                    className='object-cover'
+                    unoptimized
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {messageText && (
+            <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+              {messageText}
+            </div>
+          )}
         </div>
       ) : (
         <div className='flex max-w-[80%] flex-col'>

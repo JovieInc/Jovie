@@ -1,5 +1,7 @@
 'use client';
 
+import { ImagePlus } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -14,7 +16,7 @@ import {
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
-import { useChatAvatarUpload, useJovieChat } from './hooks';
+import { useChatImageAttachments, useJovieChat } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
@@ -60,6 +62,7 @@ export function JovieChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const {
@@ -86,21 +89,58 @@ export function JovieChat({
     onConversationCreate,
   });
 
-  // Profile photo upload from chat
+  // Image attachments for chat messages
   const {
-    fileInputRef,
-    isUploading: isImageUploading,
-    openFilePicker,
-    handleFileChange,
-  } = useChatAvatarUpload({
-    onUploadSuccess: message => {
-      submitMessage(message);
-    },
-    onError: error => {
-      setChatError({ type: 'unknown', message: error });
-    },
+    pendingImages,
+    isDragOver,
+    isProcessing: isImageProcessing,
+    addFiles,
+    removeImage,
+    clearImages,
+    toFileUIParts,
+    dropZoneRef,
+  } = useChatImageAttachments({
+    onError: error => setChatError({ type: 'unknown', message: error }),
     disabled: isLoading || isSubmitting,
   });
+
+  // Open file picker for image attachments
+  const openImagePicker = useCallback(() => {
+    imageFileInputRef.current?.click();
+  }, []);
+
+  const handleImageFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) addFiles(e.target.files);
+      e.target.value = '';
+    },
+    [addFiles]
+  );
+
+  // Handle clipboard paste for images
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const imageFiles = Array.from(e.clipboardData.items)
+        .filter(item => item.type.startsWith('image/'))
+        .map(item => item.getAsFile())
+        .filter((f): f is File => f !== null);
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        addFiles(imageFiles);
+      }
+    },
+    [addFiles]
+  );
+
+  // Submit with image attachments
+  const handleSubmitWithImages = useCallback(
+    (e?: React.FormEvent) => {
+      const files = toFileUIParts();
+      handleSubmit(e, files.length > 0 ? files : undefined);
+      clearImages();
+    },
+    [handleSubmit, toFileUIParts, clearImages]
+  );
 
   // Notify parent when the conversation title changes (e.g. after auto-generation)
   const prevTitleRef = useRef<string | null>(null);
@@ -165,17 +205,51 @@ export function JovieChat({
   const activeToolLabel = isLoading ? getActiveToolLabel(messages) : null;
   const thinkingLabel = activeToolLabel ?? 'Thinking...';
 
+  // Shared ChatInput props for both views
+  const chatInputProps = {
+    ref: inputRef,
+    value: input,
+    onChange: setInput,
+    onSubmit: handleSubmitWithImages,
+    isLoading,
+    isSubmitting,
+    onImageAttach: openImagePicker,
+    isImageProcessing,
+    pendingImages,
+    onRemoveImage: removeImage,
+    onPaste: handlePaste,
+  } as const;
+
   return (
-    <div className='flex h-full flex-col'>
-      {/* Hidden file input for profile photo upload */}
+    <div ref={dropZoneRef} className='relative flex h-full flex-col'>
+      {/* Hidden file input for image attachments */}
       <input
-        ref={fileInputRef}
+        ref={imageFileInputRef}
         type='file'
         accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
-        onChange={handleFileChange}
+        onChange={handleImageFileChange}
+        multiple
         className='hidden'
         tabIndex={-1}
       />
+
+      {/* Drag-and-drop overlay */}
+      <AnimatePresence>
+        {isDragOver && (
+          <motion.div
+            className='absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-accent/50 bg-accent/5 backdrop-blur-sm'
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <div className='flex flex-col items-center gap-2 text-accent'>
+              <ImagePlus className='h-8 w-8' />
+              <span className='text-sm font-medium'>Drop images here</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {hasMessages ? (
         // Chat view - messages + input at bottom
@@ -252,16 +326,9 @@ export function JovieChat({
           <div className='border-t border-subtle px-4 py-4'>
             <div className='mx-auto max-w-2xl'>
               <ChatInput
-                ref={inputRef}
-                value={input}
-                onChange={setInput}
-                onSubmit={handleSubmit}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
+                {...chatInputProps}
                 placeholder='Ask a follow-up...'
                 variant='compact'
-                onImageUpload={openFilePicker}
-                isImageUploading={isImageUploading}
               />
             </div>
           </div>
@@ -285,16 +352,7 @@ export function JovieChat({
               <p className='text-center text-[15px] text-secondary-token'>
                 What can I help you with?
               </p>
-              <ChatInput
-                ref={inputRef}
-                value={input}
-                onChange={setInput}
-                onSubmit={handleSubmit}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
-                onImageUpload={openFilePicker}
-                isImageUploading={isImageUploading}
-              />
+              <ChatInput {...chatInputProps} />
               <SuggestedPrompts onSelect={handleSuggestedPrompt} />
             </div>
 

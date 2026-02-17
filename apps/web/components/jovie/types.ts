@@ -61,6 +61,10 @@ export interface MessagePart {
     readonly toolName: string;
     readonly state: string;
   };
+  /** File attachment URL (data URL or blob URL). Present when type === 'file'. */
+  readonly url?: string;
+  /** MIME type of the file attachment. Present when type === 'file'. */
+  readonly mediaType?: string;
 }
 
 /** User-friendly labels for AI tool invocations shown during streaming. */
