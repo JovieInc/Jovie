@@ -544,6 +544,7 @@
   --font-weight-normal: 400;
   --font-weight-book: 450; /* KEY: Linear's default UI weight */
   --font-weight-medium: 500;
+  --font-weight-nav: 510; /* Linear sidebar nav weight */
   --font-weight-semibold: 538; /* Linear-specific, not standard 600 */
   --font-weight-bold: 590; /* Linear-specific, not standard 700 */
   --font-weight-heavy: 700;
@@ -727,19 +728,19 @@
   --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.08; /* Semi-transparent white for hover (Linear) */
+  --sidebar-accent: 255 255 255 / 0.02; /* Hover bg — Linear: rgba(255,255,255,0.02) */
   --sidebar-accent-foreground: 227 228 229;
   --sidebar-border: 255 255 255 / 0.05;
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 161 161 170;
-  --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 8 9 10; /* Matches bg-base — rgb(8,9,10) */
-  --sidebar-surface-hover: 255 255 255 / 0.05; /* Matches Linear interactive-hover */
-  --sidebar-input-background: 255 255 255 / 0.05;
-  --sidebar-input-border: 255 255 255 / 0.05;
-  --sidebar-item-foreground: 148 152 160; /* Muted nav text, brightens on hover */
-  --sidebar-item-icon: 120 124 132; /* Dimmer nav icons */
-  --sidebar-accent-active: 255 255 255 / 0.05; /* Matches Linear border-subtle */
+  --sidebar-muted: 98 102 109; /* Section headers — Linear: rgb(98,102,109) */
+  --sidebar-muted-foreground: 98 102 109;
+  --sidebar-surface: 17 17 17; /* Matches bg-base */
+  --sidebar-surface-hover: 255 255 255 / 0.02; /* Hover — matches sidebar-accent */
+  --sidebar-input-background: 255 255 255 / 0.06;
+  --sidebar-input-border: 255 255 255 / 0.06;
+  --sidebar-item-foreground: 208 214 224; /* Nav text — Linear: rgb(208,214,224) */
+  --sidebar-item-icon: 98 102 109; /* Nav icons — Linear: rgb(98,102,109) */
+  --sidebar-accent-active: 255 255 255 / 0.04; /* Active bg — Linear: rgba(255,255,255,0.04) */
 }
 
 /* ============================================
