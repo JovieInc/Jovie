@@ -348,12 +348,10 @@ export function ArtistNotificationsCTA({
   return (
     <div className='space-y-3'>
       <p
-        className='text-center text-sm text-secondary-token leading-snug'
+        className='text-center text-[13px] font-[450] tracking-wide text-tertiary-token'
         style={noFontSynthesisStyle}
       >
-        Get notified when{' '}
-        <span className='font-semibold text-primary-token'>{artist.name}</span>{' '}
-        drops new music, announces tours &amp; more
+        Never miss a release.
       </p>
 
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
