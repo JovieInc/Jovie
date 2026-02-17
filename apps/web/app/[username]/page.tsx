@@ -15,6 +15,7 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -397,6 +398,13 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
+  // Evaluate two-step subscribe experiment per-artist (deterministic bucketing)
+  const subscribeTwoStep = await checkGate(
+    profile.id,
+    FEATURE_FLAG_KEYS.SUBSCRIBE_TWO_STEP,
+    false
+  );
+
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
@@ -459,6 +467,7 @@ export default async function ArtistPage({
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
+        subscribeTwoStep={subscribeTwoStep}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

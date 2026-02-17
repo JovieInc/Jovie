@@ -1,43 +1,27 @@
 'use client';
 
 import {
-  Skeleton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@jovie/ui';
-import { AlertCircle, Bell, Mail, Phone } from 'lucide-react';
+import { AlertCircle, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
-
-/** Prevents synthetic font weight rendering for better typography */
-const noFontSynthesisStyle: CSSProperties = { fontSynthesisWeight: 'none' };
 
 import { CTAButton } from '@/components/atoms/CTAButton';
 import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
+import {
+  noFontSynthesisStyle,
+  SubscriptionFormSkeleton,
+  SubscriptionPendingConfirmation,
+  SubscriptionSuccess,
+} from './shared';
 import type { ArtistNotificationsCTAProps } from './types';
 import { useSubscriptionForm } from './useSubscriptionForm';
 import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
-
-/**
- * Loading skeleton - shown during hydration while checking subscription status
- */
-function SubscriptionFormSkeleton() {
-  return (
-    <output className='block space-y-3' aria-busy='true'>
-      <span className='sr-only'>Loading subscription form</span>
-      {/* Input area skeleton */}
-      <Skeleton className='h-12 w-full rounded-2xl' />
-      {/* Button skeleton */}
-      <Skeleton className='h-11 w-full rounded-md' />
-      {/* Disclaimer area skeleton - fixed height to prevent layout shift */}
-      <div className='h-4' />
-    </output>
-  );
-}
 
 /**
  * Listen Now CTA - shown when notifications are disabled or in idle state
@@ -72,42 +56,6 @@ function ListenNowCTA({
     >
       Listen Now
     </Link>
-  );
-}
-
-/**
- * Success state - shown when user has subscribed
- */
-function SubscriptionSuccess({ artistName }: Readonly<{ artistName: string }>) {
-  return (
-    <div className='space-y-1'>
-      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
-        <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>You&apos;re in</span>
-      </div>
-      <p className='text-xs text-center text-secondary-token'>
-        You&apos;ll get a heads-up when {artistName} releases new music,
-        announces tours &amp; more. Tap the bell to manage your alerts.
-      </p>
-    </div>
-  );
-}
-
-/**
- * Pending confirmation state - shown when double opt-in email was sent
- */
-function SubscriptionPendingConfirmation() {
-  return (
-    <div className='space-y-1'>
-      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-surface-2 text-primary-token shadow-sm transition-colors duration-200'>
-        <Mail className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>Check your email</span>
-      </div>
-      <p className='text-xs text-center text-secondary-token'>
-        We sent a confirmation link to your email. Click it to start receiving
-        updates from this artist.
-      </p>
-    </div>
   );
 }
 
