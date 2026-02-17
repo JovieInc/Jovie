@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { AboutSection } from '@/components/profile/AboutSection';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import {
   ArtistNotificationsCTA,
@@ -89,6 +90,8 @@ interface StaticArtistPageProps {
   readonly allowPhotoDownloads?: boolean;
   /** Whether to show the two-step notification subscribe variant */
   readonly subscribeTwoStep?: boolean;
+  /** Artist genres for the about section */
+  readonly genres?: string[] | null;
 }
 
 /**
@@ -144,7 +147,8 @@ function renderContent(
   mergedDSPs: AvailableDSP[],
   primaryAction: PrimaryAction,
   enableDynamicEngagement: boolean,
-  subscribeTwoStep: boolean
+  subscribeTwoStep: boolean,
+  genres?: string[] | null
 ) {
   switch (mode) {
     case 'listen':
@@ -201,6 +205,9 @@ function renderContent(
         </div>
       );
 
+    case 'about':
+      return <AboutSection artist={artist} genres={genres} />;
+
     default: // 'profile' mode
       // spotifyPreferred is now read client-side in ProfilePrimaryCTA
       return (
@@ -229,6 +236,7 @@ export function StaticArtistPage({
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   subscribeTwoStep = false,
+  genres,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -283,7 +291,8 @@ export function StaticArtistPage({
               mergedDSPs,
               primaryAction,
               enableDynamicEngagement,
-              subscribeTwoStep
+              subscribeTwoStep,
+              genres
             )
           )}
         </div>

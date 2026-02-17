@@ -67,12 +67,12 @@ CREATE TABLE "insight_generation_runs" (
 );
 --> statement-breakpoint
 ALTER TABLE "audience_members" ADD COLUMN IF NOT EXISTS "utm_params" jsonb DEFAULT '{}'::jsonb;--> statement-breakpoint
-ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmed_at" timestamp;--> statement-breakpoint
-ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmation_token" text;--> statement-breakpoint
-ALTER TABLE "notification_subscriptions" ADD COLUMN "confirmation_sent_at" timestamp;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "growth_access_requested_at" timestamp;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "growth_access_reason" text;--> statement-breakpoint
-ALTER TABLE "tour_dates" ADD COLUMN "timezone" text;--> statement-breakpoint
+ALTER TABLE "notification_subscriptions" ADD COLUMN IF NOT EXISTS "confirmed_at" timestamp;--> statement-breakpoint
+ALTER TABLE "notification_subscriptions" ADD COLUMN IF NOT EXISTS "confirmation_token" text;--> statement-breakpoint
+ALTER TABLE "notification_subscriptions" ADD COLUMN IF NOT EXISTS "confirmation_sent_at" timestamp;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "growth_access_requested_at" timestamp;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "growth_access_reason" text;--> statement-breakpoint
+ALTER TABLE "tour_dates" ADD COLUMN IF NOT EXISTS "timezone" text;--> statement-breakpoint
 ALTER TABLE "ai_insights" ADD CONSTRAINT "ai_insights_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "ai_insights" ADD CONSTRAINT "ai_insights_generation_run_id_insight_generation_runs_id_fk" FOREIGN KEY ("generation_run_id") REFERENCES "public"."insight_generation_runs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "insight_generation_runs" ADD CONSTRAINT "insight_generation_runs_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
