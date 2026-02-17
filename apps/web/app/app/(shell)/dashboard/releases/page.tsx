@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
+import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
 import { getDashboardData } from '../actions';
 import {
@@ -42,18 +43,22 @@ export default async function ReleasesPage() {
 
   if (releasesResult.status === 'rejected') {
     void captureError('loadReleaseMatrix failed', releasesResult.reason, {
-      route: '/app/releases',
+      route: APP_ROUTES.RELEASES,
     });
   }
   if (spotifyResult.status === 'rejected') {
     void captureError('checkSpotifyConnection failed', spotifyResult.reason, {
-      route: '/app/releases',
+      route: APP_ROUTES.RELEASES,
     });
   }
   if (appleMusicResult.status === 'rejected') {
-    void captureError('checkAppleMusicConnection failed', appleMusicResult.reason, {
-      route: '/app/releases',
-    });
+    void captureError(
+      'checkAppleMusicConnection failed',
+      appleMusicResult.reason,
+      {
+        route: APP_ROUTES.RELEASES,
+      }
+    );
   }
 
   // Read allow artwork downloads setting from profile settings
