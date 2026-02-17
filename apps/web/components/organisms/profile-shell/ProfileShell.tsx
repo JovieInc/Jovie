@@ -196,11 +196,11 @@ export function ProfileShell({
                         (isMobile ? (
                           <>
                             <CircleIconButton
-                              size='xs'
-                              variant='surface'
+                              size='md'
+                              variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className='hover:scale-105'
+                              className='border border-transparent hover:border-subtle hover:bg-surface-2'
                               onClick={() => setTipDrawerOpen(true)}
                             >
                               <DollarSign
@@ -219,11 +219,11 @@ export function ProfileShell({
                           </>
                         ) : (
                           <CircleIconButton
-                            size='xs'
-                            variant='surface'
+                            size='md'
+                            variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className='hover:scale-105'
+                            className='border border-transparent hover:border-subtle hover:bg-surface-2'
                             asChild
                           >
                             <Link href={`/${artist.handle}?mode=tip`}>
