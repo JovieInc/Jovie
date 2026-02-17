@@ -211,9 +211,8 @@ export async function updateAllowProfilePhotoDownloads(
     throw new TypeError('allowDownloads must be a boolean');
   }
 
-  const profile = await requireOwnProfile();
-
   try {
+    const profile = await requireOwnProfile();
     const currentSettings = (profile.settings ?? {}) as Record<string, unknown>;
 
     const [updated] = await db
@@ -240,8 +239,6 @@ export async function updateAllowProfilePhotoDownloads(
     await captureError('updateAllowProfilePhotoDownloads failed', error, {
       route: 'dashboard/actions/creator-profile',
     });
-    throw new Error('Failed to update profile photo download setting', {
-      cause: error,
-    });
+    throw error;
   }
 }

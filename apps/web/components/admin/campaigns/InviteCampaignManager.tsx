@@ -62,6 +62,7 @@ export function InviteCampaignManager() {
 
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
+  const { mutateAsync: sendInvites } = sendInvitesMutation;
 
   const handleRefreshClick = useCallback(() => {
     refetchPreview();
@@ -74,7 +75,7 @@ export function InviteCampaignManager() {
     setSendResult(null);
 
     try {
-      const result = await sendInvitesMutation.mutateAsync({
+      const result = await sendInvites({
         fitScoreThreshold,
         limit,
         minDelayMs: throttling.minDelayMs,
@@ -87,7 +88,7 @@ export function InviteCampaignManager() {
     } catch {
       // Error is handled by the mutation
     }
-  }, [preview, fitScoreThreshold, limit, throttling, sendInvitesMutation]);
+  }, [preview, fitScoreThreshold, limit, throttling, sendInvites]);
 
   const handleSendClick = useCallback(() => {
     if (!preview || preview.sample.withEmails === 0) return;
