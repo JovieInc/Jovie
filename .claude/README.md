@@ -41,6 +41,7 @@ All files in this directory are checked into the repo and shared across the team
 | `/audit-db-connections` | Audit non-standard DB connection patterns |
 | `/audit-routes` | Audit hardcoded route paths |
 | `/sync-permissions` | Sync permission settings |
+| `/turbo-docs` | Search Turborepo documentation from the terminal |
 | `/session-start-hook` | Configure session start behavior |
 
 ## Hooks
@@ -85,6 +86,7 @@ The Stop hook runs when Claude finishes a task. It:
 |-------|-------------|
 | `coderabbit-review` | Run CodeRabbit AI code review on changes |
 | `consolidate-ui` | Consolidate UI component patterns |
+| `turborepo` | Turborepo monorepo expert (builds, caching, worktrees, OOM) |
 
 ## Adding New Commands
 

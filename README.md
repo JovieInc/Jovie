@@ -10,7 +10,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - **Next.js 16** - React framework with App Router, Server Components, and Server Actions
 - **React 19** - Latest React with concurrent features
 - **TypeScript 5** - Type-safe development across the entire stack
-- **Turborepo** - Monorepo build system with intelligent caching
+- **Turborepo 2.8** - Monorepo build system with intelligent caching, shared worktree cache, and `turbo docs` CLI
 
 ### Authentication & Security
 - **Clerk 7** - Complete user management with social login, MFA, and webhooks
@@ -218,6 +218,39 @@ pnpm format:check
 
 # Tailwind CSS check
 pnpm tailwind:check
+```
+
+### Turborepo
+
+```bash
+# Search Turborepo docs from terminal (2.8+)
+turbo docs "task configuration"
+
+# Run only affected packages (CI optimization)
+pnpm turbo build --affected
+pnpm turbo test --affected
+
+# Preview task execution plan without running
+pnpm turbo build --dry
+
+# Reduce memory pressure for tests (OOM fix)
+pnpm turbo test --concurrency=1
+```
+
+### Parallel Development with Worktrees
+
+Git worktrees enable parallel agent work with shared Turbo cache (2.8+):
+
+```bash
+# Create a worktree for parallel work
+git worktree add ../Jovie-agent-1 -b agent/task-name
+cd ../Jovie-agent-1 && pnpm install
+
+# Work normally -- turbo cache is shared automatically
+pnpm turbo build
+
+# Clean up
+git worktree remove ../Jovie-agent-1
 ```
 
 ### CI/CD
