@@ -15,6 +15,7 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -371,8 +372,16 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    latestRelease,
+    latestRelease: fetchedLatestRelease,
   } = profileResult;
+
+  // Feature-flagged: latest release card is disabled by default (gate defaults to false)
+  const showLatestRelease = await checkGate(
+    null,
+    FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD,
+    false
+  );
+  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
 
   if (status === 'error') {
     return (
