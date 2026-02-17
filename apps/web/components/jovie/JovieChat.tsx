@@ -15,11 +15,7 @@ import {
   SuggestedPrompts,
 } from './components';
 import { useChatAvatarUpload, useJovieChat } from './hooks';
-import type {
-  JovieChatProps,
-  MessagePart,
-  StarterSuggestionContext,
-} from './types';
+import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
@@ -59,13 +55,12 @@ export function JovieChat({
   onTitleChange,
   displayName,
   avatarUrl,
+  username,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [starterContext, setStarterContext] =
-    useState<StarterSuggestionContext | null>(null);
 
   const {
     input,
@@ -272,23 +267,35 @@ export function JovieChat({
           </div>
         </>
       ) : (
-        // Empty state - welcome hero + suggestions + input, centered
-        <div className='flex flex-1 flex-col items-center justify-center px-4 pb-6'>
-          <div className='chat-stagger mx-auto w-full max-w-2xl space-y-5'>
-            {/* Welcome hero */}
-            <div className='flex flex-col items-center text-center space-y-3'>
-              <div className='chat-logo-mark flex h-11 w-11 items-center justify-center rounded-[13px] border border-white/[0.06] bg-gradient-to-b from-white/[0.06] to-transparent'>
-                <BrandLogo size={22} tone='auto' />
-              </div>
-              <div className='space-y-1.5'>
-                <h1 className='text-[18px] font-semibold text-primary-token tracking-[-0.025em] leading-tight'>
-                  {displayName ? `Hey, ${displayName}` : 'Hey there'}
-                </h1>
-                <p className='text-[14px] leading-relaxed text-secondary-token/80 max-w-sm mx-auto'>
-                  I can help you manage your profile, analyze your stats, and
-                  plan your next move.
-                </p>
-              </div>
+        // Empty state - input near bottom with carousel + pills
+        <div className='flex flex-1 flex-col items-center justify-end px-4 pb-8'>
+          <div className='chat-stagger w-full max-w-2xl space-y-4'>
+            {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
+            {profileId && (
+              <SuggestedProfilesCarousel
+                profileId={profileId}
+                username={username}
+                displayName={displayName}
+                avatarUrl={avatarUrl}
+              />
+            )}
+
+            {/* One-liner + input + pills */}
+            <div className='space-y-3'>
+              <p className='text-center text-[15px] text-secondary-token'>
+                What can I help you with?
+              </p>
+              <ChatInput
+                ref={inputRef}
+                value={input}
+                onChange={setInput}
+                onSubmit={handleSubmit}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                onImageUpload={openFilePicker}
+                isImageUploading={isImageUploading}
+              />
+              <SuggestedPrompts onSelect={handleSuggestedPrompt} />
             </div>
 
             {/* Error display */}
@@ -300,32 +307,6 @@ export function JovieChat({
                 isSubmitting={isSubmitting}
               />
             )}
-
-            {/* Suggested profiles carousel (DSP matches, social links, avatars) */}
-            {profileId && (
-              <SuggestedProfilesCarousel
-                profileId={profileId}
-                onContextLoad={setStarterContext}
-              />
-            )}
-
-            {/* Suggested prompts */}
-            <SuggestedPrompts
-              onSelect={handleSuggestedPrompt}
-              context={starterContext}
-            />
-
-            {/* Input */}
-            <ChatInput
-              ref={inputRef}
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSubmit}
-              isLoading={isLoading}
-              isSubmitting={isSubmitting}
-              onImageUpload={openFilePicker}
-              isImageUploading={isImageUploading}
-            />
           </div>
         </div>
       )}
