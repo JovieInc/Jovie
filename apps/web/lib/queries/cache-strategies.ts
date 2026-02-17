@@ -127,12 +127,13 @@ export const PAGINATED_CACHE: CacheStrategyOptions = {
  * Cache strategy for user-initiated search queries.
  * Use for: artist search, content search, typeahead results
  *
- * Short stale time so previously searched terms are instant,
- * but no automatic refetching since searches are user-driven.
+ * 5-minute stale time aligned with the server-side cache TTL so
+ * previously searched terms are instant within a session.
+ * No automatic refetching since searches are user-driven.
  */
 export const SEARCH_CACHE: CacheStrategyOptions = {
-  staleTime: 1 * MINUTE,
-  gcTime: 10 * MINUTE,
+  staleTime: 5 * MINUTE,
+  gcTime: 30 * MINUTE,
   refetchOnMount: false,
   refetchOnWindowFocus: false,
 };

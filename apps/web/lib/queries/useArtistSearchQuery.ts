@@ -62,7 +62,7 @@ export interface UseArtistSearchQueryReturn {
 }
 
 const DEFAULT_LIMIT = 5;
-const DEFAULT_MIN_QUERY_LENGTH = 2;
+const DEFAULT_MIN_QUERY_LENGTH = 1;
 
 async function fetchArtistSearch(
   query: string,
@@ -201,6 +201,14 @@ export function useArtistSearchQuery(
       if (trimmed.length < minQueryLength) {
         asyncDebouncer.cancel();
         setDebouncedQuery('');
+        setIsPending(false);
+        return;
+      }
+
+      // Single letter: bypass debounce for instant alphabet pre-cache results
+      if (trimmed.length === 1 && /^[a-zA-Z]$/i.test(trimmed)) {
+        asyncDebouncer.cancel();
+        setDebouncedQuery(trimmed);
         setIsPending(false);
         return;
       }

@@ -1,7 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { cacheQuery } from '@/lib/db/cache';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
+import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
 import { logger } from '@/lib/utils/logger';
@@ -13,10 +15,11 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Query constraints
-const MIN_QUERY_LENGTH = 2;
+const MIN_QUERY_LENGTH = 1;
 const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
+const SEARCH_CACHE_TTL_SECONDS = 300; // 5 minutes
 
 // Normalized response shape for client
 export interface SpotifyArtistResult {
@@ -28,14 +31,6 @@ export interface SpotifyArtistResult {
   popularity: number;
   verified?: boolean;
 }
-
-// Simple in-memory cache for API responses with proactive cleanup
-const searchCache = new Map<
-  string,
-  { data: SpotifyArtistResult[]; timestamp: number }
->();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const MAX_CACHE_SIZE = 100; // Maximum entries to prevent memory exhaustion
 
 /**
  * In-memory rate limiting per IP with proactive cleanup
@@ -78,29 +73,6 @@ function cleanupRateLimitMap(): void {
     entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
     const toDelete = entries.slice(0, entries.length - MAX_RATE_LIMIT_ENTRIES);
     toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
-  }
-}
-
-/**
- * Proactively clean expired cache entries to prevent memory exhaustion.
- * Uses LRU-style eviction when limit is reached.
- */
-function cleanupSearchCache(): void {
-  const now = Date.now();
-
-  // First, remove all expired entries
-  for (const [key, entry] of searchCache.entries()) {
-    if (now - entry.timestamp > CACHE_DURATION) {
-      searchCache.delete(key);
-    }
-  }
-
-  // If still over limit, remove oldest entries (LRU eviction)
-  if (searchCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(searchCache.entries());
-    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-    const toDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-    toDelete.forEach(([key]) => searchCache.delete(key));
   }
 }
 
@@ -226,37 +198,44 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Check cache first
-  const cacheKey = `${q.toLowerCase()}:${limit}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data, { headers: rateLimitHeaders });
+  // Fast path: single-letter queries served from alphabet pre-cache
+  if (q.length === 1 && /^[a-zA-Z]$/.test(q)) {
+    const alphabetResults = await getAlphabetResults(q.toLowerCase());
+    if (alphabetResults && alphabetResults.length > 0) {
+      return NextResponse.json(alphabetResults, { headers: rateLimitHeaders });
+    }
+    // No cached results — return empty rather than hitting Spotify with a 1-char query
+    return NextResponse.json([], { headers: rateLimitHeaders });
   }
 
   try {
-    // Use the hardened Spotify client with circuit breaker and retry
-    const artists = await spotifyClient.searchArtists(q, limit);
+    // Multi-layer cache (in-memory LRU + Redis) wrapping Spotify API
+    const cacheKey = `spotify:search:${q.toLowerCase()}:${limit}`;
+    const results = await cacheQuery<SpotifyArtistResult[]>(
+      cacheKey,
+      async () => {
+        // Use the hardened Spotify client with circuit breaker and retry
+        const artists = await spotifyClient.searchArtists(q, limit);
 
-    // Normalize response shape (data already sanitized by client)
-    const normalizedResults: SpotifyArtistResult[] = artists.map(artist => ({
-      id: artist.spotifyId,
-      name: artist.name,
-      url: buildSpotifyArtistUrl(artist.spotifyId),
-      imageUrl: artist.imageUrl ?? undefined,
-      followers: artist.followerCount,
-      popularity: artist.popularity,
-      // Spotify doesn't expose verified status via search API
-      verified: undefined,
-    }));
+        // Normalize response shape (data already sanitized by client)
+        const normalizedResults: SpotifyArtistResult[] = artists.map(
+          artist => ({
+            id: artist.spotifyId,
+            name: artist.name,
+            url: buildSpotifyArtistUrl(artist.spotifyId),
+            imageUrl: artist.imageUrl ?? undefined,
+            followers: artist.followerCount,
+            popularity: artist.popularity,
+            // Spotify doesn't expose verified status via search API
+            verified: undefined,
+          })
+        );
 
-    // VIP boost: Prioritize featured creators for exact name matches
-    const results = await applyVipBoost(normalizedResults, q, limit);
-
-    // Cache the results
-    searchCache.set(cacheKey, {
-      data: results,
-      timestamp: Date.now(),
-    });
+        // VIP boost: Prioritize featured creators for exact name matches
+        return applyVipBoost(normalizedResults, q, limit);
+      },
+      { ttlSeconds: SEARCH_CACHE_TTL_SECONDS, useRedis: true }
+    );
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
@@ -293,14 +272,7 @@ export async function GET(request: NextRequest) {
     );
   } finally {
     // Probabilistic cleanup (10% of requests) to amortize cost.
-    // Full cleanup on every request is O(n log n) due to sorting;
-    // at 30 req/min this saves ~27 unnecessary cleanups per minute.
-    if (
-      Math.random() < 0.1 ||
-      searchCache.size > MAX_CACHE_SIZE ||
-      rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES
-    ) {
-      cleanupSearchCache();
+    if (Math.random() < 0.1 || rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
       cleanupRateLimitMap();
     }
   }
