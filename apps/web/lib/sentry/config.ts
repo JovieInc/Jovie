@@ -198,6 +198,35 @@ const FRAMEWORK_INTERNAL_ERRORS = [
 ] as const;
 
 /**
+ * Checks if an error is an AbortError from request cancellation.
+ *
+ * AbortController cancellations are expected when users navigate away,
+ * requests are deduplicated, or async searches are superseded. Not a bug.
+ */
+function isAbortError(event: SentryEvent): boolean {
+  const type = event.exception?.values?.[0]?.type ?? '';
+  const message = event.exception?.values?.[0]?.value ?? '';
+  return type === 'AbortError' || (type === 'Error' && message === 'aborted');
+}
+
+/**
+ * Checks if an error is a hydration mismatch.
+ *
+ * Hydration mismatches from SSR/client differences are largely mitigated
+ * (mounted guards, theme handling) and remaining occurrences are transient.
+ * Downgrade to warning instead of dropping entirely for monitoring.
+ */
+function isHydrationMismatch(event: SentryEvent): boolean {
+  const message = event.exception?.values?.[0]?.value?.toLowerCase() ?? '';
+  return (
+    message.includes('hydration failed') ||
+    message.includes("server rendered html didn't match") ||
+    message.includes("server rendered text didn't match") ||
+    message.includes('switched to client rendering')
+  );
+}
+
+/**
  * Checks if an error is a deployment transition error that should be filtered.
  *
  * These are ReferenceErrors that occur when users have stale JavaScript
@@ -281,6 +310,16 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
   // Filter React/Next.js framework internal errors (not actionable)
   if (isFrameworkInternalError(event)) {
     return null;
+  }
+
+  // Filter AbortError from request cancellation (normal navigation behavior)
+  if (isAbortError(event)) {
+    return null;
+  }
+
+  // Downgrade hydration mismatches to warning (transient SSR/client differences)
+  if (isHydrationMismatch(event)) {
+    event.level = 'warning';
   }
 
   // Anonymize IP addresses if present
