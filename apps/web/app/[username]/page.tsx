@@ -372,8 +372,16 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    latestRelease,
+    latestRelease: fetchedLatestRelease,
   } = profileResult;
+
+  // Feature-flagged: latest release card is disabled by default (gate defaults to false)
+  const showLatestRelease = await checkGate(
+    null,
+    FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD,
+    false
+  );
+  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
 
   if (status === 'error') {
     return (
