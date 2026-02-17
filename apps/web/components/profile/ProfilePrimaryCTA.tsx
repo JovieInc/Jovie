@@ -16,19 +16,26 @@ import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
+const ctaLoadingFallback = (
+  <div className='space-y-4 py-4 sm:py-5' aria-busy='true'>
+    <div className='h-12 w-full rounded-xl bg-surface-1 animate-pulse' />
+  </div>
+);
+
 const ArtistNotificationsCTA = dynamic(
   () =>
     import('@/components/profile/artist-notifications-cta').then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className='space-y-4 py-4 sm:py-5' aria-busy='true'>
-        <div className='h-12 w-full rounded-xl bg-surface-1 animate-pulse' />
-      </div>
-    ),
-  }
+  { ssr: false, loading: () => ctaLoadingFallback }
+);
+
+const TwoStepNotificationsCTA = dynamic(
+  () =>
+    import('@/components/profile/artist-notifications-cta').then(mod => ({
+      default: mod.TwoStepNotificationsCTA,
+    })),
+  { ssr: false, loading: () => ctaLoadingFallback }
 );
 
 /**
@@ -59,6 +66,8 @@ type ProfilePrimaryCTAProps = {
   /** Pre-computed merged DSPs for the mobile listen drawer */
   readonly mergedDSPs?: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
+  /** Whether to show the two-step notification subscribe variant */
+  readonly subscribeTwoStep?: boolean;
 };
 
 const ctaLinkClass =
@@ -72,6 +81,7 @@ export function ProfilePrimaryCTA({
   showCapture = true,
   mergedDSPs,
   enableDynamicEngagement = false,
+  subscribeTwoStep = false,
 }: ProfilePrimaryCTAProps) {
   const isMobile = useBreakpointDown('md');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -100,6 +110,13 @@ export function ProfilePrimaryCTA({
     !isSubscribed &&
     !isHydratingSubscriptionStatus
   ) {
+    if (subscribeTwoStep) {
+      return (
+        <div className='space-y-4 py-4 sm:py-5'>
+          <TwoStepNotificationsCTA artist={artist} />
+        </div>
+      );
+    }
     return (
       <div className='space-y-4 py-4 sm:py-5'>
         <ArtistNotificationsCTA

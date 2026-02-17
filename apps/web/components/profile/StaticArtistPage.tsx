@@ -1,6 +1,9 @@
 import { Suspense } from 'react';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
+import {
+  ArtistNotificationsCTA,
+  TwoStepNotificationsCTA,
+} from '@/components/profile/artist-notifications-cta';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
@@ -84,6 +87,8 @@ interface StaticArtistPageProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  /** Whether to show the two-step notification subscribe variant */
+  readonly subscribeTwoStep?: boolean;
 }
 
 /**
@@ -138,7 +143,8 @@ function renderContent(
   socialLinks: LegacySocialLink[],
   mergedDSPs: AvailableDSP[],
   primaryAction: PrimaryAction,
-  enableDynamicEngagement: boolean
+  enableDynamicEngagement: boolean,
+  subscribeTwoStep: boolean
 ) {
   switch (mode) {
     case 'listen':
@@ -187,7 +193,11 @@ function renderContent(
       // Subscribe mode - show notification subscription form directly
       return (
         <div className='space-y-4 py-4 sm:py-5'>
-          <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+          {subscribeTwoStep ? (
+            <TwoStepNotificationsCTA artist={artist} />
+          ) : (
+            <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+          )}
         </div>
       );
 
@@ -218,6 +228,7 @@ export function StaticArtistPage({
   latestRelease,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  subscribeTwoStep = false,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -260,6 +271,7 @@ export function StaticArtistPage({
                   enableDynamicEngagement={enableDynamicEngagement}
                   autoOpenCapture={resolvedAutoOpenCapture}
                   showCapture
+                  subscribeTwoStep={subscribeTwoStep}
                 />
               </div>
             </div>
@@ -270,7 +282,8 @@ export function StaticArtistPage({
               socialLinks,
               mergedDSPs,
               primaryAction,
-              enableDynamicEngagement
+              enableDynamicEngagement,
+              subscribeTwoStep
             )
           )}
         </div>

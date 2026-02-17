@@ -406,6 +406,13 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
+  // Evaluate two-step subscribe experiment per-artist (deterministic bucketing)
+  const subscribeTwoStep = await checkGate(
+    profile.id,
+    FEATURE_FLAG_KEYS.SUBSCRIBE_TWO_STEP,
+    false
+  );
+
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
@@ -468,6 +475,7 @@ export default async function ArtistPage({
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
+        subscribeTwoStep={subscribeTwoStep}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

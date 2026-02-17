@@ -6,6 +6,7 @@
 export const FEATURE_FLAG_KEYS = {
   CLAIM_HANDLE: 'feature_claim_handle',
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
+  SUBSCRIBE_TWO_STEP: 'feature_subscribe_two_step',
   LATEST_RELEASE_CARD: 'feature_latest_release_card',
 } as const;
 
