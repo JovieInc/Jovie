@@ -33,7 +33,7 @@ export function ProfileMockup() {
 
   // Check reduced motion preference
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const mq = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
     setPrefersReducedMotion(mq.matches);
     const handler = (e: MediaQueryListEvent) =>
       setPrefersReducedMotion(e.matches);
@@ -45,7 +45,7 @@ export function ProfileMockup() {
     const el = barRef.current;
     if (!el || prefersReducedMotion) return;
     el.style.animation = 'none';
-    void el.offsetWidth;
+    el.getBoundingClientRect();
     el.style.animation = `ctaFill ${CTA_INTERVAL}ms linear forwards`;
     progressPercent.current = 0;
   }, [prefersReducedMotion]);
@@ -182,7 +182,7 @@ export function ProfileMockup() {
                 ? 'none'
                 : `ctaFill ${CTA_INTERVAL}ms linear forwards`,
             }}
-          />
+          ></div>
         </div>
 
         {/* Label */}

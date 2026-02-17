@@ -95,13 +95,13 @@ export function buildArtistBioDraft(
     .join(' ');
 
   const followersText =
-    input.spotifyFollowers != null
-      ? formatNumber(input.spotifyFollowers)
-      : 'not available';
+    input.spotifyFollowers == null
+      ? 'not available'
+      : formatNumber(input.spotifyFollowers);
   const popularityText =
-    input.spotifyPopularity != null
-      ? `${input.spotifyPopularity} / 100`
-      : 'not available';
+    input.spotifyPopularity == null
+      ? 'not available'
+      : `${input.spotifyPopularity} / 100`;
   const facts = [
     `Spotify followers: ${followersText}`,
     `Spotify popularity: ${popularityText}`,

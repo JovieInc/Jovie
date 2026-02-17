@@ -67,14 +67,14 @@ export function MobileNav({
           : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
       ]
     : [
-        ...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : []),
+        ...(hidePricingLink ? [] : [{ href: '/pricing', label: 'Pricing' }]),
         ...(showAuthenticatedAction
           ? []
           : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
       ];
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
-  const portalTarget = typeof document !== 'undefined' ? document.body : null;
+  const portalTarget = typeof document === 'undefined' ? null : document.body;
 
   return (
     <>

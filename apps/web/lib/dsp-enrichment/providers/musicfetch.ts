@@ -127,7 +127,7 @@ export async function fetchArtistBySpotifyUrl(
 
     const data: MusicFetchResponse = await response.json();
 
-    if (!data.result || data.result.type !== 'artist') {
+    if (!data.result || data.result?.type !== 'artist') {
       logger.warn('MusicFetch returned non-artist result', {
         type: data.result?.type,
         spotifyUrl,

@@ -81,13 +81,13 @@ export function HeaderNav({
           <div className='flex-1' aria-hidden='true' />
         ) : (
           <div className='flex-1 hidden md:flex items-center justify-center gap-6'>
-            {navLinks ? (
+            {navLinks &&
               navLinks.map(link => (
                 <a key={link.href} href={link.href} className={navLinkClass}>
                   {link.label}
                 </a>
-              ))
-            ) : hidePricingLink ? null : (
+              ))}
+            {!navLinks && !hidePricingLink && (
               <Link
                 href={APP_ROUTES.PRICING}
                 className={cn(navLinkClass, isPricingActive && 'is-active')}
