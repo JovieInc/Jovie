@@ -30,11 +30,11 @@ function ThemePreview({
   colors,
   compact = false,
   className,
-}: {
+}: Readonly<{
   colors: { surface1: string; surface2: string; surface3: string };
   compact?: boolean;
   className?: string;
-}) {
+}>) {
   return (
     <div
       className={cn('relative w-full h-full', className)}
@@ -115,7 +115,11 @@ export function SettingsAppearanceSection() {
                   </div>
                 ) : (
                   <ThemePreview
-                    colors={PREVIEW_COLORS[option.value as 'light' | 'dark']}
+                    colors={
+                      option.value === 'light'
+                        ? PREVIEW_COLORS.light
+                        : PREVIEW_COLORS.dark
+                    }
                   />
                 )}
               </div>

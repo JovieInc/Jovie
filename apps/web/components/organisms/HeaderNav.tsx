@@ -81,12 +81,11 @@ export function HeaderNav({
           <div className='flex-1' aria-hidden='true' />
         ) : (
           <div className='flex-1 hidden md:flex items-center justify-center gap-6'>
-            {navLinks &&
-              navLinks.map(link => (
-                <a key={link.href} href={link.href} className={navLinkClass}>
-                  {link.label}
-                </a>
-              ))}
+            {navLinks?.map(link => (
+              <a key={link.href} href={link.href} className={navLinkClass}>
+                {link.label}
+              </a>
+            ))}
             {!navLinks && !hidePricingLink && (
               <Link
                 href={APP_ROUTES.PRICING}

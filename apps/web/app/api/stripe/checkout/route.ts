@@ -26,78 +26,71 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    { status, headers: NO_STORE_HEADERS }
+  );
+}
+
+function normalizeReferralCode(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  const isValid =
+    trimmed.length >= MIN_REFERRAL_CODE_LENGTH &&
+    trimmed.length <= MAX_REFERRAL_CODE_LENGTH &&
+    REFERRAL_CODE_PATTERN.test(trimmed);
+  return isValid ? trimmed.toLowerCase() : undefined;
+}
+
+async function validatePriceId(priceId: string): Promise<NextResponse | null> {
+  const activePriceIds = getActivePriceIds();
+
+  Sentry.addBreadcrumb({
+    category: 'billing',
+    message: 'Price validation',
+    level: 'info',
+    data: {
+      requestedPriceId: priceId,
+      activePriceIdCount: activePriceIds.length,
+    },
+  });
+
+  if (activePriceIds.length === 0) {
+    await captureCriticalError(
+      'Checkout rejected: no active price IDs configured',
+      new Error(
+        'getActivePriceIds() returned empty — STRIPE_PRICE_PRO_MONTHLY/YEARLY likely missing'
+      ),
+      { route: '/api/stripe/checkout', requestedPriceId: priceId }
+    );
+    return jsonError('Billing is temporarily unavailable', 503);
+  }
+
+  if (!activePriceIds.includes(priceId)) {
+    return jsonError('Invalid price ID', 400);
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+    if (!userId) return jsonError('Unauthorized', 401);
 
-    // Parse request body
     const body = await request.json();
     const { priceId, referralCode: rawReferralCode } = body;
 
     if (!priceId || typeof priceId !== 'string') {
-      return NextResponse.json(
-        { error: 'Invalid price ID' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return jsonError('Invalid price ID', 400);
     }
 
-    // Validate and normalize referral code if provided
-    let referralCode: string | undefined;
-    if (typeof rawReferralCode === 'string') {
-      const trimmed = rawReferralCode.trim();
-      if (
-        trimmed.length >= MIN_REFERRAL_CODE_LENGTH &&
-        trimmed.length <= MAX_REFERRAL_CODE_LENGTH &&
-        REFERRAL_CODE_PATTERN.test(trimmed)
-      ) {
-        referralCode = trimmed.toLowerCase();
-      }
-      // Silently ignore invalid referral codes — they shouldn't block checkout
-    }
+    const referralCode = normalizeReferralCode(rawReferralCode);
 
-    // Validate that the price ID is one of our active prices
-    const activePriceIds = getActivePriceIds();
+    const priceError = await validatePriceId(priceId);
+    if (priceError) return priceError;
 
-    Sentry.addBreadcrumb({
-      category: 'billing',
-      message: 'Price validation',
-      level: 'info',
-      data: {
-        requestedPriceId: priceId,
-        activePriceIdCount: activePriceIds.length,
-      },
-    });
-
-    if (activePriceIds.length === 0) {
-      // Zero active prices is a config problem, not a user error
-      await captureCriticalError(
-        'Checkout rejected: no active price IDs configured',
-        new Error(
-          'getActivePriceIds() returned empty — STRIPE_PRICE_PRO_MONTHLY/YEARLY likely missing'
-        ),
-        { route: '/api/stripe/checkout', requestedPriceId: priceId }
-      );
-      return NextResponse.json(
-        { error: 'Billing is temporarily unavailable' },
-        { status: 503, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!activePriceIds.includes(priceId)) {
-      return NextResponse.json(
-        { error: 'Invalid price ID' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Get price details for logging
     const priceDetails = getPriceMappingDetails(priceId);
     logger.info('Creating checkout session for:', {
       userId,
@@ -106,14 +99,10 @@ export async function POST(request: NextRequest) {
       description: priceDetails?.description,
     });
 
-    // Ensure Stripe customer exists
     const customerResult = await ensureStripeCustomer();
     if (!customerResult.success || !customerResult.customerId) {
       logger.error('Failed to ensure Stripe customer:', customerResult.error);
-      return NextResponse.json(
-        { error: 'Failed to create customer' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
+      return jsonError('Failed to create customer', 500);
     }
 
     if (priceDetails?.plan) {
@@ -134,26 +123,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create URLs for success and cancel
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const successUrl = `${baseUrl}/billing/success`;
-    const cancelUrl = `${baseUrl}/billing/cancel`;
-
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
-    const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
 
-    // Create checkout session
     const session = await createCheckoutSession({
       customerId: customerResult.customerId,
       priceId,
       userId,
-      successUrl,
-      cancelUrl,
-      idempotencyKey,
+      successUrl: `${baseUrl}/billing/success`,
+      cancelUrl: `${baseUrl}/billing/cancel`,
+      idempotencyKey: `checkout:${userId}:${priceId}:${idempotencyBucket}`,
       referralCode,
     });
 
-    // Log successful checkout creation
     logger.info('Checkout session created:', {
       sessionId: session.id,
       userId,
@@ -163,10 +145,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      {
-        sessionId: session.id,
-        url: session.url,
-      },
+      { sessionId: session.id, url: session.url },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -174,27 +153,17 @@ export async function POST(request: NextRequest) {
     await captureCriticalError(
       'Stripe checkout session creation failed',
       error,
-      {
-        route: '/api/stripe/checkout',
-        method: 'POST',
-      }
+      { route: '/api/stripe/checkout', method: 'POST' }
     );
 
-    // Return appropriate error based on the error type
     if (error instanceof Error) {
       const knownError = getCheckoutErrorResponse(error);
       if (knownError) {
-        return NextResponse.json(
-          { error: knownError.message },
-          { status: knownError.status, headers: NO_STORE_HEADERS }
-        );
+        return jsonError(knownError.message, knownError.status);
       }
     }
 
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+    return jsonError('Failed to create checkout session', 500);
   }
 }
 

@@ -1057,6 +1057,66 @@ export async function OPTIONS() {
   });
 }
 
+/**
+ * Build the tool set for paid-plan chat sessions.
+ */
+function buildChatTools(
+  artistContext: ArtistContext,
+  resolvedProfileId: string | null
+) {
+  return {
+    proposeProfileEdit: createProfileEditTool(artistContext),
+    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+    suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+    writeWorldClassBio: createWorldClassBioTool(
+      artistContext,
+      resolvedProfileId
+    ),
+    generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+    createPromoStrategy: createPromoStrategyTool(
+      artistContext,
+      resolvedProfileId
+    ),
+    markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+    ...(resolvedProfileId
+      ? { createRelease: createReleaseTool(resolvedProfileId) }
+      : {}),
+  };
+}
+
+/**
+ * Build a standardized error response for chat streaming failures.
+ */
+function buildChatErrorResponse(
+  error: unknown,
+  userId: string,
+  messageCount: number,
+  requestId: string
+) {
+  Sentry.captureException(error, {
+    tags: { feature: 'ai-chat' },
+    extra: { userId, messageCount, requestId },
+  });
+
+  const message =
+    error instanceof Error ? error.message : 'An unexpected error occurred';
+
+  return NextResponse.json(
+    {
+      error: 'Failed to process chat request',
+      message:
+        'Jovie hit a temporary issue while processing your message. Please try again.',
+      errorCode:
+        sanitizeErrorCode(
+          error instanceof Error ? (error as { code?: string }).code : undefined
+        ) ?? 'CHAT_STREAM_FAILED',
+      debugMessage: message,
+      requestId,
+    },
+    { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+  );
+}
+
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
 
@@ -1164,24 +1224,7 @@ export async function POST(req: Request) {
 
     // Gate AI tools behind paid plans — free users get chat-only
     const tools = planLimits.aiCanUseTools
-      ? {
-          proposeProfileEdit: createProfileEditTool(artistContext),
-          checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
-          suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
-          writeWorldClassBio: createWorldClassBioTool(
-            artistContext,
-            resolvedProfileId
-          ),
-          generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
-          createPromoStrategy: createPromoStrategyTool(
-            artistContext,
-            resolvedProfileId
-          ),
-          markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
-          ...(resolvedProfileId
-            ? { createRelease: createReleaseTool(resolvedProfileId) }
-            : {}),
-        }
+      ? buildChatTools(artistContext, resolvedProfileId)
       : {};
 
     const result = streamText({
@@ -1215,33 +1258,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: { feature: 'ai-chat' },
-      extra: {
-        userId,
-        messageCount: uiMessages.length,
-        requestId,
-      },
-    });
-
-    const message =
-      error instanceof Error ? error.message : 'An unexpected error occurred';
-
-    return NextResponse.json(
-      {
-        error: 'Failed to process chat request',
-        message:
-          'Jovie hit a temporary issue while processing your message. Please try again.',
-        errorCode:
-          sanitizeErrorCode(
-            error instanceof Error
-              ? (error as { code?: string }).code
-              : undefined
-          ) ?? 'CHAT_STREAM_FAILED',
-        debugMessage: message,
-        requestId,
-      },
-      { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
-    );
+    return buildChatErrorResponse(error, userId, uiMessages.length, requestId);
   }
 }

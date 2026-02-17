@@ -127,24 +127,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           className='flex flex-col gap-3 sm:flex-row sm:items-end'
         >
           <div className='flex-1'>
-            {!pendingEmail ? (
-              <div>
-                <label
-                  htmlFor='new-email'
-                  className='block text-sm text-primary-token mb-1.5'
-                >
-                  Add email address
-                </label>
-                <Input
-                  id='new-email'
-                  type='email'
-                  value={newEmail}
-                  placeholder='you@example.com'
-                  onChange={event => setNewEmail(event.target.value)}
-                  required
-                />
-              </div>
-            ) : (
+            {pendingEmail ? (
               <div>
                 <label
                   htmlFor='verify-code'
@@ -160,6 +143,23 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   value={verificationCode}
                   onChange={event => setVerificationCode(event.target.value)}
                   placeholder='Enter 6-digit code'
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor='new-email'
+                  className='block text-sm text-primary-token mb-1.5'
+                >
+                  Add email address
+                </label>
+                <Input
+                  id='new-email'
+                  type='email'
+                  value={newEmail}
+                  placeholder='you@example.com'
+                  onChange={event => setNewEmail(event.target.value)}
                   required
                 />
               </div>
