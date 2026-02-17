@@ -3,15 +3,18 @@
 import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, User } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
-
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-import { ChatMarkdown } from './ChatMarkdown';
+
+const ChatMarkdown = dynamic(
+  () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
+  { ssr: false }
+);
 
 interface ChatMessageProps {
   readonly id: string;

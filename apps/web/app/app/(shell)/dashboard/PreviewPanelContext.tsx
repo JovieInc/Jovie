@@ -171,7 +171,9 @@ export function usePreviewPanelData(): PreviewPanelDataContextValue {
 
 /**
  * Combined hook for backwards compatibility.
- * Prefer using usePreviewPanelState or usePreviewPanelData for better performance.
+ * @deprecated Prefer using {@link usePreviewPanelState} (for isOpen/open/close/toggle)
+ * or {@link usePreviewPanelData} (for previewData/setPreviewData) to avoid
+ * unnecessary re-renders from subscribing to both contexts.
  */
 export function usePreviewPanel(): PreviewPanelContextValue {
   const stateContext = useContext(PreviewPanelStateContext);

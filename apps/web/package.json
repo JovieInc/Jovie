@@ -2,6 +2,7 @@
   "name": "@jovie/web",
   "version": "26.2.0",
   "private": true,
+  "sideEffects": false,
   "engines": {
     "node": ">=24.0.0"
   },
@@ -130,8 +131,6 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10",
-    "@statsig/react-bindings": "^3.31.2",
-    "@statsig/session-replay": "^3.31.2",
     "@stripe/stripe-js": "^8.7.0",
     "@tanstack/react-pacer": "^0.19.3",
     "@tanstack/react-query": "^5.90.20",

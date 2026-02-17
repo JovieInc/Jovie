@@ -3,7 +3,10 @@
 import { SegmentControl } from '@jovie/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  usePreviewPanelData,
+  usePreviewPanelState,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { ProfileContactHeader } from './ProfileContactHeader';
@@ -24,7 +27,8 @@ const PROFILE_TAB_OPTIONS = [
 ];
 
 export function ProfileContactSidebar() {
-  const { isOpen, close, previewData } = usePreviewPanel();
+  const { isOpen, close } = usePreviewPanelState();
+  const { previewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryOption>('social');

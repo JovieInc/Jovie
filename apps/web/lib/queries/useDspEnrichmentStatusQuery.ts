@@ -143,7 +143,7 @@ export function useDspEnrichmentStatusQuery({
     queryKey: queryKeys.dspEnrichment.status(profileId),
     queryFn: ({ signal }) => fetchEnrichmentStatus(profileId, signal),
     enabled: enabled && !!profileId,
-    staleTime: 1000, // Very short stale time for real-time updates
+    staleTime: 5000, // Match polling interval to avoid refetching between polls
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnMount: true,
     refetchOnWindowFocus: false, // Polling handles freshness

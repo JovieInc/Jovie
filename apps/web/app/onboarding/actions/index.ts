@@ -14,6 +14,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { isSecureEnv } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import {
   createOnboardingError,
   OnboardingErrorCode,
@@ -248,6 +249,9 @@ export async function completeOnboarding({
 
     return completion;
   } catch (error) {
+    await captureError('completeOnboarding failed', error, {
+      route: 'onboarding',
+    });
     throw logOnboardingError(error, { username, displayName, email });
   }
 }

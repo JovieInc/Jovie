@@ -20,7 +20,7 @@ export interface SuggestionsQueryResult {
 /** Polling interval configuration */
 const POLLING_CONFIG = {
   /** Initial polling interval in ms */
-  initialInterval: 2000,
+  initialInterval: 5000,
   /** Maximum polling interval in ms */
   maxInterval: 30000,
   /** Multiplier for exponential backoff */
