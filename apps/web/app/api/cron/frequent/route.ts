@@ -20,6 +20,7 @@ import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
 import { sendPendingNotifications } from '../send-release-notifications/route';
@@ -92,6 +93,32 @@ export async function GET(request: Request) {
           return notifResult as unknown as Record<string, unknown>;
         })
       : { success: true, skipped: true };
+
+  // 4. Warm Spotify alphabet cache — every 6 hours
+  const hour = new Date().getHours();
+  if (hour % 6 === 0 && minute < 15) {
+    try {
+      const warmResult = await warmAlphabetCache();
+      results.alphabetCache = {
+        success: true,
+        data: warmResult as unknown as Record<string, unknown>,
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('[frequent-cron] Alphabet cache warming failed:', error);
+      await captureError(
+        'Frequent cron: alphabet cache warming failed',
+        error,
+        {
+          route: '/api/cron/frequent',
+          subjob: 'alphabetCache',
+        }
+      );
+      results.alphabetCache = { success: false, error: msg };
+    }
+  } else {
+    results.alphabetCache = { success: true, skipped: true };
+  }
 
   const duration = Date.now() - startTime;
   const allSuccessful = Object.values(results).every(r => r.success);
