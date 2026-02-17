@@ -5,7 +5,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureWarning } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -42,8 +42,8 @@ export async function GET() {
         userId,
         error: billingResult.error,
       });
-      await captureCriticalError(
-        'Billing lookup failed — user may lose pro features',
+      await captureWarning(
+        'Billing lookup failed — transient, user falls back to free tier',
         new Error(`Billing lookup failed: ${billingResult.error}`),
         {
           route: '/api/billing/status',
@@ -87,11 +87,9 @@ export async function GET() {
   } catch (error) {
     logger.error('Error getting billing status:', error);
 
-    await captureCriticalError(
-      'Billing status endpoint error — revenue-critical',
-      error,
-      { route: '/api/billing/status' }
-    );
+    await captureWarning('Billing status endpoint error', error, {
+      route: '/api/billing/status',
+    });
 
     return NextResponse.json(
       { error: 'Failed to get billing status' },

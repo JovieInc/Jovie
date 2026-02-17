@@ -21,6 +21,14 @@ const isProduction = process.env.NODE_ENV === 'production';
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
 
+  // Suppress known non-actionable errors
+  ignoreErrors: [
+    // Clerk SSR race condition: auth()/currentUser() called before request
+    // context is available during edge/serverless cold starts. Not a code bug —
+    // all usages are correctly in server components/actions/API routes.
+    /Clerk: auth\(\)|currentUser\(\)|clerkClient\(\).+only supported/,
+  ],
+
   // Sample 10% of transactions in production, 100% in development
   tracesSampleRate: isProduction ? 0.1 : 1.0,
 
