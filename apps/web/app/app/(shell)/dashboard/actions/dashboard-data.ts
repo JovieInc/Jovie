@@ -442,7 +442,14 @@ async function fetchTippingStatsWithSession(
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
     };
   } catch (error) {
+    // Query timeouts are expected during Neon cold starts — downgrade to warning.
+    // The dashboard degrades gracefully by showing empty tipping stats.
+    const level =
+      error instanceof Error && error.name === 'QueryTimeoutError'
+        ? 'warning'
+        : 'error';
     Sentry.captureException(error, {
+      level,
       tags: { query: 'tipping_stats', context: 'dashboard_data' },
     });
     return createEmptyTippingStats();

@@ -27,6 +27,8 @@ Sentry.init({
     // context is available during edge/serverless cold starts. Not a code bug —
     // all usages are correctly in server components/actions/API routes.
     /Clerk: (?:auth\(\)|currentUser\(\)|clerkClient\(\)).+only supported/,
+    // Node.js TransformStream internal bug — not application code.
+    /transformAlgorithm is not a function/,
   ],
 
   // Sample 10% of transactions in production, 100% in development
