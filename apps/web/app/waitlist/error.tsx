@@ -1,14 +1,9 @@
 'use client';
 
 import ErrorBoundary from '@/components/organisms/ErrorBoundary';
+import type { ErrorProps } from '@/types/common';
 
-interface ErrorProps
-  extends Readonly<{
-    readonly error: Error & { digest?: string };
-    readonly reset: () => void;
-  }> {}
-
-export default function WaitlistError({ error, reset }: Readonly<ErrorProps>) {
+export default function WaitlistError({ error, reset }: ErrorProps) {
   return (
     <ErrorBoundary
       error={error}
