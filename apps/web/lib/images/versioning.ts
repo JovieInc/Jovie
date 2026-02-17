@@ -56,7 +56,7 @@ export function versionImageUrl(url: string, version?: string): string {
 
   // Skip versioning for local images — Next.js Image requires localPatterns
   // to allow query strings, and local static assets don't need cache-busting
-  if (url.startsWith('/')) return url;
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
 
   // Skip versioning for external CDNs that don't support query parameters
   const skipVersioningDomains = [

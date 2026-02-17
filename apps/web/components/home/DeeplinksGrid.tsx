@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { IGComparisonAside } from '@/components/home/IGComparisonAside';
 import { Container } from '@/components/site/Container';
 
 /* ------------------------------------------------------------------ */
@@ -197,118 +198,6 @@ const cards: CardData[] = [
     mockup: <ListenMockup />,
   },
 ];
-
-/* ------------------------------------------------------------------ */
-/*  IG Comparison Aside (merged from IGComparisonAside.tsx)             */
-/* ------------------------------------------------------------------ */
-
-const jovieLinks = [
-  { label: 'New Music', url: 'jov.ie/tim' },
-  { label: 'Tour', url: 'jov.ie/tim/tour' },
-  { label: 'Tip', url: 'jov.ie/tim/tip' },
-  { label: 'Booking', url: 'jov.ie/tim/contact' },
-  { label: 'Merch', url: 'jov.ie/tim/shop' },
-];
-
-function IGComparisonAside() {
-  return (
-    <div
-      className='grid grid-cols-1 md:grid-cols-2 overflow-hidden'
-      style={{
-        backgroundColor: 'var(--linear-border-subtle)',
-        gap: '1px',
-        borderRadius: '10px',
-        marginTop: '1.5rem',
-      }}
-    >
-      {/* Linktree side (dimmed) */}
-      <div
-        className='flex flex-col gap-4 p-6'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          opacity: 0.5,
-        }}
-      >
-        <span
-          className='text-xs font-medium'
-          style={{ color: 'var(--linear-text-tertiary)' }}
-        >
-          Linktree in your bio
-        </span>
-
-        <div
-          className='flex items-center justify-between rounded-md px-3 py-2 font-mono text-sm'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
-          <span>linktr.ee/timwhite</span>
-          <span>→</span>
-        </div>
-
-        <p
-          style={{
-            fontSize: 'var(--linear-body-sm-size)',
-            lineHeight: 'var(--linear-body-sm-leading)',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
-          One link → their page → tap again. Two extra clicks.
-        </p>
-      </div>
-
-      {/* Jovie side */}
-      <div
-        className='flex flex-col gap-4 p-6'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-        }}
-      >
-        <span className='text-xs font-medium' style={{ color: '#4ade80' }}>
-          Jovie deeplinks in your bio
-        </span>
-
-        <div className='flex flex-col gap-1.5'>
-          {jovieLinks.map(link => (
-            <div
-              key={link.url}
-              className='flex items-center justify-between rounded-md px-3 py-2 text-sm'
-              style={{
-                backgroundColor: 'var(--linear-bg-surface-1)',
-              }}
-            >
-              <span
-                style={{
-                  color: 'var(--linear-text-secondary)',
-                  fontSize: 'var(--linear-body-sm-size)',
-                }}
-              >
-                {link.label}
-              </span>
-              <span
-                className='font-mono text-xs'
-                style={{ color: 'var(--linear-text-tertiary)' }}
-              >
-                {link.url}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <p
-          style={{
-            fontSize: 'var(--linear-body-sm-size)',
-            lineHeight: 'var(--linear-body-sm-leading)',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
-          Five links. Each goes direct. Zero friction.
-        </p>
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                    */

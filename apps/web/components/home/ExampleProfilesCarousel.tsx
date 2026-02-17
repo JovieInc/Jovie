@@ -159,7 +159,7 @@ export function ExampleProfilesCarousel() {
                   key={p.name}
                   type='button'
                   onClick={() => handleSelect(i)}
-                  className='relative rounded-full transition-all duration-200'
+                  className='relative rounded-full transition-all duration-200 focus-ring-themed'
                   style={{
                     width: 44,
                     height: 44,

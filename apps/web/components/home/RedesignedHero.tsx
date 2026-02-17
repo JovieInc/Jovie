@@ -48,14 +48,13 @@ export function RedesignedHero() {
 
         {/* Subheading */}
         <p
+          className='max-w-[460px] mt-6'
           style={{
-            maxWidth: '460px',
-            marginTop: '24px',
             fontSize: '15px',
             fontWeight: 400,
             lineHeight: 1.65,
             letterSpacing: '0.005em',
-            color: 'oklch(66% 0.01 260)',
+            color: 'var(--linear-text-secondary)',
           }}
         >
           Jovie builds your link-in-bio from Spotify in 30 seconds — with smart
@@ -74,7 +73,7 @@ export function RedesignedHero() {
           style={{
             fontSize: '13px',
             letterSpacing: '0.01em',
-            color: 'oklch(56% 0.008 260)',
+            color: 'var(--linear-text-tertiary)',
           }}
         >
           Free forever. No credit card.

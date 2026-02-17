@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock next/link
+type NextLinkProps = ComponentProps<'a'> & { href: string };
 vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: any) => (
+  default: ({ children, href, ...props }: NextLinkProps) => (
     <a href={href} {...props}>
       {children}
     </a>

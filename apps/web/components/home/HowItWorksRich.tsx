@@ -1,3 +1,4 @@
+import { BadgeCheck, Check, Link2, Search } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 
 const steps = [
@@ -46,20 +47,11 @@ function SearchMockup() {
           border: '1px solid var(--linear-border-subtle)',
         }}
       >
-        <svg
+        <Search
           aria-hidden='true'
-          width='14'
-          height='14'
-          viewBox='0 0 24 24'
-          fill='none'
-          stroke='var(--linear-text-tertiary)'
-          strokeWidth='2'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-        >
-          <circle cx='11' cy='11' r='8' />
-          <path d='m21 21-4.3-4.3' />
-        </svg>
+          size={14}
+          className='text-[var(--linear-text-tertiary)]'
+        />
         <span
           style={{
             fontSize: '13px',
@@ -116,19 +108,12 @@ function SearchMockup() {
           className='w-5 h-5 rounded-full shrink-0 flex items-center justify-center'
           style={{ backgroundColor: '#4ade80' }}
         >
-          <svg
+          <Check
             aria-hidden='true'
-            width='12'
-            height='12'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='#000'
-            strokeWidth='3'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-          >
-            <path d='M20 6 9 17l-5-5' />
-          </svg>
+            size={12}
+            className='text-black'
+            strokeWidth={3}
+          />
         </div>
       </div>
 
@@ -205,15 +190,11 @@ function BioCardMockup() {
                 timwhitemusic
               </span>
               {/* Verified badge */}
-              <svg
+              <BadgeCheck
                 aria-hidden='true'
-                width='14'
-                height='14'
-                viewBox='0 0 24 24'
-                fill='#3b82f6'
-              >
-                <path d='M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 12c0 3.072 1.146 5.873 3.025 7.985a11.96 11.96 0 0 0 5.975 3.07 11.96 11.96 0 0 0 5.975-3.07A12.02 12.02 0 0 0 21 12a12.02 12.02 0 0 0-.382-5.016z' />
-              </svg>
+                size={14}
+                className='fill-blue-500 text-blue-500'
+              />
             </div>
             <span
               style={{
@@ -231,20 +212,7 @@ function BioCardMockup() {
 
         {/* Profile link */}
         <div className='flex items-center gap-1.5 mt-3'>
-          <svg
-            aria-hidden='true'
-            width='12'
-            height='12'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='#8b5cf6'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-          >
-            <path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' />
-            <path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' />
-          </svg>
+          <Link2 aria-hidden='true' size={12} className='text-violet-500' />
           <span
             style={{
               fontSize: '12px',

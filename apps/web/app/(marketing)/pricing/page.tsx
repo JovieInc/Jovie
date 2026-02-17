@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import {
+  ENTITLEMENT_REGISTRY,
+  getAllPlanIds,
+} from '@/lib/entitlements/registry';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -37,7 +40,7 @@ export const metadata: Metadata = {
   },
 };
 
-// Product/Offer JSON-LD Structured Data
+// Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
 const PRICING_SCHEMA = JSON.stringify({
   '@context': 'https://schema.org',
   '@type': 'WebPage',
@@ -47,57 +50,29 @@ const PRICING_SCHEMA = JSON.stringify({
   url: `${APP_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: [
-      {
+    itemListElement: getAllPlanIds().map((planId, index) => {
+      const plan = ENTITLEMENT_REGISTRY[planId];
+      const price = plan.marketing.price?.monthly ?? 0;
+      return {
         '@type': 'ListItem',
-        position: 1,
+        position: index + 1,
         item: {
           '@type': 'Product',
-          name: `${APP_NAME} Free`,
-          description: 'Free for everyone',
+          name: `${APP_NAME} ${plan.marketing.displayName}`,
+          description: plan.marketing.tagline,
           offers: {
             '@type': 'Offer',
-            price: '0',
+            price: String(price),
             priceCurrency: 'USD',
+            ...(price > 0 && {
+              priceValidUntil: '2026-12-31',
+              billingIncrement: 'P1M',
+            }),
             availability: 'https://schema.org/InStock',
           },
         },
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        item: {
-          '@type': 'Product',
-          name: `${APP_NAME} Pro`,
-          description: 'For growing artists',
-          offers: {
-            '@type': 'Offer',
-            price: '39',
-            priceCurrency: 'USD',
-            priceValidUntil: '2026-12-31',
-            availability: 'https://schema.org/InStock',
-            billingIncrement: 'P1M',
-          },
-        },
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        item: {
-          '@type': 'Product',
-          name: `${APP_NAME} Growth`,
-          description: 'For serious artists',
-          offers: {
-            '@type': 'Offer',
-            price: '99',
-            priceCurrency: 'USD',
-            priceValidUntil: '2026-12-31',
-            availability: 'https://schema.org/InStock',
-            billingIncrement: 'P1M',
-          },
-        },
-      },
-    ],
+      };
+    }),
   },
 });
 

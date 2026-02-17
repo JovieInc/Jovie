@@ -11,29 +11,15 @@ export function LabelLogosBar() {
   return (
     <section
       aria-label='Record labels using Jovie'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
-      className='px-5 pb-14 pt-0 sm:px-6 sm:pb-20 lg:px-[77px]'
+      className='bg-[var(--linear-bg-page)] px-5 pb-14 pt-0 sm:px-6 sm:pb-20 lg:px-[77px]'
     >
       <div className='w-full'>
         {/* Subtle separator */}
         <div
           aria-hidden='true'
-          className='mb-10 sm:mb-14'
-          style={{
-            height: '1px',
-            background:
-              'linear-gradient(to right, rgba(255,255,255,0.06), rgba(255,255,255,0.03) 50%, transparent)',
-          }}
+          className='mb-10 sm:mb-14 h-px bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-transparent'
         />
-        <p
-          className='mb-5 text-logo-muted'
-          style={{
-            fontSize: '0.6875rem',
-            fontWeight: 500,
-            textTransform: 'uppercase',
-            letterSpacing: '0.12em',
-          }}
-        >
+        <p className='mb-5 text-logo-muted text-[0.6875rem] font-medium uppercase tracking-[0.12em]'>
           Driving streams to releases from
         </p>
         <div className='flex flex-wrap items-center gap-x-10 gap-y-4'>

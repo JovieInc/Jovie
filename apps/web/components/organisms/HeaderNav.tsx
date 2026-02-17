@@ -79,11 +79,17 @@ export function HeaderNav({
         {/* Nav links - desktop only, right-aligned */}
         {!hideNav && (
           <div className='hidden md:flex items-center gap-2'>
-            {navLinks?.map(link => (
-              <a key={link.href} href={link.href} className={navLinkClass}>
-                {link.label}
-              </a>
-            ))}
+            {navLinks?.map(link =>
+              link.href.startsWith('/') && !link.href.startsWith('#') ? (
+                <Link key={link.href} href={link.href} className={navLinkClass}>
+                  {link.label}
+                </Link>
+              ) : (
+                <a key={link.href} href={link.href} className={navLinkClass}>
+                  {link.label}
+                </a>
+              )
+            )}
             {!navLinks && !hidePricingLink && (
               <Link
                 href={APP_ROUTES.PRICING}
@@ -98,8 +104,7 @@ export function HeaderNav({
 
         {/* Divider between nav and auth - desktop only */}
         <div
-          className='hidden md:block mx-3 h-4 w-px'
-          style={{ backgroundColor: 'rgb(35, 37, 42)' }}
+          className='hidden md:block mx-3 h-4 w-px bg-[var(--linear-border-subtle)]'
           aria-hidden='true'
         />
 
