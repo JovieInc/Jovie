@@ -144,14 +144,13 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
       isPublic: true,
     });
   } catch (error) {
-    // updateCreatorProfile already captures errors to Sentry; only
-    // capture here for errors that occur before that call (validation).
-    if (
-      !(
-        error instanceof TypeError &&
-        (error as Error).message?.includes('not found')
-      )
-    ) {
+    // updateCreatorProfile already captures all its errors to Sentry.
+    // Only capture validation errors thrown before that call.
+    const isFromUpdate =
+      error instanceof TypeError &&
+      (error.message.includes('not found') ||
+        error.message.includes('Unauthorized'));
+    if (!isFromUpdate) {
       await captureError('publishProfileBasics failed', error, {
         route: 'dashboard/actions/creator-profile',
       });

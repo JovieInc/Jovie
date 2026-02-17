@@ -86,12 +86,15 @@ export async function ensureHandleAvailable(
   }
 }
 
+const EXPECTED_VALIDATION_CODES = new Set<string>([
+  OnboardingErrorCode.EMAIL_IN_USE,
+  OnboardingErrorCode.USERNAME_TAKEN,
+]);
+
 /** Returns true for known validation errors that should not be reported to Sentry. */
 function isExpectedValidationError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  const msg = error.message;
-  return (
-    msg.includes(OnboardingErrorCode.EMAIL_IN_USE) ||
-    msg.includes(OnboardingErrorCode.USERNAME_TAKEN)
-  );
+  // Error format from onboardingErrorToError: "[CODE] message"
+  const match = error.message.match(/^\[([^\]]+)\]/);
+  return match !== null && EXPECTED_VALIDATION_CODES.has(match[1]);
 }
