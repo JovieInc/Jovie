@@ -92,10 +92,10 @@ function AuthShellWrapperInner({
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
-  let defaultHeaderAction: ReactNode = null;
-  if (config.isTableRoute) {
-    defaultHeaderAction = <DrawerToggleButton />;
-  }
+  const defaultHeaderAction = useMemo(
+    () => (config.isTableRoute ? <DrawerToggleButton /> : null),
+    [config.isTableRoute]
+  );
   const headerAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
 

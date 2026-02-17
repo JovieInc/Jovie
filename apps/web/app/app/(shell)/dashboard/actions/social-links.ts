@@ -15,6 +15,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Minimal link shape for initializing DashboardLinks client from the server.
@@ -78,76 +79,85 @@ export async function getProfileSocialLinks(
   // Prevent caching of user-specific data
   noStore();
 
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
+  try {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
+    return await withDbSession(async clerkUserId => {
+      // Query against creatorProfiles with ownership check and left-join links
+      const rows = await db
+        .select({
+          profileId: creatorProfiles.id,
+          linkId: socialLinks.id,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          sortOrder: socialLinks.sortOrder,
+          isActive: socialLinks.isActive,
+          displayText: socialLinks.displayText,
+          state: socialLinks.state,
+          confidence: socialLinks.confidence,
+          sourcePlatform: socialLinks.sourcePlatform,
+          sourceType: socialLinks.sourceType,
+          evidence: socialLinks.evidence,
+          version: socialLinks.version,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .leftJoin(
+          socialLinks,
+          eq(socialLinks.creatorProfileId, creatorProfiles.id)
+        )
+        .where(
+          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+        )
+        .orderBy(socialLinks.sortOrder);
+
+      // If the profile does not belong to the user, rows will be empty
+      // Map only existing link rows (filter out null linkId from left join)
+      const links: ProfileSocialLink[] = rows
+        .filter(r => r.linkId !== null)
+        .map(r => {
+          const state =
+            (r.state as 'active' | 'suggested' | 'rejected' | null) ??
+            (r.isActive ? 'active' : 'suggested');
+          if (state === 'rejected') return null;
+          const parsedConfidence =
+            typeof r.confidence === 'number'
+              ? r.confidence
+              : Number.parseFloat(String(r.confidence ?? '0'));
+
+          return {
+            id: r.linkId!,
+            platform: r.platform!,
+            platformType: r.platformType ?? null,
+            url: r.url!,
+            sortOrder: r.sortOrder ?? 0,
+            isActive: state === 'active',
+            displayText: r.displayText ?? null,
+            state,
+            confidence: Number.isFinite(parsedConfidence)
+              ? parsedConfidence
+              : 0,
+            sourcePlatform: r.sourcePlatform,
+            sourceType: r.sourceType ?? null,
+            evidence: r.evidence as {
+              sources?: string[];
+              signals?: string[];
+            } | null,
+            version: r.version ?? 1,
+          };
+        })
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+      return links;
+    });
+  } catch (error) {
+    await captureError('getProfileSocialLinks failed', error, {
+      route: 'dashboard/actions/social-links',
+    });
+    throw error;
   }
-
-  return await withDbSession(async clerkUserId => {
-    // Query against creatorProfiles with ownership check and left-join links
-    const rows = await db
-      .select({
-        profileId: creatorProfiles.id,
-        linkId: socialLinks.id,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-        url: socialLinks.url,
-        sortOrder: socialLinks.sortOrder,
-        isActive: socialLinks.isActive,
-        displayText: socialLinks.displayText,
-        state: socialLinks.state,
-        confidence: socialLinks.confidence,
-        sourcePlatform: socialLinks.sourcePlatform,
-        sourceType: socialLinks.sourceType,
-        evidence: socialLinks.evidence,
-        version: socialLinks.version,
-      })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .leftJoin(
-        socialLinks,
-        eq(socialLinks.creatorProfileId, creatorProfiles.id)
-      )
-      .where(
-        and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
-      )
-      .orderBy(socialLinks.sortOrder);
-
-    // If the profile does not belong to the user, rows will be empty
-    // Map only existing link rows (filter out null linkId from left join)
-    const links: ProfileSocialLink[] = rows
-      .filter(r => r.linkId !== null)
-      .map(r => {
-        const state =
-          (r.state as 'active' | 'suggested' | 'rejected' | null) ??
-          (r.isActive ? 'active' : 'suggested');
-        if (state === 'rejected') return null;
-        const parsedConfidence =
-          typeof r.confidence === 'number'
-            ? r.confidence
-            : Number.parseFloat(String(r.confidence ?? '0'));
-
-        return {
-          id: r.linkId!,
-          platform: r.platform!,
-          platformType: r.platformType ?? null,
-          url: r.url!,
-          sortOrder: r.sortOrder ?? 0,
-          isActive: state === 'active',
-          displayText: r.displayText ?? null,
-          state,
-          confidence: Number.isFinite(parsedConfidence) ? parsedConfidence : 0,
-          sourcePlatform: r.sourcePlatform,
-          sourceType: r.sourceType ?? null,
-          evidence: r.evidence as {
-            sources?: string[];
-            signals?: string[];
-          } | null,
-          version: r.version ?? 1,
-        };
-      })
-      .filter((link): link is NonNullable<typeof link> => Boolean(link));
-
-    return links;
-  });
 }

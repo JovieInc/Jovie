@@ -16,6 +16,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { isContentClean } from '@/lib/validation/content-filter';
 
 /**
@@ -47,48 +48,55 @@ export async function updateCreatorProfile(
   // Prevent caching of mutations
   noStore();
 
-  const { userId } = await getCachedAuth();
+  try {
+    const { userId } = await getCachedAuth();
 
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  return await withDbSession(async clerkUserId => {
-    // First get the user's database ID
-    const [user] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (!user) {
-      throw new TypeError('User not found');
+    if (!userId) {
+      throw new Error('Unauthorized');
     }
 
-    // Update the creator profile
-    const [updatedProfile] = await db
-      .update(creatorProfiles)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(creatorProfiles.id, profileId),
-          eq(creatorProfiles.userId, user.id)
+    return await withDbSession(async clerkUserId => {
+      // First get the user's database ID
+      const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!user) {
+        throw new TypeError('User not found');
+      }
+
+      // Update the creator profile
+      const [updatedProfile] = await db
+        .update(creatorProfiles)
+        .set({
+          ...updates,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(creatorProfiles.id, profileId),
+            eq(creatorProfiles.userId, user.id)
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    if (!updatedProfile) {
-      throw new TypeError('Profile not found or unauthorized');
-    }
+      if (!updatedProfile) {
+        throw new TypeError('Profile not found or unauthorized');
+      }
 
-    // Use centralized cache invalidation
-    await invalidateProfileCache(updatedProfile.usernameNormalized);
+      // Use centralized cache invalidation
+      await invalidateProfileCache(updatedProfile.usernameNormalized);
 
-    return updatedProfile;
-  });
+      return updatedProfile;
+    });
+  } catch (error) {
+    await captureError('updateCreatorProfile failed', error, {
+      route: 'dashboard/actions/creator-profile',
+    });
+    throw error;
+  }
 }
 
 /**
@@ -105,35 +113,42 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
   'use server';
   noStore();
 
-  const profileId = formData.get('profileId');
-  const displayNameRaw = formData.get('displayName');
-  const bioRaw = formData.get('bio');
+  try {
+    const profileId = formData.get('profileId');
+    const displayNameRaw = formData.get('displayName');
+    const bioRaw = formData.get('bio');
 
-  if (!profileId || typeof profileId !== 'string') {
-    throw new TypeError('Profile ID is required');
+    if (!profileId || typeof profileId !== 'string') {
+      throw new TypeError('Profile ID is required');
+    }
+
+    const displayName =
+      typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
+    if (!displayName) {
+      throw new TypeError('Display name is required');
+    }
+    if (!isContentClean(displayName)) {
+      throw new TypeError('Display name contains language that is not allowed');
+    }
+
+    const bio =
+      typeof bioRaw === 'string' && bioRaw.trim().length > 0
+        ? bioRaw.trim()
+        : undefined;
+
+    // updateCreatorProfile already handles cache invalidation via invalidateProfileCache
+    await updateCreatorProfile(profileId, {
+      displayName,
+      bio,
+      onboardingCompletedAt: new Date(),
+      isPublic: true,
+    });
+  } catch (error) {
+    await captureError('publishProfileBasics failed', error, {
+      route: 'dashboard/actions/creator-profile',
+    });
+    throw error;
   }
-
-  const displayName =
-    typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
-  if (!displayName) {
-    throw new TypeError('Display name is required');
-  }
-  if (!isContentClean(displayName)) {
-    throw new TypeError('Display name contains language that is not allowed');
-  }
-
-  const bio =
-    typeof bioRaw === 'string' && bioRaw.trim().length > 0
-      ? bioRaw.trim()
-      : undefined;
-
-  // updateCreatorProfile already handles cache invalidation via invalidateProfileCache
-  await updateCreatorProfile(profileId, {
-    displayName,
-    bio,
-    onboardingCompletedAt: new Date(),
-    isPublic: true,
-  });
 }
 
 /**
@@ -213,6 +228,9 @@ export async function updateAllowProfilePhotoDownloads(
       await invalidateProfileCache(profile.usernameNormalized);
     }
   } catch (error) {
+    await captureError('updateAllowProfilePhotoDownloads failed', error, {
+      route: 'dashboard/actions/creator-profile',
+    });
     throw new Error('Failed to update profile photo download setting', {
       cause: error,
     });

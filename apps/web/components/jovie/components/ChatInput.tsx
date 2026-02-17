@@ -43,6 +43,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const isOverLimit = characterCount > MAX_MESSAGE_LENGTH;
     const hasImageUpload = Boolean(onImageUpload);
 
+    const handleFormSubmit = useCallback(
+      (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(e);
+      },
+      [onSubmit]
+    );
+
+    const handleChange = useCallback(
+      (e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value),
+      [onChange]
+    );
+
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
@@ -81,17 +94,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       : cn('px-4 py-4 max-h-48', paddingRight);
 
     return (
-      <form
-        onSubmit={e => {
-          e.preventDefault();
-          onSubmit(e);
-        }}
-      >
+      <form onSubmit={handleFormSubmit}>
         <div className='relative'>
           <textarea
             ref={ref}
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onChange={handleChange}
             placeholder={placeholder}
             rows={1}
             className={cn(

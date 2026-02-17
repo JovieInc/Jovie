@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   BellRing,
   Copy,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
@@ -150,6 +151,65 @@ const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     size: 48,
   }),
 ];
+
+/** Estimated height of each mobile card row in px. */
+const MOBILE_CARD_HEIGHT = 72;
+
+/** Virtualized mobile card list to avoid rendering all rows at once. */
+const MobileCardList = memo(function MobileCardList({
+  rows,
+  mode,
+  selectedMemberId,
+  onTap,
+}: {
+  rows: AudienceMember[];
+  mode: 'members' | 'subscribers';
+  selectedMemberId: string | null;
+  onTap: (member: AudienceMember) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => MOBILE_CARD_HEIGHT,
+    overscan: 5,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className='md:hidden overflow-auto'
+      style={{ maxHeight: '100%' }}
+    >
+      <div
+        className='relative w-full'
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map(virtualRow => {
+          const member = rows[virtualRow.index];
+          return (
+            <div
+              key={member.id}
+              className='absolute left-0 w-full border-b border-subtle/60'
+              style={{
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <AudienceMobileCard
+                member={member}
+                mode={mode}
+                isSelected={selectedMemberId === member.id}
+                onTap={onTap}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
 
 export const DashboardAudienceTableUnified = memo(
   function DashboardAudienceTableUnified({
@@ -418,18 +478,13 @@ export const DashboardAudienceTableUnified = memo(
                 />
               ) : (
                 <>
-                  {/* Mobile card list */}
-                  <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
-                    {rows.map(member => (
-                      <AudienceMobileCard
-                        key={member.id}
-                        member={member}
-                        mode={mode}
-                        isSelected={selectedMember?.id === member.id}
-                        onTap={setSelectedMember}
-                      />
-                    ))}
-                  </div>
+                  {/* Mobile card list (virtualized) */}
+                  <MobileCardList
+                    rows={rows}
+                    mode={mode}
+                    selectedMemberId={selectedMember?.id ?? null}
+                    onTap={setSelectedMember}
+                  />
 
                   {/* Desktop table */}
                   <div className='hidden md:block h-full'>

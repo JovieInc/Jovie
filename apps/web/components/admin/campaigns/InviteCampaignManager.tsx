@@ -12,7 +12,7 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -63,22 +63,11 @@ export function InviteCampaignManager() {
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
 
-  const handleRefreshClick = () => {
+  const handleRefreshClick = useCallback(() => {
     refetchPreview();
-  };
+  }, [refetchPreview]);
 
-  const handleSendClick = () => {
-    if (!preview || preview.sample.withEmails === 0) return;
-
-    // Show confirmation for large batches
-    if (preview.sample.withEmails >= LARGE_BATCH_THRESHOLD) {
-      setShowConfirmModal(true);
-    } else {
-      handleConfirmSend();
-    }
-  };
-
-  const handleConfirmSend = async () => {
+  const handleConfirmSend = useCallback(async () => {
     setShowConfirmModal(false);
     if (!preview || preview.sample.withEmails === 0) return;
 
@@ -98,7 +87,18 @@ export function InviteCampaignManager() {
     } catch {
       // Error is handled by the mutation
     }
-  };
+  }, [preview, fitScoreThreshold, limit, throttling, sendInvitesMutation]);
+
+  const handleSendClick = useCallback(() => {
+    if (!preview || preview.sample.withEmails === 0) return;
+
+    // Show confirmation for large batches
+    if (preview.sample.withEmails >= LARGE_BATCH_THRESHOLD) {
+      setShowConfirmModal(true);
+    } else {
+      handleConfirmSend();
+    }
+  }, [preview, handleConfirmSend]);
 
   const avgDelaySeconds = Math.round(
     (throttling.minDelayMs + throttling.maxDelayMs) / 2 / 1000

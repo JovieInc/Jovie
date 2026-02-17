@@ -45,7 +45,7 @@ export function useChatConversationsQuery({
   enabled = true,
 }: ConversationsOptions = {}) {
   return useQuery({
-    queryKey: queryKeys.chat.conversations(limit),
+    queryKey: queryKeys.chat.conversations(),
     queryFn: ({ signal }) => fetchConversations(limit, signal),
     enabled,
     staleTime: 30_000, // 30 seconds

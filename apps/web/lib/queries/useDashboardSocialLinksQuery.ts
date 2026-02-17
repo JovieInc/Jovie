@@ -10,6 +10,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
+import { STANDARD_CACHE } from './cache-strategies';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
@@ -69,7 +70,7 @@ async function fetchSocialLinks(
 ): Promise<DashboardSocialLink[]> {
   const response = await fetchWithTimeout<SocialLinksResponse>(
     `/api/dashboard/social-links?profileId=${encodeURIComponent(profileId)}`,
-    { signal, cache: 'no-store' }
+    { signal }
   );
   return response.links || [];
 }
@@ -107,8 +108,7 @@ export function useDashboardSocialLinksQuery(profileId: string) {
     queryKey: queryKeys.dashboard.socialLinks(profileId),
     queryFn: ({ signal }) => fetchSocialLinks(profileId, signal),
     enabled: Boolean(profileId),
-    staleTime: 30_000, // Consider fresh for 30 seconds
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes after unmount
+    ...STANDARD_CACHE,
   });
 }
 

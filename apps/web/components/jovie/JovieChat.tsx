@@ -151,6 +151,14 @@ export function JovieChat({
     return -1;
   }, [messages]);
 
+  // Determine the active tool label for contextual loading state
+  const isStreaming = status === 'streaming';
+  const activeToolLabel = useMemo(
+    () => (isLoading ? getActiveToolLabel(messages) : null),
+    [isLoading, messages]
+  );
+  const thinkingLabel = activeToolLabel ?? 'Thinking...';
+
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
@@ -159,11 +167,6 @@ export function JovieChat({
       </div>
     );
   }
-
-  // Determine the active tool label for contextual loading state
-  const isStreaming = status === 'streaming';
-  const activeToolLabel = isLoading ? getActiveToolLabel(messages) : null;
-  const thinkingLabel = activeToolLabel ?? 'Thinking...';
 
   return (
     <div className='flex h-full flex-col'>

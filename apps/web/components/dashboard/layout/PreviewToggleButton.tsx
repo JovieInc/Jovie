@@ -2,11 +2,11 @@
 
 import { TooltipShortcut } from '@jovie/ui';
 import { PanelRight, PanelRightOpen } from 'lucide-react';
-import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export function PreviewToggleButton() {
-  const { isOpen, toggle } = usePreviewPanel();
+  const { isOpen, toggle } = usePreviewPanelState();
   const label = isOpen ? 'Hide preview' : 'Show preview';
   const Icon = isOpen ? PanelRightOpen : PanelRight;
 

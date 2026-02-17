@@ -4,7 +4,10 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  usePreviewPanelData,
+  usePreviewPanelState,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { ArtistContext } from './grouped-links/types';
@@ -112,7 +115,8 @@ export function EnhancedDashboardLinks({
   }, [selectedProfile, hasSocialLinks, hasMusicLinks, tippingStats]);
 
   // Get sidebar state early to gate polling
-  const { setPreviewData, isOpen: sidebarOpen } = usePreviewPanel();
+  const { setPreviewData } = usePreviewPanelData();
+  const { isOpen: sidebarOpen } = usePreviewPanelState();
 
   // Links persistence hook
   const {
