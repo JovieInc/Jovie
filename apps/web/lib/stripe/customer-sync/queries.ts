@@ -10,7 +10,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { captureCriticalError } from '@/lib/error-tracking';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   BILLING_FIELDS_FULL,
   type BillingFieldsResult,
@@ -177,7 +177,7 @@ export async function fetchUserBillingData<
       data: userData as BillingFieldsResult<T>,
     };
   } catch (error) {
-    await captureCriticalError('Error fetching user billing data', error, {
+    await captureWarning('Billing data fetch failed (transient)', error, {
       clerkUserId,
       fields: fields.join(','),
       function: 'fetchUserBillingData',
@@ -230,8 +230,8 @@ export async function fetchUserBillingDataWithAuth<
       return await fetchUserBillingData({ clerkUserId, fields });
     });
   } catch (error) {
-    await captureCriticalError(
-      'Error fetching user billing data with auth',
+    await captureWarning(
+      'Billing data fetch with auth failed (transient)',
       error,
       {
         fields: fields.join(','),

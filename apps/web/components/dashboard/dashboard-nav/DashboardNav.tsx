@@ -144,7 +144,7 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && genres.length > 0 && (
-        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50 group-data-[collapsible=icon]:hidden'>
+        <div className='mt-3 group-data-[collapsible=icon]:hidden'>
           <SidebarCollapsibleGroup label='Genres' defaultOpen>
             <div className='flex flex-wrap gap-1.5 px-2 py-1'>
               {genres.map(genre => (
@@ -158,14 +158,13 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && (
-        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50'>
+        <div className='mt-3'>
           <RecentChats />
         </div>
       )}
 
       {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section'>
-          <div className='my-1.5 mx-2 border-t border-sidebar-border/10' />
+        <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>
