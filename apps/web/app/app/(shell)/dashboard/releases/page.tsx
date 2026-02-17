@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
+import { captureError } from '@/lib/error-tracking';
 import { getDashboardData } from '../actions';
 import {
   checkAppleMusicConnection,
@@ -7,6 +8,7 @@ import {
   loadReleaseMatrix,
 } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
+import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 
 export const runtime = 'nodejs';
 
@@ -19,11 +21,40 @@ export default async function ReleasesPage() {
     redirect('/sign-in?redirect_url=/app/dashboard/releases');
   }
 
-  const [releases, spotifyStatus, appleMusicStatus] = await Promise.all([
-    loadReleaseMatrix(),
-    checkSpotifyConnection(),
-    checkAppleMusicConnection(),
-  ]);
+  // Use allSettled so a single fetch failure degrades gracefully instead of crashing
+  const [releasesResult, spotifyResult, appleMusicResult] =
+    await Promise.allSettled([
+      loadReleaseMatrix(),
+      checkSpotifyConnection(),
+      checkAppleMusicConnection(),
+    ]);
+
+  const releases =
+    releasesResult.status === 'fulfilled' ? releasesResult.value : [];
+  const spotifyStatus =
+    spotifyResult.status === 'fulfilled'
+      ? spotifyResult.value
+      : { connected: false, spotifyId: null, artistName: null };
+  const appleMusicStatus =
+    appleMusicResult.status === 'fulfilled'
+      ? appleMusicResult.value
+      : { connected: false, artistName: null, artistId: null };
+
+  if (releasesResult.status === 'rejected') {
+    void captureError('loadReleaseMatrix failed', releasesResult.reason, {
+      route: '/app/releases',
+    });
+  }
+  if (spotifyResult.status === 'rejected') {
+    void captureError('checkSpotifyConnection failed', spotifyResult.reason, {
+      route: '/app/releases',
+    });
+  }
+  if (appleMusicResult.status === 'rejected') {
+    void captureError('checkAppleMusicConnection failed', appleMusicResult.reason, {
+      route: '/app/releases',
+    });
+  }
 
   // Read allow artwork downloads setting from profile settings
   const profileSettings =
@@ -32,15 +63,17 @@ export default async function ReleasesPage() {
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
 
   return (
-    <ReleaseProviderMatrix
-      releases={releases}
-      providerConfig={providerConfig}
-      primaryProviders={primaryProviderKeys}
-      spotifyConnected={spotifyStatus.connected}
-      spotifyArtistName={spotifyStatus.artistName}
-      appleMusicConnected={appleMusicStatus.connected}
-      appleMusicArtistName={appleMusicStatus.artistName}
-      allowArtworkDownloads={allowArtworkDownloads}
-    />
+    <ReleasesClientBoundary>
+      <ReleaseProviderMatrix
+        releases={releases}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        spotifyConnected={spotifyStatus.connected}
+        spotifyArtistName={spotifyStatus.artistName}
+        appleMusicConnected={appleMusicStatus.connected}
+        appleMusicArtistName={appleMusicStatus.artistName}
+        allowArtworkDownloads={allowArtworkDownloads}
+      />
+    </ReleasesClientBoundary>
   );
 }
