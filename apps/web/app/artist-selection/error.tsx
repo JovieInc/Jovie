@@ -7,13 +7,16 @@ interface ErrorProps {
   readonly reset: () => void;
 }
 
-export default function ProfileError({ error, reset }: Readonly<ErrorProps>) {
+export default function ArtistSelectionError({
+  error,
+  reset,
+}: Readonly<ErrorProps>) {
   return (
     <ErrorBoundary
       error={error}
       reset={reset}
-      context='Profile'
-      message="We couldn't load this profile right now. Please try again."
+      context='ArtistSelection'
+      message='We encountered an error loading artist selection. Please try again.'
     />
   );
 }

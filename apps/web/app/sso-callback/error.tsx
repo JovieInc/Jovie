@@ -7,13 +7,16 @@ interface ErrorProps {
   readonly reset: () => void;
 }
 
-export default function ProfileError({ error, reset }: Readonly<ErrorProps>) {
+export default function SSOCallbackError({
+  error,
+  reset,
+}: Readonly<ErrorProps>) {
   return (
     <ErrorBoundary
       error={error}
       reset={reset}
-      context='Profile'
-      message="We couldn't load this profile right now. Please try again."
+      context='SSOCallback'
+      message='We encountered an error during sign-in. Please try again.'
     />
   );
 }

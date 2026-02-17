@@ -7,13 +7,13 @@ interface ErrorProps {
   readonly reset: () => void;
 }
 
-export default function ProfileError({ error, reset }: Readonly<ErrorProps>) {
+export default function SettingsError({ error, reset }: Readonly<ErrorProps>) {
   return (
     <ErrorBoundary
       error={error}
       reset={reset}
-      context='Profile'
-      message="We couldn't load this profile right now. Please try again."
+      context='Settings'
+      message='We encountered an error loading settings. Please try again.'
     />
   );
 }
