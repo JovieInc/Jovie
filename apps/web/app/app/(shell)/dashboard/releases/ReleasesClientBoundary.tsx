@@ -3,10 +3,12 @@
 import type { ReactNode } from 'react';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 
+interface ReleasesClientBoundaryProps {
+  readonly children: ReactNode;
+}
+
 export function ReleasesClientBoundary({
   children,
-}: {
-  readonly children: ReactNode;
-}) {
+}: ReleasesClientBoundaryProps) {
   return <QueryErrorBoundary>{children}</QueryErrorBoundary>;
 }
