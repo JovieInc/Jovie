@@ -307,6 +307,93 @@ async function runMigrations() {
     // return the highest applied migration index.
     const probes: Probe[] = [
       {
+        tag: '0035_old_mindworm',
+        idx: idxFor('0035_old_mindworm'),
+        existsQuery: `SELECT (
+          to_regclass('public.creator_profiles') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'creator_profiles'
+              AND column_name = 'location'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'creator_profiles'
+              AND column_name = 'active_since_year'
+          )
+        ) AS ok`,
+      },
+      {
+        tag: '0031_add_referral_program',
+        idx: idxFor('0031_add_referral_program'),
+        existsQuery: `SELECT (
+          to_regclass('public.referral_codes') IS NOT NULL
+          AND to_regclass('public.referrals') IS NOT NULL
+          AND to_regclass('public.referral_commissions') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'users'
+              AND column_name = 'referred_by_code'
+          )
+        ) AS ok`,
+      },
+      {
+        tag: '0030_regular_the_hunter',
+        idx: idxFor('0030_regular_the_hunter'),
+        existsQuery: `SELECT (
+          to_regclass('public.ai_insights') IS NOT NULL
+          AND to_regclass('public.insight_generation_runs') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'audience_members'
+              AND column_name = 'utm_params'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'notification_subscriptions'
+              AND column_name = 'confirmed_at'
+          )
+        ) AS ok`,
+      },
+      {
+        tag: '0026_add_subscription_email_verification',
+        idx: idxFor('0026_add_subscription_email_verification'),
+        existsQuery: `SELECT (
+          to_regclass('public.notification_subscriptions') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'notification_subscriptions'
+              AND column_name = 'confirmed_at'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'notification_subscriptions'
+              AND column_name = 'confirmation_token'
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'notification_subscriptions'
+              AND column_name = 'confirmation_sent_at'
+          )
+        ) AS ok`,
+      },
+      {
         tag: '0000_sleepy_ted_forrester',
         idx: idxFor('0000_sleepy_ted_forrester'),
         existsQuery:
