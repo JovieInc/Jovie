@@ -3,13 +3,13 @@
 import ErrorBoundary from '@/components/organisms/ErrorBoundary';
 import type { ErrorProps } from '@/types/common';
 
-export default function WaitlistError({ error, reset }: ErrorProps) {
+export default function ReleaseError({ error, reset }: ErrorProps) {
   return (
     <ErrorBoundary
       error={error}
       reset={reset}
-      context='Waitlist'
-      message='We encountered an error. Please try again.'
+      context='Release'
+      message='We encountered an error loading this release. Please try again.'
     />
   );
 }
