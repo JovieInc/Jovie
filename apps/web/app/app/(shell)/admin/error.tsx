@@ -1,11 +1,7 @@
 'use client';
 
 import ErrorBoundary from '@/components/organisms/ErrorBoundary';
-
-interface ErrorProps {
-  readonly error: Error & { digest?: string };
-  readonly reset: () => void;
-}
+import type { ErrorProps } from '@/types/common';
 
 export default function AdminError({ error, reset }: ErrorProps) {
   return (

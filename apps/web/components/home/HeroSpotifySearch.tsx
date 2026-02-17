@@ -2,7 +2,6 @@
 
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   type KeyboardEvent,
@@ -280,12 +279,6 @@ export function HeroSpotifySearch() {
         )}
       </div>
 
-      <p className='mt-2 text-center text-xs text-tertiary-token'>
-        {isSpotifyUrl(trimmedQuery)
-          ? 'Spotify URL detected — press Continue to import.'
-          : 'Search by name or paste a Spotify URL.'}
-      </p>
-
       {/* Dropdown results */}
       {shouldShowDropdown && (
         <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg'>
@@ -461,17 +454,6 @@ export function HeroSpotifySearch() {
           </button>
         </div>
       )}
-
-      {/* Fallback: sign up without Spotify */}
-      <p className='mt-2 text-center text-[13px] text-tertiary-token'>
-        or{' '}
-        <Link
-          href={APP_ROUTES.SIGNUP}
-          className='underline transition-colors text-secondary-token'
-        >
-          sign up without Spotify
-        </Link>
-      </p>
     </div>
   );
 }
