@@ -5,15 +5,27 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 /**
+ * Generate a short reference ID for errors without a Next.js digest.
+ * Uses timestamp + random hex to create a unique, human-readable reference.
+ */
+function generateErrorRef(): string {
+  const ts = Date.now().toString(36).slice(-4);
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `ref-${ts}-${rand}`;
+}
+
+/**
  * Build a copyable error details string.
  */
 export function buildErrorDetails(
   error: (Error & { digest?: string }) | undefined,
   timestamp: Date,
-  extra?: Record<string, string>
+  extra?: Record<string, string>,
+  errorRef?: string
 ): string {
+  const id = error?.digest || errorRef || generateErrorRef();
   const lines = [
-    `Error ID: ${error?.digest || 'unknown'}`,
+    `Error ID: ${id}`,
     `Time: ${timestamp.toISOString()}`,
     ...Object.entries(extra ?? {}).map(([k, v]) => `${k}: ${v}`),
     `URL: ${globalThis.location?.href ?? 'N/A'}`,
@@ -34,9 +46,13 @@ interface ErrorDetailsProps {
  */
 export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
   const [timestamp] = useState(() => new Date());
+  const [errorRef] = useState(() =>
+    error?.digest ? undefined : generateErrorRef()
+  );
+  const displayId = error?.digest || errorRef;
 
   const handleCopy = () => {
-    const details = buildErrorDetails(error, timestamp, extraContext);
+    const details = buildErrorDetails(error, timestamp, extraContext, errorRef);
     if (!navigator?.clipboard) {
       toast.error('Clipboard not available');
       return;
@@ -54,9 +70,9 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
   return (
     <>
       <div className='space-y-2 border-t border-subtle pt-4'>
-        {error?.digest && (
+        {displayId && (
           <p className='text-xs text-muted-foreground text-center'>
-            Error ID: {error.digest}
+            Error ID: {displayId}
           </p>
         )}
         <p className='text-xs text-muted-foreground text-center'>
