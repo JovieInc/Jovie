@@ -128,6 +128,14 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Used in**:
   - `components/molecules/AvatarUploadable.tsx`
 
+#### `feature_latest_release_card`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Show latest release card on public artist profile pages. Disabled by default as a kill switch.
+- **Expiry**: Re-enable when release card UX is finalized
+- **Used in**:
+  - `app/[username]/page.tsx`
+
 #### `feature_contacts`
 - **Status**: Development
 - **Default**: `false`
