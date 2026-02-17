@@ -30,7 +30,6 @@ import { captureError } from '@/lib/error-tracking';
  * @throws Error if the user is not authenticated or not found
  */
 export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
-  'use server';
   noStore();
   try {
     const { userId } = await getCachedAuth();

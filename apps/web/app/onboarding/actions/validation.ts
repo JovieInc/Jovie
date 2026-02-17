@@ -41,9 +41,13 @@ export async function ensureEmailAvailable(
       );
     }
   } catch (error) {
-    await captureError('ensureEmailAvailable failed', error, {
-      route: 'onboarding-validation',
-    });
+    // Only report unexpected errors to Sentry; EMAIL_IN_USE is a normal
+    // validation outcome, not a system failure.
+    if (!isExpectedValidationError(error)) {
+      await captureError('ensureEmailAvailable failed', error, {
+        route: 'onboarding-validation',
+      });
+    }
     throw error;
   }
 }
@@ -71,9 +75,23 @@ export async function ensureHandleAvailable(
       throw onboardingErrorToError(error);
     }
   } catch (error) {
-    await captureError('ensureHandleAvailable failed', error, {
-      route: 'onboarding-validation',
-    });
+    // Only report unexpected errors to Sentry; USERNAME_TAKEN is a normal
+    // validation outcome, not a system failure.
+    if (!isExpectedValidationError(error)) {
+      await captureError('ensureHandleAvailable failed', error, {
+        route: 'onboarding-validation',
+      });
+    }
     throw error;
   }
+}
+
+/** Returns true for known validation errors that should not be reported to Sentry. */
+function isExpectedValidationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message;
+  return (
+    msg.includes(OnboardingErrorCode.EMAIL_IN_USE) ||
+    msg.includes(OnboardingErrorCode.USERNAME_TAKEN)
+  );
 }

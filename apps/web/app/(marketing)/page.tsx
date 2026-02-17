@@ -7,21 +7,21 @@ const ComparisonSection = dynamic(
     import('@/components/home/comparison-visual').then(m => ({
       default: m.ComparisonSection,
     })),
-  { ssr: false, loading: () => <div style={{ height: 480 }} /> }
+  { loading: () => <div style={{ height: 480 }} /> }
 );
 const ExampleProfilesCarousel = dynamic(
   () =>
     import('@/components/home/ExampleProfilesCarousel').then(m => ({
       default: m.ExampleProfilesCarousel,
     })),
-  { ssr: false, loading: () => <div style={{ height: 400 }} /> }
+  { loading: () => <div style={{ height: 400 }} /> }
 );
 const DeeplinksGrid = dynamic(
   () =>
     import('@/components/home/DeeplinksGrid').then(m => ({
       default: m.DeeplinksGrid,
     })),
-  { ssr: false, loading: () => <div style={{ height: 480 }} /> }
+  { loading: () => <div style={{ height: 480 }} /> }
 );
 
 import { FinalCTASection } from '@/components/home/FinalCTASection';

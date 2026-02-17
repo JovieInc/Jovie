@@ -52,7 +52,7 @@ export async function updateCreatorProfile(
     const { userId } = await getCachedAuth();
 
     if (!userId) {
-      throw new Error('Unauthorized');
+      throw new TypeError('Unauthorized');
     }
 
     return await withDbSession(async clerkUserId => {
@@ -94,6 +94,7 @@ export async function updateCreatorProfile(
   } catch (error) {
     await captureError('updateCreatorProfile failed', error, {
       route: 'dashboard/actions/creator-profile',
+      profileId,
     });
     throw error;
   }
@@ -110,7 +111,6 @@ export async function updateCreatorProfile(
  * @throws Error if profileId is missing or displayName is empty
  */
 export async function publishProfileBasics(formData: FormData): Promise<void> {
-  'use server';
   noStore();
 
   try {
@@ -144,9 +144,18 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
       isPublic: true,
     });
   } catch (error) {
-    await captureError('publishProfileBasics failed', error, {
-      route: 'dashboard/actions/creator-profile',
-    });
+    // updateCreatorProfile already captures errors to Sentry; only
+    // capture here for errors that occur before that call (validation).
+    if (
+      !(
+        error instanceof TypeError &&
+        (error as Error).message?.includes('not found')
+      )
+    ) {
+      await captureError('publishProfileBasics failed', error, {
+        route: 'dashboard/actions/creator-profile',
+      });
+    }
     throw error;
   }
 }
