@@ -79,21 +79,20 @@ export function HeaderNav({
         {/* Nav links - desktop only, right-aligned */}
         {!hideNav && (
           <div className='hidden md:flex items-center gap-2'>
-            {navLinks
-              ? navLinks.map(link => (
-                  <a key={link.href} href={link.href} className={navLinkClass}>
-                    {link.label}
-                  </a>
-                ))
-              : !hidePricingLink && (
-                  <Link
-                    href={APP_ROUTES.PRICING}
-                    className={cn(navLinkClass, isPricingActive && 'is-active')}
-                    aria-current={isPricingActive ? 'page' : undefined}
-                  >
-                    Pricing
-                  </Link>
-                )}
+            {navLinks?.map(link => (
+              <a key={link.href} href={link.href} className={navLinkClass}>
+                {link.label}
+              </a>
+            ))}
+            {!navLinks && !hidePricingLink && (
+              <Link
+                href={APP_ROUTES.PRICING}
+                className={cn(navLinkClass, isPricingActive && 'is-active')}
+                aria-current={isPricingActive ? 'page' : undefined}
+              >
+                Pricing
+              </Link>
+            )}
           </div>
         )}
 

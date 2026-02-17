@@ -212,7 +212,7 @@ const LOGOS = [
 ];
 
 /* ─── Mock browser chrome bar ─── */
-function MockBar({ url }: { url: string }) {
+function MockBar({ url }: Readonly<{ url: string }>) {
   return (
     <div
       className='flex items-center gap-2 px-4 py-3'
@@ -533,7 +533,7 @@ export default function LaunchPage() {
               </div>
             </div>
             <div className='flex items-center gap-1.5 font-medium ml-auto text-xs text-emerald-400'>
-              <span className='w-1.5 h-1.5 rounded-full bg-emerald-400' />
+              <span className='w-1.5 h-1.5 rounded-full bg-emerald-400' />{' '}
               Connected
             </div>
           </div>
@@ -623,10 +623,7 @@ export default function LaunchPage() {
                           fontSize: '0.6rem',
                           padding: '0.1rem 0.35rem',
                           borderRadius: 2,
-                          background:
-                            r.badge === 'Smart Link'
-                              ? 'rgba(74,222,128,0.06)'
-                              : 'rgba(74,222,128,0.06)',
+                          background: 'rgba(74,222,128,0.06)',
                           color: 'rgb(52 211 153)',
                           opacity: r.badge === 'Pro' ? 0.4 : 0.7,
                         }}
@@ -902,7 +899,7 @@ export default function LaunchPage() {
             >
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
-              </span>
+              </span>{' '}
               /tip
             </div>
             <p
@@ -988,7 +985,7 @@ export default function LaunchPage() {
             >
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
-              </span>
+              </span>{' '}
               /tour
             </div>
             <p
@@ -1078,7 +1075,7 @@ export default function LaunchPage() {
             >
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
-              </span>
+              </span>{' '}
               /contact
             </div>
             <p
@@ -1143,7 +1140,7 @@ export default function LaunchPage() {
             >
               <span style={{ color: 'var(--linear-text-tertiary)' }}>
                 jov.ie/tim
-              </span>
+              </span>{' '}
               /listen
             </div>
             <p

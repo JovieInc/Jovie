@@ -199,7 +199,11 @@ export function PlanComparisonSection({
 
                 {/* Price */}
                 <div className='mt-4 flex items-baseline gap-1'>
-                  {priceDisplay !== null ? (
+                  {priceDisplay === null ? (
+                    <span className='text-sm font-medium text-tertiary-token'>
+                      Coming soon
+                    </span>
+                  ) : (
                     <>
                       <span className='text-3xl font-bold text-primary-token'>
                         {priceDisplay}
@@ -208,10 +212,6 @@ export function PlanComparisonSection({
                         {intervalLabel}
                       </span>
                     </>
-                  ) : (
-                    <span className='text-sm font-medium text-tertiary-token'>
-                      Coming soon
-                    </span>
                   )}
                 </div>
 

@@ -78,7 +78,7 @@ function ListenNowCTA({
 /**
  * Success state - shown when user has subscribed
  */
-function SubscriptionSuccess({ artistName }: { artistName: string }) {
+function SubscriptionSuccess({ artistName }: Readonly<{ artistName: string }>) {
   return (
     <div className='space-y-1'>
       <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>

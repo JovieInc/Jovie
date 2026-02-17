@@ -46,10 +46,10 @@ export interface UnifiedSidebarProps {
 function SettingsNavGroup({
   items,
   pathname,
-}: {
+}: Readonly<{
   items: NavItem[];
   pathname: string;
-}) {
+}>) {
   return (
     <SidebarMenu>
       {items.map(item => {
@@ -80,9 +80,9 @@ function SettingsNavGroup({
               <ContextMenuItem
                 onSelect={async () => {
                   const origin =
-                    typeof window !== 'undefined'
-                      ? window.location.origin
-                      : BASE_URL;
+                    globalThis.window === undefined
+                      ? BASE_URL
+                      : globalThis.location.origin;
                   const url = `${origin}${item.href}`;
                   const ok = await copyToClipboard(url);
                   if (ok) {

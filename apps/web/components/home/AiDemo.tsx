@@ -98,7 +98,7 @@ export function AiDemo() {
 
   // Check reduced motion preference
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const mq = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
     setPrefersReducedMotion(mq.matches);
     const handler = (e: MediaQueryListEvent) =>
       setPrefersReducedMotion(e.matches);
@@ -194,6 +194,10 @@ export function AiDemo() {
     if (nextDemo) setVisibleCount(nextDemo.segments.length);
   }, [demoIndex]);
 
+  let toggleLabel = 'Pause demo';
+  if (prefersReducedMotion) toggleLabel = 'Show next demo';
+  else if (isPaused) toggleLabel = 'Resume demo';
+
   return (
     <figure
       ref={containerRef}
@@ -235,25 +239,10 @@ export function AiDemo() {
         <button
           type='button'
           onClick={prefersReducedMotion ? showNextDemo : togglePause}
-          aria-label={
-            prefersReducedMotion
-              ? 'Show next demo'
-              : isPaused
-                ? 'Resume demo'
-                : 'Pause demo'
-          }
+          aria-label={toggleLabel}
           className='focus-ring w-6 h-6 flex items-center justify-center rounded text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-secondary)] transition-colors'
         >
-          {prefersReducedMotion ? (
-            <svg
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='w-3 h-3'
-              aria-hidden='true'
-            >
-              <path d='M4 2l10 6-10 6V2z' />
-            </svg>
-          ) : isPaused ? (
+          {prefersReducedMotion || isPaused ? (
             <svg
               viewBox='0 0 16 16'
               fill='currentColor'

@@ -710,6 +710,70 @@ export const unsubscribeFromNotificationsDomain = async (
   }
 };
 
+/**
+ * Build subscription query clauses for the given contact details.
+ */
+function buildSubscriptionClauses(
+  normalizedEmail: string | null,
+  normalizedPhone: string | null
+): Array<ReturnType<typeof and>> {
+  const clauses: Array<ReturnType<typeof and>> = [];
+
+  if (normalizedEmail) {
+    clauses.push(
+      and(
+        eq(notificationSubscriptions.channel, 'email'),
+        eq(notificationSubscriptions.email, normalizedEmail)
+      )
+    );
+  }
+
+  if (normalizedPhone) {
+    clauses.push(
+      and(
+        eq(notificationSubscriptions.channel, 'sms'),
+        eq(notificationSubscriptions.phone, normalizedPhone)
+      )
+    );
+  }
+
+  return clauses;
+}
+
+/**
+ * Merge subscription rows into channel states, contact details, and preferences.
+ */
+function mergeSubscriptionRows(
+  rows: Array<{
+    channel: string;
+    email: string | null;
+    phone: string | null;
+    preferences: FanNotificationPreferences | null;
+  }>
+) {
+  const channels: NotificationSubscriptionState = { email: false, sms: false };
+  const details: NotificationContactValues = {};
+  let mergedPrefs: FanNotificationPreferences | undefined;
+
+  for (const row of rows) {
+    if (row.channel === 'email' && row.email) {
+      channels.email = true;
+      details.email = row.email;
+    }
+
+    if (row.channel === 'sms' && row.phone) {
+      channels.sms = true;
+      details.sms = row.phone;
+    }
+
+    if (!mergedPrefs && row.preferences) {
+      mergedPrefs = row.preferences;
+    }
+  }
+
+  return { channels, details, mergedPrefs };
+}
+
 export const getNotificationStatusDomain = async (
   payload: unknown
 ): Promise<NotificationDomainResponse<NotificationStatusResponse>> => {
@@ -730,31 +794,10 @@ export const getNotificationStatusDomain = async (
       );
     }
 
-    const channels: NotificationSubscriptionState = {
-      email: false,
-      sms: false,
-    };
-    const details: NotificationContactValues = {};
-
-    const valueClauses: Array<ReturnType<typeof and>> = [];
-
-    if (normalizedEmail) {
-      valueClauses.push(
-        and(
-          eq(notificationSubscriptions.channel, 'email'),
-          eq(notificationSubscriptions.email, normalizedEmail)
-        )
-      );
-    }
-
-    if (normalizedPhone) {
-      valueClauses.push(
-        and(
-          eq(notificationSubscriptions.channel, 'sms'),
-          eq(notificationSubscriptions.phone, normalizedPhone)
-        )
-      );
-    }
+    const valueClauses = buildSubscriptionClauses(
+      normalizedEmail,
+      normalizedPhone
+    );
 
     if (valueClauses.length === 0) {
       return buildValidationErrorResponse('Contact required to check status');
@@ -776,25 +819,7 @@ export const getNotificationStatusDomain = async (
       )
       .limit(2);
 
-    // Merge preferences across all subscription rows (email + sms)
-    let mergedPrefs: FanNotificationPreferences | undefined;
-
-    for (const row of rows) {
-      if (row.channel === 'email' && row.email) {
-        channels.email = true;
-        details.email = row.email;
-      }
-
-      if (row.channel === 'sms' && row.phone) {
-        channels.sms = true;
-        details.sms = row.phone;
-      }
-
-      // Use the first non-null preferences found (they should be identical across channels)
-      if (!mergedPrefs && row.preferences) {
-        mergedPrefs = row.preferences;
-      }
-    }
+    const { channels, details, mergedPrefs } = mergeSubscriptionRows(rows);
 
     return buildStatusSuccessResponse(channels, details, mergedPrefs);
   } catch (error) {
@@ -866,7 +891,7 @@ export const updateContentPreferencesDomain = async (
     let totalUpdated = 0;
     for (const row of existing) {
       const merged: FanNotificationPreferences = {
-        ...(row.preferences ?? {}),
+        ...row.preferences,
         ...preferences,
       };
 

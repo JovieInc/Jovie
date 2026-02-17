@@ -29,6 +29,49 @@ const DSP_DISPLAY: Record<
   apple_music: { label: 'Apple Music', color: 'text-[#FA243C]' },
 };
 
+type DspProvider = 'spotify' | 'apple_music';
+
+interface ArtistSelection {
+  id: string;
+  name: string;
+  url: string;
+  imageUrl?: string;
+}
+
+function isConfirmedMatch(match: DspMatch): boolean {
+  return match.status === 'confirmed' || match.status === 'auto_confirmed';
+}
+
+function findConfirmedMatch(
+  matches: DspMatch[] | undefined,
+  providerId: DspProvider
+): DspMatch | undefined {
+  return matches?.find(m => m.providerId === providerId && isConfirmedMatch(m));
+}
+
+async function connectProvider(
+  provider: DspProvider,
+  artist: ArtistSelection
+): Promise<{ success: boolean; message?: string }> {
+  if (provider === 'spotify') {
+    return connectSpotifyArtist({
+      spotifyArtistId: artist.id,
+      spotifyArtistUrl: artist.url,
+      artistName: artist.name,
+    });
+  }
+  return connectAppleMusicArtist({
+    externalArtistId: artist.id,
+    externalArtistName: artist.name,
+    externalArtistUrl: artist.url,
+    externalArtistImageUrl: artist.imageUrl,
+  });
+}
+
+function getProviderLabel(provider: DspProvider): string {
+  return DSP_DISPLAY[provider]?.label ?? provider;
+}
+
 interface ConnectedDspListProps {
   readonly profileId: string;
   readonly spotifyId: string | null;
@@ -53,16 +96,13 @@ export function ConnectedDspList({
   const { mutate: rejectMatch } = useRejectDspMatchMutation();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [paletteProvider, setPaletteProvider] = useState<
-    'spotify' | 'apple_music'
-  >('apple_music');
+  const [paletteProvider, setPaletteProvider] =
+    useState<DspProvider>('apple_music');
 
   const handleDisconnect = useCallback(
     (match: DspMatch | undefined) => {
       if (!match) return;
-      const label =
-        DSP_DISPLAY[match.providerId as keyof typeof DSP_DISPLAY]?.label ??
-        match.providerId;
+      const label = getProviderLabel(match.providerId as DspProvider);
       rejectMatch(
         { matchId: match.id, profileId, reason: 'user_disconnected' },
         {
@@ -76,18 +116,14 @@ export function ConnectedDspList({
   );
 
   const handleSyncNow = useCallback(
-    (provider: 'spotify' | 'apple_music') => {
+    (provider: DspProvider) => {
       if (!spotifyId) {
         toast.error('A Spotify ID is required to sync DSP profiles');
         return;
       }
-      const label = DSP_DISPLAY[provider]?.label ?? provider;
+      const label = getProviderLabel(provider);
       triggerDiscovery(
-        {
-          profileId,
-          spotifyArtistId: spotifyId,
-          targetProviders: [provider],
-        },
+        { profileId, spotifyArtistId: spotifyId, targetProviders: [provider] },
         {
           onSuccess: () => toast.success(`${label} sync started`),
           onError: err => toast.error(err.message || `Failed to sync ${label}`),
@@ -97,80 +133,44 @@ export function ConnectedDspList({
     [profileId, spotifyId, triggerDiscovery]
   );
 
-  const handleOpenPalette = useCallback(
-    (provider: 'spotify' | 'apple_music') => {
-      setPaletteProvider(provider);
-      setPaletteOpen(true);
-    },
-    []
-  );
+  const handleOpenPalette = useCallback((provider: DspProvider) => {
+    setPaletteProvider(provider);
+    setPaletteOpen(true);
+  }, []);
 
   const handlePaletteSelect = useCallback(
-    async (artist: {
-      id: string;
-      name: string;
-      url: string;
-      imageUrl?: string;
-    }) => {
+    async (artist: ArtistSelection) => {
       try {
-        if (paletteProvider === 'spotify') {
-          const result = await connectSpotifyArtist({
-            spotifyArtistId: artist.id,
-            spotifyArtistUrl: artist.url,
-            artistName: artist.name,
-          });
-          if (result.success) {
-            toast.success(result.message);
-          } else {
-            toast.error(result.message || 'Failed to connect Spotify');
-          }
+        const result = await connectProvider(paletteProvider, artist);
+        if (result.success) {
+          toast.success(result.message);
         } else {
-          const result = await connectAppleMusicArtist({
-            externalArtistId: artist.id,
-            externalArtistName: artist.name,
-            externalArtistUrl: artist.url,
-            externalArtistImageUrl: artist.imageUrl,
-          });
-          if (result.success) {
-            toast.success(result.message);
-          } else {
-            toast.error(result.message || 'Failed to connect Apple Music');
-          }
+          toast.error(
+            result.message ||
+              `Failed to connect ${getProviderLabel(paletteProvider)}`
+          );
         }
 
         await queryClient.invalidateQueries({
           queryKey: queryKeys.dspEnrichment.matches(profileId),
         });
       } catch (err) {
-        const providerName =
-          paletteProvider === 'spotify' ? 'Spotify' : 'Apple Music';
         toast.error(
           err instanceof Error
             ? err.message
-            : `Failed to connect ${providerName}`
+            : `Failed to connect ${getProviderLabel(paletteProvider)}`
         );
       }
     },
     [paletteProvider, profileId, queryClient]
   );
 
-  // Determine connection status for Spotify and Apple Music
   const spotifyMatch = useMemo(
-    () =>
-      matches?.find(
-        m =>
-          m.providerId === 'spotify' &&
-          (m.status === 'confirmed' || m.status === 'auto_confirmed')
-      ),
+    () => findConfirmedMatch(matches, 'spotify'),
     [matches]
   );
   const appleMusicMatch = useMemo(
-    () =>
-      matches?.find(
-        m =>
-          m.providerId === 'apple_music' &&
-          (m.status === 'confirmed' || m.status === 'auto_confirmed')
-      ),
+    () => findConfirmedMatch(matches, 'apple_music'),
     [matches]
   );
 
@@ -199,6 +199,9 @@ export function ConnectedDspList({
     );
   }
 
+  const isSpotifyConnected = !!spotifyId || !!spotifyMatch;
+  const hasNoConnections = !spotifyId && !spotifyMatch && !appleMusicMatch;
+
   return (
     <DashboardCard variant='settings'>
       <div className='space-y-4'>
@@ -206,16 +209,15 @@ export function ConnectedDspList({
           Connect your Spotify and Apple Music artist profiles.
         </p>
 
-        {/* Spotify & Apple Music connection pills */}
         <div className='flex flex-wrap items-center gap-2'>
           <DspConnectionPill
             provider='spotify'
-            connected={!!spotifyId || !!spotifyMatch}
+            connected={isSpotifyConnected}
             artistName={spotifyMatch?.externalArtistName}
             onClick={
-              !spotifyId && !spotifyMatch
-                ? () => handleOpenPalette('spotify')
-                : undefined
+              isSpotifyConnected
+                ? undefined
+                : () => handleOpenPalette('spotify')
             }
             onSyncNow={spotifyId ? () => handleSyncNow('spotify') : undefined}
             onDisconnect={
@@ -244,7 +246,7 @@ export function ConnectedDspList({
           />
         </div>
 
-        {!spotifyId && !spotifyMatch && !appleMusicMatch && (
+        {hasNoConnections && (
           <div className='text-center py-4'>
             <Music className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
             <p className='text-sm text-secondary-token'>
@@ -254,7 +256,6 @@ export function ConnectedDspList({
         )}
       </div>
 
-      {/* Artist search command palette */}
       <ArtistSearchCommandPalette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}

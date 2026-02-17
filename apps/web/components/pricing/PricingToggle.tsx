@@ -38,7 +38,7 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
           checked={!isYearly}
           onChange={() => handleToggle(false)}
           className='sr-only'
-        />
+        />{' '}
         Monthly $5
       </label>
       <label
