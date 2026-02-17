@@ -106,9 +106,7 @@ describe('HeroSpotifySearch', () => {
 
     it('renders sr-only label', () => {
       renderComponent();
-      const label = screen.getByText(
-        'Search Spotify artists or paste a profile link'
-      );
+      const label = screen.getByText('Search Spotify artists or paste a link');
       expect(label).toHaveClass('sr-only');
     });
 
@@ -149,9 +147,9 @@ describe('HeroSpotifySearch', () => {
       renderComponent();
       const user = userEvent.setup();
       await user.type(getInput(), 'loading');
-      // Loading skeleton renders 3 pulse placeholders
-      const listbox = screen.getByRole('listbox');
-      const pulseElements = listbox.querySelectorAll('.animate-pulse');
+      // Loading skeleton renders 3 pulse placeholders inside the dropdown container
+      const dropdown = screen.getByRole('listbox').closest('div')!;
+      const pulseElements = dropdown.querySelectorAll('.animate-pulse');
       expect(pulseElements.length).toBe(3);
     });
 
@@ -276,16 +274,14 @@ describe('HeroSpotifySearch', () => {
       renderComponent();
       const user = userEvent.setup();
       await user.type(getInput(), 'Taylor');
-      // Taylor Swift is verified — her option row should contain an SVG (BadgeCheck)
-      const taylorOption = screen
-        .getByText('Taylor Swift')
-        .closest('[role="option"]')!;
-      expect(taylorOption.querySelector('svg')).toBeInTheDocument();
+      // Taylor Swift is verified — her visible button row should contain a BadgeCheck SVG
+      const taylorButton = screen.getByText('Taylor Swift').closest('button')!;
+      expect(taylorButton.querySelector('svg')).toBeInTheDocument();
       // Phoebe Bridgers is not verified — no SVG in her row
-      const phoebeOption = screen
+      const phoebeButton = screen
         .getByText('Phoebe Bridgers')
-        .closest('[role="option"]')!;
-      expect(phoebeOption.querySelector('svg')).not.toBeInTheDocument();
+        .closest('button')!;
+      expect(phoebeButton.querySelector('svg')).not.toBeInTheDocument();
     });
   });
 
@@ -306,7 +302,7 @@ describe('HeroSpotifySearch', () => {
       renderComponent();
       expect(getInput()).toHaveAttribute(
         'placeholder',
-        'Search Spotify artists or paste a profile link'
+        'Search your artist name or paste a Spotify link'
       );
     });
   });
@@ -332,7 +328,12 @@ describe('HeroSpotifySearch', () => {
       const user = userEvent.setup();
       const input = getInput();
       await user.type(input, 'Taylor');
-      await user.click(screen.getByText('Paste a Spotify URL instead'));
+      // Text appears in both a hidden <option> and visible <button>; click the button
+      const pasteButtons = screen.getAllByText('Paste a Spotify URL instead');
+      const visibleButton = pasteButtons.find(
+        el => el.closest('button') !== null
+      )!;
+      await user.click(visibleButton);
       expect(mockClear).toHaveBeenCalled();
       expect(input).toHaveValue('');
     });
@@ -368,22 +369,23 @@ describe('HeroSpotifySearch', () => {
       const user = userEvent.setup();
       await user.type(getInput(), 'Taylor');
       const options = screen.getAllByRole('option');
-      // 3 artists + 1 paste URL = 4
-      expect(options).toHaveLength(4);
+      // 1 disabled placeholder + 3 artists + 1 paste URL = 5
+      expect(options).toHaveLength(5);
     });
 
-    it('aria-selected updates with activeIndex', async () => {
+    it('active selection updates with keyboard navigation', async () => {
       renderComponent();
       const user = userEvent.setup();
-      await user.type(getInput(), 'Taylor');
-      const options = screen.getAllByRole('option');
-      // All should be aria-selected=false initially
-      for (const option of options) {
-        expect(option).toHaveAttribute('aria-selected', 'false');
-      }
+      const input = getInput();
+      await user.type(input, 'Taylor');
+      // Initially no active descendant
+      expect(input).not.toHaveAttribute('aria-activedescendant');
+      // ArrowDown selects first artist
       await user.keyboard('{ArrowDown}');
-      expect(options[0]).toHaveAttribute('aria-selected', 'true');
-      expect(options[1]).toHaveAttribute('aria-selected', 'false');
+      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-0');
+      // ArrowDown again selects second artist
+      await user.keyboard('{ArrowDown}');
+      expect(input).toHaveAttribute('aria-activedescendant', 'hero-result-1');
     });
 
     it('aria-controls references listbox id', async () => {
