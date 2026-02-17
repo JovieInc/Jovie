@@ -155,7 +155,7 @@ function extractSocialLinks(result: MusicFetchArtistResult): ExtractedLink[] {
   ).map(({ serviceKey, platformId }) => ({
     url: services[serviceKey]!.url!,
     platformId,
-    sourcePlatform: 'musicfetch' as const,
+    sourcePlatform: 'musicfetch',
     evidence: {
       sources: ['musicfetch'],
       signals: ['musicfetch_artist_lookup'],

@@ -446,7 +446,7 @@ export async function recalculateAllFitScores(
     await batchUpdateFitScores(db, scoredProfiles);
     totalScored += scoredProfiles.length;
 
-    const lastProfile = profiles[profiles.length - 1];
+    const lastProfile = profiles.at(-1);
     if (!lastProfile) {
       break;
     }

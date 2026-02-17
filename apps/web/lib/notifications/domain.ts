@@ -866,7 +866,7 @@ export const updateContentPreferencesDomain = async (
     let totalUpdated = 0;
     for (const row of existing) {
       const merged: FanNotificationPreferences = {
-        ...(row.preferences ?? {}),
+        ...row.preferences,
         ...preferences,
       };
 

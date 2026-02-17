@@ -263,9 +263,10 @@ export function HeroSpotifySearch() {
             activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
           }
         />
-        {state === 'loading' ? (
+        {state === 'loading' && (
           <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0' />
-        ) : showContinueAction ? (
+        )}
+        {state !== 'loading' && showContinueAction && (
           <button
             type='button'
             onClick={handleContinue}
@@ -273,7 +274,8 @@ export function HeroSpotifySearch() {
           >
             Continue
           </button>
-        ) : (
+        )}
+        {state !== 'loading' && !showContinueAction && (
           <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
         )}
       </div>
