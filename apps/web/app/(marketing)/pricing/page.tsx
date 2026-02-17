@@ -4,36 +4,7 @@ import Link from 'next/link';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
-
-// Feature lists aligned with PLAN_LIMITS in lib/stripe/config.ts
-const FREE_FEATURES = [
-  'AI-powered personalization',
-  'Smart deep links',
-  'Auto-sync from Spotify',
-  'Basic analytics (7 days)',
-  'Up to 100 contacts',
-] as const;
-
-const PRO_FEATURES = [
-  'All Free features +',
-  'Remove Jovie branding',
-  'Extended analytics (90 days)',
-  'Unlimited contacts',
-  'Contact export',
-  'Geographic insights',
-  'Priority support',
-] as const;
-
-const GROWTH_FEATURES = [
-  'All Pro features +',
-  'Full analytics (1 year)',
-  'Automated follow-ups',
-  'A/B testing',
-  'Meta pixel integration',
-  'Custom domain',
-  'Catalog monitoring',
-  'Impersonation detection',
-] as const;
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -347,43 +318,43 @@ export default function PricingPage() {
               {/* Free Tier */}
               <div className='border-b md:border-b-0 md:border-r border-[var(--linear-border-default)]'>
                 <PricingTier
-                  name='Free'
-                  billingLabel='Free for everyone'
+                  name={ENTITLEMENT_REGISTRY.free.marketing.displayName}
+                  billingLabel={ENTITLEMENT_REGISTRY.free.marketing.tagline}
                   price='$0'
                   buttonLabel='Get started'
                   buttonHref='/signup?plan=free'
                   buttonVariant='secondary'
-                  features={FREE_FEATURES}
+                  features={ENTITLEMENT_REGISTRY.free.marketing.features}
                 />
               </div>
 
               {/* Pro Tier - Highlighted */}
               <PricingTier
-                name='Pro'
+                name={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
                 billingLabel='Billed monthly'
-                price='$39'
+                price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
                 priceSuffix='/month'
-                yearlyPrice='or $348/year (save $120)'
+                yearlyPrice={`or $${ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly})`}
                 buttonLabel='Get started'
                 buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
-                features={PRO_FEATURES}
+                features={ENTITLEMENT_REGISTRY.pro.marketing.features}
                 isHighlighted
               />
 
               {/* Growth Tier */}
               <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
                 <PricingTier
-                  name='Growth'
+                  name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
                   badge='Early Access'
                   billingLabel='Billed monthly'
-                  price='$99'
+                  price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
                   priceSuffix='/month'
-                  yearlyPrice='or $948/year (save $240)'
+                  yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly})`}
                   buttonLabel='Request Early Access'
                   buttonHref='/signup?plan=growth'
                   buttonVariant='secondary'
-                  features={GROWTH_FEATURES}
+                  features={ENTITLEMENT_REGISTRY.growth.marketing.features}
                 />
               </div>
             </div>

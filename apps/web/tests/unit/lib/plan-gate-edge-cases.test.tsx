@@ -100,7 +100,7 @@ describe('usePlanGate – edge cases', () => {
     expect(result.current.analyticsRetentionDays).toBe(7);
   });
 
-  it('pro user with isPro=true but no plan string → pro entitlements', async () => {
+  it('pro user with isPro=true but no plan string → free-tier entitlements from registry', async () => {
     mockBillingResponse({
       isPro: true,
       plan: null,
@@ -116,12 +116,12 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // isPro drives all boolean features
+    // isPro flag is still true from billing response
     expect(result.current.isPro).toBe(true);
-    expect(result.current.canRemoveBranding).toBe(true);
-    expect(result.current.canExportContacts).toBe(true);
-    expect(result.current.canAccessAdvancedAnalytics).toBe(true);
-    // But retention and contacts are plan-derived → null plan = free values
+    // But entitlements are derived from plan string via registry — null plan = free
+    expect(result.current.canRemoveBranding).toBe(false);
+    expect(result.current.canExportContacts).toBe(false);
+    expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(7);
     expect(result.current.contactsLimit).toBe(100);
   });

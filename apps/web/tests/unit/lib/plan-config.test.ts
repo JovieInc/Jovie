@@ -1,88 +1,100 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ENTITLEMENT_REGISTRY,
+  getEntitlements,
   getPlanDisplayName,
-  getPlanLimits,
   hasAdvancedFeatures,
   isProPlan,
-  PLAN_LIMITS,
-} from '@/lib/stripe/config';
+} from '@/lib/entitlements/registry';
 
-describe('Plan Configuration', () => {
-  describe('PLAN_LIMITS', () => {
+describe('Plan Configuration (Entitlement Registry)', () => {
+  describe('ENTITLEMENT_REGISTRY', () => {
     it('free plan has correct limits', () => {
-      expect(PLAN_LIMITS.free).toEqual({
+      const free = ENTITLEMENT_REGISTRY.free;
+      expect(free.limits).toEqual({
         analyticsRetentionDays: 7,
         contactsLimit: 100,
+        smartLinksLimit: 5,
+        aiDailyMessageLimit: 5,
+      });
+      expect(free.booleans).toEqual({
         canExportContacts: false,
         canRemoveBranding: false,
         canAccessAdvancedAnalytics: false,
         canFilterSelfFromAnalytics: false,
-        aiDailyMessageLimit: 5,
-        aiCanUseTools: false,
+        canAccessAdPixels: false,
         canBeVerified: false,
-        smartLinksLimit: 5,
+        aiCanUseTools: false,
       });
     });
 
     it('pro plan has correct limits', () => {
-      expect(PLAN_LIMITS.pro).toEqual({
+      const pro = ENTITLEMENT_REGISTRY.pro;
+      expect(pro.limits).toEqual({
         analyticsRetentionDays: 90,
         contactsLimit: null,
+        smartLinksLimit: null,
+        aiDailyMessageLimit: 100,
+      });
+      expect(pro.booleans).toEqual({
         canExportContacts: true,
         canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
-        aiDailyMessageLimit: 100,
-        aiCanUseTools: true,
+        canAccessAdPixels: true,
         canBeVerified: true,
-        smartLinksLimit: null,
+        aiCanUseTools: true,
       });
     });
 
     it('growth plan has correct limits', () => {
-      expect(PLAN_LIMITS.growth).toEqual({
+      const growth = ENTITLEMENT_REGISTRY.growth;
+      expect(growth.limits).toEqual({
         analyticsRetentionDays: 365,
         contactsLimit: null,
+        smartLinksLimit: null,
+        aiDailyMessageLimit: 500,
+      });
+      expect(growth.booleans).toEqual({
         canExportContacts: true,
         canRemoveBranding: true,
         canAccessAdvancedAnalytics: true,
         canFilterSelfFromAnalytics: true,
-        aiDailyMessageLimit: 500,
-        aiCanUseTools: true,
+        canAccessAdPixels: true,
         canBeVerified: true,
-        smartLinksLimit: null,
+        aiCanUseTools: true,
       });
     });
 
     it('free plan contacts limit is exactly 100', () => {
-      expect(PLAN_LIMITS.free.contactsLimit).toBe(100);
+      expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
     });
 
     it('pro and growth have unlimited contacts (null)', () => {
-      expect(PLAN_LIMITS.pro.contactsLimit).toBeNull();
-      expect(PLAN_LIMITS.growth.contactsLimit).toBeNull();
+      expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
+      expect(ENTITLEMENT_REGISTRY.growth.limits.contactsLimit).toBeNull();
     });
   });
 
-  describe('getPlanLimits', () => {
-    it('returns free limits for null plan', () => {
-      expect(getPlanLimits(null)).toEqual(PLAN_LIMITS.free);
+  describe('getEntitlements', () => {
+    it('returns free entitlements for null plan', () => {
+      expect(getEntitlements(null)).toEqual(ENTITLEMENT_REGISTRY.free);
     });
 
-    it('returns free limits for unknown plan', () => {
-      expect(getPlanLimits('unknown')).toEqual(PLAN_LIMITS.free);
+    it('returns free entitlements for unknown plan', () => {
+      expect(getEntitlements('unknown')).toEqual(ENTITLEMENT_REGISTRY.free);
     });
 
-    it('returns free limits for "free" plan', () => {
-      expect(getPlanLimits('free')).toEqual(PLAN_LIMITS.free);
+    it('returns free entitlements for "free" plan', () => {
+      expect(getEntitlements('free')).toEqual(ENTITLEMENT_REGISTRY.free);
     });
 
-    it('returns pro limits for "pro" plan', () => {
-      expect(getPlanLimits('pro')).toEqual(PLAN_LIMITS.pro);
+    it('returns pro entitlements for "pro" plan', () => {
+      expect(getEntitlements('pro')).toEqual(ENTITLEMENT_REGISTRY.pro);
     });
 
-    it('returns growth limits for "growth" plan', () => {
-      expect(getPlanLimits('growth')).toEqual(PLAN_LIMITS.growth);
+    it('returns growth entitlements for "growth" plan', () => {
+      expect(getEntitlements('growth')).toEqual(ENTITLEMENT_REGISTRY.growth);
     });
   });
 
@@ -141,14 +153,12 @@ describe('Plan Configuration', () => {
   });
 
   describe('Edge cases across all helpers', () => {
-    it('getPlanLimits falls back to free for empty string', () => {
-      expect(getPlanLimits('')).toEqual(PLAN_LIMITS.free);
+    it('getEntitlements falls back to free for empty string', () => {
+      expect(getEntitlements('')).toEqual(ENTITLEMENT_REGISTRY.free);
     });
 
-    it('getPlanLimits falls back to free for undefined', () => {
-      expect(getPlanLimits(undefined as unknown as string)).toEqual(
-        PLAN_LIMITS.free
-      );
+    it('getEntitlements falls back to free for undefined', () => {
+      expect(getEntitlements(undefined)).toEqual(ENTITLEMENT_REGISTRY.free);
     });
 
     it('isProPlan rejects case-mismatched strings', () => {
@@ -168,47 +178,39 @@ describe('Plan Configuration', () => {
     });
 
     it('plan hierarchy: growth > pro > free for retention days', () => {
-      expect(PLAN_LIMITS.growth.analyticsRetentionDays).toBeGreaterThan(
-        PLAN_LIMITS.pro.analyticsRetentionDays
-      );
-      expect(PLAN_LIMITS.pro.analyticsRetentionDays).toBeGreaterThan(
-        PLAN_LIMITS.free.analyticsRetentionDays
+      expect(
+        ENTITLEMENT_REGISTRY.growth.limits.analyticsRetentionDays
+      ).toBeGreaterThan(ENTITLEMENT_REGISTRY.pro.limits.analyticsRetentionDays);
+      expect(
+        ENTITLEMENT_REGISTRY.pro.limits.analyticsRetentionDays
+      ).toBeGreaterThan(
+        ENTITLEMENT_REGISTRY.free.limits.analyticsRetentionDays
       );
     });
 
     it('all paid plans have unlimited contacts (null)', () => {
       const paidPlans = ['pro', 'growth'] as const;
       for (const plan of paidPlans) {
-        expect(PLAN_LIMITS[plan].contactsLimit).toBeNull();
+        expect(ENTITLEMENT_REGISTRY[plan].limits.contactsLimit).toBeNull();
       }
     });
 
     it('all paid plans enable all boolean features', () => {
       const paidPlans = ['pro', 'growth'] as const;
-      const boolFeatures = [
-        'canExportContacts',
-        'canRemoveBranding',
-        'canAccessAdvancedAnalytics',
-        'canFilterSelfFromAnalytics',
-      ] as const;
-
       for (const plan of paidPlans) {
-        for (const feature of boolFeatures) {
-          expect(PLAN_LIMITS[plan][feature]).toBe(true);
+        for (const [, value] of Object.entries(
+          ENTITLEMENT_REGISTRY[plan].booleans
+        )) {
+          expect(value).toBe(true);
         }
       }
     });
 
     it('free plan disables all boolean features', () => {
-      const boolFeatures = [
-        'canExportContacts',
-        'canRemoveBranding',
-        'canAccessAdvancedAnalytics',
-        'canFilterSelfFromAnalytics',
-      ] as const;
-
-      for (const feature of boolFeatures) {
-        expect(PLAN_LIMITS.free[feature]).toBe(false);
+      for (const [, value] of Object.entries(
+        ENTITLEMENT_REGISTRY.free.booleans
+      )) {
+        expect(value).toBe(false);
       }
     });
   });

@@ -1,18 +1,35 @@
 import type { Metadata } from 'next';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { ComparisonSection } from '@/components/home/comparison-visual';
+import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
+import { ExampleProfilesCarousel } from '@/components/home/ExampleProfilesCarousel';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
-import { HowItWorksSection } from '@/components/home/HowItWorksSection';
+import { HowItWorksRich } from '@/components/home/HowItWorksRich';
+import { LabelLogosBar } from '@/components/home/LabelLogosBar';
 import { ProblemSection } from '@/components/home/ProblemSection';
+import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import {
+  homepageComparison,
+  homepageDeeplinksGrid,
+  homepageExampleProfiles,
+  homepageFinalCta,
+  homepageHero,
+  homepageHowItWorks,
+  homepageLabelLogos,
+  homepageProblem,
+  homepageProductPreview,
+  homepageSeeItInAction,
+  homepageWhatYouGet,
+} from '@/lib/flags';
 
-// Fully static - no database dependency, instant cold starts
-export const revalidate = false;
+// Flags read cookies for toolbar overrides, making this page dynamic.
+// Revert to `revalidate = false` once homepage design is finalized.
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The Link-in-Bio Built for Artists`;
@@ -215,7 +232,33 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
 });
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [
+    showHero,
+    showLabelLogos,
+    showHowItWorks,
+    showProductPreview,
+    showExampleProfiles,
+    showDeeplinksGrid,
+    showProblem,
+    showComparison,
+    showWhatYouGet,
+    showSeeItInAction,
+    showFinalCta,
+  ] = await Promise.all([
+    homepageHero(),
+    homepageLabelLogos(),
+    homepageHowItWorks(),
+    homepageProductPreview(),
+    homepageExampleProfiles(),
+    homepageDeeplinksGrid(),
+    homepageProblem(),
+    homepageComparison(),
+    homepageWhatYouGet(),
+    homepageSeeItInAction(),
+    homepageFinalCta(),
+  ]);
+
   return (
     <div
       className='relative min-h-screen'
@@ -244,34 +287,51 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
 
-      {/* 1. Hero Section */}
-      <RedesignedHero />
+      {showHero && <RedesignedHero />}
 
-      {/* 2. Problem Section */}
-      <ProblemSection />
+      {showLabelLogos && <LabelLogosBar />}
 
-      {/* 3. Comparison Section */}
-      <ComparisonSection />
+      {showHowItWorks && <HowItWorksRich />}
 
-      <DeferredSection placeholderHeight={560}>
-        {/* 4. What You Get Section */}
-        <WhatYouGetSection />
-      </DeferredSection>
+      {showProductPreview && (
+        <DeferredSection placeholderHeight={640}>
+          <ProfileMockup />
+        </DeferredSection>
+      )}
 
-      <DeferredSection placeholderHeight={640}>
-        {/* 5. How It Works Section */}
-        <HowItWorksSection />
-      </DeferredSection>
+      {showExampleProfiles && (
+        <DeferredSection placeholderHeight={400}>
+          <ExampleProfilesCarousel />
+        </DeferredSection>
+      )}
 
-      <DeferredSection placeholderHeight={520}>
-        {/* 6. See It In Action Section */}
-        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-      </DeferredSection>
+      {showDeeplinksGrid && (
+        <DeferredSection placeholderHeight={480}>
+          <DeeplinksGrid />
+        </DeferredSection>
+      )}
 
-      <DeferredSection placeholderHeight={480}>
-        {/* 7. Final CTA Section */}
-        <FinalCTASection />
-      </DeferredSection>
+      {showProblem && <ProblemSection />}
+
+      {showComparison && <ComparisonSection />}
+
+      {showWhatYouGet && (
+        <DeferredSection placeholderHeight={560}>
+          <WhatYouGetSection />
+        </DeferredSection>
+      )}
+
+      {showSeeItInAction && (
+        <DeferredSection placeholderHeight={520}>
+          <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+        </DeferredSection>
+      )}
+
+      {showFinalCta && (
+        <DeferredSection placeholderHeight={480}>
+          <FinalCTASection />
+        </DeferredSection>
+      )}
     </div>
   );
 }

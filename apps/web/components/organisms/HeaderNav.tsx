@@ -59,51 +59,53 @@ export function HeaderNav({
         ...style,
       }}
     >
-      {/* Linear-style centered content container */}
+      {/* Linear-style full-width content container */}
       <nav
-        className='flex items-center h-16 mx-auto'
+        className='flex items-center h-[72px] w-full px-5 sm:px-6 lg:px-[77px]'
         aria-label='Primary navigation'
-        style={{
-          display: 'flex',
-          width: '100%',
-          maxWidth: 'var(--linear-container-max)',
-          padding: `0 var(--linear-container-padding)`,
-          margin: '0 auto',
-        }}
       >
-        {/* Logo section - left aligned */}
+        {/* Logo section - left aligned with Linear padding */}
         <div className='flex items-center'>
-          <LogoLink logoSize={logoSize} variant={logoVariant} />
+          <LogoLink
+            logoSize={logoSize}
+            variant={logoVariant}
+            className='px-2 rounded-[6px]'
+          />
         </div>
 
-        {/* Center nav links - desktop only */}
-        {hideNav ? (
-          <div className='flex-1' aria-hidden='true' />
-        ) : (
-          <div className='flex-1 hidden md:flex items-center justify-center gap-6'>
-            {navLinks ? (
-              navLinks.map(link => (
-                <a key={link.href} href={link.href} className={navLinkClass}>
-                  {link.label}
-                </a>
-              ))
-            ) : hidePricingLink ? null : (
-              <Link
-                href={APP_ROUTES.PRICING}
-                className={cn(navLinkClass, isPricingActive && 'is-active')}
-                aria-current={isPricingActive ? 'page' : undefined}
-              >
-                Pricing
-              </Link>
-            )}
+        {/* Spacer pushes nav + auth to the right */}
+        <div className='flex-1' aria-hidden='true' />
+
+        {/* Nav links - desktop only, right-aligned */}
+        {!hideNav && (
+          <div className='hidden md:flex items-center gap-2'>
+            {navLinks
+              ? navLinks.map(link => (
+                  <a key={link.href} href={link.href} className={navLinkClass}>
+                    {link.label}
+                  </a>
+                ))
+              : !hidePricingLink && (
+                  <Link
+                    href={APP_ROUTES.PRICING}
+                    className={cn(navLinkClass, isPricingActive && 'is-active')}
+                    aria-current={isPricingActive ? 'page' : undefined}
+                  >
+                    Pricing
+                  </Link>
+                )}
           </div>
         )}
 
-        {/* Spacer on mobile when nav links are hidden */}
-        {!hideNav && <div className='flex-1 md:hidden' aria-hidden='true' />}
+        {/* Divider between nav and auth - desktop only */}
+        <div
+          className='hidden md:block mx-3 h-4 w-px'
+          style={{ backgroundColor: 'rgb(35, 37, 42)' }}
+          aria-hidden='true'
+        />
 
-        {/* Auth actions - hidden on mobile, shown in MobileNav instead */}
-        <div className='hidden md:flex items-center gap-1'>
+        {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
+        <div className='flex items-center gap-1'>
           <AuthActions />
         </div>
 

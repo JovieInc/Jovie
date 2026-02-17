@@ -93,7 +93,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
         borderTop: '1px solid var(--linear-border-subtle)',
       }}
     >
-      <div className='max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8'>
+      <div className='w-full px-5 sm:px-6 lg:px-[77px]'>
         <h2
           className='text-center'
           style={{

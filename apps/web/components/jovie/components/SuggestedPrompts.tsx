@@ -90,9 +90,10 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'flex items-center gap-2 rounded-xl border border-subtle',
-        'bg-surface-1 px-3.5 py-2.5 text-left transition-all duration-150',
-        'hover:border-default hover:bg-surface-2',
+        'chat-pill flex items-center gap-2 rounded-lg border border-white/[0.06]',
+        'bg-surface-1 px-3.5 py-2.5 text-left',
+        'hover:border-white/[0.1] hover:bg-surface-2 hover:-translate-y-px',
+        'active:translate-y-0 active:scale-[0.98]',
         'focus:outline-none focus:ring-2 focus:ring-accent/20 focus:ring-offset-2 focus:ring-offset-transparent',
         'cursor-pointer'
       )}
@@ -105,7 +106,7 @@ function SuggestionPill({
           )}
         />
       )}
-      <span className='text-sm leading-snug text-secondary-token'>
+      <span className='text-[13px] leading-snug text-secondary-token'>
         {suggestion.label}
       </span>
     </button>
@@ -138,7 +139,7 @@ export function SuggestedPrompts({ onSelect, context }: SuggestedPromptsProps) {
         <button
           type='button'
           onClick={handleToggle}
-          className='text-xs text-tertiary-token transition-colors hover:text-secondary-token'
+          className='text-[11px] text-tertiary-token/60 transition-colors duration-200 hover:text-secondary-token'
         >
           {showAll ? 'Show less' : 'Explore more'}
         </button>

@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import {
@@ -15,7 +16,6 @@ import {
   startCanvasGeneration,
   validateArtworkForCanvas,
 } from '@/lib/services/canvas/service';
-import { getPlanLimits } from '@/lib/stripe/config';
 
 export const maxDuration = 30;
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   // Canvas generation requires AI tools (pro/growth plan)
   try {
     const entitlements = await getCurrentUserEntitlements();
-    if (!getPlanLimits(entitlements.plan).aiCanUseTools) {
+    if (!getEntitlements(entitlements.plan).booleans.aiCanUseTools) {
       return NextResponse.json(
         {
           error:

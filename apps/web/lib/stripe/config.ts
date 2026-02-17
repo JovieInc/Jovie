@@ -26,55 +26,6 @@ interface PriceMapping {
   description: string;
 }
 
-// Plan feature limits
-export const PLAN_LIMITS = {
-  free: {
-    analyticsRetentionDays: 7,
-    contactsLimit: 100,
-    canExportContacts: false,
-    canRemoveBranding: false,
-    canAccessAdvancedAnalytics: false,
-    canFilterSelfFromAnalytics: false,
-    // AI features
-    aiDailyMessageLimit: 5,
-    aiCanUseTools: false,
-    // Verification
-    canBeVerified: false,
-    // Smart links (5 oldest releases free, rest gated)
-    smartLinksLimit: 5,
-  },
-  pro: {
-    analyticsRetentionDays: 90,
-    contactsLimit: null, // unlimited
-    canExportContacts: true,
-    canRemoveBranding: true,
-    canAccessAdvancedAnalytics: true,
-    canFilterSelfFromAnalytics: true,
-    // AI features
-    aiDailyMessageLimit: 100,
-    aiCanUseTools: true,
-    // Verification
-    canBeVerified: true,
-    // Smart links
-    smartLinksLimit: null, // unlimited
-  },
-  growth: {
-    analyticsRetentionDays: 365,
-    contactsLimit: null, // unlimited
-    canExportContacts: true,
-    canRemoveBranding: true,
-    canAccessAdvancedAnalytics: true,
-    canFilterSelfFromAnalytics: true,
-    // AI features
-    aiDailyMessageLimit: 500,
-    aiCanUseTools: true,
-    // Verification
-    canBeVerified: true,
-    // Smart links
-    smartLinksLimit: null, // unlimited
-  },
-} as const;
-
 // Current active price mappings
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
@@ -154,43 +105,6 @@ export function getPriceMappingDetails(priceId: string): PriceMapping | null {
  */
 export function getAvailablePricing() {
   return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
-}
-
-/**
- * Check if a user should have pro features based on their plan
- */
-export function isProPlan(plan: string | null): boolean {
-  return plan === 'pro' || plan === 'growth';
-}
-
-/**
- * Check if a plan has advanced/growth features
- */
-export function hasAdvancedFeatures(plan: string | null): boolean {
-  return plan === 'growth';
-}
-
-/**
- * Get plan limits for a given plan type
- */
-export function getPlanLimits(plan: string | null) {
-  if (plan === 'growth') return PLAN_LIMITS.growth;
-  if (plan === 'pro') return PLAN_LIMITS.pro;
-  return PLAN_LIMITS.free;
-}
-
-/**
- * Get plan display name for UI
- */
-export function getPlanDisplayName(plan: string | null): string {
-  switch (plan) {
-    case 'growth':
-      return 'Growth';
-    case 'pro':
-      return 'Pro';
-    default:
-      return 'Free';
-  }
 }
 
 /**

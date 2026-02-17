@@ -274,17 +274,17 @@ export function JovieChat({
       ) : (
         // Empty state - welcome hero + suggestions + input, centered
         <div className='flex flex-1 flex-col items-center justify-center px-4 pb-6'>
-          <div className='mx-auto w-full max-w-2xl space-y-6'>
+          <div className='chat-stagger mx-auto w-full max-w-2xl space-y-5'>
             {/* Welcome hero */}
             <div className='flex flex-col items-center text-center space-y-3'>
-              <div className='flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-2'>
-                <BrandLogo size={20} tone='auto' />
+              <div className='chat-logo-mark flex h-11 w-11 items-center justify-center rounded-[13px] border border-white/[0.06] bg-gradient-to-b from-white/[0.06] to-transparent'>
+                <BrandLogo size={22} tone='auto' />
               </div>
-              <div className='space-y-1'>
-                <h1 className='text-lg font-semibold text-primary-token tracking-tight'>
+              <div className='space-y-1.5'>
+                <h1 className='text-[18px] font-semibold text-primary-token tracking-[-0.025em] leading-tight'>
                   {displayName ? `Hey, ${displayName}` : 'Hey there'}
                 </h1>
-                <p className='text-sm text-secondary-token max-w-sm mx-auto'>
+                <p className='text-[14px] leading-relaxed text-secondary-token/80 max-w-sm mx-auto'>
                   I can help you manage your profile, analyze your stats, and
                   plan your next move.
                 </p>

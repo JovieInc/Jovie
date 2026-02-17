@@ -484,8 +484,13 @@ async function resolveDashboardData(): Promise<DashboardData> {
         canExportContacts: false,
         canAccessAdvancedAnalytics: false,
         canFilterSelfFromAnalytics: false,
+        canAccessAdPixels: false,
+        canBeVerified: false,
+        aiCanUseTools: false,
         analyticsRetentionDays: 7,
         contactsLimit: 100,
+        smartLinksLimit: 5,
+        aiDailyMessageLimit: 5,
       };
     } else {
       throw error;

@@ -95,7 +95,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             placeholder={placeholder}
             rows={1}
             className={cn(
-              'w-full resize-none rounded-2xl border bg-surface-1',
+              'w-full resize-none rounded-xl border bg-surface-1',
               'text-primary-token placeholder:text-tertiary-token',
               'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
               'transition-colors duration-fast',

@@ -59,19 +59,11 @@ export function MobileNav({
     }
   }, [isOpen, close]);
 
+  // Auth links (Log in / Sign up) are now always visible in the header bar,
+  // so the mobile nav only needs nav links (Pricing, etc.)
   const navLinks = customNavLinks
-    ? [
-        ...customNavLinks,
-        ...(showAuthenticatedAction
-          ? []
-          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
-      ]
-    : [
-        ...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : []),
-        ...(showAuthenticatedAction
-          ? []
-          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
-      ];
+    ? [...customNavLinks]
+    : [...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : [])];
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document !== 'undefined' ? document.body : null;
