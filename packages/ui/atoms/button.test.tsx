@@ -18,8 +18,8 @@ describe('Button', () => {
       </Button>
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-surface-2');
-    expect(btn.className).toContain('h-8');
+    expect(btn.className).toContain('bg-surface-1');
+    expect(btn.className).toContain('h-7');
   });
 
   it('forwards refs', () => {

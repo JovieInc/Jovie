@@ -7,6 +7,7 @@ import { AccountSettingsSection } from '@/components/dashboard/organisms/account
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
+import { SettingsAudienceSection } from '@/components/dashboard/organisms/SettingsAudienceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
@@ -158,6 +159,12 @@ export function SettingsPolished({
             isPro={isPro}
           />
         ),
+      },
+      {
+        id: 'audience',
+        title: 'Audience',
+        description: 'Fan verification and opt-in preferences.',
+        render: () => <SettingsAudienceSection />,
       },
     ],
     [artist, isPro, onArtistUpdate, router]

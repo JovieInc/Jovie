@@ -58,7 +58,7 @@ export const DROPDOWN_CONTENT_BASE =
  * Shadow effect for elevated appearance
  */
 export const DROPDOWN_SHADOW =
-  'shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,255,255,0.04)]';
+  'shadow-[0_4px_24px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_32px_rgba(8,9,10,0.6),0_0_0_1px_rgba(255,255,255,0.04)]';
 
 /**
  * Transform origin for dropdown menus (Radix specific)

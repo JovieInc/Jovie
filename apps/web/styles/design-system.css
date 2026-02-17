@@ -129,6 +129,11 @@
   --color-interactive-hover: oklch(0% 0 0 / 6%);
   --color-interactive-active: oklch(0% 0 0 / 12%);
 
+  /* Badge/tag styles — light mode equivalents */
+  --color-badge-bg: rgba(0, 0, 0, 0.06);
+  --color-badge-border: rgba(0, 0, 0, 0.06);
+  --color-badge-text: oklch(10% 0 0);
+
   /* Table cell hover */
   --color-cell-hover: #f0f0f0;
 
@@ -223,7 +228,9 @@
        Tertiary:  lch(62.6% 1.35 272)  → oklch ~63% — descriptions, meta
        Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
      Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
-  --color-text-primary-token: oklch(100% 0 272);
+  --color-text-primary-token: oklch(
+    97% 0.003 260
+  ); /* rgb(247,248,248) — Linear marketing extraction */
   --color-text-secondary-token: oklch(91% 0.008 272);
   --color-text-tertiary-token: oklch(63% 0.008 272);
   --color-text-quaternary-token: oklch(38% 0.008 272);
@@ -268,9 +275,17 @@
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
-  /* Interactive states - white-based (Linear uses semi-transparent overlays) */
+  /* Interactive states - white-based (Linear uses semi-transparent overlays)
+     Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
   --color-interactive-hover: rgba(255, 255, 255, 0.05);
-  --color-interactive-active: rgba(255, 255, 255, 0.08);
+  --color-interactive-active: rgba(255, 255, 255, 0.05);
+
+  /* Badge/tag styles — extracted from Linear marketing demo (2026-02-16)
+     bg: rgba(255,255,255,0.05), border: 1px solid rgba(255,255,255,0.05)
+     radius: 2px, font: 10px/510 */
+  --color-badge-bg: rgba(255, 255, 255, 0.05);
+  --color-badge-border: rgba(255, 255, 255, 0.05);
+  --color-badge-text: rgb(247, 248, 248);
 
   /* Table cell hover — same as surface-2 rgb(22,23,24) */
   --color-cell-hover: #161718;
@@ -280,11 +295,12 @@
   --shadow-sm: 0px 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-md: 0px 4px 24px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0px 7px 32px rgba(0, 0, 0, 0.35);
-  --shadow-xl: 0px 7px 32px rgba(0, 0, 0, 0.5);
+  --shadow-xl: rgba(8, 9, 10, 0.6) 0px 4px 32px; /* Extracted: popup/modal shadow */
 
-  /* Dark mode card shadow — 1px ring via box-shadow + soft depth */
+  /* Dark mode card shadow — 1px ring via box-shadow + soft depth
+     Extracted: ring + depth layer rgba(0,0,0,0.4) 0px 2px 4px */
   --shadow-card:
-    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
   --shadow-card-elevated:
     rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
     rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
@@ -631,14 +647,14 @@
    ============================================ */
 :root {
   --radius-none: 0;
-  --radius-xs: 3px; /* Tags, tiny elements (observed in Linear) */
-  --radius-sm: 4px; /* Sidebar items, badges */
-  --radius-md: 5px; /* Input fields — Linear uses 5px, not 6px */
-  --radius-default: 6px; /* Buttons, dropdowns */
-  --radius-lg: 8px; /* Cards, modals */
-  --radius-xl: 10px; /* Large cards (observed in Linear) */
-  --radius-2xl: 12px; /* Panels, sheets */
-  --radius-3xl: 14px; /* Large modals (observed in Linear) */
+  --radius-xs: 2px; /* Tags/badges — extracted: 2px on issue labels */
+  --radius-sm: 4px; /* Sidebar items */
+  --radius-md: 6px; /* Input fields — extracted: 6px on inputs & sidebar buttons */
+  --radius-default: 8px; /* Buttons, dropdowns — extracted: 8px on nav buttons & cards */
+  --radius-lg: 8px; /* Cards — extracted: 8px on marketing cards */
+  --radius-xl: 12px; /* Large cards, panels — extracted: 12px on feature sections */
+  --radius-2xl: 16px; /* Modals, sheets — extracted: 16px on elevated panels */
+  --radius-3xl: 22px; /* Large modals — extracted: 22px on hero sections */
   --radius-pill: 48px; /* Pill buttons (observed in Linear) */
   --radius-full: 9999px; /* Circles, tags */
 }
@@ -651,7 +667,7 @@
      80%+ of their 33 unique transition rules use 150ms */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
-  --duration-normal: 150ms; /* THE Linear default */
+  --duration-normal: 160ms; /* Linear default — extracted: 0.16s cubic-bezier */
   --duration-slow: 200ms;
   --duration-slower: 250ms;
   --duration-slowest: 300ms;

@@ -4,6 +4,7 @@ import {
   Home,
   IdCard,
   Link2,
+  MailCheck,
   Music,
   Music2,
   PieChart,
@@ -125,6 +126,12 @@ export const artistSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_AD_PIXELS,
     id: 'ad-pixels',
     icon: Rocket,
+  },
+  {
+    name: 'Audience',
+    href: APP_ROUTES.SETTINGS_AUDIENCE,
+    id: 'audience',
+    icon: MailCheck,
   },
 ];
 

@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded text-sm font-medium transition-colors duration-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded-[var(--radius-default)] text-[13px] font-medium transition-colors duration-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
@@ -31,10 +31,10 @@ const buttonVariants = cva(
           'backdrop-blur-sm bg-transparent border border-subtle hover:bg-surface-1/20 dark:hover:bg-surface-2/10',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 px-3 text-xs',
-        lg: 'h-11 px-8 text-base',
-        icon: 'h-10 w-10',
+        default: 'h-8 px-3 py-1.5',
+        sm: 'h-7 px-2.5 text-xs',
+        lg: 'h-10 px-4 py-2 text-sm',
+        icon: 'h-8 w-8',
       },
     },
     defaultVariants: {
