@@ -195,6 +195,8 @@ const fetchProfileAndLinks = async (
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
+      location: result.location ?? null,
+      active_since_year: result.activeSinceYear ?? null,
       is_featured: result.isFeatured || false,
       marketing_opt_out: result.marketingOptOut || false,
       profile_views: result.profileViews || 0,
@@ -337,7 +339,7 @@ interface Props {
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
+    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about';
   }>;
 }
 
@@ -476,6 +478,7 @@ export default async function ArtistPage({
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         subscribeTwoStep={subscribeTwoStep}
+        genres={genres}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>
