@@ -222,7 +222,7 @@ body {
 
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded text-sm font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-lg text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
 
@@ -245,15 +245,15 @@ body {
   }
 
   .btn-sm {
-    @apply h-8 px-3 text-xs;
+    @apply h-7 px-2.5 text-xs;
   }
 
   .btn-md {
-    @apply h-10 px-4 py-2;
+    @apply h-8 px-3 py-1.5;
   }
 
   .btn-lg {
-    @apply h-12 px-8 text-base;
+    @apply h-10 px-4 py-2 text-sm;
   }
 }
 
@@ -1255,4 +1255,9 @@ body {
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: var(--color-logo-muted);
   --color-logo-muted-hover: var(--color-logo-muted-hover);
+
+  /* Badge tokens — extracted from Linear marketing demo */
+  --color-badge-bg: var(--color-badge-bg);
+  --color-badge-border: var(--color-badge-border);
+  --color-badge-text: var(--color-badge-text);
 }

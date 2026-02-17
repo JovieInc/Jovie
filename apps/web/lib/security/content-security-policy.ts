@@ -54,7 +54,8 @@ const STATIC_CSP_PARTS = {
   frameAncestors: "frame-ancestors 'none'",
   formAction: "form-action 'self'",
   styleSrc: "style-src 'self' 'unsafe-inline'",
-  fontSrc: "font-src 'self' data:",
+  fontSrc:
+    "font-src 'self' data: https://vercel.live https://assets.vercel.com",
   workerSrc: "worker-src 'self' blob:",
   manifestSrc: "manifest-src 'self'",
 
@@ -89,6 +90,8 @@ const STATIC_CSP_PARTS = {
     'https://*.public.blob.vercel-storage.com',
     'https://*.blob.vercel-storage.com',
     'https://*.mzstatic.com',
+    'https://vercel.live',
+    'https://vercel.com',
   ].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
@@ -107,6 +110,8 @@ const STATIC_CSP_PARTS = {
     'https://jov.ie',
     'https://challenges.cloudflare.com',
     'https://clerk-telemetry.com',
+    'https://vercel.live',
+    'wss://ws-us3.pusher.com',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)

@@ -39,6 +39,7 @@ export const APP_ROUTES = {
   SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
+  SETTINGS_AUDIENCE: '/app/settings/audience',
 
   // Admin
   ADMIN: '/app/admin',

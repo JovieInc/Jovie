@@ -29,22 +29,22 @@ describe('Badge', () => {
   });
 
   describe('Variants', () => {
-    it('applies primary variant by default', () => {
+    it('applies secondary variant by default', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-btn-primary');
-      expect(badge.className).toContain('text-btn-primary-foreground');
+      expect(badge.className).toContain('bg-[var(--color-badge-bg)]');
+      expect(badge.className).toContain('text-[var(--color-badge-text)]');
     });
 
-    it('applies secondary variant', () => {
+    it('applies secondary variant explicitly', () => {
       render(
         <Badge variant='secondary' data-testid='badge'>
           New
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-surface-1');
-      expect(badge.className).toContain('text-primary-token');
+      expect(badge.className).toContain('bg-[var(--color-badge-bg)]');
+      expect(badge.className).toContain('text-[var(--color-badge-text)]');
     });
 
     it('applies success variant', () => {
@@ -85,8 +85,8 @@ describe('Badge', () => {
     it('applies md size by default', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-sm');
-      expect(badge.className).toContain('px-2.5');
+      expect(badge.className).toContain('text-[11px]');
+      expect(badge.className).toContain('px-2');
     });
 
     it('applies sm size', () => {
@@ -96,7 +96,7 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-xs');
+      expect(badge.className).toContain('text-[10px]');
       expect(badge.className).toContain('px-2');
     });
 
@@ -107,7 +107,7 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-base');
+      expect(badge.className).toContain('text-xs');
       expect(badge.className).toContain('px-3');
     });
   });
@@ -118,8 +118,8 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('inline-flex');
       expect(badge.className).toContain('items-center');
-      expect(badge.className).toContain('rounded-full');
-      expect(badge.className).toContain('font-semibold');
+      expect(badge.className).toContain('rounded-[var(--radius-xs)]');
+      expect(badge.className).toContain('font-[510]');
     });
 
     it('merges custom className', () => {
@@ -130,7 +130,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('custom-class');
-      expect(badge.className).toContain('rounded-full');
+      expect(badge.className).toContain('rounded-[var(--radius-xs)]');
     });
   });
 
