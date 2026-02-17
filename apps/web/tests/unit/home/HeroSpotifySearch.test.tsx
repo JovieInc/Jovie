@@ -274,14 +274,18 @@ describe('HeroSpotifySearch', () => {
       renderComponent();
       const user = userEvent.setup();
       await user.type(getInput(), 'Taylor');
-      // Taylor Swift is verified — her visible button row should contain a BadgeCheck SVG
+      // Taylor Swift is verified — her row should contain a verified-badge testid
       const taylorButton = screen.getByText('Taylor Swift').closest('button')!;
-      expect(taylorButton.querySelector('svg')).toBeInTheDocument();
-      // Phoebe Bridgers is not verified — no SVG in her row
+      expect(
+        within(taylorButton).getByTestId('verified-badge')
+      ).toBeInTheDocument();
+      // Phoebe Bridgers is not verified — no verified badge in her row
       const phoebeButton = screen
         .getByText('Phoebe Bridgers')
         .closest('button')!;
-      expect(phoebeButton.querySelector('svg')).not.toBeInTheDocument();
+      expect(
+        within(phoebeButton).queryByTestId('verified-badge')
+      ).not.toBeInTheDocument();
     });
   });
 

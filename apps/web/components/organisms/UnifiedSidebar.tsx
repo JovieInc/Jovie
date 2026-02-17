@@ -181,7 +181,7 @@ function SidebarHeaderNav({
               )}
             >
               <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-app text-white group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+              <span className='text-app text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
             </button>

@@ -418,7 +418,10 @@ export function HeroSpotifySearch() {
                     )}
                   </div>
                   {artist.verified && (
-                    <div className='shrink-0 text-brand-spotify'>
+                    <div
+                      className='shrink-0 text-brand-spotify'
+                      data-testid='verified-badge'
+                    >
                       <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                     </div>
                   )}

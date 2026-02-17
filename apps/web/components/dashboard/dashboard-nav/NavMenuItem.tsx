@@ -82,7 +82,8 @@ export function NavMenuItem({
 
   const innerContent = (
     <>
-      {/* Fixed-width icon container — Linear: 14px icons */}
+      {/* Fixed-width icon container — intentionally 14px (size-3.5) to match
+         Linear's sidebar icon sizing for visual consistency */}
       <span
         data-sidebar-icon
         className='flex size-3.5 shrink-0 items-center justify-center'
