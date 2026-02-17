@@ -4,17 +4,6 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-/**
- * PII Collection Notice:
- * When sendDefaultPii is enabled, Sentry may collect:
- * - User IP addresses (anonymized via beforeSend)
- * - User IDs (Clerk user IDs only, no emails)
- * - Request headers (sensitive headers scrubbed)
- *
- * This data is used for error debugging and is retained per Sentry's data retention policy.
- * Users can request data deletion via privacy@jov.ie.
- */
-
 const isProduction = process.env.NODE_ENV === 'production';
 
 Sentry.init({
@@ -22,12 +11,7 @@ Sentry.init({
 
   // Suppress known non-actionable errors
   ignoreErrors: [
-    // Clerk SSR race condition: auth()/currentUser() called before request
-    // context is available during edge/serverless cold starts. Not a code bug —
-    // all usages are correctly in server components/actions/API routes.
     /Clerk: (?:auth\(\)|currentUser\(\)|clerkClient\(\)).+only supported/,
-    // Node.js TransformStream internal bug — not application code.
-    // Occurs during streaming responses (chat API). Only 2 users affected.
     /transformAlgorithm is not a function/,
   ],
 
@@ -48,22 +32,17 @@ Sentry.init({
     }),
   ],
 
-  // Suppress initialization timeout warnings (Sentry continues in background)
+  // Suppress initialization timeout warnings
   debug: false,
 
   // Scrub sensitive data before sending to Sentry
   beforeSend(event) {
-    // Anonymize IP addresses
     if (event.user?.ip_address) {
       event.user.ip_address = '{{auto}}';
     }
-
-    // Remove email addresses if present
     if (event.user?.email) {
       delete event.user.email;
     }
-
-    // Scrub sensitive headers
     if (event.request?.headers) {
       const sensitiveHeaders = [
         'authorization',
@@ -77,7 +56,6 @@ Sentry.init({
         }
       }
     }
-
     return event;
   },
 });
