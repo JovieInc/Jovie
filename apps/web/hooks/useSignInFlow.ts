@@ -239,11 +239,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
       try {
         // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments
+        // behavior across local, preview, and production environments.
+        // Read stored redirect URL (falls back to /app) so returning users
+        // go directly to the dashboard instead of bouncing through the homepage.
+        const storedRedirect = base.getRedirectUrl();
         await signIn.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
           redirectUrl: `${APP_URL}/signin/sso-callback`,
-          redirectUrlComplete: `${APP_URL}/`,
+          redirectUrlComplete: `${APP_URL}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard

@@ -10,8 +10,8 @@ export default function SignInSsoCallbackPage() {
   return (
     <div className='flex items-center justify-center min-h-[200px]'>
       <SsoCallbackHandler
-        signInFallbackRedirectUrl='/'
-        signUpFallbackRedirectUrl='/'
+        signInFallbackRedirectUrl='/app'
+        signUpFallbackRedirectUrl='/app'
       />
     </div>
   );
