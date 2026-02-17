@@ -67,6 +67,7 @@ apps/should-i-make/.next
 apps/web/node_modules
 packages/ui/node_modules
 .auto-claude
+.auto-claude-status
 
 # Turborepo
 .turbo
@@ -75,3 +76,9 @@ doppler.yaml
 # Local git worktrees (should never be committed)
 .worktrees/
 /.issues/
+
+# Screenshot pipeline artifacts
+ideation/screenshots/
+
+# npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
+package-lock.json
