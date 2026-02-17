@@ -130,6 +130,67 @@ export class PaymentHandler extends BaseSubscriptionHandler {
   }
 
   /**
+   * Record referral commission for a successful payment, if applicable.
+   * Failures are logged but do not propagate — commission tracking is secondary.
+   * @private
+   */
+  private async tryRecordReferralCommission(
+    userId: string,
+    invoice: Stripe.Invoice
+  ): Promise<void> {
+    if (invoice.amount_paid <= 0) return;
+
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (!internalId) return;
+
+      await recordCommission({
+        referredUserId: internalId,
+        stripeInvoiceId: invoice.id,
+        paymentAmountCents: invoice.amount_paid,
+        currency: invoice.currency,
+        periodStart: invoice.period_start
+          ? new Date(invoice.period_start * 1000)
+          : undefined,
+        periodEnd: invoice.period_end
+          ? new Date(invoice.period_end * 1000)
+          : undefined,
+      });
+    } catch (error) {
+      logger.warn('Failed to record referral commission', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stripeInvoiceId: invoice.id,
+      });
+    }
+  }
+
+  /**
+   * Send a recovery email if this payment recovered from a previous failure.
+   * Fire-and-forget — failures are logged but do not propagate.
+   * @private
+   */
+  private sendRecoveryEmailIfNeeded(
+    invoice: Stripe.Invoice,
+    subscription: Stripe.Subscription,
+    userId: string
+  ): void {
+    if (!invoice.attempt_count || invoice.attempt_count <= 1) return;
+
+    const priceId = subscription.items.data[0]?.price?.id;
+    sendPaymentRecoveredEmail({
+      userId,
+      amountPaid: invoice.amount_paid,
+      currency: invoice.currency,
+      priceId,
+    }).catch(error => {
+      logger.warn('Failed to send payment recovery email', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    });
+  }
+
+  /**
    * Handle invoice.payment_succeeded event.
    *
    * When a subscription payment succeeds, ensures the user has pro access.
@@ -143,10 +204,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
-    // Extract subscription ID from invoice
     const subscriptionId = this.extractSubscriptionId(invoice);
 
-    // Skip if this invoice is not for a subscription (e.g., one-time payment)
     if (!subscriptionId) {
       return {
         success: true,
@@ -156,13 +215,9 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
 
     try {
-      // Retrieve full subscription from Stripe API
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const userId = subscription.metadata?.clerk_user_id;
 
-      // Skip if we can't identify the user
-      // Note: For payment_succeeded, we don't do fallback lookup since it's less critical
-      // than payment_failed - the subscription.updated event will handle status changes
       if (!userId) {
         return {
           success: true,
@@ -171,7 +226,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         };
       }
 
-      // Process subscription to ensure user has correct billing status
       const result = await this.processSubscription({
         subscription,
         userId,
@@ -181,54 +235,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       });
 
       await invalidateBillingCache();
-
-      // Record referral commission if applicable.
-      // Awaited so failures are surfaced instead of silently dropped.
-      // Only records commission for active referrals — expired/churned referrals are ignored.
-      // If a user cancels and re-subscribes via a new referral, that new referral gets credit.
-      if (userId && invoice.amount_paid > 0) {
-        try {
-          const internalId = await getInternalUserId(userId);
-          if (internalId) {
-            await recordCommission({
-              referredUserId: internalId,
-              stripeInvoiceId: invoice.id,
-              paymentAmountCents: invoice.amount_paid,
-              currency: invoice.currency,
-              periodStart: invoice.period_start
-                ? new Date(invoice.period_start * 1000)
-                : undefined,
-              periodEnd: invoice.period_end
-                ? new Date(invoice.period_end * 1000)
-                : undefined,
-            });
-          }
-        } catch (error) {
-          // Log but don't fail the webhook — commission tracking is secondary
-          // to ensuring billing status is updated correctly
-          logger.warn('Failed to record referral commission', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stripeInvoiceId: invoice.id,
-          });
-        }
-      }
-
-      // Check if this is a recovery from a failed payment (attempt_count > 1)
-      // If so, send a recovery confirmation email
-      if (invoice.attempt_count && invoice.attempt_count > 1) {
-        const priceId = subscription.items.data[0]?.price?.id;
-        sendPaymentRecoveredEmail({
-          userId,
-          amountPaid: invoice.amount_paid,
-          currency: invoice.currency,
-          priceId,
-        }).catch(error => {
-          logger.warn('Failed to send payment recovery email', {
-            userId,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        });
-      }
+      await this.tryRecordReferralCommission(userId, invoice);
+      this.sendRecoveryEmailIfNeeded(invoice, subscription, userId);
 
       return result;
     } catch (error) {
@@ -241,7 +249,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
           event: 'invoice.payment_succeeded',
         }
       );
-      // For payment succeeded, we don't throw - subscription.updated will handle it
       return {
         success: true,
         skipped: true,

@@ -36,6 +36,24 @@ interface SubJobResult {
   data?: Record<string, unknown>;
 }
 
+async function runSubJob(
+  name: string,
+  fn: () => Promise<Record<string, unknown>>
+): Promise<SubJobResult> {
+  try {
+    const data = await fn();
+    return { success: true, data };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`[frequent-cron] ${name} failed:`, error);
+    await captureError(`Frequent cron: ${name} failed`, error, {
+      route: '/api/cron/frequent',
+      subjob: name,
+    });
+    return { success: false, error: msg };
+  }
+}
+
 export async function GET(request: Request) {
   const startTime = Date.now();
 
@@ -51,64 +69,29 @@ export async function GET(request: Request) {
   const results: Record<string, SubJobResult> = {};
 
   // 1. Process campaigns — every invocation (15 min)
-  try {
+  results.campaigns = await runSubJob('campaigns', async () => {
     const campaignResult = await processCampaigns();
     const suppressionsCleared = await cleanupExpiredSuppressions();
-    results.campaigns = {
-      success: true,
-      data: { ...campaignResult, suppressionsCleared },
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[frequent-cron] Campaign processing failed:', error);
-    await captureError('Frequent cron: campaign processing failed', error, {
-      route: '/api/cron/frequent',
-      subjob: 'campaigns',
-    });
-    results.campaigns = { success: false, error: msg };
-  }
+    return { ...campaignResult, suppressionsCleared };
+  });
 
   // 2. Pixel forwarding retry — every other invocation (~30 min)
-  if (minute >= 30) {
-    try {
-      const pixelResult = await processPendingEvents();
-      results.pixelRetry = {
-        success: true,
-        data: pixelResult as unknown as Record<string, unknown>,
-      };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('[frequent-cron] Pixel retry failed:', error);
-      await captureError('Frequent cron: pixel retry failed', error, {
-        route: '/api/cron/frequent',
-        subjob: 'pixelRetry',
-      });
-      results.pixelRetry = { success: false, error: msg };
-    }
-  } else {
-    results.pixelRetry = { success: true, skipped: true };
-  }
+  results.pixelRetry =
+    minute >= 30
+      ? await runSubJob('pixelRetry', async () => {
+          const pixelResult = await processPendingEvents();
+          return pixelResult as unknown as Record<string, unknown>;
+        })
+      : { success: true, skipped: true };
 
   // 3. Send release notifications — on the hour (minute < 15)
-  if (minute < 15) {
-    try {
-      const notifResult = await sendPendingNotifications();
-      results.sendNotifications = {
-        success: true,
-        data: notifResult as unknown as Record<string, unknown>,
-      };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('[frequent-cron] Send notifications failed:', error);
-      await captureError('Frequent cron: send notifications failed', error, {
-        route: '/api/cron/frequent',
-        subjob: 'sendNotifications',
-      });
-      results.sendNotifications = { success: false, error: msg };
-    }
-  } else {
-    results.sendNotifications = { success: true, skipped: true };
-  }
+  results.sendNotifications =
+    minute < 15
+      ? await runSubJob('sendNotifications', async () => {
+          const notifResult = await sendPendingNotifications();
+          return notifResult as unknown as Record<string, unknown>;
+        })
+      : { success: true, skipped: true };
 
   const duration = Date.now() - startTime;
   const allSuccessful = Object.values(results).every(r => r.success);

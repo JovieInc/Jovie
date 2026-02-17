@@ -102,38 +102,40 @@ function mapDspFields(
   const services = result.services;
 
   // Apple Music (special case: has both URL and ID fields)
-  if (services.appleMusic?.url) {
-    if (!existingProfile.appleMusicId) {
-      const id = extractAppleMusicId(services.appleMusic.url);
-      if (id) {
-        updates.appleMusicId = id;
-      }
-    }
-    if (!existingProfile.appleMusicUrl) {
-      updates.appleMusicUrl = services.appleMusic.url;
-    }
+  const appleMusicUrl = services.appleMusic?.url;
+  if (appleMusicUrl) {
+    mapAppleMusicFields(appleMusicUrl, existingProfile, updates);
   }
 
   // Extract IDs for DSPs with ID-only fields (data-driven)
   for (const mapping of DSP_ID_MAPPINGS) {
-    const service = services[mapping.serviceKey];
-    if (!existingProfile[mapping.idField] && service?.url) {
-      const id = mapping.extractor(service.url);
-      if (id) {
-        updates[mapping.idField] = id;
-      }
-    }
+    const serviceUrl = services[mapping.serviceKey]?.url;
+    if (existingProfile[mapping.idField] || !serviceUrl) continue;
+    const id = mapping.extractor(serviceUrl);
+    if (id) updates[mapping.idField] = id;
   }
 
   // YouTube URL (fallback to YouTube Music if main YouTube unavailable)
-  if (!existingProfile.youtubeUrl) {
-    const ytUrl = services.youtube?.url || services.youtubeMusic?.url;
-    if (ytUrl) {
-      updates.youtubeUrl = ytUrl;
-    }
-  }
+  const ytUrl =
+    !existingProfile.youtubeUrl &&
+    (services.youtube?.url || services.youtubeMusic?.url);
+  if (ytUrl) updates.youtubeUrl = ytUrl;
 
   return updates;
+}
+
+function mapAppleMusicFields(
+  url: string,
+  existingProfile: DspProfileFields,
+  updates: Record<string, string>
+): void {
+  if (!existingProfile.appleMusicId) {
+    const id = extractAppleMusicId(url);
+    if (id) updates.appleMusicId = id;
+  }
+  if (!existingProfile.appleMusicUrl) {
+    updates.appleMusicUrl = url;
+  }
 }
 
 /** Social platforms to extract from MusicFetch (stored as social_links, not DSP profile fields) */
@@ -150,17 +152,21 @@ const SOCIAL_PLATFORM_MAPPINGS = [
 function extractSocialLinks(result: MusicFetchArtistResult): ExtractedLink[] {
   const services = result.services;
 
-  return SOCIAL_PLATFORM_MAPPINGS.filter(
-    ({ serviceKey }) => services[serviceKey]?.url
-  ).map(({ serviceKey, platformId }) => ({
-    url: services[serviceKey]!.url!,
-    platformId,
-    sourcePlatform: 'musicfetch',
-    evidence: {
-      sources: ['musicfetch'],
-      signals: ['musicfetch_artist_lookup'],
-    },
-  }));
+  return SOCIAL_PLATFORM_MAPPINGS.flatMap(({ serviceKey, platformId }) => {
+    const url = services[serviceKey]?.url;
+    if (!url) return [];
+    return [
+      {
+        url,
+        platformId,
+        sourcePlatform: 'musicfetch' as const,
+        evidence: {
+          sources: ['musicfetch'],
+          signals: ['musicfetch_artist_lookup'],
+        },
+      },
+    ];
+  });
 }
 
 // ============================================================================

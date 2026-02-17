@@ -212,7 +212,7 @@ const LOGOS = [
 ];
 
 /* ─── Mock browser chrome bar ─── */
-function MockBar({ url }: { url: string }) {
+function MockBar({ url }: Readonly<{ url: string }>) {
   return (
     <div
       className='flex items-center gap-2 px-4 py-3'

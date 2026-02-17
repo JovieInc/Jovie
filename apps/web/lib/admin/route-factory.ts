@@ -60,6 +60,27 @@ async function resolveEntitlements() {
 }
 
 /**
+ * Builds a JSON error response for a failed admin action.
+ */
+function buildAdminErrorJsonResponse<TPayload, TResult>(
+  error: unknown,
+  config: AdminRouteConfig<TPayload, TResult>
+): NextResponse {
+  if (error instanceof TypeError) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 400 }
+    );
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : (config.errorMessage ?? `Failed to ${config.actionName}`);
+  return NextResponse.json({ success: false, error: message }, { status: 500 });
+}
+
+/**
  * Creates an admin route handler with standardized authorization,
  * error handling, and response formatting.
  *
@@ -144,21 +165,7 @@ export function createAdminRouteHandler<TPayload, TResult = void>(
 
       // Return error response
       if (wantsJson) {
-        if (error instanceof TypeError) {
-          return NextResponse.json(
-            { success: false, error: error.message },
-            { status: 400 }
-          );
-        }
-
-        const message =
-          error instanceof Error
-            ? error.message
-            : (config.errorMessage ?? `Failed to ${config.actionName}`);
-        return NextResponse.json(
-          { success: false, error: message },
-          { status: 500 }
-        );
+        return buildAdminErrorJsonResponse(error, config);
       }
 
       const redirectUrl = new URL(APP_ROUTES.ADMIN_CREATORS, request.url);

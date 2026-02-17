@@ -12,6 +12,64 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { cn } from '@/lib/utils';
 
+type NavLink = { href: string; label: string };
+
+function buildNavLinks(
+  customNavLinks: ReadonlyArray<NavLink> | undefined,
+  hidePricingLink: boolean,
+  showAuthenticatedAction: boolean
+): NavLink[] {
+  const baseLinks: NavLink[] = customNavLinks
+    ? [...customNavLinks]
+    : hidePricingLink
+      ? []
+      : [{ href: '/pricing', label: 'Pricing' }];
+
+  if (!showAuthenticatedAction) {
+    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
+  }
+
+  return baseLinks;
+}
+
+function MobileNavCta({
+  showAuthenticatedAction,
+  close,
+}: {
+  showAuthenticatedAction: boolean;
+  close: () => void;
+}) {
+  const href = showAuthenticatedAction
+    ? APP_ROUTES.DASHBOARD
+    : APP_ROUTES.WAITLIST;
+  const label = showAuthenticatedAction ? 'Open App' : 'Sign up';
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
+        'text-[17px] font-semibold',
+        'transition-all duration-200 ease-out',
+        'active:scale-[0.98]'
+      )}
+      style={{
+        color: 'var(--linear-btn-primary-fg)',
+        backgroundColor: 'var(--linear-btn-primary-bg)',
+        border: '1px solid var(--linear-btn-primary-border)',
+        boxShadow: 'var(--linear-shadow-button)',
+      }}
+      onClick={close}
+    >
+      {label}
+      <ArrowRight
+        size={16}
+        className='transition-transform duration-200 group-hover:translate-x-0.5'
+      />
+    </Link>
+  );
+}
+
 export function MobileNav({
   hidePricingLink = false,
   navLinks: customNavLinks,
@@ -24,7 +82,7 @@ export function MobileNav({
   const pathname = usePathname();
   const isAuthed = useIsAuthenticated();
   const { isSignedIn: clerkSignedIn } = useAuthSafe();
-  const showAuthenticatedAction = isAuthed && clerkSignedIn;
+  const showAuthenticatedAction = !!(isAuthed && clerkSignedIn);
 
   const close = useCallback(() => setIsOpen(false), []);
 
@@ -35,11 +93,7 @@ export function MobileNav({
 
   // Prevent body scroll when menu is open
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = isOpen ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
@@ -47,31 +101,22 @@ export function MobileNav({
 
   // Close on Escape key
   useEffect(() => {
+    if (!isOpen) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         close();
         toggleRef.current?.focus();
       }
     }
-    if (isOpen) {
-      document.addEventListener('keydown', onKeyDown);
-      return () => document.removeEventListener('keydown', onKeyDown);
-    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, close]);
 
-  const navLinks = customNavLinks
-    ? [
-        ...customNavLinks,
-        ...(showAuthenticatedAction
-          ? []
-          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
-      ]
-    : [
-        ...(hidePricingLink ? [] : [{ href: '/pricing', label: 'Pricing' }]),
-        ...(showAuthenticatedAction
-          ? []
-          : [{ href: APP_ROUTES.SIGNIN, label: 'Log in' }]),
-      ];
+  const navLinks = buildNavLinks(
+    customNavLinks,
+    hidePricingLink,
+    showAuthenticatedAction
+  );
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document === 'undefined' ? null : document.body;
@@ -214,53 +259,10 @@ export function MobileNav({
                       : '0ms',
                   }}
                 >
-                  {showAuthenticatedAction ? (
-                    <Link
-                      href={APP_ROUTES.DASHBOARD}
-                      className={cn(
-                        'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
-                        'text-[17px] font-semibold',
-                        'transition-all duration-200 ease-out',
-                        'active:scale-[0.98]'
-                      )}
-                      style={{
-                        color: 'var(--linear-btn-primary-fg)',
-                        backgroundColor: 'var(--linear-btn-primary-bg)',
-                        border: '1px solid var(--linear-btn-primary-border)',
-                        boxShadow: 'var(--linear-shadow-button)',
-                      }}
-                      onClick={close}
-                    >
-                      Open App
-                      <ArrowRight
-                        size={16}
-                        className='transition-transform duration-200 group-hover:translate-x-0.5'
-                      />
-                    </Link>
-                  ) : (
-                    <Link
-                      href={APP_ROUTES.WAITLIST}
-                      className={cn(
-                        'group flex items-center justify-center gap-2 h-[52px] rounded-xl',
-                        'text-[17px] font-semibold',
-                        'transition-all duration-200 ease-out',
-                        'active:scale-[0.98]'
-                      )}
-                      style={{
-                        color: 'var(--linear-btn-primary-fg)',
-                        backgroundColor: 'var(--linear-btn-primary-bg)',
-                        border: '1px solid var(--linear-btn-primary-border)',
-                        boxShadow: 'var(--linear-shadow-button)',
-                      }}
-                      onClick={close}
-                    >
-                      Sign up
-                      <ArrowRight
-                        size={16}
-                        className='transition-transform duration-200 group-hover:translate-x-0.5'
-                      />
-                    </Link>
-                  )}
+                  <MobileNavCta
+                    showAuthenticatedAction={showAuthenticatedAction}
+                    close={close}
+                  />
                 </div>
               </div>
 

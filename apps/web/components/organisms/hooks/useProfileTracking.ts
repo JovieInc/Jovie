@@ -45,7 +45,7 @@ function extractUtmParams():
       term?: string;
     }
   | undefined {
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(globalThis.location.search);
   const source = params.get('utm_source');
   const medium = params.get('utm_medium');
   const campaign = params.get('utm_campaign');

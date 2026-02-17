@@ -172,6 +172,62 @@ function pickProviderUrl(
   return fallback?.url ?? null;
 }
 
+type Creator = NonNullable<Awaited<ReturnType<typeof getCreatorByUsername>>>;
+type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
+
+/**
+ * Resolves content by slug, handling old-slug redirects.
+ * Calls notFound() if content cannot be found.
+ */
+async function resolveContentOrRedirect(
+  creator: Creator,
+  slug: string,
+  dsp: string | undefined
+): Promise<Content> {
+  const content = await getContentBySlug(creator.id, slug);
+  if (content) return content;
+
+  const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
+  if (redirectInfo) {
+    const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
+    permanentRedirect(
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
+    );
+  }
+  notFound();
+}
+
+/**
+ * Handles direct DSP redirect when ?dsp= param is present.
+ * Calls notFound() for invalid providers or redirect() on success.
+ */
+function handleDspRedirect(
+  dsp: string,
+  content: Content,
+  creator: Creator
+): never {
+  const providerKey = dsp as ProviderKey;
+
+  if (!PROVIDER_CONFIG[providerKey]) {
+    notFound();
+  }
+
+  const targetUrl = pickProviderUrl(content.providerLinks, providerKey);
+  if (!targetUrl) {
+    notFound();
+  }
+
+  void trackServerEvent('smart_link_clicked', {
+    contentType: content.type,
+    contentId: content.id,
+    profileId: creator.id,
+    provider: providerKey,
+    contentTitle: content.title,
+  });
+
+  redirect(targetUrl);
+}
+
 export default async function ContentSmartLinkPage({
   params,
   searchParams,
@@ -190,41 +246,11 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await getContentBySlug(creator.id, slug);
-
-  if (!content) {
-    const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
-    if (redirectInfo) {
-      const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
-      permanentRedirect(
-        `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
-      );
-    }
-    notFound();
-  }
+  const content = await resolveContentOrRedirect(creator, slug, dsp);
 
   // If DSP is specified, redirect immediately
   if (dsp) {
-    const providerKey = dsp as ProviderKey;
-
-    if (!PROVIDER_CONFIG[providerKey]) {
-      notFound();
-    }
-
-    const targetUrl = pickProviderUrl(content.providerLinks, providerKey);
-    if (!targetUrl) {
-      notFound();
-    }
-
-    void trackServerEvent('smart_link_clicked', {
-      contentType: content.type,
-      contentId: content.id,
-      profileId: creator.id,
-      provider: providerKey,
-      contentTitle: content.title,
-    });
-
-    redirect(targetUrl);
+    handleDspRedirect(dsp, content, creator);
   }
 
   // Build provider data for the landing page
@@ -338,6 +364,82 @@ export default async function ContentSmartLinkPage({
   );
 }
 
+/** Resolve the best OG image URL, size, height, and MIME type from content artwork data. */
+function resolveOgImage(
+  artworkSizes: Record<string, string> | null | undefined,
+  artworkUrl: string | null
+): { url: string; width: number; height: number; type: string } {
+  const defaultImage = `${BASE_URL}/og/default.png`;
+  const url =
+    artworkSizes?.['1000'] ??
+    artworkSizes?.original ??
+    artworkUrl ??
+    defaultImage;
+  const isDefault = url === defaultImage;
+
+  let width = 1200;
+  if (artworkSizes?.['1000']) {
+    width = 1000;
+  } else if (!artworkSizes?.original && artworkUrl) {
+    width = 640;
+  }
+
+  const height = isDefault ? 630 : width;
+
+  const EXT_TO_MIME: Record<string, string> = {
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.avif': 'image/avif',
+  };
+
+  let type = 'image/jpeg';
+  if (isDefault) {
+    type = 'image/png';
+  } else {
+    for (const [ext, mime] of Object.entries(EXT_TO_MIME)) {
+      if (url.includes(ext)) {
+        type = mime;
+        break;
+      }
+    }
+  }
+
+  return { url, width, height, type };
+}
+
+/** Build the SEO description for a content page. */
+function buildContentDescription(
+  content: {
+    title: string;
+    releaseDate: Date | null;
+    providerLinks: Array<{ providerId: string }>;
+  },
+  artistName: string,
+  isUnreleased: boolean
+): string {
+  const releaseYear = content.releaseDate
+    ? ` (${content.releaseDate.getFullYear()})`
+    : '';
+
+  if (isUnreleased) {
+    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`;
+  }
+
+  const streamingPlatforms =
+    content.providerLinks.length > 0
+      ? content.providerLinks
+          .slice(0, 3)
+          .map(
+            l =>
+              PROVIDER_CONFIG[l.providerId as ProviderKey]?.label ||
+              l.providerId
+          )
+          .join(', ')
+      : 'Spotify, Apple Music';
+
+  return `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -369,24 +471,11 @@ export async function generateMetadata({
     ? `${content.title} by ${artistName} - Coming Soon`
     : `${content.title} by ${artistName} - Stream Now`;
 
-  const releaseYear = content.releaseDate
-    ? ` (${content.releaseDate.getFullYear()})`
-    : '';
-  const streamingPlatforms =
-    content.providerLinks.length > 0
-      ? content.providerLinks
-          .slice(0, 3)
-          .map(
-            l =>
-              PROVIDER_CONFIG[l.providerId as ProviderKey]?.label ||
-              l.providerId
-          )
-          .join(', ')
-      : 'Spotify, Apple Music';
-
-  const description = isUnreleased
-    ? `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`
-    : `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+  const description = buildContentDescription(
+    content,
+    artistName,
+    !!isUnreleased
+  );
 
   const keywords = [
     content.title,
@@ -401,31 +490,7 @@ export async function generateMetadata({
   ];
 
   const ogType = content.type === 'release' ? 'music.album' : 'music.song';
-
-  const defaultImage = `${BASE_URL}/og/default.png`;
-  const ogImageUrl =
-    content.artworkSizes?.['1000'] ??
-    content.artworkSizes?.original ??
-    content.artworkUrl ??
-    defaultImage;
-  const isDefaultImage = ogImageUrl === defaultImage;
-  let ogImageSize = 1200;
-  if (content.artworkSizes?.['1000']) {
-    ogImageSize = 1000;
-  } else if (!content.artworkSizes?.original && content.artworkUrl) {
-    ogImageSize = 640;
-  }
-  const ogImageHeight = isDefaultImage ? 630 : ogImageSize;
-
-  let ogImageType = 'image/jpeg';
-  if (isDefaultImage || ogImageUrl.includes('.png')) {
-    ogImageType = 'image/png';
-  } else if (ogImageUrl.includes('.webp')) {
-    ogImageType = 'image/webp';
-  } else if (ogImageUrl.includes('.avif')) {
-    ogImageType = 'image/avif';
-  }
-
+  const ogImage = resolveOgImage(content.artworkSizes, content.artworkUrl);
   const artworkAlt = `${content.title} ${content.type === 'release' ? 'album' : 'track'} artwork`;
 
   return {
@@ -458,11 +523,11 @@ export async function generateMetadata({
       locale: 'en_US',
       images: [
         {
-          url: ogImageUrl,
-          width: ogImageSize,
-          height: ogImageHeight,
+          url: ogImage.url,
+          width: ogImage.width,
+          height: ogImage.height,
           alt: artworkAlt,
-          type: ogImageType,
+          type: ogImage.type,
         },
       ],
       ...(content.type === 'track' &&
@@ -478,7 +543,7 @@ export async function generateMetadata({
       site: '@jovieapp',
       images: [
         {
-          url: ogImageUrl,
+          url: ogImage.url,
           alt: artworkAlt,
         },
       ],

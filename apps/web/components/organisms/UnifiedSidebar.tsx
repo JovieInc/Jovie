@@ -80,7 +80,7 @@ function SettingsNavGroup({
               <ContextMenuItem
                 onSelect={async () => {
                   const origin =
-                    typeof globalThis.window === 'undefined'
+                    globalThis.window === undefined
                       ? BASE_URL
                       : globalThis.location.origin;
                   const url = `${origin}${item.href}`;

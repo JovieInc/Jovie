@@ -22,6 +22,14 @@ import {
 /** Max retries for unique constraint violations on insert */
 const MAX_UNIQUE_RETRIES = 3;
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as { code: string }).code === '23505'
+  );
+}
+
 /**
  * Generate a unique referral code for a user.
  * If the user already has a code, returns the existing one.
@@ -49,87 +57,92 @@ export async function getOrCreateReferralCode(
 
   // Normalize customCode: treat empty/whitespace-only as no custom code
   const trimmedCustomCode = customCode?.trim() || undefined;
-  const code = trimmedCustomCode ?? generateRandomCode();
-
   if (trimmedCustomCode) {
-    const validationError = validateReferralCode(trimmedCustomCode);
-    if (validationError) {
-      throw new Error(validationError);
-    }
-
-    // Check uniqueness
-    const taken = await db
-      .select({ id: referralCodes.id })
-      .from(referralCodes)
-      .where(eq(referralCodes.code, trimmedCustomCode.toLowerCase()))
-      .limit(1);
-
-    if (taken.length > 0) {
-      throw new Error('This referral code is already taken');
-    }
+    await validateAndCheckCustomCode(trimmedCustomCode);
   }
 
-  let normalizedCode = code.toLowerCase();
+  let normalizedCode = (
+    trimmedCustomCode ?? generateRandomCode()
+  ).toLowerCase();
 
   // Retry loop: handles race conditions where a concurrent request inserts
   // between our check and insert. The UNIQUE constraints on user_id and code
   // in the DB will reject the duplicate, and we retry or return existing.
   for (let attempt = 0; attempt < MAX_UNIQUE_RETRIES; attempt++) {
-    try {
-      await db.insert(referralCodes).values({
-        userId,
-        code: normalizedCode,
-      });
+    const result = await tryInsertReferralCode(
+      userId,
+      normalizedCode,
+      trimmedCustomCode,
+      attempt
+    );
+    if (result) return result;
 
-      logger.info('Referral code created', { userId, code: normalizedCode });
-      return { code: normalizedCode, isNew: true };
-    } catch (error) {
-      // Check for unique constraint violation (Postgres error code 23505)
-      const isUniqueViolation =
-        error instanceof Error &&
-        'code' in error &&
-        (error as { code: string }).code === '23505';
-
-      if (!isUniqueViolation) {
-        throw error;
-      }
-
-      // Another request won the race — re-check for the existing active code
-      const raceWinner = await db
-        .select({ code: referralCodes.code })
-        .from(referralCodes)
-        .where(
-          and(
-            eq(referralCodes.userId, userId),
-            eq(referralCodes.isActive, true)
-          )
-        )
-        .limit(1);
-
-      if (raceWinner.length > 0) {
-        return { code: raceWinner[0].code, isNew: false };
-      }
-
-      // If no existing code found (e.g. code collision on a different user),
-      // retry with a new random code if no custom code was provided
-      if (trimmedCustomCode) {
-        throw new Error('This referral code is already taken');
-      }
-
-      // Generate a fresh random code for the next attempt
-      normalizedCode = generateRandomCode().toLowerCase();
-
-      logger.warn('Referral code collision, retrying', {
-        userId,
-        attempt,
-        code: normalizedCode,
-      });
-    }
+    // Generate a fresh random code for the next attempt
+    normalizedCode = generateRandomCode().toLowerCase();
   }
 
   throw new Error(
     'Failed to create referral code after multiple attempts. Please try again.'
   );
+}
+
+async function validateAndCheckCustomCode(code: string): Promise<void> {
+  const validationError = validateReferralCode(code);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const taken = await db
+    .select({ id: referralCodes.id })
+    .from(referralCodes)
+    .where(eq(referralCodes.code, code.toLowerCase()))
+    .limit(1);
+
+  if (taken.length > 0) {
+    throw new Error('This referral code is already taken');
+  }
+}
+
+async function tryInsertReferralCode(
+  userId: string,
+  normalizedCode: string,
+  trimmedCustomCode: string | undefined,
+  attempt: number
+): Promise<{ code: string; isNew: boolean } | null> {
+  try {
+    await db.insert(referralCodes).values({ userId, code: normalizedCode });
+    logger.info('Referral code created', { userId, code: normalizedCode });
+    return { code: normalizedCode, isNew: true };
+  } catch (error) {
+    if (!isUniqueConstraintViolation(error)) {
+      throw error;
+    }
+  }
+
+  // Another request won the race — re-check for the existing active code
+  const raceWinner = await db
+    .select({ code: referralCodes.code })
+    .from(referralCodes)
+    .where(
+      and(eq(referralCodes.userId, userId), eq(referralCodes.isActive, true))
+    )
+    .limit(1);
+
+  if (raceWinner.length > 0) {
+    return { code: raceWinner[0].code, isNew: false };
+  }
+
+  // Code collision on a different user — custom codes can't be retried
+  if (trimmedCustomCode) {
+    throw new Error('This referral code is already taken');
+  }
+
+  logger.warn('Referral code collision, retrying', {
+    userId,
+    attempt,
+    code: normalizedCode,
+  });
+  return null;
 }
 
 /**
@@ -218,12 +231,7 @@ export async function createReferral(
   } catch (error) {
     // Check for unique constraint violation in case a DB-level constraint
     // is later added on (referred_user_id, status)
-    const isUniqueViolation =
-      error instanceof Error &&
-      'code' in error &&
-      (error as { code: string }).code === '23505';
-
-    if (isUniqueViolation) {
+    if (isUniqueConstraintViolation(error)) {
       return { success: false, error: 'User already has an active referral' };
     }
     throw error;
