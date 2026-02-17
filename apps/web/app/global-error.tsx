@@ -63,6 +63,7 @@ export default function GlobalError({
   return (
     <html lang='en'>
       <head>
+        <title>Something went wrong | Jovie</title>
         <meta
           name='viewport'
           content='width=device-width, initial-scale=1, viewport-fit=cover'
