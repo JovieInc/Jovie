@@ -3,11 +3,11 @@
   "version": "26.2.0",
   "private": true,
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "doppler run -- next dev",
-    "dev:local": "next dev",
+    "dev": "next dev",
+    "dev:doppler": "doppler run -- next dev",
     "validate-env": "tsx scripts/validate-env.ts",
     "build": "next build",
     "build:validate": "npm run validate-env && next build",
