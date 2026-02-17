@@ -163,7 +163,7 @@ export function MobileNav({
                 paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
               }}
               aria-label='Mobile navigation'
-              aria-hidden={!isOpen}
+              inert={!isOpen ? true : undefined}
             >
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>
