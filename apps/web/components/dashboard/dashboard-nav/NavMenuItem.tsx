@@ -82,12 +82,13 @@ export function NavMenuItem({
 
   const innerContent = (
     <>
-      {/* Fixed-width icon container for consistent alignment */}
+      {/* Fixed-width icon container — intentionally 14px (size-3.5) to match
+         Linear's sidebar icon sizing for visual consistency */}
       <span
         data-sidebar-icon
-        className='flex size-4 shrink-0 items-center justify-center'
+        className='flex size-3.5 shrink-0 items-center justify-center'
       >
-        <item.icon className='size-4' aria-hidden='true' />
+        <item.icon className='size-3.5' aria-hidden='true' />
       </span>
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}
