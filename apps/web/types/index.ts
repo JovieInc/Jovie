@@ -300,8 +300,12 @@ export interface UserEntitlements {
   canExportContacts: boolean;
   canAccessAdvancedAnalytics: boolean;
   canFilterSelfFromAnalytics: boolean;
+  canAccessAdPixels: boolean;
+  canBeVerified: boolean;
+  aiCanUseTools: boolean;
   // Limits
   analyticsRetentionDays: number;
   contactsLimit: number | null; // null = unlimited
   smartLinksLimit: number | null; // null = unlimited, 5 for free tier
+  aiDailyMessageLimit: number;
 }

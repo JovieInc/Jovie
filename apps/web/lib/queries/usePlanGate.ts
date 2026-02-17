@@ -3,8 +3,8 @@
 /**
  * Plan gate hook for client-side feature gating by subscription plan.
  *
- * Provides a centralized way to check which features are unavailable
- * due to the user's current plan, and whether they need to upgrade.
+ * Derives all entitlements from the central ENTITLEMENT_REGISTRY so there is
+ * a single source of truth for plan features.
  *
  * @example
  * ```tsx
@@ -18,6 +18,7 @@
  * ```
  */
 
+import { ENTITLEMENT_REGISTRY, type PlanId } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from './useBillingStatusQuery';
 
 /**
@@ -43,31 +44,18 @@ export interface PlanGateEntitlements {
   canAccessAdvancedAnalytics: boolean;
   /** Pro: can export contacts */
   canExportContacts: boolean;
-  /** Analytics retention days based on plan (7 for free, 90 for pro) */
+  /** Pro: can be verified */
+  canBeVerified: boolean;
+  /** AI: can use tools (pro/growth) */
+  aiCanUseTools: boolean;
+  /** Analytics retention days based on plan */
   analyticsRetentionDays: number;
-  /** Contact limit based on plan (100 for free, null for unlimited) */
+  /** Contact limit based on plan (null = unlimited) */
   contactsLimit: number | null;
-  /** Smart link limit based on plan (5 for free, null for unlimited) */
+  /** Smart link limit based on plan (null = unlimited) */
   smartLinksLimit: number | null;
-}
-
-/** Map plan string to analytics retention days */
-function getRetentionDays(plan: string | null): number {
-  if (plan === 'growth') return 365;
-  if (plan === 'pro') return 90;
-  return 7;
-}
-
-/** Map plan string to contact limit */
-function getContactsLimit(plan: string | null): number | null {
-  if (plan === 'pro' || plan === 'growth') return null;
-  return 100;
-}
-
-/** Map plan string to smart link limit (5 for free, unlimited for pro/growth) */
-function getSmartLinksLimit(plan: string | null): number | null {
-  if (plan === 'pro' || plan === 'growth') return null;
-  return 5;
+  /** AI daily message limit based on plan */
+  aiDailyMessageLimit: number;
 }
 
 /**
@@ -85,18 +73,16 @@ export function usePlanGate(): PlanGateEntitlements {
   const isPro = data?.isPro ?? false;
   const plan = data?.plan ?? null;
 
+  const planKey: PlanId =
+    plan === 'growth' ? 'growth' : plan === 'pro' ? 'pro' : 'free';
+  const ent = ENTITLEMENT_REGISTRY[planKey];
+
   return {
     isLoading,
     isError,
     isPro,
     plan,
-    canRemoveBranding: isPro,
-    canAccessAdPixels: isPro,
-    canFilterSelfFromAnalytics: isPro,
-    canAccessAdvancedAnalytics: isPro,
-    canExportContacts: isPro,
-    analyticsRetentionDays: getRetentionDays(plan),
-    contactsLimit: getContactsLimit(plan),
-    smartLinksLimit: getSmartLinksLimit(plan),
+    ...ent.booleans,
+    ...ent.limits,
   };
 }

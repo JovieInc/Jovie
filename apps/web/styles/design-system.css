@@ -88,6 +88,10 @@
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(0, 0, 0, 0.25);
+  --color-logo-muted-hover: rgba(0, 0, 0, 0.5);
+
   /* Border system - semi-transparent for flexibility */
   --color-border-subtle: oklch(0% 0 0 / 6%);
   --color-border-default: oklch(0% 0 0 / 10%);
@@ -166,40 +170,51 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces - progressively lighter with CHROMATIC TINT
-     Linear uses lch() with hue 272 and increasing chroma (0.7-4.2)
-     This gives darks a subtle blue warmth — critical for matching Linear.
-     Converted from Linear's live LCH values:
-       bg-page:      lch(2.467% 0 272)
-       bg-primary:   lch(4.8% 0.7 272)
-       bg-quaternary: lch(7.133% 1.867 272)
-       bg-secondary: lch(10.633% 3.033 272)
-       bg-tertiary:  lch(14.133% 4.2 272) */
-  /* prettier-ignore */ --color-bg-base: oklch(
-    5% 0.005 272
-  ); /* sidebar & page bg — was #111111 */
-  /* prettier-ignore */ --color-bg-surface-0: oklch(
-    5% 0.005 272
-  ); /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: oklch(
-    11% 0.015 272
-  ); /* main content — elevated */
-  /* prettier-ignore */ --color-bg-surface-2: oklch(
-    14.5% 0.018 272
-  ); /* cards, drawer */
-  /* prettier-ignore */ --color-bg-surface-3: oklch(
-    18% 0.02 272
-  ); /* Modals, tooltips */
+  /* Dark mode surfaces - extracted from Linear.app marketing (2026-02-16)
+     via Playwright getComputedStyle on live page elements.
+     Key: chroma is very low (0.003) — nearly achromatic with hint of blue.
+     Hue 260 (Linear's neutral gray family).
 
-  /* Additional dark surface levels (Linear has ~8 distinct levels) */
-  --color-bg-page: oklch(3% 0 272); /* Deepest page bg */
-  --color-bg-hover: oklch(
-    7.5% 0.01 272
-  ); /* Row/item hover (Linear bg-quaternary) */
-  --color-bg-elevated: oklch(8.5% 0.01 272); /* Slightly elevated */
-  --color-bg-input: oklch(12% 0.012 272); /* Input backgrounds */
-  --color-bg-active: oklch(13% 0.018 272); /* Active/selected items */
-  --color-bg-button: oklch(17% 0.015 272); /* Button backgrounds */
+     Extracted RGB → OKLCH mapping:
+       Page bg:     rgb(8,9,10)   → oklch(14% 0.003 260)
+       Card bg:     rgb(15,16,17) → oklch(17.2% 0.003 260)
+       Content:     rgb(18,19,20) → oklch(18.6% 0.003 260)
+       Input:       rgb(22,23,24) → oklch(20.4% 0.003 260)
+       Divider/btn: rgb(35,37,42) → oklch(26.5% 0.01 265) */
+  /* prettier-ignore */ --color-bg-base: oklch(
+    14% 0.003 260
+  ); /* page bg — rgb(8,9,10) */
+  /* prettier-ignore */ --color-bg-surface-0: oklch(
+    17.2% 0.003 260
+  ); /* cards — rgb(15,16,17) */
+  /* prettier-ignore */ --color-bg-surface-1: oklch(
+    18.6% 0.003 260
+  ); /* content — rgb(18,19,20) */
+  /* prettier-ignore */ --color-bg-surface-2: oklch(
+    20.4% 0.003 260
+  ); /* inputs, elevated — rgb(22,23,24) */
+  /* prettier-ignore */ --color-bg-surface-3: oklch(
+    26.5% 0.01 265
+  ); /* modals, tooltips — rgb(35,37,42) */
+
+  /* Additional dark surface levels (Linear product screenshots) */
+  --color-bg-page: oklch(14% 0.003 260); /* Page bg = base — rgb(8,9,10) */
+  --color-bg-hover: rgba(
+    255,
+    255,
+    255,
+    0.02
+  ); /* Row/item hover (Linear uses semi-transparent) */
+  --color-bg-elevated: oklch(17.7% 0.003 260); /* Frame bg — rgb(16,17,18) */
+  --color-bg-input: oklch(
+    20.4% 0.003 260
+  ); /* Input backgrounds — rgb(22,23,24) */
+  --color-bg-active: oklch(
+    20.4% 0.003 260
+  ); /* Active/selected items — same as input */
+  --color-bg-button: oklch(
+    26.5% 0.01 265
+  ); /* Button backgrounds — rgb(35,37,42) */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
@@ -214,10 +229,17 @@
   --color-text-quaternary-token: oklch(38% 0.008 272);
   --color-text-disabled-token: oklch(28% 0.006 272);
 
-  /* Border system - semi-transparent white for dark mode (Linear-style) */
-  --color-border-subtle: oklch(100% 0 0 / 6%);
-  --color-border-default: oklch(100% 0 0 / 10%);
-  --color-border-strong: oklch(100% 0 0 / 16%);
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(255, 255, 255, 0.3);
+  --color-logo-muted-hover: rgba(255, 255, 255, 0.5);
+
+  /* Border system - extracted from Linear marketing (2026-02-16)
+     Subtle:  rgba(255,255,255,0.05) — card borders, dividers
+     Default: rgba(255,255,255,0.08) — frame borders, input borders
+     Strong:  rgba(255,255,255,0.10) — panel outlines */
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-default: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.1);
   --color-border-focus: oklch(60% 0.12 272);
 
   /* Accent - slightly brighter in dark mode */
@@ -246,29 +268,33 @@
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
-  /* Interactive states - white-based */
-  --color-interactive-hover: oklch(100% 0 0 / 8%);
-  --color-interactive-active: oklch(100% 0 0 / 14%);
+  /* Interactive states - white-based (Linear uses semi-transparent overlays) */
+  --color-interactive-hover: rgba(255, 255, 255, 0.05);
+  --color-interactive-active: rgba(255, 255, 255, 0.08);
 
-  /* Table cell hover - #151618 (21, 22, 24) */
-  --color-cell-hover: #151618;
+  /* Table cell hover — same as surface-2 rgb(22,23,24) */
+  --color-cell-hover: #161718;
 
-  /* Shadows - deeper in dark mode, with dark ring borders */
-  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 20%), 0 1px 3px oklch(0% 0 0 / 25%);
-  --shadow-md: 0 4px 8px oklch(0% 0 0 / 30%), 0 2px 4px oklch(0% 0 0 / 25%);
-  --shadow-lg: 0 12px 24px oklch(0% 0 0 / 40%), 0 6px 8px oklch(0% 0 0 / 30%);
-  --shadow-xl: 0 24px 48px oklch(0% 0 0 / 50%), 0 12px 16px oklch(0% 0 0 / 35%);
+  /* Shadows - extracted from Linear.app CSS custom properties (2026-02-16)
+     --shadow-tiny/low/medium/high hierarchy */
+  --shadow-sm: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0px 4px 24px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0px 7px 32px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0px 7px 32px rgba(0, 0, 0, 0.5);
 
-  /* Dark mode card shadow — ring with dark border */
+  /* Dark mode card shadow — 1px ring via box-shadow + soft depth */
   --shadow-card:
-    oklch(20% 0.02 272) 0px 0px 0px 1px,
-    oklch(0% 0 0 / 15%) 0px 3px 6px -2px,
-    oklch(0% 0 0 / 20%) 0px 1px 1px 0px;
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
   --shadow-card-elevated:
-    oklch(0% 0 0 / 20%) 0px 3px 6px -2px, oklch(0% 0 0 / 25%) 0px 1px 1px 0px;
-  --shadow-divider: oklch(20% 0.02 272) 0px -0.5px 0px 0px inset;
+    rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
+    rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
+  --shadow-divider: rgba(255, 255, 255, 0.05) 0px -0.5px 0px 0px inset;
   --shadow-button-inset:
-    0px 4px 4px -1px oklch(0% 0 0 / 10%), 0px 1px 1px 0px oklch(0% 0 0 / 18%);
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -696,24 +722,24 @@
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Linear-inspired: slightly lighter bg, semi-transparent accents */
-  --sidebar-background: 17 17 17; /* #111111 - matches bg-base */
+  /* Matches new bg-base: rgb(8,9,10) extracted from Linear */
+  --sidebar-background: 8 9 10; /* rgb(8,9,10) - matches bg-base */
   --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
   --sidebar-accent: 255 255 255 / 0.08; /* Semi-transparent white for hover (Linear) */
   --sidebar-accent-foreground: 227 228 229;
-  --sidebar-border: 255 255 255 / 0.06;
+  --sidebar-border: 255 255 255 / 0.05;
   --sidebar-ring: 109 119 230 / 0.55;
   --sidebar-muted: 161 161 170;
   --sidebar-muted-foreground: 148 150 156;
-  --sidebar-surface: 17 17 17; /* Matches bg-base */
-  --sidebar-surface-hover: 255 255 255 / 0.04; /* Subtle semi-transparent hover */
-  --sidebar-input-background: 255 255 255 / 0.06;
-  --sidebar-input-border: 255 255 255 / 0.06;
+  --sidebar-surface: 8 9 10; /* Matches bg-base — rgb(8,9,10) */
+  --sidebar-surface-hover: 255 255 255 / 0.05; /* Matches Linear interactive-hover */
+  --sidebar-input-background: 255 255 255 / 0.05;
+  --sidebar-input-border: 255 255 255 / 0.05;
   --sidebar-item-foreground: 148 152 160; /* Muted nav text, brightens on hover */
   --sidebar-item-icon: 120 124 132; /* Dimmer nav icons */
-  --sidebar-accent-active: 255 255 255 / 0.06; /* Subtler active state, Linear-style */
+  --sidebar-accent-active: 255 255 255 / 0.05; /* Matches Linear border-subtle */
 }
 
 /* ============================================
@@ -729,12 +755,14 @@
 }
 
 :root.dark {
-  --menu-background: 27 29 33;
+  /* Menu tokens aligned to Linear surface hierarchy (2026-02-16)
+     Menu bg = surface-2 (rgb 22,23,24), hover = surface-3 area */
+  --menu-background: 22 23 24;
   --menu-foreground: 244 244 245;
-  --menu-border: 255 255 255 / 0.1;
-  --menu-shadow: 0 0 0 / 0.4;
-  --menu-item-hover: 33 36 42;
-  --menu-separator: 255 255 255 / 0.08;
+  --menu-border: 255 255 255 / 0.08;
+  --menu-shadow: 0 0 0 / 0.35;
+  --menu-item-hover: 35 37 42;
+  --menu-separator: 255 255 255 / 0.05;
 }
 
 /* ============================================

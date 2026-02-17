@@ -17,6 +17,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import {
   checkAiChatRateLimitForPlan,
@@ -33,7 +34,6 @@ import {
 } from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { getPlanLimits } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
@@ -1132,7 +1132,7 @@ export async function POST(req: Request) {
   // Fetch user plan for rate limiting and tool gating
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
-  const planLimits = getPlanLimits(userPlan);
+  const planLimits = getEntitlements(userPlan);
 
   // Rate limiting - plan-aware daily quota + burst protection
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
@@ -1210,8 +1210,8 @@ export async function POST(req: Request) {
   const artistContext = contextResult.context;
 
   const systemPrompt = buildSystemPrompt(artistContext, {
-    aiCanUseTools: planLimits.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.aiDailyMessageLimit,
+    aiCanUseTools: planLimits.booleans.aiCanUseTools,
+    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
   });
 
   try {
@@ -1223,7 +1223,7 @@ export async function POST(req: Request) {
       profileId && typeof profileId === 'string' ? profileId : null;
 
     // Gate AI tools behind paid plans — free users get chat-only
-    const tools = planLimits.aiCanUseTools
+    const tools = planLimits.booleans.aiCanUseTools
       ? buildChatTools(artistContext, resolvedProfileId)
       : {};
 

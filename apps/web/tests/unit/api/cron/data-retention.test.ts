@@ -42,9 +42,23 @@ describe('GET /api/cron/data-retention', () => {
       clickEventsDeleted: 10,
       audienceMembersDeleted: 5,
       notificationSubscriptionsDeleted: 2,
+      pixelEventsDeleted: 3,
+      stripeWebhookEventsDeleted: 1,
+      webhookEventsDeleted: 0,
+      notificationDeliveryLogDeleted: 4,
+      emailEngagementDeleted: 2,
+      chatMessagesDeleted: 0,
+      chatAuditLogDeleted: 0,
+      billingAuditLogDeleted: 1,
+      adminAuditLogDeleted: 0,
+      ingestionJobsDeleted: 0,
+      unsubscribeTokensDeleted: 0,
+      emailSendAttributionDeleted: 0,
+      emailSuppressionsDeleted: 0,
       duration: 100,
       retentionDays: 90,
       cutoffDate: new Date(),
+      chatCutoffDate: new Date(),
     });
 
     const { GET } = await import('@/app/api/cron/data-retention/route');

@@ -1,90 +1,83 @@
-import { ArrowRight } from 'lucide-react';
-import Link from 'next/link';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 
 /**
- * RedesignedHero - Linear.app style hero section
- * Matches Linear's homepage hero layout exactly
+ * RedesignedHero - Clean, left-aligned hero section
  */
 export function RedesignedHero() {
   return (
-    <section
-      className='relative overflow-hidden'
-      style={{
-        minHeight: 'calc(100vh - 56px)',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        /* Responsive padding: tighter on mobile, spacious on desktop */
-        padding:
-          'clamp(48px, 8vh, 80px) clamp(16px, 5vw, 24px) clamp(60px, 10vh, 120px)',
-      }}
-    >
+    <section className='relative overflow-hidden px-5 pb-16 pt-16 sm:px-6 md:pb-24 md:pt-36 lg:px-[77px]'>
+      {/* Ambient glow — subtle depth cue behind content */}
       <div
-        className='relative z-10 mx-auto w-full'
-        style={{ maxWidth: '1200px' }}
-      >
-        <div className='text-center'>
-          {/* H1 - Large centered headline like Linear */}
-          <h1
-            className='text-balance mx-auto'
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0'
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 55% at 25% 35%, oklch(22% 0.025 260 / 0.5), transparent 70%)',
+        }}
+      />
+
+      <div className='relative w-full'>
+        {/* H1 - Left-aligned headline */}
+        <h1
+          className='text-balance'
+          style={{
+            maxWidth: '640px',
+            fontSize: 'clamp(32px, calc(16px + 3.5vw), 56px)',
+            fontWeight: 500,
+            lineHeight: 1.1,
+            letterSpacing: '-0.025em',
+            color: 'var(--linear-text-primary)',
+            fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
+            fontVariationSettings: '"opsz" 56',
+          }}
+        >
+          Your entire music career.
+          <br />
+          <span
             style={{
-              maxWidth: '900px',
-              /* Responsive font-size: 28px on 375px → 40px on 768px → 56px on 1200px+ */
-              fontSize: 'clamp(28px, calc(14px + 3.5vw), 56px)',
-              fontWeight: 500,
-              lineHeight: 1.1,
-              letterSpacing: '-0.022em',
-              color: 'var(--linear-text-primary)',
+              background:
+                'linear-gradient(to right, oklch(72% 0.015 260), oklch(58% 0.01 260))',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
             }}
           >
-            Your entire music career.{' '}
-            <span style={{ color: 'var(--linear-text-secondary)' }}>
-              One intelligent link.
-            </span>
-          </h1>
+            One intelligent link.
+          </span>
+        </h1>
 
-          {/* Subheading - matches Linear's lead paragraph */}
-          <p
-            className='mx-auto'
-            style={{
-              maxWidth: '560px',
-              marginTop: '24px',
-              fontSize: 'var(--linear-h4-size)',
-              fontWeight: 400,
-              lineHeight: 1.6,
-              color: 'var(--linear-text-secondary)',
-            }}
-          >
-            Import your Spotify, get smart links for every release, and a
-            link-in-bio that converts listeners into fans.
-          </p>
+        {/* Subheading */}
+        <p
+          className='max-w-[460px] mt-6'
+          style={{
+            fontSize: '15px',
+            fontWeight: 400,
+            lineHeight: 1.65,
+            letterSpacing: '0.005em',
+            color: 'var(--linear-text-secondary)',
+          }}
+        >
+          Jovie builds your link-in-bio from Spotify in 30 seconds — with smart
+          links for every release, automatic email capture, and fan retargeting
+          built in.
+        </p>
 
-          {/* Spotify Search CTA */}
-          <div style={{ marginTop: '40px' }}>
-            <HeroSpotifySearch />
-          </div>
-
-          {/* Secondary CTA */}
-          <div style={{ marginTop: '16px' }}>
-            <Link
-              href='#how-it-works'
-              className='inline-flex items-center transition-opacity hover:opacity-70'
-              style={{
-                fontSize: '14px',
-                fontWeight: 500,
-                color: 'var(--linear-text-secondary)',
-                gap: '6px',
-              }}
-            >
-              <span>See how it works</span>
-              <ArrowRight
-                className='transition-transform group-hover:translate-x-0.5'
-                style={{ width: '14px', height: '14px' }}
-              />
-            </Link>
-          </div>
+        {/* Spotify Search CTA */}
+        <div className='mt-10 max-w-[440px]'>
+          <HeroSpotifySearch />
         </div>
+
+        {/* Trust line */}
+        <p
+          className='mt-5'
+          style={{
+            fontSize: '13px',
+            letterSpacing: '0.01em',
+            color: 'var(--linear-text-tertiary)',
+          }}
+        >
+          Free forever. No credit card.
+        </p>
       </div>
     </section>
   );

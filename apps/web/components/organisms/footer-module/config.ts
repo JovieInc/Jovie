@@ -7,20 +7,24 @@ export const CONTAINER_SIZES: Record<ContainerSize, string> = {
   lg: 'max-w-6xl',
   xl: 'max-w-7xl',
   full: 'max-w-none',
-  homepage: 'max-w-[1100px]',
+  homepage: 'max-w-none',
 };
 
 export function getVariantConfigs(
-  maxWidthClass: string
+  maxWidthClass: string,
+  containerSize?: ContainerSize
 ): Record<
   'marketing' | 'profile' | 'minimal' | 'regular',
   FooterVariantConfig
 > {
+  const isHomepage = containerSize === 'homepage';
+  const pxClass = isHomepage ? 'px-5 sm:px-6 lg:px-[77px]' : 'px-6 lg:px-8';
+  const mxClass = isHomepage ? '' : 'mx-auto';
   return {
     marketing: {
       containerClass: 'border-t border-subtle bg-base',
       contentClass: cn(
-        'mx-auto px-6 lg:px-8 py-12 lg:py-16 flex flex-col sm:flex-row items-center justify-between gap-6',
+        `${mxClass} ${pxClass} py-12 lg:py-16 flex flex-col sm:flex-row items-center justify-between gap-6`,
         maxWidthClass
       ),
       colorVariant: 'light',
@@ -41,7 +45,7 @@ export function getVariantConfigs(
     minimal: {
       containerClass: 'border-t border-subtle bg-base',
       contentClass: cn(
-        'mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
+        `${mxClass} ${pxClass} flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10`,
         maxWidthClass
       ),
       colorVariant: 'light',
@@ -53,7 +57,7 @@ export function getVariantConfigs(
     regular: {
       containerClass: 'border-t border-subtle bg-base',
       contentClass: cn(
-        'mx-auto px-6 lg:px-8 pt-12 pb-10 flex items-center justify-between',
+        `${mxClass} ${pxClass} pt-12 pb-10 flex items-center justify-between`,
         maxWidthClass
       ),
       colorVariant: 'light',
@@ -66,22 +70,23 @@ export function getVariantConfigs(
 }
 
 export const FOOTER_LINK_CLASS_NAME = cn(
-  'inline-flex rounded-md px-2 py-1.5 -mx-2 -my-1.5',
-  'text-[14px] leading-6 font-normal tracking-[-0.01em]',
-  'transition-all duration-150 ease-out',
+  'inline-flex h-7 items-center',
+  'text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]',
+  'transition-colors duration-100',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
 );
 
-// Linear-aligned: links are TERTIARY (muted gray), hover to secondary
+// Linear-aligned: links are SECONDARY (muted gray), hover to primary
 export const FOOTER_LINK_STYLE = {
-  color: 'var(--linear-text-tertiary)',
+  color: 'var(--linear-text-secondary)',
 };
 
 export const FOOTER_LINK_HOVER_CLASS =
-  'hover:[color:var(--linear-text-secondary)]';
+  'hover:[color:var(--linear-text-primary)]';
 
+// Linear: 13px, weight 510, normal case, line-height 19.5px, tracking -0.01em, mb 24px
 export const SECTION_HEADING_CLASS_NAME =
-  'text-[11px] leading-4 font-semibold tracking-[0.04em] uppercase mb-4';
+  'text-[13px] leading-[19.5px] font-[510] tracking-[-0.01em] mb-6';
 
 // Linear-aligned: headings are PRIMARY (white), links are muted
 export const SECTION_HEADING_STYLE = {

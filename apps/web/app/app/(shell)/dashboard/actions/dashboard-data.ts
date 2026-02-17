@@ -30,6 +30,7 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
@@ -472,6 +473,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
         level: 'warning',
         tags: { context: 'dashboard_billing_unavailable' },
       });
+      const freeDefaults = getEntitlements('free');
       entitlements = {
         userId: error.userId,
         isAdmin: error.isAdmin,
@@ -480,12 +482,8 @@ async function resolveDashboardData(): Promise<DashboardData> {
         plan: 'free' as const,
         isPro: false,
         hasAdvancedFeatures: false,
-        canRemoveBranding: false,
-        canExportContacts: false,
-        canAccessAdvancedAnalytics: false,
-        canFilterSelfFromAnalytics: false,
-        analyticsRetentionDays: 7,
-        contactsLimit: 100,
+        ...freeDefaults.booleans,
+        ...freeDefaults.limits,
       };
     } else {
       throw error;
