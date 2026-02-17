@@ -8,7 +8,7 @@
     }
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.15.4",
@@ -39,7 +39,7 @@
     }
   },
   "scripts": {
-    "dev": "turbo dev --filter=@jovie/web",
+    "dev": "cd apps/web && pnpm run dev",
     "dev:web": "turbo dev --filter=@jovie/web",
     "build": "turbo build",
     "build:web": "turbo build --filter=@jovie/web",

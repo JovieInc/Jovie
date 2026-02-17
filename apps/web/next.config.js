@@ -1,14 +1,31 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
-const { codecovWebpackPlugin } = require('@codecov/webpack-plugin');
+
+// Safely require optional dependencies that may not be installed
+function safeRequire(mod) {
+  try {
+    return require(mod);
+  } catch {
+    return null;
+  }
+}
+
+const codecovModule = safeRequire('@codecov/webpack-plugin');
+const codecovWebpackPlugin = codecovModule?.codecovWebpackPlugin;
 
 // Read version from canonical source (version.json at monorepo root)
-const { version: APP_VERSION } = require('../../version.json');
+let APP_VERSION = '0.0.0';
+try {
+  APP_VERSION = require('../../version.json').version;
+} catch {
+  // version.json may not exist during initial setup
+}
 
 // Bundle analyzer for performance optimization
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
+const bundleAnalyzerModule = safeRequire('@next/bundle-analyzer');
+const withBundleAnalyzer = bundleAnalyzerModule
+  ? bundleAnalyzerModule({ enabled: process.env.ANALYZE === 'true' })
+  : (config) => config;
 
 const nextConfig = {
   // Transpile workspace packages for proper module resolution
@@ -429,13 +446,15 @@ const nextConfig = {
     };
 
     // Codecov Bundle Analysis plugin - uploads bundle stats during CI builds
-    config.plugins.push(
-      codecovWebpackPlugin({
-        enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-        bundleName: 'jovie-web',
-        uploadToken: process.env.CODECOV_TOKEN,
-      })
-    );
+    if (codecovWebpackPlugin) {
+      config.plugins.push(
+        codecovWebpackPlugin({
+          enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
+          bundleName: 'jovie-web',
+          uploadToken: process.env.CODECOV_TOKEN,
+        })
+      );
+    }
 
     return config;
   },
@@ -446,8 +465,11 @@ const nextConfig = {
 // client-side code that uses eval(), violating Content Security Policy.
 const enableVercelToolbar =
   process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
-const withVercelToolbar = enableVercelToolbar
-  ? require('@vercel/toolbar/plugins/next')()
+const vercelToolbarPlugin = enableVercelToolbar
+  ? safeRequire('@vercel/toolbar/plugins/next')
+  : null;
+const withVercelToolbar = vercelToolbarPlugin
+  ? vercelToolbarPlugin()
   : config => config;
 
 // Apply plugins in order: bundle analyzer -> vercel toolbar
@@ -455,9 +477,10 @@ module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
 // Injected content via Sentry wizard below
 
-const { withSentryConfig } = require('@sentry/nextjs');
+const sentryNextjs = safeRequire('@sentry/nextjs');
 
-module.exports = withSentryConfig(module.exports, {
+if (sentryNextjs) {
+module.exports = sentryNextjs.withSentryConfig(module.exports, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
@@ -489,3 +512,4 @@ module.exports = withSentryConfig(module.exports, {
     automaticVercelMonitors: true,
   },
 });
+}
