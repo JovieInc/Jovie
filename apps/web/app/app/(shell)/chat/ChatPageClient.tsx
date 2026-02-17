@@ -133,6 +133,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       initialQuery={initialQuery ?? undefined}
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
+      username={selectedProfile.username ?? undefined}
     />
   );
 }

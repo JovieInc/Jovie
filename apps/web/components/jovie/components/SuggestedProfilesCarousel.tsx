@@ -3,6 +3,7 @@
 import {
   Camera,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -12,10 +13,7 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  ProfileSuggestion,
-  SuggestionsStarterContext,
-} from '@/app/api/suggestions/route';
+import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +85,99 @@ function CarouselDots({
           />
         );
       })}
+    </div>
+  );
+}
+
+function ProfileReadyCard({
+  displayName,
+  username,
+  avatarUrl,
+  onDismiss,
+  direction,
+}: {
+  readonly displayName?: string;
+  readonly username?: string;
+  readonly avatarUrl?: string | null;
+  readonly onDismiss: () => void;
+  readonly direction: 'left' | 'right' | null;
+}) {
+  return (
+    <div
+      className={cn(
+        'chat-card rounded-xl border border-white/[0.06] bg-surface-1 overflow-hidden',
+        'transition-all duration-300 ease-out',
+        direction === 'left' && 'animate-slide-out-left',
+        direction === 'right' && 'animate-slide-out-right'
+      )}
+    >
+      <div className='relative p-4'>
+        {/* Dismiss button */}
+        <button
+          type='button'
+          onClick={onDismiss}
+          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+          aria-label='Dismiss'
+        >
+          <X className='h-3.5 w-3.5' />
+        </button>
+
+        {/* Header */}
+        <div className='flex items-center gap-2 mb-4'>
+          <CheckCircle2 className='h-4 w-4 text-emerald-400' />
+          <p className='text-sm font-medium text-primary-token'>
+            Your profile is live
+          </p>
+        </div>
+
+        {/* Profile info */}
+        <div className='flex items-center gap-3 mb-4'>
+          {avatarUrl ? (
+            <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-surface-2'>
+              <Image
+                src={avatarUrl}
+                alt={displayName ?? 'Profile'}
+                fill
+                className='object-cover'
+                sizes='48px'
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-2 text-tertiary-token'>
+              <span className='text-lg font-medium'>
+                {displayName?.[0]?.toUpperCase() ?? '?'}
+              </span>
+            </div>
+          )}
+          <div className='min-w-0'>
+            <p className='truncate text-sm font-medium text-primary-token'>
+              {displayName ?? 'Your profile'}
+            </p>
+            {username && (
+              <p className='truncate text-xs text-tertiary-token'>
+                jov.ie/{username}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <a
+          href={username ? `/${username}` : '/'}
+          target='_blank'
+          rel='noopener noreferrer'
+          className={cn(
+            'flex w-full items-center justify-center gap-1.5 rounded-lg',
+            'bg-accent px-3 py-2.5 text-[13px] font-medium text-on-accent',
+            'transition-colors hover:bg-accent/90',
+            'focus:outline-none'
+          )}
+        >
+          View your profile
+          <ExternalLink className='h-3.5 w-3.5' />
+        </a>
+      </div>
     </div>
   );
 }
@@ -238,12 +329,16 @@ function SuggestionCard({
 
 interface SuggestedProfilesCarouselProps {
   readonly profileId: string;
-  readonly onContextLoad?: (context: SuggestionsStarterContext | null) => void;
+  readonly username?: string;
+  readonly displayName?: string;
+  readonly avatarUrl?: string | null;
 }
 
 export function SuggestedProfilesCarousel({
   profileId,
-  onContextLoad,
+  username,
+  displayName,
+  avatarUrl,
 }: SuggestedProfilesCarouselProps) {
   const {
     suggestions,
@@ -255,7 +350,6 @@ export function SuggestedProfilesCarousel({
     confirm,
     reject,
     isActioning,
-    starterContext,
   } = useSuggestedProfiles(profileId);
 
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(
@@ -293,10 +387,6 @@ export function SuggestedProfilesCarousel({
     next();
   }, [next]);
 
-  useEffect(() => {
-    onContextLoad?.(starterContext);
-  }, [onContextLoad, starterContext]);
-
   // Don't render anything while loading or if there are no suggestions
   if (isLoading || total === 0) return null;
 
@@ -305,9 +395,11 @@ export function SuggestedProfilesCarousel({
 
   // Determine the section heading based on current card type
   const heading =
-    current.type === 'avatar'
-      ? 'Choose your profile photo'
-      : 'We found profiles that might be yours';
+    current.type === 'profile_ready'
+      ? 'Welcome'
+      : current.type === 'avatar'
+        ? 'Choose your profile photo'
+        : 'We found profiles that might be yours';
 
   return (
     <div className='space-y-2'>
@@ -356,14 +448,25 @@ export function SuggestedProfilesCarousel({
       </div>
 
       {/* Card */}
-      <SuggestionCard
-        key={current.id}
-        suggestion={current}
-        onConfirm={handleConfirm}
-        onReject={handleReject}
-        isActioning={isActioning}
-        direction={slideDirection}
-      />
+      {current.type === 'profile_ready' ? (
+        <ProfileReadyCard
+          key={current.id}
+          displayName={displayName}
+          username={username}
+          avatarUrl={avatarUrl}
+          onDismiss={handleReject}
+          direction={slideDirection}
+        />
+      ) : (
+        <SuggestionCard
+          key={current.id}
+          suggestion={current}
+          onConfirm={handleConfirm}
+          onReject={handleReject}
+          isActioning={isActioning}
+          direction={slideDirection}
+        />
+      )}
 
       {/* Progress dots */}
       <CarouselDots total={total} current={currentIndex} />

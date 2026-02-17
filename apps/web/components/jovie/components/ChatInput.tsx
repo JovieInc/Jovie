@@ -78,7 +78,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     }
     const sizeClasses = isCompact
       ? cn('px-4 py-3 max-h-32', paddingRight)
-      : cn('px-4 py-3.5 max-h-48', paddingRight);
+      : cn('px-4 py-4 max-h-48', paddingRight);
 
     return (
       <form
@@ -97,12 +97,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             className={cn(
               'w-full resize-none rounded-xl border bg-surface-1',
               'text-primary-token placeholder:text-tertiary-token',
-              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-1',
+              'focus:outline-none',
               'transition-colors duration-fast',
               sizeClasses,
               isOverLimit
-                ? 'border-error focus:border-error focus:ring-error/20'
-                : 'border-subtle focus:border-accent focus:ring-accent/20'
+                ? 'border-error focus:border-error focus:ring-2 focus:ring-error/20'
+                : 'border-white/[0.08] focus:border-white/[0.14]'
             )}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
