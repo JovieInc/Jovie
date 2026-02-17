@@ -68,9 +68,9 @@ function SettingsNavGroup({
                   <Link
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
-                    className='flex w-full min-w-0 items-center gap-3'
+                    className='flex w-full min-w-0 items-center gap-2'
                   >
-                    <item.icon className='size-4' />
+                    <item.icon className='size-3.5' />
                     <span className='truncate'>{item.name}</span>
                   </Link>
                 </SidebarMenuButton>
@@ -128,9 +128,9 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
       <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
-      <div className='mx-2 border-t border-sidebar-border group-data-[collapsible=icon]:mx-0' />
+      <div className='mx-2 group-data-[collapsible=icon]:mx-0' />
       <div>
-        <span className='mb-1 block px-2 text-[11px] font-medium text-sidebar-muted group-data-[collapsible=icon]:hidden'>
+        <span className='mb-1 block px-2 text-app text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -158,7 +158,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium text-sidebar-item-foreground transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
+            'inline-flex h-7 items-center gap-1.5 rounded px-1 text-app text-sidebar-item-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -176,12 +176,12 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 items-center gap-2 rounded-md px-2 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 items-center gap-1.5 rounded px-1 transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-sm font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden'>
+              <span className='text-app text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
             </button>
@@ -193,7 +193,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded bg-transparent text-sidebar-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-4' />
         </Link>
@@ -225,11 +225,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='icon'
       className={cn(
         'bg-base',
-        '[--sidebar-width:220px]',
+        '[--sidebar-width:232px]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
       )}
     >
-      <SidebarHeader className='relative h-[52px] justify-center gap-0 px-2 py-0'>
+      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 pt-2 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -238,7 +238,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -250,7 +250,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='px-3 pb-2 pt-1 group-data-[collapsible=icon]:hidden'>
+      <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
         <span className='text-[11px] text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA

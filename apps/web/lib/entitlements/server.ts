@@ -74,7 +74,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   if (!billing.success) {
     // Billing lookup failed — throw so callers surface an error state
     // instead of silently revoking pro features for paying users.
-    logger.error('Billing lookup failed in entitlements', {
+    logger.warn('Billing lookup failed in entitlements (transient)', {
       userId,
       error: billing.error,
     });

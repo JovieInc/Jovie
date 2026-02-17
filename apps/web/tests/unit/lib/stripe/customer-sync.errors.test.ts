@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mockBillingAuditLog,
-  mockCaptureCriticalError,
+  mockCaptureWarning,
   mockDb,
   mockDbSelect,
   mockUsersTable,
@@ -28,8 +28,8 @@ vi.mock('@/lib/db/schema/auth', () => ({
   billingAuditLog: mockBillingAuditLog,
 }));
 vi.mock('@/lib/error-tracking', () => ({
-  captureCriticalError: mockCaptureCriticalError,
-  captureWarning: vi.fn(),
+  captureCriticalError: vi.fn(),
+  captureWarning: mockCaptureWarning,
 }));
 vi.mock('server-only', () => ({}));
 vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn() }));
@@ -115,8 +115,8 @@ describe('fetchUserBillingData - Errors', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to retrieve billing data');
-      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        'Error fetching user billing data',
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        'Billing data fetch failed (transient)',
         dbError,
         expect.objectContaining({
           clerkUserId: 'clerk_db_error',
@@ -142,7 +142,7 @@ describe('fetchUserBillingData - Errors', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Failed to retrieve billing data');
-      expect(mockCaptureCriticalError).toHaveBeenCalled();
+      expect(mockCaptureWarning).toHaveBeenCalled();
     });
 
     it('includes field selection in error context', async () => {
@@ -161,8 +161,8 @@ describe('fetchUserBillingData - Errors', () => {
         fields: BILLING_FIELDS_STATUS,
       });
 
-      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-        'Error fetching user billing data',
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        'Billing data fetch failed (transient)',
         dbError,
         expect.objectContaining({
           fields: expect.stringContaining('id'),

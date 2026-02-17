@@ -14,7 +14,7 @@ export const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar='menu'
-    className={cn('flex w-full min-w-0 flex-col gap-px', className)}
+    className={cn('flex w-full min-w-0 flex-col gap-0.5', className)}
     {...props}
   />
 ));
@@ -35,16 +35,18 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout and typography — 13px + weight 450 (book) matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded px-2 py-0.5 text-left text-app font-book leading-tight outline-none',
-    // Transitions
-    'transition-all duration-150 ease-out active:duration-50',
+    // Base layout — 13px / weight 510 / 6px radius matching Linear
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-left text-app leading-tight outline-none',
+    // Font weight 510 — Linear's exact sidebar nav weight
+    '[font-weight:var(--font-weight-nav)]',
+    // Transitions — Linear: 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+    'transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
     // Default text color - muted sidebar tokens matching Linear
     'text-sidebar-item-foreground',
-    // Hover state - brighten on hover
-    'hover:text-sidebar-foreground hover:bg-sidebar-accent',
-    // Active state - subtle bg highlight like Linear
-    'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
+    // Hover state — Linear: rgba(255,255,255,0.02) bg
+    'hover:bg-sidebar-accent',
+    // Active state — Linear: rgba(255,255,255,0.04)
+    'data-[active=true]:bg-sidebar-accent-active',
     // Focus state - subtle bg like Linear (no rings)
     'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
@@ -56,14 +58,14 @@ const sidebarMenuButtonVariants = cva(
     // Text truncation in collapsed mode
     '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
-    // Icon styling
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-150',
+    // Icon styling — 14px icons matching Linear
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-150',
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-150',
-    'hover:[&>svg]:text-sidebar-item-foreground',
-    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
-    'data-[active=true]:[&>svg]:text-sidebar-foreground',
-    'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-foreground',
+    'hover:[&>svg]:text-sidebar-item-icon',
+    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
+    'data-[active=true]:[&>svg]:text-sidebar-item-icon',
+    'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
   ].join(' '),
   {
     variants: {
@@ -187,10 +189,10 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar='menu-action'
       className={cn(
-        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-colors duration-normal ease-out',
+        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
         'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none',
-        '[&>svg]:size-4 [&>svg]:shrink-0',
+        '[&>svg]:size-3.5 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
         'peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
@@ -305,12 +307,12 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-app text-sidebar-item-foreground outline-none transition-colors duration-normal',
+        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
         'hover:bg-sidebar-accent hover:text-sidebar-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-foreground',
         'disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50',
-        '[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
+        '[&>span:last-child]:truncate [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors',
         'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground data-[active=true]:font-medium',
         'data-[active=true]:[&>svg]:text-sidebar-item-foreground hover:[&>svg]:text-sidebar-item-foreground',
         size === 'sm' && 'text-xs min-h-5',
