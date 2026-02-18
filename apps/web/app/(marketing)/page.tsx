@@ -308,9 +308,11 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
 
-      {showHero && <RedesignedHero />}
-
-      {showLabelLogos && <LabelLogosBar />}
+      {/* Hero + logo bar fill the viewport together */}
+      <div className='flex min-h-svh flex-col'>
+        {showHero && <RedesignedHero />}
+        {showLabelLogos && <LabelLogosBar />}
+      </div>
 
       {showHowItWorks && <HowItWorksRich />}
 

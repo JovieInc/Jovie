@@ -19,6 +19,10 @@ import type { LoadingState } from '@/lib/auth/types';
 import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
+/** Use current origin for OAuth callbacks so localhost works correctly */
+const getOAuthBaseUrl = () =>
+  typeof window !== 'undefined' ? window.location.origin : APP_URL;
+
 /**
  * Wait for Clerk session to be fully propagated.
  * Polls until session is active or timeout is reached.
@@ -280,15 +284,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       base.storeRedirectUrl();
 
       try {
-        // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments.
-        // Include the stored redirect URL (which may contain ?handle=X from the
-        // claim form) so the handle survives the OAuth round-trip.
+        // Use current origin for OAuth callbacks so localhost, preview, and
+        // production all redirect correctly after the OAuth round-trip.
+        const oauthBase = getOAuthBaseUrl();
         const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: `${APP_URL}/signup/sso-callback`,
-          redirectUrlComplete: `${APP_URL}${storedRedirect}`,
+          redirectUrl: `${oauthBase}/signup/sso-callback`,
+          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard

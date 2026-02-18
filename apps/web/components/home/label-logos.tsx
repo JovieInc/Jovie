@@ -1,28 +1,29 @@
-const FONT_FAMILY = 'system-ui, -apple-system, sans-serif';
+/**
+ * Record label logo components for the homepage logo bar.
+ *
+ * Sony Music uses official vector paths from the 2023 brand identity.
+ * Other labels use text-based SVGs with the Inter font stack (loaded by
+ * the app) to approximate their wordmark styles.
+ */
 
+const FONT_FAMILY =
+  'Inter, ui-sans-serif, system-ui, -apple-system, sans-serif';
+
+/**
+ * Sony Music — official 2023 wordmark paths
+ * Source: Wikimedia Commons (public domain)
+ */
 export function SonyMusicLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 140 22'
-      width={140}
-      height={22}
-      fill='none'
+      viewBox='0 732 856 66'
+      fill='currentColor'
       aria-label='Sony Music'
       {...props}
     >
       <title>Sony Music</title>
-      <text
-        x='0'
-        y='16'
-        fill='currentColor'
-        fontFamily={FONT_FAMILY}
-        fontSize='15'
-        fontWeight={500}
-        letterSpacing='0.18em'
-      >
-        SONY MUSIC
-      </text>
+      <path d='m819.836 732.186c-.48 0-.972.01-1.463.02h-.104c-12.305.339-25.11 4.675-32.503 11.37a27.555 27.555 0 0 0 -4.527 5.32c-3.113 4.751-4.743 10.23-4.743 15.737 0 .556.02 1.113.048 1.67.396 7.232 3.45 14.191 9.222 19.415 6.947 6.289 16.812 10.072 27.675 11.138 10.39 1.019 21.058-.642 28.356-4.772 7.213-4.082 12.212-10.949 13.928-18.493.034-.15.057-.32.095-.47h-8.45c-1.349 4.48-5.884 9.61-10.184 11.666-3.992 1.909-9.147 3.932-17.37 3.819a70.464 70.464 0 0 1 -1.782-.066 27.186 27.186 0 0 1 -4.112-.546c-4.771-1.035-9.147-3.18-12.41-6.413-4.351-4.314-6.647-10.439-6.647-16.945 0-6.526 2.292-12.636 6.648-16.993 4.408-4.409 10.93-6.676 17.757-6.798h1.254c7.553.113 11.947 1.112 17.596 3.97 3.563 1.802 8.571 6.995 9.628 12.285h7.817v-21.35h-8.12v2.29c0 .397-.207.84-.603 1.066-.377.207-.925.236-1.641-.132-3.512-1.803-12.795-6.77-25.365-6.788zm-786.044.094c-7.15-.038-15.296 1.396-22.153 4.451-6.381 2.844-11.639 7.44-11.639 15.089 0 6.846 4.376 10.872 4.24 10.74 1.883 1.707 4.87 4.648 12.683 6.336 3.477.751 10.924 1.906 18.386 2.745 7.351.827 14.64 1.508 17.607 2.234 2.37.58 6.268 1.434 6.268 5.838 0 4.442-4.145 5.762-4.88 6.054-.74.294-5.7 2.565-14.689 2.565-6.625 0-14.562-1.981-17.473-2.972-3.342-1.136-6.813-2.817-10.092-6.825-.809-.988-2.066-3.708-2.066-6.395h-8.174v22.716h9.03v-3.073c0-.302.47-1.772 1.947-1.065 1.867.895 7.404 3.035 13.222 4.252 4.72.987 7.783 1.688 13.658 1.688 9.628 0 14.792-1.556 18.342-2.575 3.423-.98 7.575-2.725 10.904-5.393 1.82-1.458 5.82-5.178 5.82-11.948 0-6.516-3.453-10.561-4.71-11.768a21.63 21.63 0 0 0 -5.826-3.97c-1.873-.876-4.788-1.923-7.174-2.49-4.69-1.111-15.177-2.583-20.17-3.082-5.27-.528-14.427-1.33-18.048-2.452-1.119-.347-3.399-1.434-3.399-4.037 0-1.848 1.072-3.451 3.09-4.752 3.184-2.053 9.807-3.254 16.585-3.254 8.086 0 14.897 1.772 19.223 3.715 1.508.677 3.203 1.633 4.587 2.755 1.56 1.265 3.705 3.885 4.5 7.534h7.302v-19.775h-8.124v2.292c0 .763-.766 1.697-2.24.934-3.655-1.895-13.908-6.046-26.537-6.111zm97.662 0c-12.751 0-26.343 4.404-34.045 11.391-6.13 5.562-9.278 13.315-9.278 21.057 0 7.827 3.062 15.456 9.278 21.085 8.27 7.489 20.695 11.456 34.045 11.456 13.423 0 26.096-3.96 34.13-11.456 5.97-5.57 9.143-13.57 9.143-21.085 0-7.78-2.98-15.418-9.143-21.019-8.632-7.846-19.929-11.43-34.13-11.43zm536.213 0c-7.138-.038-15.284 1.396-22.14 4.451-6.384 2.846-11.648 7.44-11.648 15.088 0 6.845 4.378 10.721 4.245 10.58 1.877 1.725 4.866 4.46 12.684 6.138 3.475.747 11.003 1.792 18.462 2.622 7.35.818 14.56 1.764 17.531 2.48 2.37.572 6.26 1.67 6.26 6.073 0 4.442-4.139 5.752-4.865 6.054-.747.31-5.705 2.565-14.692 2.565-6.629 0-14.568-1.98-17.481-2.98-3.338-1.145-6.82-2.81-10.092-6.817-.813-.996-2.065-3.717-2.065-6.395h-8.165v22.716h9.024v-3.073c0-.302.471-1.772 1.933-1.065 1.88.91 7.412 3.035 13.24 4.252 4.722.986 7.77 1.678 13.654 1.678 9.627 0 14.785-1.555 18.34-2.565 3.434-.974 7.573-2.725 10.91-5.393 1.817-1.452 5.808-5.178 5.808-11.948 0-6.516-3.45-10.297-4.705-11.504-1.705-1.642-3.686-2.866-5.827-3.866-1.877-.877-4.602-1.716-6.977-2.273-4.7-1.1-15.382-2.613-20.37-3.113-5.266-.527-14.399-1.553-18.02-2.676-1.125-.35-3.413-1.764-3.413-4.367 0-1.848 1.065-3.451 3.083-4.752 3.187-2.054 9.808-3.254 16.578-3.254 8.09 0 14.89 1.772 19.237 3.715 1.471.726 3.197 1.633 4.583 2.755 1.554 1.257 3.696 3.885 4.488 7.534h7.3v-19.774h-8.11v2.29c0 .764-.765 1.698-2.255.935-3.653-1.873-13.909-6.046-26.535-6.111zm56.532 3.659v7.224h7.674c3.281 0 3.094 2.548 3.094 2.548l-.093 38.194s.18 2.549-3.11 2.549h-7.668v7.213h40.255v-7.213h-8.041c-3.29 0-3.112-2.565-3.112-2.565l-.093-38.178s-.187-2.548 3.094-2.548h8.057v-7.224zm-443.557.017v7.176h7.082c3.083 0 5.064 1.959 6.237 3.215.934 1 21.177 23.996 21.675 24.63.494.633.494.736.494 1.018v11.76c0 2.885-3.037 2.697-3.037 2.697h-7.735v7.214h39.566v-7.233h-8.242s-2.912.202-2.912-2.544v-11.65s-.031-.964.282-1.326c.547-.632 21.053-23.986 21.958-25.026 1.976-2.273 3.05-2.754 5.695-2.754h7.274v-7.175h-32.598v7.175h4.884c1.452 0 1.848 1.463 1.221 2.245l-13.804 16.141h-.44l-13.484-16.143c-.986-1.206-.188-2.244.878-2.244h4.79v-7.176zm168.698 0-37.237.002v7.194h6.306c4.555 0 4.877 2.535 4.877 4.742v33.769c0 2.046.132 4.79-2.791 4.79h-7.818v7.213h31.373v-7.213h-6.157c-3.235 0-3.415-1.452-3.471-4.65l.02-36.756h.282l21.943 48.639h12.362l21.754-48.639h.293l.264 36.757c-.066 3.197-.236 4.649-3.461 4.649h-6.167v7.213h38.02v-7.213h-7.816c-2.913 0-2.791-2.744-2.791-4.79l-.189-33.769c0-2.207.311-4.742 4.875-4.742h6.308v-7.194l-36.558-.001-17.133 37.737zm-265.716.002v7.194h6.312c4.55 0 4.877 2.535 4.877 4.742v33.769c0 2.046.13 4.79-2.793 4.79h-7.82v7.213h33.329v-7.213h-8.125c-3.23 0-3.403-1.452-3.46-4.65v-28.91l45.705 40.773h11.619l-.618-46.054c.085-3.338.273-4.48 3.72-4.48h7.294v-7.174h-33.918v7.174h7.467c3.385 0 3.988 1.358 4.017 4.48l.42 24.103-39.658-35.757zm347.567 0v7.174h7.025c3.394 0 3.997 1.358 4.026 4.48h.01v27.874c0 18.52 19.208 21.792 35.691 21.792 16.814 0 33.08-3.441 33.08-21.216l-.122-30.11c.179-2.064.829-2.82 3.63-2.82h7.299v-7.174h-33.59v7.174h6.677c3.254 0 3.933 1.264 4.008 4.13l-.028 29.054c0 6.705-2.444 14.032-20.954 14.032-17.322 0-16.587-11.948-16.587-13.966v-29.156c.094-3.036.407-4.094 3.717-4.094h7.1v-7.174zm-399.737 4.78c7.006 0 13.757 2.556 18.279 6.997 4.416 4.339 6.69 10.4 6.69 16.992 0 6.818-2.117 12.372-6.69 16.936-4.571 4.561-11.132 7.025-18.279 7.025-7.014 0-13.74-2.499-18.3-7.025-4.352-4.32-6.654-10.439-6.654-16.936 0-6.525 2.3-12.645 6.655-16.992 4.523-4.516 11.285-6.997 18.3-6.997z' />
     </svg>
   );
 }
@@ -31,9 +32,7 @@ export function UniversalMusicGroupLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 210 22'
-      width={210}
-      height={22}
+      viewBox='0 0 230 18'
       fill='none'
       aria-label='Universal Music Group'
       {...props}
@@ -41,12 +40,12 @@ export function UniversalMusicGroupLogo(props: React.SVGProps<SVGSVGElement>) {
       <title>Universal Music Group</title>
       <text
         x='0'
-        y='16'
+        y='14'
         fill='currentColor'
         fontFamily={FONT_FAMILY}
         fontSize='13'
-        fontWeight={400}
-        letterSpacing='0.1em'
+        fontWeight={500}
+        letterSpacing='0.14em'
       >
         UNIVERSAL MUSIC GROUP
       </text>
@@ -58,9 +57,7 @@ export function AwalLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 100 24'
-      width={100}
-      height={24}
+      viewBox='0 0 72 20'
       fill='none'
       aria-label='AWAL'
       {...props}
@@ -68,12 +65,12 @@ export function AwalLogo(props: React.SVGProps<SVGSVGElement>) {
       <title>AWAL</title>
       <text
         x='0'
-        y='18'
+        y='16'
         fill='currentColor'
         fontFamily={FONT_FAMILY}
-        fontSize='20'
-        fontWeight={800}
-        letterSpacing='0.2em'
+        fontSize='18'
+        fontWeight={700}
+        letterSpacing='0.18em'
       >
         AWAL
       </text>
@@ -85,9 +82,7 @@ export function ArmadaMusicLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 150 22'
-      width={150}
-      height={22}
+      viewBox='0 0 170 18'
       fill='none'
       aria-label='Armada Music'
       {...props}
@@ -95,12 +90,12 @@ export function ArmadaMusicLogo(props: React.SVGProps<SVGSVGElement>) {
       <title>Armada Music</title>
       <text
         x='0'
-        y='16'
+        y='14'
         fill='currentColor'
         fontFamily={FONT_FAMILY}
         fontSize='14'
-        fontWeight={500}
-        letterSpacing='0.12em'
+        fontWeight={600}
+        letterSpacing='0.14em'
       >
         ARMADA MUSIC
       </text>
@@ -112,9 +107,7 @@ export function BlackHoleRecordingsLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 200 22'
-      width={200}
-      height={22}
+      viewBox='0 0 220 18'
       fill='none'
       aria-label='Black Hole Recordings'
       {...props}
@@ -122,13 +115,12 @@ export function BlackHoleRecordingsLogo(props: React.SVGProps<SVGSVGElement>) {
       <title>Black Hole Recordings</title>
       <text
         x='0'
-        y='16'
+        y='14'
         fill='currentColor'
         fontFamily={FONT_FAMILY}
         fontSize='12.5'
-        fontWeight={400}
-        letterSpacing='0.1em'
-        style={{ fontStretch: 'semi-condensed' }}
+        fontWeight={500}
+        letterSpacing='0.12em'
       >
         BLACK HOLE RECORDINGS
       </text>
@@ -140,9 +132,7 @@ export function DiscoWaxLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 130 24'
-      width={130}
-      height={24}
+      viewBox='0 0 120 20'
       fill='none'
       aria-label='Disco:Wax'
       {...props}
@@ -150,12 +140,12 @@ export function DiscoWaxLogo(props: React.SVGProps<SVGSVGElement>) {
       <title>Disco:Wax</title>
       <text
         x='0'
-        y='18'
+        y='16'
         fill='currentColor'
         fontFamily={FONT_FAMILY}
-        fontSize='17'
+        fontSize='16'
         fontWeight={700}
-        letterSpacing='0.12em'
+        letterSpacing='0.1em'
       >
         DISCO:WAX
       </text>
