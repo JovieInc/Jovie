@@ -998,13 +998,17 @@ export async function connectAppleMusicArtist(params: {
   };
 }
 
+interface DeleteReleaseParams {
+  releaseId: string;
+}
+
 /**
  * Delete a release and all associated data (tracks, provider links, etc.).
  * Cascading deletes handle child records automatically.
  */
-export async function deleteRelease(params: {
-  releaseId: string;
-}): Promise<{ success: boolean }> {
+export async function deleteRelease(
+  params: DeleteReleaseParams
+): Promise<{ success: boolean }> {
   noStore();
 
   const { userId } = await getCachedAuth();
