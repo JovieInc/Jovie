@@ -1,0 +1,544 @@
+# Sentry Autofix Workflow
+#
+# PURPOSE: Automatically implement fixes for Sentry production errors.
+# Pipeline: Sentry Alert → GitHub Issue → CodeRabbit Plan → Claude Fix → PR
+#
+# TRIGGER: Activates when CodeRabbit comments a plan on a sentry-labeled issue.
+# Only proceeds if ALL guard conditions pass.
+#
+# SAFETY:
+# - Only triggers on issues with "sentry" label
+# - Waits for CodeRabbit plan before proceeding
+# - Respects ai:opt-out label
+# - Maximum 1 autofix attempt per issue (label-gated)
+# - Scope-limited: max 10 files changed, no high-risk paths
+# - Human escalation on failure
+#
+# COST: ~1 Claude Opus invocation per Sentry issue that gets a plan.
+# At ~10 Sentry issues/week = ~40 invocations/month.
+
+name: Sentry Autofix
+
+on:
+  issue_comment:
+    types: [created]
+
+# Minimal permissions — expanded only where needed in autofix job
+permissions:
+  contents: read
+  issues: read
+
+# Prevent concurrent runs on the same issue to avoid race conditions
+concurrency:
+  group: sentry-autofix-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================================
+  # GUARD JOB: Validate all trigger conditions before proceeding
+  # Follows the same guard pattern as coderabbit-autofix.yml
+  # ============================================================================
+  guard:
+    name: Trigger Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      should_run: ${{ steps.evaluate.outputs.should_run }}
+      plan_body: ${{ steps.extract-plan.outputs.plan_body }}
+    steps:
+      # GUARD 1: Comment is from CodeRabbit bot (not a human or Claude)
+      - name: Check commenter is CodeRabbit
+        id: check-commenter
+        run: |
+          COMMENTER="${{ github.event.comment.user.login }}"
+          echo "Commenter: $COMMENTER"
+
+          if [[ "$COMMENTER" != "coderabbitai[bot]" ]]; then
+            echo "❌ Commenter is not CodeRabbit (got: $COMMENTER)"
+            echo "is_coderabbit=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Commenter is CodeRabbit"
+            echo "is_coderabbit=true" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 2: Issue has "sentry" label (only Sentry issues, not all issues)
+      - name: Check issue has sentry label
+        id: check-sentry-label
+        if: steps.check-commenter.outputs.is_coderabbit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels --jq '.[].name')
+          echo "Labels: $LABELS"
+
+          if echo "$LABELS" | grep -q "^sentry$"; then
+            echo "✅ Issue has sentry label"
+            echo "has_sentry=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Issue missing sentry label"
+            echo "has_sentry=false" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 3: Issue does NOT have ai:opt-out label (human override)
+      - name: Check no opt-out label
+        id: check-opt-out
+        if: steps.check-commenter.outputs.is_coderabbit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels --jq '.[].name')
+
+          if echo "$LABELS" | grep -q "^ai:opt-out$"; then
+            echo "❌ Issue has ai:opt-out label — skipping"
+            echo "opted_out=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No ai:opt-out label"
+            echo "opted_out=false" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 4: Comment contains a CodeRabbit plan (not just any comment)
+      - name: Check comment contains plan
+        id: check-plan
+        if: steps.check-commenter.outputs.is_coderabbit == 'true'
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # CodeRabbit plans contain structured sections like "## Plan",
+          # "## Implementation Plan", "### Tasks", "### Steps"
+          if echo "$COMMENT_BODY" | grep -qiE "(## (Implementation )?Plan|### (Phased )?Tasks|### Steps|## Summary.*\n.*## Research|## Design)"; then
+            echo "✅ Comment contains a CodeRabbit plan"
+            echo "has_plan=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Comment does not appear to contain a plan"
+            echo "has_plan=false" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 5: Retry guard — only 1 attempt per issue
+      # Uses the same label-based tracking as coderabbit-autofix.yml
+      - name: Check retry guard
+        id: check-retry
+        if: steps.check-commenter.outputs.is_coderabbit == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels --jq '.[].name')
+
+          HAS_FIXING=$(echo "$LABELS" | grep -c "^ai:fixing$" || true)
+          HAS_FIXED=$(echo "$LABELS" | grep -c "^ai:fixed$" || true)
+          HAS_FAILED=$(echo "$LABELS" | grep -c "^ai:failed$" || true)
+
+          if [[ "$HAS_FIXING" -gt 0 || "$HAS_FIXED" -gt 0 || "$HAS_FAILED" -gt 0 ]]; then
+            echo "❌ Issue already has ai:fixing/ai:fixed/ai:failed label — skipping"
+            echo "retries_available=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ No prior attempt labels found"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+          fi
+
+      # GUARD 6: Issue is still open
+      - name: Check issue is open
+        id: check-open
+        if: steps.check-commenter.outputs.is_coderabbit == 'true'
+        run: |
+          STATE="${{ github.event.issue.state }}"
+          echo "Issue state: $STATE"
+
+          if [[ "$STATE" == "open" ]]; then
+            echo "✅ Issue is open"
+            echo "is_open=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Issue is not open (state: $STATE)"
+            echo "is_open=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Aggregate all guards into final decision
+      - name: Evaluate all guards
+        id: evaluate
+        run: |
+          IS_CODERABBIT="${{ steps.check-commenter.outputs.is_coderabbit }}"
+          HAS_SENTRY="${{ steps.check-sentry-label.outputs.has_sentry }}"
+          OPTED_OUT="${{ steps.check-opt-out.outputs.opted_out }}"
+          HAS_PLAN="${{ steps.check-plan.outputs.has_plan }}"
+          RETRIES="${{ steps.check-retry.outputs.retries_available }}"
+          IS_OPEN="${{ steps.check-open.outputs.is_open }}"
+
+          echo "=== Guard Summary ==="
+          echo "Is CodeRabbit:      $IS_CODERABBIT"
+          echo "Has sentry label:   $HAS_SENTRY"
+          echo "Opted out:          $OPTED_OUT"
+          echo "Has plan:           $HAS_PLAN"
+          echo "Retries available:  $RETRIES"
+          echo "Is open:            $IS_OPEN"
+
+          if [[ "$IS_CODERABBIT" == "true" && \
+                "$HAS_SENTRY" == "true" && \
+                "$OPTED_OUT" == "false" && \
+                "$HAS_PLAN" == "true" && \
+                "$RETRIES" == "true" && \
+                "$IS_OPEN" == "true" ]]; then
+            echo "✅ All guards passed — proceeding with autofix"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ One or more guards failed — skipping autofix"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Extract the plan content for the autofix job
+      - name: Extract plan from comment
+        id: extract-plan
+        if: steps.evaluate.outputs.should_run == 'true'
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Base64 encode the comment body to preserve formatting and special chars
+          PLAN_B64=$(echo "$COMMENT_BODY" | base64 -w0)
+          echo "plan_body=$PLAN_B64" >> $GITHUB_OUTPUT
+          echo "✅ Plan extracted and encoded"
+
+  # ============================================================================
+  # AUTOFIX JOB: Implement the fix using Claude Code
+  # ============================================================================
+  autofix:
+    name: Implement Fix
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Elevated permissions for this job only
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark issue as in-progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+
+          # Add ai:fixing label
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels \
+            --method POST --field "labels[]=ai:fixing" || true
+
+          # Post status comment
+          gh issue comment "$ISSUE_NUMBER" --body "## Sentry Autofix Started
+
+          Claude is implementing a fix based on the CodeRabbit plan above.
+
+          **Status**: In progress
+          **Triggered by**: CodeRabbit plan comment
+          **Workflow run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Prepare agent instructions
+        id: prepare
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+
+          # Decode plan from guard job
+          PLAN_BODY=$(echo "${{ needs.guard.outputs.plan_body }}" | base64 -d)
+
+          # Build structured instructions for Claude
+          cat > /tmp/sentry-fix-instructions.md << 'INSTRUCTIONS_EOF'
+          # Sentry Bug Fix Instructions
+
+          You are fixing a production bug detected by Sentry. CodeRabbit has analyzed
+          the issue and generated an implementation plan below.
+
+          ## CRITICAL CONSTRAINTS
+
+          1. **Follow the plan**: Use CodeRabbit's plan as your primary guide
+          2. **Minimal scope**: Only modify files identified in the plan
+          3. **Max 5 files**: If the fix requires more than 5 files, stop and explain why
+          4. **No high-risk changes**: Do NOT modify auth, payments, migrations, or middleware
+          5. **Scan for siblings**: If you fix a pattern, search for the same pattern elsewhere
+          6. **Run validation**: After fixing, run ship validation (typecheck, lint, tests)
+
+          ## FORBIDDEN PATHS (stop and escalate if fix requires these)
+
+          - app/(auth)/**
+          - app/api/stripe/**
+          - drizzle/migrations/**
+          - middleware.ts
+          - lib/auth/**
+          - lib/env.ts
+
+          INSTRUCTIONS_EOF
+
+          {
+            echo ""
+            echo "## SENTRY ERROR DETAILS"
+            echo ""
+            echo "**Issue**: #${ISSUE_NUMBER} — ${ISSUE_TITLE}"
+            echo ""
+            echo "$ISSUE_BODY"
+            echo ""
+            echo "## CODERABBIT IMPLEMENTATION PLAN"
+            echo ""
+            echo "$PLAN_BODY"
+            echo ""
+            echo "## YOUR TASK"
+            echo ""
+            echo "1. Read the Sentry error details and CodeRabbit plan carefully"
+            echo "2. Implement the fix following the plan's guidance"
+            echo "3. Search for similar patterns (sibling bugs) and fix those too"
+            echo "4. Run validation:"
+            echo "   - \`pnpm turbo typecheck --filter=@jovie/web\`"
+            echo "   - \`pnpm biome check .\`"
+            echo "   - \`pnpm vitest --run --changed\`"
+            echo "5. If any validation fails, fix the errors"
+            echo "6. Do NOT commit changes — the workflow handles committing"
+            echo ""
+            echo "IMPORTANT: If the fix requires changes to forbidden paths (auth, payments,"
+            echo "migrations, middleware), do NOT make those changes. Instead, write a comment"
+            echo "explaining what changes are needed and why they require human review."
+          } >> /tmp/sentry-fix-instructions.md
+
+          echo "instructions_file=/tmp/sentry-fix-instructions.md" >> $GITHUB_OUTPUT
+
+          # Debug: show what we're asking the agent to do
+          echo "=== Agent Instructions ==="
+          cat /tmp/sentry-fix-instructions.md
+
+      - name: Run Claude agent
+        id: claude-fix
+        uses: anthropics/claude-code-action@68cfeead1890300cc87935dbe2c023825be87b8a # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read the file at /tmp/sentry-fix-instructions.md and implement the fix described.
+
+            After making changes, run these validation commands:
+            1. pnpm turbo typecheck --filter=@jovie/web (verify types)
+            2. pnpm biome check . --write (auto-fix formatting)
+            3. pnpm biome check . (verify no remaining lint issues)
+            4. pnpm vitest --run --changed (run affected tests)
+
+            If validation fails, analyze the errors and fix them.
+            Do NOT commit the changes — just make the fixes.
+
+          # Use Opus for complex bug fixes (per agents.md section 6.1)
+          claude_args: '--model claude-opus-4-5-20251101'
+
+      - name: Validate fixes
+        id: validate
+        run: |
+          set +e
+
+          echo "=== Running TypeScript typecheck ==="
+          pnpm turbo typecheck --filter=@jovie/web 2>&1 | tee /tmp/typecheck.log
+          TYPECHECK_EXIT=$?
+
+          echo "=== Running Biome auto-fix ==="
+          pnpm biome check . --write 2>&1 | tee /tmp/biome-write.log
+
+          echo "=== Running Biome check ==="
+          pnpm biome check . 2>&1 | tee /tmp/biome-check.log
+          BIOME_EXIT=$?
+
+          echo "=== Running affected tests ==="
+          pnpm vitest --run --changed 2>&1 | tee /tmp/test.log
+          TEST_EXIT=$?
+
+          if [[ $TYPECHECK_EXIT -eq 0 && $BIOME_EXIT -eq 0 && $TEST_EXIT -eq 0 ]]; then
+            echo "✅ All validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Validation failed (typecheck=$TYPECHECK_EXIT, biome=$BIOME_EXIT, tests=$TEST_EXIT)"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Scope guard: ensure we didn't change too many files or touch forbidden paths
+      - name: Scope guard
+        id: scope-guard
+        run: |
+          CHANGED=$(git diff --name-only HEAD)
+          FILE_COUNT=$(echo "$CHANGED" | grep -c . || true)
+
+          echo "Changed files ($FILE_COUNT):"
+          echo "$CHANGED"
+
+          FORBIDDEN_HIT="false"
+          for pattern in "app/(auth)/" "app/api/stripe/" "drizzle/migrations/" "middleware.ts" "lib/auth/" "lib/env.ts"; do
+            if echo "$CHANGED" | grep -q "$pattern"; then
+              echo "⚠️ FORBIDDEN: Changes detected in $pattern"
+              FORBIDDEN_HIT="true"
+            fi
+          done
+
+          if [[ "$FILE_COUNT" -gt 10 ]]; then
+            echo "scope_ok=false" >> $GITHUB_OUTPUT
+            echo "scope_reason=Too many files changed ($FILE_COUNT > 10)" >> $GITHUB_OUTPUT
+          elif [[ "$FORBIDDEN_HIT" == "true" ]]; then
+            echo "scope_ok=false" >> $GITHUB_OUTPUT
+            echo "scope_reason=Changes detected in forbidden paths" >> $GITHUB_OUTPUT
+          else
+            echo "scope_ok=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Create branch, commit, push, and open PR
+      - name: Create PR
+        if: steps.validate.outputs.validation_passed == 'true' && steps.scope-guard.outputs.scope_ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+
+          # Check for actual changes
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+            gh issue comment "$ISSUE_NUMBER" --body "## Sentry Autofix: No Changes Needed
+
+          After analyzing the error and plan, no code changes were necessary.
+          This may indicate the error is environmental or already resolved."
+
+            # Update labels
+            gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels/ai%3Afixing --method DELETE || true
+            gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels \
+              --method POST --field "labels[]=ai:fixed" || true
+            exit 0
+          fi
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create branch
+          BRANCH_NAME="fix/sentry-${ISSUE_NUMBER}"
+          git checkout -b "$BRANCH_NAME"
+
+          # Stage and commit
+          git add -A
+          git commit -m "$(cat <<EOF
+          fix: resolve Sentry error #${ISSUE_NUMBER}
+
+          Automated fix for production error detected by Sentry.
+          Implementation based on CodeRabbit's auto-generated plan.
+
+          Closes #${ISSUE_NUMBER}
+
+          Co-authored-by: Claude <claude@anthropic.com>
+          EOF
+          )"
+
+          # Push branch
+          git push -u origin "$BRANCH_NAME"
+
+          # Build PR body
+          DIFF_STAT=$(git diff --stat HEAD~1)
+          PR_BODY="$(cat <<EOF
+          ## Summary
+
+          Automated fix for a production error detected by Sentry.
+
+          - **Sentry Issue**: See #${ISSUE_NUMBER} for full error details
+          - **Implementation Plan**: Generated by CodeRabbit Issue Planner
+          - **Fix Applied By**: Claude Code (automated)
+
+          ## Changes
+
+          \`\`\`
+          ${DIFF_STAT}
+          \`\`\`
+
+          ## Validation
+
+          - [x] TypeScript typecheck: Passed
+          - [x] Biome lint: Passed
+          - [x] Affected tests: Passed
+
+          ## Test Plan
+
+          - [ ] Verify the fix addresses the Sentry error
+          - [ ] Check for regression in affected areas
+          - [ ] Monitor Sentry after deploy for error resolution
+
+          Closes #${ISSUE_NUMBER}
+
+          ---
+          *This PR was automatically generated by the Sentry Autofix pipeline.*
+          EOF
+          )"
+
+          # Create PR
+          PR_URL=$(gh pr create \
+            --title "fix: resolve Sentry error — ${ISSUE_TITLE}" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "sentry" \
+            --label "ai:auto-fix")
+
+          echo "✅ PR created: $PR_URL"
+
+          # Enable auto-merge (squash)
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          gh pr merge "$PR_NUMBER" --auto --squash || true
+
+          # Update issue labels
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels/ai%3Afixing --method DELETE || true
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels \
+            --method POST --field "labels[]=ai:fixed" || true
+
+          # Comment on issue with PR link
+          gh issue comment "$ISSUE_NUMBER" --body "## Sentry Autofix Complete
+
+          A fix has been implemented and submitted as a pull request.
+
+          **PR**: $PR_URL
+          **Status**: Awaiting CI and CodeRabbit review
+          **Auto-merge**: Enabled (will merge when all checks pass)
+
+          The PR will be reviewed by CodeRabbit automatically."
+
+      # Escalate to human on failure
+      - name: Escalate to human
+        if: always() && needs.guard.outputs.should_run == 'true' && (steps.validate.outputs.validation_passed == 'false' || steps.scope-guard.outputs.scope_ok == 'false')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          SCOPE_OK="${{ steps.scope-guard.outputs.scope_ok }}"
+          SCOPE_REASON="${{ steps.scope-guard.outputs.scope_reason }}"
+
+          if [[ "$SCOPE_OK" == "false" ]]; then
+            REASON="Scope guard triggered: $SCOPE_REASON"
+          else
+            REASON="Validation failed (typecheck, lint, or tests)"
+          fi
+
+          # Update labels
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels/ai%3Afixing --method DELETE || true
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels \
+            --method POST --field "labels[]=ai:failed" || true
+          gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels \
+            --method POST --field "labels[]=needs-human" || true
+
+          # Comment explaining failure
+          gh issue comment "$ISSUE_NUMBER" --body "## Sentry Autofix Failed
+
+          The automated fix could not be completed.
+
+          **Reason**: $REASON
+          **Workflow run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          **Next steps**: A human developer needs to review the Sentry error and CodeRabbit plan above, then implement the fix manually.
+
+          The \`needs-human\` and \`ai:failed\` labels have been added to this issue."

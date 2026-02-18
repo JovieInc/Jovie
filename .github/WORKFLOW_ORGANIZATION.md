@@ -223,6 +223,61 @@ When automation fails after 2 attempts:
 
 ---
 
+### 7. **Sentry Autofix** (`sentry-autofix.yml`)
+
+**Purpose:** Automatically implement fixes for production errors detected by Sentry
+
+**Pipeline:** Sentry Alert → GitHub Issue → CodeRabbit Plan → Claude Fix → PR
+
+**Triggers:**
+
+- `issue_comment` with action `created`
+- Only when commenter is `coderabbitai[bot]`
+- Only when issue has `sentry` label
+- Only when comment contains a CodeRabbit plan
+
+**Guard Conditions (all must pass):**
+
+1. Comment from `coderabbitai[bot]`
+2. Issue has `sentry` label
+3. Issue does NOT have `ai:opt-out` label
+4. Comment contains plan markers (`## Plan`, `### Tasks`, etc.)
+5. No existing `ai:fixing`/`ai:fixed`/`ai:failed` label (single attempt)
+6. Issue is still open
+
+**Process:**
+
+1. **Guard Job**: Validates all trigger conditions
+2. **Autofix Job** (if guards pass):
+   - Marks issue with `ai:fixing` label
+   - Builds structured prompt from Sentry error + CodeRabbit plan
+   - Runs Claude Code to implement the fix
+   - Validates: TypeScript + Biome lint + affected tests
+   - Scope guard: max 10 files, no forbidden paths
+   - Creates branch, commits, pushes, opens PR
+   - Enables auto-merge on the PR
+   - Updates issue labels to `ai:fixed`
+
+**Safety Features:**
+
+- ✅ Single attempt per issue (label-gated, no retry loops)
+- ✅ `ai:opt-out` label disables automation per-issue
+- ✅ Scope guard: max 10 files changed
+- ✅ Forbidden paths: auth, payments, migrations, middleware
+- ✅ Concurrency group prevents parallel runs on same issue
+- ✅ Human escalation with `needs-human` + `ai:failed` labels
+
+**Escalation:**
+
+When automation fails:
+- `ai:failed` and `needs-human` labels added to issue
+- Comment posted explaining the failure reason
+- Link to workflow run for debugging
+
+**Cost:** ~1 Claude Opus invocation per Sentry issue (~40/month at 10 issues/week)
+
+---
+
 ## 🔄 **Workflow Dependencies**
 
 ### **Feature → Main Flow**

@@ -1,4 +1,4 @@
-# AI Automation (CodeRabbit, auto-merge, CI healing)
+# AI Automation (CodeRabbit, auto-merge, CI healing, Sentry autofix)
 
 This document explains the automation and labels used in this repo so agents can ship quickly without breaking `main`.
 
@@ -6,6 +6,7 @@ This document explains the automation and labels used in this repo so agents can
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/claude.yml`
+- `.github/workflows/sentry-autofix.yml`
 - `.github/workflows/neon-ephemeral-branch-cleanup.yml`
 - `.coderabbit.yaml`
 
@@ -65,6 +66,48 @@ These labels are used to coordinate automation and prevent merge loops.
 ### `ci:manual`
 
 - CI failure requires manual intervention.
+
+## Sentry Autofix Pipeline
+
+End-to-end automation from production errors to fix PRs.
+
+### Pipeline flow
+
+```
+Sentry Alert → GitHub Issue [sentry, bug] → CodeRabbit Plan → Claude Fix → PR
+```
+
+1. **Sentry** detects a production error and creates a GitHub Issue (labels: `sentry`, `bug`)
+2. **CodeRabbit Issue Planner** auto-generates an implementation plan on the issue
+3. **`sentry-autofix.yml`** detects the plan comment and triggers Claude Code
+4. **Claude** implements the fix, runs validation, and opens a PR
+5. **CodeRabbit** reviews the PR automatically
+6. **CI** runs, and if green, the PR auto-merges
+
+### Sentry labels
+
+#### `sentry`
+
+- Issue was created by a Sentry alert rule.
+- Triggers CodeRabbit auto-planning (configured in `.coderabbit.yaml`).
+
+#### `needs-human`
+
+- Autofix failed or the issue requires changes to high-risk paths.
+- A human developer must resolve this manually.
+
+### Disabling
+
+- **Per-issue**: Add `ai:opt-out` label to any Sentry issue.
+- **Globally**: Disable the Sentry alert rule in Sentry UI, or disable the workflow in GitHub Actions.
+
+### Safety
+
+- Single attempt per issue (no retry loops).
+- Scope guard: max 10 files, no changes to auth/payments/migrations/middleware.
+- Label state machine prevents re-triggering: `sentry,bug` → `ai:fixing` → `ai:fixed` or `ai:failed`.
+
+See `docs/SENTRY_GITHUB_SETUP.md` for full setup instructions.
 
 ## CodeRabbit CLI (local)
 

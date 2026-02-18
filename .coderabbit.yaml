@@ -209,3 +209,27 @@ code_generation:
         instructions: |
           Mock database with vi.mock() for unit tests.
           Test query builders and business logic separately.
+
+# Issue Planner: auto-generate code plans for Sentry issues
+# When a GitHub issue with the "sentry" label is created (by Sentry alert rules),
+# CodeRabbit will automatically analyze the codebase and generate an implementation plan.
+# This plan is then picked up by .github/workflows/sentry-autofix.yml to trigger Claude.
+issue_enrichment:
+  auto_enrich:
+    enabled: true
+
+  planning:
+    enabled: true
+    auto_planning:
+      enabled: true
+      labels: ['sentry']
+
+  labeling:
+    auto_apply_labels: true
+    labeling_instructions:
+      - label: "sentry"
+        instructions: "Apply to issues automatically created by Sentry alert rules. These contain production error reports with stack traces."
+      - label: "ai:auto-fix"
+        instructions: "Apply to Sentry issues that appear to be straightforward bugs fixable by an AI agent (null checks, missing imports, type errors, boundary violations)."
+      - label: "ai:opt-out"
+        instructions: "Apply to issues that touch high-risk areas (auth, payments, database migrations, middleware) and should NOT be auto-fixed."
