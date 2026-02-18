@@ -39,7 +39,7 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex items-center gap-2 rounded-lg border border-white/[0.06]',
+        'chat-pill flex w-fit items-center gap-2 rounded-lg border border-white/[0.06]',
         'bg-white/[0.02] px-3.5 py-2.5 text-left',
         'hover:border-white/[0.1] hover:bg-white/[0.04]',
         'active:scale-[0.98]',

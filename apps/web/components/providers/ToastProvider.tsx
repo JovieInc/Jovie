@@ -98,7 +98,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
             title: 'font-linear-semibold',
             description: 'font-linear-normal',
             actionButton:
-              'bg-btn-primary text-btn-primary-foreground font-linear-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              'border border-default bg-transparent text-primary-token font-linear-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
               'bg-surface-2 text-secondary-token font-linear-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             success: '[&>svg]:text-success',

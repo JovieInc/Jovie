@@ -137,6 +137,14 @@ const APPROVED_STATUSES = [
   'active',
 ] as const;
 
+/** Whether the user has a complete profile */
+function hasCompleteProfile(result: {
+  profileId: string | null;
+  profileComplete: Date | null;
+}): boolean {
+  return !!result.profileId && !!result.profileComplete;
+}
+
 /**
  * Determine user state from database query result
  */
@@ -164,23 +172,16 @@ function determineUserState(
     result.userStatus as (typeof APPROVED_STATUSES)[number]
   );
 
-  if (!isWaitlistApproved) {
-    if (!waitlistEnabled) {
-      // Waitlist disabled: skip gate, route based on profile completeness
-      if (!result.profileId || !result.profileComplete) {
-        return { ...NEEDS_ONBOARDING_STATE };
-      }
-      return { ...ACTIVE_USER_STATE };
-    }
+  // Not approved + waitlist enabled → send to waitlist
+  if (!isWaitlistApproved && waitlistEnabled) {
     return { ...DEFAULT_WAITLIST_STATE };
   }
 
-  // Has approval but no profile or incomplete → needs onboarding
-  if (!result.profileId || !result.profileComplete) {
+  // Either approved, or waitlist is disabled — route based on profile completeness
+  if (!hasCompleteProfile(result)) {
     return { ...NEEDS_ONBOARDING_STATE };
   }
 
-  // Fully active user
   return { ...ACTIVE_USER_STATE };
 }
 

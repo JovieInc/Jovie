@@ -516,6 +516,50 @@ async function countSubscribers(
   return Number(total ?? 0);
 }
 
+function buildEmptyAudienceData(
+  mode: AudienceMode,
+  view: AudienceView
+): AudienceServerData {
+  return {
+    mode,
+    view,
+    rows: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
+    direction: 'desc',
+    subscriberCount: 0,
+  };
+}
+
+function buildDataPromise(
+  tx: DbSessionTx,
+  clerkUserId: string,
+  selectedProfileId: string,
+  mode: AudienceMode,
+  view: AudienceView,
+  searchParams: SearchParams,
+  options: { includeDetails: boolean; memberId?: string; segments?: string[] }
+) {
+  if (mode === 'subscribers') {
+    return fetchSubscribersData(
+      tx,
+      clerkUserId,
+      selectedProfileId,
+      searchParams
+    );
+  }
+  return fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
+    includeDetails: options.includeDetails,
+    memberId: options.memberId,
+    // 'all' shows all members, 'anonymous' filters to anonymous only
+    typeFilter:
+      view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined,
+    segmentFilter: options.segments,
+  });
+}
+
 export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
@@ -541,17 +585,7 @@ export async function getAudienceServerData(params: {
   const mode: AudienceMode = view === 'subscribers' ? 'subscribers' : 'members';
 
   if (!selectedProfileId) {
-    return {
-      mode,
-      view,
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 10,
-      sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
-      direction: 'desc',
-      subscriberCount: 0,
-    };
+    return buildEmptyAudienceData(mode, view);
   }
 
   // All audience reads now go through authenticated RLS-protected sessions
@@ -559,19 +593,15 @@ export async function getAudienceServerData(params: {
   return await withDbSessionTx(async (tx, clerkUserId) => {
     // Subscriber count and main data query are independent — run in parallel
     // to eliminate the sequential waterfall.
-    const dataPromise =
-      mode === 'subscribers'
-        ? fetchSubscribersData(tx, clerkUserId, selectedProfileId, searchParams)
-        : fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
-            includeDetails,
-            memberId,
-            // 'all' shows all members, 'anonymous' filters to anonymous only
-            typeFilter:
-              view === 'anonymous'
-                ? ('anonymous' as AudienceMemberType)
-                : undefined,
-            segmentFilter: segments,
-          });
+    const dataPromise = buildDataPromise(
+      tx,
+      clerkUserId,
+      selectedProfileId,
+      mode,
+      view,
+      searchParams,
+      { includeDetails, memberId, segments }
+    );
 
     const [subscriberCount, data] = await Promise.all([
       countSubscribers(tx, clerkUserId, selectedProfileId),
