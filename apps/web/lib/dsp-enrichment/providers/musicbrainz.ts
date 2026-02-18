@@ -70,10 +70,17 @@ async function musicBrainzRequest<T>(endpoint: string): Promise<T> {
     });
     clearTimeout(timeoutId);
     if (response.status === 503 || response.status === 429) {
-      throw new MusicBrainzError('Rate limit exceeded', response.status, 'RATE_LIMITED');
+      throw new MusicBrainzError(
+        'Rate limit exceeded',
+        response.status,
+        'RATE_LIMITED'
+      );
     }
     if (!response.ok) {
-      throw new MusicBrainzError(`MusicBrainz API error: ${response.status}`, response.status);
+      throw new MusicBrainzError(
+        `MusicBrainz API error: ${response.status}`,
+        response.status
+      );
     }
     return (await response.json()) as T;
   } catch (error) {
@@ -92,7 +99,9 @@ async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
   return musicBrainzCircuitBreaker.execute(() => withRetry(fn));
 }
 
-export async function lookupMusicBrainzByIsrc(isrc: string): Promise<MusicBrainzRecording[]> {
+export async function lookupMusicBrainzByIsrc(
+  isrc: string
+): Promise<MusicBrainzRecording[]> {
   try {
     const response = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<{ recordings: MusicBrainzRecording[] }>(
@@ -101,7 +110,10 @@ export async function lookupMusicBrainzByIsrc(isrc: string): Promise<MusicBrainz
     });
     return response.recordings ?? [];
   } catch (error) {
-    if (error instanceof MusicBrainzError && (error.statusCode === 404 || error.statusCode === 400)) {
+    if (
+      error instanceof MusicBrainzError &&
+      (error.statusCode === 404 || error.statusCode === 400)
+    ) {
       return [];
     }
     throw error;
@@ -122,7 +134,9 @@ export async function bulkLookupMusicBrainzByIsrc(
   return results;
 }
 
-export async function getMusicBrainzArtist(mbid: string): Promise<MusicBrainzArtist | null> {
+export async function getMusicBrainzArtist(
+  mbid: string
+): Promise<MusicBrainzArtist | null> {
   try {
     const artist = await executeWithCircuitBreaker(async () => {
       return musicBrainzRequest<MusicBrainzArtist>(
@@ -143,5 +157,8 @@ export function isMusicBrainzAvailable(): boolean {
 }
 
 export function getMusicBrainzStats() {
-  return { configured: true, circuitBreaker: musicBrainzCircuitBreaker.getStats() };
+  return {
+    configured: true,
+    circuitBreaker: musicBrainzCircuitBreaker.getStats(),
+  };
 }
