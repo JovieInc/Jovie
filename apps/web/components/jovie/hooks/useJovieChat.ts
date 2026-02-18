@@ -13,7 +13,7 @@ import {
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
 
-import type { ArtistContext, ChatError } from '../types';
+import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
 import {
   extractErrorMetadata,
@@ -300,9 +300,6 @@ export function useJovieChat({
     queryClient,
     messages,
   ]);
-
-  /** Shape of file attachments passed to AI SDK's sendMessage. */
-  type FileUIPart = { type: 'file'; mediaType: string; url: string };
 
   // Core submit logic
   const doSubmit = useCallback(

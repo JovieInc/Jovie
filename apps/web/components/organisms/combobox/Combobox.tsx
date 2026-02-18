@@ -1,6 +1,10 @@
 'use client';
 
-import * as Headless from '@headlessui/react';
+import {
+  ComboboxButton,
+  ComboboxInput,
+  Combobox as HeadlessCombobox,
+} from '@headlessui/react';
 import { clsx } from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';
 import {
@@ -137,7 +141,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
           {value ? `Selected: ${value.name}` : ''}
         </div>
 
-        <Headless.Combobox
+        <HeadlessCombobox
           value={value}
           onChange={val => {
             if (val) handleSelect(val);
@@ -163,7 +167,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                   )}
                 >
                   <div className='relative flex-1'>
-                    <Headless.Combobox.Input
+                    <ComboboxInput
                       ref={inputRef}
                       id={inputId}
                       aria-controls={listboxId}
@@ -192,7 +196,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       autoComplete='off'
                     />
 
-                    <Headless.Combobox.Button
+                    <ComboboxButton
                       className={clsx(
                         'absolute inset-y-0 right-0 flex items-center justify-center w-10',
                         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50',
@@ -212,7 +216,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                           aria-hidden='true'
                         />
                       )}
-                    </Headless.Combobox.Button>
+                    </ComboboxButton>
                   </div>
 
                   {showCta && (
@@ -265,7 +269,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
               </>
             );
           }}
-        </Headless.Combobox>
+        </HeadlessCombobox>
       </div>
     );
   }

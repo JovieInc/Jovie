@@ -38,15 +38,12 @@ const DashboardAudienceTable = dynamic(
     loading: () => (
       <div className='h-full w-full space-y-4 p-4'>
         <div className='flex items-center justify-between'>
-          <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
-          <div className='h-8 w-32 animate-pulse rounded bg-surface-1' />
+          <div className='h-8 w-48 rounded skeleton' />
+          <div className='h-8 w-32 rounded skeleton' />
         </div>
         <div className='space-y-2'>
           {DASHBOARD_AUDIENCE_LOADING_ROW_KEYS.map(key => (
-            <div
-              key={key}
-              className='h-14 animate-pulse rounded-lg bg-surface-1'
-            />
+            <div key={key} className='h-14 rounded-lg skeleton' />
           ))}
         </div>
       </div>

@@ -1,10 +1,16 @@
 'use client';
 
 import { SegmentControl } from '@jovie/ui';
+import { LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  usePreviewPanelData,
+  usePreviewPanelState,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { useUserButton } from '@/components/organisms/user-button';
+import { APP_ROUTES } from '@/constants/routes';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {
@@ -24,8 +30,13 @@ const PROFILE_TAB_OPTIONS = [
 ];
 
 export function ProfileContactSidebar() {
-  const { isOpen, close, previewData } = usePreviewPanel();
+  const { isOpen, close } = usePreviewPanelState();
+  const { previewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+  const { menuActions } = useUserButton({
+    settingsHref: APP_ROUTES.SETTINGS,
+  });
+  const { handleSignOut, loading } = menuActions;
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryOption>('social');
 
@@ -59,9 +70,50 @@ export function ProfileContactSidebar() {
     }
   }, [resolvedCategory, selectedCategory]);
 
-  // Don't render until we have preview data
+  // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
-    return null;
+    return (
+      <RightDrawer
+        isOpen={isOpen}
+        width={SIDEBAR_WIDTH}
+        ariaLabel='Profile Contact'
+      >
+        <div className='flex h-full flex-col'>
+          {/* Header skeleton */}
+          <div className='flex h-12 shrink-0 items-center justify-between border-b border-subtle px-4'>
+            <div className='h-4 w-24 rounded skeleton' />
+            <div className='h-6 w-6 rounded skeleton' />
+          </div>
+          {/* Avatar + name skeleton */}
+          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+            <div className='flex items-center gap-3'>
+              <div className='h-12 w-12 rounded-full skeleton' />
+              <div className='space-y-2'>
+                <div className='h-4 w-28 rounded skeleton' />
+                <div className='h-3 w-20 rounded skeleton' />
+              </div>
+            </div>
+          </div>
+          {/* Tab skeleton */}
+          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+            <div className='flex gap-2'>
+              <div className='h-7 w-16 rounded-md skeleton' />
+              <div className='h-7 w-16 rounded-md skeleton' />
+              <div className='h-7 w-14 rounded-md skeleton' />
+            </div>
+          </div>
+          {/* Link rows skeleton */}
+          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3'>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className='flex items-center gap-3'>
+                <div className='h-8 w-8 rounded-md skeleton shrink-0' />
+                <div className='flex-1 h-4 rounded skeleton' />
+              </div>
+            ))}
+          </div>
+        </div>
+      </RightDrawer>
+    );
   }
 
   const { username, displayName, avatarUrl, links, profilePath } = previewData;
@@ -116,6 +168,19 @@ export function ProfileContactSidebar() {
                 ?.allowProfilePhotoDownloads === true
             }
           />
+        </div>
+
+        {/* Sign out */}
+        <div className='shrink-0 border-t border-subtle px-4 py-3'>
+          <button
+            type='button'
+            onClick={handleSignOut}
+            disabled={loading.signOut}
+            className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            <LogOut className='size-4 text-tertiary-token' aria-hidden />
+            {loading.signOut ? 'Signing out...' : 'Sign out'}
+          </button>
         </div>
       </div>
     </RightDrawer>

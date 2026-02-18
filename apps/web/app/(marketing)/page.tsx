@@ -1,8 +1,29 @@
 import type { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { ComparisonSection } from '@/components/home/comparison-visual';
-import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
-import { ExampleProfilesCarousel } from '@/components/home/ExampleProfilesCarousel';
+
+const ComparisonSection = dynamic(
+  () =>
+    import('@/components/home/comparison-visual').then(m => ({
+      default: m.ComparisonSection,
+    })),
+  { loading: () => <div style={{ height: 480 }} /> }
+);
+const ExampleProfilesCarousel = dynamic(
+  () =>
+    import('@/components/home/ExampleProfilesCarousel').then(m => ({
+      default: m.ExampleProfilesCarousel,
+    })),
+  { loading: () => <div style={{ height: 400 }} /> }
+);
+const DeeplinksGrid = dynamic(
+  () =>
+    import('@/components/home/DeeplinksGrid').then(m => ({
+      default: m.DeeplinksGrid,
+    })),
+  { loading: () => <div style={{ height: 480 }} /> }
+);
+
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
@@ -313,7 +334,11 @@ export default async function HomePage() {
 
       {showProblem && <ProblemSection />}
 
-      {showComparison && <ComparisonSection />}
+      {showComparison && (
+        <DeferredSection placeholderHeight={480}>
+          <ComparisonSection />
+        </DeferredSection>
+      )}
 
       {showWhatYouGet && (
         <DeferredSection placeholderHeight={560}>

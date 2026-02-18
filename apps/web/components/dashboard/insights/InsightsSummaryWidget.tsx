@@ -13,12 +13,12 @@ export function InsightsSummaryWidget() {
     return (
       <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
         <div className='flex items-center gap-2'>
-          <div className='h-4 w-4 animate-pulse rounded bg-surface-2' />
-          <div className='h-3 w-24 animate-pulse rounded bg-surface-2' />
+          <div className='h-4 w-4 rounded skeleton' />
+          <div className='h-3 w-24 rounded skeleton' />
         </div>
         <div className='mt-3 space-y-2'>
-          <div className='h-3 w-full animate-pulse rounded bg-surface-2' />
-          <div className='h-3 w-3/4 animate-pulse rounded bg-surface-2' />
+          <div className='h-3 w-full rounded skeleton' />
+          <div className='h-3 w-3/4 rounded skeleton' />
         </div>
       </div>
     );

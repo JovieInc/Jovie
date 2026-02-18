@@ -1,8 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-
-const MINUTE = 60 * 1000;
+import { queryKeys } from './keys';
 
 export interface EnvHealthResponse {
   ok: boolean;
@@ -51,11 +50,11 @@ async function fetchEnvHealth(): Promise<EnvHealthResponse> {
  */
 export function useEnvHealthQuery({ enabled = false }: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['env-health'] as const,
+    queryKey: queryKeys.health.env(),
     queryFn: fetchEnvHealth,
     enabled,
-    staleTime: 5 * MINUTE,
-    gcTime: 10 * MINUTE,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     retry: false, // Don't retry health checks - they may fail intentionally
   });
 }

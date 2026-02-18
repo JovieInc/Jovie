@@ -135,11 +135,12 @@ export function JovieChat({
   // Submit with image attachments
   const handleSubmitWithImages = useCallback(
     (e?: React.FormEvent) => {
+      if (isLoading || isSubmitting) return;
       const files = toFileUIParts();
       handleSubmit(e, files.length > 0 ? files : undefined);
       clearImages();
     },
-    [handleSubmit, toFileUIParts, clearImages]
+    [handleSubmit, toFileUIParts, clearImages, isLoading, isSubmitting]
   );
 
   // Notify parent when the conversation title changes (e.g. after auto-generation)
@@ -191,6 +192,14 @@ export function JovieChat({
     return -1;
   }, [messages]);
 
+  // Determine the active tool label for contextual loading state
+  const isStreaming = status === 'streaming';
+  const activeToolLabel = useMemo(
+    () => (isLoading ? getActiveToolLabel(messages) : null),
+    [isLoading, messages]
+  );
+  const thinkingLabel = activeToolLabel ?? 'Thinking...';
+
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
     return (
@@ -199,11 +208,6 @@ export function JovieChat({
       </div>
     );
   }
-
-  // Determine the active tool label for contextual loading state
-  const isStreaming = status === 'streaming';
-  const activeToolLabel = isLoading ? getActiveToolLabel(messages) : null;
-  const thinkingLabel = activeToolLabel ?? 'Thinking...';
 
   // Shared ChatInput props for both views
   const chatInputProps = {
@@ -244,7 +248,7 @@ export function JovieChat({
             transition={{ duration: 0.15 }}
           >
             <div className='flex flex-col items-center gap-2 text-accent'>
-              <ImagePlus className='h-8 w-8' />
+              <ImagePlus className='h-6 w-6' />
               <span className='text-sm font-medium'>Drop images here</span>
             </div>
           </motion.div>

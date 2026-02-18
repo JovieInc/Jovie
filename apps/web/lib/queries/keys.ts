@@ -217,6 +217,7 @@ export const queryKeys = {
   health: {
     all: ['health'] as const,
     buildInfo: () => [...queryKeys.health.all, 'build-info'] as const,
+    env: () => [...queryKeys.health.all, 'env'] as const,
   },
 
   // Admin queries

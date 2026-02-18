@@ -2,6 +2,9 @@
   "name": "@jovie/ui",
   "version": "26.2.0",
   "private": true,
+  "sideEffects": [
+    "*.css"
+  ],
   "engines": {
     "node": ">=24.0.0"
   },

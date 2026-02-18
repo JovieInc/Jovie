@@ -49,7 +49,7 @@ export function ImagePreviewStrip({
               )}
               aria-label={`Remove ${image.name}`}
             >
-              <X className='h-3 w-3' />
+              <X className='h-4 w-4' />
             </button>
           </motion.div>
         ))}

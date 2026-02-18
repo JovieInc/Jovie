@@ -67,6 +67,13 @@ export interface MessagePart {
   readonly mediaType?: string;
 }
 
+/** Shape of file attachments passed to AI SDK's sendMessage. */
+export interface FileUIPart {
+  readonly type: 'file';
+  readonly mediaType: string;
+  readonly url: string;
+}
+
 /** User-friendly labels for AI tool invocations shown during streaming. */
 export const TOOL_LABELS: Record<string, string> = {
   proposeProfileEdit: 'Editing profile...',

@@ -58,7 +58,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       (value.trim() || hasPendingImages) &&
       !isLoading &&
       !isSubmitting &&
-      !isOverLimit;
+      !isOverLimit &&
+      !isImageProcessing;
+
+    const handleFormSubmit = useCallback(
+      (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(e);
+      },
+      [onSubmit]
+    );
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -91,12 +100,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       : cn('px-4 py-4 max-h-48', paddingRight);
 
     return (
-      <form
-        onSubmit={e => {
-          e.preventDefault();
-          onSubmit(e);
-        }}
-      >
+      <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
             'rounded-xl border bg-surface-1 transition-colors duration-fast',

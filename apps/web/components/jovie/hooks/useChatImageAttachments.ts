@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import type { FileUIPart } from '../types';
 
 /** Maximum number of images per message. */
 const MAX_IMAGES_PER_MESSAGE = 4;
@@ -33,11 +34,7 @@ export interface UseChatImageAttachmentsReturn {
   readonly addFiles: (files: FileList | File[]) => void;
   readonly removeImage: (id: string) => void;
   readonly clearImages: () => void;
-  readonly toFileUIParts: () => Array<{
-    type: 'file';
-    mediaType: string;
-    url: string;
-  }>;
+  readonly toFileUIParts: () => FileUIPart[];
   /** Attach this ref to the drop zone container. Drag events are bound via useEffect. */
   readonly dropZoneRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -70,16 +67,21 @@ export function useChatImageAttachments({
   // Stable ref for addFiles so the useEffect drag listener doesn't go stale
   const addFilesRef = useRef<(files: FileList | File[]) => void>(() => {});
 
+  // Keep a ref to pendingImages so cleanup captures the latest value
+  const pendingImagesRef = useRef(pendingImages);
+  useEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  }, [pendingImages]);
+
   // Revoke object URLs on unmount
   useEffect(
     () => () => {
-      pendingImages.forEach(img => {
+      pendingImagesRef.current.forEach(img => {
         if (img.previewUrl.startsWith('blob:')) {
           URL.revokeObjectURL(img.previewUrl);
         }
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup only on unmount
     []
   );
 
@@ -164,7 +166,9 @@ export function useChatImageAttachments({
   );
 
   // Keep the ref in sync for useEffect drag listeners
-  addFilesRef.current = addFiles;
+  useEffect(() => {
+    addFilesRef.current = addFiles;
+  }, [addFiles]);
 
   const removeImage = useCallback((id: string) => {
     setPendingImages(prev => {

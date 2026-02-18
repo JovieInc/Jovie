@@ -1,6 +1,6 @@
 'use client';
 
-import * as Headless from '@headlessui/react';
+import { ComboboxOptions } from '@headlessui/react';
 import { clsx } from 'clsx';
 import { forwardRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
@@ -23,7 +23,7 @@ export const ComboboxDropdown = forwardRef<
   const showNoResults = query.length > 0 && !hasResults && !isLoading;
 
   return (
-    <Headless.Combobox.Options
+    <ComboboxOptions
       ref={ref}
       id={listboxId}
       className={clsx(
@@ -72,7 +72,7 @@ export const ComboboxDropdown = forwardRef<
           <ComboboxOptionItem key={option.id} option={option} index={index} />
         ));
       })()}
-    </Headless.Combobox.Options>
+    </ComboboxOptions>
   );
 });
 

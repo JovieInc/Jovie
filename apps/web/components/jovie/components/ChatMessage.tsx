@@ -3,15 +3,18 @@
 import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, User } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
-
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-
 import type { MessagePart } from '../types';
 import { getMessageText } from '../utils';
-import { ChatMarkdown } from './ChatMarkdown';
+
+const ChatMarkdown = dynamic(
+  () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
+  { ssr: false }
+);
 
 interface ChatMessageProps {
   readonly id: string;
@@ -59,9 +62,9 @@ export function ChatMessage({
         <div className='max-w-[80%] rounded-2xl px-4 py-3 bg-accent text-accent-foreground'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
-              {fileParts.map(file => (
+              {fileParts.map((file, index) => (
                 <div
-                  key={file.url}
+                  key={`${file.url}-${index}`}
                   className='relative h-32 w-32 overflow-hidden rounded-lg'
                 >
                   <Image

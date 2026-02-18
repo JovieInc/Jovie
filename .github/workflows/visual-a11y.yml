@@ -17,8 +17,6 @@ jobs:
   storybook-a11y:
     name: Storybook A11y Checks
     runs-on: ubuntu-latest
-    # Non-blocking: continue even if this job fails
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -47,7 +45,6 @@ jobs:
           npx concurrently -k -s first -n "SB,TEST" -c "magenta,cyan" \
             "npx http-server apps/web/storybook-static -p 6006 --silent" \
             "npx wait-on tcp:127.0.0.1:6006 && pnpm --filter web storybook:test --url http://127.0.0.1:6006"
-        continue-on-error: true
 
       - name: A11y Results Summary
         if: always()

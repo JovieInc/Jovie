@@ -33,9 +33,9 @@ export function SkipToContent({
         'focus:not-sr-only',
         // Styling when visible
         'focus:fixed focus:left-4 focus:top-4 focus:z-[9999]',
-        'focus:rounded-md focus:bg-primary focus:px-4 focus:py-2',
-        'focus:text-primary-foreground focus-visible:outline-none focus-visible:ring-2',
-        'focus-visible:ring-ring focus-visible:ring-offset-2',
+        'focus:rounded-md focus:bg-btn-primary focus:px-4 focus:py-2',
+        'focus:text-btn-primary-foreground focus-visible:outline-none focus-visible:ring-2',
+        'focus-visible:ring-focus focus-visible:ring-offset-2',
         className
       )}
     >
