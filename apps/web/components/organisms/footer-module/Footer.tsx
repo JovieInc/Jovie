@@ -105,12 +105,17 @@ export function Footer({
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
         className={className}
-        style={{
-          backgroundColor: 'var(--linear-bg-footer)',
-          borderTop: '1px solid rgb(35, 37, 42)',
-        }}
+        style={{ backgroundColor: 'var(--linear-bg-footer)' }}
         aria-label='Site footer'
       >
+        {/* Gradient separator — matches logo bar treatment */}
+        <div
+          aria-hidden='true'
+          className='h-px'
+          style={{
+            background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+          }}
+        />
         <div
           className={cn(
             containerSize === 'homepage'
@@ -262,11 +267,16 @@ export function Footer({
   return (
     <footer
       className={className}
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        borderTop: '1px solid rgb(35, 37, 42)',
-      }}
+      style={{ backgroundColor: 'var(--linear-bg-footer)' }}
     >
+      {/* Gradient separator — matches logo bar treatment */}
+      <div
+        aria-hidden='true'
+        className='h-px'
+        style={{
+          background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+        }}
+      />
       <div
         className={cn(
           containerSize === 'homepage'
