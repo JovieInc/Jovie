@@ -1,15 +1,15 @@
 import type { MetricSnapshot } from '@/types/insights';
 import {
-  aggregateClicks,
   aggregateAudience,
-  aggregateSubscribers,
-  aggregateRevenue,
-  aggregateTourData,
-  fetchProfileContext,
+  aggregateClicks,
   aggregateReleases,
+  aggregateRevenue,
+  aggregateSubscribers,
   aggregateTemporalPatterns,
+  aggregateTourData,
   computeCityGrowthRates,
   computeReferrerGrowthRates,
+  fetchProfileContext,
 } from './domain-aggregators';
 import { DEFAULT_PERIOD_DAYS } from './thresholds';
 
