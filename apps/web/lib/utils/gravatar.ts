@@ -138,14 +138,16 @@ function md5Hex(input: string): string {
       const temp = d;
       d = c;
       c = b;
-      b = (b + rotl((a + f + TABLE[j]! + w[g]!) | 0, SHIFT[j]!)) | 0;
+      b = Math.trunc(
+        b + rotl(Math.trunc(a + f + TABLE[j]! + w[g]!), SHIFT[j]!)
+      );
       a = temp;
     }
 
-    a0 = (a0 + a) | 0;
-    b0 = (b0 + b) | 0;
-    c0 = (c0 + c) | 0;
-    d0 = (d0 + d) | 0;
+    a0 = Math.trunc(a0 + a);
+    b0 = Math.trunc(b0 + b);
+    c0 = Math.trunc(c0 + c);
+    d0 = Math.trunc(d0 + d);
   }
 
   return hexLE(a0) + hexLE(b0) + hexLE(c0) + hexLE(d0);
