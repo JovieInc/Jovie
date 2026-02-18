@@ -203,10 +203,7 @@ async function uploadRemoteAvatar(params: {
         params.cookieHeader
       );
 
-      // Success - always log for monitoring
-      console.info(
-        `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
-      );
+      // Success
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =
@@ -216,22 +213,29 @@ async function uploadRemoteAvatar(params: {
 
       // Don't retry for invalid content type - it won't change
       if (errorMessage.includes('Invalid content type')) {
-        console.warn('[AVATAR_UPLOAD] Invalid content type:', errorMessage);
+        Sentry.captureMessage('Avatar upload: invalid content type', {
+          level: 'warning',
+          extra: { errorMessage },
+        });
         break;
       }
 
-      console.warn(
-        `[AVATAR_UPLOAD] Attempt ${attempt + 1}/${maxRetries} failed:`,
-        errorMessage
+      Sentry.captureMessage(
+        `Avatar upload attempt ${attempt + 1}/${maxRetries} failed`,
+        {
+          level: 'warning',
+          extra: { errorMessage },
+        }
       );
     }
   }
 
   // All retries exhausted
-  console.error(
-    `[AVATAR_UPLOAD] Failed after ${maxRetries} attempts:`,
-    lastError?.message
-  );
+  if (lastError) {
+    Sentry.captureException(lastError, {
+      extra: { maxRetries, context: 'avatar_upload_retries_exhausted' },
+    });
+  }
   return null;
 }
 
@@ -254,7 +258,10 @@ export async function handleBackgroundAvatarUpload(
     });
 
     if (!uploaded) {
-      console.warn('[ONBOARDING] Avatar upload failed for profile:', profileId);
+      Sentry.captureMessage('Avatar upload failed for profile', {
+        level: 'warning',
+        extra: { profileId },
+      });
       return;
     }
 
@@ -285,11 +292,6 @@ export async function handleBackgroundAvatarUpload(
         .where(eq(profilePhotos.id, uploaded.photoId));
     });
   } catch (avatarError) {
-    console.error(
-      '[ONBOARDING] Avatar upload exception for profile:',
-      profileId,
-      avatarError
-    );
     Sentry.captureException(avatarError, {
       tags: { context: 'onboarding_avatar_upload', profileId },
       level: 'warning',

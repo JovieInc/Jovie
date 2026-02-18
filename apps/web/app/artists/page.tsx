@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
@@ -39,7 +40,7 @@ export default async function ArtistsPage() {
       .where(eq(creatorProfiles.isPublic, true))
       .orderBy(asc(creatorProfiles.displayName));
   } catch (err) {
-    console.error('Error loading profiles:', err);
+    Sentry.captureException(err);
     error = true;
   }
 

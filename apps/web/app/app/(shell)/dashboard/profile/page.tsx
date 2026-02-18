@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
@@ -41,7 +42,7 @@ export default async function ProfilePage() {
     );
   } catch (error) {
     throwIfRedirect(error);
-    console.error('Error loading profile:', error);
+    Sentry.captureException(error);
 
     return (
       <PageErrorState message='Failed to load profile data. Please refresh the page.' />

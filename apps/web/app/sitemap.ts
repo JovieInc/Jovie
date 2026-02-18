@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
@@ -121,7 +122,7 @@ async function buildProfileSitemap(): Promise<MetadataRoute.Sitemap> {
         .where(eq(creatorProfiles.isPublic, true)),
     ]);
   } catch (error) {
-    console.error('Error fetching data for sitemap:', error);
+    Sentry.captureException(error);
   }
 
   // Profile homepage
