@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock useBreakpointDown so we can control mobile vs desktop in tests
 const mockUseBreakpointDown = vi.fn();
@@ -85,6 +85,10 @@ describe('DrawerHeader', () => {
   });
 
   describe('mobile vs desktop aria-labels', () => {
+    beforeEach(() => {
+      mockUseBreakpointDown.mockClear();
+    });
+
     it('uses "Close sidebar" aria-label on desktop (isMobile=false)', () => {
       mockUseBreakpointDown.mockReturnValue(false);
       render(<DrawerHeader title='Details' onClose={vi.fn()} />);
