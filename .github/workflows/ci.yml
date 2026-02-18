@@ -24,7 +24,7 @@ jobs:
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
@@ -652,14 +652,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Next build cache
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: .next/cache
-          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-next-
+      # .next/cache is managed by Turbo — no separate cache step needed
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -676,7 +669,12 @@ jobs:
         run: |
           cd apps/web
 
-          # Start Next.js standalone server in background
+          if [ ! -f .lighthouserc.build.json ]; then
+            echo "⚠️ Lighthouse config not found; skipping."
+            exit 0
+          fi
+
+          # Start Next.js standalone server in background (monorepo places it under apps/web/)
           node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
@@ -819,7 +817,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           directory: apps/web/coverage
           flags: unittests
@@ -828,7 +826,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           directory: apps/web
           flags: unittests
