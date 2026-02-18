@@ -1031,12 +1031,14 @@ body {
 [data-sonner-toast] [data-button] {
   font-weight: var(--linear-font-weight-medium);
   font-size: 0.8125rem;
-  line-height: 1;
+  line-height: 1.25;
   border-radius: var(--linear-radius-sm);
   padding: 6px 12px;
+  margin-top: 8px;
   transition:
     opacity 150ms ease,
-    background-color 150ms ease;
+    background-color 150ms ease,
+    border-color 150ms ease;
 }
 
 /* Type-specific left-border accent */
