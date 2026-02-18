@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { BASE_URL } from '@/constants/app';
+import { env } from '@/lib/env-server';
 
 // Single domain robots.txt configuration
 // Everything is served from jov.ie:
@@ -11,7 +12,7 @@ import { BASE_URL } from '@/constants/app';
 // Uses VERCEL_ENV to distinguish production from preview/staging at build time,
 // making this route statically renderable (no runtime headers() dependency).
 
-const isProduction = process.env.VERCEL_ENV === 'production';
+const isProduction = env.VERCEL_ENV === 'production';
 
 export default function robots(): MetadataRoute.Robots {
   // jov.ie - allow marketing + profiles, block app/api routes
