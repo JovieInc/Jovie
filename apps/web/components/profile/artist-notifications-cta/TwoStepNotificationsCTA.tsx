@@ -113,13 +113,13 @@ export function TwoStepNotificationsCTA({
   // Auto-focus the email input after transition to step 2
   useEffect(() => {
     if (step !== 'input') return;
-    const timeoutId = window.setTimeout(
+    const timeoutId = globalThis.setTimeout(
       () => {
         inputRef.current?.focus({ preventScroll: true });
       },
       prefersReducedMotion ? 0 : 350
     );
-    return () => window.clearTimeout(timeoutId);
+    return () => globalThis.clearTimeout(timeoutId);
   }, [step, prefersReducedMotion]);
 
   const hasSubscriptions = Boolean(
