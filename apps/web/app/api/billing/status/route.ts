@@ -5,7 +5,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { captureError, captureWarning } from '@/lib/error-tracking';
+import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -42,14 +42,10 @@ export async function GET() {
         userId,
         error: billingResult.error,
       });
-      await captureWarning(
-        'Billing lookup failed — transient, user falls back to free tier',
-        new Error(`Billing lookup failed: ${billingResult.error}`),
-        {
-          route: '/api/billing/status',
-          userId,
-        }
-      );
+      // Note: Not reporting to Sentry here — transient billing failures are
+      // already captured upstream in fetchUserBillingData. Reporting again here
+      // creates duplicate noise (835+ events). The 503 response lets clients
+      // retry gracefully.
       return NextResponse.json(
         { error: 'Billing service temporarily unavailable' },
         {

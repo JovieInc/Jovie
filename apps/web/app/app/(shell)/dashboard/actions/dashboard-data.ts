@@ -476,9 +476,12 @@ async function resolveDashboardData(): Promise<DashboardData> {
     if (error instanceof BillingUnavailableError) {
       // Billing DB is down — degrade gracefully instead of crashing dashboard.
       // Admin status is still available from the error since it's fetched independently.
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: { context: 'dashboard_billing_unavailable' },
+      // Note: Not reporting to Sentry here — the underlying DB failure is already
+      // captured upstream in fetchUserBillingData. Duplicate reporting was creating
+      // thousands of Sentry events (JOVIE-WEB-AD/AE/AF/AC/9Y/9C).
+      logger.warn('Billing unavailable, degrading to free tier', {
+        userId: error.userId,
+        isAdmin: error.isAdmin,
       });
       const freeDefaults = getEntitlements('free');
       entitlements = {

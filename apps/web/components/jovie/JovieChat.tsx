@@ -338,37 +338,44 @@ export function JovieChat({
           </div>
         </>
       ) : (
-        // Empty state - input near bottom with carousel + pills
-        <div className='flex flex-1 flex-col items-center justify-end px-4 pb-8'>
-          <div className='chat-stagger w-full max-w-2xl space-y-4'>
-            {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
-            {profileId && (
-              <SuggestedProfilesCarousel
-                profileId={profileId}
-                username={username}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-              />
-            )}
+        // Empty state - centered content with input pinned at bottom
+        <div className='flex flex-1 flex-col'>
+          {/* Centered content area */}
+          <div className='flex flex-1 flex-col items-center justify-center px-4'>
+            <div className='chat-stagger w-full max-w-2xl space-y-4'>
+              {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
+              {profileId && (
+                <SuggestedProfilesCarousel
+                  profileId={profileId}
+                  username={username}
+                  displayName={displayName}
+                  avatarUrl={avatarUrl}
+                />
+              )}
 
-            {/* One-liner + input + pills */}
-            <div className='space-y-3'>
               <p className='text-center text-[15px] text-secondary-token'>
                 What can I help you with?
               </p>
-              <ChatInput {...chatInputProps} />
+
               <SuggestedPrompts onSelect={handleSuggestedPrompt} />
             </div>
+          </div>
 
-            {/* Error display */}
-            {chatError && (
-              <ErrorDisplay
-                chatError={chatError}
-                onRetry={handleRetry}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
-              />
-            )}
+          {/* Input pinned at bottom */}
+          <div className='px-4 pb-8'>
+            <div className='mx-auto w-full max-w-2xl space-y-3'>
+              <ChatInput {...chatInputProps} />
+
+              {/* Error display */}
+              {chatError && (
+                <ErrorDisplay
+                  chatError={chatError}
+                  onRetry={handleRetry}
+                  isLoading={isLoading}
+                  isSubmitting={isSubmitting}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

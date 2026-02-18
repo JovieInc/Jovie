@@ -78,23 +78,31 @@ async function assertProfileOwnership(
 }
 
 /**
- * Core contacts fetch logic (cacheable)
+ * Core contacts fetch logic (cacheable).
+ * Accepts clerkUserId explicitly so this function can run inside unstable_cache
+ * without calling auth()/headers() (which are forbidden inside cached scopes).
  */
 async function fetchContactsCore(
   profileId: string,
   userId: string
 ): Promise<DashboardContact[]> {
-  return withDbSessionTx(async (tx, clerkUserId) => {
-    await assertProfileOwnership(tx, profileId, clerkUserId);
+  return withDbSessionTx(
+    async (tx, clerkUserId) => {
+      await assertProfileOwnership(tx, profileId, clerkUserId);
 
-    const rows = await tx
-      .select()
-      .from(creatorContacts)
-      .where(eq(creatorContacts.creatorProfileId, profileId))
-      .orderBy(asc(creatorContacts.sortOrder), asc(creatorContacts.createdAt));
+      const rows = await tx
+        .select()
+        .from(creatorContacts)
+        .where(eq(creatorContacts.creatorProfileId, profileId))
+        .orderBy(
+          asc(creatorContacts.sortOrder),
+          asc(creatorContacts.createdAt)
+        );
 
-    return rows.map(mapContact);
-  });
+      return rows.map(mapContact);
+    },
+    { clerkUserId: userId }
+  );
 }
 
 /**

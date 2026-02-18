@@ -39,7 +39,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onSubmit,
       isLoading,
       isSubmitting,
-      placeholder = 'What do you wanna ask Jovie?',
+      placeholder = 'Ask Jovie anything',
       variant = 'default',
       onImageAttach,
       isImageProcessing = false,
