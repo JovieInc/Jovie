@@ -117,10 +117,7 @@ export function useAutoSave<TData>({
         setErrorMessage(null);
         onSuccessRef.current?.();
       } catch (err) {
-        const saveError = err instanceof Error ? err : new Error('Save failed');
-        setError(saveError);
-        setErrorMessage(formatPacerError(saveError));
-        onErrorRef.current?.(saveError);
+        // Let the debouncer's onError handler handle state updates
         throw err;
       }
     },
