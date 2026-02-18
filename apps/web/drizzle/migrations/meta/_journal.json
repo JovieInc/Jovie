@@ -253,6 +253,13 @@
       "when": 1771359913412,
       "tag": "0035_old_mindworm",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1771459200000,
+      "tag": "0036_add_ingest_audit_logs",
+      "breakpoints": true
     }
   ]
 }
