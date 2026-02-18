@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { Copy, Loader2 } from 'lucide-react';
+import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -115,11 +115,26 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
     }
   }, [rawQuery, conversationId]);
 
-  // Show loading state until profile is available to avoid sending undefined profileId
+  // Profile unavailable — show actionable error instead of infinite spinner.
+  // This happens when billing/entitlements fail or the DB query times out,
+  // causing getDashboardData to return selectedProfile: null.
   if (!selectedProfile) {
     return (
       <div className='flex h-full items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin text-secondary-token' />
+        <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+          <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          <p className='text-sm text-secondary-token'>
+            Could not load your profile. This is usually temporary.
+          </p>
+          <button
+            type='button'
+            onClick={() => window.location.reload()}
+            className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+          >
+            <RefreshCw className='h-4 w-4' />
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
