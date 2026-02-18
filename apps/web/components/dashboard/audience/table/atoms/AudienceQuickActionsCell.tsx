@@ -37,7 +37,7 @@ export function AudienceQuickActionsCell({
       <button
         type='button'
         onClick={onBlock}
-        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400'
+        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-error/10 hover:text-error'
         aria-label='Block member'
         title='Block'
       >
