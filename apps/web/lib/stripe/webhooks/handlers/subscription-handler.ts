@@ -135,6 +135,22 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
+    // Skip subscriptions still awaiting initial payment.
+    // Stripe fires `customer.subscription.created` before the first invoice is
+    // paid, so the status is often `incomplete`.  Processing it would
+    // incorrectly downgrade the user.  The `checkout.session.completed` or
+    // `customer.subscription.updated` (→ active) event will handle activation.
+    if (
+      subscription.status === 'incomplete' ||
+      subscription.status === 'incomplete_expired'
+    ) {
+      return {
+        success: true,
+        skipped: true,
+        reason: `subscription_created_with_status_${subscription.status}`,
+      };
+    }
+
     const userId = await this.extractUserId(
       subscription,
       'customer.subscription.created'

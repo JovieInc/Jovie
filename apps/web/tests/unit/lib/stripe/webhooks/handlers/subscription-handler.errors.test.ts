@@ -258,7 +258,7 @@ describe('@critical SubscriptionHandler - Status Handling', () => {
     );
   });
 
-  it('handles incomplete subscription status (downgrades)', async () => {
+  it('skips incomplete subscription on creation (defers to checkout/updated event)', async () => {
     const context: WebhookContext = {
       event: {
         id: 'evt_incomplete',
@@ -281,11 +281,11 @@ describe('@critical SubscriptionHandler - Status Handling', () => {
     const result = await handler.handle(context);
 
     expect(result.success).toBe(true);
-    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isPro: false,
-      })
-    );
+    expect(result.skipped).toBe(true);
+    expect(result.reason).toBe('subscription_created_with_status_incomplete');
+    // Should NOT call updateUserBillingStatus — the checkout.session.completed
+    // or customer.subscription.updated event will handle activation.
+    expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
   });
 
   it('handles incomplete_expired subscription status (downgrades)', async () => {

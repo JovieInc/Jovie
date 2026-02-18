@@ -29,14 +29,20 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Check if event is stale compared to last processed event
+ * Check if event is stale compared to last processed event.
+ *
+ * Uses strict less-than (`<`) rather than `<=` so that events sharing
+ * the same Stripe `created` timestamp are NOT treated as stale.
+ * Stripe frequently emits `checkout.session.completed` and
+ * `customer.subscription.created` in the same second; skipping one
+ * of them would leave the user's billing status out of date.
  */
 function isEventStale(
   eventTimestamp: Date | undefined,
   lastEventAt: Date | null | undefined
 ): boolean {
   if (!eventTimestamp || !lastEventAt) return false;
-  return eventTimestamp <= lastEventAt;
+  return eventTimestamp < lastEventAt;
 }
 
 /**

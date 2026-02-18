@@ -392,17 +392,27 @@ export class PaymentHandler extends BaseSubscriptionHandler {
   /**
    * Extract subscription ID from an invoice.
    *
-   * The subscription field can be:
-   * - A string subscription ID
-   * - An expanded Subscription object with an 'id' field
-   * - null (for invoices not tied to a subscription)
+   * Stripe SDK v20 moved the subscription reference from the top-level
+   * `invoice.subscription` field to `invoice.parent.subscription_details.subscription`.
+   * We check the new location first and fall back to the legacy field so
+   * the handler works regardless of which Stripe API version is active.
    *
    * @param invoice - The Stripe invoice object
    * @returns The subscription ID if present, null otherwise
    * @private
    */
   private extractSubscriptionId(invoice: Stripe.Invoice): string | null {
-    // Handle the subscription field which can be string | Subscription | null
+    // SDK v20+: subscription lives under parent.subscription_details
+    const parent = invoice.parent;
+    if (parent?.subscription_details?.subscription) {
+      const sub = parent.subscription_details.subscription;
+      if (typeof sub === 'string') return sub;
+      if (sub && typeof sub === 'object' && 'id' in sub) {
+        return (sub as { id: string }).id;
+      }
+    }
+
+    // Legacy fallback: top-level subscription field (pre-v20 SDK / older API versions)
     const raw = invoice as unknown as Record<string, unknown>;
     const subField = raw['subscription'];
 
