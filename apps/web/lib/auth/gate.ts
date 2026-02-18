@@ -186,7 +186,9 @@ async function createUserWithRetry(
         .onConflictDoUpdate({
           target: users.clerkId,
           set: {
-            email,
+            // Only overwrite email if a new value is provided — prevents
+            // nulling out an existing email when Clerk hasn't propagated yet
+            ...(email ? { email } : {}),
             userStatus,
             updatedAt: new Date(),
           },

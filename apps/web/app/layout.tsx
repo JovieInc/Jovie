@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
@@ -153,9 +154,14 @@ export default async function RootLayout({
       : null;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
+  // Read CSP nonce from request headers (set by middleware) to prevent
+  // hydration mismatch: server renders nonce="" but client expects undefined
+  const headersList = await headers();
+  const nonce = headersList.get('x-nonce') || undefined;
+
   const headContent = (
     <head>
-      <Script src='/theme-init.js' strategy='beforeInteractive' />
+      <Script src='/theme-init.js' strategy='beforeInteractive' nonce={nonce} />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
