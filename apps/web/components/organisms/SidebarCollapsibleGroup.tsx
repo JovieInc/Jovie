@@ -39,12 +39,12 @@ export function SidebarCollapsibleGroup({
             tooltip={tooltip}
             className={cn(
               'justify-between',
-              'text-sidebar-muted hover:bg-transparent',
-              'h-7 px-1'
+              'text-sidebar-item-icon hover:bg-transparent',
+              'h-6 px-1'
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-app'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-2xs tracking-wide'>
               {label}
             </span>
             <ChevronRight

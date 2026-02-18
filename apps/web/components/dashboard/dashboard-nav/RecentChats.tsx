@@ -136,7 +136,7 @@ export function RecentChats() {
                   asChild
                   isActive={isActive}
                   tooltip={title}
-                  className='h-8'
+                  className='h-7'
                 >
                   <Link href={href}>
                     <span className='flex-1 truncate text-[13px]'>{title}</span>

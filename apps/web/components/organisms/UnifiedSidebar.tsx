@@ -129,7 +129,7 @@ function SettingsNavigation({
       <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
       <div className='mx-2 group-data-[collapsible=icon]:mx-0' />
       <div>
-        <span className='mb-0.5 block px-2 text-app tracking-tight text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-0.5 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
