@@ -46,11 +46,11 @@ function verifySignature(
 
 export async function POST(request: NextRequest) {
   const webhookSecret = env.SENTRY_WEBHOOK_SECRET;
-  const dispatchToken = env.GITHUB_DISPATCH_TOKEN;
+  const dispatchToken = env.GH_DISPATCH_TOKEN;
 
   if (!webhookSecret || !dispatchToken) {
     logger.warn(
-      '[Sentry Webhook] Missing SENTRY_WEBHOOK_SECRET or GITHUB_DISPATCH_TOKEN'
+      '[Sentry Webhook] Missing SENTRY_WEBHOOK_SECRET or GH_DISPATCH_TOKEN'
     );
     return NextResponse.json(
       { error: 'Webhook not configured' },
