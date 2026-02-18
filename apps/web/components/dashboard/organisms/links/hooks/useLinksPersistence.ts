@@ -164,7 +164,12 @@ function processSaveSuccess({
 
   if (suggestionsEnabled && hasIngestableLink(normalized)) {
     setAutoRefreshUntilMs(Date.now() + 20000);
-    onSyncSuggestions?.();
+    onSyncSuggestions?.().catch((err: unknown) => {
+      track('dashboard_social_links_sync_failed', {
+        profileId,
+        error: String(err),
+      });
+    });
   }
 
   if (profileId) {
@@ -418,6 +423,12 @@ export function useLinksPersistence({
     linksRef.current = links;
   }, [links]);
 
+  // Ref for async access to linksVersion (avoids stale closure in queued saves)
+  const linksVersionRef = useRef<number>(linksVersion);
+  useEffect(() => {
+    linksVersionRef.current = linksVersion;
+  }, [linksVersion]);
+
   // Suggested links state
   const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
     convertDbLinksToSuggestions(suggestionInitialLinks || [])
@@ -483,12 +494,12 @@ export function useLinksPersistence({
       await executePersistLinks({
         input,
         profileId,
-        linksVersion,
+        linksVersion: linksVersionRef.current,
         onSuccess: handleSaveSuccess,
         onConflict: handleConflictError,
       });
     },
-    [profileId, linksVersion, handleSaveSuccess, handleConflictError]
+    [profileId, handleSaveSuccess, handleConflictError]
   );
 
   // Enqueue a save, ensuring we never write older state after newer state

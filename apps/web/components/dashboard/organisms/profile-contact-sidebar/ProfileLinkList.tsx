@@ -137,7 +137,13 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
             <div className='truncate text-sm text-primary-token'>
               {handle
                 ? `@${handle}`
-                : new URL(link.url).hostname.replace('www.', '')}
+                : (() => {
+                    try {
+                      return new URL(link.url).hostname.replace('www.', '');
+                    } catch {
+                      return link.url;
+                    }
+                  })()}
             </div>
           </div>
         </div>
