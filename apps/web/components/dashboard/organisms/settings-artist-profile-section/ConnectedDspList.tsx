@@ -203,6 +203,53 @@ export function ConnectedDspList({
   const hasNoConnections = !spotifyId && !spotifyMatch && !appleMusicMatch;
 
   return (
+    <ConnectedDspListContent
+      isSpotifyConnected={isSpotifyConnected}
+      spotifyId={spotifyId}
+      spotifyMatch={spotifyMatch}
+      appleMusicMatch={appleMusicMatch}
+      hasNoConnections={hasNoConnections}
+      handleOpenPalette={handleOpenPalette}
+      handleSyncNow={handleSyncNow}
+      handleDisconnect={handleDisconnect}
+      paletteOpen={paletteOpen}
+      setPaletteOpen={setPaletteOpen}
+      paletteProvider={paletteProvider}
+      handlePaletteSelect={handlePaletteSelect}
+    />
+  );
+}
+
+interface ConnectedDspListContentProps {
+  readonly isSpotifyConnected: boolean;
+  readonly spotifyId: string | null;
+  readonly spotifyMatch: DspMatch | undefined;
+  readonly appleMusicMatch: DspMatch | undefined;
+  readonly hasNoConnections: boolean;
+  readonly handleOpenPalette: (provider: DspProvider) => void;
+  readonly handleSyncNow: (provider: DspProvider) => void;
+  readonly handleDisconnect: (match: DspMatch | undefined) => void;
+  readonly paletteOpen: boolean;
+  readonly setPaletteOpen: (open: boolean) => void;
+  readonly paletteProvider: DspProvider;
+  readonly handlePaletteSelect: (artist: ArtistSelection) => Promise<void>;
+}
+
+function ConnectedDspListContent({
+  isSpotifyConnected,
+  spotifyId,
+  spotifyMatch,
+  appleMusicMatch,
+  hasNoConnections,
+  handleOpenPalette,
+  handleSyncNow,
+  handleDisconnect,
+  paletteOpen,
+  setPaletteOpen,
+  paletteProvider,
+  handlePaletteSelect,
+}: ConnectedDspListContentProps) {
+  return (
     <DashboardCard variant='settings'>
       <div className='space-y-4'>
         <p className='text-sm text-secondary-token'>

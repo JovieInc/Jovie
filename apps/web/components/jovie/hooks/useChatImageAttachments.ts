@@ -139,28 +139,24 @@ export function useChatImageAttachments({
         return;
       }
 
-      setPendingImages(prev => {
-        const remaining = MAX_IMAGES_PER_MESSAGE - prev.length;
-        if (remaining <= 0) {
-          onError(
-            `You can attach up to ${MAX_IMAGES_PER_MESSAGE} images per message.`
-          );
-          return prev;
-        }
+      const currentCount = pendingImagesRef.current.length;
+      const remaining = MAX_IMAGES_PER_MESSAGE - currentCount;
+      if (remaining <= 0) {
+        onError(
+          `You can attach up to ${MAX_IMAGES_PER_MESSAGE} images per message.`
+        );
+        return;
+      }
 
-        const toAdd = imageFiles.slice(0, remaining);
-        if (imageFiles.length > remaining) {
-          onError(
-            `Only ${remaining} more image${remaining === 1 ? '' : 's'} can be added (max ${MAX_IMAGES_PER_MESSAGE}).`
-          );
-        }
+      const toAdd = imageFiles.slice(0, remaining);
+      if (imageFiles.length > remaining) {
+        onError(
+          `Only ${remaining} more image${remaining === 1 ? '' : 's'} can be added (max ${MAX_IMAGES_PER_MESSAGE}).`
+        );
+      }
 
-        // Start async processing outside setState
-        setIsProcessing(true);
-        void processFiles(toAdd);
-
-        return prev;
-      });
+      setIsProcessing(true);
+      processFiles(toAdd).catch(() => {});
     },
     [disabled, onError, processFiles]
   );

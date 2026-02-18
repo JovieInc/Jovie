@@ -39,6 +39,24 @@ interface SubJobResult {
   data?: Record<string, unknown>;
 }
 
+async function runSubJob(
+  name: string,
+  fn: () => Promise<unknown>
+): Promise<SubJobResult> {
+  try {
+    const data = await fn();
+    return { success: true, data: data as Record<string, unknown> };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`[daily-maintenance] ${name} failed:`, error);
+    await captureError(`Daily maintenance: ${name} failed`, error, {
+      route: '/api/cron/daily-maintenance',
+      subjob: name,
+    });
+    return { success: false, error: msg };
+  }
+}
+
 export async function GET(request: Request) {
   const startTime = Date.now();
 
@@ -53,100 +71,41 @@ export async function GET(request: Request) {
   const results: Record<string, SubJobResult> = {};
 
   // 1. Schedule release notifications — runs first (time-sensitive)
-  try {
-    const schedResult = await scheduleReleaseNotifications();
-    results.scheduleNotifications = {
-      success: true,
-      data: schedResult as unknown as Record<string, unknown>,
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[daily-maintenance] Schedule notifications failed:', error);
-    await captureError(
-      'Daily maintenance: schedule notifications failed',
-      error,
-      { route: '/api/cron/daily-maintenance', subjob: 'scheduleNotifications' }
-    );
-    results.scheduleNotifications = { success: false, error: msg };
-  }
+  results.scheduleNotifications = await runSubJob(
+    'scheduleNotifications',
+    scheduleReleaseNotifications
+  );
 
   // 2. Cleanup orphaned photos
-  try {
-    const photoResult = await cleanupOrphanedPhotos();
-    results.cleanupPhotos = {
-      success: true,
-      data: photoResult as unknown as Record<string, unknown>,
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[daily-maintenance] Cleanup photos failed:', error);
-    await captureError('Daily maintenance: cleanup photos failed', error, {
-      route: '/api/cron/daily-maintenance',
-      subjob: 'cleanupPhotos',
-    });
-    results.cleanupPhotos = { success: false, error: msg };
-  }
+  results.cleanupPhotos = await runSubJob(
+    'cleanupPhotos',
+    cleanupOrphanedPhotos
+  );
 
   // 3. Cleanup expired idempotency keys
-  try {
-    const keysDeleted = await cleanupExpiredKeys();
-    results.cleanupKeys = {
-      success: true,
-      data: { deleted: keysDeleted },
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[daily-maintenance] Cleanup keys failed:', error);
-    await captureError('Daily maintenance: cleanup keys failed', error, {
-      route: '/api/cron/daily-maintenance',
-      subjob: 'cleanupKeys',
-    });
-    results.cleanupKeys = { success: false, error: msg };
-  }
+  results.cleanupKeys = await runSubJob('cleanupKeys', async () => ({
+    deleted: await cleanupExpiredKeys(),
+  }));
 
   // 4. Billing reconciliation (daily safety net for webhooks)
-  try {
-    const billingResult = await runReconciliation();
-    results.billingReconciliation = {
-      success: billingResult.success,
-      data: {
-        stats: billingResult.stats,
-        duration: billingResult.duration,
-        errors: billingResult.errors.length,
-      },
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[daily-maintenance] Billing reconciliation failed:', error);
-    await captureError(
-      'Daily maintenance: billing reconciliation failed',
-      error,
-      { route: '/api/cron/daily-maintenance', subjob: 'billingReconciliation' }
-    );
-    results.billingReconciliation = { success: false, error: msg };
-  }
+  results.billingReconciliation = await runSubJob(
+    'billingReconciliation',
+    async () => {
+      const r = await runReconciliation();
+      return {
+        success: r.success,
+        stats: r.stats,
+        duration: r.duration,
+        errors: r.errors.length,
+      };
+    }
+  );
 
   // 5. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
-  if (isSunday) {
-    try {
-      const retentionResult = await runDataRetentionCleanup();
-      results.dataRetention = {
-        success: true,
-        data: retentionResult as unknown as Record<string, unknown>,
-      };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('[daily-maintenance] Data retention failed:', error);
-      await captureError('Daily maintenance: data retention failed', error, {
-        route: '/api/cron/daily-maintenance',
-        subjob: 'dataRetention',
-      });
-      results.dataRetention = { success: false, error: msg };
-    }
-  } else {
-    results.dataRetention = { success: true, skipped: true };
-  }
+  results.dataRetention = isSunday
+    ? await runSubJob('dataRetention', runDataRetentionCleanup)
+    : { success: true, skipped: true };
 
   const duration = Date.now() - startTime;
   const allSuccessful = Object.values(results).every(r => r.success);

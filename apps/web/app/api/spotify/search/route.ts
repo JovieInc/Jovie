@@ -117,6 +117,44 @@ function checkRateLimit(ip: string): RateLimitResult {
   };
 }
 
+function validateSearchQuery(q: string | undefined): NextResponse | null {
+  if (!isSpotifyAvailable()) {
+    return NextResponse.json(
+      { error: 'Spotify integration not available', code: 'UNAVAILABLE' },
+      {
+        status: 503,
+        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
+      }
+    );
+  }
+
+  const queryValidation = artistSearchQuerySchema.safeParse(q);
+  if (!queryValidation.success) {
+    const errorMessage =
+      queryValidation.error.issues[0]?.message || 'Invalid query';
+    return NextResponse.json(
+      { error: errorMessage, code: 'INVALID_QUERY' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (!q || q.length < MIN_QUERY_LENGTH) {
+    return NextResponse.json(
+      { error: 'Query too short', code: 'QUERY_TOO_SHORT' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (q.length > MAX_QUERY_LENGTH) {
+    return NextResponse.json(
+      { error: 'Query too long', code: 'QUERY_TOO_LONG' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return null;
+}
+
 /**
  * GET /api/spotify/search?q={query}&limit={limit}
  * Returns a JSON list of Spotify artists matching the query.
@@ -132,40 +170,14 @@ export async function GET(request: NextRequest) {
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
 
-  // Check if Spotify is available
-  if (!isSpotifyAvailable()) {
-    return NextResponse.json(
-      { error: 'Spotify integration not available', code: 'UNAVAILABLE' },
-      {
-        status: 503,
-        headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_SERVICE },
-      }
-    );
-  }
-
-  // Validate query using Zod schema
-  const queryValidation = artistSearchQuerySchema.safeParse(q);
-  if (!queryValidation.success) {
-    const errorMessage =
-      queryValidation.error.issues[0]?.message || 'Invalid query';
-    return NextResponse.json(
-      { error: errorMessage, code: 'INVALID_QUERY' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  // Additional length checks for API-specific constraints
-  if (!q || q.length < MIN_QUERY_LENGTH) {
-    return NextResponse.json(
-      { error: 'Query too short', code: 'QUERY_TOO_SHORT' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (q.length > MAX_QUERY_LENGTH) {
-    return NextResponse.json(
-      { error: 'Query too long', code: 'QUERY_TOO_LONG' },
-      { status: 400, headers: NO_STORE_HEADERS }
+  const validationError = validateSearchQuery(q);
+  if (validationError || !q) {
+    return (
+      validationError ??
+      NextResponse.json(
+        { error: 'Query required', code: 'INVALID_QUERY' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      )
     );
   }
 
