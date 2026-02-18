@@ -13,7 +13,7 @@ import {
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
 
-import type { ArtistContext, ChatError } from '../types';
+import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
 import {
   extractErrorMetadata,
@@ -303,8 +303,10 @@ export function useJovieChat({
 
   // Core submit logic
   const doSubmit = useCallback(
-    async (text: string) => {
-      if (!text.trim() || isLoading || isSubmitting) return;
+    async (text: string, files?: FileUIPart[]) => {
+      const hasFiles = files && files.length > 0;
+      if (!text.trim() && !hasFiles) return;
+      if (isLoading || isSubmitting) return;
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -333,7 +335,7 @@ export function useJovieChat({
         // No active conversation, create one first
         try {
           const result = await createConversationMutation.mutateAsync({
-            initialMessage: trimmedText,
+            initialMessage: trimmedText || '(image attachment)',
           });
           setActiveConversationId(result.conversation.id);
           onConversationCreate?.(result.conversation.id);
@@ -358,7 +360,10 @@ export function useJovieChat({
         }
       }
 
-      sendMessage({ text: trimmedText });
+      sendMessage({
+        text: trimmedText,
+        ...(hasFiles ? { files } : {}),
+      });
       setInput('');
 
       // Reset textarea height
@@ -392,9 +397,9 @@ export function useJovieChat({
   });
 
   const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
+    (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      throttledSubmit(input);
+      throttledSubmit(input, files);
     },
     [input, throttledSubmit]
   );

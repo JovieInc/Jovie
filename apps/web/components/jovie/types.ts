@@ -61,6 +61,17 @@ export interface MessagePart {
     readonly toolName: string;
     readonly state: string;
   };
+  /** File attachment URL (data URL or blob URL). Present when type === 'file'. */
+  readonly url?: string;
+  /** MIME type of the file attachment. Present when type === 'file'. */
+  readonly mediaType?: string;
+}
+
+/** Shape of file attachments passed to AI SDK's sendMessage. */
+export interface FileUIPart {
+  readonly type: 'file';
+  readonly mediaType: string;
+  readonly url: string;
 }
 
 /** User-friendly labels for AI tool invocations shown during streaming. */
