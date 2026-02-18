@@ -5,7 +5,7 @@ import { HeroSpotifySearch } from './HeroSpotifySearch';
  */
 export function RedesignedHero() {
   return (
-    <section className='relative overflow-hidden px-5 pb-16 pt-16 sm:px-6 md:pb-24 md:pt-36 lg:px-[77px]'>
+    <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 pb-16 sm:px-6 lg:px-[77px]'>
       {/* Ambient glow — subtle depth cue behind content */}
       <div
         aria-hidden='true'
@@ -69,13 +69,17 @@ export function RedesignedHero() {
 
         {/* Trust line */}
         <p
-          className='mt-5'
+          className='mt-5 flex items-center gap-2'
           style={{
             fontSize: '13px',
             letterSpacing: '0.01em',
             color: 'var(--linear-text-tertiary)',
           }}
         >
+          <span
+            aria-hidden='true'
+            className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
+          />
           Free forever. No credit card.
         </p>
       </div>

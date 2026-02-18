@@ -18,6 +18,10 @@ import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 import { useSignInSafe } from './useClerkSafe';
 
+/** Use current origin for OAuth callbacks so localhost works correctly */
+const getOAuthBaseUrl = () =>
+  typeof window !== 'undefined' ? window.location.origin : APP_URL;
+
 // Re-export types for backwards compatibility
 export type { AuthMethod, LoadingState } from '@/lib/auth/types';
 // Workaround for eslint - use AuthMethod via re-export
@@ -238,15 +242,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.storeRedirectUrl();
 
       try {
-        // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments.
-        // Read stored redirect URL (falls back to /app) so returning users
-        // go directly to the dashboard instead of bouncing through the homepage.
+        // Use current origin for OAuth callbacks so localhost, preview, and
+        // production all redirect correctly after the OAuth round-trip.
+        const oauthBase = getOAuthBaseUrl();
         const storedRedirect = base.getRedirectUrl();
         await signIn.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: `${APP_URL}/signin/sso-callback`,
-          redirectUrlComplete: `${APP_URL}${storedRedirect}`,
+          redirectUrl: `${oauthBase}/signin/sso-callback`,
+          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard
