@@ -5,6 +5,7 @@
  * One cold start + one DB connection serves all jobs.
  *
  * Sub-jobs:
+ * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
  * - Process campaigns: every invocation (15 min)
  * - Pixel forwarding retry: every other invocation (~30 min)
  * - Send release notifications: on the hour (~60 min)
@@ -15,7 +16,9 @@
  * Schedule: every 15 minutes (configured in vercel.json)
  */
 
+import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -69,14 +72,21 @@ export async function GET(request: Request) {
   const minute = new Date().getMinutes();
   const results: Record<string, SubJobResult> = {};
 
-  // 1. Process campaigns — every invocation (15 min)
+  // 1. DB warm ping — keeps Neon compute from auto-suspending
+  results.dbWarmPing = await runSubJob('dbWarmPing', async () => {
+    const pingStart = Date.now();
+    await db.execute(drizzleSql`SELECT 1`);
+    return { latencyMs: Date.now() - pingStart };
+  });
+
+  // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {
     const campaignResult = await processCampaigns();
     const suppressionsCleared = await cleanupExpiredSuppressions();
     return { ...campaignResult, suppressionsCleared };
   });
 
-  // 2. Pixel forwarding retry — every other invocation (~30 min)
+  // 3. Pixel forwarding retry — every other invocation (~30 min)
   results.pixelRetry =
     minute >= 30
       ? await runSubJob('pixelRetry', async () => {
@@ -85,7 +95,7 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // 3. Send release notifications — on the hour (minute < 15)
+  // 4. Send release notifications — on the hour (minute < 15)
   results.sendNotifications =
     minute < 15
       ? await runSubJob('sendNotifications', async () => {
@@ -94,7 +104,7 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // 4. Warm Spotify alphabet cache — every 6 hours
+  // 5. Warm Spotify alphabet cache — every 6 hours
   const hour = new Date().getHours();
   if (hour % 6 === 0 && minute < 15) {
     try {
