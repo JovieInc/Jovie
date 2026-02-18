@@ -53,7 +53,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
+          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-${{ matrix.browser }}-
 
@@ -74,6 +74,7 @@ jobs:
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Report on Failure
         if: failure()
