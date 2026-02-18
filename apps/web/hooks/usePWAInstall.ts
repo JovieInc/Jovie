@@ -29,6 +29,7 @@ if (typeof window !== 'undefined') {
   }
 
   window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
     _earlyPromptEvent = e as BeforeInstallPromptEvent;
   });
 }
