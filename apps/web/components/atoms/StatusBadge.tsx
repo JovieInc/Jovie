@@ -30,9 +30,7 @@ export function StatusBadge({
   dynamic = false,
 }: StatusBadgeProps) {
   return (
-    // role="status" is correct for live announcements; <output> is for form calculation results
-    <div
-      role={dynamic ? 'status' : undefined}
+    <output
       className={cn(
         'inline-flex items-center gap-2 rounded-full border font-medium',
         variantClasses[variant],
@@ -42,6 +40,6 @@ export function StatusBadge({
     >
       {icon && <span className='flex-shrink-0'>{icon}</span>}
       <span>{children}</span>
-    </div>
+    </output>
   );
 }

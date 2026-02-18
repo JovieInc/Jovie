@@ -25,12 +25,11 @@ export function AudienceRowSelectionCell({
         className
       )}
     >
-      {/* role="presentation" correctly hides wrapper; checkbox inside is the interactive element */}
       <div
         className='contents'
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
-        role='presentation'
+        aria-hidden='true'
       >
         <span
           className={cn(

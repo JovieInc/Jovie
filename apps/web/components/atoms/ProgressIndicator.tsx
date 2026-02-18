@@ -42,14 +42,11 @@ export function ProgressIndicator({
   };
 
   return (
-    // Multi-step progress with custom styling; native <progress> doesn't support step indicators
-    <div
+    <progress
       className={`space-y-4 ${className}`}
-      role='progressbar'
       aria-label={`Progress: Step ${currentStep + 1} of ${totalSteps}`}
-      aria-valuenow={currentStep + 1}
-      aria-valuemin={1}
-      aria-valuemax={totalSteps}
+      value={currentStep + 1}
+      max={totalSteps}
     >
       {/* Progress bar */}
       <div className='space-y-2'>
@@ -135,6 +132,6 @@ export function ProgressIndicator({
           );
         })}
       </div>
-    </div>
+    </progress>
   );
 }

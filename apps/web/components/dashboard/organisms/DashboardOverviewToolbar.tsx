@@ -22,31 +22,28 @@ export function DashboardOverviewToolbar({
 
   return (
     <div className='flex items-center justify-end gap-2'>
-      {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div
-        role='group'
-        aria-label='Dashboard window'
-        className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/3 dark:ring-white/5 backdrop-blur-sm'
-      >
-        {(['7d', '30d', '90d'] as const).map(value => {
-          const active = range === value;
-          return (
-            <button
-              key={value}
-              type='button'
-              onClick={() => onRangeChange(value)}
-              aria-pressed={active}
-              className={
-                active
-                  ? 'h-6 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40'
-                  : 'h-6 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
-              }
-            >
-              {value}
-            </button>
-          );
-        })}
-      </div>
+      <fieldset aria-label='Dashboard window' className='border-0 p-0 m-0'>
+        <div className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/3 dark:ring-white/5 backdrop-blur-sm'>
+          {(['7d', '30d', '90d'] as const).map(value => {
+            const active = range === value;
+            return (
+              <button
+                key={value}
+                type='button'
+                onClick={() => onRangeChange(value)}
+                aria-pressed={active}
+                className={
+                  active
+                    ? 'h-6 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40'
+                    : 'h-6 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
+                }
+              >
+                {value}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
 
       <button
         type='button'

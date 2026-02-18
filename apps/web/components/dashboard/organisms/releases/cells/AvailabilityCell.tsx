@@ -286,8 +286,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   {status === 'missing' ? (
                     <span
                       className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'
-                      role='img'
-                      aria-label={`${config.label}: not linked`}
+                      aria-hidden='true'
                     >
                       <span className='h-1 w-1 rounded-full bg-tertiary-token' />
                     </span>
@@ -298,8 +297,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         status === 'manual' && 'ring-2 ring-amber-400/30'
                       )}
                       style={{ backgroundColor: config.accent }}
-                      role='img'
-                      aria-label={`${config.label}: ${status === 'manual' ? 'manually linked' : 'linked'}`}
+                      aria-hidden='true'
                     >
                       {status === 'manual' && (
                         <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />

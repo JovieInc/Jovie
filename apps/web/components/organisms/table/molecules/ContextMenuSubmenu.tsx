@@ -57,12 +57,11 @@ export function ContextMenuSubmenu({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    // role="presentation" correctly hides wrapper; button inside is the interactive element
     <div
       className='relative'
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
-      role='presentation'
+      aria-hidden='true'
     >
       {/* Submenu Trigger */}
       <button

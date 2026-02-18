@@ -206,7 +206,7 @@ export function useArtistSearchQuery(
       }
 
       // Single letter: bypass debounce for instant alphabet pre-cache results
-      if (trimmed.length === 1 && /^[a-zA-Z]$/i.test(trimmed)) {
+      if (trimmed.length === 1 && /^[a-zA-Z]$/.test(trimmed)) {
         asyncDebouncer.cancel();
         setDebouncedQuery(trimmed);
         setIsPending(false);

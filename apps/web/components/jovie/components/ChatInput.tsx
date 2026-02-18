@@ -111,7 +111,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         >
           {hasPendingImages && onRemoveImage && (
             <ImagePreviewStrip
-              images={pendingImages!}
+              images={pendingImages ?? []}
               onRemove={onRemoveImage}
             />
           )}

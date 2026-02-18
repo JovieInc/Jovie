@@ -22,9 +22,7 @@ export function LogoLoader({
   'aria-label': ariaLabel = 'Loading',
 }: LogoLoaderProps) {
   return (
-    // role="status" is correct for live announcements; <output> is for form calculation results
-    <div
-      role='status'
+    <output
       aria-live='polite'
       aria-label={ariaLabel}
       className={cn(
@@ -44,6 +42,6 @@ export function LogoLoader({
         )}
         style={{ animationDuration: '1.25s' }}
       />
-    </div>
+    </output>
   );
 }

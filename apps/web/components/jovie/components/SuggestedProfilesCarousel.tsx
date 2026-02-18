@@ -23,6 +23,8 @@ import { useSuggestedProfiles } from '../hooks/useSuggestedProfiles';
 // Platform icon mapping (provider_id -> SocialIcon platform name)
 // ============================================================================
 
+type SlideDirection = 'left' | 'right' | null;
+
 function confidenceBadgeClass(confidence: number): string {
   if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
   if (confidence >= 0.5) return 'bg-amber-500/15 text-amber-400';
@@ -100,7 +102,7 @@ function ProfileReadyCard({
   readonly username?: string;
   readonly avatarUrl?: string | null;
   readonly onDismiss: () => void;
-  readonly direction: 'left' | 'right' | null;
+  readonly direction: SlideDirection;
 }) {
   return (
     <div
@@ -193,7 +195,7 @@ function SuggestionCard({
   readonly onConfirm: () => void;
   readonly onReject: () => void;
   readonly isActioning: boolean;
-  readonly direction: 'left' | 'right' | null;
+  readonly direction: SlideDirection;
 }) {
   const isAvatar = suggestion.type === 'avatar';
   const iconPlatform =
@@ -352,9 +354,7 @@ export function SuggestedProfilesCarousel({
     isActioning,
   } = useSuggestedProfiles(profileId);
 
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(
-    null
-  );
+  const [slideDirection, setSlideDirection] = useState<SlideDirection>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Clean up timeout on unmount
@@ -394,12 +394,14 @@ export function SuggestedProfilesCarousel({
   if (!current) return null;
 
   // Determine the section heading based on current card type
-  const heading =
-    current.type === 'profile_ready'
-      ? 'Welcome'
-      : current.type === 'avatar'
-        ? 'Choose your profile photo'
-        : 'We found profiles that might be yours';
+  let heading: string;
+  if (current.type === 'profile_ready') {
+    heading = 'Welcome';
+  } else if (current.type === 'avatar') {
+    heading = 'Choose your profile photo';
+  } else {
+    heading = 'We found profiles that might be yours';
+  }
 
   return (
     <div className='space-y-2'>

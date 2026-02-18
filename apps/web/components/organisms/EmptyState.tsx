@@ -191,9 +191,7 @@ export function EmptyState({
   };
 
   return (
-    // role="status" is correct for state announcements; <output> is for form calculation results
-    <section
-      role='status'
+    <output
       aria-labelledby={headingId}
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
@@ -236,6 +234,6 @@ export function EmptyState({
           {renderSecondaryAction()}
         </div>
       )}
-    </section>
+    </output>
   );
 }
