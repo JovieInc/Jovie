@@ -59,9 +59,16 @@ function upgradeGoogleAvatarUrl(url: string): string {
     return url.replace(sizePattern, `=s${HIGH_RES_SIZE}-c`);
   }
 
-  // If no size parameter, append one
-  // Check if URL already has query params
-  if (url.includes('?')) {
+  // If no size parameter, append one.
+  // Use URL parsing to check for query params rather than substring matching.
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.search) {
+      // URL already has query params but no Google size suffix — return as-is
+      return url;
+    }
+  } catch {
+    // Invalid URL — return as-is
     return url;
   }
 
@@ -126,9 +133,11 @@ function upgradeTwitterAvatarUrl(url: string): string {
     return url.replace(sizePattern, '_400x400$2');
   }
 
-  // If no size suffix, try to add one before the extension
+  // If no size suffix, try to add one before the extension.
+  // The sizePattern above already handles _400x400, so we only reach
+  // here when no known size suffix is present.
   const extPattern = /(\.[a-z]+)$/i;
-  if (extPattern.test(url) && !url.includes('_400x400')) {
+  if (extPattern.test(url)) {
     return url.replace(extPattern, '_400x400$1');
   }
 
