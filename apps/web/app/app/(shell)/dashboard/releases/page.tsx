@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 import {
   checkAppleMusicConnection,
@@ -22,16 +23,28 @@ export default async function ReleasesPage() {
     redirect('/sign-in?redirect_url=/app/dashboard/releases');
   }
 
-  // Use allSettled so a single fetch failure degrades gracefully instead of crashing
-  const [releasesResult, spotifyResult, appleMusicResult] =
-    await Promise.allSettled([
-      loadReleaseMatrix(),
-      checkSpotifyConnection(),
-      checkAppleMusicConnection(),
-    ]);
+  // Handle redirects for users who need onboarding
+  if (dashboardData.needsOnboarding) {
+    redirect('/onboarding');
+  }
 
-  const releases =
-    releasesResult.status === 'fulfilled' ? releasesResult.value : [];
+  // Fetch releases outside allSettled so redirect() from requireProfile() can propagate
+  let releases: Awaited<ReturnType<typeof loadReleaseMatrix>> = [];
+  try {
+    releases = await loadReleaseMatrix();
+  } catch (error) {
+    throwIfRedirect(error);
+    void captureError('loadReleaseMatrix failed', error, {
+      route: APP_ROUTES.RELEASES,
+    });
+  }
+
+  // Use allSettled for connection checks — these don't redirect and degrade gracefully
+  const [spotifyResult, appleMusicResult] = await Promise.allSettled([
+    checkSpotifyConnection(),
+    checkAppleMusicConnection(),
+  ]);
+
   const spotifyStatus =
     spotifyResult.status === 'fulfilled'
       ? spotifyResult.value
@@ -41,11 +54,6 @@ export default async function ReleasesPage() {
       ? appleMusicResult.value
       : { connected: false, artistName: null, artistId: null };
 
-  if (releasesResult.status === 'rejected') {
-    void captureError('loadReleaseMatrix failed', releasesResult.reason, {
-      route: APP_ROUTES.RELEASES,
-    });
-  }
   if (spotifyResult.status === 'rejected') {
     void captureError('checkSpotifyConnection failed', spotifyResult.reason, {
       route: APP_ROUTES.RELEASES,

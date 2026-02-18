@@ -54,6 +54,7 @@ import {
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -588,7 +589,8 @@ export async function checkSpotifyConnection(): Promise<{
       spotifyId: data.selectedProfile.spotifyId ?? null,
       artistName,
     };
-  } catch {
+  } catch (error) {
+    throwIfRedirect(error);
     return { connected: false, spotifyId: null, artistName: null };
   }
 }
@@ -847,7 +849,8 @@ export async function checkAppleMusicConnection(): Promise<{
       artistName: isConnected ? match.externalArtistName : null,
       artistId: isConnected ? match.externalArtistId : null,
     };
-  } catch {
+  } catch (error) {
+    throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };
   }
 }
