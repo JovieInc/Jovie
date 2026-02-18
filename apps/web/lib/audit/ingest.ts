@@ -13,6 +13,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
+import { getDb } from '@/lib/db';
+import { ingestAuditLogs } from '@/lib/db/schema/audit';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 
 // ============================================================================
@@ -198,9 +200,34 @@ export async function logIngestEvent(event: IngestAuditEvent): Promise<void> {
       });
   }
 
-  // See JOV-481: Implement audit log persistence to database
-  // await writeToDatabase(logEntry);
-  // await sendToAuditService(logEntry);
+  // Persist to database (fire-and-forget to avoid blocking the request)
+  persistAuditLog(logEntry).catch(err => {
+    captureError('[Ingest Audit] DB write failed', err, {
+      type: logEntry.type,
+    });
+  });
+}
+
+/**
+ * Persist an audit log entry to the database.
+ * Called fire-and-forget from logIngestEvent to avoid blocking the request.
+ */
+async function persistAuditLog(entry: AuditLogEntry): Promise<void> {
+  const db = getDb();
+  await db.insert(ingestAuditLogs).values({
+    type: entry.type,
+    level: entry.level,
+    userId: entry.userId ?? null,
+    artistId: entry.artistId ?? null,
+    spotifyId: entry.spotifyId ?? null,
+    handle: entry.handle ?? null,
+    action: entry.action ?? null,
+    result: entry.result ?? null,
+    failureReason: entry.failureReason ?? null,
+    ipAddress: entry.ip ?? null,
+    userAgent: entry.userAgent ?? null,
+    metadata: entry.metadata ?? null,
+  });
 }
 
 // ============================================================================
