@@ -126,14 +126,11 @@ export function UniversalLinkInputArtistSearchMode({
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {ARTIST_SEARCH_LOADING_KEYS.map(key => (
-                <div
-                  key={key}
-                  className='flex items-center gap-3 animate-pulse motion-reduce:animate-none'
-                >
-                  <div className='w-10 h-10 rounded-full bg-surface-3' />
+                <div key={key} className='flex items-center gap-3'>
+                  <div className='w-10 h-10 rounded-full skeleton' />
                   <div className='flex-1 space-y-1'>
-                    <div className='h-4 w-32 bg-surface-3 rounded' />
-                    <div className='h-3 w-20 bg-surface-3 rounded' />
+                    <div className='h-4 w-32 rounded skeleton' />
+                    <div className='h-3 w-20 rounded skeleton' />
                   </div>
                 </div>
               ))}

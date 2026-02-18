@@ -1,9 +1,19 @@
-import { AuthLoader } from '@/components/organisms/AuthLoader';
+import {
+  InputSkeleton,
+  SettingsButtonSkeleton,
+  SettingsLoadingSkeleton,
+} from '@/components/molecules/SettingsLoadingSkeleton';
 
 /**
- * Settings loading screen
- * Uses AuthLoader to match the unified layout (sidebar offset, no layout shift)
+ * Settings loading screen — generic skeleton matching settings page layout.
  */
 export default function SettingsLoading() {
-  return <AuthLoader />;
+  return (
+    <SettingsLoadingSkeleton>
+      <InputSkeleton />
+      <InputSkeleton />
+      <InputSkeleton />
+      <SettingsButtonSkeleton />
+    </SettingsLoadingSkeleton>
+  );
 }

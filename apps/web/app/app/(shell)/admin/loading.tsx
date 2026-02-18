@@ -1,9 +1,23 @@
-import { AuthLoader } from '@/components/organisms/AuthLoader';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import {
+  AdminActivitySectionSkeleton,
+  AdminKpiSectionSkeleton,
+  AdminUsageSectionSkeleton,
+} from './_components';
 
 /**
- * Admin loading screen
- * Uses AuthLoader to match the unified layout (sidebar offset, no layout shift)
+ * Admin loading screen — matches admin page layout with 3 skeleton sections.
  */
 export default function AdminLoading() {
-  return <AuthLoader />;
+  return (
+    <PageShell>
+      <PageContent>
+        <div className='space-y-8'>
+          <AdminKpiSectionSkeleton />
+          <AdminUsageSectionSkeleton />
+          <AdminActivitySectionSkeleton />
+        </div>
+      </PageContent>
+    </PageShell>
+  );
 }

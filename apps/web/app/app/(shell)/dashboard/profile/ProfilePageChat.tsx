@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { JovieChat } from '@/components/jovie/JovieChat';
 
@@ -9,8 +9,18 @@ export function ProfilePageChat() {
 
   if (!selectedProfile) {
     return (
-      <div className='flex h-full items-center justify-center'>
-        <Loader2 className='h-6 w-6 animate-spin text-secondary-token' />
+      <div className='flex h-full flex-col'>
+        {/* Empty message area skeleton */}
+        <div className='flex flex-1 items-center justify-center'>
+          <div className='flex flex-col items-center gap-3'>
+            <MessageSquare className='h-8 w-8 text-tertiary-token opacity-40' />
+            <div className='h-4 w-32 rounded skeleton' />
+          </div>
+        </div>
+        {/* Input bar skeleton */}
+        <div className='shrink-0 border-t border-subtle p-4'>
+          <div className='h-10 rounded-lg skeleton' />
+        </div>
       </div>
     );
   }
