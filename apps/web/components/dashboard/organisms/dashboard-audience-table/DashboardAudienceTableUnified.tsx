@@ -256,7 +256,10 @@ export const DashboardAudienceTableUnified = memo(
 
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
-        if (!profileId) return;
+        if (!profileId) {
+          toast.error('Unable to block member — profile not loaded');
+          return;
+        }
         try {
           const res = await fetch('/api/dashboard/audience/members', {
             method: 'DELETE',
