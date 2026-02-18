@@ -124,12 +124,16 @@ function SettingsNavigation({
   return (
     <nav
       aria-label={`${section} navigation`}
-      className='flex flex-1 flex-col gap-2 overflow-hidden'
+      className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
-      <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
-      <div className='mx-2 group-data-[collapsible=icon]:mx-0' />
       <div>
-        <span className='mb-0.5 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          General
+        </span>
+        <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
+      </div>
+      <div>
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />

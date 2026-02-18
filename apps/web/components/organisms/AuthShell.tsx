@@ -77,7 +77,7 @@ function AuthShellInner({
           <div
             className={cn(
               'flex-1 min-h-0 overflow-hidden flex',
-              showMobileTabs && 'pb-20 lg:pb-6'
+              showMobileTabs && 'pb-20 lg:pb-0'
             )}
           >
             <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
