@@ -25,7 +25,7 @@ jobs:
           ISSUE_ID: ${{ github.event.client_payload.issue_id }}
         run: |
           BRANCH="sentry-fix/${ISSUE_ID}"
-          if git ls-remote --heads "https://github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
+          if git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
             echo "Branch $BRANCH already exists — skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
@@ -89,8 +89,8 @@ jobs:
         run: |
           BRANCH="sentry-fix/${ISSUE_ID}"
 
-          # Check if there are changes to commit
-          if git diff --quiet && git diff --staged --quiet; then
+          # Check if there are changes to commit (tracked + untracked)
+          if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
             echo "No changes were made — Claude could not fix the issue"
             echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 0
@@ -104,7 +104,7 @@ jobs:
 
           # Stage and commit
           git add -A
-          git commit -m "$(cat <<'EOF'
+          git commit -m "$(cat <<EOF
           fix: resolve Sentry error — ${ERROR_TITLE}
 
           Automated fix for Sentry issue ${ISSUE_ID}.
@@ -122,7 +122,7 @@ jobs:
             --base main \
             --head "$BRANCH" \
             --title "fix: Sentry autofix — ${ERROR_TITLE}" \
-            --body "$(cat <<'EOF'
+            --body "$(cat <<EOF
           ## Summary
 
           Automated fix for a Sentry production error.

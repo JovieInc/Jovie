@@ -22,6 +22,31 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+/** Stack frame from Sentry payload */
+interface SentryFrame {
+  filename?: string;
+  function?: string;
+  lineno?: number;
+}
+
+/**
+ * Simple in-process dedupe cache to prevent Sentry retry storms
+ * from triggering multiple dispatches for the same issue.
+ */
+const recentDispatches = new Map<string, number>();
+const DEDUPE_TTL_MS = 60_000; // 1 minute
+
+function isDuplicate(issueId: string): boolean {
+  const now = Date.now();
+  // Evict stale entries
+  for (const [key, ts] of recentDispatches) {
+    if (now - ts > DEDUPE_TTL_MS) recentDispatches.delete(key);
+  }
+  if (recentDispatches.has(issueId)) return true;
+  recentDispatches.set(issueId, now);
+  return false;
+}
+
 /**
  * Verify Sentry webhook signature.
  * Sentry sends `sentry-hook-signature` = HMAC-SHA256 hex digest of raw body.
@@ -94,20 +119,32 @@ export async function POST(request: NextRequest) {
     }
 
     const issueId = String(issue.id);
+
+    // Dedupe: skip if we already dispatched for this issue recently
+    if (isDuplicate(issueId)) {
+      logger.info('[Sentry Webhook] Duplicate dispatch suppressed', {
+        issueId,
+      });
+      return NextResponse.json(
+        { received: true, deduplicated: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const title = issue.title || 'Unknown error';
     const culprit = issue.culprit || '';
     const message = issue.metadata?.value || issue.message || '';
     const url = issue.permalink || `https://sentry.io/issues/${issueId}/`;
 
     // Extract stack trace from first exception if available
-    const frames =
+    const frames: SentryFrame[] | undefined =
       issue.metadata?.stacktrace?.frames ||
       payload.data?.issue?.platform_context?.stacktrace?.frames;
     const stacktrace = frames
       ? frames
           .slice(-10)
           .map(
-            (f: { filename?: string; function?: string; lineno?: number }) =>
+            (f: SentryFrame) =>
               `  ${f.filename || '?'}:${f.lineno || '?'} in ${f.function || '?'}`
           )
           .join('\n')
