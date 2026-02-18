@@ -19,11 +19,14 @@ function buildNavLinks(
   hidePricingLink: boolean,
   showAuthenticatedAction: boolean
 ): NavLink[] {
-  const baseLinks: NavLink[] = customNavLinks
-    ? [...customNavLinks]
-    : hidePricingLink
-      ? []
-      : [{ href: '/pricing', label: 'Pricing' }];
+  let baseLinks: NavLink[];
+  if (customNavLinks) {
+    baseLinks = [...customNavLinks];
+  } else if (hidePricingLink) {
+    baseLinks = [];
+  } else {
+    baseLinks = [{ href: '/pricing', label: 'Pricing' }];
+  }
 
   if (!showAuthenticatedAction) {
     baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });

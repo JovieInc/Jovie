@@ -61,10 +61,8 @@ export function TipSelector({
         Choose amount
       </p>
 
-      {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div
-        className='grid grid-cols-3 gap-3'
-        role='group'
+      <fieldset
+        className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
         aria-label='Tip amount options'
       >
         {amounts.map((amount, idx) => (
@@ -76,7 +74,7 @@ export function TipSelector({
             index={idx}
           />
         ))}
-      </div>
+      </fieldset>
 
       <Button
         onClick={handleContinue}

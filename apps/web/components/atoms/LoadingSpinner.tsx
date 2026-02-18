@@ -33,9 +33,7 @@ export function LoadingSpinner({
   const toneClass = toneClasses[tone];
 
   return (
-    // role="status" is correct for live announcements; <output> is for form calculation results
-    <span
-      role='status'
+    <output
       aria-label={label}
       data-testid='spinner'
       data-size={size}
@@ -64,7 +62,7 @@ export function LoadingSpinner({
           )}
         />
       </span>
-    </span>
+    </output>
   );
 }
 

@@ -38,7 +38,7 @@ async function fetchTopArtistsForLetter(
 ): Promise<SpotifyArtistResult[]> {
   const artists = await spotifyClient.searchArtists(letter, FETCH_PER_LETTER);
 
-  return artists
+  return [...artists]
     .sort((a, b) => b.popularity - a.popularity)
     .slice(0, RESULTS_PER_LETTER)
     .map(artist => ({

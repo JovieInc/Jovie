@@ -84,9 +84,7 @@ export function StarterEmptyState({
   };
 
   return (
-    // role="status" is correct for state announcements; <output> is for form calculation results
-    <div
-      role='status'
+    <output
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}
       className={cn(
@@ -114,6 +112,6 @@ export function StarterEmptyState({
 
         <Rocket className='hidden h-10 w-10 text-accent-token sm:block' />
       </div>
-    </div>
+    </output>
   );
 }

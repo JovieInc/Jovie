@@ -140,16 +140,27 @@ function getMergedDSPs(
   return Array.from(byKey.values());
 }
 
-function renderContent(
-  mode: string,
-  artist: Artist,
-  socialLinks: LegacySocialLink[],
-  mergedDSPs: AvailableDSP[],
-  primaryAction: PrimaryAction,
-  enableDynamicEngagement: boolean,
-  subscribeTwoStep: boolean,
-  genres?: string[] | null
-) {
+interface RenderContentOptions {
+  readonly mode: string;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly mergedDSPs: AvailableDSP[];
+  readonly primaryAction: PrimaryAction;
+  readonly enableDynamicEngagement: boolean;
+  readonly subscribeTwoStep: boolean;
+  readonly genres?: string[] | null;
+}
+
+function renderContent({
+  mode,
+  artist,
+  socialLinks,
+  mergedDSPs,
+  primaryAction,
+  enableDynamicEngagement,
+  subscribeTwoStep,
+  genres,
+}: RenderContentOptions) {
   switch (mode) {
     case 'listen':
       return (
@@ -284,7 +295,7 @@ export function StaticArtistPage({
               </div>
             </div>
           ) : (
-            renderContent(
+            renderContent({
               mode,
               artist,
               socialLinks,
@@ -292,8 +303,8 @@ export function StaticArtistPage({
               primaryAction,
               enableDynamicEngagement,
               subscribeTwoStep,
-              genres
-            )
+              genres,
+            })
           )}
         </div>
       </ArtistPageShell>

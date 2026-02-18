@@ -73,8 +73,14 @@ export function usePlanGate(): PlanGateEntitlements {
   const isPro = data?.isPro ?? false;
   const plan = data?.plan ?? null;
 
-  const planKey: PlanId =
-    plan === 'growth' ? 'growth' : plan === 'pro' ? 'pro' : 'free';
+  let planKey: PlanId;
+  if (plan === 'growth') {
+    planKey = 'growth';
+  } else if (plan === 'pro') {
+    planKey = 'pro';
+  } else {
+    planKey = 'free';
+  }
   const ent = ENTITLEMENT_REGISTRY[planKey];
 
   return {

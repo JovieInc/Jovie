@@ -67,14 +67,13 @@ function TanStackHeaderCheckbox({
   const normalizedState = normalizeHeaderState(headerCheckboxState);
 
   return (
-    // role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      role='presentation'
+      aria-hidden='true'
     >
       <Checkbox
         aria-label='Select all rows'
@@ -98,14 +97,13 @@ function TanStackRowCheckbox({
   onToggleSelect: () => void;
 }) {
   return (
-    // role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
     <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      role='presentation'
+      aria-hidden='true'
     >
       <span
         className={cn(

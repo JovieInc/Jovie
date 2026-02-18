@@ -28,7 +28,7 @@ const CTA_INTERVAL = 5000;
 export function ProfileMockup() {
   const [isListen, setIsListen] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const barRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLProgressElement>(null);
   const progressPercent = useRef(0);
 
   // Check reduced motion preference
@@ -166,14 +166,12 @@ export function ProfileMockup() {
           </div>
 
           {/* Progress bar */}
-          <div
+          <progress
             ref={barRef}
-            role='progressbar'
-            aria-valuenow={0}
-            aria-valuemin={0}
-            aria-valuemax={100}
+            value={0}
+            max={100}
             aria-label='Time until CTA switches'
-            className='cta-progress absolute bottom-0 left-0 h-[3px] opacity-60'
+            className='cta-progress absolute bottom-0 left-0 h-[3px] opacity-60 appearance-none [&::-webkit-progress-bar]:bg-transparent [&::-webkit-progress-value]:bg-current [&::-moz-progress-bar]:bg-current'
             style={{
               backgroundColor: isListen
                 ? 'rgb(52 211 153)'
@@ -182,7 +180,7 @@ export function ProfileMockup() {
                 ? 'none'
                 : `ctaFill ${CTA_INTERVAL}ms linear forwards`,
             }}
-          ></div>
+          />
         </div>
 
         {/* Label */}

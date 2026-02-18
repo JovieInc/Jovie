@@ -246,15 +246,14 @@ function SocialIconInner({
   }
 
   return (
-    // SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
     <svg
       className={iconClass}
       style={sizeStyle}
       fill='currentColor'
       viewBox='0 0 24 24'
+      role={ariaHidden ? undefined : 'img'}
       aria-hidden={ariaHidden}
       aria-label={ariaLabel}
-      role={ariaLabel ? 'img' : undefined}
     >
       <path d={entry.path} />
     </svg>
