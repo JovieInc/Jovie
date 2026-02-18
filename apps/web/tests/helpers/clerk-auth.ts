@@ -168,7 +168,7 @@ export async function signInUser(
           strategyError instanceof Error
             ? strategyError.message
             : String(strategyError);
-        if (strategyMsg.includes('strategy')) {
+        if (strategyMsg.toLowerCase().includes('strategy')) {
           console.log(
             '  Password strategy not available, falling back to email_code'
           );
