@@ -127,6 +127,10 @@ export const ServerEnvSchema = z.object({
 
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
+  SENTRY_WEBHOOK_SECRET: z.string().optional(),
+
+  // GitHub dispatch (Sentry autofix pipeline)
+  GITHUB_DISPATCH_TOKEN: z.string().optional(),
 
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
@@ -207,6 +211,8 @@ export const ENV_KEYS = [
   'ENABLE_IMPERSONATION',
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
+  'SENTRY_WEBHOOK_SECRET',
+  'GITHUB_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_FACEBOOK_PIXEL_ID',

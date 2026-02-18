@@ -1,0 +1,180 @@
+name: Sentry Autofix
+
+on:
+  repository_dispatch:
+    types: [sentry-issue]
+
+concurrency:
+  group: sentry-autofix-${{ github.event.client_payload.issue_id }}
+  cancel-in-progress: false
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Check for existing branch (dedup)
+        id: dedup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+        run: |
+          BRANCH="sentry-fix/${ISSUE_ID}"
+          if git ls-remote --heads "https://github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Branch $BRANCH already exists — skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout main
+        if: steps.dedup.outputs.skip != 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create fix branch
+        if: steps.dedup.outputs.skip != 'true'
+        env:
+          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+        run: |
+          git checkout -b "sentry-fix/${ISSUE_ID}"
+
+      - name: Setup Node.js and pnpm
+        if: steps.dedup.outputs.skip != 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run Claude Code to fix the bug
+        if: steps.dedup.outputs.skip != 'true'
+        id: claude
+        uses: anthropics/claude-code-action@68cfeead1890300cc87935dbe2c023825be87b8a # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            A Sentry error needs to be fixed. Here are the details:
+
+            **Error:** ${{ github.event.client_payload.title }}
+            **Culprit:** ${{ github.event.client_payload.culprit }}
+            **Message:** ${{ github.event.client_payload.message }}
+            **Sentry URL:** ${{ github.event.client_payload.url }}
+
+            **Stack Trace:**
+            ```
+            ${{ github.event.client_payload.stacktrace }}
+            ```
+
+            Instructions:
+            1. Investigate the error using the culprit file and stack trace
+            2. Fix the root cause of the bug
+            3. Run `pnpm biome check . --write` to auto-fix formatting
+            4. Run `pnpm turbo typecheck --filter=@jovie/web` to verify types pass
+            5. If validation fails, fix the issues and re-run
+
+            Keep changes minimal — fix only the bug, do not refactor surrounding code.
+
+      - name: Push branch and create PR
+        if: steps.dedup.outputs.skip != 'true'
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          ERROR_TITLE: ${{ github.event.client_payload.title }}
+          SENTRY_URL: ${{ github.event.client_payload.url }}
+        run: |
+          BRANCH="sentry-fix/${ISSUE_ID}"
+
+          # Check if there are changes to commit
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes were made — Claude could not fix the issue"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage and commit
+          git add -A
+          git commit -m "$(cat <<'EOF'
+          fix: resolve Sentry error — ${ERROR_TITLE}
+
+          Automated fix for Sentry issue ${ISSUE_ID}.
+          See: ${SENTRY_URL}
+
+          Co-authored-by: Claude <claude@anthropic.com>
+          EOF
+          )"
+
+          # Push branch
+          git push origin "HEAD:${BRANCH}"
+
+          # Create PR
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "fix: Sentry autofix — ${ERROR_TITLE}" \
+            --body "$(cat <<'EOF'
+          ## Summary
+
+          Automated fix for a Sentry production error.
+
+          - **Error:** ${ERROR_TITLE}
+          - **Sentry:** ${SENTRY_URL}
+          - **Issue ID:** ${ISSUE_ID}
+
+          ## Test plan
+
+          - [ ] CI passes (Biome + TypeScript + tests)
+          - [ ] Error no longer reproduces in production after deploy
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code) via Sentry Autofix
+          EOF
+          )")
+
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.create-pr.outputs.pr_url }}
+        run: |
+          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge not available (branch protection may not be configured)"
+
+      - name: Fallback — convert to draft if validation failed
+        if: failure() && steps.dedup.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+        run: |
+          BRANCH="sentry-fix/${ISSUE_ID}"
+
+          # Check if branch was pushed
+          if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Branch was never pushed — nothing to clean up"
+            exit 0
+          fi
+
+          # Check if PR exists
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+
+          if [ -n "$PR_NUMBER" ]; then
+            # Convert to draft and add label
+            gh pr ready "$PR_NUMBER" --undo 2>/dev/null || true
+            gh pr edit "$PR_NUMBER" --add-label "needs-human" 2>/dev/null || true
+            gh pr comment "$PR_NUMBER" --body "## ⚠️ Sentry Autofix Failed
+
+          The automated fix workflow was unable to fully resolve this Sentry error.
+          A human developer needs to review and complete the fix.
+
+          The \`needs-human\` label has been added to this PR." 2>/dev/null || true
+          fi
