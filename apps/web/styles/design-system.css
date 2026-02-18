@@ -570,7 +570,7 @@
   --font-weight-normal: 450; /* Linear default — "book" weight, not standard 400 */
   --font-weight-book: 450; /* Alias for normal */
   --font-weight-medium: 500;
-  --font-weight-nav: 510; /* Linear sidebar nav weight */
+  --font-weight-nav: 500; /* Linear sidebar nav = --font-weight-medium */
   --font-weight-semibold: 600; /* Linear: 600, not our old 538 */
   --font-weight-bold: 700; /* Linear: 700, not our old 590 */
   --font-weight-heavy: 700;
@@ -768,7 +768,7 @@
   --sidebar-input-border: 255 255 255 / 0.06;
   --sidebar-item-foreground: 208 214 224; /* Nav text — Linear: rgb(208,214,224) */
   --sidebar-item-icon: 98 102 109; /* Nav icons — Linear: rgb(98,102,109) */
-  --sidebar-accent-active: 255 255 255 / 0.06; /* Active bg — Linear: rgba(255,255,255,0.06) */
+  --sidebar-accent-active: 255 255 255 / 0.04; /* Active bg — Linear: rgba(255,255,255,0.04) */
 }
 
 /* ============================================

@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, SquarePen } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Copy, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
@@ -129,7 +129,7 @@ function SettingsNavigation({
       <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
       <div className='mx-2 group-data-[collapsible=icon]:mx-0' />
       <div>
-        <span className='mb-0.5 block px-2 text-[12px] text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-0.5 block px-2 text-app tracking-tight text-sidebar-muted group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -157,12 +157,12 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded px-1 text-app text-sidebar-item-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-7 items-center gap-1.5 rounded-md px-1 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
           <ArrowLeft className='size-3.5' aria-hidden='true' />
-          <span className='truncate text-[12px] group-data-[collapsible=icon]:hidden'>
+          <span className='truncate text-app tracking-tight group-data-[collapsible=icon]:hidden'>
             Back to app
           </span>
         </Link>
@@ -175,14 +175,18 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 items-center gap-1.5 rounded px-1 transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 items-center gap-1.5 rounded-md px-1 transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-app text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+              <span className='text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
+              <ChevronDown
+                className='size-3 shrink-0 text-sidebar-item-icon opacity-60 group-data-[collapsible=icon]:hidden'
+                aria-hidden='true'
+              />
             </button>
           }
         />
@@ -192,9 +196,9 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded bg-transparent text-sidebar-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
-          <SquarePen className='size-4' />
+          <SquarePen className='size-3.5' />
         </Link>
       )}
     </div>
@@ -250,7 +254,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       </SidebarContent>
 
       <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
-        <span className='text-[11px] text-sidebar-muted select-none'>
+        <span className='text-2xs text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

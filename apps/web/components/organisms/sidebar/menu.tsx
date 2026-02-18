@@ -35,9 +35,9 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout — 13px / weight 510 / 6px radius matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-left text-app leading-tight outline-none',
-    // Font weight 510 — Linear's exact sidebar nav weight
+    // Base layout — 13px / weight 500 / 6px radius / -0.01em tracking matching Linear
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-left text-app leading-tight tracking-tight outline-none',
+    // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94)
     'transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
@@ -249,7 +249,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
     >
       {showIcon && (
         <Skeleton
-          className='size-5 rounded-md shrink-0'
+          className='size-3.5 rounded-md shrink-0'
           data-sidebar='menu-skeleton-icon'
         />
       )}
