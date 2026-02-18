@@ -204,8 +204,18 @@ async function createUserWithRetry(
       const dbErrorCode = (error as { code?: string })?.code;
       const dbConstraint = (error as { constraint?: string })?.constraint;
       const dbDetail = (error as { detail?: string })?.detail;
+      // Include key details in the message string because RSC console
+      // forwarding serialises the context object as `{}`
+      const errorSummary = [
+        lastError.message,
+        dbErrorCode && `code=${dbErrorCode}`,
+        dbConstraint && `constraint=${dbConstraint}`,
+        dbDetail && `detail=${dbDetail}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
       await captureError(
-        `User creation failed (attempt ${attempt + 1}/${maxRetries})`,
+        `User creation failed (attempt ${attempt + 1}/${maxRetries}): ${errorSummary}`,
         lastError,
         {
           clerkUserId,
