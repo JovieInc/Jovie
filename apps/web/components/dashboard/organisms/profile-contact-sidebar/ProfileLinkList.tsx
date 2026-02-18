@@ -26,6 +26,18 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
+/**
+ * Safely extract a display hostname from a URL string.
+ * Returns the hostname without 'www.' prefix, or the raw URL if parsing fails.
+ */
+function formatDisplayHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url;
+  }
+}
+
 const ACTION_BUTTON_CLASS = [
   'p-1.5 rounded-md text-secondary-token',
   'hover:text-primary-token hover:bg-surface-1/60',
@@ -46,31 +58,6 @@ const SECTION_LABELS: Record<LinkSection, string> = {
   earnings: 'Earnings',
   custom: 'Web',
 };
-
-/**
- * Display labels for platforms with special casing requirements
- */
-const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
-  youtube_music: 'YouTube Music',
-  youtubemusic: 'YouTube Music',
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  linkedin: 'LinkedIn',
-  soundcloud: 'SoundCloud',
-  bandcamp: 'Bandcamp',
-  apple_music: 'Apple Music',
-  amazon_music: 'Amazon Music',
-  dsp: 'DSP',
-};
-
-function formatPlatformName(platform: string): string {
-  const lower = platform.toLowerCase();
-  if (PLATFORM_DISPLAY_LABELS[lower]) {
-    return PLATFORM_DISPLAY_LABELS[lower];
-  }
-  // Fallback: capitalize first letter for unknown platforms
-  return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
-}
 
 interface LinkItemProps {
   readonly link: PreviewPanelLink;
@@ -98,8 +85,6 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   const handleRemove = useCallback(() => {
     onRemove?.(link.id);
   }, [link.id, onRemove]);
-
-  const platformName = formatPlatformName(link.platform);
 
   const handle = extractHandleFromUrl(link.url);
 
@@ -161,14 +146,9 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
             <SocialIcon platform={link.platform} className='h-4 w-4' />
           </div>
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-sm font-medium text-primary-token'>
-              {platformName}
+            <div className='truncate text-sm text-primary-token'>
+              {handle ? `@${handle}` : formatDisplayHost(link.url)}
             </div>
-            {handle && (
-              <div className='truncate text-sm text-secondary-token'>
-                @{handle}
-              </div>
-            )}
           </div>
         </div>
 

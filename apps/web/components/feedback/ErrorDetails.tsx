@@ -26,6 +26,7 @@ export function buildErrorDetails(
   const id = error?.digest || errorRef || generateErrorRef();
   const lines = [
     `Error ID: ${id}`,
+    `Message: ${error?.message || 'Unknown error'}`,
     `Time: ${timestamp.toISOString()}`,
     ...Object.entries(extra ?? {}).map(([k, v]) => `${k}: ${v}`),
     `URL: ${globalThis.location?.href ?? 'N/A'}`,

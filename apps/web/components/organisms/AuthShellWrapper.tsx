@@ -96,11 +96,20 @@ function AuthShellWrapperInner({
     () => (config.isTableRoute ? <DrawerToggleButton /> : null),
     [config.isTableRoute]
   );
-  const headerAction =
+  // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
+  // degrades gracefully (renders nothing + toast) instead of crashing the shell.
+  // This matches the previewPanel pattern on line 140.
+  const rawHeaderAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
+  const headerAction = rawHeaderAction ? (
+    <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
+  ) : null;
 
   // Header badge from context (shown after breadcrumb on left side)
-  const headerBadge = headerActionsContext?.headerBadge ?? null;
+  const rawHeaderBadge = headerActionsContext?.headerBadge ?? null;
+  const headerBadge = rawHeaderBadge ? (
+    <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
+  ) : null;
 
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
