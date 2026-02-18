@@ -1241,10 +1241,14 @@ export async function POST(req: Request) {
       },
       onError: ({ error }) => {
         // EPIPE/ECONNRESET occur when clients disconnect mid-stream (e.g.
-        // navigating away, closing the tab, or losing network). These are
-        // expected in any streaming endpoint and not actionable bugs.
+        // navigating away, closing the tab, or losing network). Only treat
+        // them as client disconnects when the request's abort signal confirms
+        // the client actually disconnected; otherwise surface the error.
         const code = (error as NodeJS.ErrnoException)?.code;
-        if (code === 'EPIPE' || code === 'ECONNRESET') {
+        if (
+          (code === 'EPIPE' || code === 'ECONNRESET') &&
+          req.signal?.aborted
+        ) {
           return;
         }
 
@@ -1268,8 +1272,14 @@ export async function POST(req: Request) {
   } catch (error) {
     // Client disconnections during stream setup are not actionable
     const code = (error as NodeJS.ErrnoException)?.code;
-    if (code === 'EPIPE' || code === 'ECONNRESET') {
-      return new NextResponse(null, { status: 499 });
+    if ((code === 'EPIPE' || code === 'ECONNRESET') && req.signal?.aborted) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Client disconnected', requestId }),
+        {
+          status: 499,
+          headers: { ...CORS_HEADERS, 'x-request-id': requestId },
+        }
+      );
     }
 
     return buildChatErrorResponse(error, userId, uiMessages.length, requestId);
