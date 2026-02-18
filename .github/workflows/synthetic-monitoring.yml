@@ -55,7 +55,7 @@ jobs:
           E2E_ENVIRONMENT: production
         run: |
           # Run only the golden path test
-          npx playwright test tests/e2e/golden-path.spec.ts --reporter=json --output=test-results
+          pnpm --filter=@jovie/web exec playwright test tests/e2e/golden-path.spec.ts --reporter=json --output=test-results
         continue-on-error: true
 
       - name: Parse test results

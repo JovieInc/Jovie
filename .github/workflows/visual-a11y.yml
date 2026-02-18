@@ -17,16 +17,17 @@ jobs:
   storybook-a11y:
     name: Storybook A11y Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -42,9 +43,9 @@ jobs:
       - name: Run Storybook Tests (A11y)
         id: a11y-test
         run: |
-          npx concurrently -k -s first -n "SB,TEST" -c "magenta,cyan" \
-            "npx http-server apps/web/storybook-static -p 6006 --silent" \
-            "npx wait-on tcp:127.0.0.1:6006 && pnpm --filter web storybook:test --url http://127.0.0.1:6006"
+          npx http-server apps/web/storybook-static -p 6006 --silent &
+          npx wait-on tcp:127.0.0.1:6006 --timeout 30000
+          pnpm --filter web storybook:test --url http://127.0.0.1:6006
 
       - name: A11y Results Summary
         if: always()
@@ -74,13 +75,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
@@ -102,7 +103,7 @@ jobs:
 
       - name: Upload Visual Diff Artifacts
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: visual-diff-report
           path: |

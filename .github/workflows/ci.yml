@@ -691,7 +691,7 @@ jobs:
           done
 
           # Run Lighthouse CI with build config
-          npx lhci autorun --config=.lighthouserc.build.json || {
+          pnpm exec lhci autorun --config=.lighthouserc.build.json || {
             echo "⚠️ Lighthouse checks failed - performance regression detected"
             kill $SERVER_PID 2>/dev/null || true
             exit 1
@@ -894,7 +894,7 @@ jobs:
           # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          PORT=3100 npx next start &
+          PORT=3100 pnpm --filter=@jovie/web exec next start &
           SERVER_PID=$!
           # Wait for server to accept connections
           for i in $(seq 1 30); do
@@ -1440,10 +1440,6 @@ jobs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: 24
-          package-manager-cache: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -2150,4 +2146,4 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: npx lhci autorun --config=.lighthouserc.json
+        run: pnpm exec lhci autorun --config=.lighthouserc.json

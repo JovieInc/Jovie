@@ -104,7 +104,7 @@ jobs:
             exit 0
           fi
           echo "Deleting Neon branch '$BRANCH_NAME'..."
-          npx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+          pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring."
           }
 
