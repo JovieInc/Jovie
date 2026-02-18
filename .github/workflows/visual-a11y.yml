@@ -44,7 +44,7 @@ jobs:
         id: a11y-test
         run: |
           npx http-server apps/web/storybook-static -p 6006 --silent &
-          npx wait-on tcp:127.0.0.1:6006 --timeout 30000
+          timeout 30 bash -c 'until curl -s http://127.0.0.1:6006 > /dev/null; do sleep 1; done'
           pnpm --filter web storybook:test --url http://127.0.0.1:6006
 
       - name: A11y Results Summary
