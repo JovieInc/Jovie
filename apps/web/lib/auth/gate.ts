@@ -136,6 +136,104 @@ function isPermanentError(error: Error): boolean {
 }
 
 /**
+ * Check if an insert error is an email uniqueness conflict and attempt
+ * to adopt the existing row by updating its clerk_id.
+ * Returns the adopted user ID, or null if not an email conflict.
+ */
+async function tryAdoptExistingUser(
+  insertError: unknown,
+  email: string | null,
+  clerkUserId: string,
+  userStatus: UserLifecycleStatus
+): Promise<string | null> {
+  if (!email) return null;
+
+  const constraint = (insertError as { constraint?: string })?.constraint;
+  const isEmailConflict =
+    constraint === 'users_email_unique' ||
+    (insertError instanceof Error &&
+      insertError.message?.includes('users_email_unique'));
+
+  if (!isEmailConflict) return null;
+
+  const [adopted] = await db
+    .update(users)
+    .set({
+      clerkId: clerkUserId,
+      userStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.email, email))
+    .returning({ id: users.id });
+
+  return adopted?.id ?? null;
+}
+
+/** Build an error summary string from a database error for logging. */
+function buildErrorSummary(error: unknown): {
+  summary: string;
+  dbErrorCode: string | undefined;
+  dbConstraint: string | undefined;
+  dbDetail: string | undefined;
+} {
+  const normalizedError =
+    error instanceof Error ? error : new Error('Unknown error');
+  const dbErrorCode = (error as { code?: string })?.code;
+  const dbConstraint = (error as { constraint?: string })?.constraint;
+  const dbDetail = (error as { detail?: string })?.detail;
+  const summary = [
+    normalizedError.message,
+    dbErrorCode && `code=${dbErrorCode}`,
+    dbConstraint && `constraint=${dbConstraint}`,
+    dbDetail && `detail=${dbDetail}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return { summary, dbErrorCode, dbConstraint, dbDetail };
+}
+
+/** Upsert a user row, handling email uniqueness conflicts via adoption. */
+async function upsertUser(
+  clerkUserId: string,
+  email: string | null,
+  userStatus: UserLifecycleStatus,
+  waitlistEntryId: string | undefined
+): Promise<string> {
+  try {
+    const [createdUser] = await db
+      .insert(users)
+      .values({
+        clerkId: clerkUserId,
+        email,
+        userStatus,
+        waitlistEntryId,
+      })
+      .onConflictDoUpdate({
+        target: users.clerkId,
+        set: {
+          ...(email ? { email } : {}),
+          userStatus,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: users.id });
+
+    if (createdUser?.id) return createdUser.id;
+  } catch (insertError) {
+    const adoptedId = await tryAdoptExistingUser(
+      insertError,
+      email,
+      clerkUserId,
+      userStatus
+    );
+    if (adoptedId) return adoptedId;
+    throw insertError;
+  }
+
+  throw new Error('Failed to create or retrieve user');
+}
+
+/**
  * Helper function to create a DB user with exponential backoff retry logic.
  *
  * Handles transient database errors that might occur during the Clerk
@@ -156,14 +254,12 @@ async function createUserWithRetry(
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
-      if (attempt > 0) {
-        const delay = Math.min(1000 * attempt, 3000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+    if (attempt > 0) {
+      const delay = Math.min(1000 * attempt, 3000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
 
-      // Check if user already has an existing DB record with a claimed profile
+    try {
       const [existingUserData] = await db
         .select({
           userId: users.id,
@@ -184,81 +280,13 @@ async function createUserWithRetry(
         .limit(1);
 
       const userStatus = determineUserStatus(waitlistEntryId, existingUserData);
-
-      let createdUser: { id: string } | undefined;
-      try {
-        [createdUser] = await db
-          .insert(users)
-          .values({
-            clerkId: clerkUserId,
-            email,
-            userStatus,
-            waitlistEntryId, // Keep for historical tracking only
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: {
-              // Only overwrite email if a new value is provided — prevents
-              // nulling out an existing email when Clerk hasn't propagated yet
-              ...(email ? { email } : {}),
-              userStatus,
-              updatedAt: new Date(),
-            },
-          })
-          .returning({ id: users.id });
-      } catch (insertError) {
-        // Handle email uniqueness conflict: same email, different clerk_id.
-        // This happens when the dev DB is reset from production (Neon branch
-        // reset) — production clerk_ids don't match the dev Clerk instance.
-        // Adopt the existing row by updating its clerk_id to the current one.
-        const constraint = (insertError as { constraint?: string })?.constraint;
-        if (
-          email &&
-          (constraint === 'users_email_unique' ||
-            (insertError instanceof Error &&
-              insertError.message?.includes('users_email_unique')))
-        ) {
-          const [adopted] = await db
-            .update(users)
-            .set({
-              clerkId: clerkUserId,
-              userStatus,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.email, email))
-            .returning({ id: users.id });
-
-          if (adopted?.id) {
-            return adopted.id;
-          }
-        }
-        // Re-throw for the outer catch to handle
-        throw insertError;
-      }
-
-      if (!createdUser?.id) {
-        throw new Error('Failed to create or retrieve user');
-      }
-
-      return createdUser.id;
+      return await upsertUser(clerkUserId, email, userStatus, waitlistEntryId);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-      // Extract database-specific error details for better diagnostics
-      const dbErrorCode = (error as { code?: string })?.code;
-      const dbConstraint = (error as { constraint?: string })?.constraint;
-      const dbDetail = (error as { detail?: string })?.detail;
-      // Include key details in the message string because RSC console
-      // forwarding serialises the context object as `{}`
-      const errorSummary = [
-        lastError.message,
-        dbErrorCode && `code=${dbErrorCode}`,
-        dbConstraint && `constraint=${dbConstraint}`,
-        dbDetail && `detail=${dbDetail}`,
-      ]
-        .filter(Boolean)
-        .join(', ');
+      const { summary, dbErrorCode, dbConstraint, dbDetail } =
+        buildErrorSummary(error);
       await captureError(
-        `User creation failed (attempt ${attempt + 1}/${maxRetries}): ${errorSummary}`,
+        `User creation failed (attempt ${attempt + 1}/${maxRetries}): ${summary}`,
         lastError,
         {
           clerkUserId,
@@ -273,9 +301,7 @@ async function createUserWithRetry(
         }
       );
 
-      if (isPermanentError(lastError)) {
-        break;
-      }
+      if (isPermanentError(lastError)) break;
     }
   }
 

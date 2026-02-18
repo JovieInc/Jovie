@@ -105,7 +105,7 @@ export function RecentChats() {
         <SidebarMenu>
           {(['a', 'b', 'c'] as const).map(id => (
             <SidebarMenuItem key={`skeleton-${id}`}>
-              <div className='flex h-8 items-center px-2'>
+              <div className='flex h-7 items-center px-2'>
                 <Skeleton className='h-3.5 flex-1' rounded='sm' />
               </div>
             </SidebarMenuItem>
@@ -136,7 +136,7 @@ export function RecentChats() {
                   asChild
                   isActive={isActive}
                   tooltip={title}
-                  className='h-8'
+                  className='h-7'
                 >
                   <Link href={href}>
                     <span className='flex-1 truncate text-[13px]'>{title}</span>

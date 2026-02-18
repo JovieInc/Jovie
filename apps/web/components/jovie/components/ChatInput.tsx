@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
+import { SimpleTooltip } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2 } from 'lucide-react';
 import { forwardRef, useCallback } from 'react';
 
@@ -103,10 +103,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-xl border bg-surface-1 transition-colors duration-fast',
+            'rounded-lg border bg-white/[0.02] transition-colors duration-fast',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-white/[0.08] focus-within:border-white/[0.14]'
+              : 'border-white/[0.08] focus-within:border-white/[0.12]'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -163,24 +163,25 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               </SimpleTooltip>
             )}
 
-            <Button
+            <button
               type='submit'
-              size='icon'
               disabled={!canSend}
               className={cn(
-                'absolute rounded-lg',
+                'absolute rounded-md flex items-center justify-center',
+                'bg-white/[0.9] text-black transition-all duration-fast',
+                'hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed',
                 isCompact
-                  ? 'bottom-2 right-2 h-8 w-8'
-                  : 'bottom-3 right-3 h-10 w-10'
+                  ? 'bottom-2 right-2 h-7 w-7'
+                  : 'bottom-3 right-3 h-8 w-8'
               )}
               aria-label='Send message'
             >
               {isLoading || isSubmitting ? (
-                <Loader2 className='h-4 w-4 animate-spin' />
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
               ) : (
-                <ArrowUp className='h-4 w-4' />
+                <ArrowUp className='h-3.5 w-3.5' />
               )}
-            </Button>
+            </button>
 
             {isNearLimit && (
               <output

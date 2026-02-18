@@ -2,6 +2,7 @@ import { HeroSpotifySearch } from './HeroSpotifySearch';
 
 /**
  * RedesignedHero - Clean, left-aligned hero section
+ * Supports both light and dark mode via --linear-* CSS custom properties.
  */
 export function RedesignedHero() {
   return (
@@ -11,8 +12,7 @@ export function RedesignedHero() {
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{
-          background:
-            'radial-gradient(ellipse 70% 55% at 25% 35%, oklch(22% 0.025 260 / 0.5), transparent 70%)',
+          background: 'var(--linear-hero-glow)',
         }}
       />
 
@@ -36,7 +36,7 @@ export function RedesignedHero() {
           <span
             style={{
               background:
-                'linear-gradient(to right, oklch(72% 0.015 260), oklch(58% 0.01 260))',
+                'linear-gradient(to right, var(--linear-hero-gradient-from), var(--linear-hero-gradient-to))',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
@@ -79,7 +79,7 @@ export function RedesignedHero() {
           <span
             aria-hidden='true'
             className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-          />
+          />{' '}
           Free forever. No credit card.
         </p>
       </div>

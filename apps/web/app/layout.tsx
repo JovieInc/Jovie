@@ -291,7 +291,7 @@ export default async function RootLayout({
   // publishableKey may be undefined in test/dev mode
   // CoreProviders handle base client providers; Clerk is mounted per route.
   return (
-    <html lang='en' suppressHydrationWarning>
+    <html lang='en' className='dark' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
         {/* Skip to main content link for keyboard accessibility */}
