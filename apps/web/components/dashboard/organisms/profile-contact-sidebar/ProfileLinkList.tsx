@@ -4,16 +4,12 @@ import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import {
-  getPlatformIconMetadata,
-  SocialIcon,
-} from '@/components/atoms/SocialIcon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
 import { cn } from '@/lib/utils';
-import { getContrastTextOnBrand } from '@/lib/utils/color';
 import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
@@ -105,9 +101,6 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
 
   const platformName = formatPlatformName(link.platform);
 
-  // Get platform brand color
-  const iconMeta = getPlatformIconMetadata(link.platform);
-  const brandBg = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
   const handle = extractHandleFromUrl(link.url);
 
   const swipeActionsWidth = onRemove ? 132 : 88;
@@ -164,14 +157,8 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
       >
         {/* Left: Icon box + Platform Name */}
         <div className='flex items-center gap-3 min-w-0'>
-          <div
-            className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg'
-            style={{
-              backgroundColor: brandBg,
-              color: getContrastTextOnBrand(brandBg),
-            }}
-          >
-            <SocialIcon platform={link.platform} className='h-5 w-5' />
+          <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token'>
+            <SocialIcon platform={link.platform} className='h-4 w-4' />
           </div>
           <div className='min-w-0 flex-1'>
             <div className='truncate text-sm font-medium text-primary-token'>

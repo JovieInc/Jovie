@@ -1,7 +1,6 @@
 'use client';
 
 import { SegmentControl } from '@jovie/ui';
-import { LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -9,8 +8,6 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { useUserButton } from '@/components/organisms/user-button';
-import { APP_ROUTES } from '@/constants/routes';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {
@@ -33,10 +30,6 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
-  const { menuActions } = useUserButton({
-    settingsHref: APP_ROUTES.SETTINGS,
-  });
-  const { handleSignOut, loading } = menuActions;
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryOption>('social');
 
@@ -168,19 +161,6 @@ export function ProfileContactSidebar() {
                 ?.allowProfilePhotoDownloads === true
             }
           />
-        </div>
-
-        {/* Sign out */}
-        <div className='shrink-0 border-t border-subtle px-4 py-3'>
-          <button
-            type='button'
-            onClick={handleSignOut}
-            disabled={loading.signOut}
-            className='flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60'
-          >
-            <LogOut className='size-4 text-tertiary-token' aria-hidden />
-            {loading.signOut ? 'Signing out...' : 'Sign out'}
-          </button>
         </div>
       </div>
     </RightDrawer>
