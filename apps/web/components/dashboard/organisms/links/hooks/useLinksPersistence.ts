@@ -259,12 +259,15 @@ async function runSaveLoop(
   saveLoopRunningRef: React.MutableRefObject<boolean>,
   persist: (input: LinkItem[]) => Promise<void>
 ): Promise<void> {
-  while (pendingSaveRef.current) {
-    const next = pendingSaveRef.current;
-    pendingSaveRef.current = null;
-    await persist(next);
+  try {
+    while (pendingSaveRef.current) {
+      const next = pendingSaveRef.current;
+      pendingSaveRef.current = null;
+      await persist(next);
+    }
+  } finally {
+    saveLoopRunningRef.current = false;
   }
-  saveLoopRunningRef.current = false;
 }
 
 /**

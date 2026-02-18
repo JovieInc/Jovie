@@ -26,6 +26,18 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
+/**
+ * Safely extract a display hostname from a URL string.
+ * Returns the hostname without 'www.' prefix, or the raw URL if parsing fails.
+ */
+function formatDisplayHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url;
+  }
+}
+
 const ACTION_BUTTON_CLASS = [
   'p-1.5 rounded-md text-secondary-token',
   'hover:text-primary-token hover:bg-surface-1/60',
@@ -135,15 +147,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
           </div>
           <div className='min-w-0 flex-1'>
             <div className='truncate text-sm text-primary-token'>
-              {handle
-                ? `@${handle}`
-                : (() => {
-                    try {
-                      return new URL(link.url).hostname.replace('www.', '');
-                    } catch {
-                      return link.url;
-                    }
-                  })()}
+              {handle ? `@${handle}` : formatDisplayHost(link.url)}
             </div>
           </div>
         </div>
