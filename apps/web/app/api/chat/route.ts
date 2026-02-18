@@ -1240,6 +1240,14 @@ export async function POST(req: Request) {
         functionId: 'jovie-chat',
       },
       onError: ({ error }) => {
+        // EPIPE/ECONNRESET occur when clients disconnect mid-stream (e.g.
+        // navigating away, closing the tab, or losing network). These are
+        // expected in any streaming endpoint and not actionable bugs.
+        const code = (error as NodeJS.ErrnoException)?.code;
+        if (code === 'EPIPE' || code === 'ECONNRESET') {
+          return;
+        }
+
         Sentry.captureException(error, {
           tags: { feature: 'ai-chat', errorType: 'streaming' },
           extra: {
@@ -1258,6 +1266,12 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
+    // Client disconnections during stream setup are not actionable
+    const code = (error as NodeJS.ErrnoException)?.code;
+    if (code === 'EPIPE' || code === 'ECONNRESET') {
+      return new NextResponse(null, { status: 499 });
+    }
+
     return buildChatErrorResponse(error, userId, uiMessages.length, requestId);
   }
 }
