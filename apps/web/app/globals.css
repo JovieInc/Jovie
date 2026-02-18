@@ -73,6 +73,11 @@ body {
 }
 
 @theme {
+  /* Custom font sizes — Linear's type scale registered as Tailwind utilities
+     text-2xs = 11px, text-app = 13px (Linear's default UI size) */
+  --text-2xs: 0.6875rem;
+  --text-app: 0.8125rem;
+
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui",
