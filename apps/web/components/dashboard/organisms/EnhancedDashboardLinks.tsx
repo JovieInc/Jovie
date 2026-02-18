@@ -36,10 +36,7 @@ const GroupedLinksManager = dynamic(
     loading: () => (
       <div className='space-y-3'>
         {GROUPED_LINKS_MANAGER_LOADING_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-16 animate-pulse rounded-lg bg-surface-1'
-          />
+          <div key={key} className='h-16 rounded-lg skeleton' />
         ))}
       </div>
     ),
@@ -56,10 +53,10 @@ const ProfileEditorSection = dynamic(
   {
     loading: () => (
       <div className='mb-4 flex items-start gap-4'>
-        <div className='h-20 w-20 animate-pulse rounded-full bg-surface-1' />
+        <div className='h-20 w-20 rounded-full skeleton' />
         <div className='flex-1 space-y-2'>
-          <div className='h-6 w-48 animate-pulse rounded bg-surface-1' />
-          <div className='h-4 w-32 animate-pulse rounded bg-surface-1' />
+          <div className='h-6 w-48 rounded skeleton' />
+          <div className='h-4 w-32 rounded skeleton' />
         </div>
       </div>
     ),

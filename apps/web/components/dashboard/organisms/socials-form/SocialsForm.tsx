@@ -250,9 +250,9 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
       <div className='rounded-lg border border-subtle divide-y divide-subtle'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div key={key} className='flex items-center gap-3 px-4 py-3'>
-            <div className='h-8 w-8 rounded-md bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
-            <div className='h-4 w-24 rounded bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
-            <div className='flex-1 h-9 rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none' />
+            <div className='h-8 w-8 rounded-md skeleton shrink-0' />
+            <div className='h-4 w-24 rounded skeleton shrink-0' />
+            <div className='flex-1 h-9 rounded-lg skeleton' />
           </div>
         ))}
       </div>

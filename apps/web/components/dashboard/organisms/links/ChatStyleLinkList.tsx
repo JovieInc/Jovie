@@ -149,7 +149,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                   >
                     <div className='flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 opacity-60'>
                       <div className='h-4 w-4' />
-                      <div className='flex h-10 w-10 shrink-0 animate-pulse items-center justify-center rounded-lg bg-surface-1' />
+                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg skeleton' />
                       <div className='flex-1'>
                         <div className='text-sm text-secondary-token'>
                           Adding...
