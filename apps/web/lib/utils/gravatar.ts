@@ -138,9 +138,7 @@ function md5Hex(input: string): string {
       const temp = d;
       d = c;
       c = b;
-      b = Math.trunc(
-        b + rotl(Math.trunc(a + f + TABLE[j]! + w[g]!), SHIFT[j]!)
-      );
+      b = Math.trunc(b + rotl(Math.trunc(a + f + TABLE[j] + w[g]), SHIFT[j]));
       a = temp;
     }
 
