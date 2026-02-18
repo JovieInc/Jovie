@@ -602,13 +602,19 @@ async function discoverMusicBrainzMatch(
   const status: DspMatchStatus = matchingResult.bestMatch.shouldAutoConfirm
     ? 'auto_confirmed'
     : 'suggested';
-  await storeMatch(
+  // MusicBrainz is metadata-only — no track enrichment job is enqueued
+  const matchId = await storeMatch(
     tx,
     creatorProfileId,
     'musicbrainz',
     matchingResult.bestMatch,
     status
   );
+  logger.debug('Stored MusicBrainz match', {
+    matchId,
+    creatorProfileId,
+    status,
+  });
   if (status === 'auto_confirmed') {
     await tx
       .update(creatorProfiles)

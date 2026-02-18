@@ -186,6 +186,13 @@ export function convertDeezerToIsrcMatches(
           artistName: deezerTrack.artist.name,
         },
       });
+    } else if (deezerTrack) {
+      Sentry.addBreadcrumb({
+        message: 'Skipped Deezer match: missing artist',
+        category: 'matching',
+        data: { normalizedIsrc, localTrackId: localTrack.id },
+        level: 'warning',
+      });
     }
   }
   return matches;
