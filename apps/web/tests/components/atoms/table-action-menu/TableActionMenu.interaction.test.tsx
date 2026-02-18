@@ -86,7 +86,10 @@ describe('TableActionMenu interaction tests', () => {
       ).resolves.not.toThrow();
     });
 
-    it('renders disabled items with data-disabled attribute', () => {
+    it('renders disabled items with data-disabled attribute and does not fire onClick', async () => {
+      const handleEdit = vi.fn();
+      const user = userEvent.setup();
+
       render(
         <TableActionMenu
           open={true}
@@ -95,7 +98,7 @@ describe('TableActionMenu interaction tests', () => {
               id: 'edit',
               label: 'Edit',
               icon: Pencil,
-              onClick: vi.fn(),
+              onClick: handleEdit,
               disabled: true,
             },
           ]}
@@ -104,6 +107,9 @@ describe('TableActionMenu interaction tests', () => {
 
       const item = screen.getByRole('menuitem', { name: /edit/i });
       expect(item).toHaveAttribute('data-disabled');
+
+      await user.click(item);
+      expect(handleEdit).not.toHaveBeenCalled();
     });
 
     it('renders subText on action items', () => {
@@ -161,7 +167,7 @@ describe('TableActionMenu interaction tests', () => {
       expect(screen.getAllByRole('menuitem')).toHaveLength(2);
     });
 
-    it('renders submenu trigger with chevron indicator', async () => {
+    it('renders submenu trigger with aria-haspopup and chevron icon', async () => {
       const user = userEvent.setup();
 
       render(
@@ -185,6 +191,8 @@ describe('TableActionMenu interaction tests', () => {
       expect(submenuTrigger).toBeInTheDocument();
       // Submenu triggers have aria-haspopup="menu"
       expect(submenuTrigger).toHaveAttribute('aria-haspopup', 'menu');
+      // Submenu triggers render a chevron SVG indicator
+      expect(submenuTrigger.querySelector('svg')).toBeInTheDocument();
     });
 
     it('submenu trigger is rendered as a menuitem in open state', () => {
@@ -314,7 +322,7 @@ describe('TableActionMenu interaction tests', () => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
 
-    it('supports onOpenChange callback with custom trigger', async () => {
+    it('supports onOpenChange callback with custom trigger for open and close', async () => {
       const onOpenChange = vi.fn();
       const user = userEvent.setup();
 
@@ -332,6 +340,10 @@ describe('TableActionMenu interaction tests', () => {
 
       await user.click(screen.getByRole('button', { name: /custom trigger/i }));
       expect(onOpenChange).toHaveBeenCalledWith(true);
+
+      // Close by pressing Escape and assert onOpenChange called with false
+      await user.keyboard('{Escape}');
+      expect(onOpenChange).toHaveBeenCalledWith(false);
     });
   });
 });
