@@ -111,10 +111,10 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
-    icon: 'UserSearch',
-    label: 'Review my profile and suggest improvements',
+    icon: 'Camera',
+    label: 'Change my profile photo',
     prompt:
-      'Review my full profile — bio, links, and stats — and suggest specific improvements I should make.',
+      'Help me change my profile photo.',
     accent: 'purple',
   },
   {

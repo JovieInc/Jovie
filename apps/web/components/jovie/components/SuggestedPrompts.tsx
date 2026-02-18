@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3, Target, UserSearch } from 'lucide-react';
+import { BarChart3, Camera, Target, UserSearch } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { type ChatSuggestion, DEFAULT_SUGGESTIONS } from '../types';
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   BarChart3,
+  Camera,
   Target,
   UserSearch,
 };
@@ -64,7 +65,7 @@ function SuggestionPill({
 
 export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
   return (
-    <div className='flex flex-wrap gap-2'>
+    <div className='flex flex-col gap-2'>
       {DEFAULT_SUGGESTIONS.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
