@@ -64,7 +64,8 @@ export function ExampleProfilesCarousel() {
     const el = progressRef.current;
     if (!el || prefersReducedMotion) return;
     el.style.animation = 'none';
-    void el.offsetWidth;
+    // Force reflow so the animation restarts from 0%
+    el.getClientRects();
     el.style.animation = `carouselProgress ${ROTATION_INTERVAL}ms linear forwards`;
   }, [prefersReducedMotion]);
 

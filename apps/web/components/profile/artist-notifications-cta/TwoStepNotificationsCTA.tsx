@@ -24,6 +24,36 @@ type Step = 'button' | 'input';
 
 const EASE_FADE: [number, number, number, number] = [0.32, 0, 0.67, 1];
 
+function getExitVariant(instant: boolean) {
+  if (instant) return { opacity: 0 };
+  return {
+    opacity: 0,
+    y: -8,
+    transition: { duration: 0.2, ease: EASE_FADE },
+  };
+}
+
+function getEnterVariant(instant: boolean) {
+  return {
+    initial: instant ? false : ({ opacity: 0, y: 8 } as const),
+    animate: instant
+      ? { opacity: 1, y: 0 }
+      : {
+          opacity: 1,
+          y: 0,
+          transition: {
+            opacity: { duration: 0.25, ease: EASE_FADE, delay: 0.05 },
+            y: {
+              type: 'spring' as const,
+              stiffness: 500,
+              damping: 30,
+              delay: 0.05,
+            },
+          },
+        },
+  };
+}
+
 interface TwoStepNotificationsCTAProps {
   readonly artist: Artist;
 }
@@ -115,26 +145,13 @@ export function TwoStepNotificationsCTA({
   }
 
   const instant = prefersReducedMotion === true;
+  const enterVariant = getEnterVariant(instant);
 
   return (
     <div className='space-y-3'>
       <AnimatePresence mode='wait' initial={false}>
         {step === 'button' ? (
-          <motion.div
-            key='cta-button'
-            exit={
-              instant
-                ? { opacity: 0 }
-                : {
-                    opacity: 0,
-                    y: -8,
-                    transition: {
-                      duration: 0.2,
-                      ease: EASE_FADE,
-                    },
-                  }
-            }
-          >
+          <motion.div key='cta-button' exit={getExitVariant(instant)}>
             <button
               type='button'
               onClick={handleReveal}
@@ -148,28 +165,8 @@ export function TwoStepNotificationsCTA({
         ) : (
           <motion.div
             key='cta-input'
-            initial={instant ? false : { opacity: 0, y: 8 }}
-            animate={
-              instant
-                ? { opacity: 1, y: 0 }
-                : {
-                    opacity: 1,
-                    y: 0,
-                    transition: {
-                      opacity: {
-                        duration: 0.25,
-                        ease: EASE_FADE,
-                        delay: 0.05,
-                      },
-                      y: {
-                        type: 'spring' as const,
-                        stiffness: 500,
-                        damping: 30,
-                        delay: 0.05,
-                      },
-                    },
-                  }
-            }
+            initial={enterVariant.initial}
+            animate={enterVariant.animate}
           >
             <div className='space-y-3'>
               <p
