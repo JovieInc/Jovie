@@ -78,7 +78,7 @@ export function BenefitsGrid() {
                   {/* Emoji and title */}
                   <div className='flex items-start gap-4 mb-6'>
                     {/* Emoji needs role="img" for screen reader accessibility */}
-                    <div // NOSONAR S6819
+                    <div
                       className='text-3xl'
                       role='img'
                       aria-label={benefit.title}

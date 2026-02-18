@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { cookies } from 'next/headers';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
@@ -91,7 +92,7 @@ export default async function AppShellLayout({
       throw error;
     }
 
-    console.error('Error loading app shell:', error);
+    Sentry.captureException(error);
 
     // SAFETY: Error UI is self-contained - DO NOT render {children} here
     // as it would break context provider expectations (DashboardDataProvider, etc.)

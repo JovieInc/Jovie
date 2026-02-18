@@ -192,7 +192,7 @@ export function EmptyState({
 
   return (
     // role="status" is correct for state announcements; <output> is for form calculation results
-    <section // NOSONAR S6819
+    <section
       role='status'
       aria-labelledby={headingId}
       aria-describedby={description ? descriptionId : undefined}

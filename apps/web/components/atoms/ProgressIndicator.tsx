@@ -43,7 +43,7 @@ export function ProgressIndicator({
 
   return (
     // Multi-step progress with custom styling; native <progress> doesn't support step indicators
-    <div // NOSONAR S6819
+    <div
       className={`space-y-4 ${className}`}
       role='progressbar'
       aria-label={`Progress: Step ${currentStep + 1} of ${totalSteps}`}

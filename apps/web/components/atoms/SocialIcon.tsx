@@ -247,7 +247,7 @@ function SocialIconInner({
 
   return (
     // SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
-    <svg // NOSONAR S6819
+    <svg
       className={iconClass}
       style={sizeStyle}
       fill='currentColor'

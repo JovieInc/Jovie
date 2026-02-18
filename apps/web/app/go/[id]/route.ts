@@ -3,6 +3,7 @@
  * Fast redirects for normal (non-sensitive) links with anti-cloaking compliance
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getWrappedLink,
@@ -41,7 +42,7 @@ export async function GET(
 
     // Increment click count asynchronously (don't wait)
     incrementClickCount(shortId).catch(error => {
-      console.error('Failed to increment click count:', error);
+      Sentry.captureException(error);
     });
 
     // Create redirect response with anti-cloaking headers
@@ -72,7 +73,7 @@ export async function GET(
 
     return response;
   } catch (error) {
-    console.error('Link redirect error:', error);
+    Sentry.captureException(error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

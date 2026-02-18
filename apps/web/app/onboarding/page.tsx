@@ -55,7 +55,6 @@ export default async function OnboardingPage({
         },
       });
     }
-    console.warn('[onboarding] Missing clerkUserId, redirecting to signin');
     redirect('/sign-in?redirect_url=/onboarding');
   }
 
@@ -71,14 +70,8 @@ export default async function OnboardingPage({
     const dashboardData = await getDashboardData();
     existingProfile = dashboardData.selectedProfile;
   } catch (error) {
-    // Log the error for debugging - distinguish between expected "no profile" and actual errors
-    const errorMessage = extractErrorMessage(error, 'Unknown error');
-    console.warn('[onboarding] Failed to load existing profile:', {
-      error: errorMessage,
-      clerkUserId: authResult.clerkUserId,
-    });
-
     // Capture database/connection errors to Sentry (but not "no profile" errors)
+    const errorMessage = extractErrorMessage(error, 'Unknown error');
     if (
       errorMessage.includes('database') ||
       errorMessage.includes('connection') ||

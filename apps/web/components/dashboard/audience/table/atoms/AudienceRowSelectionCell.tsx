@@ -26,7 +26,7 @@ export function AudienceRowSelectionCell({
       )}
     >
       {/* role="presentation" correctly hides wrapper; checkbox inside is the interactive element */}
-      <div // NOSONAR S6819
+      <div
         className='contents'
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}

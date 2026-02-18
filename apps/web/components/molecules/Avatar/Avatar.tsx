@@ -187,7 +187,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     return (
       <div ref={ref} className={cn('relative', className)} style={style}>
         {/* Fallback avatar wrapper needs role="img"; contains initials, not an actual image */}
-        <div // NOSONAR S6819
+        <div
           className={cn(
             sizeClass,
             roundedClass,
@@ -217,7 +217,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   return (
     <div ref={ref} className={cn('relative', className)} style={style}>
       {/* Avatar wrapper needs role="img" for loading state accessibility; contains Image component */}
-      <div // NOSONAR S6819
+      <div
         className={cn(
           sizeClass,
           roundedClass,

@@ -169,10 +169,7 @@ export function UniversalLinkInputUrlMode({
 
       {url && !detectedLink?.isValid && (
         // role="status" is correct for hint announcements; <output> is for form results
-        <div // NOSONAR S6819
-          className='hidden text-xs text-secondary-token'
-          role='status'
-        >
+        <div className='hidden text-xs text-secondary-token' role='status'>
           💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more for
           automatic detection
         </div>

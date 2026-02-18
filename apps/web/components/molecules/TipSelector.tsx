@@ -62,7 +62,7 @@ export function TipSelector({
       </p>
 
       {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div // NOSONAR S6819
+      <div
         className='grid grid-cols-3 gap-3'
         role='group'
         aria-label='Tip amount options'
