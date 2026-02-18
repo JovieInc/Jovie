@@ -38,7 +38,7 @@ export function SettingsSection({
         <h2
           id={headingId}
           className={cn(
-            'text-lg font-medium text-primary-token tracking-tight',
+            'text-[15px] font-medium text-primary-token tracking-tight',
             titleClassName
           )}
         >
