@@ -68,7 +68,7 @@ function TanStackHeaderCheckbox({
 
   return (
     // role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
-    <div // NOSONAR S6819
+    <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>
@@ -99,7 +99,7 @@ function TanStackRowCheckbox({
 }) {
   return (
     // role="presentation" correctly hides wrapper from screen readers; Checkbox inside is the interactive element
-    <div // NOSONAR S6819
+    <div
       className='relative flex h-5 w-5 items-center justify-center'
       onClick={event => event.stopPropagation()}
       onKeyDown={event =>

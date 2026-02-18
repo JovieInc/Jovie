@@ -34,7 +34,7 @@ export function LoadingSpinner({
 
   return (
     // role="status" is correct for live announcements; <output> is for form calculation results
-    <span // NOSONAR S6819
+    <span
       role='status'
       aria-label={label}
       data-testid='spinner'

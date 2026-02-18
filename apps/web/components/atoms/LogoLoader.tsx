@@ -23,7 +23,7 @@ export function LogoLoader({
 }: LogoLoaderProps) {
   return (
     // role="status" is correct for live announcements; <output> is for form calculation results
-    <div // NOSONAR S6819
+    <div
       role='status'
       aria-live='polite'
       aria-label={ariaLabel}
