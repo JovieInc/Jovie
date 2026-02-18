@@ -103,19 +103,27 @@ async function queryWithRetry(
 function handleDbFailure(
   userId: string,
   staleEntry: { isAdmin: boolean; expiresAt: number } | undefined,
-  lastError: unknown
+  lastError: unknown,
+  now: number = Date.now()
 ): boolean {
-  if (staleEntry !== undefined) {
+  if (staleEntry !== undefined && staleEntry.expiresAt + STALE_GRACE_MS > now) {
     captureWarning(
       '[admin/roles] DB query failed after retry, using stale cache',
       { userId, isAdmin: staleEntry.isAdmin, expiredAt: staleEntry.expiresAt }
     );
     return staleEntry.isAdmin;
   }
-  captureError(
-    '[admin/roles] DB query failed after retry, no cache available — denying access',
-    lastError
-  );
+  if (staleEntry !== undefined) {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
+      { userId, expiredAt: staleEntry.expiresAt }
+    );
+  } else {
+    captureError(
+      '[admin/roles] DB query failed after retry, no cache available — denying access',
+      lastError
+    );
+  }
   return false;
 }
 
