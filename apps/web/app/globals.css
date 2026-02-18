@@ -1260,4 +1260,17 @@ body {
   --color-badge-bg: var(--color-badge-bg);
   --color-badge-border: var(--color-badge-border);
   --color-badge-text: var(--color-badge-text);
+
+  /* Semantic status tokens — enables bg-success, text-success, border-success, etc. */
+  --color-success: var(--color-success);
+  --color-success-subtle: var(--color-success-subtle);
+  --color-warning: var(--color-warning);
+  --color-warning-subtle: var(--color-warning-subtle);
+  --color-info: var(--color-info);
+  --color-info-subtle: var(--color-info-subtle);
+  --color-error-subtle: var(--color-error-subtle);
+
+  /* Accent token — enables bg-accent-subtle, text-accent, border-accent */
+  --color-accent: var(--color-accent);
+  --color-accent-subtle: var(--color-accent-subtle);
 }

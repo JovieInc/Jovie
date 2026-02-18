@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
@@ -13,9 +12,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { APP_ROUTES } from '@/constants/routes';
 import { useTablePanel } from '@/contexts/TablePanelContext';
-import { useProfileData } from '@/hooks/useProfileData';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -51,16 +48,7 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
   const tablePanel = useTablePanel();
-  const isDashboardOrAdmin = section !== 'settings';
-  const pathname = usePathname();
   const previewPanelState = usePreviewPanelState();
-
-  // Use shared hook for profile data (eliminates duplication with UnifiedSidebar)
-  const { profileHref } = useProfileData(isDashboardOrAdmin);
-
-  // On the profile page, the mobile avatar button opens the ProfileContactSidebar
-  // (full-screen RightDrawer) instead of the basic MobileProfileDrawer sheet.
-  const isProfilePage = pathname === APP_ROUTES.DASHBOARD_PROFILE;
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
@@ -80,10 +68,7 @@ function AuthShellInner({
             breadcrumbSuffix={headerBadge}
             action={headerAction}
             mobileProfileSlot={
-              <MobileProfileDrawer
-                profileHref={profileHref}
-                onOpen={isProfilePage ? previewPanelState.toggle : undefined}
-              />
+              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
             }
             showDivider={isTableRoute}
           />

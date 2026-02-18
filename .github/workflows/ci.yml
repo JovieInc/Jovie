@@ -1017,6 +1017,104 @@ jobs:
             -H "Content-Type: application/json" \
             "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
 
+  ci-admin-smoke:
+    name: Admin E2E Smoke
+    environment: Preview – jovie
+    # Gated: only runs with 'testing' label (admin tests need auth credentials)
+    # Also runs on push to main for full coverage
+    needs: [ci-fast]
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping admin smoke; no E2E-relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run Admin Smoke Tests (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_ADMIN_USERNAME: ${{ secrets.E2E_CLERK_ADMIN_USERNAME }}
+          E2E_CLERK_ADMIN_PASSWORD: ${{ secrets.E2E_CLERK_ADMIN_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+        run: pnpm --filter=@jovie/web exec playwright test admin-page-content admin-navigation --project=chromium
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
@@ -1614,7 +1712,7 @@ jobs:
   # These tests verify the most critical user flows: public profiles + auth
   ci-smoke-required:
     name: Smoke Tests (Required)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke]
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1633,6 +1731,17 @@ jobs:
           fi
 
           echo "E2E Smoke (PR Fast Feedback) succeeded."
+
+      - name: Gate admin smoke on PRs
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          # ci-admin-smoke: allow skip (label-gated) but block on failure
+          if [ "${{ needs.ci-admin-smoke.result }}" == "failure" ]; then
+            echo "Admin E2E Smoke did not succeed."
+            exit 1
+          fi
+
+          echo "Admin E2E Smoke: ${{ needs.ci-admin-smoke.result }} (skip/success OK)"
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
