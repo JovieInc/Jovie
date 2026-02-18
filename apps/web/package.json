@@ -182,6 +182,7 @@
     "@clerk/clerk-js": "^5.121.1",
     "@clerk/testing": "^1.13.31",
     "@codecov/webpack-plugin": "^1.9.1",
+    "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.1.1",
     "@playwright/test": "^1.58.1",
     "@storybook/addon-a11y": "^10.2.4",
