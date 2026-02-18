@@ -47,31 +47,6 @@ const SECTION_LABELS: Record<LinkSection, string> = {
   custom: 'Web',
 };
 
-/**
- * Display labels for platforms with special casing requirements
- */
-const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
-  youtube_music: 'YouTube Music',
-  youtubemusic: 'YouTube Music',
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  linkedin: 'LinkedIn',
-  soundcloud: 'SoundCloud',
-  bandcamp: 'Bandcamp',
-  apple_music: 'Apple Music',
-  amazon_music: 'Amazon Music',
-  dsp: 'DSP',
-};
-
-function formatPlatformName(platform: string): string {
-  const lower = platform.toLowerCase();
-  if (PLATFORM_DISPLAY_LABELS[lower]) {
-    return PLATFORM_DISPLAY_LABELS[lower];
-  }
-  // Fallback: capitalize first letter for unknown platforms
-  return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
-}
-
 interface LinkItemProps {
   readonly link: PreviewPanelLink;
   readonly onRemove?: (linkId: string) => void;
@@ -98,8 +73,6 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   const handleRemove = useCallback(() => {
     onRemove?.(link.id);
   }, [link.id, onRemove]);
-
-  const platformName = formatPlatformName(link.platform);
 
   const handle = extractHandleFromUrl(link.url);
 
@@ -161,14 +134,11 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
             <SocialIcon platform={link.platform} className='h-4 w-4' />
           </div>
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-sm font-medium text-primary-token'>
-              {platformName}
+            <div className='truncate text-sm text-primary-token'>
+              {handle
+                ? `@${handle}`
+                : new URL(link.url).hostname.replace('www.', '')}
             </div>
-            {handle && (
-              <div className='truncate text-sm text-secondary-token'>
-                @{handle}
-              </div>
-            )}
           </div>
         </div>
 

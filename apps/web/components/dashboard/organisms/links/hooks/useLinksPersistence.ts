@@ -127,6 +127,175 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /**
+ * Parameters for processSaveSuccess
+ */
+interface ProcessSaveSuccessParams {
+  successData: SaveLinksResponse;
+  normalized: LinkItem[];
+  profileId: string | undefined;
+  suggestionsEnabled: boolean;
+  setLinksVersion: React.Dispatch<React.SetStateAction<number>>;
+  setLinks: React.Dispatch<React.SetStateAction<LinkItem[]>>;
+  setAutoRefreshUntilMs: React.Dispatch<React.SetStateAction<number | null>>;
+  onSyncSuggestions: (() => Promise<void>) | undefined;
+  queryClient: ReturnType<typeof useQueryClient>;
+}
+
+/**
+ * Process a successful save response (module-level to reduce hook CC)
+ */
+function processSaveSuccess({
+  successData,
+  normalized,
+  profileId,
+  suggestionsEnabled,
+  setLinksVersion,
+  setLinks,
+  setAutoRefreshUntilMs,
+  onSyncSuggestions,
+  queryClient,
+}: ProcessSaveSuccessParams): void {
+  const newVersion = parseVersionFromBody(successData);
+  if (newVersion !== null) {
+    setLinksVersion(newVersion);
+  }
+
+  setLinks(prev => (areLinkItemsEqual(prev, normalized) ? prev : normalized));
+
+  if (suggestionsEnabled && hasIngestableLink(normalized)) {
+    setAutoRefreshUntilMs(Date.now() + 20000);
+    onSyncSuggestions?.();
+  }
+
+  if (profileId) {
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.dashboard.socialLinks(profileId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.suggestions.list(profileId),
+    });
+  }
+
+  track('dashboard_social_links_saved', { profileId });
+
+  const now = new Date();
+  toast.success(
+    `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
+  );
+}
+
+/**
+ * Parameters for executePersistLinks
+ */
+interface ExecutePersistLinksParams {
+  input: LinkItem[];
+  profileId: string | undefined;
+  linksVersion: number;
+  onSuccess: (data: SaveLinksResponse, normalized: LinkItem[]) => void;
+  onConflict: () => Promise<void>;
+}
+
+/**
+ * Execute a single persist-links API call (module-level to reduce hook CC)
+ */
+async function executePersistLinks({
+  input,
+  profileId,
+  linksVersion,
+  onSuccess,
+  onConflict,
+}: ExecutePersistLinksParams): Promise<void> {
+  const normalized = normalizeLinkItems(input);
+
+  if (!profileId) {
+    toast.error('Unable to save links. Please refresh and try again.');
+    return;
+  }
+
+  try {
+    const payload = buildSavePayload(normalized);
+
+    const successData = await fetchWithTimeout<SaveLinksResponse>(
+      '/api/dashboard/social-links',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profileId,
+          links: payload,
+          expectedVersion: linksVersion,
+        }),
+        timeout: 15000,
+      }
+    );
+
+    onSuccess(successData, normalized);
+  } catch (error) {
+    if (error instanceof FetchError && error.status === 409) {
+      await onConflict();
+      return;
+    }
+
+    void captureError('Failed to save social links', error, {
+      profileId,
+      linkCount: normalized.length,
+      route: APP_ROUTES.PROFILE,
+    });
+
+    toast.error(extractErrorMessage(error));
+  }
+}
+
+/**
+ * Run the save queue loop, draining pending saves sequentially
+ */
+async function runSaveLoop(
+  pendingSaveRef: React.MutableRefObject<LinkItem[] | null>,
+  saveLoopRunningRef: React.MutableRefObject<boolean>,
+  persist: (input: LinkItem[]) => Promise<void>
+): Promise<void> {
+  while (pendingSaveRef.current) {
+    const next = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    await persist(next);
+  }
+  saveLoopRunningRef.current = false;
+}
+
+/**
+ * Create a debounced save function with cancel and flush methods
+ */
+function createDebouncedSave(
+  asyncDebouncer: {
+    maybeExecute: (input: LinkItem[]) => void;
+    cancel: () => void;
+  },
+  lastInputRef: React.MutableRefObject<LinkItem[] | null>,
+  enqueueSave: (input: LinkItem[]) => void
+): { (input: LinkItem[]): void; flush: () => void; cancel: () => void } {
+  const fn = (input: LinkItem[]) => {
+    lastInputRef.current = input;
+    asyncDebouncer.maybeExecute(input);
+  };
+
+  fn.cancel = () => {
+    asyncDebouncer.cancel();
+    lastInputRef.current = null;
+  };
+
+  fn.flush = () => {
+    const pending = lastInputRef.current;
+    if (pending) {
+      asyncDebouncer.cancel();
+      lastInputRef.current = null;
+      enqueueSave(pending);
+    }
+  };
+
+  return fn;
+}
+
+/**
  * Options for the useLinksPersistence hook
  */
 export interface UseLinksPersistenceOptions {
@@ -277,40 +446,17 @@ export function useLinksPersistence({
   // Handle successful save response
   const handleSaveSuccess = useCallback(
     (successData: SaveLinksResponse, normalized: LinkItem[]) => {
-      // Update version from success response
-      const newVersion = parseVersionFromBody(successData);
-      if (newVersion !== null) {
-        setLinksVersion(newVersion);
-      }
-
-      // Keep normalized links locally
-      setLinks(prev =>
-        areLinkItemsEqual(prev, normalized) ? prev : normalized
-      );
-
-      // Check for ingestable URLs and trigger suggestion sync
-      if (suggestionsEnabled && hasIngestableLink(normalized)) {
-        setAutoRefreshUntilMs(Date.now() + 20000);
-        onSyncSuggestions?.();
-      }
-
-      // Invalidate TanStack Query cache for consistency
-      if (profileId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.dashboard.socialLinks(profileId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.suggestions.list(profileId),
-        });
-      }
-
-      // Track analytics
-      track('dashboard_social_links_saved', { profileId });
-
-      const now = new Date();
-      toast.success(
-        `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
-      );
+      processSaveSuccess({
+        successData,
+        normalized,
+        profileId,
+        suggestionsEnabled,
+        setLinksVersion,
+        setLinks,
+        setAutoRefreshUntilMs,
+        onSyncSuggestions,
+        queryClient,
+      });
     },
     [profileId, suggestionsEnabled, onSyncSuggestions, queryClient]
   );
@@ -334,46 +480,13 @@ export function useLinksPersistence({
   // Persist links to server
   const persistLinks = useCallback(
     async (input: LinkItem[]): Promise<void> => {
-      const normalized = normalizeLinkItems(input);
-
-      if (!profileId) {
-        toast.error('Unable to save links. Please refresh and try again.');
-        return;
-      }
-
-      try {
-        const payload = buildSavePayload(normalized);
-
-        const successData = await fetchWithTimeout<SaveLinksResponse>(
-          '/api/dashboard/social-links',
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              profileId,
-              links: payload,
-              expectedVersion: linksVersion,
-            }),
-            timeout: 15000,
-          }
-        );
-
-        handleSaveSuccess(successData, normalized);
-      } catch (error) {
-        // Handle 409 Conflict - links were modified elsewhere
-        if (error instanceof FetchError && error.status === 409) {
-          await handleConflictError();
-          return;
-        }
-
-        void captureError('Failed to save social links', error, {
-          profileId,
-          linkCount: normalized.length,
-          route: APP_ROUTES.PROFILE,
-        });
-
-        toast.error(extractErrorMessage(error));
-      }
+      await executePersistLinks({
+        input,
+        profileId,
+        linksVersion,
+        onSuccess: handleSaveSuccess,
+        onConflict: handleConflictError,
+      });
     },
     [profileId, linksVersion, handleSaveSuccess, handleConflictError]
   );
@@ -386,14 +499,7 @@ export function useLinksPersistence({
       if (saveLoopRunningRef.current) return;
       saveLoopRunningRef.current = true;
 
-      void (async () => {
-        while (pendingSaveRef.current) {
-          const next = pendingSaveRef.current;
-          pendingSaveRef.current = null;
-          await persistLinks(next);
-        }
-        saveLoopRunningRef.current = false;
-      })();
+      void runSaveLoop(pendingSaveRef, saveLoopRunningRef, persistLinks);
     },
     [persistLinks]
   );
@@ -411,28 +517,10 @@ export function useLinksPersistence({
   );
 
   // Debounced save function with cancel and flush methods
-  const debouncedSave = useMemo(() => {
-    const fn = (input: LinkItem[]) => {
-      lastInputRef.current = input;
-      asyncDebouncer.maybeExecute(input);
-    };
-
-    fn.cancel = () => {
-      asyncDebouncer.cancel();
-      lastInputRef.current = null;
-    };
-
-    fn.flush = () => {
-      const pending = lastInputRef.current;
-      if (pending) {
-        asyncDebouncer.cancel();
-        lastInputRef.current = null;
-        enqueueSave(pending);
-      }
-    };
-
-    return fn;
-  }, [asyncDebouncer, enqueueSave]);
+  const debouncedSave = useMemo(
+    () => createDebouncedSave(asyncDebouncer, lastInputRef, enqueueSave),
+    [asyncDebouncer, enqueueSave]
+  );
 
   // Cancel pending saves when profileId changes
   useEffect(() => {

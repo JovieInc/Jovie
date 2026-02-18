@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -53,21 +54,25 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   }, [conversationId, notifications]);
 
   const headerActions = useMemo(
-    () =>
-      conversationId ? (
-        <SimpleTooltip content='Copy session ID'>
-          <CircleIconButton
-            size='sm'
-            variant='outline'
-            ariaLabel='Copy session ID'
-            onClick={() => {
-              handleCopyConversationId();
-            }}
-          >
-            <Copy aria-hidden='true' className='size-4' />
-          </CircleIconButton>
-        </SimpleTooltip>
-      ) : null,
+    () => (
+      <>
+        {conversationId && (
+          <SimpleTooltip content='Copy session ID'>
+            <CircleIconButton
+              size='sm'
+              variant='outline'
+              ariaLabel='Copy session ID'
+              onClick={() => {
+                handleCopyConversationId();
+              }}
+            >
+              <Copy aria-hidden='true' className='size-4' />
+            </CircleIconButton>
+          </SimpleTooltip>
+        )}
+        <PreviewToggleButton />
+      </>
+    ),
     [conversationId, handleCopyConversationId]
   );
 
