@@ -200,6 +200,10 @@ async function createUserWithRetry(
       return createdUser.id;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
+      // Extract database-specific error details for better diagnostics
+      const dbErrorCode = (error as { code?: string })?.code;
+      const dbConstraint = (error as { constraint?: string })?.constraint;
+      const dbDetail = (error as { detail?: string })?.detail;
       await captureError(
         `User creation failed (attempt ${attempt + 1}/${maxRetries})`,
         lastError,
@@ -209,6 +213,10 @@ async function createUserWithRetry(
           attempt: attempt + 1,
           maxRetries,
           operation: 'createUserWithRetry',
+          errorType: lastError.constructor?.name ?? 'unknown',
+          dbErrorCode,
+          dbConstraint,
+          dbDetail,
         }
       );
 
@@ -218,6 +226,7 @@ async function createUserWithRetry(
     }
   }
 
+  const dbErrorCode = (lastError as unknown as { code?: string })?.code;
   await captureCriticalError(
     `User creation failed after ${maxRetries} attempts`,
     lastError,
@@ -226,6 +235,9 @@ async function createUserWithRetry(
       email,
       maxRetries,
       operation: 'createUserWithRetry',
+      errorMessage: lastError?.message,
+      errorType: lastError?.constructor?.name ?? 'unknown',
+      dbErrorCode,
     }
   );
   return null;

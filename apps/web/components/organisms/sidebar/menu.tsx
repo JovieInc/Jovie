@@ -45,8 +45,8 @@ const sidebarMenuButtonVariants = cva(
     'text-sidebar-item-foreground',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
     'hover:bg-sidebar-accent',
-    // Active state — Linear: rgba(255,255,255,0.04)
-    'data-[active=true]:bg-sidebar-accent-active',
+    // Active state — Linear: rgba(255,255,255,0.06) bg, brighter text
+    'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
     // Focus state - subtle bg like Linear (no rings)
     'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state

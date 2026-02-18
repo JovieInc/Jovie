@@ -172,7 +172,7 @@ const MARKETING_PREFIXES = [
 
 export function CoreProviders({
   children,
-  initialThemeMode = 'system',
+  initialThemeMode = 'dark',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
   const enableAnalytics = useMemo(

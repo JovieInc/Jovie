@@ -179,7 +179,7 @@ export function SettingsPolished({
 
     return (
       <div
-        className='space-y-4 sm:space-y-6 pb-4 sm:pb-6'
+        className='space-y-4 sm:space-y-5 pb-4 sm:pb-6'
         data-testid='settings-polished'
       >
         <SettingsSection
@@ -196,11 +196,11 @@ export function SettingsPolished({
   // Full settings view with group headers
   return (
     <div
-      className='space-y-8 sm:space-y-10 pb-4 sm:pb-6'
+      className='space-y-6 sm:space-y-8 pb-4 sm:pb-6'
       data-testid='settings-polished'
     >
       {/* General settings */}
-      <div className='space-y-6 sm:space-y-8'>
+      <div className='space-y-5 sm:space-y-6'>
         <h3 className='text-[13px] font-medium text-tertiary-token'>General</h3>
         {userSections.map(section => (
           <SettingsSection
@@ -215,7 +215,7 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div className='space-y-6 sm:space-y-8'>
+      <div className='space-y-5 sm:space-y-6'>
         <h3 className='text-[13px] font-medium text-tertiary-token'>Artist</h3>
         {artistSections.map(section => (
           <SettingsSection
