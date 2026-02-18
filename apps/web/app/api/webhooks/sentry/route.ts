@@ -42,9 +42,12 @@ function isDuplicate(issueId: string): boolean {
   for (const [key, ts] of recentDispatches) {
     if (now - ts > DEDUPE_TTL_MS) recentDispatches.delete(key);
   }
-  if (recentDispatches.has(issueId)) return true;
-  recentDispatches.set(issueId, now);
-  return false;
+  return recentDispatches.has(issueId);
+}
+
+/** Mark an issue as dispatched — call AFTER successful dispatch only */
+function markDispatched(issueId: string): void {
+  recentDispatches.set(issueId, Date.now());
 }
 
 /**
@@ -188,6 +191,9 @@ export async function POST(request: NextRequest) {
         { status: 502, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Mark as dispatched AFTER success so failed dispatches can be retried
+    markDispatched(issueId);
 
     logger.info('[Sentry Webhook] Dispatched autofix', {
       issueId,
