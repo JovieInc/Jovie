@@ -26,7 +26,7 @@ const NAV_ITEMS_2 = [
  */
 export function AppShellSkeleton() {
   return (
-    <div className='flex h-svh w-full overflow-hidden bg-base'>
+    <div className='flex h-svh w-full overflow-hidden bg-base [--sidebar-width:232px]'>
       {/* Sidebar skeleton — matches sidebar width and bg */}
       <div className='hidden lg:flex lg:shrink-0 lg:w-(--sidebar-width) lg:flex-col bg-sidebar'>
         {/* Sidebar header skeleton */}
