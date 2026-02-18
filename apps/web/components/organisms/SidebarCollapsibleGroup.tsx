@@ -39,7 +39,7 @@ export function SidebarCollapsibleGroup({
             tooltip={tooltip}
             className={cn(
               'justify-between',
-              'text-sidebar-item-icon hover:text-sidebar-item-foreground hover:bg-transparent',
+              'text-sidebar-item-icon hover:bg-transparent',
               'h-6 px-1'
             )}
             aria-expanded={open}
@@ -49,7 +49,7 @@ export function SidebarCollapsibleGroup({
             </span>
             <ChevronRight
               className={cn(
-                'size-3 shrink-0 opacity-50 transition-transform duration-200 ease-out',
+                'size-3 shrink-0 opacity-50 transition-transform duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
                 open ? 'rotate-90' : 'rotate-0'
               )}
               aria-hidden='true'
@@ -60,7 +60,7 @@ export function SidebarCollapsibleGroup({
 
       <div
         className={cn(
-          'grid transition-[grid-template-rows,opacity] duration-200 ease-out',
+          'grid transition-[grid-template-rows,opacity] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
           open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         )}
       >

@@ -16,7 +16,8 @@ import { getRedis } from '@/lib/redis';
  * where sidebar and layout might see different values).
  */
 const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
-const MEMORY_CACHE_TTL_MS = 15 * 1000; // 15 seconds - shorter for multi-instance consistency
+const MEMORY_CACHE_TTL_MS = 60 * 1000; // 60 seconds - matches Redis TTL for consistency
+const STALE_GRACE_MS = 5 * 60 * 1000; // 5 minutes - keep expired entries as DB-failure fallback
 const REDIS_KEY_PREFIX = 'admin:role:';
 const MAX_FALLBACK_CACHE_SIZE = 100; // Max users to cache in memory
 
@@ -27,13 +28,14 @@ const fallbackCache = new Map<
 >();
 
 /**
- * Prune expired entries and enforce max cache size.
+ * Prune stale entries beyond the grace period and enforce max cache size.
+ * Entries within the stale grace window are kept as DB-failure fallbacks.
  * Called before adding new entries to prevent unbounded memory growth.
  */
 function pruneFallbackCache(now: number): void {
-  // First pass: remove expired entries
+  // First pass: remove entries past the stale grace period
   for (const [key, entry] of fallbackCache) {
-    if (entry.expiresAt <= now) {
+    if (entry.expiresAt + STALE_GRACE_MS <= now) {
       fallbackCache.delete(key);
     }
   }
@@ -90,24 +92,38 @@ async function queryWithRetry(
 
 /**
  * Handle DB query failure by falling back to stale cache or denying access.
+ *
+ * When the DB is unreachable, we prefer returning stale cached results over
+ * revoking access. This prevents transient DB issues (Neon cold starts,
+ * connection pool exhaustion) from intermittently hiding admin nav items
+ * or returning 404s on admin routes.
+ *
  * @internal
  */
 function handleDbFailure(
   userId: string,
   staleEntry: { isAdmin: boolean; expiresAt: number } | undefined,
-  lastError: unknown
+  lastError: unknown,
+  now: number = Date.now()
 ): boolean {
-  if (staleEntry?.isAdmin) {
+  if (staleEntry !== undefined && staleEntry.expiresAt + STALE_GRACE_MS > now) {
     captureWarning(
       '[admin/roles] DB query failed after retry, using stale cache',
+      { userId, isAdmin: staleEntry.isAdmin, expiredAt: staleEntry.expiresAt }
+    );
+    return staleEntry.isAdmin;
+  }
+  if (staleEntry !== undefined) {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
       { userId, expiredAt: staleEntry.expiresAt }
     );
-    return true;
+  } else {
+    captureError(
+      '[admin/roles] DB query failed after retry, no cache available — denying access',
+      lastError
+    );
   }
-  captureError(
-    '[admin/roles] DB query failed after retry, denying access',
-    lastError
-  );
   return false;
 }
 

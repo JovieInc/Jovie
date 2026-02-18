@@ -105,8 +105,8 @@ export function RecentChats() {
         <SidebarMenu>
           {(['a', 'b', 'c'] as const).map(id => (
             <SidebarMenuItem key={`skeleton-${id}`}>
-              <div className='flex h-7 items-center px-2'>
-                <Skeleton className='h-3.5 flex-1' rounded='sm' />
+              <div className='flex h-7 items-center px-1.5'>
+                <Skeleton className='h-3 flex-1' rounded='sm' />
               </div>
             </SidebarMenuItem>
           ))}

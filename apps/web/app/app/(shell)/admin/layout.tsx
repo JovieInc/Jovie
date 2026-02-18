@@ -1,5 +1,6 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
@@ -33,8 +34,10 @@ export default async function AdminLayout({
     redirect('/sign-in?redirect_url=/app/admin');
   }
 
+  // Redirect non-admins to dashboard instead of returning 404.
+  // A 404 is misleading — the routes exist, the user just lacks permission.
   if (!entitlements.isAdmin) {
-    notFound();
+    redirect(APP_ROUTES.DASHBOARD);
   }
 
   return children;

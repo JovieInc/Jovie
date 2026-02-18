@@ -134,7 +134,7 @@ export function DashboardNav(_: DashboardNavProps) {
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && (
-                  <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
+                  <div className='my-1.5 mx-2 border-t border-sidebar-border' />
                 )}
                 {renderSection(section.items)}
               </div>
