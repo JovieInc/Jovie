@@ -40,6 +40,9 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
 
+      - name: Install Playwright browsers
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
       - name: Run Storybook Tests (A11y)
         id: a11y-test
         run: |
