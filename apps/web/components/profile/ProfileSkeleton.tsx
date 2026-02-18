@@ -8,8 +8,9 @@ import { Container } from '@/components/site/Container';
 
 export function ProfileSkeleton() {
   return (
-    <output
-      className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden block'
+    <div
+      role='status'
+      className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden'
       aria-busy='true'
       aria-label='Loading Jovie profile'
     >
@@ -62,6 +63,6 @@ export function ProfileSkeleton() {
           </div>
         </div>
       </Container>
-    </output>
+    </div>
   );
 }

@@ -84,7 +84,8 @@ export function StarterEmptyState({
   };
 
   return (
-    <output
+    <div
+      role='status'
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}
       className={cn(
@@ -112,6 +113,6 @@ export function StarterEmptyState({
 
         <Rocket className='hidden h-10 w-10 text-accent-token sm:block' />
       </div>
-    </output>
+    </div>
   );
 }

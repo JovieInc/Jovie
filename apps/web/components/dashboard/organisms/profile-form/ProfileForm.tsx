@@ -158,12 +158,13 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       </Button>
 
       {success && (
-        <output
-          className='bg-green-500/10 border border-green-500/20 rounded-lg p-3 block'
+        <div
+          className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'
+          role='status'
           aria-live='polite'
         >
           <p className='text-sm text-success'>Profile updated successfully!</p>
-        </output>
+        </div>
       )}
     </form>
   );

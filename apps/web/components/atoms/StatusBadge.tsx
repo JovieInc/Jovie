@@ -30,7 +30,8 @@ export function StatusBadge({
   dynamic = false,
 }: StatusBadgeProps) {
   return (
-    <output
+    <div
+      role={dynamic ? 'status' : undefined}
       className={cn(
         'inline-flex items-center gap-2 rounded-full border font-medium',
         variantClasses[variant],
@@ -40,6 +41,6 @@ export function StatusBadge({
     >
       {icon && <span className='flex-shrink-0'>{icon}</span>}
       <span>{children}</span>
-    </output>
+    </div>
   );
 }

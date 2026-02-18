@@ -168,10 +168,10 @@ export function UniversalLinkInputUrlMode({
       </div>
 
       {url && !detectedLink?.isValid && (
-        <output className='hidden text-xs text-secondary-token'>
+        <div className='hidden text-xs text-secondary-token' role='status'>
           💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more for
           automatic detection
-        </output>
+        </div>
       )}
     </div>
   );

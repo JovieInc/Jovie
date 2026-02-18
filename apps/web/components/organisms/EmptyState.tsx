@@ -191,7 +191,8 @@ export function EmptyState({
   };
 
   return (
-    <output
+    <section
+      role='status'
       aria-labelledby={headingId}
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
@@ -234,6 +235,6 @@ export function EmptyState({
           {renderSecondaryAction()}
         </div>
       )}
-    </output>
+    </section>
   );
 }

@@ -33,7 +33,8 @@ export function LoadingSpinner({
   const toneClass = toneClasses[tone];
 
   return (
-    <output
+    <span
+      role='status'
       aria-label={label}
       data-testid='spinner'
       data-size={size}
@@ -62,7 +63,7 @@ export function LoadingSpinner({
           )}
         />
       </span>
-    </output>
+    </span>
   );
 }
 
