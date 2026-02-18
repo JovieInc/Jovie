@@ -38,7 +38,7 @@ export function AudienceCreatedAtCell({
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
-        aria-hidden='true'
+        role='presentation'
       >
         <AudienceRowActionsMenu
           row={row}

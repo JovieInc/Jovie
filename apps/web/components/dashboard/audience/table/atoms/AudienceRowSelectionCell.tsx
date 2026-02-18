@@ -29,7 +29,7 @@ export function AudienceRowSelectionCell({
         className='contents'
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
-        aria-hidden='true'
+        role='presentation'
       >
         <span
           className={cn(

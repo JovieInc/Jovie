@@ -73,7 +73,7 @@ function TanStackHeaderCheckbox({
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
+      role='presentation'
     >
       <Checkbox
         aria-label='Select all rows'
@@ -103,7 +103,7 @@ function TanStackRowCheckbox({
       onKeyDown={event =>
         handleActivationKeyDown(event, e => e.stopPropagation())
       }
-      aria-hidden='true'
+      role='presentation'
     >
       <span
         className={cn(

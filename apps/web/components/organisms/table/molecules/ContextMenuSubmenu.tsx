@@ -61,7 +61,7 @@ export function ContextMenuSubmenu({
       className='relative'
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
-      aria-hidden='true'
+      role='presentation'
     >
       {/* Submenu Trigger */}
       <button
