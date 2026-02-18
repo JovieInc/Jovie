@@ -23,6 +23,8 @@ import { logger } from '@/lib/utils/logger';
 
 import {
   convertAppleMusicToIsrcMatches,
+  convertDeezerToIsrcMatches,
+  convertMusicBrainzToIsrcMatches,
   type LocalArtistData,
   type LocalTrackData,
   orchestrateMatching,
@@ -35,6 +37,16 @@ import {
   isAppleMusicAvailable,
   MAX_ISRC_BATCH_SIZE,
 } from '../providers/apple-music';
+import {
+  bulkLookupDeezerByIsrc,
+  getDeezerArtist,
+  isDeezerAvailable,
+} from '../providers/deezer';
+import {
+  bulkLookupMusicBrainzByIsrc,
+  getMusicBrainzArtist,
+  isMusicBrainzAvailable,
+} from '../providers/musicbrainz';
 import type {
   DspArtistDiscoveryResult,
   DspMatchStatus,
@@ -382,18 +394,236 @@ async function discoverAppleMusicMatch(
   return { match: matchingResult.bestMatch, status };
 }
 
+/**
+ * Discover Deezer artist match.
+ */
+async function discoverDeezerMatch(
+  tx: DbOrTransaction,
+  localTracks: LocalTrackData[],
+  localArtist: LocalArtistData,
+  creatorProfileId: string
+): Promise<{
+  match: ScoredArtistMatch | null;
+  status: DspMatchStatus | null;
+  error?: string;
+}> {
+  if (!isDeezerAvailable())
+    return { match: null, status: null, error: 'Deezer not available' };
+  const selectedTracks = selectTracksForMatching(
+    localTracks,
+    MAX_TRACKS_FOR_MATCHING
+  );
+  if (selectedTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
+    return {
+      match: null,
+      status: null,
+      error: `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${selectedTracks.length})`,
+    };
+  }
+  const isrcs = selectedTracks
+    .map(t => t.isrc)
+    .filter((isrc): isrc is string => isrc !== null);
+  const allTracks = await bulkLookupDeezerByIsrc(isrcs);
+  const rawIsrcMatches = convertDeezerToIsrcMatches(allTracks, selectedTracks);
+  const isrcMatches = rawIsrcMatches.filter(m => {
+    const name = m.matchedTrack.artistName.toLowerCase();
+    return (
+      !name.includes('various artists') &&
+      !name.includes('various artist') &&
+      !name.includes('compilation')
+    );
+  });
+  if (isrcMatches.length === 0)
+    return {
+      match: null,
+      status: null,
+      error: 'No valid ISRC matches found on Deezer',
+    };
+  const artistIdList = Array.from(
+    new Set(isrcMatches.map(m => m.matchedTrack.artistId))
+  );
+  const artistProfiles = new Map<
+    string,
+    { url?: string; imageUrl?: string; name?: string }
+  >();
+  const ARTIST_FETCH_CONCURRENCY = 5;
+  for (let i = 0; i < artistIdList.length; i += ARTIST_FETCH_CONCURRENCY) {
+    const batch = artistIdList.slice(i, i + ARTIST_FETCH_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(id => getDeezerArtist(id))
+    );
+    results.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const artist = result.value;
+        artistProfiles.set(batch[idx], {
+          url: artist.link,
+          imageUrl: artist.picture_big || artist.picture_medium || undefined,
+          name: artist.name,
+        });
+      }
+    });
+  }
+  const matchingResult = orchestrateMatching(
+    'deezer',
+    isrcMatches,
+    localArtist,
+    { minIsrcMatches: 3, artistProfiles }
+  );
+  if (!matchingResult.bestMatch)
+    return {
+      match: null,
+      status: null,
+      error: matchingResult.errors.join('; ') || 'No Deezer match found',
+    };
+  const validation = validateMatch(matchingResult.bestMatch, localArtist);
+  if (!validation.valid)
+    return {
+      match: null,
+      status: null,
+      error: validation.reason ?? 'Match validation failed',
+    };
+  const status: DspMatchStatus = matchingResult.bestMatch.shouldAutoConfirm
+    ? 'auto_confirmed'
+    : 'suggested';
+  const matchId = await storeMatch(
+    tx,
+    creatorProfileId,
+    'deezer',
+    matchingResult.bestMatch,
+    status
+  );
+  if (status === 'auto_confirmed') {
+    await tx
+      .update(creatorProfiles)
+      .set({ deezerId: matchingResult.bestMatch.externalArtistId })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+    void enqueueDspTrackEnrichmentJob({
+      creatorProfileId,
+      matchId,
+      providerId: 'deezer',
+      externalArtistId: matchingResult.bestMatch.externalArtistId,
+    }).catch(error => {
+      logger.warn(
+        'Failed to enqueue release enrichment after Deezer auto-confirm',
+        { creatorProfileId, matchId, error }
+      );
+    });
+  }
+  return { match: matchingResult.bestMatch, status };
+}
+
+/**
+ * Discover MusicBrainz artist match.
+ */
+async function discoverMusicBrainzMatch(
+  tx: DbOrTransaction,
+  localTracks: LocalTrackData[],
+  localArtist: LocalArtistData,
+  creatorProfileId: string
+): Promise<{
+  match: ScoredArtistMatch | null;
+  status: DspMatchStatus | null;
+  error?: string;
+}> {
+  if (!isMusicBrainzAvailable())
+    return { match: null, status: null, error: 'MusicBrainz not available' };
+  const selectedTracks = selectTracksForMatching(
+    localTracks,
+    MAX_TRACKS_FOR_MATCHING
+  );
+  if (selectedTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
+    return {
+      match: null,
+      status: null,
+      error: `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${selectedTracks.length})`,
+    };
+  }
+  const isrcs = selectedTracks
+    .map(t => t.isrc)
+    .filter((isrc): isrc is string => isrc !== null);
+  const allRecordings = await bulkLookupMusicBrainzByIsrc(isrcs);
+  const rawIsrcMatches = convertMusicBrainzToIsrcMatches(
+    allRecordings,
+    selectedTracks
+  );
+  const isrcMatches = rawIsrcMatches.filter(m => {
+    const name = m.matchedTrack.artistName.toLowerCase();
+    return (
+      !name.includes('various artists') &&
+      !name.includes('various artist') &&
+      !name.includes('compilation')
+    );
+  });
+  if (isrcMatches.length === 0)
+    return {
+      match: null,
+      status: null,
+      error: 'No valid ISRC matches found on MusicBrainz',
+    };
+  const artistIdList = Array.from(
+    new Set(isrcMatches.map(m => m.matchedTrack.artistId))
+  );
+  const artistProfiles = new Map<
+    string,
+    { url?: string; imageUrl?: string; name?: string }
+  >();
+  for (const mbid of artistIdList) {
+    try {
+      const artist = await getMusicBrainzArtist(mbid);
+      if (artist)
+        artistProfiles.set(mbid, {
+          url: `https://musicbrainz.org/artist/${mbid}`,
+          name: artist.name,
+        });
+    } catch {
+      /* Continue without profile data */
+    }
+    await new Promise(resolve => setTimeout(resolve, 1100));
+  }
+  const matchingResult = orchestrateMatching(
+    'musicbrainz',
+    isrcMatches,
+    localArtist,
+    { minIsrcMatches: 3, artistProfiles }
+  );
+  if (!matchingResult.bestMatch)
+    return {
+      match: null,
+      status: null,
+      error: matchingResult.errors.join('; ') || 'No MusicBrainz match found',
+    };
+  const validation = validateMatch(matchingResult.bestMatch, localArtist);
+  if (!validation.valid)
+    return {
+      match: null,
+      status: null,
+      error: validation.reason ?? 'Match validation failed',
+    };
+  const status: DspMatchStatus = matchingResult.bestMatch.shouldAutoConfirm
+    ? 'auto_confirmed'
+    : 'suggested';
+  await storeMatch(
+    tx,
+    creatorProfileId,
+    'musicbrainz',
+    matchingResult.bestMatch,
+    status
+  );
+  if (status === 'auto_confirmed') {
+    await tx
+      .update(creatorProfiles)
+      .set({ musicbrainzId: matchingResult.bestMatch.externalArtistId })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  }
+  return { match: matchingResult.bestMatch, status };
+}
+
 // ============================================================================
 // Job Processor
 // ============================================================================
 
 /**
  * Process a DSP artist discovery job.
- *
- * Discovers matching artist profiles on target DSPs using ISRC-based matching.
- *
- * @param tx - Database transaction
- * @param jobPayload - Job payload
- * @returns Discovery result with matches found
  */
 export async function processDspArtistDiscoveryJob(
   tx: DbOrTransaction,
@@ -408,7 +638,6 @@ export async function processDspArtistDiscoveryJob(
     errors: [],
   };
 
-  // Fetch local data
   const [localTracks, localArtist] = await Promise.all([
     fetchLocalTracks(tx, creatorProfileId),
     fetchLocalArtist(tx, creatorProfileId, spotifyArtistId),
@@ -418,7 +647,6 @@ export async function processDspArtistDiscoveryJob(
     result.errors.push('Creator profile not found');
     return result;
   }
-
   if (localTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
     result.errors.push(
       `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${localTracks.length})`
@@ -426,30 +654,52 @@ export async function processDspArtistDiscoveryJob(
     return result;
   }
 
-  // Process each target provider
   for (const providerId of targetProviders) {
     try {
+      let discoveryResult: {
+        match: ScoredArtistMatch | null;
+        status: DspMatchStatus | null;
+        error?: string;
+      };
+
       if (providerId === 'apple_music') {
-        const { match, status, error } = await discoverAppleMusicMatch(
+        discoveryResult = await discoverAppleMusicMatch(
           tx,
           localTracks,
           localArtist,
           creatorProfileId
         );
-
-        if (match && status) {
-          result.matches.push({
-            providerId: 'apple_music',
-            status,
-            externalArtistId: match.externalArtistId,
-            externalArtistName: match.externalArtistName,
-            confidenceScore: match.confidenceScore,
-          });
-        } else if (error) {
-          result.errors.push(`Apple Music: ${error}`);
-        }
+      } else if (providerId === 'deezer') {
+        discoveryResult = await discoverDeezerMatch(
+          tx,
+          localTracks,
+          localArtist,
+          creatorProfileId
+        );
+      } else if (providerId === 'musicbrainz') {
+        discoveryResult = await discoverMusicBrainzMatch(
+          tx,
+          localTracks,
+          localArtist,
+          creatorProfileId
+        );
+      } else {
+        result.errors.push(`${providerId}: Unsupported provider`);
+        continue;
       }
-      // See JOV-479: Add Deezer and MusicBrainz support
+
+      const { match, status, error } = discoveryResult;
+      if (match && status) {
+        result.matches.push({
+          providerId,
+          status,
+          externalArtistId: match.externalArtistId,
+          externalArtistName: match.externalArtistName,
+          confidenceScore: match.confidenceScore,
+        });
+      } else if (error) {
+        result.errors.push(`${providerId}: ${error}`);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown error occurred';
@@ -462,8 +712,6 @@ export async function processDspArtistDiscoveryJob(
 
 /**
  * Process discovery job with standalone database operations.
- * Used when called from API routes.
- * The neon-http driver does not support transactions.
  */
 export async function processDspArtistDiscoveryJobStandalone(
   jobPayload: unknown
