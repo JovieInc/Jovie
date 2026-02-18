@@ -11,8 +11,10 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import type {
   AppleMusicTrack,
+  DeezerTrack,
   DspProviderId,
   IsrcMatchResult,
+  MusicBrainzRecording,
   ScoredArtistMatch,
 } from '../types';
 import { scoreAndRankCandidates } from './confidence';
@@ -157,6 +159,66 @@ export function convertAppleMusicToIsrcMatches(
     }
   }
 
+  return matches;
+}
+
+/**
+ * Convert Deezer track results to ISRC match results.
+ */
+export function convertDeezerToIsrcMatches(
+  trackMap: Map<string, DeezerTrack>,
+  localTracks: LocalTrackData[]
+): IsrcMatchResult[] {
+  const matches: IsrcMatchResult[] = [];
+  for (const localTrack of localTracks) {
+    if (!localTrack.isrc) continue;
+    const normalizedIsrc = localTrack.isrc.toUpperCase();
+    const deezerTrack = trackMap.get(normalizedIsrc);
+    if (deezerTrack?.artist) {
+      matches.push({
+        isrc: normalizedIsrc,
+        localTrackId: localTrack.id,
+        localTrackTitle: localTrack.title,
+        matchedTrack: {
+          id: String(deezerTrack.id),
+          title: deezerTrack.title,
+          artistId: String(deezerTrack.artist.id),
+          artistName: deezerTrack.artist.name,
+        },
+      });
+    }
+  }
+  return matches;
+}
+
+/**
+ * Convert MusicBrainz recording results to ISRC match results.
+ */
+export function convertMusicBrainzToIsrcMatches(
+  recordingMap: Map<string, MusicBrainzRecording>,
+  localTracks: LocalTrackData[]
+): IsrcMatchResult[] {
+  const matches: IsrcMatchResult[] = [];
+  for (const localTrack of localTracks) {
+    if (!localTrack.isrc) continue;
+    const normalizedIsrc = localTrack.isrc.toUpperCase();
+    const recording = recordingMap.get(normalizedIsrc);
+    if (recording) {
+      const artistCredit = recording['artist-credit']?.[0];
+      if (!artistCredit?.artist) continue;
+      matches.push({
+        isrc: normalizedIsrc,
+        localTrackId: localTrack.id,
+        localTrackTitle: localTrack.title,
+        matchedTrack: {
+          id: recording.id,
+          title: recording.title,
+          artistId: artistCredit.artist.id,
+          artistName: artistCredit.artist.name,
+        },
+      });
+    }
+  }
   return matches;
 }
 
