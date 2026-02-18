@@ -126,7 +126,7 @@ const clerkAppearance = {
 // Uses hydration guard to prevent SSR of ClerkProvider which accesses window
 export function ClientProviders({
   children,
-  initialThemeMode = 'system',
+  initialThemeMode = 'dark',
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {

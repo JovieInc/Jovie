@@ -48,7 +48,7 @@ const preview: Preview = {
     Story => (
       <ThemeProvider
         attribute='class'
-        defaultTheme='system'
+        defaultTheme='dark'
         enableSystem
         disableTransitionOnChange
         storageKey='jovie-theme'
