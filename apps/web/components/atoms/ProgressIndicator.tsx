@@ -42,11 +42,13 @@ export function ProgressIndicator({
   };
 
   return (
-    <progress
+    <div
       className={`space-y-4 ${className}`}
+      role='progressbar'
       aria-label={`Progress: Step ${currentStep + 1} of ${totalSteps}`}
-      value={currentStep + 1}
-      max={totalSteps}
+      aria-valuenow={currentStep + 1}
+      aria-valuemin={0}
+      aria-valuemax={totalSteps}
     >
       {/* Progress bar */}
       <div className='space-y-2'>
@@ -132,6 +134,6 @@ export function ProgressIndicator({
           );
         })}
       </div>
-    </progress>
+    </div>
   );
 }
