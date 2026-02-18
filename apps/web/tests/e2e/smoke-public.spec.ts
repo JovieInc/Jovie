@@ -88,9 +88,9 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         `Homepage body content length is < MIN_CONTENT_LENGTH.homepage (${MIN_CONTENT_LENGTH.homepage})`
       ).toBe(true);
 
-      // Verify main heading exists
-      const h1 = page.locator('h1').first();
-      await expect(h1, 'Homepage missing h1 heading').toBeVisible({
+      // Verify a heading exists (h1 may be inside a feature-flagged hero)
+      const heading = page.locator('h1, h2, [role="heading"]').first();
+      await expect(heading, 'Homepage missing heading element').toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
