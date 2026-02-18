@@ -95,8 +95,8 @@
   );
 
   /* Logo muted tokens for label logos bar */
-  --color-logo-muted: rgba(0, 0, 0, 0.25);
-  --color-logo-muted-hover: rgba(0, 0, 0, 0.5);
+  --color-logo-muted: rgba(0, 0, 0, 0.4);
+  --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
 
   /* Border system - semi-transparent for flexibility */
   --color-border-subtle: oklch(0% 0 0 / 6%);
@@ -242,8 +242,8 @@
   --color-text-disabled-token: oklch(28% 0.006 272);
 
   /* Logo muted tokens for label logos bar */
-  --color-logo-muted: rgba(255, 255, 255, 0.3);
-  --color-logo-muted-hover: rgba(255, 255, 255, 0.5);
+  --color-logo-muted: rgba(255, 255, 255, 0.55);
+  --color-logo-muted-hover: rgba(255, 255, 255, 0.75);
 
   /* Border system - extracted from Linear marketing (2026-02-16)
      Subtle:  rgba(255,255,255,0.05) — card borders, dividers

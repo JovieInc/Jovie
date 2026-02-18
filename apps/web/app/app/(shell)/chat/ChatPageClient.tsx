@@ -128,7 +128,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
           </p>
           <button
             type='button'
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
             className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
           >
             <RefreshCw className='h-4 w-4' />

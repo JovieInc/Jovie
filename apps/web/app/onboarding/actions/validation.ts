@@ -95,6 +95,6 @@ const EXPECTED_VALIDATION_CODES = new Set<string>([
 function isExpectedValidationError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   // Error format from onboardingErrorToError: "[CODE] message"
-  const match = error.message.match(/^\[([^\]]+)\]/);
+  const match = /^\[([^\]]+)\]/.exec(error.message);
   return match !== null && EXPECTED_VALIDATION_CODES.has(match[1]);
 }

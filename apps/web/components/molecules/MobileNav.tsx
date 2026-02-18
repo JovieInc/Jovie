@@ -38,10 +38,10 @@ function buildNavLinks(
 function MobileNavCta({
   showAuthenticatedAction,
   close,
-}: {
+}: Readonly<{
   showAuthenticatedAction: boolean;
   close: () => void;
-}) {
+}>) {
   const href = showAuthenticatedAction
     ? APP_ROUTES.DASHBOARD
     : APP_ROUTES.WAITLIST;
@@ -211,7 +211,7 @@ export function MobileNav({
                 paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
               }}
               aria-label='Mobile navigation'
-              inert={!isOpen ? true : undefined}
+              inert={isOpen ? undefined : true}
             >
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>

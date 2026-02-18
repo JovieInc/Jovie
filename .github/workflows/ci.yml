@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  merge_group:
   push:
     branches: [main, 'codegen-bot/**', 'claude/**']
     paths-ignore:
@@ -16,7 +17,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
 
@@ -329,7 +330,7 @@ jobs:
   drizzle-migration-guard:
     name: Migration Guard
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -448,11 +449,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Merge gate for PRs: fast checks + unit tests + a11y must all pass.
-    # Configure this as the required status check in branch protection
-    # instead of ci-fast alone, so unit test and a11y failures block merge.
+    # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
+    # This is the only required status check in the branch ruleset.
     needs: [ci-fast, ci-unit-tests, ci-a11y]
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -708,8 +708,8 @@ jobs:
     name: Unit Tests
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs (critical + changed) and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    # Unit tests run on all PRs, merge queue, and push to main
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -836,7 +836,7 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -1187,25 +1187,6 @@ jobs:
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
-
-  ci-merge-smoke:
-    name: Merge Group Smoke
-    if: ${{ github.event_name == 'merge_group' }}
-    needs: [ci-fast]
-    runs-on: ubuntu-latest
-    timeout-minutes: 7
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 2
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Build (smoke)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   ci-e2e-tests:
     name: E2E Tests

@@ -235,6 +235,52 @@ interface ConnectedDspListContentProps {
   readonly handlePaletteSelect: (artist: ArtistSelection) => Promise<void>;
 }
 
+function getSpotifyPillProps(
+  isSpotifyConnected: boolean,
+  spotifyId: string | null,
+  spotifyMatch: DspMatch | undefined,
+  handleOpenPalette: (provider: DspProvider) => void,
+  handleSyncNow: (provider: DspProvider) => void,
+  handleDisconnect: (match: DspMatch | undefined) => void
+) {
+  return {
+    provider: 'spotify' as const,
+    connected: isSpotifyConnected,
+    artistName: spotifyMatch?.externalArtistName,
+    onClick: isSpotifyConnected
+      ? undefined
+      : () => handleOpenPalette('spotify'),
+    onSyncNow: spotifyId ? () => handleSyncNow('spotify') : undefined,
+    onDisconnect: spotifyMatch
+      ? () => handleDisconnect(spotifyMatch)
+      : undefined,
+  };
+}
+
+function getAppleMusicPillProps(
+  spotifyId: string | null,
+  appleMusicMatch: DspMatch | undefined,
+  handleOpenPalette: (provider: DspProvider) => void,
+  handleSyncNow: (provider: DspProvider) => void,
+  handleDisconnect: (match: DspMatch | undefined) => void
+) {
+  return {
+    provider: 'apple_music' as const,
+    connected: !!appleMusicMatch,
+    artistName: appleMusicMatch?.externalArtistName,
+    onClick: appleMusicMatch
+      ? undefined
+      : () => handleOpenPalette('apple_music'),
+    onSyncNow:
+      appleMusicMatch && spotifyId
+        ? () => handleSyncNow('apple_music')
+        : undefined,
+    onDisconnect: appleMusicMatch
+      ? () => handleDisconnect(appleMusicMatch)
+      : undefined,
+  };
+}
+
 function ConnectedDspListContent({
   isSpotifyConnected,
   spotifyId,
@@ -249,6 +295,22 @@ function ConnectedDspListContent({
   paletteProvider,
   handlePaletteSelect,
 }: ConnectedDspListContentProps) {
+  const spotifyProps = getSpotifyPillProps(
+    isSpotifyConnected,
+    spotifyId,
+    spotifyMatch,
+    handleOpenPalette,
+    handleSyncNow,
+    handleDisconnect
+  );
+  const appleProps = getAppleMusicPillProps(
+    spotifyId,
+    appleMusicMatch,
+    handleOpenPalette,
+    handleSyncNow,
+    handleDisconnect
+  );
+
   return (
     <DashboardCard variant='settings'>
       <div className='space-y-4'>
@@ -257,40 +319,8 @@ function ConnectedDspListContent({
         </p>
 
         <div className='flex flex-wrap items-center gap-2'>
-          <DspConnectionPill
-            provider='spotify'
-            connected={isSpotifyConnected}
-            artistName={spotifyMatch?.externalArtistName}
-            onClick={
-              isSpotifyConnected
-                ? undefined
-                : () => handleOpenPalette('spotify')
-            }
-            onSyncNow={spotifyId ? () => handleSyncNow('spotify') : undefined}
-            onDisconnect={
-              spotifyMatch ? () => handleDisconnect(spotifyMatch) : undefined
-            }
-          />
-          <DspConnectionPill
-            provider='apple_music'
-            connected={!!appleMusicMatch}
-            artistName={appleMusicMatch?.externalArtistName}
-            onClick={
-              appleMusicMatch
-                ? undefined
-                : () => handleOpenPalette('apple_music')
-            }
-            onSyncNow={
-              appleMusicMatch && spotifyId
-                ? () => handleSyncNow('apple_music')
-                : undefined
-            }
-            onDisconnect={
-              appleMusicMatch
-                ? () => handleDisconnect(appleMusicMatch)
-                : undefined
-            }
-          />
+          <DspConnectionPill {...spotifyProps} />
+          <DspConnectionPill {...appleProps} />
         </div>
 
         {hasNoConnections && (

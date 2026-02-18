@@ -68,7 +68,7 @@ function logToConsole(
   try {
     serialised = JSON.stringify(data, null, 2);
   } catch {
-    serialised = String(data);
+    serialised = '[unserializable data]';
   }
   const consoleMessage = `[${severity.toUpperCase()}] ${message} ${serialised}`;
 

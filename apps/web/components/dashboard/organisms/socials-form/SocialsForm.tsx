@@ -2,7 +2,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, CommonDropdown, Input } from '@jovie/ui';
-import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -289,29 +289,8 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]'
               >
-                <div
-                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
-                  style={{
-                    backgroundColor: PLATFORM_METADATA_MAP[link.platform]
-                      ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
-                      : undefined,
-                    color: PLATFORM_METADATA_MAP[link.platform]
-                      ? getChipSafeIconColor(
-                          `#${PLATFORM_METADATA_MAP[link.platform].color}`,
-                          isDark
-                        )
-                      : undefined,
-                  }}
-                >
-                  <SocialIcon
-                    platform={link.platform}
-                    className='h-4 w-4'
-                    aria-hidden
-                  />
-                </div>
-
                 <CommonDropdown
                   variant='dropdown'
                   searchable
@@ -322,12 +301,24 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                   trigger={
                     <button
                       type='button'
-                      className='flex h-9 w-[140px] shrink-0 items-center justify-between gap-1 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:border-interactive'
+                      className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive'
+                      style={{
+                        backgroundColor: PLATFORM_METADATA_MAP[link.platform]
+                          ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
+                          : undefined,
+                        color: PLATFORM_METADATA_MAP[link.platform]
+                          ? getChipSafeIconColor(
+                              `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                              isDark
+                            )
+                          : undefined,
+                      }}
                     >
-                      <span className='truncate'>
-                        {getPlatformLabel(link.platform)}
-                      </span>
-                      <ChevronDown className='h-3.5 w-3.5 shrink-0 opacity-50' />
+                      <SocialIcon
+                        platform={link.platform}
+                        className='h-4 w-4'
+                        aria-hidden
+                      />
                     </button>
                   }
                   aria-label={`Select platform for link ${index + 1}`}

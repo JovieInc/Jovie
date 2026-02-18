@@ -73,6 +73,11 @@ body {
 }
 
 @theme {
+  /* Custom font sizes — Linear's type scale registered as Tailwind utilities
+     text-2xs = 11px, text-app = 13px (Linear's default UI size) */
+  --text-2xs: 0.6875rem;
+  --text-app: 0.8125rem;
+
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
     var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui",
@@ -480,9 +485,9 @@ body {
     font-size: var(--linear-caption-size);
     font-weight: var(--linear-font-weight-medium);
     line-height: var(--linear-button-height-sm);
-    color: rgb(8, 9, 10);
-    background-color: rgb(230, 230, 230);
-    border: 1px solid rgb(230, 230, 230);
+    color: var(--linear-btn-primary-fg);
+    background-color: var(--linear-btn-primary-bg);
+    border: 1px solid var(--linear-btn-primary-border);
     border-radius: 4px;
     outline-color: transparent;
     max-width: 100%;
@@ -502,8 +507,8 @@ body {
       transform 160ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
     &:hover {
-      background-color: rgb(255, 255, 255);
-      border-color: rgb(255, 255, 255);
+      background-color: var(--linear-btn-primary-hover);
+      border-color: var(--linear-btn-primary-hover);
     }
   }
 
