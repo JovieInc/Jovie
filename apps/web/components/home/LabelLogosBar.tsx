@@ -1,8 +1,6 @@
 import {
   ArmadaMusicLogo,
   AwalLogo,
-  BlackHoleRecordingsLogo,
-  DiscoWaxLogo,
   SonyMusicLogo,
   UniversalMusicGroupLogo,
 } from './label-logos';
@@ -17,18 +15,19 @@ export function LabelLogosBar() {
         {/* Subtle separator */}
         <div
           aria-hidden='true'
-          className='mb-10 sm:mb-14 h-px bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-transparent'
+          className='mb-10 sm:mb-14 h-px'
+          style={{
+            background: `linear-gradient(to right, var(--linear-separator-from), var(--linear-separator-via), transparent)`,
+          }}
         />
         <p className='mb-5 text-logo-muted text-[0.6875rem] font-medium uppercase tracking-[0.12em]'>
-          Driving streams to releases from
+          Trusted by artists on
         </p>
-        <div className='flex flex-wrap items-center gap-x-10 gap-y-4'>
-          <SonyMusicLogo className='h-5 w-auto text-logo-muted select-none' />
-          <UniversalMusicGroupLogo className='h-4 w-auto text-logo-muted select-none' />
+        <div className='flex flex-wrap items-center gap-x-10 gap-y-5'>
+          <SonyMusicLogo className='h-[18px] w-auto text-logo-muted select-none' />
+          <UniversalMusicGroupLogo className='h-[13px] w-auto text-logo-muted select-none' />
           <AwalLogo className='h-5 w-auto text-logo-muted select-none' />
-          <ArmadaMusicLogo className='h-4 w-auto text-logo-muted select-none' />
-          <BlackHoleRecordingsLogo className='h-4 w-auto text-logo-muted select-none' />
-          <DiscoWaxLogo className='h-5 w-auto text-logo-muted select-none' />
+          <ArmadaMusicLogo className='h-[22px] w-auto text-logo-muted select-none' />
         </div>
       </div>
     </section>
