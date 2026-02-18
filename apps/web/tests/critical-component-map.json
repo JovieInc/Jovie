@@ -1,0 +1,42 @@
+{
+  "$schema": "Critical component map: source file → test file(s) that should run when changed",
+  "components/organisms/contact-sidebar/DrawerNav.tsx": [
+    "tests/components/organisms/contact-sidebar/DrawerNav.interaction.test.tsx"
+  ],
+  "components/organisms/contact-sidebar/ContactSidebar.tsx": [
+    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
+  ],
+  "components/organisms/contact-sidebar/useContactSidebar.ts": [
+    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
+  ],
+  "components/organisms/contact-sidebar/ContactFields.tsx": [
+    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
+  ],
+  "components/organisms/contact-sidebar/ContactWebsite.tsx": [
+    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
+  ],
+  "components/organisms/contact-sidebar/ContactSocialLinks.tsx": [
+    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
+  ],
+  "components/dashboard/atoms/link-actions/LinkActions.tsx": [
+    "tests/components/dashboard/LinkActions.keyboard.test.tsx",
+    "tests/components/dashboard/LinkActions.negative.interaction.test.tsx"
+  ],
+  "components/dashboard/atoms/link-actions/useLinkActionsMenu.ts": [
+    "tests/components/dashboard/LinkActions.keyboard.test.tsx",
+    "tests/components/dashboard/LinkActions.negative.interaction.test.tsx"
+  ],
+  "components/organisms/release-sidebar/ReleaseSidebar.tsx": [
+    "tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx",
+    "tests/components/organisms/release-sidebar/ReleaseMetadata.test.tsx"
+  ],
+  "components/organisms/release-sidebar/ReleaseDspLinks.tsx": [
+    "tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx"
+  ],
+  "components/organisms/release-sidebar/useReleaseSidebar.ts": [
+    "tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx"
+  ],
+  "components/organisms/release-sidebar/ReleaseMetadata.tsx": [
+    "tests/components/organisms/release-sidebar/ReleaseMetadata.test.tsx"
+  ]
+}
