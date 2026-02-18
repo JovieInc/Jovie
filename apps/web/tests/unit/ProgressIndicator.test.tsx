@@ -31,9 +31,8 @@ describe('ProgressIndicator', () => {
 
     const progressbar = screen.getByRole('progressbar');
     expect(progressbar).toBeInTheDocument();
-    expect(progressbar).toHaveAttribute('aria-valuenow', '2');
-    expect(progressbar).toHaveAttribute('aria-valuemin', '1');
-    expect(progressbar).toHaveAttribute('aria-valuemax', '3');
+    expect(progressbar).toHaveAttribute('value', '2');
+    expect(progressbar).toHaveAttribute('max', '3');
   });
 
   it('displays correct step information', () => {

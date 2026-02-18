@@ -117,12 +117,22 @@ function determineUserStatus(
 
 /**
  * Check if an error is a permanent error that should not be retried.
+ * Email uniqueness violations are NOT permanent — they're handled by
+ * the clerk_id adoption path in createUserWithRetry.
  */
 function isPermanentError(error: Error): boolean {
-  return (
-    error.message?.includes('duplicate key') ||
-    error.message?.includes('constraint')
-  );
+  const msg = error.message ?? '';
+  const constraint = (error as { constraint?: string })?.constraint;
+
+  // Email uniqueness conflicts are recoverable via clerk_id adoption
+  if (
+    constraint === 'users_email_unique' ||
+    msg.includes('users_email_unique')
+  ) {
+    return false;
+  }
+
+  return msg.includes('duplicate key') || msg.includes('constraint');
 }
 
 /**
@@ -175,25 +185,56 @@ async function createUserWithRetry(
 
       const userStatus = determineUserStatus(waitlistEntryId, existingUserData);
 
-      const [createdUser] = await db
-        .insert(users)
-        .values({
-          clerkId: clerkUserId,
-          email,
-          userStatus,
-          waitlistEntryId, // Keep for historical tracking only
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: {
-            // Only overwrite email if a new value is provided — prevents
-            // nulling out an existing email when Clerk hasn't propagated yet
-            ...(email ? { email } : {}),
+      let createdUser: { id: string } | undefined;
+      try {
+        [createdUser] = await db
+          .insert(users)
+          .values({
+            clerkId: clerkUserId,
+            email,
             userStatus,
-            updatedAt: new Date(),
-          },
-        })
-        .returning({ id: users.id });
+            waitlistEntryId, // Keep for historical tracking only
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: {
+              // Only overwrite email if a new value is provided — prevents
+              // nulling out an existing email when Clerk hasn't propagated yet
+              ...(email ? { email } : {}),
+              userStatus,
+              updatedAt: new Date(),
+            },
+          })
+          .returning({ id: users.id });
+      } catch (insertError) {
+        // Handle email uniqueness conflict: same email, different clerk_id.
+        // This happens when the dev DB is reset from production (Neon branch
+        // reset) — production clerk_ids don't match the dev Clerk instance.
+        // Adopt the existing row by updating its clerk_id to the current one.
+        const constraint = (insertError as { constraint?: string })?.constraint;
+        if (
+          email &&
+          (constraint === 'users_email_unique' ||
+            (insertError instanceof Error &&
+              insertError.message?.includes('users_email_unique')))
+        ) {
+          const [adopted] = await db
+            .update(users)
+            .set({
+              clerkId: clerkUserId,
+              userStatus,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.email, email))
+            .returning({ id: users.id });
+
+          if (adopted?.id) {
+            return adopted.id;
+          }
+        }
+        // Re-throw for the outer catch to handle
+        throw insertError;
+      }
 
       if (!createdUser?.id) {
         throw new Error('Failed to create or retrieve user');
