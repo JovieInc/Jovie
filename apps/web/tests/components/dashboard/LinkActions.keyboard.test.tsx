@@ -180,4 +180,110 @@ describe('LinkActions Keyboard Accessibility', () => {
     await user.tab();
     expect(screen.getByRole('button', { name: /link actions/i })).toHaveFocus();
   });
+
+  it('menu closes after action is clicked', async () => {
+    const user = userEvent.setup();
+    render(
+      <LinkActions
+        onToggle={mockOnToggle}
+        onRemove={mockOnRemove}
+        isVisible={true}
+      />
+    );
+
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('menuitem', { name: /^hide$/i }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('Escape key closes menu', async () => {
+    const user = userEvent.setup();
+    render(
+      <LinkActions
+        onToggle={mockOnToggle}
+        onRemove={mockOnRemove}
+        isVisible={true}
+      />
+    );
+
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('ArrowDown/ArrowUp navigates menu items', async () => {
+    const user = userEvent.setup();
+    render(
+      <LinkActions
+        onToggle={mockOnToggle}
+        onRemove={mockOnRemove}
+        isVisible={true}
+      />
+    );
+
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+
+    const items = screen.getAllByRole('menuitem');
+    // First item should be focused on open
+    expect(items[0]).toHaveFocus();
+
+    // ArrowDown moves to next
+    await user.keyboard('{ArrowDown}');
+    expect(items[1]).toHaveFocus();
+
+    // ArrowUp moves back
+    await user.keyboard('{ArrowUp}');
+    expect(items[0]).toHaveFocus();
+  });
+
+  it('onEdit undefined hides Edit menu item', async () => {
+    const user = userEvent.setup();
+    render(
+      <LinkActions
+        onToggle={mockOnToggle}
+        onRemove={mockOnRemove}
+        isVisible={true}
+      />
+    );
+
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+
+    // Should only have Hide and Delete, not Edit
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(2);
+    expect(
+      screen.queryByRole('menuitem', { name: /edit/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('onEdit provided shows Edit menu item', async () => {
+    const mockOnEdit = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <LinkActions
+        onToggle={mockOnToggle}
+        onRemove={mockOnRemove}
+        onEdit={mockOnEdit}
+        isVisible={true}
+      />
+    );
+
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(3);
+    expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('menuitem', { name: /edit/i }));
+    expect(mockOnEdit).toHaveBeenCalledTimes(1);
+  });
 });
