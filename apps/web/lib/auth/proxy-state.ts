@@ -3,6 +3,8 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { isRetryableError, withRetry } from '@/lib/db/client/retry';
+import { QueryTimeoutError } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -225,43 +227,58 @@ const ACTIVE_USER_STATE: ProxyUserState = {
 };
 
 /**
- * Execute the database query with timeout protection
+ * Execute the database query with retry logic and per-attempt timeouts.
+ *
+ * Uses `withRetry` to recover from Neon cold starts (which can take several
+ * seconds). Each attempt is capped by DB_QUERY_TIMEOUT_MS so the proxy never
+ * hangs indefinitely. A QueryTimeoutError is thrown on timeout so callers can
+ * distinguish transient timeouts from other failures.
  */
 async function executeUserStateQuery(clerkUserId: string) {
-  const queryPromise = db
-    .select({
-      dbUserId: users.id,
-      userStatus: users.userStatus,
-      profileId: creatorProfiles.id,
-      profileComplete: creatorProfiles.onboardingCompletedAt,
-    })
-    .from(users)
-    .leftJoin(
-      creatorProfiles,
-      and(
-        eq(creatorProfiles.userId, users.id),
-        eq(creatorProfiles.isClaimed, true)
+  return withRetry(async () => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const queryPromise = db
+      .select({
+        dbUserId: users.id,
+        userStatus: users.userStatus,
+        profileId: creatorProfiles.id,
+        profileComplete: creatorProfiles.onboardingCompletedAt,
+      })
+      .from(users)
+      .leftJoin(
+        creatorProfiles,
+        and(
+          eq(creatorProfiles.userId, users.id),
+          eq(creatorProfiles.isClaimed, true)
+        )
       )
-    )
-    .where(
-      and(
-        eq(users.clerkId, clerkUserId),
-        isNull(users.deletedAt),
-        ne(users.userStatus, 'banned')
+      .where(
+        and(
+          eq(users.clerkId, clerkUserId),
+          isNull(users.deletedAt),
+          ne(users.userStatus, 'banned')
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  // Race the query against a timeout to prevent proxy hanging
-  return Promise.race([
-    queryPromise,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('[proxy-state] DB query timeout after 5s')),
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () =>
+          reject(
+            new QueryTimeoutError(
+              `[proxy-state] DB query timed out after ${DB_QUERY_TIMEOUT_MS}ms`
+            )
+          ),
         DB_QUERY_TIMEOUT_MS
-      )
-    ),
-  ]);
+      );
+    });
+
+    try {
+      return await Promise.race([queryPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId!);
+    }
+  }, 'proxy_user_state_query');
 }
 
 /**
@@ -332,9 +349,13 @@ export async function getUserState(
 
     return userState;
   } catch (error) {
+    const isTransient =
+      error instanceof QueryTimeoutError || isRetryableError(error);
+
     await captureError('Database query failed in proxy state check', error, {
       clerkUserId,
       operation: 'getProxyUserState',
+      errorType: isTransient ? 'transient' : 'persistent',
     });
 
     return { ...DEFAULT_WAITLIST_STATE };
