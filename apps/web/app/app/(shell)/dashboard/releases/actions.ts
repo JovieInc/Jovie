@@ -998,6 +998,49 @@ export async function connectAppleMusicArtist(params: {
   };
 }
 
+interface DeleteReleaseParams {
+  releaseId: string;
+}
+
+/**
+ * Delete a release and all associated data (tracks, provider links, etc.).
+ * Cascading deletes handle child records automatically.
+ */
+export async function deleteRelease(
+  params: DeleteReleaseParams
+): Promise<{ success: boolean }> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Verify the release belongs to the user's profile
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  await db
+    .delete(discogReleases)
+    .where(eq(discogReleases.id, params.releaseId));
+
+  // Invalidate cache and revalidate path
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('release_deleted', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    releaseTitle: release.title,
+  });
+
+  return { success: true };
+}
+
 /**
  * Upload release artwork via the artwork upload API.
  * Returns the new artwork URL after processing and storage.

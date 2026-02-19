@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -34,6 +35,8 @@ interface ReleaseTableRowProps {
     testId: string
   ) => Promise<string>;
   readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onDelete?: (releaseId: string) => Promise<void>;
+  readonly isDeleting?: boolean;
   readonly onAddUrl?: (
     releaseId: string,
     provider: ProviderKey,
@@ -51,11 +54,14 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   providerConfig,
   onCopy,
   onEdit,
+  onDelete,
+  isDeleting,
   onAddUrl,
   isAddingUrl,
   artistName,
 }: Readonly<ReleaseTableRowProps>) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -131,14 +137,11 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         label: 'Delete release',
         icon: Trash2,
         variant: 'destructive' as const,
-        onClick: () => {
-          // See JOV-478: Implement delete confirmation dialog
-          console.log('Delete release:', release.id);
-        },
-        disabled: true,
+        onClick: () => setShowDeleteDialog(true),
+        disabled: !onDelete,
       },
     ],
-    [handleEdit, handleCopySmartLink, utmShareItems, release.id]
+    [handleEdit, handleCopySmartLink, utmShareItems, onDelete]
   );
 
   const manualOverrideCount = release.providers.filter(
@@ -146,188 +149,206 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   ).length;
 
   return (
-    <tr
-      className={cn(
-        'group transition-colors duration-200 hover:bg-surface-2/50',
-        index !== totalRows - 1 && 'border-b border-subtle'
-      )}
-    >
-      {/* Release info cell */}
-      <td className='px-4 py-4 align-middle'>
-        <div className='flex items-center gap-3'>
-          {/* Artwork thumbnail */}
-          <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-            {release.artworkUrl ? (
-              <Image
-                src={release.artworkUrl}
-                alt={`${release.title} artwork`}
-                fill
-                className='object-cover'
-                sizes='40px'
-              />
-            ) : (
-              <div className='flex h-full w-full items-center justify-center'>
-                <Icon
-                  name='Disc3'
-                  className='h-5 w-5 text-tertiary-token'
-                  aria-hidden='true'
+    <>
+      <tr
+        className={cn(
+          'group transition-colors duration-200 hover:bg-surface-2/50',
+          index !== totalRows - 1 && 'border-b border-subtle'
+        )}
+      >
+        {/* Release info cell */}
+        <td className='px-4 py-4 align-middle'>
+          <div className='flex items-center gap-3'>
+            {/* Artwork thumbnail */}
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+              {release.artworkUrl ? (
+                <Image
+                  src={release.artworkUrl}
+                  alt={`${release.title} artwork`}
+                  fill
+                  className='object-cover'
+                  sizes='40px'
                 />
-              </div>
-            )}
-          </div>
-          {/* Title and metadata */}
-          <div className='min-w-0 flex-1'>
-            <div className='flex items-center gap-2'>
-              <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
-                {release.title}
-              </span>
-              {manualOverrideCount > 0 && (
-                <Badge
-                  variant='secondary'
-                  className='shrink-0 border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
-                >
-                  {manualOverrideCount} edited
-                </Badge>
+              ) : (
+                <div className='flex h-full w-full items-center justify-center'>
+                  <Icon
+                    name='Disc3'
+                    className='h-5 w-5 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                </div>
               )}
             </div>
-            {artistName && (
-              <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
-                {artistName}
+            {/* Title and metadata */}
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-center gap-2'>
+                <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
+                  {release.title}
+                </span>
+                {manualOverrideCount > 0 && (
+                  <Badge
+                    variant='secondary'
+                    className='shrink-0 border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
+                  >
+                    {manualOverrideCount} edited
+                  </Badge>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      </td>
-
-      {/* Release date cell */}
-      <td className='px-4 py-4 align-middle'>
-        <span className='line-clamp-1 text-xs text-secondary-token'>
-          {release.releaseDate
-            ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
-            : 'TBD'}
-        </span>
-      </td>
-
-      {/* Smart link cell */}
-      <td className='px-4 py-4 align-middle'>
-        {(() => {
-          const smartLinkTestId = `smart-link-copy-${release.id}`;
-          const isCopied = copiedId === smartLinkTestId;
-          return (
-            <Button
-              variant='secondary'
-              size='sm'
-              data-testid={smartLinkTestId}
-              data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-              onClick={() =>
-                void handleCopyWithFeedback(
-                  release.smartLinkPath,
-                  `${release.title} smart link`,
-                  smartLinkTestId
-                )
-              }
-              className={cn(
-                'inline-flex items-center text-xs transition-colors',
-                isCopied && 'bg-success/10 text-success hover:bg-success/10'
+              {artistName && (
+                <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+                  {artistName}
+                </div>
               )}
-            >
-              <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>
-                <Icon
-                  name='Link'
-                  className={cn(
-                    'absolute h-3.5 w-3.5 transition-all duration-150',
-                    isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-                  )}
-                  aria-hidden='true'
-                />
-                <Icon
-                  name='Check'
-                  className={cn(
-                    'absolute h-3.5 w-3.5 transition-all duration-150',
-                    isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-                  )}
-                  aria-hidden='true'
-                />
-              </span>
-              <span className='line-clamp-1'>
-                {isCopied ? 'Copied!' : 'Copy link'}
-              </span>
-            </Button>
+            </div>
+          </div>
+        </td>
+
+        {/* Release date cell */}
+        <td className='px-4 py-4 align-middle'>
+          <span className='line-clamp-1 text-xs text-secondary-token'>
+            {release.releaseDate
+              ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'TBD'}
+          </span>
+        </td>
+
+        {/* Smart link cell */}
+        <td className='px-4 py-4 align-middle'>
+          {(() => {
+            const smartLinkTestId = `smart-link-copy-${release.id}`;
+            const isCopied = copiedId === smartLinkTestId;
+            return (
+              <Button
+                variant='secondary'
+                size='sm'
+                data-testid={smartLinkTestId}
+                data-url={`${getBaseUrl()}${release.smartLinkPath}`}
+                onClick={() =>
+                  void handleCopyWithFeedback(
+                    release.smartLinkPath,
+                    `${release.title} smart link`,
+                    smartLinkTestId
+                  )
+                }
+                className={cn(
+                  'inline-flex items-center text-xs transition-colors',
+                  isCopied && 'bg-success/10 text-success hover:bg-success/10'
+                )}
+              >
+                <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>
+                  <Icon
+                    name='Link'
+                    className={cn(
+                      'absolute h-3.5 w-3.5 transition-all duration-150',
+                      isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
+                    )}
+                    aria-hidden='true'
+                  />
+                  <Icon
+                    name='Check'
+                    className={cn(
+                      'absolute h-3.5 w-3.5 transition-all duration-150',
+                      isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
+                    )}
+                    aria-hidden='true'
+                  />
+                </span>
+                <span className='line-clamp-1'>
+                  {isCopied ? 'Copied!' : 'Copy link'}
+                </span>
+              </Button>
+            );
+          })()}
+        </td>
+
+        {/* Provider cells */}
+        {primaryProviders.map(providerKey => {
+          const provider = release.providers.find(
+            item => item.key === providerKey
           );
-        })()}
-      </td>
+          const available = Boolean(provider?.url);
+          const isManual = provider?.source === 'manual';
+          const testId = `provider-copy-${release.id}-${providerKey}`;
+          const isCopied = copiedId === testId;
+          const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
+          const isNotFoundCopied = copiedId === notFoundTestId;
+          // Determine provider status for visual indicator
+          let status: 'manual' | 'available' | 'missing';
+          if (isManual) {
+            status = 'manual';
+          } else if (available) {
+            status = 'available';
+          } else {
+            status = 'missing';
+          }
 
-      {/* Provider cells */}
-      {primaryProviders.map(providerKey => {
-        const provider = release.providers.find(
-          item => item.key === providerKey
-        );
-        const available = Boolean(provider?.url);
-        const isManual = provider?.source === 'manual';
-        const testId = `provider-copy-${release.id}-${providerKey}`;
-        const isCopied = copiedId === testId;
-        const notFoundTestId = `not-found-copy-${release.id}-${providerKey}`;
-        const isNotFoundCopied = copiedId === notFoundTestId;
-        // Determine provider status for visual indicator
-        let status: 'manual' | 'available' | 'missing';
-        if (isManual) {
-          status = 'manual';
-        } else if (available) {
-          status = 'available';
-        } else {
-          status = 'missing';
-        }
-
-        return (
-          <td key={providerKey} className='px-4 py-4 align-middle'>
-            <div className='flex items-center gap-3'>
-              <ProviderStatusDot
-                status={status}
-                accent={providerConfig[providerKey].accent}
-              />
-              {available && (
-                <ProviderCopyButton
-                  testId={testId}
-                  path={provider?.path}
-                  releaseTitle={release.title}
-                  providerLabel={providerConfig[providerKey].label}
-                  isCopied={isCopied}
-                  isManual={isManual}
-                  onCopy={handleCopyWithFeedback}
-                />
-              )}
-              {!available && onAddUrl && (
-                <AddProviderUrlPopover
-                  providerLabel={providerConfig[providerKey].label}
+          return (
+            <td key={providerKey} className='px-4 py-4 align-middle'>
+              <div className='flex items-center gap-3'>
+                <ProviderStatusDot
+                  status={status}
                   accent={providerConfig[providerKey].accent}
-                  onSave={url => onAddUrl(release.id, providerKey, url)}
-                  isSaving={isAddingUrl}
                 />
-              )}
-              {!available && !onAddUrl && (
-                <NotFoundCopyButton
-                  testId={notFoundTestId}
-                  releaseTitle={release.title}
-                  smartLinkPath={release.smartLinkPath}
-                  isCopied={isNotFoundCopied}
-                  onCopy={handleCopyWithFeedback}
-                />
-              )}
-            </div>
-          </td>
-        );
-      })}
+                {available && (
+                  <ProviderCopyButton
+                    testId={testId}
+                    path={provider?.path}
+                    releaseTitle={release.title}
+                    providerLabel={providerConfig[providerKey].label}
+                    isCopied={isCopied}
+                    isManual={isManual}
+                    onCopy={handleCopyWithFeedback}
+                  />
+                )}
+                {!available && onAddUrl && (
+                  <AddProviderUrlPopover
+                    providerLabel={providerConfig[providerKey].label}
+                    accent={providerConfig[providerKey].accent}
+                    onSave={url => onAddUrl(release.id, providerKey, url)}
+                    isSaving={isAddingUrl}
+                  />
+                )}
+                {!available && !onAddUrl && (
+                  <NotFoundCopyButton
+                    testId={notFoundTestId}
+                    releaseTitle={release.title}
+                    smartLinkPath={release.smartLinkPath}
+                    isCopied={isNotFoundCopied}
+                    onCopy={handleCopyWithFeedback}
+                  />
+                )}
+              </div>
+            </td>
+          );
+        })}
 
-      {/* Actions cell */}
-      <td className='px-4 py-4 align-middle text-right'>
-        <div className='flex justify-end'>
-          <TableActionMenu items={menuItems} />
-        </div>
-      </td>
-    </tr>
+        {/* Actions cell */}
+        <td className='px-4 py-4 align-middle text-right'>
+          <div className='flex justify-end'>
+            <TableActionMenu items={menuItems} />
+          </div>
+        </td>
+      </tr>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title='Delete Release'
+        description={`Are you sure you want to delete "${release.title}"? This action cannot be undone.`}
+        confirmLabel='Delete'
+        variant='destructive'
+        isLoading={isDeleting}
+        onConfirm={async () => {
+          if (onDelete) {
+            await onDelete(release.id);
+            setShowDeleteDialog(false);
+          }
+        }}
+      />
+    </>
   );
 });
