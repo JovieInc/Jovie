@@ -40,7 +40,7 @@ export function SidebarCollapsibleGroup({
             className={cn(
               'justify-between',
               'text-sidebar-item-icon hover:bg-transparent',
-              'h-6 px-1'
+              'h-6 px-1.5'
             )}
             aria-expanded={open}
           >
