@@ -16,7 +16,7 @@ import {
  */
 
 interface RenderCallbackProps {
-  onRender: () => void;
+  readonly onRender: () => void;
 }
 
 function SetterConsumer({ onRender }: RenderCallbackProps) {
