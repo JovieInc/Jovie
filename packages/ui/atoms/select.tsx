@@ -90,9 +90,10 @@ const SelectContent = React.forwardRef<
     },
     ref
   ) => {
+    const isPopper = position === 'popper';
     const viewportClassNames = cn(
       SELECT_VIEWPORT_BASE,
-      position === 'popper' &&
+      isPopper &&
         'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
     );
 
@@ -101,7 +102,7 @@ const SelectContent = React.forwardRef<
         ref={ref}
         className={cn(
           selectContentClasses,
-          position === 'popper' &&
+          isPopper &&
             'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
           className
         )}

@@ -1,7 +1,15 @@
 'use client';
 
-import { Disc3 } from 'lucide-react';
+/**
+ * ReleaseArtwork Component
+ *
+ * Artwork section showing release's album cover and basic info.
+ * Supports drag-and-drop upload and right-click context menu for downloads.
+ */
+
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 
 import { EntityHeaderCard } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -43,19 +51,30 @@ export function ReleaseArtwork({
   const altText = title ? `${title} artwork` : 'Release artwork';
   const sizes = buildArtworkSizes(artworkSizes, artworkUrl);
 
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [artworkUrl]);
+
   const staticImage = (
     <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-      {artworkUrl ? (
+      {artworkUrl && !imgError ? (
         <Image
           src={artworkUrl}
           alt={altText}
           fill
           className='object-cover'
           sizes='64px'
+          onError={() => setImgError(true)}
         />
       ) : (
         <div className='flex h-full w-full items-center justify-center'>
-          <Disc3 className='h-8 w-8 text-tertiary-token' aria-hidden='true' />
+          <Icon
+            name='Disc3'
+            className='h-6 w-6 text-tertiary-token'
+            aria-hidden='true'
+          />
         </div>
       )}
     </div>

@@ -269,7 +269,7 @@ export function SettingsAdPixelsSection({
         padding='none'
         className='divide-y divide-subtle'
       >
-        <div className='flex items-center justify-between px-5 py-4'>
+        <div className='flex items-center justify-between px-4 py-3'>
           <span className='text-sm text-primary-token'>Pixel tracking</span>
           <div className='flex items-center gap-2'>
             <span className='text-xs text-secondary-token'>
@@ -283,7 +283,7 @@ export function SettingsAdPixelsSection({
           </div>
         </div>
 
-        <div className='px-5 py-4 space-y-4'>
+        <div className='px-4 py-3 space-y-4'>
           <PlatformSection
             platform='Facebook Conversions API'
             pixelIdLabel='Pixel ID'
@@ -341,7 +341,7 @@ export function SettingsAdPixelsSection({
           />
         </div>
 
-        <div className='px-5 py-4'>
+        <div className='px-4 py-3'>
           <p className='text-xs text-secondary-token'>
             Events are sent server-side for better accuracy. No third-party
             JavaScript on your profile. Credentials are encrypted.

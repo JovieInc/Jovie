@@ -4,7 +4,7 @@ import React from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
-import { formatTimeAgo } from '@/lib/utils/audience';
+import { formatTimeAgo, getFallbackName } from '@/lib/utils/audience';
 import type { AudienceIntentLevel, AudienceMember } from '@/types';
 
 export interface AudienceMobileCardProps {
@@ -38,7 +38,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   isSelected,
   onTap,
 }: AudienceMobileCardProps) {
-  const displayName = member.displayName || 'Visitor';
+  const displayName = member.displayName || getFallbackName(member.type);
   const isHighIntent = member.intentLevel === 'high';
 
   return (

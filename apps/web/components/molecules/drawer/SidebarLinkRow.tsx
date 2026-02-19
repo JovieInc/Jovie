@@ -6,10 +6,10 @@ import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
 
 const ACTION_BUTTON_CLASS = [
-  'p-1 rounded hover:bg-sidebar-border',
-  'text-sidebar-muted hover:text-sidebar-foreground',
+  'p-1 rounded hover:bg-surface-2',
+  'text-tertiary-token hover:text-primary-token',
   'transition-colors focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+  'focus-visible:ring-2 focus-visible:ring-interactive',
 ].join(' ');
 
 const SWIPE_ACTION_BUTTON_CLASS = [
@@ -67,7 +67,7 @@ export function SidebarLinkRow({
       <button
         type='button'
         onClick={handleCopy}
-        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-blue-500')}
+        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-accent')}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
         {copied ? (
@@ -79,7 +79,7 @@ export function SidebarLinkRow({
       <button
         type='button'
         onClick={handleOpen}
-        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-gray-500')}
+        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-surface-3')}
         aria-label={`Open ${label}`}
       >
         <ExternalLink className='h-4 w-4' aria-hidden='true' />
@@ -91,7 +91,7 @@ export function SidebarLinkRow({
           disabled={isRemoving}
           className={cn(
             SWIPE_ACTION_BUTTON_CLASS,
-            'bg-red-500 disabled:opacity-50'
+            'bg-destructive disabled:opacity-50'
           )}
           aria-label={`Remove ${label}`}
         >
@@ -111,7 +111,7 @@ export function SidebarLinkRow({
       <div
         className={cn(
           'group flex items-center justify-between lg:rounded-md',
-          'px-3 py-1.5 bg-base hover:bg-sidebar-surface-hover',
+          'px-3 py-1.5 bg-transparent hover:bg-interactive-hover',
           'transition-colors',
           className
         )}
@@ -124,7 +124,7 @@ export function SidebarLinkRow({
           </span>
           <span className='text-xs text-secondary-token truncate'>{label}</span>
           {badge && (
-            <span className='text-[10px] text-sidebar-muted shrink-0'>
+            <span className='text-[10px] text-tertiary-token shrink-0'>
               {badge}
             </span>
           )}

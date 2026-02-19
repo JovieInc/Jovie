@@ -3,6 +3,7 @@
 import React from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
+import { getFallbackName } from '@/lib/utils/audience';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
@@ -25,7 +26,7 @@ export interface AudienceUserCellProps {
  * - Improves scroll performance in large audience lists
  *
  * @param displayName - User's display name or null for anonymous visitors
- * @param type - Audience member type: 'anonymous', 'email', 'sms', 'connected'
+ * @param type - Audience member type: 'anonymous', 'email', 'sms', 'spotify', 'customer'
  * @param email - User's email address (for email type members)
  * @param phone - User's phone number (for SMS type members)
  */
@@ -48,7 +49,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div className={cn('text-xs text-primary-token min-w-0', className)}>
       <TruncatedText lines={1} className='font-medium'>
-        {displayName || 'Visitor'}
+        {displayName || getFallbackName(type)}
       </TruncatedText>
       {secondaryLabel && (
         <TruncatedText lines={1} className='text-[11px] text-secondary-token'>

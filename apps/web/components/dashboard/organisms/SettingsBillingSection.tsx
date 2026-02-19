@@ -23,7 +23,7 @@ export function SettingsBillingSection() {
 
   return (
     <DashboardCard variant='settings' padding='none'>
-      <div className='flex items-center justify-between px-5 py-4'>
+      <div className='flex items-center justify-between px-4 py-3'>
         <p className='text-sm text-secondary-token'>
           Update payment details, change plans, or view invoices.
         </p>

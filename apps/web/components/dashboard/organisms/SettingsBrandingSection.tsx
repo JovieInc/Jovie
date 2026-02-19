@@ -64,7 +64,7 @@ export function SettingsBrandingSection({
       padding='none'
       className='divide-y divide-subtle'
     >
-      <div className='px-5 py-4'>
+      <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Hide Jovie Branding'
           description='Remove Jovie branding from your profile page for a fully custom experience.'
@@ -77,7 +77,7 @@ export function SettingsBrandingSection({
       </div>
 
       {isPro && hideBranding && (
-        <div className='px-5 py-4 flex items-center gap-3'>
+        <div className='px-4 py-3 flex items-center gap-3'>
           <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
           <p className='text-sm text-emerald-600 dark:text-emerald-400'>
             Branding is hidden on your profile.

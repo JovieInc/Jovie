@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
@@ -109,6 +110,14 @@ export function ReleaseSidebar({
   const handleBackToRelease = useCallback(() => {
     setSelectedTrack(null);
   }, []);
+
+  const handleCanvasStatusChange = useCallback(
+    (status: CanvasStatus) => {
+      if (!release || !onReleaseChange) return;
+      onReleaseChange({ ...release, canvasStatus: status });
+    },
+    [release, onReleaseChange]
+  );
 
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
@@ -306,7 +315,12 @@ export function ReleaseSidebar({
               {activeTab === 'details' && (
                 <>
                   <div className='pb-5'>
-                    <ReleaseMetadata release={release} />
+                    <ReleaseMetadata
+                      release={release}
+                      onCanvasStatusChange={
+                        isEditable ? handleCanvasStatusChange : undefined
+                      }
+                    />
                   </div>
 
                   {isEditable && (

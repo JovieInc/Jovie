@@ -86,7 +86,6 @@ function buildDropdownItems({
                   <Badge
                     variant='secondary'
                     size='sm'
-                    emphasis='subtle'
                     className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
                   >
                     Pro

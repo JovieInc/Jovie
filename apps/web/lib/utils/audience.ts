@@ -1,7 +1,25 @@
+import type { AudienceMemberType } from '@/types';
+
 export type DeviceIndicator = {
   iconName: string;
   label: string;
 };
+
+/** Derive a meaningful fallback name from member type instead of generic "Visitor" */
+export function getFallbackName(type: AudienceMemberType): string {
+  switch (type) {
+    case 'email':
+      return 'Email Subscriber';
+    case 'sms':
+      return 'SMS Subscriber';
+    case 'spotify':
+      return 'Spotify Listener';
+    case 'customer':
+      return 'Customer';
+    default:
+      return 'Visitor';
+  }
+}
 
 export function formatCountryLabel(code: string | null): string {
   if (!code) return 'Unknown';

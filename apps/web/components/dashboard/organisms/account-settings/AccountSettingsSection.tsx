@@ -12,7 +12,6 @@ import { SettingsAppearanceSection } from '@/components/dashboard/organisms/Sett
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
-import { DashboardCard } from '../../atoms/DashboardCard';
 import { ConnectedAccountsCard } from './ConnectedAccountsCard';
 import { EmailManagementCard } from './EmailManagementCard';
 import { SessionManagementCard } from './SessionManagementCard';
@@ -26,33 +25,31 @@ function ClerkAccountSections() {
 
   if (!isLoaded || !user || !typedUser) {
     return (
-      <DashboardCard variant='settings'>
-        <div className='space-y-4'>
-          <LoadingSkeleton height='h-6' width='w-1/3' />
-          <LoadingSkeleton height='h-4' />
-          <LoadingSkeleton height='h-12' />
-          <LoadingSkeleton height='h-6' width='w-1/2' />
-        </div>
-      </DashboardCard>
+      <div className='space-y-4 py-3'>
+        <LoadingSkeleton height='h-6' width='w-1/3' />
+        <LoadingSkeleton height='h-4' />
+        <LoadingSkeleton height='h-12' />
+        <LoadingSkeleton height='h-6' width='w-1/2' />
+      </div>
     );
   }
 
   return (
     <>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3 first:pt-0'>
           Email
         </h3>
         <EmailManagementCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Connected accounts
         </h3>
         <ConnectedAccountsCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Sessions
         </h3>
         <SessionManagementCard
@@ -66,16 +63,16 @@ function ClerkAccountSections() {
 
 export function AccountSettingsSection() {
   return (
-    <div className='space-y-8' data-testid='account-settings-section'>
+    <div className='space-y-0' data-testid='account-settings-section'>
       <ClerkAccountSections />
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Appearance
         </h3>
         <SettingsAppearanceSection />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token mb-3'>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Notifications
         </h3>
         <SettingsNotificationsSection />

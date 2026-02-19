@@ -2,9 +2,9 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { PencilLine, Trash2 } from 'lucide-react';
-import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -160,25 +160,10 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         <td className='px-4 py-4 align-middle'>
           <div className='flex items-center gap-3'>
             {/* Artwork thumbnail */}
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-              {release.artworkUrl ? (
-                <Image
-                  src={release.artworkUrl}
-                  alt={`${release.title} artwork`}
-                  fill
-                  className='object-cover'
-                  sizes='40px'
-                />
-              ) : (
-                <div className='flex h-full w-full items-center justify-center'>
-                  <Icon
-                    name='Disc3'
-                    className='h-5 w-5 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                </div>
-              )}
-            </div>
+            <ReleaseArtworkThumb
+              src={release.artworkUrl}
+              alt={`${release.title} artwork`}
+            />
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>

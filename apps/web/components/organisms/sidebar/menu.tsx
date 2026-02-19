@@ -59,8 +59,8 @@ const sidebarMenuButtonVariants = cva(
     '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — 14px icons matching Linear
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-normal [&>svg]:ease-interactive',
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-normal [&>svg]:ease-interactive',
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-normal [&_[data-sidebar-icon]_svg]:ease-interactive',
     'hover:[&>svg]:text-sidebar-item-icon',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
