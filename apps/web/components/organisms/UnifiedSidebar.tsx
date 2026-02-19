@@ -200,7 +200,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3.5' />
         </Link>
@@ -233,7 +233,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       className={cn(
         'bg-base',
         '[--sidebar-width:232px]',
-        'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
+        'transition-[width] duration-normal ease-interactive'
       )}
     >
       <SidebarHeader className='relative h-9 justify-center gap-0 px-2 pt-2 pb-0'>
