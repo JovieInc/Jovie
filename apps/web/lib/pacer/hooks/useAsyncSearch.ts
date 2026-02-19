@@ -5,9 +5,10 @@
  */
 
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
-import { useAsyncDebouncer } from '@tanstack/react-pacer';
+import { AsyncRetryer, useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isAbortError } from '../errors';
+import { formatPacerError, isAbortError } from '../errors';
+import { isRetryableError, RETRY_DEFAULTS } from '../retry';
 import { PACER_TIMING } from './timing';
 
 export interface UseAsyncSearchOptions<TResult> {
@@ -17,6 +18,8 @@ export interface UseAsyncSearchOptions<TResult> {
   wait?: number;
   /** Minimum query length to trigger search */
   minQueryLength?: number;
+  /** Max retry attempts (default: 2) */
+  maxRetries?: number;
   /** Callback on search error */
   onError?: (error: Error) => void;
 }
@@ -38,6 +41,8 @@ export interface UseAsyncSearchReturn<TResult> {
   query: string;
   /** Search error if any */
   error: Error | null;
+  /** User-friendly error message */
+  errorMessage: string | null;
   /** Search state */
   state: 'idle' | 'loading' | 'error' | 'empty' | 'success';
 }
@@ -45,7 +50,7 @@ export interface UseAsyncSearchReturn<TResult> {
 /**
  * @example
  * ```tsx
- * const { search, results, isSearching, isPending, error, clear } = useAsyncSearch({
+ * const { search, results, isSearching, isPending, error, errorMessage, clear } = useAsyncSearch({
  *   searchFn: async (query, signal) => {
  *     const response = await fetch(`/api/search?q=${query}`, { signal });
  *     return response.json();
@@ -59,11 +64,13 @@ export function useAsyncSearch<TResult>({
   searchFn,
   wait = PACER_TIMING.SEARCH_DEBOUNCE_MS,
   minQueryLength = 2,
+  maxRetries = RETRY_DEFAULTS.FAST.maxAttempts,
   onError,
 }: UseAsyncSearchOptions<TResult>): UseAsyncSearchReturn<TResult> {
   const [results, setResults] = useState<TResult[]>([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<Error | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchState, setSearchState] = useState<
     'idle' | 'loading' | 'error' | 'empty' | 'success'
   >('idle');
@@ -81,17 +88,34 @@ export function useAsyncSearch<TResult>({
   const executeSearch = useCallback(
     async (trimmedQuery: string, controller: AbortController) => {
       try {
-        const searchResults = await searchFnRef.current(
-          trimmedQuery,
-          controller.signal
+        const retryer = new AsyncRetryer(
+          async () => {
+            return await searchFnRef.current(trimmedQuery, controller.signal);
+          },
+          {
+            maxAttempts: maxRetries,
+            baseWait: RETRY_DEFAULTS.FAST.baseWait,
+            backoff: RETRY_DEFAULTS.FAST.backoff,
+            jitter: 0.1,
+            onError: retryErr => {
+              if (!isRetryableError(retryErr)) {
+                retryer.abort();
+              }
+            },
+          }
         );
+
+        const searchResults = await retryer.execute();
 
         if (controller.signal.aborted) {
           return;
         }
 
-        setResults(searchResults);
-        setSearchState(searchResults.length === 0 ? 'empty' : 'success');
+        if (searchResults) {
+          setResults(searchResults);
+          setErrorMessage(null);
+          setSearchState(searchResults.length === 0 ? 'empty' : 'success');
+        }
       } catch (err) {
         if (isAbortError(err)) {
           return;
@@ -100,12 +124,13 @@ export function useAsyncSearch<TResult>({
         const searchError =
           err instanceof Error ? err : new Error('Search failed');
         setError(searchError);
+        setErrorMessage(formatPacerError(searchError));
         setResults([]);
         setSearchState('error');
         onErrorRef.current?.(searchError);
       }
     },
-    []
+    [maxRetries]
   );
 
   // Stabilize debouncer options to prevent recreation on every render
@@ -116,6 +141,7 @@ export function useAsyncSearch<TResult>({
         const searchError =
           err instanceof Error ? err : new Error('Search failed');
         setError(searchError);
+        setErrorMessage(formatPacerError(searchError));
         setSearchState('error');
         onErrorRef.current?.(searchError);
       },
@@ -131,11 +157,13 @@ export function useAsyncSearch<TResult>({
         setResults([]);
         setSearchState('idle');
         setError(null);
+        setErrorMessage(null);
         return;
       }
 
       setSearchState('loading');
       setError(null);
+      setErrorMessage(null);
 
       // Cancel any previous request
       abortControllerRef.current?.abort();
@@ -164,6 +192,7 @@ export function useAsyncSearch<TResult>({
         setResults([]);
         setSearchState('idle');
         setError(null);
+        setErrorMessage(null);
         return;
       }
 
@@ -187,11 +216,13 @@ export function useAsyncSearch<TResult>({
         setResults([]);
         setSearchState('idle');
         setError(null);
+        setErrorMessage(null);
         return;
       }
 
       setSearchState('loading');
       setError(null);
+      setErrorMessage(null);
 
       // Cancel any previous request
       abortControllerRef.current?.abort();
@@ -210,6 +241,7 @@ export function useAsyncSearch<TResult>({
     setResults([]);
     setSearchState('idle');
     setError(null);
+    setErrorMessage(null);
     setQuery('');
   }, [asyncDebouncer]);
 
@@ -230,6 +262,7 @@ export function useAsyncSearch<TResult>({
     isPending: asyncDebouncer.state.isPending || false,
     query,
     error,
+    errorMessage,
     state: searchState,
   };
 }

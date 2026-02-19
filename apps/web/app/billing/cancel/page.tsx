@@ -22,17 +22,17 @@ export default function CheckoutCancelPage() {
     });
   }, []);
   return (
-    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center'>
+    <div className='flex min-h-[calc(100dvh-4rem)] items-center justify-center'>
       <div className='w-full text-center'>
-        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15'>
-          <XCircle className='h-8 w-8 text-amber-500' />
+        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-warning-subtle)]'>
+          <XCircle className='h-8 w-8 text-[var(--color-warning)]' />
         </div>
 
-        <h1 className='mt-6 text-3xl font-bold text-foreground'>
+        <h1 className='mt-6 text-3xl font-bold text-primary-token'>
           Checkout cancelled
         </h1>
 
-        <p className='mt-4 text-lg text-muted-foreground'>
+        <p className='mt-4 text-lg text-secondary-token'>
           No worries. Your subscription wasn&apos;t charged.
         </p>
 

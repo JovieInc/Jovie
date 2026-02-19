@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { page, track } from '@/lib/analytics';
@@ -20,13 +21,17 @@ export default function CheckoutSuccessPage() {
     });
   }, []);
   return (
-    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center'>
+    <div className='flex min-h-[calc(100dvh-4rem)] items-center justify-center'>
       <div className='w-full text-center'>
-        <h1 className='mt-6 text-3xl font-bold text-foreground'>
+        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-success-subtle)]'>
+          <CheckCircle className='h-8 w-8 text-[var(--color-success)]' />
+        </div>
+
+        <h1 className='mt-6 text-3xl font-bold text-primary-token'>
           You&apos;ve been upgraded.
         </h1>
 
-        <p className='mt-4 text-lg text-muted-foreground'>
+        <p className='mt-4 text-lg text-secondary-token'>
           Your subscription is active and your profile is now branding-free.
         </p>
 

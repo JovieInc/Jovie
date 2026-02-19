@@ -162,10 +162,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     return (
       <div className='space-y-3'>
         {LOADING_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-12 bg-surface-2 rounded-md animate-pulse motion-reduce:animate-none'
-          />
+          <div key={key} className='h-12 rounded-md skeleton' />
         ))}
       </div>
     );

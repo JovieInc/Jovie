@@ -1,19 +1,18 @@
 'use client';
 
-import { Check, Copy, ExternalLink, Plus, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import {
-  getPlatformIconMetadata,
-  SocialIcon,
-} from '@/components/atoms/SocialIcon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
 import { cn } from '@/lib/utils';
-import { getContrastSafeIconColor } from '@/lib/utils/color';
-import type { CategoryOption } from './ProfileLinkCategorySelector';
+import { extractHandleFromUrl } from '@/lib/utils/social-platform';
+
+export type CategoryOption = LinkSection | 'all';
 
 export interface ProfileLinkListProps {
   readonly links: PreviewPanelLink[];
@@ -27,8 +26,29 @@ function getLinkSection(platform: string): LinkSection {
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
-const ACTION_BUTTON_CLASS =
-  'p-1.5 rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1/60 transition-colors ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token';
+/**
+ * Safely extract a display hostname from a URL string.
+ * Returns the hostname without 'www.' prefix, or the raw URL if parsing fails.
+ */
+function formatDisplayHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url;
+  }
+}
+
+const ACTION_BUTTON_CLASS = [
+  'p-1.5 rounded-md text-secondary-token',
+  'hover:text-primary-token hover:bg-surface-1/60',
+  'transition-colors ease-out focus-visible:outline-none',
+  'focus-visible:ring-2 focus-visible:ring-primary-token',
+].join(' ');
+
+const SWIPE_ACTION_CLASS = [
+  'flex h-full items-center justify-center px-4',
+  'text-white transition-colors active:opacity-80',
+].join(' ');
 
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
 
@@ -38,31 +58,6 @@ const SECTION_LABELS: Record<LinkSection, string> = {
   earnings: 'Earnings',
   custom: 'Web',
 };
-
-/**
- * Display labels for platforms with special casing requirements
- */
-const PLATFORM_DISPLAY_LABELS: Record<string, string> = {
-  youtube_music: 'YouTube Music',
-  youtubemusic: 'YouTube Music',
-  youtube: 'YouTube',
-  tiktok: 'TikTok',
-  linkedin: 'LinkedIn',
-  soundcloud: 'SoundCloud',
-  bandcamp: 'Bandcamp',
-  apple_music: 'Apple Music',
-  amazon_music: 'Amazon Music',
-  dsp: 'DSP',
-};
-
-function formatPlatformName(platform: string): string {
-  const lower = platform.toLowerCase();
-  if (PLATFORM_DISPLAY_LABELS[lower]) {
-    return PLATFORM_DISPLAY_LABELS[lower];
-  }
-  // Fallback: capitalize first letter for unknown platforms
-  return platform.charAt(0).toUpperCase() + platform.slice(1).toLowerCase();
-}
 
 interface LinkItemProps {
   readonly link: PreviewPanelLink;
@@ -91,97 +86,107 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
     onRemove?.(link.id);
   }, [link.id, onRemove]);
 
-  const platformName = formatPlatformName(link.platform);
+  const handle = extractHandleFromUrl(link.url);
 
-  // Get platform brand color
-  const iconMeta = getPlatformIconMetadata(link.platform);
-  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : undefined;
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const swipeActionsWidth = onRemove ? 132 : 88;
+
+  const swipeActions = (
+    <>
+      <button
+        type='button'
+        onClick={handleCopy}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
+        aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+      >
+        {copied ? (
+          <Check className='h-4 w-4' aria-hidden='true' />
+        ) : (
+          <Copy className='h-4 w-4' aria-hidden='true' />
+        )}
+      </button>
+      <button
+        type='button'
+        onClick={handleOpen}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        aria-label={`Open ${link.title}`}
+      >
+        <ExternalLink className='h-4 w-4' aria-hidden='true' />
+      </button>
+      {onRemove && (
+        <button
+          type='button'
+          onClick={handleRemove}
+          className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
+          aria-label={`Remove ${link.title}`}
+        >
+          <Trash2 className='h-4 w-4' aria-hidden='true' />
+        </button>
+      )}
+    </>
+  );
 
   return (
-    <div
-      className={cn(
-        'flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors ease-out hover:bg-surface-2',
-        !link.isVisible && 'opacity-60'
-      )}
+    <SwipeToReveal
+      itemId={`profile-link-${link.id}`}
+      actions={swipeActions}
+      actionsWidth={swipeActionsWidth}
+      className='rounded-2xl'
     >
-      {/* Left: Icon + Platform Name */}
-      <div className='flex items-center gap-3 min-w-0'>
-        <span
-          className='shrink-0'
-          style={
-            brandColor
-              ? { color: getContrastSafeIconColor(brandColor, isDark) }
-              : undefined
-          }
-        >
-          <SocialIcon platform={link.platform} className='h-4 w-4' />
-        </span>
-        <span className='text-sm font-medium text-primary-token truncate'>
-          {platformName}
-        </span>
-      </div>
+      <div
+        className={cn(
+          'flex items-center justify-between rounded-2xl',
+          'bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
+          'transition-colors ease-out',
+          !link.isVisible && 'opacity-60'
+        )}
+      >
+        {/* Left: Icon box + Platform Name */}
+        <div className='flex items-center gap-3 min-w-0'>
+          <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token'>
+            <SocialIcon platform={link.platform} className='h-4 w-4' />
+          </div>
+          <div className='min-w-0 flex-1'>
+            <div className='truncate text-sm text-primary-token'>
+              {handle ? `@${handle}` : formatDisplayHost(link.url)}
+            </div>
+          </div>
+        </div>
 
-      {/* Right: Actions (always visible) */}
-      <div className='flex items-center gap-1 shrink-0'>
-        <button
-          type='button'
-          onClick={handleOpen}
-          className={ACTION_BUTTON_CLASS}
-          aria-label={`Open ${link.title}`}
-        >
-          <ExternalLink className='h-4 w-4' aria-hidden='true' />
-        </button>
-        <button
-          type='button'
-          onClick={handleCopy}
-          className={ACTION_BUTTON_CLASS}
-          aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
-        >
-          {copied ? (
-            <Check className='h-4 w-4 text-success' aria-hidden='true' />
-          ) : (
-            <Copy className='h-4 w-4' aria-hidden='true' />
-          )}
-        </button>
-        {onRemove && (
+        {/* Right: Actions (visible on hover/focus - desktop only) */}
+        <div className='hidden sm:flex items-center gap-1 shrink-0'>
           <button
             type='button'
-            onClick={handleRemove}
+            onClick={handleOpen}
             className={ACTION_BUTTON_CLASS}
-            aria-label={`Remove ${link.title}`}
+            aria-label={`Open ${link.title}`}
           >
-            <X className='h-4 w-4' aria-hidden='true' />
+            <ExternalLink className='h-4 w-4' aria-hidden='true' />
           </button>
-        )}
+          <button
+            type='button'
+            onClick={handleCopy}
+            className={ACTION_BUTTON_CLASS}
+            aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
+          >
+            {copied ? (
+              <Check className='h-4 w-4 text-success' aria-hidden='true' />
+            ) : (
+              <Copy className='h-4 w-4' aria-hidden='true' />
+            )}
+          </button>
+          {onRemove && (
+            <button
+              type='button'
+              onClick={handleRemove}
+              className={ACTION_BUTTON_CLASS}
+              aria-label={`Remove ${link.title}`}
+            >
+              <Trash2 className='h-4 w-4' aria-hidden='true' />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-interface SectionHeaderProps {
-  readonly section: LinkSection;
-  readonly onAdd?: (section: LinkSection) => void;
-}
-
-function SectionHeader({ section, onAdd }: SectionHeaderProps) {
-  return (
-    <div className='flex items-center justify-between mb-2'>
-      <h4 className='text-xs font-medium text-secondary-token'>
-        {SECTION_LABELS[section]} links
-      </h4>
-      {onAdd && (
-        <button
-          type='button'
-          onClick={() => onAdd(section)}
-          className='p-1 rounded hover:bg-surface-2 text-secondary-token hover:text-primary-token transition-colors'
-          aria-label={`Add ${SECTION_LABELS[section]} link`}
-        >
-          <Plus className='h-4 w-4' />
-        </button>
-      )}
-    </div>
+    </SwipeToReveal>
   );
 }
 
@@ -226,21 +231,25 @@ export function ProfileLinkList({
     );
   }
 
-  // When viewing a specific category, show section header
+  // When viewing a specific category, use shared DrawerLinkSection
   if (selectedCategory !== 'all') {
     return (
-      <div className='space-y-3'>
-        <SectionHeader section={selectedCategory} onAdd={onAddLink} />
+      <DrawerLinkSection
+        title={`${SECTION_LABELS[selectedCategory]} links`}
+        onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
+        addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
+        isEmpty={false} // Early return above guarantees filteredLinks is non-empty
+      >
         <div className='space-y-2'>
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
         </div>
-      </div>
+      </DrawerLinkSection>
     );
   }
 
-  // When viewing all, group by section
+  // When viewing all, group by section using shared DrawerLinkSection
   return (
     <div className='space-y-6'>
       {SECTION_ORDER.map(section => {
@@ -248,14 +257,18 @@ export function ProfileLinkList({
         if (sectionLinks.length === 0) return null;
 
         return (
-          <div key={section} className='space-y-3'>
-            <SectionHeader section={section} onAdd={onAddLink} />
+          <DrawerLinkSection
+            key={section}
+            title={`${SECTION_LABELS[section]} links`}
+            onAdd={onAddLink ? () => onAddLink(section) : undefined}
+            addLabel={`Add ${SECTION_LABELS[section]} link`}
+          >
             <div className='space-y-2'>
               {sectionLinks.map(link => (
                 <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
               ))}
             </div>
-          </div>
+          </DrawerLinkSection>
         );
       })}
     </div>

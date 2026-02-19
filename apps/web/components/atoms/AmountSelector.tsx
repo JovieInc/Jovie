@@ -36,22 +36,22 @@ export const AmountSelector = memo(function AmountSelector({
         'group relative w-full aspect-square rounded-2xl border text-center transition-all duration-150 ease-out flex flex-col items-center justify-center gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         isSelected
-          ? 'border-accent bg-accent-subtle text-accent-token shadow-sm ring-2 ring-accent/20'
+          ? 'bg-btn-primary text-btn-primary-foreground shadow-sm'
           : 'border-default bg-surface-1 text-primary-token hover:border-strong hover:bg-surface-2 hover:shadow-sm',
         className
       )}
     >
       <span
-        className='text-[10px] font-medium uppercase tracking-wider text-secondary-token'
+        className={cn(
+          'text-[10px] font-medium uppercase tracking-wider',
+          isSelected ? 'text-btn-primary-foreground/70' : 'text-secondary-token'
+        )}
         aria-hidden
       >
         USD
       </span>
       <span
-        className={cn(
-          'text-2xl font-semibold tabular-nums tracking-tight',
-          isSelected && 'text-accent-token'
-        )}
+        className='text-2xl font-semibold tabular-nums tracking-tight'
         aria-hidden
       >
         ${amount}

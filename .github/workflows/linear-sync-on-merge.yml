@@ -1,0 +1,98 @@
+name: Linear Sync on Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync_done:
+    name: Mark Linear issue Done
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Extract Linear issue marker from PR body
+        id: extract
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          BODY_FILE="$RUNNER_TEMP/pr_body.txt"
+          printf '%s' "$PR_BODY" > "$BODY_FILE"
+
+          LINEAR_ISSUE_ID=$(sed -n 's/.*linear-issue-id:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
+          LINEAR_ISSUE_IDENTIFIER=$(sed -n 's/.*linear-issue-identifier:\([^ >-]*\).*/\1/p' "$BODY_FILE" | head -1)
+
+          if [[ -z "$LINEAR_ISSUE_ID" ]]; then
+            echo "No linear-issue-id marker found; skipping"
+            echo "has_linear_marker=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_linear_marker=true" >> "$GITHUB_OUTPUT"
+          echo "issue_id=$LINEAR_ISSUE_ID" >> "$GITHUB_OUTPUT"
+          echo "issue_identifier=$LINEAR_ISSUE_IDENTIFIER" >> "$GITHUB_OUTPUT"
+
+      - name: Move Linear issue to done + comment
+        if: steps.extract.outputs.has_linear_marker == 'true'
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          ISSUE_ID: ${{ steps.extract.outputs.issue_id }}
+          ISSUE_IDENTIFIER: ${{ steps.extract.outputs.issue_identifier }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "LINEAR_API_KEY not set; skipping"
+            exit 0
+          fi
+
+          ISSUE_DATA=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<JSON
+          {
+            \"query\": \"query IssueDoneState($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }\",
+            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
+          }
+          JSON
+          )")
+
+          DONE_STATE_ID=$(echo "$ISSUE_DATA" | jq -r '
+            .data.issue.team.states.nodes
+            | map(select((.type // "") == "completed" or ((.name // "") | ascii_downcase | test("done|completed"))))
+            | .[0].id // empty
+          ')
+
+          if [[ -n "$DONE_STATE_ID" ]]; then
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(cat <<JSON
+            {
+              \"query\": \"mutation SetIssueDone($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }\",
+              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"stateId\": \"${DONE_STATE_ID}\" }
+            }
+            JSON
+            )" > /dev/null
+          fi
+
+          curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<JSON
+          {
+            \"query\": \"mutation AddDoneComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
+            \"variables\": {
+              \"issueId\": \"${ISSUE_ID}\",
+              \"body\": \"PR merged for ${ISSUE_IDENTIFIER}: ${PR_URL} (merge SHA: ${MERGE_SHA})\"
+            }
+          }
+          JSON
+          )" > /dev/null

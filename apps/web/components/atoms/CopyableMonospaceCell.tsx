@@ -62,7 +62,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
         className={cn(
           'h-3 w-3 transition-opacity',
           copied
-            ? 'text-green-600 opacity-100 dark:text-green-400'
+            ? 'text-success opacity-100'
             : 'opacity-0 group-hover/copy:opacity-60'
         )}
       />

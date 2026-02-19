@@ -72,7 +72,7 @@ export function ContactDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
         <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t'
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
           style={{
             backgroundColor: 'var(--liquid-glass-bg)',
             backdropFilter: `blur(var(--liquid-glass-blur-intense))`,

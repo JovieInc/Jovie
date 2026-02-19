@@ -2,16 +2,17 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, CommonDropdown, Input } from '@jovie/ui';
-import { ChevronDown, Plus, Share2, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
-import { EmptyState } from '@/components/organisms/EmptyState';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
+import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
-import { useSocialsForm } from './useSocialsForm';
+import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
+import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
 const CHIP_BG_ALPHA = 0x15 / 255;
@@ -59,13 +60,32 @@ const SUGGESTED_PLATFORM_IDS = [
   'website',
 ] as const;
 
-const EXCLUDED_PLATFORM_IDS = new Set(['onlyfans', 'twitter']);
+const EXCLUDED_PLATFORM_IDS = new Set([
+  'onlyfans',
+  'twitter',
+  // Professional links (only 'website' remains)
+  'blog',
+  'portfolio',
+  'booking',
+  'press_kit',
+  'other',
+  // Link aggregators
+  'linktree',
+  'beacons',
+  'linkin_bio',
+  'allmylinks',
+  'linkfire',
+  'toneden',
+  'featurefm',
+]);
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
-    ['social', 'creator', 'messaging', 'professional'].includes(
+    (['social', 'creator', 'messaging', 'professional'].includes(
       platform.category
-    ) && !EXCLUDED_PLATFORM_IDS.has(platform.id)
+    ) ||
+      (platform.category === 'music' && !PRIMARY_DSP_IDS.has(platform.id))) &&
+    !EXCLUDED_PLATFORM_IDS.has(platform.id)
 );
 
 const SUGGESTED_PLATFORM_SET = new Set<string>(SUGGESTED_PLATFORM_IDS);
@@ -79,9 +99,17 @@ const SOCIAL_PLATFORM_GROUPS = [
     ),
   },
   {
+    label: 'Music',
+    platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
+      platform => platform.category === 'music'
+    ),
+  },
+  {
     label: 'All supported platforms',
     platforms: SOCIAL_LINK_PLATFORM_CANDIDATES.filter(
-      platform => !SUGGESTED_PLATFORM_SET.has(platform.id)
+      platform =>
+        !SUGGESTED_PLATFORM_SET.has(platform.id) &&
+        platform.category !== 'music'
     ),
   },
 ] as const;
@@ -99,6 +127,16 @@ PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
+
+// Music DSP placeholders (canonical underscore IDs from ALL_PLATFORMS)
+PLATFORM_PLACEHOLDERS.youtube_music =
+  'https://music.youtube.com/channel/UCxxxxx';
+PLATFORM_PLACEHOLDERS.bandcamp = 'https://yourname.bandcamp.com';
+PLATFORM_PLACEHOLDERS.tidal = 'https://tidal.com/browse/artist/12345';
+PLATFORM_PLACEHOLDERS.deezer = 'https://deezer.com/artist/12345';
+PLATFORM_PLACEHOLDERS.amazon_music = 'https://music.amazon.com/artists/B0xxxxx';
+PLATFORM_PLACEHOLDERS.pandora = 'https://pandora.com/artist/yourname';
+PLATFORM_PLACEHOLDERS.beatport = 'https://beatport.com/artist/yourname';
 
 function getPlaceholder(platform: string): string {
   return PLATFORM_PLACEHOLDERS[platform] || 'https://...';
@@ -151,8 +189,19 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     handleUrlBlur,
     addSocialLink,
   } = useSocialsForm({ artistId: artist.id });
+  const {
+    suggestions,
+    isLoading: suggestionsLoading,
+    actioningId,
+    confirm: confirmSuggestion,
+    dismiss: dismissSuggestion,
+  } = useSocialLinkSuggestions(artist.id);
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
   const urlInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const focusUrlField = useCallback((index: number) => {
@@ -201,9 +250,9 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
       <div className='rounded-lg border border-subtle divide-y divide-subtle'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div key={key} className='flex items-center gap-3 px-4 py-3'>
-            <div className='h-8 w-8 rounded-md bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
-            <div className='h-4 w-24 rounded bg-surface-2 animate-pulse motion-reduce:animate-none shrink-0' />
-            <div className='flex-1 h-9 rounded-lg bg-surface-2 animate-pulse motion-reduce:animate-none' />
+            <div className='h-8 w-8 rounded-md skeleton shrink-0' />
+            <div className='h-4 w-24 rounded skeleton shrink-0' />
+            <div className='flex-1 h-9 rounded-lg skeleton' />
           </div>
         ))}
       </div>
@@ -212,45 +261,36 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
-      {socialLinks.length === 0 ? (
-        <EmptyState
-          icon={<Share2 className='h-6 w-6' aria-hidden='true' />}
-          heading='No social links yet'
-          description='Add your most important social profiles first. You can still add every supported platform when you need it.'
-          action={{
-            label: 'Add first link',
-            onClick: handleAddSocialLink,
-          }}
+      {!suggestionsLoading && suggestions.length > 0 && (
+        <SocialLinkSuggestionRows
+          suggestions={suggestions}
+          actioningId={actioningId}
+          onConfirm={confirmSuggestion}
+          onDismiss={dismissSuggestion}
         />
+      )}
+
+      {socialLinks.length === 0 ? (
+        <div className='flex justify-center py-6'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={handleAddSocialLink}
+            className='gap-1.5'
+          >
+            <Plus className='h-3.5 w-3.5' />
+            Add Link
+          </Button>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className='space-y-0'>
           <div className='rounded-lg border border-subtle divide-y divide-subtle'>
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]'
               >
-                <div
-                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md'
-                  style={{
-                    backgroundColor: PLATFORM_METADATA_MAP[link.platform]
-                      ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
-                      : undefined,
-                    color: PLATFORM_METADATA_MAP[link.platform]
-                      ? getChipSafeIconColor(
-                          `#${PLATFORM_METADATA_MAP[link.platform].color}`,
-                          isDark
-                        )
-                      : undefined,
-                  }}
-                >
-                  <SocialIcon
-                    platform={link.platform}
-                    className='h-4 w-4'
-                    aria-hidden
-                  />
-                </div>
-
                 <CommonDropdown
                   variant='dropdown'
                   searchable
@@ -261,12 +301,24 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                   trigger={
                     <button
                       type='button'
-                      className='flex h-9 w-[140px] shrink-0 items-center justify-between gap-1 rounded-lg border border-subtle bg-surface-1 px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:border-interactive'
+                      className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive'
+                      style={{
+                        backgroundColor: PLATFORM_METADATA_MAP[link.platform]
+                          ? `#${PLATFORM_METADATA_MAP[link.platform].color}15`
+                          : undefined,
+                        color: PLATFORM_METADATA_MAP[link.platform]
+                          ? getChipSafeIconColor(
+                              `#${PLATFORM_METADATA_MAP[link.platform].color}`,
+                              isDark
+                            )
+                          : undefined,
+                      }}
                     >
-                      <span className='truncate'>
-                        {getPlatformLabel(link.platform)}
-                      </span>
-                      <ChevronDown className='h-3.5 w-3.5 shrink-0 opacity-50' />
+                      <SocialIcon
+                        platform={link.platform}
+                        className='h-4 w-4'
+                        aria-hidden
+                      />
                     </button>
                   }
                   aria-label={`Select platform for link ${index + 1}`}

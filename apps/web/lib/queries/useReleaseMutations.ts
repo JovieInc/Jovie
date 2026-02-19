@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  deleteRelease,
   refreshRelease,
   rescanIsrcLinks,
   resetProviderOverride,
@@ -238,6 +239,51 @@ export function useRescanIsrcLinksMutation(profileId: string) {
           );
         }
       }
+    },
+  });
+}
+
+/**
+ * Mutation to delete a release with optimistic removal from the cache.
+ */
+export function useDeleteReleaseMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteRelease,
+
+    onMutate: async variables => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.releases.matrix(profileId),
+      });
+
+      const previousReleases = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+
+      if (previousReleases) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          previousReleases.filter(r => r.id !== variables.releaseId)
+        );
+      }
+
+      return { previousReleases };
+    },
+
+    onError: (_err, _variables, context) => {
+      if (context?.previousReleases) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          context.previousReleases
+        );
+      }
+    },
+
+    onSettled: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.releases.matrix(profileId),
+      });
     },
   });
 }

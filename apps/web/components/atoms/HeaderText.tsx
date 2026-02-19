@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 type HeaderTextTone = 'primary' | 'secondary';
 
 const toneClasses: Record<HeaderTextTone, string> = {
-  primary: 'text-gray-900 dark:text-gray-50',
-  secondary: 'text-gray-600 dark:text-gray-300',
+  primary: 'text-primary-token',
+  secondary: 'text-secondary-token',
 };
 
 export function headerTextClass({

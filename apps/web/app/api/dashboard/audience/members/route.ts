@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
           deviceType: audienceMembers.deviceType,
           latestActions: audienceMembers.latestActions,
           referrerHistory: audienceMembers.referrerHistory,
+          utmParams: audienceMembers.utmParams,
           email: audienceMembers.email,
           phone: audienceMembers.phone,
           spotifyConnected: audienceMembers.spotifyConnected,
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
         referrerHistory: Array.isArray(member.referrerHistory)
           ? member.referrerHistory
           : [],
+        utmParams: member.utmParams ?? {},
         email: member.email,
         phone: member.phone,
         spotifyConnected: Boolean(member.spotifyConnected),

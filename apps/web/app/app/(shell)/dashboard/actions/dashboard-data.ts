@@ -30,6 +30,7 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
@@ -155,11 +156,11 @@ export interface DashboardData {
  * @param clerkUserId - Clerk user ID for the current user
  * @returns Dashboard data without isAdmin (added by caller)
  */
-type ChromeData = Omit<DashboardData, 'isAdmin' | 'tippingStats'>;
+type CoreData = Omit<DashboardData, 'isAdmin'>;
 
-async function fetchChromeDataWithSession(
+async function fetchDashboardCoreWithSession(
   clerkUserId: string
-): Promise<ChromeData> {
+): Promise<CoreData> {
   try {
     // First check if user exists in users table
     // Use batch API to ensure RLS session variables are set on the same connection
@@ -184,6 +185,7 @@ async function fetchChromeDataWithSession(
         sidebarCollapsed: false,
         hasSocialLinks: false,
         hasMusicLinks: false,
+        tippingStats: createEmptyTippingStats(),
       };
     }
 
@@ -224,15 +226,16 @@ async function fetchChromeDataWithSession(
         sidebarCollapsed: false,
         hasSocialLinks: false,
         hasMusicLinks: false,
+        tippingStats: createEmptyTippingStats(),
       };
     }
 
     const selected = selectDashboardProfile(creatorData);
 
-    // Performance optimization: Single query for both link counts using conditional aggregation
-    // This reduces database round trips from 3 to 2 (33% reduction)
-    // Each query in Promise.all uses batch API to ensure RLS session on same connection
-    const [settings, linkCounts] = await Promise.all([
+    // Performance optimization: Fetch settings, link counts, AND tipping stats in parallel.
+    // This eliminates the waterfall where tipping stats had to wait for chrome data to finish.
+    // Each query in Promise.all uses batch API to ensure RLS session on same connection.
+    const [settings, linkCounts, tippingStats] = await Promise.all([
       executeWithSession(
         clerkUserId,
         () =>
@@ -301,6 +304,9 @@ async function fetchChromeDataWithSession(
           });
           throw error;
         }),
+      // Tipping stats now run in parallel with settings and link counts,
+      // eliminating the previous waterfall where they waited for chrome data
+      fetchTippingStatsWithSession(selected.id, clerkUserId),
     ]);
 
     const hasLinks = linkCounts.hasLinks;
@@ -315,6 +321,7 @@ async function fetchChromeDataWithSession(
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
       hasMusicLinks,
+      tippingStats,
     };
   } catch (error) {
     // Handle both standard and non-standard error objects
@@ -356,6 +363,7 @@ async function fetchChromeDataWithSession(
       sidebarCollapsed: false,
       hasSocialLinks: false,
       hasMusicLinks: false,
+      tippingStats: createEmptyTippingStats(),
     };
   }
 }
@@ -434,7 +442,14 @@ async function fetchTippingStatsWithSession(
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
     };
   } catch (error) {
+    // Query timeouts are expected during Neon cold starts — downgrade to warning.
+    // The dashboard degrades gracefully by showing empty tipping stats.
+    const level =
+      error instanceof Error && error.name === 'QueryTimeoutError'
+        ? 'warning'
+        : 'error';
     Sentry.captureException(error, {
+      level,
       tags: { query: 'tipping_stats', context: 'dashboard_data' },
     });
     return createEmptyTippingStats();
@@ -461,10 +476,14 @@ async function resolveDashboardData(): Promise<DashboardData> {
     if (error instanceof BillingUnavailableError) {
       // Billing DB is down — degrade gracefully instead of crashing dashboard.
       // Admin status is still available from the error since it's fetched independently.
-      Sentry.captureException(error, {
-        level: 'warning',
-        tags: { context: 'dashboard_billing_unavailable' },
+      // Note: Not reporting to Sentry here — the underlying DB failure is already
+      // captured upstream in fetchUserBillingData. Duplicate reporting was creating
+      // thousands of Sentry events (JOVIE-WEB-AD/AE/AF/AC/9Y/9C).
+      logger.warn('Billing unavailable, degrading to free tier', {
+        userId: error.userId,
+        isAdmin: error.isAdmin,
       });
+      const freeDefaults = getEntitlements('free');
       entitlements = {
         userId: error.userId,
         isAdmin: error.isAdmin,
@@ -473,12 +492,8 @@ async function resolveDashboardData(): Promise<DashboardData> {
         plan: 'free' as const,
         isPro: false,
         hasAdvancedFeatures: false,
-        canRemoveBranding: false,
-        canExportContacts: false,
-        canAccessAdvancedAnalytics: false,
-        canFilterSelfFromAnalytics: false,
-        analyticsRetentionDays: 7,
-        contactsLimit: 100,
+        ...freeDefaults.booleans,
+        ...freeDefaults.limits,
       };
     } else {
       throw error;
@@ -502,23 +517,16 @@ async function resolveDashboardData(): Promise<DashboardData> {
   }
 
   try {
-    const chromeData = await Sentry.startSpan(
-      { op: 'task', name: 'dashboard.getChromeData' },
-      async () => getCachedChromeData(userId)
+    // Single cached fetch for all dashboard core data (profile, settings, links, tipping stats).
+    // Tipping stats now run in parallel with settings and link counts inside the core fetch,
+    // eliminating the previous waterfall where they waited for chrome data to complete.
+    const coreData = await Sentry.startSpan(
+      { op: 'task', name: 'dashboard.getCoreData' },
+      async () => getCachedDashboardCore(userId)
     );
 
-    let tippingStats = createEmptyTippingStats();
-    if (chromeData.selectedProfile) {
-      tippingStats = await Sentry.startSpan(
-        { op: 'task', name: 'dashboard.getTippingStats' },
-        async () =>
-          getCachedTippingStats(chromeData.selectedProfile!.id, userId)
-      );
-    }
-
     return {
-      ...chromeData,
-      tippingStats,
+      ...coreData,
       isAdmin,
     };
   } catch (error) {
@@ -540,16 +548,15 @@ async function resolveDashboardData(): Promise<DashboardData> {
   }
 }
 
-const getCachedChromeData = unstableCache(
-  async (clerkUserId: string) => fetchChromeDataWithSession(clerkUserId),
-  ['dashboard-chrome'],
-  { revalidate: 30 }
-);
-
-const getCachedTippingStats = unstableCache(
-  async (profileId: string, clerkUserId: string) =>
-    fetchTippingStatsWithSession(profileId, clerkUserId),
-  ['dashboard-tipping-stats'],
+/**
+ * Single consolidated cache for all dashboard core data.
+ * Settings, link counts, and tipping stats are fetched in parallel
+ * within fetchDashboardCoreWithSession, eliminating the previous
+ * waterfall where tipping stats waited for chrome data.
+ */
+const getCachedDashboardCore = unstableCache(
+  async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
+  ['dashboard-core'],
   { revalidate: 30 }
 );
 

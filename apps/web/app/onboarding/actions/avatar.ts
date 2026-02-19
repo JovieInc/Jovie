@@ -8,14 +8,132 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
+import { publicEnv } from '@/lib/env-public';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
+
+/** Known Vercel project prefixes for this workspace. */
+const VERCEL_PROJECT_PREFIXES = ['jovie-', 'shouldimake-'] as const;
+
+/** OAuth provider hostnames that serve user avatar images. */
+const OAUTH_AVATAR_HOSTNAMES = [
+  'lh3.googleusercontent.com', // Google
+  'platform-lookaside.fbsbx.com', // Facebook
+  'avatars.githubusercontent.com', // GitHub
+  'img.clerk.com', // Clerk
+  'images.clerk.dev', // Clerk (legacy)
+  'gravatar.com', // Gravatar
+  'www.gravatar.com', // Gravatar
+  'cdn.discordapp.com', // Discord
+] as const;
+
+/**
+ * Builds the set of allowed hostnames for avatar uploads.
+ * Includes:
+ * - localhost for development
+ * - The hostname from NEXT_PUBLIC_APP_URL (e.g., jov.ie)
+ * - The normalized NEXT_PUBLIC_PROFILE_HOSTNAME
+ * - Known OAuth provider hostnames (Google, GitHub, Clerk, etc.)
+ */
+function buildAllowedHostnames(): Set<string> {
+  const allowed = new Set<string>(['localhost', ...OAUTH_AVATAR_HOSTNAMES]);
+
+  // Add hostname from NEXT_PUBLIC_APP_URL
+  const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    try {
+      const parsed = new URL(appUrl);
+      allowed.add(parsed.hostname);
+    } catch {
+      // Invalid URL, skip
+    }
+  }
+
+  // Add NEXT_PUBLIC_PROFILE_HOSTNAME — normalize in case it includes protocol/port
+  const profileHostname = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
+  if (profileHostname) {
+    try {
+      const parsed = new URL(`https://${profileHostname}`);
+      allowed.add(parsed.hostname);
+    } catch {
+      // Already a bare hostname — use as-is
+      allowed.add(profileHostname);
+    }
+  }
+
+  return allowed;
+}
+
+/**
+ * Validates and normalizes the remote avatar image URL to prevent SSRF.
+ * Only allows HTTP(S) URLs whose hostnames are in the allowed set.
+ */
+function getSafeImageUrl(imageUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    throw new TypeError('Invalid avatar image URL');
+  }
+
+  // Only allow HTTP(S) schemes
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new TypeError('Invalid avatar image URL protocol');
+  }
+
+  const allowedHostnames = buildAllowedHostnames();
+  if (!allowedHostnames.has(url.hostname)) {
+    throw new TypeError('Avatar image host is not allowed');
+  }
+
+  return url.toString();
+}
+
+/**
+ * Checks if a hostname is a known Vercel preview deployment for this project.
+ * Only matches our specific project prefixes, not arbitrary .vercel.app domains.
+ */
+function isVercelPreviewHostname(hostname: string): boolean {
+  if (!hostname.endsWith('.vercel.app')) return false;
+  return VERCEL_PROJECT_PREFIXES.some(prefix => hostname.startsWith(prefix));
+}
+
+/**
+ * Returns a safe upload URL for the internal images API, based on a trusted origin.
+ * Throws if the provided baseUrl is not in the allow-list of permitted hosts.
+ */
+function getSafeUploadUrl(baseUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new TypeError('Invalid base URL for avatar upload');
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new TypeError('Unsupported protocol for avatar upload URL');
+  }
+
+  const allowedHostnames = buildAllowedHostnames();
+  const isAllowed =
+    allowedHostnames.has(parsed.hostname) ||
+    isVercelPreviewHostname(parsed.hostname);
+
+  if (!isAllowed) {
+    throw new TypeError('Untrusted host for avatar upload URL');
+  }
+
+  const uploadUrl = new URL('/api/images/upload', parsed.origin);
+  return uploadUrl.toString();
+}
 
 /**
  * Fetches the remote avatar image and validates content type.
  */
 async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
-  const source = await fetch(imageUrl, {
+  const safeImageUrl = getSafeImageUrl(imageUrl);
+  const source = await fetch(safeImageUrl, {
+    redirect: 'error', // Prevent SSRF via redirect to internal services
     signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
   });
 
@@ -63,7 +181,8 @@ async function uploadAvatarFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const upload = await fetch(`${baseUrl}/api/images/upload`, {
+  const uploadUrl = getSafeUploadUrl(baseUrl);
+  const upload = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
     headers: cookieHeader ? { cookie: cookieHeader } : undefined,
@@ -124,10 +243,7 @@ async function uploadRemoteAvatar(params: {
         params.cookieHeader
       );
 
-      // Success - always log for monitoring
-      console.info(
-        `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
-      );
+      // Success
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =
@@ -137,22 +253,29 @@ async function uploadRemoteAvatar(params: {
 
       // Don't retry for invalid content type - it won't change
       if (errorMessage.includes('Invalid content type')) {
-        console.warn('[AVATAR_UPLOAD] Invalid content type:', errorMessage);
+        Sentry.captureMessage('Avatar upload: invalid content type', {
+          level: 'warning',
+          extra: { errorMessage },
+        });
         break;
       }
 
-      console.warn(
-        `[AVATAR_UPLOAD] Attempt ${attempt + 1}/${maxRetries} failed:`,
-        errorMessage
+      Sentry.captureMessage(
+        `Avatar upload attempt ${attempt + 1}/${maxRetries} failed`,
+        {
+          level: 'warning',
+          extra: { errorMessage },
+        }
       );
     }
   }
 
   // All retries exhausted
-  console.error(
-    `[AVATAR_UPLOAD] Failed after ${maxRetries} attempts:`,
-    lastError?.message
-  );
+  if (lastError) {
+    Sentry.captureException(lastError, {
+      extra: { maxRetries, context: 'avatar_upload_retries_exhausted' },
+    });
+  }
   return null;
 }
 
@@ -175,7 +298,10 @@ export async function handleBackgroundAvatarUpload(
     });
 
     if (!uploaded) {
-      console.warn('[ONBOARDING] Avatar upload failed for profile:', profileId);
+      Sentry.captureMessage('Avatar upload failed for profile', {
+        level: 'warning',
+        extra: { profileId },
+      });
       return;
     }
 
@@ -206,11 +332,6 @@ export async function handleBackgroundAvatarUpload(
         .where(eq(profilePhotos.id, uploaded.photoId));
     });
   } catch (avatarError) {
-    console.error(
-      '[ONBOARDING] Avatar upload exception for profile:',
-      profileId,
-      avatarError
-    );
     Sentry.captureException(avatarError, {
       tags: { context: 'onboarding_avatar_upload', profileId },
       level: 'warning',

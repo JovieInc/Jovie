@@ -145,13 +145,8 @@ export function OnboardingHandleStep({
 }: OnboardingHandleStepProps) {
   function renderValidationStatus(): React.ReactNode {
     if (!handleInput || stateError) return null;
-    if (handleValidation.checking) {
-      return (
-        <div className='text-sm text-secondary-token animate-in fade-in slide-in-from-bottom-1 duration-300'>
-          Checking…
-        </div>
-      );
-    }
+    // Checking state is shown via spinner icon in the input — no text needed
+    if (handleValidation.checking) return null;
     if (handleValidation.clientValid && handleValidation.available) return null;
     if (handleValidation.error) {
       return (

@@ -102,20 +102,20 @@ export function Logo({
   };
 
   const wordmark = (wordmarkClassName?: string, testId?: string) => (
-    // SVG requires role="img" for accessibility; native <img> cannot render inline SVGs
-    <svg // NOSONAR S6819
+    <svg
       xmlns='http://www.w3.org/2000/svg'
       xmlnsXlink='http://www.w3.org/1999/xlink'
       viewBox='0 0 136 39'
-      role='img'
+      role={ariaHidden ? undefined : 'img'}
       aria-hidden={ariaHidden}
       aria-label={ariaHidden ? undefined : 'Jovie logo'}
       data-testid={testId}
       className={cn(
         sizeClasses[size],
-        'text-black dark:text-white transition-colors duration-200',
+        'transition-colors duration-200',
         wordmarkClassName
       )}
+      style={{ color: 'var(--linear-text-primary, currentColor)' }}
       fill='currentColor'
     >
       <path

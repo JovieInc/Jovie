@@ -44,6 +44,13 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
     handleRemoveEmail,
   } = useEmailManagement(user);
 
+  let emailButtonLabel = 'Add';
+  if (pendingEmail) {
+    emailButtonLabel = emailStatus === 'verifying' ? 'Verifying…' : 'Confirm';
+  } else if (emailStatus === 'sending') {
+    emailButtonLabel = 'Sending…';
+  }
+
   return (
     <DashboardCard
       variant='settings'
@@ -101,7 +108,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 <Button
                   variant='ghost'
                   size='sm'
-                  className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                  className='text-destructive hover:text-destructive hover:bg-destructive/10'
                   disabled={syncingEmailId === email.id}
                   onClick={() => setEmailToRemove(email)}
                 >
@@ -120,24 +127,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           className='flex flex-col gap-3 sm:flex-row sm:items-end'
         >
           <div className='flex-1'>
-            {!pendingEmail ? (
-              <div>
-                <label
-                  htmlFor='new-email'
-                  className='block text-sm text-primary-token mb-1.5'
-                >
-                  Add email address
-                </label>
-                <Input
-                  id='new-email'
-                  type='email'
-                  value={newEmail}
-                  placeholder='you@example.com'
-                  onChange={event => setNewEmail(event.target.value)}
-                  required
-                />
-              </div>
-            ) : (
+            {pendingEmail ? (
               <div>
                 <label
                   htmlFor='verify-code'
@@ -156,9 +146,26 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   required
                 />
               </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor='new-email'
+                  className='block text-sm text-primary-token mb-1.5'
+                >
+                  Add email address
+                </label>
+                <Input
+                  id='new-email'
+                  type='email'
+                  value={newEmail}
+                  placeholder='you@example.com'
+                  onChange={event => setNewEmail(event.target.value)}
+                  required
+                />
+              </div>
             )}
             {emailError && (
-              <p className='text-sm text-red-500 mt-1.5'>{emailError}</p>
+              <p className='text-sm text-destructive mt-1.5'>{emailError}</p>
             )}
           </div>
           <div className='flex gap-2 shrink-0'>
@@ -169,13 +176,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 emailStatus === 'sending' || emailStatus === 'verifying'
               }
             >
-              {pendingEmail
-                ? emailStatus === 'verifying'
-                  ? 'Verifying…'
-                  : 'Confirm'
-                : emailStatus === 'sending'
-                  ? 'Sending…'
-                  : 'Add'}
+              {emailButtonLabel}
             </Button>
             {pendingEmail && (
               <Button

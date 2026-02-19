@@ -12,6 +12,11 @@ import {
 } from '@/lib/utils/platform-detection';
 import type { SocialLink, UseSocialsFormReturn } from './types';
 
+const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube'] as const;
+
+/** DSPs managed via the dedicated connections UI — exclude from social links. */
+export const PRIMARY_DSP_IDS = new Set(['spotify', 'apple_music']);
+
 interface UseSocialsFormOptions {
   artistId: string;
 }
@@ -39,12 +44,24 @@ export function useSocialsForm({
   } = useSaveSocialLinksMutation(artistId);
   const [submitError, setSubmitError] = useState<string | undefined>(undefined);
 
-  // Sync fetched data to local state when it changes
+  // Sync fetched data to local state when it changes.
+  // Sync fetched links into local state only when the local state hasn't been
+  // touched yet (empty array). This prevents background refetches from
+  // clobbering in-progress user edits.
+  const initializedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (fetchedLinks) {
-      setSocialLinks(fetchedLinks);
+    if (!fetchedLinks || initializedRef.current === artistId) return;
+    initializedRef.current = artistId;
+    if (fetchedLinks.length === 0) {
+      setSocialLinks(
+        DEFAULT_PLATFORMS.map(platform => ({ id: '', platform, url: '' }))
+      );
+    } else {
+      setSocialLinks(
+        fetchedLinks.filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+      );
     }
-  }, [fetchedLinks]);
+  }, [artistId, fetchedLinks]);
 
   // Auto-clear success state after 3 seconds
   useEffect(() => {

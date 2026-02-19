@@ -12,11 +12,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -146,10 +146,26 @@ export function AdminCreatorProfilesUnified({
   headerCheckboxStateRef.current = headerCheckboxState;
 
   const confirmBulkDelete = useCallback((count: number) => {
+    // Resolve any previous pending promise before creating a new one
+    bulkDeleteResolverRef.current?.(false);
+
     setBulkDeleteCount(count);
     setBulkDeleteDialogOpen(true);
     return new Promise<boolean>(resolve => {
-      bulkDeleteResolverRef.current = resolve;
+      // Safety timeout: if dialog doesn't respond within 30s, resolve false
+      const timeout = setTimeout(() => {
+        if (bulkDeleteResolverRef.current === wrappedResolve) {
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
+          resolve(false);
+        }
+      }, 30_000);
+
+      const wrappedResolve = (confirmed: boolean) => {
+        clearTimeout(timeout);
+        resolve(confirmed);
+      };
+      bulkDeleteResolverRef.current = wrappedResolve;
     });
   }, []);
 
@@ -225,9 +241,14 @@ export function AdminCreatorProfilesUnified({
     getId: profile => profile.id,
   });
 
-  const handleSidebarClose = () => {
+  const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
-  };
+  }, []);
+
+  const handleSidebarRefresh = useCallback(() => {
+    router.refresh();
+    refetchSocialLinks();
+  }, [router, refetchSocialLinks]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
@@ -241,6 +262,17 @@ export function AdminCreatorProfilesUnified({
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
 
+  // Refs to avoid recreating handleRowSelectionChange when selection state changes
+  const rowSelectionRef = useRef(rowSelection);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  rowSelectionRef.current = rowSelection;
+  const filteredProfilesLengthRef = useRef(filteredProfiles.length);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  filteredProfilesLengthRef.current = filteredProfiles.length;
+  const selectedIdsSizeRef = useRef(selectedIds.size);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  selectedIdsSizeRef.current = selectedIds.size;
+
   const handleRowSelectionChange = useCallback(
     (
       updaterOrValue:
@@ -249,7 +281,7 @@ export function AdminCreatorProfilesUnified({
     ) => {
       const newSelection =
         typeof updaterOrValue === 'function'
-          ? updaterOrValue(rowSelection)
+          ? updaterOrValue(rowSelectionRef.current)
           : updaterOrValue;
 
       // Update our custom row selection state
@@ -261,13 +293,13 @@ export function AdminCreatorProfilesUnified({
 
       // Toggle all if all selected or all deselected
       if (
-        newSelectedIds.size === filteredProfiles.length ||
-        (newSelectedIds.size === 0 && selectedIds.size > 0)
+        newSelectedIds.size === filteredProfilesLengthRef.current ||
+        (newSelectedIds.size === 0 && selectedIdsSizeRef.current > 0)
       ) {
         toggleSelectAll();
       }
     },
-    [rowSelection, filteredProfiles.length, selectedIds.size, toggleSelectAll]
+    [toggleSelectAll]
   );
 
   // Define columns using factory function
@@ -316,10 +348,42 @@ export function AdminCreatorProfilesUnified({
     return cn('group', getSelectionClass());
   }, []);
 
+  // Register right panel with AuthShell instead of rendering inline.
+  // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
+  const sidebarPanel = useMemo(
+    () => (
+      <ContactSidebar
+        contact={effectiveContact}
+        mode={mode}
+        isOpen={sidebarOpen && Boolean(effectiveContact)}
+        onClose={handleSidebarClose}
+        onRefresh={handleSidebarRefresh}
+        onContactChange={handleContactChange}
+        onSave={saveContact}
+        isSaving={isSaving}
+        onAvatarUpload={handleAvatarUpload}
+      />
+    ),
+    [
+      sidebarOpen,
+      effectiveContact,
+      mode,
+      handleSidebarClose,
+      handleSidebarRefresh,
+      handleContactChange,
+      saveContact,
+      isSaving,
+      handleAvatarUpload,
+    ]
+  );
+
+  useRegisterTablePanel(sidebarPanel);
+
   return (
-    <div className='flex h-full min-h-0 flex-row items-stretch overflow-hidden'>
-      <div className='flex-1 min-h-0 overflow-hidden min-w-0'>
+    <>
+      <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
         <AdminTableShell
+          testId='admin-creators-content'
           className='rounded-none'
           scrollContainerProps={{
             tabIndex: 0,
@@ -392,29 +456,6 @@ export function AdminCreatorProfilesUnified({
           )}
         </AdminTableShell>
       </div>
-      <RightDrawer
-        isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-        className=''
-      >
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <ContactSidebar
-            contact={effectiveContact}
-            mode={mode}
-            isOpen={sidebarOpen && Boolean(effectiveContact)}
-            onClose={handleSidebarClose}
-            onRefresh={() => {
-              router.refresh();
-              refetchSocialLinks();
-            }}
-            onContactChange={handleContactChange}
-            onSave={saveContact}
-            isSaving={isSaving}
-            onAvatarUpload={handleAvatarUpload}
-          />
-        </div>
-      </RightDrawer>
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}
@@ -452,6 +493,6 @@ export function AdminCreatorProfilesUnified({
           clearInviteProfile();
         }}
       />
-    </div>
+    </>
   );
 }

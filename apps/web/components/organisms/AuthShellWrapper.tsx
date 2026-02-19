@@ -12,6 +12,7 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
   useOptionalHeaderActions,
@@ -20,6 +21,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
+import { TablePanelProvider } from '@/contexts/TablePanelContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -49,6 +51,7 @@ export function useTableMeta(): TableMetaContextValue {
 
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
+  readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -66,9 +69,11 @@ function KeyboardShortcutsHandler() {
  */
 function AuthShellWrapperInner({
   persistSidebarCollapsed,
+  sidebarDefaultOpen,
   children,
 }: Readonly<{
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
+  sidebarDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
@@ -81,20 +86,30 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Preview panel is available on all dashboard routes (toggled via nav)
-  const previewEnabled = config.section === 'dashboard';
+  // Preview panel is available on all dashboard routes and the artist-profile settings page
+  const previewEnabled =
+    config.section === 'dashboard' || config.isArtistProfileSettings;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
-  let defaultHeaderAction: ReactNode = null;
-  if (config.isTableRoute) {
-    defaultHeaderAction = <DrawerToggleButton />;
-  }
-  const headerAction =
+  const defaultHeaderAction = useMemo(
+    () => (config.isTableRoute ? <DrawerToggleButton /> : null),
+    [config.isTableRoute]
+  );
+  // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
+  // degrades gracefully (renders nothing + toast) instead of crashing the shell.
+  // This matches the previewPanel pattern on line 140.
+  const rawHeaderAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
+  const headerAction = rawHeaderAction ? (
+    <ErrorBoundary fallback={null}>{rawHeaderAction}</ErrorBoundary>
+  ) : null;
 
   // Header badge from context (shown after breadcrumb on left side)
-  const headerBadge = headerActionsContext?.headerBadge ?? null;
+  const rawHeaderBadge = headerActionsContext?.headerBadge ?? null;
+  const headerBadge = rawHeaderBadge ? (
+    <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
+  ) : null;
 
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
@@ -120,22 +135,31 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <PreviewPanelProvider enabled={previewEnabled}>
-        <AuthShell
-          section={config.section}
-          breadcrumbs={config.breadcrumbs}
-          headerBadge={headerBadge}
-          headerAction={headerAction}
-          showMobileTabs={config.showMobileTabs}
-          isTableRoute={config.isTableRoute}
-          previewPanel={previewEnabled ? <ProfileContactSidebar /> : undefined}
-          onSidebarOpenChange={
-            persistSidebarCollapsed ? handleSidebarOpenChange : undefined
-          }
-        >
-          {children}
-        </AuthShell>
-      </PreviewPanelProvider>
+      <TablePanelProvider>
+        <PreviewPanelProvider enabled={previewEnabled}>
+          <AuthShell
+            section={config.section}
+            breadcrumbs={config.breadcrumbs}
+            headerBadge={headerBadge}
+            headerAction={headerAction}
+            showMobileTabs={config.showMobileTabs}
+            isTableRoute={config.isTableRoute}
+            previewPanel={
+              previewEnabled ? (
+                <ErrorBoundary fallback={null}>
+                  <ProfileContactSidebar />
+                </ErrorBoundary>
+              ) : undefined
+            }
+            onSidebarOpenChange={
+              persistSidebarCollapsed ? handleSidebarOpenChange : undefined
+            }
+            sidebarDefaultOpen={sidebarDefaultOpen}
+          >
+            {children}
+          </AuthShell>
+        </PreviewPanelProvider>
+      </TablePanelProvider>
     </TableMetaContext.Provider>
   );
 }
@@ -154,6 +178,7 @@ function AuthShellWrapperInner({
  */
 export function AuthShellWrapper({
   persistSidebarCollapsed,
+  sidebarDefaultOpen,
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
@@ -161,6 +186,7 @@ export function AuthShellWrapper({
       <HeaderActionsProvider>
         <AuthShellWrapperInner
           persistSidebarCollapsed={persistSidebarCollapsed}
+          sidebarDefaultOpen={sidebarDefaultOpen}
         >
           {children}
         </AuthShellWrapperInner>

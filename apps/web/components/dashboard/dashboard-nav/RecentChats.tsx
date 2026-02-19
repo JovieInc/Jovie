@@ -13,6 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Skeleton,
 } from '@jovie/ui';
 import { Ellipsis, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -60,7 +61,7 @@ export function RecentChats() {
   const notifications = useNotifications();
   const activeConversationId = params.id ?? null;
 
-  const { data: conversations } = useChatConversationsQuery({
+  const { data: conversations, isLoading } = useChatConversationsQuery({
     limit: MAX_RECENT_CHATS,
   });
 
@@ -98,6 +99,22 @@ export function RecentChats() {
     notifications,
   ]);
 
+  if (isLoading) {
+    return (
+      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
+        <SidebarMenu>
+          {(['a', 'b', 'c'] as const).map(id => (
+            <SidebarMenuItem key={`skeleton-${id}`}>
+              <div className='flex h-7 items-center px-1.5'>
+                <Skeleton className='h-3 flex-1' rounded='sm' />
+              </div>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarCollapsibleGroup>
+    );
+  }
+
   if (!conversations || conversations.length === 0) {
     return null;
   }
@@ -119,7 +136,7 @@ export function RecentChats() {
                   asChild
                   isActive={isActive}
                   tooltip={title}
-                  className='h-8'
+                  className='h-7'
                 >
                   <Link href={href}>
                     <span className='flex-1 truncate text-[13px]'>{title}</span>

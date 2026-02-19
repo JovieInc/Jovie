@@ -201,9 +201,10 @@ export {
 // =============================================================================
 
 export {
+  // Channel/method schemas
+  contentPreferenceKeySchema,
   // Types
   type NotificationChannel,
-  // Channel/method schemas
   notificationChannelSchema,
   type StatusInput,
   type SubscribeInput,
@@ -212,8 +213,12 @@ export {
   subscribeSchema,
   type UnsubscribeInput,
   type UnsubscribeMethod,
+  type UpdateContentPreferencesInput,
   unsubscribeMethodSchema,
   unsubscribeSchema,
+  updateContentPreferencesSchema,
+  type VerifyEmailOtpInput,
+  verifyEmailOtpSchema,
 } from './notifications';
 
 // =============================================================================

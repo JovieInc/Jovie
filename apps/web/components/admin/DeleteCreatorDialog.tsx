@@ -76,8 +76,8 @@ export function DeleteCreatorDialog({
       <AlertDialogContent className='max-w-md'>
         <AlertDialogHeader className='gap-4'>
           {/* Danger icon */}
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10'>
-            <Icon name='AlertTriangle' className='h-6 w-6 text-red-500' />
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10'>
+            <Icon name='AlertTriangle' className='h-6 w-6 text-destructive' />
           </div>
 
           <div className='space-y-2 text-center'>
@@ -104,7 +104,7 @@ export function DeleteCreatorDialog({
           <ul className='space-y-2'>
             {items.map(item => (
               <li key={item} className='flex items-center gap-2 text-sm'>
-                <Icon name='X' className='h-3.5 w-3.5 text-red-500/70' />
+                <Icon name='X' className='h-3.5 w-3.5 text-destructive/70' />
                 <span className='text-secondary-token'>{item}</span>
               </li>
             ))}
@@ -112,12 +112,12 @@ export function DeleteCreatorDialog({
         </div>
 
         {/* Warning banner */}
-        <div className='flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2'>
+        <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
           <Icon
             name='AlertCircle'
-            className='h-3.5 w-3.5 text-red-500 shrink-0'
+            className='h-3.5 w-3.5 text-destructive shrink-0'
           />
-          <p className='text-xs font-medium text-red-500'>
+          <p className='text-xs font-medium text-destructive'>
             This action cannot be undone
           </p>
         </div>

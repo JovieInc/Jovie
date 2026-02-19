@@ -95,7 +95,9 @@ export function SessionManagementCard({
   if (sessionsError) {
     return (
       <DashboardCard variant='settings' padding='none'>
-        <div className='px-5 py-4 text-sm text-red-500'>{sessionsError}</div>
+        <div className='px-5 py-4 text-sm text-destructive'>
+          {sessionsError}
+        </div>
       </DashboardCard>
     );
   }
@@ -142,7 +144,7 @@ export function SessionManagementCard({
               <Button
                 variant='ghost'
                 size='sm'
-                className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                className='text-destructive hover:text-destructive hover:bg-destructive/10'
                 disabled={endingSessionId === session.id}
                 onClick={() => setSessionToEnd(session)}
               >

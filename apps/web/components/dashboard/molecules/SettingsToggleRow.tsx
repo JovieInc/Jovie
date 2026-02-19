@@ -2,6 +2,7 @@
 
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
+import { SettingsPlanGateLabel } from '@/components/dashboard/atoms/SettingsPlanGateLabel';
 import { cn } from '@/lib/utils';
 
 export interface SettingsToggleRowProps {
@@ -13,6 +14,8 @@ export interface SettingsToggleRowProps {
   readonly disabled?: boolean;
   readonly className?: string;
   readonly ariaLabel: string;
+  readonly gated?: boolean;
+  readonly gatePlanName?: string;
 }
 
 export function SettingsToggleRow({
@@ -24,6 +27,8 @@ export function SettingsToggleRow({
   disabled = false,
   className,
   ariaLabel,
+  gated = false,
+  gatePlanName = 'Pro',
 }: SettingsToggleRowProps) {
   const reactId = React.useId();
   const baseId = id ?? `settings-toggle-${reactId}`;
@@ -38,13 +43,22 @@ export function SettingsToggleRow({
       )}
     >
       <div className='flex-1 min-w-0'>
-        <h3 id={titleId} className='text-sm text-primary-token'>
+        <h3
+          id={titleId}
+          className={cn(
+            'text-sm',
+            gated ? 'text-tertiary-token' : 'text-primary-token'
+          )}
+        >
           {title}
         </h3>
         {description ? (
           <p
             id={descriptionId}
-            className='mt-0.5 text-[13px] leading-normal text-tertiary-token'
+            className={cn(
+              'mt-0.5 text-[13px] leading-normal',
+              gated ? 'text-quaternary-token' : 'text-tertiary-token'
+            )}
           >
             {description}
           </p>
@@ -52,14 +66,18 @@ export function SettingsToggleRow({
       </div>
 
       <div className='shrink-0 pt-0.5'>
-        <Switch
-          checked={checked}
-          onCheckedChange={onCheckedChange}
-          disabled={disabled}
-          aria-label={ariaLabel}
-          aria-labelledby={titleId}
-          aria-describedby={descriptionId}
-        />
+        {gated ? (
+          <SettingsPlanGateLabel planName={gatePlanName} />
+        ) : (
+          <Switch
+            checked={checked}
+            onCheckedChange={onCheckedChange}
+            disabled={disabled}
+            aria-label={ariaLabel}
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
+          />
+        )}
       </div>
     </div>
   );

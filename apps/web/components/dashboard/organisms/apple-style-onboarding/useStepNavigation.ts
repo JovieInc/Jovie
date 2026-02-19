@@ -4,10 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { ONBOARDING_STEPS } from './types';
 
-interface UseStepNavigationOptions {
-  skipNameStep: boolean;
-}
-
 interface UseStepNavigationReturn {
   currentStepIndex: number;
   setCurrentStepIndex: React.Dispatch<React.SetStateAction<number>>;
@@ -20,13 +16,9 @@ interface UseStepNavigationReturn {
 /**
  * Hook to manage step navigation in the onboarding form.
  */
-export function useStepNavigation({
-  skipNameStep,
-}: UseStepNavigationOptions): UseStepNavigationReturn {
+export function useStepNavigation(): UseStepNavigationReturn {
   const router = useRouter();
-  const [currentStepIndex, setCurrentStepIndex] = useState(
-    skipNameStep ? 1 : 0
-  );
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const goToNextStep = useCallback(() => {

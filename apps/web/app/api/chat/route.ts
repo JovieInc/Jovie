@@ -17,6 +17,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import { CORS_HEADERS } from '@/lib/http/headers';
 import {
   checkAiChatRateLimitForPlan,
@@ -33,7 +34,6 @@ import {
 } from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { getPlanLimits } from '@/lib/stripe/config';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
@@ -54,7 +54,7 @@ const MAX_MESSAGES_PER_REQUEST = 50;
 const EDITABLE_FIELDS = {
   tier1: ['displayName', 'bio'] as const,
   tier2: [] as const,
-  blocked: ['username', 'avatarUrl', 'spotifyId', 'genres'] as const,
+  blocked: ['username', 'spotifyId', 'genres'] as const,
 };
 
 type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
@@ -451,8 +451,10 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 
 **Blocked Fields (cannot edit via chat):**
 - username: Requires settings page
-- avatar/profile image: Requires settings page
 - Connected accounts: Requires settings page
+
+**Client-Handled Fields:**
+- avatar/profile image: Users can upload a new profile photo directly from the chat input using the camera button. If they tell you they updated their profile photo, acknowledge it warmly. You do NOT have a tool for this — the upload is handled by the client UI.
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
@@ -1055,6 +1057,80 @@ export async function OPTIONS() {
   });
 }
 
+/**
+ * Build the tool set for paid-plan chat sessions.
+ */
+function buildChatTools(
+  artistContext: ArtistContext,
+  resolvedProfileId: string | null
+) {
+  return {
+    proposeProfileEdit: createProfileEditTool(artistContext),
+    checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
+    suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
+    writeWorldClassBio: createWorldClassBioTool(
+      artistContext,
+      resolvedProfileId
+    ),
+    generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
+    createPromoStrategy: createPromoStrategyTool(
+      artistContext,
+      resolvedProfileId
+    ),
+    markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+    ...(resolvedProfileId
+      ? { createRelease: createReleaseTool(resolvedProfileId) }
+      : {}),
+  };
+}
+
+function toNullableString(value: unknown): string | null {
+  return value && typeof value === 'string' ? value : null;
+}
+
+function isClientDisconnect(
+  error: unknown,
+  signal: AbortSignal | undefined
+): boolean {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  return (code === 'EPIPE' || code === 'ECONNRESET') && !!signal?.aborted;
+}
+
+/**
+ * Build a standardized error response for chat streaming failures.
+ */
+function buildChatErrorResponse(
+  error: unknown,
+  userId: string,
+  messageCount: number,
+  requestId: string,
+  profileId: string | null,
+  conversationId: string | null
+) {
+  Sentry.captureException(error, {
+    tags: { feature: 'ai-chat' },
+    extra: { userId, messageCount, requestId, profileId, conversationId },
+  });
+
+  const message =
+    error instanceof Error ? error.message : 'An unexpected error occurred';
+
+  return NextResponse.json(
+    {
+      error: 'Failed to process chat request',
+      message:
+        'Jovie hit a temporary issue while processing your message. Please try again.',
+      errorCode:
+        sanitizeErrorCode(
+          error instanceof Error ? (error as { code?: string }).code : undefined
+        ) ?? 'CHAT_STREAM_FAILED',
+      debugMessage: message,
+      requestId,
+    },
+    { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+  );
+}
+
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
 
@@ -1070,7 +1146,7 @@ export async function POST(req: Request) {
   // Fetch user plan for rate limiting and tool gating
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
-  const planLimits = getPlanLimits(userPlan);
+  const planLimits = getEntitlements(userPlan);
 
   // Rate limiting - plan-aware daily quota + burst protection
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
@@ -1100,6 +1176,7 @@ export async function POST(req: Request) {
   let body: {
     messages?: unknown;
     profileId?: unknown;
+    conversationId?: unknown;
     artistContext?: unknown;
   };
   try {
@@ -1111,11 +1188,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages, profileId } = body;
+  const { messages, profileId, conversationId } = body;
 
   // Validate that either profileId or artistContext is provided
   if (
-    (!profileId || typeof profileId !== 'string') &&
+    !toNullableString(profileId) &&
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {
     return NextResponse.json(
@@ -1147,39 +1224,20 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
+  const resolvedProfileId = toNullableString(profileId);
+  const resolvedConversationId = toNullableString(conversationId);
+
   const systemPrompt = buildSystemPrompt(artistContext, {
-    aiCanUseTools: planLimits.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.aiDailyMessageLimit,
+    aiCanUseTools: planLimits.booleans.aiCanUseTools,
+    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
   });
 
   try {
-    // Convert UIMessages (from the client) to ModelMessages (for streamText)
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Build tools: always include profile edit, conditionally include canvas + release creation
-    const resolvedProfileId =
-      profileId && typeof profileId === 'string' ? profileId : null;
-
     // Gate AI tools behind paid plans — free users get chat-only
-    const tools = planLimits.aiCanUseTools
-      ? {
-          proposeProfileEdit: createProfileEditTool(artistContext),
-          checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
-          suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
-          writeWorldClassBio: createWorldClassBioTool(
-            artistContext,
-            resolvedProfileId
-          ),
-          generateCanvasPlan: createGenerateCanvasPlanTool(resolvedProfileId),
-          createPromoStrategy: createPromoStrategyTool(
-            artistContext,
-            resolvedProfileId
-          ),
-          markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
-          ...(resolvedProfileId
-            ? { createRelease: createReleaseTool(resolvedProfileId) }
-            : {}),
-        }
+    const tools = planLimits.booleans.aiCanUseTools
+      ? buildChatTools(artistContext, resolvedProfileId)
       : {};
 
     const result = streamText({
@@ -1195,12 +1253,16 @@ export async function POST(req: Request) {
         functionId: 'jovie-chat',
       },
       onError: ({ error }) => {
+        if (isClientDisconnect(error, req.signal)) return;
+
         Sentry.captureException(error, {
           tags: { feature: 'ai-chat', errorType: 'streaming' },
           extra: {
             userId,
             messageCount: uiMessages.length,
             requestId,
+            profileId: resolvedProfileId,
+            conversationId: resolvedConversationId,
           },
         });
       },
@@ -1213,33 +1275,23 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: { feature: 'ai-chat' },
-      extra: {
-        userId,
-        messageCount: uiMessages.length,
-        requestId,
-      },
-    });
+    if (isClientDisconnect(error, req.signal)) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Client disconnected', requestId }),
+        {
+          status: 499,
+          headers: { ...CORS_HEADERS, 'x-request-id': requestId },
+        }
+      );
+    }
 
-    const message =
-      error instanceof Error ? error.message : 'An unexpected error occurred';
-
-    return NextResponse.json(
-      {
-        error: 'Failed to process chat request',
-        message:
-          'Jovie hit a temporary issue while processing your message. Please try again.',
-        errorCode:
-          sanitizeErrorCode(
-            error instanceof Error
-              ? (error as { code?: string }).code
-              : undefined
-          ) ?? 'CHAT_STREAM_FAILED',
-        debugMessage: message,
-        requestId,
-      },
-      { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+    return buildChatErrorResponse(
+      error,
+      userId,
+      uiMessages.length,
+      requestId,
+      resolvedProfileId,
+      resolvedConversationId
     );
   }
 }

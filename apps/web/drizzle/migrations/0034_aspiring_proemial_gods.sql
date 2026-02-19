@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "stripe_webhook_events_created_at_idx" ON "stripe_webhook_events" USING btree ("created_at");

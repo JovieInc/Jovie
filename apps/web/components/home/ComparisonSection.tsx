@@ -57,11 +57,11 @@ export function SocialProofSection() {
             </div>
           </div>
 
-          <h2 className='text-4xl font-medium tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
+          <h2 className='text-4xl font-medium tracking-tight text-primary-token sm:text-5xl lg:text-6xl'>
             Musicians love Jovie
           </h2>
 
-          <p className='mt-6 text-xl text-gray-600 dark:text-white/70'>
+          <p className='mt-6 text-xl text-secondary-token'>
             Join thousands of artists who&apos;ve transformed their fan
             experience
           </p>
@@ -72,10 +72,10 @@ export function SocialProofSection() {
           <div className='grid grid-cols-2 md:grid-cols-4 gap-8'>
             {stats.map(stat => (
               <div key={stat.label} className='text-center'>
-                <div className='text-3xl font-bold text-gray-900 dark:text-white'>
+                <div className='text-3xl font-bold text-primary-token'>
                   {stat.number}
                 </div>
-                <div className='text-sm text-gray-500 dark:text-white/60 mt-1'>
+                <div className='text-sm text-tertiary-token mt-1'>
                   {stat.label}
                 </div>
               </div>
@@ -96,7 +96,7 @@ export function SocialProofSection() {
                     </span>
                   </div>
 
-                  <blockquote className='text-gray-700 dark:text-white/90 leading-relaxed mb-6'>
+                  <blockquote className='text-primary-token leading-relaxed mb-6'>
                     &ldquo;{testimonial.quote}&rdquo;
                   </blockquote>
 
@@ -105,10 +105,10 @@ export function SocialProofSection() {
                       {testimonial.avatar}
                     </div>
                     <div className='ml-3'>
-                      <div className='text-gray-900 dark:text-white font-medium'>
+                      <div className='text-primary-token font-medium'>
                         {testimonial.author}
                       </div>
-                      <div className='text-gray-500 dark:text-white/60 text-sm'>
+                      <div className='text-tertiary-token text-sm'>
                         {testimonial.role}
                       </div>
                     </div>

@@ -53,8 +53,13 @@ describe('getCurrentUserEntitlements', () => {
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
+      canAccessAdPixels: false,
+      canBeVerified: false,
+      aiCanUseTools: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
+      smartLinksLimit: 5,
+      aiDailyMessageLimit: 5,
     });
   });
 
@@ -150,8 +155,13 @@ describe('getCurrentUserEntitlements', () => {
       canExportContacts: false,
       canAccessAdvancedAnalytics: false,
       canFilterSelfFromAnalytics: false,
+      canAccessAdPixels: false,
+      canBeVerified: false,
+      aiCanUseTools: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
+      smartLinksLimit: 5,
+      aiDailyMessageLimit: 5,
     });
   });
 
@@ -188,8 +198,13 @@ describe('getCurrentUserEntitlements', () => {
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
+      canAccessAdPixels: true,
+      canBeVerified: true,
+      aiCanUseTools: true,
       analyticsRetentionDays: 90,
       contactsLimit: null,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 100,
     });
   });
 
@@ -226,8 +241,13 @@ describe('getCurrentUserEntitlements', () => {
       canExportContacts: true,
       canAccessAdvancedAnalytics: true,
       canFilterSelfFromAnalytics: true,
+      canAccessAdPixels: true,
+      canBeVerified: true,
+      aiCanUseTools: true,
       analyticsRetentionDays: 365,
       contactsLimit: null,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 500,
     });
   });
 

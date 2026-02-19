@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { DashboardOverviewControlsProvider } from '@/components/dashboard/organisms/DashboardOverviewControlsProvider';
 import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';

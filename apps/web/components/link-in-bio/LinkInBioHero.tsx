@@ -13,9 +13,9 @@ export function LinkInBioHero() {
       subtitle="Your fans don't care about button colors—they care about your music. Jovie's AI tests every word, layout, and CTA behind the scenes to make sure more fans click, listen, and buy."
       icon='🚀'
       supportingText={
-        <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400'>
+        <div className='flex items-center gap-2 text-tertiary-token'>
           <svg
-            className='w-5 h-5 text-green-600 dark:text-green-400'
+            className='w-5 h-5 text-success'
             fill='none'
             viewBox='0 0 24 24'
             stroke='currentColor'

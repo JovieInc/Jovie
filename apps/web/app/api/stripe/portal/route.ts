@@ -31,6 +31,11 @@ export async function POST() {
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
       logger.error('Failed to get user billing info:', billingResult.error);
+      await captureCriticalError(
+        'Portal: billing info lookup failed',
+        new Error(billingResult.error || 'No billing data returned'),
+        { route: '/api/stripe/portal', userId }
+      );
       return NextResponse.json(
         { error: 'Failed to retrieve billing information' },
         { status: 500, headers: NO_STORE_HEADERS }

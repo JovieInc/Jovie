@@ -17,6 +17,7 @@ import type {
   AudienceMember,
   AudienceMemberType,
   AudienceReferrer,
+  AudienceUtmParams,
 } from '@/types';
 
 export type AudienceMode = 'members' | 'subscribers';
@@ -116,6 +117,7 @@ function transformMemberRow(member: {
   deviceType: string | null;
   latestActions: unknown[] | Record<string, unknown>[] | null;
   referrerHistory: unknown[] | Record<string, unknown>[] | null;
+  utmParams: AudienceUtmParams | null;
   email: string | null;
   phone: string | null;
   spotifyConnected: boolean | null;
@@ -135,6 +137,7 @@ function transformMemberRow(member: {
     intentLevel: member.intentLevel,
     latestActions: normalizeLatestActions(member.latestActions),
     referrerHistory: normalizeReferrerHistory(member.referrerHistory),
+    utmParams: normalizeUtmParams(member.utmParams),
     email: member.email,
     phone: member.phone,
     spotifyConnected: Boolean(member.spotifyConnected),
@@ -188,6 +191,18 @@ function normalizeReferrerHistory(value: unknown): AudienceReferrer[] {
   }));
 }
 
+function normalizeUtmParams(value: unknown): AudienceUtmParams {
+  if (!value || typeof value !== 'object') return {};
+  const record = value as Record<string, unknown>;
+  const result: AudienceUtmParams = {};
+  if (typeof record.source === 'string') result.source = record.source;
+  if (typeof record.medium === 'string') result.medium = record.medium;
+  if (typeof record.campaign === 'string') result.campaign = record.campaign;
+  if (typeof record.content === 'string') result.content = record.content;
+  if (typeof record.term === 'string') result.term = record.term;
+  return result;
+}
+
 /** Default member query params when validation fails */
 const DEFAULT_MEMBER_PARAMS = {
   page: 1,
@@ -231,6 +246,7 @@ function buildMemberSelectFields(includeDetails: boolean) {
     referrerHistory: includeDetails
       ? audienceMembers.referrerHistory
       : drizzleSql<unknown[]>`ARRAY[]::jsonb[]`,
+    utmParams: audienceMembers.utmParams,
     email: audienceMembers.email,
     phone: audienceMembers.phone,
     spotifyConnected: audienceMembers.spotifyConnected,
@@ -446,6 +462,7 @@ async function fetchSubscribersData(
       intentLevel: 'medium',
       latestActions: [],
       referrerHistory: [],
+      utmParams: {},
       email: subscriber.email,
       phone: subscriber.phone,
       spotifyConnected: false,
@@ -499,6 +516,50 @@ async function countSubscribers(
   return Number(total ?? 0);
 }
 
+function buildEmptyAudienceData(
+  mode: AudienceMode,
+  view: AudienceView
+): AudienceServerData {
+  return {
+    mode,
+    view,
+    rows: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
+    direction: 'desc',
+    subscriberCount: 0,
+  };
+}
+
+function buildDataPromise(
+  tx: DbSessionTx,
+  clerkUserId: string,
+  selectedProfileId: string,
+  mode: AudienceMode,
+  view: AudienceView,
+  searchParams: SearchParams,
+  options: { includeDetails: boolean; memberId?: string; segments?: string[] }
+) {
+  if (mode === 'subscribers') {
+    return fetchSubscribersData(
+      tx,
+      clerkUserId,
+      selectedProfileId,
+      searchParams
+    );
+  }
+  return fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
+    includeDetails: options.includeDetails,
+    memberId: options.memberId,
+    // 'all' shows all members, 'anonymous' filters to anonymous only
+    typeFilter:
+      view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined,
+    segmentFilter: options.segments,
+  });
+}
+
 export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
@@ -524,55 +585,28 @@ export async function getAudienceServerData(params: {
   const mode: AudienceMode = view === 'subscribers' ? 'subscribers' : 'members';
 
   if (!selectedProfileId) {
-    return {
-      mode,
-      view,
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 10,
-      sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
-      direction: 'desc',
-      subscriberCount: 0,
-    };
+    return buildEmptyAudienceData(mode, view);
   }
 
   // All audience reads now go through authenticated RLS-protected sessions
   // RLS bypass capability has been removed for security hardening
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    // Always count subscribers for the export button state
-    const subscriberCount = await countSubscribers(
+    // Subscriber count and main data query are independent — run in parallel
+    // to eliminate the sequential waterfall.
+    const dataPromise = buildDataPromise(
       tx,
       clerkUserId,
-      selectedProfileId
+      selectedProfileId,
+      mode,
+      view,
+      searchParams,
+      { includeDetails, memberId, segments }
     );
 
-    let data: Omit<AudienceServerData, 'view' | 'subscriberCount'>;
-
-    if (mode === 'subscribers') {
-      data = await fetchSubscribersData(
-        tx,
-        clerkUserId,
-        selectedProfileId,
-        searchParams
-      );
-    } else {
-      // 'all' shows all members, 'anonymous' filters to anonymous only
-      const typeFilter =
-        view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined;
-      data = await fetchMembersData(
-        tx,
-        clerkUserId,
-        selectedProfileId,
-        searchParams,
-        {
-          includeDetails,
-          memberId,
-          typeFilter,
-          segmentFilter: segments,
-        }
-      );
-    }
+    const [subscriberCount, data] = await Promise.all([
+      countSubscribers(tx, clerkUserId, selectedProfileId),
+      dataPromise,
+    ]);
 
     return {
       ...data,

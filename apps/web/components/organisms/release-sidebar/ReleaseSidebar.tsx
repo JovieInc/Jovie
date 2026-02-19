@@ -9,7 +9,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, SegmentControl } from '@jovie/ui';
-import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
@@ -143,7 +143,34 @@ export function ReleaseSidebar({
       ...getUTMShareDropdownItems({
         smartLinkUrl,
         context: utmContext,
-      }),
+      })
+    );
+
+    // "Copy Use Sound link" — only when release has video provider links
+    if (release.hasVideoLinks) {
+      const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
+      items.push(
+        { type: 'separator', id: 'sep-sounds' },
+        {
+          type: 'action',
+          id: 'copy-sounds-link',
+          label: 'Copy Use Sound link',
+          icon: <Sparkles className='h-4 w-4' />,
+          onClick: () => {
+            navigator.clipboard
+              ?.writeText(soundsUrl)
+              .then(() => {
+                toast.success('Use Sound link copied');
+              })
+              .catch(() => {
+                // Silently fail
+              });
+          },
+        }
+      );
+    }
+
+    items.push(
       { type: 'separator', id: 'sep-actions' },
       {
         type: 'action',

@@ -54,6 +54,8 @@ export type ProfileData = Pick<
   | 'theme'
   | 'profileViews'
   | 'genres'
+  | 'location'
+  | 'activeSinceYear'
   | 'venmoHandle'
   | 'spotifyPopularity'
   | 'createdAt'
@@ -123,5 +125,7 @@ export interface ProfileUpdateData {
   marketingOptOut?: boolean;
   settings?: Record<string, unknown>;
   theme?: Record<string, unknown>;
+  location?: string;
+  activeSinceYear?: number;
   onboardingCompletedAt?: Date | null;
 }

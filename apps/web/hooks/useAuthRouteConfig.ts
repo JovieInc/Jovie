@@ -12,6 +12,7 @@ export interface AuthRouteConfig {
   breadcrumbs: DashboardBreadcrumbItem[];
   showMobileTabs: boolean;
   isTableRoute: boolean;
+  isArtistProfileSettings: boolean;
 }
 
 /**
@@ -59,8 +60,9 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     ];
   }, [pathname]);
 
-  // Determine UI flags based on section and pathname
-  const showMobileTabs = section === 'dashboard';
+  // Show mobile bottom tabs on all authenticated sections so users always
+  // have persistent navigation on mobile (dashboard, settings, and admin).
+  const showMobileTabs = true;
 
   // Table routes that need different overflow behavior
   const isTableRoute =
@@ -70,10 +72,16 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');
 
+  // Artist profile settings page gets the preview panel sidebar
+  const isArtistProfileSettings =
+    pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`);
+
   return {
     section,
     breadcrumbs,
     showMobileTabs,
     isTableRoute,
+    isArtistProfileSettings,
   };
 }

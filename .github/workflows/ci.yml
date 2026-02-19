@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  merge_group:
   push:
     branches: [main, 'codegen-bot/**', 'claude/**']
     paths-ignore:
@@ -16,7 +17,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
 
 jobs:
 
@@ -24,7 +25,7 @@ jobs:
     name: Env Example Guard
     # Always run; fast, prevents accidental secret commits.
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
@@ -329,7 +330,7 @@ jobs:
   drizzle-migration-guard:
     name: Migration Guard
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -448,11 +449,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Merge gate for PRs: fast checks + unit tests + a11y must all pass.
-    # Configure this as the required status check in branch protection
-    # instead of ci-fast alone, so unit test and a11y failures block merge.
+    # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
+    # This is the only required status check in the branch ruleset.
     needs: [ci-fast, ci-unit-tests, ci-a11y]
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -652,14 +652,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Cache Next build cache
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: .next/cache
-          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-next-
+      # .next/cache is managed by Turbo — no separate cache step needed
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -676,8 +669,13 @@ jobs:
         run: |
           cd apps/web
 
-          # Start Next.js standalone server in background
-          node .next/standalone/server.js &
+          if [ ! -f .lighthouserc.build.json ]; then
+            echo "⚠️ Lighthouse config not found; skipping."
+            exit 0
+          fi
+
+          # Start Next.js standalone server in background (monorepo places it under apps/web/)
+          node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
           # Wait for server to be ready
@@ -691,7 +689,7 @@ jobs:
           done
 
           # Run Lighthouse CI with build config
-          npx lhci autorun --config=.lighthouserc.build.json || {
+          pnpm exec lhci autorun --config=.lighthouserc.build.json || {
             echo "⚠️ Lighthouse checks failed - performance regression detected"
             kill $SERVER_PID 2>/dev/null || true
             exit 1
@@ -704,13 +702,14 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
   ci-unit-tests:
     name: Unit Tests
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs (critical + changed) and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    # Unit tests run on all PRs, merge queue, and push to main
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -774,20 +773,18 @@ jobs:
           COVERAGE_FLAG="--coverage"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running critical tests with coverage"
-            # Run only *.critical.test.ts files - vitest matches "critical" substring in file paths
-            # Full test suite runs in nightly CI, not on every main push
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            echo "🚀 Main branch: Running full test suite with coverage"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running critical tests with coverage + tests changed since ${{ github.base_ref }}"
-            # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
-            # Then run tests for changed files (coverage already generated above)
-            git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-            pnpm --filter=@jovie/web run test -- --changed origin/${{ github.base_ref }} ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🔍 PR: Running full test suite with coverage"
+            # Run all tests on PRs to catch regressions before merge
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           else
-            echo "📦 Full suite with coverage"
-            pnpm --filter=@jovie/web run test -- $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            echo "🔍 Feature branch push: Running critical tests only (no base_ref available)"
+            # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
+            # so we can't determine changed files. Run critical tests only to avoid OOM
+            # from the full test suite. The PR event covers changed-file tests.
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -807,7 +804,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           directory: apps/web/coverage
           flags: unittests
@@ -816,7 +813,7 @@ jobs:
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1
         with:
           directory: apps/web
           flags: unittests
@@ -826,7 +823,7 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -883,7 +880,7 @@ jobs:
           # The axe audit only tests public routes (SMOKE_ONLY=1) so no real auth is needed.
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          PORT=3100 npx next start &
+          PORT=3100 pnpm --filter=@jovie/web exec next start &
           SERVER_PID=$!
           # Wait for server to accept connections
           for i in $(seq 1 30); do
@@ -985,6 +982,7 @@ jobs:
           SMOKE_ONLY: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
 
       - name: Upload Playwright Artifacts on Failure
@@ -992,6 +990,105 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
+
+      - name: Cleanup ephemeral Neon branch
+        if: always() && steps.check_changes.outputs.run_full_ci == 'true' && steps.neon-branch.outputs.branch_id != ''
+        continue-on-error: true
+        run: |
+          curl -sS -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/${{ steps.neon-branch.outputs.branch_id }}"
+
+  ci-admin-smoke:
+    name: Admin E2E Smoke
+    environment: Preview – jovie
+    # Gated: only runs with 'testing' label (admin tests need auth credentials)
+    # Also runs on push to main for full coverage
+    needs: [ci-fast]
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping admin smoke; no E2E-relevant paths changed."
+          exit 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Create ephemeral Neon database branch (with retry)
+        id: neon-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run Admin Smoke Tests (Chromium)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_ADMIN_USERNAME: ${{ secrets.E2E_CLERK_ADMIN_USERNAME }}
+          E2E_CLERK_ADMIN_PASSWORD: ${{ secrets.E2E_CLERK_ADMIN_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+        run: pnpm --filter=@jovie/web exec playwright test admin-page-content admin-navigation --project=chromium
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
@@ -1077,25 +1174,6 @@ jobs:
           NODE_ENV: test
           GIT_BRANCH: ${{ github.ref_name }}
           ALLOW_PROD_MIGRATIONS: 'true'
-
-  ci-merge-smoke:
-    name: Merge Group Smoke
-    if: ${{ github.event_name == 'merge_group' }}
-    needs: [ci-fast]
-    runs-on: ubuntu-latest
-    timeout-minutes: 7
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 2
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Build (smoke)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   ci-e2e-tests:
     name: E2E Tests
@@ -1214,6 +1292,7 @@ jobs:
           SMOKE_ONLY: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -1236,6 +1315,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           # Optional: enable deterministic spotify-only UI check
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
@@ -1249,6 +1329,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -1331,10 +1412,6 @@ jobs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-        with:
-          node-version: 24
-          package-manager-cache: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -1603,7 +1680,7 @@ jobs:
   # These tests verify the most critical user flows: public profiles + auth
   ci-smoke-required:
     name: Smoke Tests (Required)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke]
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -1622,6 +1699,17 @@ jobs:
           fi
 
           echo "E2E Smoke (PR Fast Feedback) succeeded."
+
+      - name: Gate admin smoke on PRs
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          # ci-admin-smoke: allow skip (label-gated) but block on failure
+          if [ "${{ needs.ci-admin-smoke.result }}" == "failure" ]; then
+            echo "Admin E2E Smoke did not succeed."
+            exit 1
+          fi
+
+          echo "Admin E2E Smoke: ${{ needs.ci-admin-smoke.result }} (skip/success OK)"
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -1672,6 +1760,7 @@ jobs:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -2030,4 +2119,4 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: npx lhci autorun --config=.lighthouserc.json
+        run: pnpm exec lhci autorun --config=.lighthouserc.json

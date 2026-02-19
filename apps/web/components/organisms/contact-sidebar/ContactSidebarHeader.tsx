@@ -38,7 +38,7 @@ function ContactTitle({
         onClick={onCopyClerkId}
         className={
           isClerkIdCopied
-            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400 transition-colors'
+            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-success transition-colors'
             : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors'
         }
         aria-label='Copy Clerk ID'

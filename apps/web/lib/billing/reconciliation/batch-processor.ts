@@ -21,6 +21,41 @@ import { detectStatusMismatch } from './subscription-status-resolver';
 export const BATCH_SIZE = 100;
 
 /**
+ * Fetch all Stripe subscriptions in bulk via pagination.
+ * Returns a Map keyed by subscription ID for O(1) lookups.
+ */
+export async function fetchAllSubscriptionsMap(
+  stripe: Stripe
+): Promise<Map<string, Stripe.Subscription>> {
+  const subscriptionsMap = new Map<string, Stripe.Subscription>();
+  let hasMore = true;
+  let startingAfter: string | undefined;
+
+  while (hasMore) {
+    const params: Stripe.SubscriptionListParams = {
+      status: 'all',
+      limit: 100,
+    };
+    if (startingAfter) {
+      params.starting_after = startingAfter;
+    }
+
+    const page = await stripe.subscriptions.list(params);
+
+    for (const subscription of page.data) {
+      subscriptionsMap.set(subscription.id, subscription);
+    }
+
+    hasMore = page.has_more;
+    if (page.data.length > 0) {
+      startingAfter = page.data[page.data.length - 1].id;
+    }
+  }
+
+  return subscriptionsMap;
+}
+
+/**
  * User data structure for reconciliation
  */
 export interface UserBatchItem {
@@ -139,21 +174,51 @@ async function handleMismatch(
 }
 
 /**
- * Process a single user for reconciliation
+ * Process a single user for reconciliation.
+ *
+ * When a pre-fetched `subscriptionsMap` is provided the subscription is looked
+ * up locally (O(1)) instead of making a per-user Stripe API call.  If the
+ * subscription is not found in the map it is treated as a "not_found" retrieval
+ * error (same as an orphaned subscription).
+ *
+ * When `subscriptionsMap` is omitted the function falls back to the original
+ * per-user `retrieveSubscriptionSafely()` call.
  */
 export async function processSingleUser(
   db: DbOrTransaction,
   stripe: Stripe,
-  user: UserBatchItem
+  user: UserBatchItem,
+  subscriptionsMap?: Map<string, Stripe.Subscription>
 ): Promise<ProcessUserResult> {
   // Skip users without subscription ID
   if (!user.stripeSubscriptionId) {
     return { action: 'skipped' };
   }
 
-  // Retrieve subscription from Stripe
-  const { subscription, error: retrievalError } =
-    await retrieveSubscriptionSafely(stripe, user.stripeSubscriptionId);
+  let subscription: Stripe.Subscription | null = null;
+  let retrievalError: { type: string; message: string } | null = null;
+
+  if (subscriptionsMap) {
+    // Use pre-fetched map for O(1) lookup
+    const found = subscriptionsMap.get(user.stripeSubscriptionId);
+    if (found) {
+      subscription = found;
+    } else {
+      // Subscription not in Stripe at all – treat as orphaned / not_found
+      retrievalError = {
+        type: 'not_found',
+        message: 'Subscription not found in Stripe (bulk fetch)',
+      };
+    }
+  } else {
+    // Fallback: per-user Stripe API call
+    const result = await retrieveSubscriptionSafely(
+      stripe,
+      user.stripeSubscriptionId
+    );
+    subscription = result.subscription;
+    retrievalError = result.error;
+  }
 
   // Handle retrieval errors (orphaned subscriptions, Stripe errors)
   if (retrievalError) {

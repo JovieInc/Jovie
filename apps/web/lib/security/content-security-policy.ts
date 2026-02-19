@@ -6,6 +6,7 @@ export const SCRIPT_NONCE_HEADER = 'x-nonce';
 type BuildCspOptions = {
   nonce: string;
   isDev?: boolean;
+  enableToolbar?: boolean;
 };
 
 /**
@@ -54,7 +55,8 @@ const STATIC_CSP_PARTS = {
   frameAncestors: "frame-ancestors 'none'",
   formAction: "form-action 'self'",
   styleSrc: "style-src 'self' 'unsafe-inline'",
-  fontSrc: "font-src 'self' data:",
+  fontSrc:
+    "font-src 'self' data: https://vercel.live https://assets.vercel.com",
   workerSrc: "worker-src 'self' blob:",
   manifestSrc: "manifest-src 'self'",
 
@@ -89,6 +91,8 @@ const STATIC_CSP_PARTS = {
     'https://*.public.blob.vercel-storage.com',
     'https://*.blob.vercel-storage.com',
     'https://*.mzstatic.com',
+    'https://vercel.live',
+    'https://vercel.com',
   ].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
@@ -107,6 +111,8 @@ const STATIC_CSP_PARTS = {
     'https://jov.ie',
     'https://challenges.cloudflare.com',
     'https://clerk-telemetry.com',
+    'https://vercel.live',
+    'wss://ws-us3.pusher.com',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)
@@ -131,11 +137,12 @@ const STATIC_CSP_PARTS = {
 const buildCspDirectives = ({
   nonce,
   isDev = isDevelopment(),
+  enableToolbar = !process.env.NEXT_DISABLE_TOOLBAR,
 }: BuildCspOptions): string[] => {
-  // Build script-src with nonce and optional dev 'unsafe-eval'
-  const scriptSrc = isDev
-    ? `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' 'unsafe-eval' ${STATIC_CSP_PARTS.scriptSrcSuffix}`
-    : `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
+  // 'unsafe-eval' is only needed when @vercel/toolbar is active (its client
+  // runtime uses eval()). Nonce-based CSP still prevents script injection.
+  const evalDirective = enableToolbar ? " 'unsafe-eval'" : '';
+  const scriptSrc = `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}'${evalDirective} ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
 
   // Build connect-src with optional dev localhost
   // Note: localhost:25000 is Turbopack HMR, localhost:25011 is Vercel toolbar
@@ -143,8 +150,9 @@ const buildCspDirectives = ({
     ? `${STATIC_CSP_PARTS.connectSrcBase} http://localhost:25000 http://localhost:25011 ws://localhost:25000`
     : STATIC_CSP_PARTS.connectSrcBase;
 
-  // Build frame-src with optional dev vercel.live
-  const frameSrc = isDev
+  // https://vercel.live is needed when the Vercel Toolbar is active
+  // for the iframe-based UI (comments, flags panel, etc.)
+  const frameSrc = enableToolbar
     ? `${STATIC_CSP_PARTS.frameSrcBase} https://vercel.live`
     : STATIC_CSP_PARTS.frameSrcBase;
 

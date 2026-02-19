@@ -38,7 +38,7 @@ test.describe('Pricing Page', () => {
     const firstButton = getStartedButtons.first();
     await expect(firstButton).toBeVisible();
     const href = await firstButton.getAttribute('href');
-    expect(href).toContain('/waitlist');
+    expect(href).toContain('/signup');
   });
 
   test('shows pricing tier details', async ({ page }) => {

@@ -189,18 +189,18 @@ describe('PlaceholderImage', () => {
   });
 
   describe('accessibility', () => {
-    it('SVG has role attribute', () => {
+    it('SVG has aria-hidden attribute', () => {
       const { container } = render(<PlaceholderImage />);
       const svg = container.querySelector('svg');
 
-      expect(svg).toHaveAttribute('role', 'img');
+      expect(svg).toHaveAttribute('aria-hidden', 'true');
     });
 
-    it('SVG has aria-label', () => {
+    it('SVG is decorative (no aria-label)', () => {
       const { container } = render(<PlaceholderImage />);
       const svg = container.querySelector('svg');
 
-      expect(svg).toHaveAttribute('aria-label', 'Default profile picture');
+      expect(svg).not.toHaveAttribute('aria-label');
     });
 
     it('custom children do not have forced accessibility attributes', () => {

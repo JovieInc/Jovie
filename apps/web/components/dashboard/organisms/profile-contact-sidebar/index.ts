@@ -2,6 +2,6 @@ export { ProfileContactHeader } from './ProfileContactHeader';
 export { ProfileContactSidebar } from './ProfileContactSidebar';
 export {
   type CategoryOption,
-  ProfileLinkCategorySelector,
-} from './ProfileLinkCategorySelector';
-export { getCategoryCounts, ProfileLinkList } from './ProfileLinkList';
+  getCategoryCounts,
+  ProfileLinkList,
+} from './ProfileLinkList';

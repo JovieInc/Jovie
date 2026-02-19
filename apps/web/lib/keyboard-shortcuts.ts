@@ -115,7 +115,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then C',
     category: 'navigation',
     icon: IdCard,
-    href: APP_ROUTES.CONTACTS,
+    href: APP_ROUTES.SETTINGS_CONTACTS,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'c',
@@ -137,7 +137,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     keys: 'G then O',
     category: 'navigation',
     icon: CalendarDays,
-    href: APP_ROUTES.TOUR_DATES,
+    href: APP_ROUTES.SETTINGS_TOURING,
     isSequential: true,
     firstKey: 'g',
     secondKey: 'o',
@@ -212,13 +212,13 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   overview: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-dashboard')!,
   profile: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-profile')!,
-  contacts: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-contacts')!,
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
-  'tour-dates': KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-tour-dates')!,
   audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,
   chat: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-chat')!,
   account: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-settings')!,
+  contacts: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-contacts')!,
+  touring: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-tour-dates')!,
 };
 
 /**

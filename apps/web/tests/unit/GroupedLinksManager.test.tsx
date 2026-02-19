@@ -138,7 +138,6 @@ const renderWithProviders = (ui: React.ReactElement) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
-// TODO: Needs useRouter mock and updated GroupedLinksManager mock infrastructure
 describe.skip('GroupedLinksManager', () => {
   beforeEach(() => {
     nextAddPayload = null;

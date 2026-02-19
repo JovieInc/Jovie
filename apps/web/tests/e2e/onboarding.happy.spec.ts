@@ -44,7 +44,7 @@ test.describe('Onboarding Happy Path', () => {
     }
   });
 
-  test('programmatic session → onboarding (name → handle → done) → dashboard', async ({
+  test('programmatic session → onboarding (handle → done) → dashboard', async ({
     page,
   }) => {
     // Set timeout to 60 seconds as per requirement
@@ -91,18 +91,7 @@ test.describe('Onboarding Happy Path', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    // Step 4a: Name step - fill display name and continue
-    const nameInput = page.getByLabel('Your name');
-    await expect(nameInput).toBeVisible({ timeout: 5_000 });
-
-    const displayName = `Playwright User ${Date.now().toString(36)}`;
-    await nameInput.fill(displayName);
-
-    const continueButton = page.getByRole('button', { name: 'Continue' });
-    await expect(continueButton).toBeVisible({ timeout: 5_000 });
-    await continueButton.click();
-
-    // Step 4b: Handle step - claim an available handle
+    // Step 4: Handle step - claim an available handle
     const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 

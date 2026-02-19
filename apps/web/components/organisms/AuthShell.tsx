@@ -1,8 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
+import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
 import {
   SidebarInset,
   SidebarProvider,
@@ -10,6 +12,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
+import { useTablePanel } from '@/contexts/TablePanelContext';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -25,6 +28,8 @@ export interface AuthShellProps {
   /** Preview panel slot (rendered alongside main content) */
   readonly previewPanel?: ReactNode;
   readonly onSidebarOpenChange?: (open: boolean) => void;
+  /** Server-provided sidebar default open state (from cookie). Eliminates layout flash. */
+  readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -42,6 +47,8 @@ function AuthShellInner({
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
+  const tablePanel = useTablePanel();
+  const previewPanelState = usePreviewPanelState();
 
   // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
@@ -60,17 +67,23 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            mobileProfileSlot={
+              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+            }
             showDivider={isTableRoute}
           />
         )}
         {isTableRoute ? (
           <div
             className={cn(
-              'flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto',
-              showMobileTabs && 'pb-20 lg:pb-6'
+              'flex-1 min-h-0 overflow-hidden flex',
+              showMobileTabs && 'pb-20 lg:pb-0'
             )}
           >
-            {children}
+            <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
+              {children}
+            </div>
+            {tablePanel}
           </div>
         ) : (
           <div className='flex-1 min-h-0 overflow-hidden flex'>
@@ -103,11 +116,14 @@ function AuthShellInner({
  * by individual page components using the shared RightDrawer shell.
  */
 export function AuthShell(props: Readonly<AuthShellProps>) {
-  const { onSidebarOpenChange, ...rest } = props;
+  const { onSidebarOpenChange, sidebarDefaultOpen, ...rest } = props;
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SidebarProvider onOpenChange={onSidebarOpenChange}>
+      <SidebarProvider
+        defaultOpen={sidebarDefaultOpen}
+        onOpenChange={onSidebarOpenChange}
+      >
         <AuthShellInner {...rest} />
       </SidebarProvider>
     </div>

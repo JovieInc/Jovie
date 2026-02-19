@@ -1,6 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import * as Sentry from '@sentry/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +14,7 @@ import {
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
 
-import type { ArtistContext, ChatError } from '../types';
+import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
 import {
   extractErrorMetadata,
@@ -102,9 +103,14 @@ export function useJovieChat({
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
-        body: profileId ? { profileId } : { artistContext },
+        body: {
+          ...(profileId ? { profileId } : { artistContext }),
+          ...(activeConversationId
+            ? { conversationId: activeConversationId }
+            : {}),
+        },
       }),
-    [profileId, artistContext]
+    [profileId, artistContext, activeConversationId]
   );
 
   // Convert loaded messages to the UIMessage format useChat expects
@@ -129,6 +135,18 @@ export function useJovieChat({
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
     onError: error => {
+      Sentry.captureException(error, {
+        tags: {
+          feature: 'ai-chat',
+          source: 'useJovieChat',
+          errorType: 'stream',
+        },
+        extra: {
+          profileId: profileId ?? null,
+          conversationId: activeConversationId,
+        },
+      });
+
       const errorType = getErrorType(error);
       const metadata = extractErrorMetadata(error);
 
@@ -278,6 +296,18 @@ export function useJovieChat({
           }
         },
         onError: err => {
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'message-persistence',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+              messageCount: messagesToPersist.length,
+            },
+          });
           console.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
@@ -299,12 +329,15 @@ export function useJovieChat({
     addMessagesMutation,
     queryClient,
     messages,
+    profileId,
   ]);
 
   // Core submit logic
   const doSubmit = useCallback(
-    async (text: string) => {
-      if (!text.trim() || isLoading || isSubmitting) return;
+    async (text: string, files?: FileUIPart[]) => {
+      const hasFiles = files && files.length > 0;
+      if (!text.trim() && !hasFiles) return;
+      if (isLoading || isSubmitting) return;
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -333,7 +366,7 @@ export function useJovieChat({
         // No active conversation, create one first
         try {
           const result = await createConversationMutation.mutateAsync({
-            initialMessage: trimmedText,
+            initialMessage: trimmedText || '(image attachment)',
           });
           setActiveConversationId(result.conversation.id);
           onConversationCreate?.(result.conversation.id);
@@ -345,6 +378,17 @@ export function useJovieChat({
             assistantMessage: '', // Will be filled when response completes
           };
         } catch (err) {
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'conversation-create',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+            },
+          });
           console.error('[useJovieChat] Failed to create conversation:', err);
           setChatError({
             type: 'server',
@@ -358,7 +402,10 @@ export function useJovieChat({
         }
       }
 
-      sendMessage({ text: trimmedText });
+      sendMessage({
+        text: trimmedText,
+        ...(hasFiles ? { files } : {}),
+      });
       setInput('');
 
       // Reset textarea height
@@ -373,6 +420,7 @@ export function useJovieChat({
       activeConversationId,
       createConversationMutation,
       onConversationCreate,
+      profileId,
     ]
   );
 
@@ -392,18 +440,19 @@ export function useJovieChat({
   });
 
   const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
+    (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      throttledSubmit(input);
+      throttledSubmit(input, files);
     },
     [input, throttledSubmit]
   );
 
-  const handleSuggestedPrompt = useCallback((prompt: string) => {
-    setInput(prompt);
-    // Focus the input after setting the prompt
-    inputRef.current?.focus();
-  }, []);
+  const handleSuggestedPrompt = useCallback(
+    (prompt: string) => {
+      doSubmit(prompt);
+    },
+    [doSubmit]
+  );
 
   return {
     // State

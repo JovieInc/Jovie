@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
 import { generateInsights } from '@/lib/services/insights/insight-generator';
@@ -27,6 +28,25 @@ export async function POST() {
       return NextResponse.json(
         { error: 'Creator profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Insight generation requires AI tools (pro/growth plan)
+    try {
+      const entitlements = await getCurrentUserEntitlements();
+      if (!entitlements.isPro) {
+        return NextResponse.json(
+          {
+            error:
+              'AI-generated insights require a Pro plan. Upgrade to unlock this feature.',
+          },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: 'Unable to verify plan status. Please try again.' },
+        { status: 503, headers: NO_STORE_HEADERS }
       );
     }
 

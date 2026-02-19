@@ -6,13 +6,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const cardVariants = cva(
-  'rounded-2xl border border-subtle bg-surface-1 text-primary-token shadow-sm transition-colors',
+  'rounded-lg border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal',
   {
     variants: {
       variant: {
         default: '',
         hoverable:
-          'hover:bg-surface-2 hover:shadow-md cursor-pointer motion-reduce:transition-none',
+          'hover:bg-surface-2 hover:shadow-card-elevated cursor-pointer motion-reduce:transition-none',
       },
     },
     defaultVariants: {

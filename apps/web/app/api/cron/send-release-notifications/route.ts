@@ -526,84 +526,100 @@ async function processNotificationBatches(
 }
 
 /**
+ * Core logic for sending pending release notifications.
+ * Exported for use by the consolidated /api/cron/frequent handler.
+ */
+export async function sendPendingNotifications(): Promise<{
+  sent: number;
+  failed: number;
+  skipped: number;
+  processed: number;
+}> {
+  const now = new Date();
+  const sendingTimeoutThreshold = new Date(now.getTime() - SENDING_TIMEOUT_MS);
+
+  // Recovery: Reset stuck "sending" rows back to "pending" for retry
+  const recoveredCount = await recoverStuckNotifications(
+    now,
+    sendingTimeoutThreshold
+  );
+  if (recoveredCount > 0) {
+    logger.info(
+      `[send-release-notifications] Recovered ${recoveredCount} stuck "sending" rows`
+    );
+  }
+
+  // Find pending notifications that are due
+  const pendingNotifications = await fetchPendingNotifications(now);
+
+  if (pendingNotifications.length === 0) {
+    logger.info('[send-release-notifications] No pending notifications');
+    return { sent: 0, failed: 0, skipped: 0, processed: 0 };
+  }
+
+  // Batch fetch all required data upfront
+  const releaseIds = [...new Set(pendingNotifications.map(n => n.releaseId))];
+  const creatorProfileIds = [
+    ...new Set(pendingNotifications.map(n => n.creatorProfileId)),
+  ];
+  const subscriptionIds = [
+    ...new Set(pendingNotifications.map(n => n.notificationSubscriptionId)),
+  ];
+
+  const [releasesMap, creatorsMap, subscribersMap, linksMap] =
+    await Promise.all([
+      batchFetchReleases(releaseIds),
+      batchFetchCreatorProfiles(creatorProfileIds),
+      batchFetchSubscribers(subscriptionIds),
+      batchFetchStreamingLinks(releaseIds),
+    ]);
+
+  // Process notifications in parallel batches
+  const totals = await processNotificationBatches(
+    pendingNotifications,
+    now,
+    releasesMap,
+    creatorsMap,
+    subscribersMap,
+    linksMap
+  );
+
+  logger.info(
+    `[send-release-notifications] Sent ${totals.totalSent}, skipped ${totals.totalSkipped}, failed ${totals.totalFailed}`
+  );
+
+  return {
+    sent: totals.totalSent,
+    failed: totals.totalFailed,
+    skipped: totals.totalSkipped,
+    processed: pendingNotifications.length,
+  };
+}
+
+/**
  * Cron job to send pending release day notifications.
- *
- * This job:
- * 1. Finds pending notifications where scheduledFor <= now
- * 2. Fetches release details and streaming links
- * 3. Sends email/SMS notifications to subscribers
- * 4. Updates notification status to 'sent' or 'failed'
  *
  * Schedule: Every hour (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  // Verify cron secret in all environments
   const authHeader = request.headers.get('authorization');
   if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return createUnauthorizedResponse();
   }
 
-  const now = new Date();
-  const sendingTimeoutThreshold = new Date(now.getTime() - SENDING_TIMEOUT_MS);
-
   try {
-    // Recovery: Reset stuck "sending" rows back to "pending" for retry
-    const recoveredCount = await recoverStuckNotifications(
-      now,
-      sendingTimeoutThreshold
-    );
-    if (recoveredCount > 0) {
-      logger.info(
-        `[send-release-notifications] Recovered ${recoveredCount} stuck "sending" rows`
-      );
+    const result = await sendPendingNotifications();
+
+    if (result.processed === 0) {
+      return createEmptyResponse(new Date());
     }
-
-    // Find pending notifications that are due
-    const pendingNotifications = await fetchPendingNotifications(now);
-
-    if (pendingNotifications.length === 0) {
-      logger.info('[send-release-notifications] No pending notifications');
-      return createEmptyResponse(now);
-    }
-
-    // Batch fetch all required data upfront
-    const releaseIds = [...new Set(pendingNotifications.map(n => n.releaseId))];
-    const creatorProfileIds = [
-      ...new Set(pendingNotifications.map(n => n.creatorProfileId)),
-    ];
-    const subscriptionIds = [
-      ...new Set(pendingNotifications.map(n => n.notificationSubscriptionId)),
-    ];
-
-    const [releasesMap, creatorsMap, subscribersMap, linksMap] =
-      await Promise.all([
-        batchFetchReleases(releaseIds),
-        batchFetchCreatorProfiles(creatorProfileIds),
-        batchFetchSubscribers(subscriptionIds),
-        batchFetchStreamingLinks(releaseIds),
-      ]);
-
-    // Process notifications in parallel batches
-    const totals = await processNotificationBatches(
-      pendingNotifications,
-      now,
-      releasesMap,
-      creatorsMap,
-      subscribersMap,
-      linksMap
-    );
-    const { totalSent, totalFailed, totalSkipped } = totals;
-
-    logger.info(
-      `[send-release-notifications] Sent ${totalSent}, skipped ${totalSkipped}, failed ${totalFailed}`
-    );
 
     return createSuccessResponse(
-      totalSent,
-      totalFailed,
-      totalSkipped,
-      pendingNotifications.length,
-      now
+      result.sent,
+      result.failed,
+      result.skipped,
+      result.processed,
+      new Date()
     );
   } catch (error) {
     logger.error('[send-release-notifications] Processing failed:', error);

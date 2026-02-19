@@ -1,6 +1,6 @@
 'use client';
 
-import * as Headless from '@headlessui/react';
+import { ComboboxOption as HeadlessComboboxOption } from '@headlessui/react';
 import { clsx } from 'clsx';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
@@ -71,12 +71,14 @@ function OptionImage({
 
 export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
   return (
-    <Headless.Combobox.Option
+    <HeadlessComboboxOption
       className={({ active }) =>
         clsx(
           'relative cursor-pointer select-none px-4 py-3 transition-colors',
           'focus-visible:outline-none',
-          active ? 'bg-indigo-600 text-white' : 'text-gray-900 hover:bg-gray-50'
+          active
+            ? 'bg-accent text-accent-foreground'
+            : 'text-primary-token hover:bg-surface-1'
         )
       }
       value={option}
@@ -118,6 +120,6 @@ export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
           )}
         </div>
       )}
-    </Headless.Combobox.Option>
+    </HeadlessComboboxOption>
   );
 }

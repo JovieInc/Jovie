@@ -24,8 +24,18 @@ export function TablePaginationFooter({
   onPageSizeChange,
   className,
 }: TablePaginationFooterProps) {
-  // Hide pagination when there's no data
-  if (totalItems === 0) return null;
+  if (totalItems === 0) {
+    return (
+      <div
+        className={cn(
+          'flex items-center px-4 py-3 bg-surface-0 border-t border-subtle',
+          className
+        )}
+      >
+        <span className='text-sm text-secondary-token'>0 results</span>
+      </div>
+    );
+  }
 
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);

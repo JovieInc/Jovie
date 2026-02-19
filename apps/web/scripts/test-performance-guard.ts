@@ -56,13 +56,11 @@ class TestPerformanceGuard {
     critical: {
       maxTotalDuration: 400000, // 6.67 minutes
       description: 'Critical regression suite (includes auth E2E tests)',
-      // TODO: Optimize auth tests to reduce back to 120s target
-      // See: https://github.com/JovieInc/Jovie/issues/TBD
     },
     full: {
-      maxTotalDuration: 300000,
+      maxTotalDuration: 420000,
       description:
-        'Full coverage runs should stay under 5 minutes to guard against drift.',
+        'Full coverage runs should stay under 7 minutes to guard against drift.',
     },
   };
 

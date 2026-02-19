@@ -14,6 +14,7 @@ import { syncEmailFromClerk } from './clerk-sync';
 import { resolveProfileState } from './profile-state-resolver';
 // eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { checkUserStatus } from './status-checker';
+import { isWaitlistEnabled } from './waitlist-config';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -89,6 +90,17 @@ function determineUserStatus(
   existingUserData: ExistingUserData | undefined
 ): UserLifecycleStatus {
   if (!waitlistEntryId) {
+    // When waitlist is disabled, skip waitlist states — treat as approved
+    if (!isWaitlistEnabled()) {
+      const hasClaimedProfile =
+        existingUserData?.profileId && existingUserData.profileClaimed;
+      if (!hasClaimedProfile) {
+        return 'waitlist_approved';
+      }
+      return existingUserData.onboardingComplete
+        ? 'active'
+        : 'onboarding_incomplete';
+    }
     return 'waitlist_pending';
   }
 
@@ -105,12 +117,120 @@ function determineUserStatus(
 
 /**
  * Check if an error is a permanent error that should not be retried.
+ * Email uniqueness violations are NOT permanent — they're handled by
+ * the clerk_id adoption path in createUserWithRetry.
  */
 function isPermanentError(error: Error): boolean {
-  return (
-    error.message?.includes('duplicate key') ||
-    error.message?.includes('constraint')
-  );
+  const msg = error.message ?? '';
+  const constraint = (error as { constraint?: string })?.constraint;
+
+  // Email uniqueness conflicts are recoverable via clerk_id adoption
+  if (
+    constraint === 'users_email_unique' ||
+    msg.includes('users_email_unique')
+  ) {
+    return false;
+  }
+
+  return msg.includes('duplicate key') || msg.includes('constraint');
+}
+
+/**
+ * Check if an insert error is an email uniqueness conflict and attempt
+ * to adopt the existing row by updating its clerk_id.
+ * Returns the adopted user ID, or null if not an email conflict.
+ */
+async function tryAdoptExistingUser(
+  insertError: unknown,
+  email: string | null,
+  clerkUserId: string,
+  userStatus: UserLifecycleStatus
+): Promise<string | null> {
+  if (!email) return null;
+
+  const constraint = (insertError as { constraint?: string })?.constraint;
+  const isEmailConflict =
+    constraint === 'users_email_unique' ||
+    (insertError instanceof Error &&
+      insertError.message?.includes('users_email_unique'));
+
+  if (!isEmailConflict) return null;
+
+  const [adopted] = await db
+    .update(users)
+    .set({
+      clerkId: clerkUserId,
+      userStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.email, email))
+    .returning({ id: users.id });
+
+  return adopted?.id ?? null;
+}
+
+/** Build an error summary string from a database error for logging. */
+function buildErrorSummary(error: unknown): {
+  summary: string;
+  dbErrorCode: string | undefined;
+  dbConstraint: string | undefined;
+  dbDetail: string | undefined;
+} {
+  const normalizedError =
+    error instanceof Error ? error : new Error('Unknown error');
+  const dbErrorCode = (error as { code?: string })?.code;
+  const dbConstraint = (error as { constraint?: string })?.constraint;
+  const dbDetail = (error as { detail?: string })?.detail;
+  const summary = [
+    normalizedError.message,
+    dbErrorCode && `code=${dbErrorCode}`,
+    dbConstraint && `constraint=${dbConstraint}`,
+    dbDetail && `detail=${dbDetail}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return { summary, dbErrorCode, dbConstraint, dbDetail };
+}
+
+/** Upsert a user row, handling email uniqueness conflicts via adoption. */
+async function upsertUser(
+  clerkUserId: string,
+  email: string | null,
+  userStatus: UserLifecycleStatus,
+  waitlistEntryId: string | undefined
+): Promise<string> {
+  try {
+    const [createdUser] = await db
+      .insert(users)
+      .values({
+        clerkId: clerkUserId,
+        email,
+        userStatus,
+        waitlistEntryId,
+      })
+      .onConflictDoUpdate({
+        target: users.clerkId,
+        set: {
+          ...(email ? { email } : {}),
+          userStatus,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: users.id });
+
+    if (createdUser?.id) return createdUser.id;
+  } catch (insertError) {
+    const adoptedId = await tryAdoptExistingUser(
+      insertError,
+      email,
+      clerkUserId,
+      userStatus
+    );
+    if (adoptedId) return adoptedId;
+    throw insertError;
+  }
+
+  throw new Error('Failed to create or retrieve user');
 }
 
 /**
@@ -134,14 +254,12 @@ async function createUserWithRetry(
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
-      if (attempt > 0) {
-        const delay = Math.min(1000 * attempt, 3000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+    if (attempt > 0) {
+      const delay = Math.min(1000 * attempt, 3000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
 
-      // Check if user already has an existing DB record with a claimed profile
+    try {
       const [existingUserData] = await db
         .select({
           userId: users.id,
@@ -162,34 +280,13 @@ async function createUserWithRetry(
         .limit(1);
 
       const userStatus = determineUserStatus(waitlistEntryId, existingUserData);
-
-      const [createdUser] = await db
-        .insert(users)
-        .values({
-          clerkId: clerkUserId,
-          email,
-          userStatus,
-          waitlistEntryId, // Keep for historical tracking only
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: {
-            email,
-            userStatus,
-            updatedAt: new Date(),
-          },
-        })
-        .returning({ id: users.id });
-
-      if (!createdUser?.id) {
-        throw new Error('Failed to create or retrieve user');
-      }
-
-      return createdUser.id;
+      return await upsertUser(clerkUserId, email, userStatus, waitlistEntryId);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
+      const { summary, dbErrorCode, dbConstraint, dbDetail } =
+        buildErrorSummary(error);
       await captureError(
-        `User creation failed (attempt ${attempt + 1}/${maxRetries})`,
+        `User creation failed (attempt ${attempt + 1}/${maxRetries}): ${summary}`,
         lastError,
         {
           clerkUserId,
@@ -197,15 +294,18 @@ async function createUserWithRetry(
           attempt: attempt + 1,
           maxRetries,
           operation: 'createUserWithRetry',
+          errorType: lastError.constructor?.name ?? 'unknown',
+          dbErrorCode,
+          dbConstraint,
+          dbDetail,
         }
       );
 
-      if (isPermanentError(lastError)) {
-        break;
-      }
+      if (isPermanentError(lastError)) break;
     }
   }
 
+  const dbErrorCode = (lastError as unknown as { code?: string })?.code;
   await captureCriticalError(
     `User creation failed after ${maxRetries} attempts`,
     lastError,
@@ -214,6 +314,9 @@ async function createUserWithRetry(
       email,
       maxRetries,
       operation: 'createUserWithRetry',
+      errorMessage: lastError?.message,
+      errorType: lastError?.constructor?.name ?? 'unknown',
+      dbErrorCode,
     }
   );
   return null;
@@ -258,25 +361,31 @@ async function handleMissingDbUser(
     throw new TypeError('Email is required for user creation');
   }
 
-  // Check waitlist status before creating user
-  const waitlistResult = await checkWaitlistAccessInternal(email);
+  // Check waitlist status before creating user (only when waitlist is enabled)
+  let waitlistEntryId: string | undefined;
 
-  if (waitlistResult.status === 'new' || !waitlistResult.status) {
-    return {
-      state: UserState.NEEDS_WAITLIST_SUBMISSION,
-      clerkUserId,
-      dbUserId: null,
-      profileId: null,
-      redirectTo: '/waitlist',
-      context: { ...baseContext, email },
-    };
+  if (isWaitlistEnabled()) {
+    const waitlistResult = await checkWaitlistAccessInternal(email);
+
+    if (waitlistResult.status === 'new' || !waitlistResult.status) {
+      return {
+        state: UserState.NEEDS_WAITLIST_SUBMISSION,
+        clerkUserId,
+        dbUserId: null,
+        profileId: null,
+        redirectTo: '/waitlist',
+        context: { ...baseContext, email },
+      };
+    }
+
+    waitlistEntryId = waitlistResult.entryId ?? undefined;
   }
 
-  // Create the user
+  // Create the user (without waitlist entry when waitlist is disabled)
   const newUserId = await createUserWithRetry(
     clerkUserId,
     email,
-    waitlistResult.entryId ?? undefined
+    waitlistEntryId
   );
 
   if (!newUserId) {
@@ -286,7 +395,7 @@ async function handleMissingDbUser(
       {
         clerkUserId,
         email,
-        waitlistEntryId: waitlistResult.entryId,
+        waitlistEntryId,
         context: 'resolveUserState',
       }
     );

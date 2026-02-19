@@ -5,7 +5,10 @@
  * and new release detection.
  */
 
-export type { FanNotificationPreferences } from '@/lib/db/schema/analytics';
+export type {
+  FanNotificationContentType,
+  FanNotificationPreferences,
+} from '@/lib/db/schema/analytics';
 // Re-export database types
 export type {
   DspArtistEnrichment,
@@ -630,4 +633,5 @@ export const DSP_RATE_LIMITS = {
   musicbrainz: { requests: 1, window: 1 }, // 1/sec (be respectful)
   dsp_discovery: { requests: 10, window: 60 }, // 10 discoveries/min per user
   dsp_enrichment: { requests: 100, window: 3600 }, // 100 enrichments/hour global
+  musicfetch: { requests: 6, window: 60 }, // 6/min (starter tier, adjust per plan)
 } as const;

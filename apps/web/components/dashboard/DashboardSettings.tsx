@@ -1,23 +1,9 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { memo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-
-const SettingsPolished = dynamic(
-  () =>
-    import('@/components/dashboard/organisms/SettingsPolished').then(mod => ({
-      default: mod.SettingsPolished,
-    })),
-  {
-    loading: () => (
-      <div className='mx-auto max-w-2xl space-y-8 pb-8'>
-        <div className='h-96 animate-pulse motion-reduce:animate-none rounded-lg bg-surface-1' />
-      </div>
-    ),
-  }
-);
 
 export interface DashboardSettingsProps {
   readonly focusSection?: string;

@@ -31,7 +31,7 @@ warnings=0
 # Check for @ts-ignore (should use @ts-expect-error with comment)
 if echo "$content" | grep -q '@ts-ignore'; then
   echo "WARNING: @ts-ignore found - use @ts-expect-error with explanation instead"
-  echo "  Track in TECH_DEBT_TRACKER.md if unavoidable"
+  echo "  Track in docs/TECH_DEBT_TRACKER.md if unavoidable"
   warnings=1
 fi
 

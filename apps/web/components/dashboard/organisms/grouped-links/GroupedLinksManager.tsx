@@ -20,9 +20,7 @@ const InlineChatArea = dynamic(
     import('../InlineChatArea').then(mod => ({ default: mod.InlineChatArea })),
   {
     ssr: false,
-    loading: () => (
-      <div className='mb-4 h-12 animate-pulse rounded-lg bg-surface-1' />
-    ),
+    loading: () => <div className='mb-4 h-12 rounded-lg skeleton' />,
   }
 );
 

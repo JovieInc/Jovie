@@ -20,7 +20,7 @@ const meta: Meta<typeof ArtistSelectionForm> = {
   },
   decorators: [
     Story => (
-      <ThemeProvider attribute='class' defaultTheme='system' enableSystem>
+      <ThemeProvider attribute='class' defaultTheme='dark' enableSystem>
         <div className='min-h-screen bg-white dark:bg-gray-900'>
           <Story />
         </div>

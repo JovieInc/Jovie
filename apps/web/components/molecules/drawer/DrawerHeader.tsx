@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ArrowLeft, X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useIsMobile } from '@/hooks/useMobile';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 
 export interface DrawerHeaderProps {
@@ -22,12 +22,12 @@ export function DrawerHeader({
   actions,
   className,
 }: DrawerHeaderProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useBreakpointDown('lg');
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between border-b border-subtle px-3 py-2 shrink-0',
+        'flex items-center justify-between border-b border-subtle h-[52px] px-3 shrink-0',
         className
       )}
     >

@@ -53,8 +53,26 @@ export function useSuggestedProfiles(
         if (!res.ok) return;
         const data = await res.json();
         if (data.success && Array.isArray(data.suggestions)) {
-          setSuggestions(data.suggestions);
-          setStarterContext(data.starterContext ?? null);
+          const ctx = data.starterContext ?? null;
+          const items = [...data.suggestions];
+
+          // Prepend "Profile Ready" card for new users
+          if (ctx && (ctx.isRecentlyOnboarded || ctx.conversationCount === 0)) {
+            items.unshift({
+              id: '__profile_ready__',
+              type: 'profile_ready',
+              platform: '',
+              platformLabel: '',
+              title: 'Your profile is live',
+              subtitle: '',
+              imageUrl: null,
+              externalUrl: null,
+              confidence: null,
+            });
+          }
+
+          setSuggestions(items);
+          setStarterContext(ctx);
         }
       } finally {
         setIsLoading(false);
@@ -84,6 +102,12 @@ export function useSuggestedProfiles(
   const confirm = useCallback(async () => {
     const suggestion = suggestions[currentIndex];
     if (!suggestion || !profileId || isActioning) return;
+
+    // Profile ready card — dismiss locally, no API call
+    if (suggestion.type === 'profile_ready') {
+      removeCurrent();
+      return;
+    }
 
     setIsActioning(true);
     try {
@@ -122,6 +146,12 @@ export function useSuggestedProfiles(
   const reject = useCallback(async () => {
     const suggestion = suggestions[currentIndex];
     if (!suggestion || !profileId || isActioning) return;
+
+    // Profile ready card — dismiss locally, no API call
+    if (suggestion.type === 'profile_ready') {
+      removeCurrent();
+      return;
+    }
 
     setIsActioning(true);
     try {

@@ -26,7 +26,7 @@ export function NewPreFooterCTA() {
 
             <div className='mt-8 flex flex-col sm:flex-row items-center justify-center gap-3'>
               <Button asChild size='lg' variant='primary'>
-                <Link href='/waitlist'>Get early access</Link>
+                <Link href='/signup'>Get started</Link>
               </Button>
               <Button asChild size='lg' variant='secondary'>
                 <Link href='#how-it-works'>See how it works</Link>

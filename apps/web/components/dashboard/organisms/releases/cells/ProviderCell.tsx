@@ -272,7 +272,7 @@ function ProviderActionButtons({
         onClick={onCopyClick}
         className={cn(
           'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
-          isCopied && 'text-green-600 hover:text-green-600 dark:text-green-400'
+          isCopied && 'text-success hover:text-success'
         )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>

@@ -6,7 +6,6 @@ import {
   DropdownMenuSubTrigger,
   MENU_ITEM_BASE,
 } from '@jovie/ui';
-import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
@@ -241,7 +240,6 @@ export function FilterSubmenu<T extends string = string>({
             </span>
           )}
         </div>
-        <ChevronRight className='h-3.5 w-3.5 text-tertiary-token' />
       </DropdownMenuSubTrigger>
 
       <DropdownMenuSubContent

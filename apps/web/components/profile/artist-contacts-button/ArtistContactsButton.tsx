@@ -31,11 +31,11 @@ export function ArtistContactsButton({
   return (
     <>
       <CircleIconButton
-        size='xs'
-        variant='surface'
+        size='md'
+        variant='ghost'
         ariaLabel='Contacts'
         data-testid='contacts-trigger'
-        className='hover:scale-105'
+        className='border border-transparent hover:border-subtle hover:bg-surface-2'
         onClick={() => {
           onIconClick();
           setDrawerOpen(true);

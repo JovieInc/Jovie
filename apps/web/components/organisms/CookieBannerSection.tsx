@@ -24,6 +24,7 @@ export function CookieBannerSection({
 }: CookieBannerSectionProps) {
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
 
   useEffect(() => {
     if (!showBanner) {
@@ -56,6 +57,12 @@ export function CookieBannerSection({
       };
     }
   }, []);
+
+  useEffect(() => {
+    if (!visible) {
+      setIsMobileExpanded(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -102,22 +109,47 @@ export function CookieBannerSection({
             boxShadow: 'var(--linear-shadow-card)',
           }}
         >
-          <p
-            className='mb-2 md:mb-0 md:flex-1'
-            style={{
-              fontSize: '12px',
-              lineHeight: '1.5',
-              color: 'var(--linear-text-secondary)',
-            }}
-          >
-            We use cookies to improve your experience.
-          </p>
+          <div className='mb-2 flex items-center justify-between gap-3 md:mb-0 md:flex-1'>
+            <p
+              style={{
+                fontSize: '12px',
+                lineHeight: '1.5',
+                color: 'var(--linear-text-secondary)',
+              }}
+            >
+              We use cookies to improve your experience.
+            </p>
+            <button
+              type='button'
+              className='md:hidden shrink-0 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
+              style={{
+                backgroundColor: 'var(--linear-bg-button)',
+                color: 'var(--linear-text-primary)',
+                border: '1px solid var(--linear-border-default)',
+                borderRadius: 'var(--linear-radius-sm)',
+                fontSize: '12px',
+                fontWeight: 'var(--linear-font-weight-medium)',
+                padding: '6px 10px',
+                height: '28px',
+              }}
+              aria-expanded={isMobileExpanded}
+              aria-controls='cookie-actions'
+              onClick={() => setIsMobileExpanded(prev => !prev)}
+            >
+              {isMobileExpanded ? 'Hide' : 'Manage'}
+            </button>
+          </div>
 
-          <CookieActions
-            onAcceptAll={acceptAll}
-            onReject={reject}
-            onCustomize={() => setCustomize(true)}
-          />
+          <div
+            id='cookie-actions'
+            className={isMobileExpanded ? 'block' : 'hidden md:block'}
+          >
+            <CookieActions
+              onAcceptAll={acceptAll}
+              onReject={reject}
+              onCustomize={() => setCustomize(true)}
+            />
+          </div>
         </aside>
       ) : null}
 

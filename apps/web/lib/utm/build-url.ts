@@ -4,6 +4,7 @@
  * Functions for building URLs with UTM parameters and resolving placeholders.
  */
 
+import { logger } from '@/lib/utils/logger';
 import type {
   UTMBuildOptions,
   UTMBuildResult,
@@ -171,9 +172,10 @@ export function buildUTMUrlString(options: UTMBuildOptions): string {
   const result = buildUTMUrl(options);
 
   if (result.hasUnresolvedPlaceholders) {
-    console.warn(
-      '[UTM] Some placeholders could not be resolved:',
-      options.params
+    logger.warn(
+      'Some placeholders could not be resolved:',
+      options.params,
+      'UTM'
     );
   }
 

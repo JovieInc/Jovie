@@ -98,7 +98,7 @@ export function UpgradeButton({
         {isLoading ? 'Loading...' : children}
       </Button>
       {error && (
-        <p className='mt-2 text-sm text-red-600 dark:text-red-400'>
+        <p className='mt-2 text-sm text-destructive'>
           {error instanceof Error ? error.message : 'Failed to start checkout'}
         </p>
       )}

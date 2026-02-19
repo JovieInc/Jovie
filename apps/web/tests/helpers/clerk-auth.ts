@@ -152,11 +152,34 @@ export async function signInUser(
         signInParams: { strategy: 'email_code', identifier: username },
       });
     } else if (password) {
-      // For real test users with passwords, use password strategy
-      await clerk.signIn({
-        page,
-        signInParams: { strategy: 'password', identifier: username, password },
-      });
+      // For real test users with passwords, try password strategy first,
+      // then fall back to email_code if the Clerk instance disabled passwords
+      try {
+        await clerk.signIn({
+          page,
+          signInParams: {
+            strategy: 'password',
+            identifier: username,
+            password,
+          },
+        });
+      } catch (strategyError) {
+        const strategyMsg =
+          strategyError instanceof Error
+            ? strategyError.message
+            : String(strategyError);
+        if (strategyMsg.includes('strategy')) {
+          console.log(
+            '  Password strategy not available, falling back to email_code'
+          );
+          await clerk.signIn({
+            page,
+            signInParams: { strategy: 'email_code', identifier: username },
+          });
+        } else {
+          throw strategyError;
+        }
+      }
     } else {
       throw new ClerkTestError(
         'E2E_CLERK_USER_PASSWORD is required for non-test email addresses. ' +

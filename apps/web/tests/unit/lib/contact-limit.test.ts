@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLAN_LIMITS } from '@/lib/stripe/config';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 /**
  * Tests for contact limit enforcement logic.
@@ -11,15 +11,15 @@ import { PLAN_LIMITS } from '@/lib/stripe/config';
 
 describe('Contact Limit Configuration', () => {
   it('free plan has a limit of 100 contacts', () => {
-    expect(PLAN_LIMITS.free.contactsLimit).toBe(100);
+    expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
   });
 
   it('pro plan has unlimited contacts', () => {
-    expect(PLAN_LIMITS.pro.contactsLimit).toBeNull();
+    expect(ENTITLEMENT_REGISTRY.pro.limits.contactsLimit).toBeNull();
   });
 
   it('growth plan has unlimited contacts', () => {
-    expect(PLAN_LIMITS.growth.contactsLimit).toBeNull();
+    expect(ENTITLEMENT_REGISTRY.growth.limits.contactsLimit).toBeNull();
   });
 });
 
@@ -61,6 +61,6 @@ describe('Contact Limit Enforcement Logic', () => {
     // - if (sanitized.id) -> update path (no limit check)
     // - else -> insert path (limit check applied)
     // We verify the config is correct for this behavior
-    expect(PLAN_LIMITS.free.contactsLimit).toBe(100);
+    expect(ENTITLEMENT_REGISTRY.free.limits.contactsLimit).toBe(100);
   });
 });

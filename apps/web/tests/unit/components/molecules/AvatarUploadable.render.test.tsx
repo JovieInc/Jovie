@@ -25,7 +25,7 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
   });
 
   it('renders as regular avatar when uploadable is false', () => {
-    render(
+    const { container } = render(
       <AvatarUploadable
         src='https://example.com/avatar.jpg'
         alt='User avatar'
@@ -34,10 +34,13 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
       />
     );
 
-    const container = screen.getByRole('img');
-    expect(container).toBeInTheDocument();
-    expect(container).not.toHaveAttribute('tabIndex');
-    expect(container).not.toHaveAttribute('role', 'button');
+    // Avatar renders an img element inside an aria-hidden container
+    const img = container.querySelector('img');
+    expect(img).toBeInTheDocument();
+    // When not uploadable, the button wrapper is disabled and non-interactive
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('tabIndex', '-1');
   });
 
   it('does not show hover overlay when not uploadable', () => {

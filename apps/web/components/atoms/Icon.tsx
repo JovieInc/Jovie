@@ -76,6 +76,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
 
 const iconRegistry = {
   Activity,
@@ -200,14 +201,12 @@ export function Icon({
   const shouldHide = ariaLabel ? (ariaHidden ?? false) : true;
 
   // Development warning: ariaHidden=false without ariaLabel is an a11y violation
-  if (
-    process.env.NODE_ENV === 'development' &&
-    ariaHidden === false &&
-    !ariaLabel
-  ) {
-    console.warn(
-      'Icon: Setting ariaHidden={false} without providing ariaLabel creates an accessibility violation. ' +
-        'Either provide an ariaLabel or remove ariaHidden to allow the default behavior.'
+  if (ariaHidden === false && !ariaLabel) {
+    logger.warn(
+      'Setting ariaHidden={false} without providing ariaLabel creates an accessibility violation. ' +
+        'Either provide an ariaLabel or remove ariaHidden to allow the default behavior.',
+      undefined,
+      'Icon'
     );
   }
 

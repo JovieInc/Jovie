@@ -39,8 +39,10 @@ export async function GET() {
       );
     }
 
-    const mrrData = await getStripeMrr();
-    const waitlistData = await getWaitlistCount();
+    const [mrrData, waitlistData] = await Promise.all([
+      getStripeMrr(),
+      getWaitlistCount(),
+    ]);
 
     const body: AdminOverviewResponse = {
       mrrUsd: mrrData.mrrUsd,

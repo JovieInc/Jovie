@@ -57,12 +57,11 @@ export function ContextMenuSubmenu({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    // role="presentation" correctly hides wrapper; button inside is the interactive element
-    <div // NOSONAR S6819
+    <div
       className='relative'
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
-      role='presentation'
+      aria-hidden='true'
     >
       {/* Submenu Trigger */}
       <button
@@ -147,7 +146,7 @@ export function ContextMenuItem({
         'px-2 py-1.5 text-left text-[13px]',
         'hover:bg-surface-2 rounded',
         'transition-colors duration-150',
-        destructive && 'text-red-500 hover:bg-red-50',
+        destructive && 'text-error hover:bg-error/10',
         className
       )}
       type='button'

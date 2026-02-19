@@ -109,7 +109,7 @@ describe('useDashboardSocialLinksQuery', () => {
       });
     });
 
-    it('uses no-store cache option', async () => {
+    it('uses default cache option (browser-managed)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ links: [] }),
@@ -122,7 +122,7 @@ describe('useDashboardSocialLinksQuery', () => {
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({
+          expect.not.objectContaining({
             cache: 'no-store',
           })
         );

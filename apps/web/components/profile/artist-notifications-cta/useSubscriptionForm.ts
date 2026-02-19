@@ -17,7 +17,10 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
-import { useSubscribeNotificationsMutation } from '@/lib/queries';
+import {
+  useSubscribeNotificationsMutation,
+  useVerifyEmailOtpMutation,
+} from '@/lib/queries';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import { buildPhoneE164, getMaxNationalDigits } from './utils';
@@ -33,6 +36,8 @@ interface UseSubscriptionFormReturn {
   phoneInput: string;
   emailInput: string;
   error: string | null;
+  otpCode: string;
+  otpStep: 'input' | 'verify';
   isSubmitting: boolean;
   isCountryOpen: boolean;
   setIsCountryOpen: (open: boolean) => void;
@@ -42,7 +47,9 @@ interface UseSubscriptionFormReturn {
   handlePhoneChange: (value: string) => void;
   handleEmailChange: (value: string) => void;
   handleFieldBlur: () => void;
+  handleOtpChange: (value: string) => void;
   handleSubscribe: () => Promise<void>;
+  handleVerifyOtp: () => Promise<void>;
   handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
 
   // From profile notifications context
@@ -76,17 +83,22 @@ export function useSubscriptionForm({
   const [phoneInput, setPhoneInput] = useState<string>('');
   const [emailInput, setEmailInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [otpStep, setOtpStep] = useState<'input' | 'verify'>('input');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isCountryOpen, setIsCountryOpen] = useState<boolean>(false);
 
   const { success: showSuccess, error: showError } = useNotifications();
   const subscribeMutation = useSubscribeNotificationsMutation();
+  const verifyEmailOtpMutation = useVerifyEmailOtpMutation();
 
   const handleChannelChange = useCallback(
     (next: NotificationChannel) => {
       if (isSubmitting) return;
       setChannel(next);
       setError(null);
+      setOtpStep('input');
+      setOtpCode('');
       if (next === 'email') {
         setPhoneInput('');
       } else {
@@ -109,9 +121,11 @@ export function useSubscriptionForm({
   const handleEmailChange = useCallback(
     (value: string) => {
       setEmailInput(value);
+      if (otpStep !== 'input') setOtpStep('input');
+      if (otpCode) setOtpCode('');
       if (error) setError(null);
     },
-    [error]
+    [error, otpCode, otpStep]
   );
 
   const validateCurrent = useCallback((): boolean => {
@@ -216,7 +230,8 @@ export function useSubscriptionForm({
       if (response.pendingConfirmation) {
         // Double opt-in: show pending confirmation state
         setNotificationsState('pending_confirmation');
-        showSuccess('Check your email to confirm your subscription');
+        setOtpStep('verify');
+        showSuccess('Enter the 6-digit code we sent to your email.');
       } else {
         // Single opt-in: immediate success
         setSubscribedChannels(prev => ({ ...prev, [channel]: true }));
@@ -270,6 +285,60 @@ export function useSubscriptionForm({
     showSuccess,
   ]);
 
+  const handleOtpChange = useCallback(
+    (value: string) => {
+      setOtpCode(value.replaceAll(/[^\d]/g, '').slice(0, 6));
+      if (error) setError(null);
+    },
+    [error]
+  );
+
+  const handleVerifyOtp = useCallback(async () => {
+    if (isSubmitting) return;
+    if (otpCode.length !== 6) {
+      setError('Enter the 6-digit code from your email');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const normalizedEmail = normalizeSubscriptionEmail(emailInput);
+      if (!normalizedEmail)
+        throw new Error('Please enter a valid email address');
+
+      await verifyEmailOtpMutation.mutateAsync({
+        artistId: artist.id,
+        email: normalizedEmail,
+        otpCode,
+      });
+
+      setSubscribedChannels(prev => ({ ...prev, email: true }));
+      setSubscriptionDetails(prev => ({ ...prev, email: normalizedEmail }));
+      setNotificationsState('success');
+      showSuccess("You're all set. We'll keep you in the loop.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Invalid verification code'
+      );
+      showError('Please check your code and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    artist.id,
+    emailInput,
+    isSubmitting,
+    otpCode,
+    setNotificationsState,
+    setSubscribedChannels,
+    setSubscriptionDetails,
+    showError,
+    showSuccess,
+    verifyEmailOtpMutation,
+  ]);
+
   const handleSubscribe = useCallback(async () => {
     if (isSubmitting) return;
 
@@ -310,12 +379,14 @@ export function useSubscriptionForm({
       event => {
         if (event.key === 'Enter') {
           event.preventDefault();
-          handleSubscribe().catch(error => {
-            console.error('[SubscriptionForm] Subscribe failed:', error);
-          });
+          (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe()).catch(
+            error => {
+              console.error('[SubscriptionForm] Subscribe failed:', error);
+            }
+          );
         }
       },
-      [handleSubscribe]
+      [handleSubscribe, handleVerifyOtp, otpStep]
     );
 
   return {
@@ -324,6 +395,8 @@ export function useSubscriptionForm({
     phoneInput,
     emailInput,
     error,
+    otpCode,
+    otpStep,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
@@ -331,7 +404,9 @@ export function useSubscriptionForm({
     handlePhoneChange,
     handleEmailChange,
     handleFieldBlur,
+    handleOtpChange,
     handleSubscribe,
+    handleVerifyOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,

@@ -10,6 +10,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { captureError } from '@/lib/error-tracking';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
@@ -96,6 +97,9 @@ export function useCheckoutMutation() {
     },
 
     onError: error => {
+      captureError('Checkout mutation failed', error, {
+        route: '/api/stripe/checkout',
+      });
       handleMutationError(error, 'Failed to start checkout');
     },
   });
@@ -127,6 +131,9 @@ export function usePortalMutation() {
     mutationFn: createPortalSession,
 
     onError: error => {
+      captureError('Portal mutation failed', error, {
+        route: '/api/stripe/portal',
+      });
       handleMutationError(error, 'Failed to open billing portal');
     },
   });
@@ -174,13 +181,40 @@ export function useCancelSubscriptionMutation() {
   return useMutation({
     mutationFn: cancelSubscriptionRequest,
 
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.billing.status(),
+      });
+
+      const previousBilling = queryClient.getQueryData(
+        queryKeys.billing.status()
+      );
+
+      queryClient.setQueryData(
+        queryKeys.billing.status(),
+        (old: { isPro: boolean; plan: string | null } | undefined) =>
+          old ? { ...old, isPro: false, plan: 'free' } : old
+      );
+
+      return { previousBilling };
+    },
+
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.billing.all,
       });
     },
 
-    onError: error => {
+    onError: (error, _variables, context) => {
+      if (context?.previousBilling) {
+        queryClient.setQueryData(
+          queryKeys.billing.status(),
+          context.previousBilling
+        );
+      }
+      captureError('Cancel subscription mutation failed', error, {
+        route: '/api/stripe/cancel',
+      });
       handleMutationError(error, 'Failed to cancel subscription');
     },
   });

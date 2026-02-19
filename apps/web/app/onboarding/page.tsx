@@ -55,7 +55,6 @@ export default async function OnboardingPage({
         },
       });
     }
-    console.warn('[onboarding] Missing clerkUserId, redirecting to signin');
     redirect('/sign-in?redirect_url=/onboarding');
   }
 
@@ -71,14 +70,8 @@ export default async function OnboardingPage({
     const dashboardData = await getDashboardData();
     existingProfile = dashboardData.selectedProfile;
   } catch (error) {
-    // Log the error for debugging - distinguish between expected "no profile" and actual errors
-    const errorMessage = extractErrorMessage(error, 'Unknown error');
-    console.warn('[onboarding] Failed to load existing profile:', {
-      error: errorMessage,
-      clerkUserId: authResult.clerkUserId,
-    });
-
     // Capture database/connection errors to Sentry (but not "no profile" errors)
+    const errorMessage = extractErrorMessage(error, 'Unknown error');
     if (
       errorMessage.includes('database') ||
       errorMessage.includes('connection') ||
@@ -91,10 +84,6 @@ export default async function OnboardingPage({
     }
   }
 
-  const displayNameSource = existingProfile?.displayName
-    ? 'profile'
-    : clerkIdentity.displayNameSource;
-
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
@@ -104,15 +93,9 @@ export default async function OnboardingPage({
     user?.username ||
     '';
 
-  const skipNameStep =
-    displayNameSource === 'profile' ||
-    displayNameSource === 'private_metadata_full_name' ||
-    displayNameSource === 'clerk_full_name' ||
-    displayNameSource === 'clerk_name_parts';
-
   return (
     <AuthLayout
-      formTitle="What's your name?"
+      formTitle='Claim your handle'
       showFooterPrompt={false}
       showFormTitle={false}
       logoSpinDelayMs={10000}
@@ -126,7 +109,6 @@ export default async function OnboardingPage({
           initialHandle={initialHandle}
           userEmail={userEmail}
           userId={userId}
-          skipNameStep={skipNameStep}
         />
       </div>
     </AuthLayout>

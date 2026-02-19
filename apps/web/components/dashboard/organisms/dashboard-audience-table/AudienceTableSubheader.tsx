@@ -2,22 +2,17 @@
 
 import { memo } from 'react';
 import { ExportCSVButton } from '@/components/organisms/table';
-import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
-import type { AudienceFilters } from './types';
+import type { AudienceFilters, AudienceView } from './types';
 import {
   AUDIENCE_CSV_COLUMNS,
   getAudienceForExport,
 } from './utils/exportAudience';
 
-export type AudienceView = 'all' | 'subscribers' | 'anonymous';
-
 interface AudienceTableSubheaderProps {
   /** Current active view filter */
   readonly view: AudienceView;
-  /** Callback when view filter changes */
-  readonly onViewChange: (view: AudienceView) => void;
   /** Current filter state */
   readonly filters: AudienceFilters;
   /** Callback when filters change */
@@ -32,23 +27,17 @@ interface AudienceTableSubheaderProps {
   readonly total: number;
 }
 
-const VIEW_OPTIONS: { value: AudienceView; label: string }[] = [
-  { value: 'all', label: 'All audience' },
-  { value: 'subscribers', label: 'Subscribers' },
-  { value: 'anonymous', label: 'Anonymous' },
-];
+const pillButtonClass =
+  'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
 
 /**
- * AudienceTableSubheader - Subheader with view filter tabs, Filter dropdown,
- * and Export CSV button.
+ * AudienceTableSubheader - Subheader with Filter dropdown and Export CSV button.
  *
- * Follows the same pattern as ReleaseTableSubheader:
- * - Left: View tabs + Filter dropdown with active filter pills
- * - Right: Export CSV
+ * The segment control (All audience / Subscribers / Anonymous) has been moved
+ * to the breadcrumb header bar via useSetHeaderActions in DashboardAudienceClient.
  */
 export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   view,
-  onViewChange,
   filters,
   onFiltersChange,
   rows,
@@ -59,35 +48,11 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   const hasData = total > 0;
   const showFilters = view !== 'subscribers';
 
-  const pillButtonClass =
-    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
-
   return (
     <div className='border-b border-subtle bg-transparent'>
-      {/* Single row: View tabs + Filter + Export */}
       <div className='flex items-center justify-between px-4 py-1'>
-        {/* Left: View filter tabs + Filter dropdown */}
+        {/* Left: Filter dropdown */}
         <div className='flex items-center gap-2'>
-          <fieldset className='inline-flex items-center gap-0.5 rounded-md bg-transparent p-0'>
-            <legend className='sr-only'>Audience view filter</legend>
-            {VIEW_OPTIONS.map(option => (
-              <button
-                key={option.value}
-                type='button'
-                onClick={() => onViewChange(option.value)}
-                aria-pressed={view === option.value}
-                className={cn(
-                  'h-7 px-2.5 text-xs font-medium rounded-md transition-colors',
-                  view === option.value
-                    ? 'bg-surface-2 text-primary-token'
-                    : 'text-tertiary-token hover:text-secondary-token'
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </fieldset>
-
           {showFilters && (
             <AudienceFilterDropdown
               filters={filters}
@@ -109,7 +74,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
             disabled={!hasData && subscriberCount === 0}
             variant='ghost'
             size='sm'
-            className='h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token'
+            className={pillButtonClass}
           />
         </div>
       </div>

@@ -5,8 +5,8 @@
 export const PACER_TIMING = {
   /** Default debounce for general use */
   DEBOUNCE_MS: 300,
-  /** Debounce for search inputs */
-  SEARCH_DEBOUNCE_MS: 300,
+  /** Debounce for search inputs (200ms with Redis cache backing) */
+  SEARCH_DEBOUNCE_MS: 200,
   /** Debounce for async validation (handle checks, etc.) */
   VALIDATION_DEBOUNCE_MS: 450,
   /** Debounce for auto-save operations */

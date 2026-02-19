@@ -136,3 +136,66 @@ export function BrandingSettingsLoading() {
     </SettingsLoadingSkeleton>
   );
 }
+
+// ============================================================================
+// Inline skeletons for settings sections (rendered inside DashboardCard)
+// ============================================================================
+
+/** Inline skeleton for Touring section — matches disconnected/form state shape */
+export function TouringSectionSkeleton() {
+  return (
+    <div className='space-y-4' aria-hidden='true'>
+      {/* Description text */}
+      <div className='h-4 w-3/4 rounded skeleton' />
+
+      {/* Form fields */}
+      <div className='space-y-3'>
+        {/* Artist name field */}
+        <div className='space-y-1.5'>
+          <div className='h-3 w-40 rounded skeleton' />
+          <div className='h-10 w-full rounded skeleton' />
+        </div>
+
+        {/* API key field */}
+        <div className='space-y-1.5'>
+          <div className='h-3 w-32 rounded skeleton' />
+          <div className='h-10 w-full rounded skeleton' />
+        </div>
+      </div>
+
+      {/* Button */}
+      <div className='h-9 w-24 rounded skeleton' />
+    </div>
+  );
+}
+
+/** Inline skeleton for Contacts section — matches contact list shape */
+export function ContactsSectionSkeleton() {
+  return (
+    <div className='space-y-3' aria-hidden='true'>
+      {/* Header row: description + add button */}
+      <div className='flex items-center justify-between'>
+        <div className='h-4 w-3/5 rounded skeleton' />
+        <div className='h-8 w-28 rounded skeleton' />
+      </div>
+
+      {/* Contact rows */}
+      <div className='divide-y divide-subtle'>
+        <div className='py-3 space-y-1.5'>
+          <div className='h-3 w-20 rounded skeleton' />
+          <div className='flex items-center gap-2'>
+            <div className='h-4 w-32 rounded skeleton' />
+            <div className='h-3 w-40 rounded skeleton' />
+          </div>
+        </div>
+        <div className='py-3 space-y-1.5'>
+          <div className='h-3 w-24 rounded skeleton' />
+          <div className='flex items-center gap-2'>
+            <div className='h-4 w-28 rounded skeleton' />
+            <div className='h-3 w-36 rounded skeleton' />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

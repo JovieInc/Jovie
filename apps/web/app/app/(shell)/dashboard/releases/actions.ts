@@ -39,11 +39,13 @@ import type {
   TrackViewModel,
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { captureError } from '@/lib/error-tracking';
 import {
   enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
+  enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
 import {
   checkIsrcRescanRateLimit,
@@ -52,6 +54,7 @@ import {
 import { trackServerEvent } from '@/lib/server-analytics';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
+import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -171,6 +174,9 @@ function mapReleaseToViewModel(
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
     originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
       ?.originalArtworkUrl as string | undefined,
+    hasVideoLinks: release.providerLinks.some(link =>
+      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+    ),
   };
 }
 
@@ -583,7 +589,8 @@ export async function checkSpotifyConnection(): Promise<{
       spotifyId: data.selectedProfile.spotifyId ?? null,
       artistName,
     };
-  } catch {
+  } catch (error) {
+    throwIfRedirect(error);
     return { connected: false, spotifyId: null, artistName: null };
   }
 }
@@ -661,6 +668,40 @@ export async function connectSpotifyArtist(params: {
       creatorProfileId: profile.id,
       spotifyArtistId: params.spotifyArtistId,
       targetProviders: ['apple_music'],
+    });
+
+    // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)
+    // Fire-and-forget: enrichment runs in background via ingestion job queue
+    // Normalize Spotify URL or construct from artist ID
+    const normalizedSpotifyUrl = (() => {
+      const raw = params.spotifyArtistUrl.trim();
+      try {
+        const parsed = new URL(raw);
+        const hostOk =
+          parsed.hostname === 'open.spotify.com' ||
+          parsed.hostname === 'spotify.com' ||
+          parsed.hostname.endsWith('.spotify.com');
+        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+        if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
+        return parsed.toString();
+      } catch {
+        return null;
+      }
+    })();
+
+    const spotifyUrlForEnrichment =
+      normalizedSpotifyUrl ??
+      `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+
+    void enqueueMusicFetchEnrichmentJob({
+      creatorProfileId: profile.id,
+      spotifyUrl: spotifyUrlForEnrichment,
+    }).catch(error => {
+      void captureError('MusicFetch enrichment enqueue failed', error, {
+        action: 'connectSpotifyArtist',
+        creatorProfileId: profile.id,
+      });
+      // Enrichment can be retried later; don't fail the connection
     });
 
     return {
@@ -808,7 +849,8 @@ export async function checkAppleMusicConnection(): Promise<{
       artistName: isConnected ? match.externalArtistName : null,
       artistId: isConnected ? match.externalArtistId : null,
     };
-  } catch {
+  } catch (error) {
+    throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };
   }
 }
@@ -954,6 +996,49 @@ export async function connectAppleMusicArtist(params: {
     message: `Connected Apple Music as ${externalArtistName}`,
     artistName: externalArtistName,
   };
+}
+
+interface DeleteReleaseParams {
+  releaseId: string;
+}
+
+/**
+ * Delete a release and all associated data (tracks, provider links, etc.).
+ * Cascading deletes handle child records automatically.
+ */
+export async function deleteRelease(
+  params: DeleteReleaseParams
+): Promise<{ success: boolean }> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Verify the release belongs to the user's profile
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  await db
+    .delete(discogReleases)
+    .where(eq(discogReleases.id, params.releaseId));
+
+  // Invalidate cache and revalidate path
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('release_deleted', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    releaseTitle: release.title,
+  });
+
+  return { success: true };
 }
 
 /**

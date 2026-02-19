@@ -10,12 +10,18 @@ import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  isCodeExpired,
   isSessionExists,
   isSignInSuggested,
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
 import type { LoadingState } from '@/lib/auth/types';
+import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
+
+/** Use current origin for OAuth callbacks so localhost works correctly */
+const getOAuthBaseUrl = () =>
+  typeof window !== 'undefined' ? window.location.origin : APP_URL;
 
 /**
  * Wait for Clerk session to be fully propagated.
@@ -96,10 +102,12 @@ export interface UseSignUpFlowReturn {
 export function useSignUpFlow(): UseSignUpFlowReturn {
   const { signUp, setActive, isLoaded } = useSignUp();
 
-  // Use shared auth flow base - sign-up always goes to onboarding
+  // Use shared auth flow base - sign-up goes to onboarding.
+  // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup
+  // (e.g. /onboarding?handle=myhandle from the claim-handle form) is preserved.
   const base = useAuthFlowBase({
     defaultRedirectUrl: '/onboarding',
-    useStoredRedirectUrl: false,
+    useStoredRedirectUrl: true,
   });
 
   // Sign-up specific state
@@ -160,6 +168,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
     async (verificationCode: string): Promise<boolean> => {
       if (!signUp || !isLoaded) return false;
 
+      // Prevent double-submission (auto-submit + manual submit can race)
+      if (
+        base.loadingState.type === 'verifying' ||
+        base.loadingState.type === 'completing'
+      ) {
+        return false;
+      }
+
       clearError();
       base.setLoadingState({ type: 'verifying' });
       base.setCode(verificationCode);
@@ -186,14 +202,19 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
           // by the time the page loads, and the fresh_signup flag provides
           // additional protection against redirect loops
           if (!sessionReady) {
-            console.warn(
-              '[useSignUpFlow] Session polling timed out, proceeding with redirect'
+            logger.warn(
+              'Session polling timed out, proceeding with redirect',
+              undefined,
+              'useSignUpFlow'
             );
           }
 
-          // Navigate to onboarding with fresh_signup flag for loop detection
+          // Navigate to onboarding with fresh_signup flag for loop detection.
+          // Use URL API to safely append the param regardless of existing query/hash.
           const redirectUrl = base.getRedirectUrl();
-          base.router.push(`${redirectUrl}?fresh_signup=true`);
+          const url = new URL(redirectUrl, window.location.origin);
+          url.searchParams.set('fresh_signup', 'true');
+          base.router.push(url.pathname + url.search);
 
           return true;
         }
@@ -212,8 +233,11 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         base.setError(message);
         base.handleCodeExpiredError(err);
 
-        // Clear the code on error so user can re-enter
-        base.setCode('');
+        // Keep the entered code visible so the user can see what they typed.
+        // Only clear if the code expired (user needs a fresh one anyway).
+        if (isCodeExpired(err)) {
+          base.setCode('');
+        }
         base.setLoadingState({ type: 'idle' });
         return false;
       }
@@ -260,12 +284,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       base.storeRedirectUrl();
 
       try {
-        // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments
+        // Use current origin for OAuth callbacks so localhost, preview, and
+        // production all redirect correctly after the OAuth round-trip.
+        const oauthBase = getOAuthBaseUrl();
+        const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
         await signUp.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: `${APP_URL}/signup/sso-callback`,
-          redirectUrlComplete: `${APP_URL}/onboarding`,
+          redirectUrl: `${oauthBase}/signup/sso-callback`,
+          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard

@@ -20,7 +20,7 @@ export default function AdminPage() {
   return (
     <PageShell>
       <PageContent>
-        <div className='space-y-8'>
+        <div className='space-y-8' data-testid='admin-dashboard-content'>
           <header>
             <h1 className='sr-only'>Admin Dashboard</h1>
           </header>

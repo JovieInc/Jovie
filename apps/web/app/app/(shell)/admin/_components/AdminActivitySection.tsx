@@ -5,7 +5,7 @@ export async function AdminActivitySection() {
   const activityItems = await getAdminActivityFeed(20);
 
   return (
-    <section id='activity'>
+    <section id='activity' data-testid='admin-activity-section'>
       <ActivityTableUnified items={activityItems} />
     </section>
   );

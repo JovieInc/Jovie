@@ -34,6 +34,7 @@ export {
   prefetchDashboardData,
   publishProfileBasics,
   setSidebarCollapsed,
+  updateAllowProfilePhotoDownloads,
   updateCreatorProfile,
 } from './actions/index';
 // Social links types and constants (from canonical source)

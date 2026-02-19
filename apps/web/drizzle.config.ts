@@ -6,7 +6,7 @@ const databaseUrl = process.env.DATABASE_URL || '';
 const url = databaseUrl.replace(/^postgres(ql)?\+neon:\/\//, 'postgres$1://');
 
 export default defineConfig({
-  schema: './lib/db/schema.ts',
+  schema: './lib/db/schema/index.ts',
   out: './drizzle/migrations',
   dialect: 'postgresql',
   dbCredentials: { url },

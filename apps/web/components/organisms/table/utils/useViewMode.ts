@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { logger } from '@/lib/utils/logger';
 
 type ViewMode = 'list' | 'board';
 
@@ -70,9 +71,10 @@ export function useViewMode({
   // Update localStorage when view mode changes
   const updateViewMode = (mode: ViewMode) => {
     if (!availableModes.includes(mode)) {
-      console.warn(
-        `View mode "${mode}" is not available. Available modes:`,
-        availableModes
+      logger.warn(
+        `View mode "${mode}" is not available.`,
+        availableModes,
+        'useViewMode'
       );
       return;
     }

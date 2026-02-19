@@ -82,7 +82,7 @@ export const CTAButton = React.forwardRef<
       'will-change-transform focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
       prefersReducedMotion
         ? 'shadow-none active:translate-y-0 hover:shadow-none'
-        : 'shadow-[0_12px_30px_rgba(0,0,0,0.12)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.14)] hover:scale-[1.02] active:scale-[0.98]',
+        : 'shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]',
       className
     );
 

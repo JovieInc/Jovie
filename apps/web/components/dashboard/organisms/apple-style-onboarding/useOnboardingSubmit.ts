@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
@@ -13,6 +14,30 @@ import {
 } from './errors';
 import type { HandleValidationState, OnboardingState } from './types';
 import { getResolvedHandle, validateDisplayName } from './validation';
+
+function tryAutoConnectSpotify(): void {
+  try {
+    const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
+    if (!spotifyUrl) return;
+
+    const artistName = sessionStorage.getItem('jovie_signup_artist_name') ?? '';
+    const artistMatch =
+      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
+
+    if (artistMatch?.[1]) {
+      const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
+      connectSpotifyArtist({
+        spotifyArtistId: artistMatch[1],
+        spotifyArtistUrl: normalizedUrl,
+        artistName,
+      }).catch(() => {});
+    }
+    sessionStorage.removeItem('jovie_signup_spotify_url');
+    sessionStorage.removeItem('jovie_signup_artist_name');
+  } catch {
+    // sessionStorage access may fail — non-critical
+  }
+}
 
 interface UseOnboardingSubmitOptions {
   userId: string;
@@ -68,6 +93,73 @@ export function useOnboardingSubmit({
     errorRef.current = state.error;
   }, [state.error]);
 
+  const handleSubmitError = useCallback(
+    (error: unknown, resolvedHandle: string, redirectUrl: string) => {
+      const errMsg = getErrorMessage(error);
+
+      // Handle Next.js redirect special case
+      if (errMsg === 'NEXT_REDIRECT') {
+        setState(prev => ({
+          ...prev,
+          step: 'complete',
+          progress: 100,
+          isSubmitting: false,
+        }));
+        return;
+      }
+
+      const errorCode = extractErrorCode(error);
+      void captureError('Onboarding submission failed', error, {
+        userId,
+        handle: resolvedHandle,
+        errorCode,
+        step: 'submission',
+        route: '/onboarding',
+      });
+
+      const errorTrackingPayload = {
+        user_id: userId,
+        handle: resolvedHandle,
+        error_message: errMsg,
+        error_code: isDatabaseError(error) ? 'DATABASE_ERROR' : errorCode,
+        error_step: 'submission',
+        timestamp: new Date().toISOString(),
+      };
+      track('onboarding_error', errorTrackingPayload);
+
+      if (isDatabaseError(error)) {
+        setState(prev => ({
+          ...prev,
+          error:
+            "We couldn't finish setting up your account. Please try again in a moment.",
+          step: 'validating',
+          progress: 0,
+          isSubmitting: false,
+        }));
+        return;
+      }
+
+      const { userMessage, shouldRedirectToSignIn } = mapErrorToUserMessage(
+        error,
+        redirectUrl
+      );
+
+      if (shouldRedirectToSignIn) {
+        router.push(`/signin?redirect_url=${encodeURIComponent(redirectUrl)}`);
+        return;
+      }
+
+      setState(prev => ({
+        ...prev,
+        error: userMessage,
+        step: 'validating',
+        progress: 0,
+        isSubmitting: false,
+      }));
+    },
+    [router, userId]
+  );
+
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
@@ -116,10 +208,12 @@ export function useOnboardingSubmit({
       }));
 
       try {
-        validateDisplayName(fullName);
+        // Use fullName if provided (from Clerk identity), otherwise fall back to handle
+        const resolvedDisplayName = fullName.trim() || resolvedHandle;
+        validateDisplayName(resolvedDisplayName);
         await completeOnboarding({
           username: resolvedHandle,
-          displayName: fullName.trim(),
+          displayName: resolvedDisplayName,
           email: userEmail,
           redirectToDashboard: false,
         });
@@ -133,83 +227,12 @@ export function useOnboardingSubmit({
           completion_time: new Date().toISOString(),
         });
 
+        // Auto-connect Spotify artist from homepage search (fire-and-forget)
+        tryAutoConnectSpotify();
+
         goToNextStep();
       } catch (error) {
-        // Handle Next.js redirect special case
-        const errMsg = getErrorMessage(error);
-        if (errMsg === 'NEXT_REDIRECT') {
-          setState(prev => ({
-            ...prev,
-            step: 'complete',
-            progress: 100,
-            isSubmitting: false,
-          }));
-          return;
-        }
-
-        const errorCode = extractErrorCode(error);
-
-        // Capture error to Sentry for monitoring
-        void captureError('Onboarding submission failed', error, {
-          userId,
-          handle: resolvedHandle,
-          errorCode,
-          step: 'submission',
-          route: '/onboarding',
-        });
-
-        // Handle database errors with retry suggestion
-        if (isDatabaseError(error)) {
-          setState(prev => ({
-            ...prev,
-            error:
-              "We couldn't finish setting up your account. Please try again in a moment.",
-            step: 'validating',
-            progress: 0,
-            isSubmitting: false,
-          }));
-          track('onboarding_error', {
-            user_id: userId,
-            handle: resolvedHandle,
-            error_message: errMsg,
-            error_code: 'DATABASE_ERROR',
-            error_step: 'submission',
-            timestamp: new Date().toISOString(),
-          });
-          return;
-        }
-
-        // Track error
-        track('onboarding_error', {
-          user_id: userId,
-          handle: resolvedHandle,
-          error_message: errMsg,
-          error_code: errorCode,
-          error_step: 'submission',
-          timestamp: new Date().toISOString(),
-        });
-
-        // Map error to user-friendly message
-        const { userMessage, shouldRedirectToSignIn } = mapErrorToUserMessage(
-          error,
-          redirectUrl
-        );
-
-        // Handle sign-in redirect for email conflicts
-        if (shouldRedirectToSignIn) {
-          router.push(
-            `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`
-          );
-          return;
-        }
-
-        setState(prev => ({
-          ...prev,
-          error: userMessage,
-          step: 'validating',
-          progress: 0,
-          isSubmitting: false,
-        }));
+        handleSubmitError(error, resolvedHandle, redirectUrl);
       }
     },
     [
@@ -217,8 +240,8 @@ export function useOnboardingSubmit({
       goToNextStep,
       handle,
       handleInput,
+      handleSubmitError,
       handleValidation,
-      router,
       setProfileReadyHandle,
       userEmail,
       userId,

@@ -1,10 +1,10 @@
 'use client';
 
 import { Badge } from '@jovie/ui/atoms/badge';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -21,8 +21,19 @@ import {
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { ProfileMenuActions } from './ProfileMenuActions';
-import { RecentChats } from './RecentChats';
 import type { DashboardNavProps, NavItem } from './types';
+
+const RecentChats = dynamic(
+  () => import('./RecentChats').then(mod => ({ default: mod.RecentChats })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className='px-2 py-1 text-sm text-secondary-token animate-pulse'>
+        Loading threads…
+      </div>
+    ),
+  }
+);
 
 function isItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.href) {
@@ -40,15 +51,6 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
-  const { toggle: toggleProfileDrawer, isOpen: isProfileDrawerOpen } =
-    usePreviewPanelState();
-
-  // Debug: track isAdmin changes in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[DashboardNav] isAdmin changed:', isAdmin);
-    }
-  }, [isAdmin]);
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -88,9 +90,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
-      const isActive = isProfileItem
-        ? isProfileDrawerOpen
-        : isItemActive(pathname, item);
+      const isActive = isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
 
       return (
@@ -100,11 +100,10 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-          onClick={isProfileItem ? toggleProfileDrawer : undefined}
         />
       );
     },
-    [pathname, profileActions, toggleProfileDrawer, isProfileDrawerOpen]
+    [pathname, profileActions]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
@@ -135,7 +134,7 @@ export function DashboardNav(_: DashboardNavProps) {
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && (
-                  <div className='my-1.5 mx-2 border-t border-sidebar-border/15' />
+                  <div className='my-1.5 mx-2 border-t border-sidebar-border' />
                 )}
                 {renderSection(section.items)}
               </div>
@@ -145,7 +144,7 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && genres.length > 0 && (
-        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50 group-data-[collapsible=icon]:hidden'>
+        <div className='mt-3 group-data-[collapsible=icon]:hidden'>
           <SidebarCollapsibleGroup label='Genres' defaultOpen>
             <div className='flex flex-wrap gap-1.5 px-2 py-1'>
               {genres.map(genre => (
@@ -159,14 +158,13 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && (
-        <div className='mt-1.5 pt-1.5 mx-1 border-t border-default/50'>
+        <div className='mt-3'>
           <RecentChats />
         </div>
       )}
 
       {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section'>
-          <div className='my-1.5 mx-2 border-t border-sidebar-border/10' />
+        <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}
           </SidebarCollapsibleGroup>

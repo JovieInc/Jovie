@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 
 import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
@@ -26,7 +27,7 @@ export default async function SettingsPage() {
       throw error;
     }
 
-    console.error('Error loading settings:', error);
+    Sentry.captureException(error);
 
     return (
       <div className='flex items-center justify-center'>

@@ -232,16 +232,25 @@ export function createAvailabilityCellRenderer(
 }
 
 /** Creates a cell renderer for the smart link column */
-export function createSmartLinkCellRenderer() {
+export function createSmartLinkCellRenderer(
+  isSmartLinkLocked?: (releaseId: string) => boolean
+) {
   return function SmartLinkCellRenderer({
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
-    return <SmartLinkCell release={row.original} />;
+    return (
+      <SmartLinkCell
+        release={row.original}
+        locked={isSmartLinkLocked?.(row.original.id)}
+      />
+    );
   };
 }
 
 /** Combined right column: smart link + popularity + year (responsive) */
-export function createRightMetaCellRenderer() {
+export function createRightMetaCellRenderer(
+  isSmartLinkLocked?: (releaseId: string) => boolean
+) {
   return function RightMetaCellRenderer({
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
@@ -253,7 +262,10 @@ export function createRightMetaCellRenderer() {
     return (
       <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-xs text-secondary-token'>
         <div className='min-w-0 flex-1'>
-          <SmartLinkCell release={release} />
+          <SmartLinkCell
+            release={release}
+            locked={isSmartLinkLocked?.(release.id)}
+          />
         </div>
 
         <div className='hidden sm:flex items-center gap-2 tabular-nums text-secondary-token shrink-0'>

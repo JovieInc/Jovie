@@ -50,21 +50,6 @@ const meta: Meta<typeof ProfileForm> = {
         { name: 'dark', value: '#1f2937' },
       ],
     },
-    // Disable actual network calls in Storybook
-    mockData: [
-      {
-        url: '/api/images/sign-upload',
-        method: 'POST',
-        status: 200,
-        response: {
-          cloudName: 'mock-cloud',
-          apiKey: 'mock-key',
-          timestamp: Date.now(),
-          signature: 'mock-signature',
-          upload_preset: 'mock-preset',
-        },
-      },
-    ],
     a11y: {
       // Enable accessibility checks
       config: {

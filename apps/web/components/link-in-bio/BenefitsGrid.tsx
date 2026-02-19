@@ -55,14 +55,14 @@ export function BenefitsGrid() {
   return (
     <div className='mx-auto max-w-7xl px-6 lg:px-8'>
       <div className='mx-auto max-w-4xl text-center mb-20'>
-        <h2 className='text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
+        <h2 className='text-4xl font-semibold tracking-tight text-primary-token sm:text-5xl lg:text-6xl'>
           The platform that{' '}
           <span className='text-transparent bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 dark:from-green-400 dark:via-blue-400 dark:to-purple-400 bg-clip-text'>
             just works
           </span>
         </h2>
 
-        <p className='mt-6 text-xl text-gray-600 dark:text-white/70 leading-relaxed'>
+        <p className='mt-6 text-xl text-secondary-token leading-relaxed'>
           Every element is designed to turn fans into streams. No distractions,
           just results.
         </p>
@@ -77,16 +77,11 @@ export function BenefitsGrid() {
                 <div className='relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm border border-default hover:border-strong transition-all duration-300 rounded-2xl p-8 h-full'>
                   {/* Emoji and title */}
                   <div className='flex items-start gap-4 mb-6'>
-                    {/* Emoji needs role="img" for screen reader accessibility */}
-                    <div // NOSONAR S6819
-                      className='text-3xl'
-                      role='img'
-                      aria-label={benefit.title}
-                    >
+                    <div className='text-3xl' aria-hidden='true'>
                       {benefit.emoji}
                     </div>
                     <div className='flex-1'>
-                      <h3 className='text-xl font-semibold text-gray-900 dark:text-white leading-tight'>
+                      <h3 className='text-xl font-semibold text-primary-token leading-tight'>
                         {benefit.title}
                       </h3>
                     </div>
@@ -97,7 +92,7 @@ export function BenefitsGrid() {
                     <span
                       className={cn(
                         'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium',
-                        'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80'
+                        'bg-gray-100 dark:bg-white/10 text-secondary-token'
                       )}
                     >
                       {benefit.metric}
@@ -105,7 +100,7 @@ export function BenefitsGrid() {
                   </div>
 
                   {/* Description */}
-                  <p className='text-gray-600 dark:text-white/70 leading-relaxed'>
+                  <p className='text-secondary-token leading-relaxed'>
                     {benefit.description}
                   </p>
                 </div>

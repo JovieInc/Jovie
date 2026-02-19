@@ -27,7 +27,7 @@ export function DashboardRemoveBrandingCard({
               Pro
             </span>
             <span className='text-[10px] font-medium text-sidebar-muted'>
-              From $5/mo
+              From $39/mo
             </span>
           </div>
 

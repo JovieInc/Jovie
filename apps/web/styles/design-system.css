@@ -53,12 +53,31 @@
 */
 
 :root {
-  /* Light mode surfaces - Linear-style: white base, subtle gray elevation */
-  /* prettier-ignore */ --color-bg-base: #f5f5f5; /* Sidebar & page bg */
-  /* prettier-ignore */ --color-bg-surface-0: #f5f5f5; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #ffffff; /* Main content area */
-  /* prettier-ignore */ --color-bg-surface-2: #ffffff; /* Cards / elevated */
-  /* prettier-ignore */ --color-bg-surface-3: #f0f0f0; /* Modals / tooltips */
+  /* Light mode surfaces — extracted from Linear CSS vars (2026-02-17)
+     --bg-base-color-light: #fcfcfc
+     --bg-sidebar-light: #f5f5f5
+     --color-bg-primary:    lch(99% 0 282.863)     — main content
+     --color-bg-secondary:  lch(93.75% 0 282.863)  — cards, panels
+     --color-bg-tertiary:   lch(91.417% 0 282.863) — nested surfaces
+     --color-bg-quaternary: lch(97.542% 0 282.863) — hover state */
+  /* prettier-ignore */ --color-bg-base: #f5f5f5; /* Sidebar bg — Linear: --bg-sidebar-light */
+  /* prettier-ignore */ --color-bg-surface-0: #fcfcfc; /* Page bg — Linear: --bg-base-color-light */
+  /* prettier-ignore */ --color-bg-surface-1: lch(
+    99% 0 282.863
+  ); /* Main content — Linear: bg-primary */
+  /* prettier-ignore */ --color-bg-surface-2: lch(
+    93.75% 0 282.863
+  ); /* Cards — Linear: bg-secondary */
+  /* prettier-ignore */ --color-bg-surface-3: lch(
+    91.417% 0 282.863
+  ); /* Nested — Linear: bg-tertiary */
+
+  --color-bg-page: #fcfcfc; /* Same as surface-0 */
+  --color-bg-hover: lch(97.542% 0 282.863); /* Linear: bg-quaternary (hover) */
+  --color-bg-elevated: lch(93.75% 0 282.863); /* Same as surface-2 */
+  --color-bg-input: lch(99% 0 282.863); /* Same as surface-1 */
+  --color-bg-active: lch(93.75% 0 282.863); /* Same as surface-2 */
+  --color-bg-button: lch(91.417% 0 282.863); /* Same as surface-3 */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -75,22 +94,23 @@
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(0, 0, 0, 0.4);
+  --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
+
   /* Border system - semi-transparent for flexibility */
   --color-border-subtle: oklch(0% 0 0 / 6%);
   --color-border-default: oklch(0% 0 0 / 10%);
   --color-border-strong: oklch(0% 0 0 / 18%);
+  --color-border-focus: lch(
+    47.918% 59.303 288.421
+  ); /* Linear accent for focus */
 
-  /* Accent colors - derived from theme inputs */
-  --color-accent: oklch(55% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-hover: oklch(
-    50% var(--theme-accent-chroma) var(--theme-accent-hue)
-  );
-  --color-accent-active: oklch(
-    45% var(--theme-accent-chroma) var(--theme-accent-hue)
-  );
-  --color-accent-subtle: oklch(
-    95% calc(var(--theme-accent-chroma) * 0.5) var(--theme-accent-hue)
-  );
+  /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421) */
+  --color-accent: lch(47.918% 59.303 288.421); /* #5e6ad2 — Linear exact */
+  --color-accent-hover: lch(42% 59.303 288.421);
+  --color-accent-active: lch(37% 59.303 288.421);
+  --color-accent-subtle: lch(92% 20 288.421);
   --color-accent-foreground: oklch(100% 0 0);
 
   /* Primary button - high contrast */
@@ -111,15 +131,37 @@
   --color-interactive-hover: oklch(0% 0 0 / 6%);
   --color-interactive-active: oklch(0% 0 0 / 12%);
 
+  /* Badge/tag styles — light mode equivalents */
+  --color-badge-bg: rgba(0, 0, 0, 0.06);
+  --color-badge-border: rgba(0, 0, 0, 0.06);
+  --color-badge-text: oklch(10% 0 0);
+
   /* Table cell hover */
   --color-cell-hover: #f0f0f0;
 
-  /* Shadows - subtle in light mode */
+  /* Shadows — Linear's exact values (same hierarchy, lighter in light mode) */
   --shadow-color: 240 10% 3.9%;
-  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 3%), 0 1px 3px oklch(0% 0 0 / 6%);
-  --shadow-md: 0 4px 6px oklch(0% 0 0 / 4%), 0 2px 4px oklch(0% 0 0 / 6%);
-  --shadow-lg: 0 10px 20px oklch(0% 0 0 / 5%), 0 6px 6px oklch(0% 0 0 / 6%);
-  --shadow-xl: 0 20px 40px oklch(0% 0 0 / 8%), 0 12px 12px oklch(0% 0 0 / 6%);
+  --shadow-sm: 0px 4px 4px -1px #0000000a, 0px 1px 1px 0px #00000014;
+  --shadow-md: 0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a;
+  --shadow-lg:
+    0 4px 40px #00000014, 0 3px 20px #0000001a, 0 2px 6px #00000014,
+    0 1px 1px #0000000f;
+  --shadow-xl: 0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a;
+
+  /* Linear card shadow — ring border + soft depth (the signature look) */
+  --shadow-card:
+    oklch(80% 0 283) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+  --shadow-card-elevated:
+    oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
+
+  /* Inset divider shadow (used for section separators) */
+  --shadow-divider: oklch(86% 0 283) 0px -0.5px 0px 0px inset;
+
+  /* Button inset shadow */
+  --shadow-button-inset:
+    0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -127,49 +169,99 @@
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
-  /* Focus ring */
+  /* Focus ring — Linear: lch(47.918% 59.303 288.421) = #5e6ad2 */
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* Font size scale — extracted from Linear CSS vars (2026-02-17)
+     --font-size-micro: 11px, --font-size-mini: 12px, --font-size-small: 13px,
+     --font-size-regular: 15px, --font-size-large: 18px */
 }
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces - progressively lighter (Linear-style contrast) */
-  /* prettier-ignore */ --color-bg-base: #111111; /* sidebar & page bg */
-  /* prettier-ignore */ --color-bg-surface-0: #111111; /* Same as base */
-  /* prettier-ignore */ --color-bg-surface-1: #191a1c; /* main content — elevated for card definition */
-  /* prettier-ignore */ --color-bg-surface-2: #1b1d21; /* contact sidebar/drawer */
-  /* prettier-ignore */ --color-bg-surface-3: #21242a; /* Modals, tooltips */
+  /* Dark mode surfaces — extracted from Linear CSS vars (2026-02-17)
+     Using Linear's exact LCH values from :root CSS custom properties:
+       --bg-color:          lch(2.467% 0 272)      = #090909  (sidebar/page bg)
+       --color-bg-primary:  lch(4.8% 0.7 272)      = #101012  (primary surface)
+       --color-bg-quaternary: lch(7.133% 1.867 272) = #141518  (hover surface)
+       --color-bg-secondary: lch(10.633% 3.033 272) = #191B1F  (secondary surface)
+       --color-bg-tertiary: lch(14.133% 4.2 272)    = #212329  (tertiary surface)
+       --bg-border-color:   lch(14.74% 3.54 272)    = #23252A  (border color) */
+  /* prettier-ignore */ --color-bg-base: lch(
+    2.467% 0 272
+  ); /* #090909 — sidebar/page bg */
+  /* prettier-ignore */ --color-bg-surface-0: lch(
+    4.8% 0.7 272
+  ); /* #101012 — primary surface */
+  /* prettier-ignore */ --color-bg-surface-1: lch(
+    7.133% 1.867 272
+  ); /* #141518 — cards */
+  /* prettier-ignore */ --color-bg-surface-2: lch(
+    10.633% 3.033 272
+  ); /* #191B1F — inputs, elevated */
+  /* prettier-ignore */ --color-bg-surface-3: lch(
+    14.133% 4.2 272
+  ); /* #212329 — modals, tooltips */
 
-  /* Text hierarchy - inverted for dark mode (Linear settings-aligned)
-     Primary: headings & row titles — bright white (Linear uses ~97%)
-     Secondary: badges, meta text — medium gray
-     Tertiary: descriptions, helper text — muted gray (Linear descriptions)
-     Quaternary: placeholders
-     Disabled: fully de-emphasized */
-  --color-text-primary-token: oklch(97% 0.003 260);
-  --color-text-secondary-token: oklch(65% 0.01 260);
-  --color-text-tertiary-token: oklch(55% 0.01 260);
-  --color-text-quaternary-token: oklch(40% 0.01 260);
-  --color-text-disabled-token: oklch(32% 0.008 260);
+  /* Additional dark surface levels */
+  --color-bg-page: lch(2.467% 0 272); /* Same as base */
+  --color-bg-hover: rgba(
+    255,
+    255,
+    255,
+    0.02
+  ); /* Row/item hover (semi-transparent overlay) */
+  --color-bg-elevated: lch(4.8% 0.7 272); /* Same as surface-0 */
+  --color-bg-input: lch(10.633% 3.033 272); /* Same as surface-2 */
+  --color-bg-active: lch(10.633% 3.033 272); /* Same as surface-2 */
+  --color-bg-button: lch(14.133% 4.2 272); /* Same as surface-3 */
 
-  /* Border system - semi-transparent white for dark mode (Linear-style) */
-  --color-border-subtle: oklch(100% 0 0 / 6%);
-  --color-border-default: oklch(100% 0 0 / 10%);
-  --color-border-strong: oklch(100% 0 0 / 16%);
+  /* Text hierarchy - inverted for dark mode
+     Extracted from Linear.app live (2026-02-15):
+       Primary:   lch(100% 0 272)     → oklch ~100% — pure white headings
+       Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
+       Tertiary:  lch(62.6% 1.35 272)  → oklch ~63% — descriptions, meta
+       Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
+     Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
+  /* Text hierarchy — extracted from Linear CSS vars (2026-02-17)
+     --color-text-primary:    lch(100% 0 272)       = pure white
+     --color-text-secondary:  lch(90.65% 1.35 272)  = #E3E4E6
+     --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
+     --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
+     --content-color:         #6b6f76               = content/meta text */
+  --color-text-primary-token: lch(100% 0 272); /* Pure white — Linear exact */
+  --color-text-secondary-token: lch(
+    90.65% 1.35 272
+  ); /* #E3E4E6 — Linear exact */
+  --color-text-tertiary-token: lch(62.6% 1.35 272); /* #969799 — Linear exact */
+  --color-text-quaternary-token: lch(
+    38.29% 1.35 272
+  ); /* #5A5B5D — Linear exact */
+  --color-text-disabled-token: oklch(28% 0.006 272);
 
-  /* Accent - slightly brighter in dark mode */
-  --color-accent: oklch(65% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-hover: oklch(
-    70% var(--theme-accent-chroma) var(--theme-accent-hue)
-  );
-  --color-accent-active: oklch(
-    60% var(--theme-accent-chroma) var(--theme-accent-hue)
-  );
-  --color-accent-subtle: oklch(
-    20% calc(var(--theme-accent-chroma) * 0.6) var(--theme-accent-hue)
-  );
+  /* Logo muted tokens for label logos bar */
+  --color-logo-muted: rgba(255, 255, 255, 0.55);
+  --color-logo-muted-hover: rgba(255, 255, 255, 0.75);
+
+  /* Border system - extracted from Linear marketing (2026-02-16)
+     Subtle:  rgba(255,255,255,0.05) — card borders, dividers
+     Default: rgba(255,255,255,0.08) — frame borders, input borders
+     Strong:  rgba(255,255,255,0.10) — panel outlines */
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-default: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.1);
+  --color-border-focus: lch(
+    47.918% 59.303 288.421
+  ); /* Linear accent for focus */
+
+  /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421)
+     Focus ring uses same accent color */
+  --color-accent: lch(47.918% 59.303 288.421); /* #5e6ad2 — Linear exact */
+  --color-accent-hover: lch(55% 59.303 288.421);
+  --color-accent-active: lch(42% 59.303 288.421);
+  --color-accent-subtle: lch(20% 30 288.421);
 
   /* Primary button - inverted for dark mode */
   --color-btn-primary-bg: oklch(100% 0 0);
@@ -185,18 +277,47 @@
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
-  /* Interactive states - white-based */
-  --color-interactive-hover: oklch(100% 0 0 / 8%);
-  --color-interactive-active: oklch(100% 0 0 / 14%);
+  /* Interactive states - white-based (Linear uses semi-transparent overlays)
+     Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
+  --color-interactive-hover: rgba(255, 255, 255, 0.05);
+  --color-interactive-active: rgba(255, 255, 255, 0.05);
 
-  /* Table cell hover - #151618 (21, 22, 24) */
-  --color-cell-hover: #151618;
+  /* Badge/tag styles — extracted from Linear marketing demo (2026-02-16)
+     bg: rgba(255,255,255,0.05), border: 1px solid rgba(255,255,255,0.05)
+     radius: 2px, font: 10px/510 */
+  --color-badge-bg: rgba(255, 255, 255, 0.05);
+  --color-badge-border: rgba(255, 255, 255, 0.05);
+  --color-badge-text: rgb(247, 248, 248);
 
-  /* Shadows - deeper in dark mode */
-  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 20%), 0 1px 3px oklch(0% 0 0 / 25%);
-  --shadow-md: 0 4px 8px oklch(0% 0 0 / 30%), 0 2px 4px oklch(0% 0 0 / 25%);
-  --shadow-lg: 0 12px 24px oklch(0% 0 0 / 40%), 0 6px 8px oklch(0% 0 0 / 30%);
-  --shadow-xl: 0 24px 48px oklch(0% 0 0 / 50%), 0 12px 16px oklch(0% 0 0 / 35%);
+  /* Table cell hover — same as surface-2 rgb(22,23,24) */
+  --color-cell-hover: #161718;
+
+  /* Shadows — extracted from Linear CSS vars (2026-02-17)
+     --shadow-tiny: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e
+     --shadow-low:  0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f
+     --shadow-medium: 0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f, 0 1px 1px #0000001a
+     --shadow-high: 0 5px 50px #0000004d, 0 4px 30px #0000004d, 0 3px 10px #0000002f */
+  --shadow-sm: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e;
+  --shadow-md: 0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f;
+  --shadow-lg:
+    0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f,
+    0 1px 1px #0000001a;
+  --shadow-xl: 0 5px 50px #0000004d, 0 4px 30px #0000004d, 0 3px 10px #0000002f;
+
+  /* Dark mode card shadow — 1px ring via box-shadow + soft depth
+     Extracted: ring + depth layer rgba(0,0,0,0.4) 0px 2px 4px */
+  --shadow-card:
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.4) 0px 2px 4px 0px;
+  --shadow-card-elevated:
+    rgba(0, 0, 0, 0.2) 0px 0px 12px 0px inset,
+    rgba(0, 0, 0, 0.2) 0px 4px 24px 0px;
+  --shadow-divider: rgba(255, 255, 255, 0.05) 0px -0.5px 0px 0px inset;
+  --shadow-button-inset:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px,
+    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
+    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
 
   /* Skeleton/loading states */
   --color-skeleton-base: oklch(
@@ -427,10 +548,11 @@
    TYPOGRAPHY SYSTEM
    ============================================ */
 :root {
-  /* Font stack */
+  /* Font stack — matches Linear.app exactly (extracted 2026-02-15) */
   --font-sans:
-    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI", Roboto, Arial, sans-serif;
+    "Inter Variable", "Inter", "SF Pro Display", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    "Open Sans", "Helvetica Neue", sans-serif;
   --font-mono:
     "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
@@ -439,9 +561,28 @@
   --font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
   --font-optical-sizing: 28;
 
-  /* Type scale - based on 16px base */
+  /* Font weights — Linear uses Inter Variable axis with non-standard stops
+     Extracted from Linear CSS vars (2026-02-17):
+       --font-weight-normal: 450  (book weight — their default!)
+       --font-weight-medium: 500
+       --font-weight-semibold: 600
+       --font-weight-bold: 700 */
+  --font-weight-normal: 450; /* Linear default — "book" weight, not standard 400 */
+  --font-weight-book: 450; /* Alias for normal */
+  --font-weight-medium: 500;
+  --font-weight-nav: 500; /* Linear sidebar nav = --font-weight-medium */
+  --font-weight-semibold: 600; /* Linear: 600, not our old 538 */
+  --font-weight-bold: 700; /* Linear: 700, not our old 590 */
+  --font-weight-heavy: 700;
+
+  /* Type scale - based on 16px base
+     KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
+  --text-2xs: 0.6875rem;
+  /* 11px — tiny labels, badges */
   --text-xs: 0.75rem;
   /* 12px */
+  --text-app: 0.8125rem;
+  /* 13px — LINEAR'S DEFAULT APP UI SIZE (sidebar, issues, tabs) */
   --text-sm: 0.875rem;
   /* 14px */
   --text-base: 1rem;
@@ -516,37 +657,70 @@
    ============================================ */
 :root {
   --radius-none: 0;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-full: 9999px;
+  --radius-xs: 2px; /* Tags/badges — extracted: 2px on issue labels */
+  --radius-sm: 4px; /* Sidebar items */
+  --radius-md: 6px; /* Input fields — extracted: 6px on inputs & sidebar buttons */
+  --radius-default: 8px; /* Buttons, dropdowns — extracted: 8px on nav buttons & cards */
+  --radius-lg: 8px; /* Cards — extracted: 8px on marketing cards */
+  --radius-xl: 12px; /* Large cards, panels — extracted: 12px on feature sections */
+  --radius-2xl: 16px; /* Modals, sheets — extracted: 16px on elevated panels */
+  --radius-3xl: 22px; /* Large modals — extracted: 22px on hero sections */
+  --radius-pill: 48px; /* Pill buttons (observed in Linear) */
+  --radius-full: 9999px; /* Circles, tags */
 }
 
 /* ============================================
    ANIMATION SYSTEM
    ============================================ */
 :root {
-  /* Durations */
-  --duration-fast: 100ms;
-  --duration-normal: 150ms;
-  --duration-slow: 300ms;
-  --duration-slower: 500ms;
+  /* Durations — extracted from Linear CSS vars (2026-02-17)
+     --speed-quickTransition: .1s
+     --speed-regularTransition: .25s
+     --speed-slowTransition: .35s */
+  --duration-instant: 50ms;
+  --duration-fast: 100ms; /* Linear: quickTransition */
+  --duration-normal: 160ms; /* Sidebar/nav transition: 0.16s cubic-bezier */
+  --duration-slow: 250ms; /* Linear: regularTransition */
+  --duration-slower: 350ms; /* Linear: slowTransition */
+  --duration-slowest: 350ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-linear: cubic-bezier(
+    0.25,
+    0.46,
+    0.45,
+    0.94
+  ); /* Linear's marketing ease */
+
+  /* Pre-composed transition patterns (extracted from Linear)
+     Use duration custom properties so prefers-reduced-motion overrides work */
+  --transition-colors:
+    border var(--duration-normal), background-color var(--duration-normal),
+    color var(--duration-normal), opacity var(--duration-normal);
+  --transition-bg: background-color var(--duration-normal);
+  --transition-opacity: opacity var(--duration-normal);
+  --transition-opacity-fast: opacity var(--duration-instant) ease-in-out;
+  --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
+  --transition-transform: transform var(--duration-normal);
+  --transition-collapse:
+    height var(--duration-slow) ease-out,
+    min-height var(--duration-slow) ease-out;
+  --transition-shadow:
+    box-shadow var(--duration-normal), background-color var(--duration-normal);
 }
 
-/* Reduced motion */
+/* Reduced motion — zero out all duration tokens so transition patterns inherit 0ms */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;
     --duration-slow: 0ms;
     --duration-slower: 0ms;
+    --duration-slowest: 0ms;
   }
 }
 
@@ -577,24 +751,24 @@
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Linear-inspired: slightly lighter bg, semi-transparent accents */
-  --sidebar-background: 17 17 17; /* #111111 - matches bg-base */
+  /* Matches new bg-base: rgb(8,9,10) extracted from Linear */
+  --sidebar-background: 8 9 10; /* rgb(8,9,10) - matches bg-base */
   --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.08; /* Semi-transparent white for hover (Linear) */
+  --sidebar-accent: 255 255 255 / 0.02; /* Hover bg — Linear: rgba(255,255,255,0.02) */
   --sidebar-accent-foreground: 227 228 229;
-  --sidebar-border: 255 255 255 / 0.06;
+  --sidebar-border: 255 255 255 / 0.05;
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 161 161 170;
-  --sidebar-muted-foreground: 148 150 156;
+  --sidebar-muted: 98 102 109; /* Section headers — Linear: rgb(98,102,109) */
+  --sidebar-muted-foreground: 98 102 109;
   --sidebar-surface: 17 17 17; /* Matches bg-base */
-  --sidebar-surface-hover: 255 255 255 / 0.04; /* Subtle semi-transparent hover */
+  --sidebar-surface-hover: 255 255 255 / 0.02; /* Hover — matches sidebar-accent */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 148 152 160; /* Muted nav text, brightens on hover */
-  --sidebar-item-icon: 120 124 132; /* Dimmer nav icons */
-  --sidebar-accent-active: 255 255 255 / 0.06; /* Subtler active state, Linear-style */
+  --sidebar-item-foreground: 208 214 224; /* Nav text — Linear: rgb(208,214,224) */
+  --sidebar-item-icon: 98 102 109; /* Nav icons — Linear: rgb(98,102,109) */
+  --sidebar-accent-active: 255 255 255 / 0.04; /* Active bg — Linear: rgba(255,255,255,0.04) */
 }
 
 /* ============================================
@@ -610,12 +784,14 @@
 }
 
 :root.dark {
-  --menu-background: 27 29 33;
+  /* Menu tokens aligned to Linear surface hierarchy (2026-02-16)
+     Menu bg = surface-2 (rgb 22,23,24), hover = surface-3 area */
+  --menu-background: 22 23 24;
   --menu-foreground: 244 244 245;
-  --menu-border: 255 255 255 / 0.1;
-  --menu-shadow: 0 0 0 / 0.4;
-  --menu-item-hover: 33 36 42;
-  --menu-separator: 255 255 255 / 0.08;
+  --menu-border: 255 255 255 / 0.08;
+  --menu-shadow: 0 0 0 / 0.35;
+  --menu-item-hover: 35 37 42;
+  --menu-separator: 255 255 255 / 0.05;
 }
 
 /* ============================================
@@ -722,4 +898,8 @@
 
   /* Map Linear interactive states */
   --color-interactive-hover: var(--linear-bg-hover);
+
+  /* Map Linear page bg and focus ring */
+  --color-bg-page: var(--linear-bg-page);
+  --color-border-focus: var(--linear-border-focus);
 }

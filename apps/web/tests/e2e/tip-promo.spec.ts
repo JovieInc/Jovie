@@ -3,18 +3,6 @@ import { expect, test } from './setup';
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/**
- * FIXME: These tests are currently skipped because they attempt to mock
- * NEXT_PUBLIC_* environment variables at runtime using page.addInitScript().
- * This approach doesn't work because:
- * 1. Next.js replaces NEXT_PUBLIC_* variables at build time, not runtime
- * 2. process.env doesn't exist in the browser context
- *
- * To fix these tests, one of the following approaches is needed:
- * - Use a runtime feature flag system (e.g., LaunchDarkly, feature-config)
- * - Test against the actual environment variable value without mocking
- * - Start separate test servers with different environment configurations
- */
 test.describe
   .skip('TipPromo Feature Flag', () => {
     test.describe('when NEXT_PUBLIC_FEATURE_TIPS is enabled', () => {

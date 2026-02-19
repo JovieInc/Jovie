@@ -107,6 +107,8 @@ export {
   type ArtistThemeResponse,
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
+// Bandsintown connection status
+export { useBandsintownConnectionQuery } from './useBandsintownConnectionQuery';
 export {
   type BillingHistoryEntry,
   useBillingHistoryQuery,
@@ -134,6 +136,18 @@ export {
   useVersionMonitor,
   type VersionMismatchInfo,
 } from './useBuildInfoQuery';
+// Campaign invites
+export {
+  type CampaignPreviewResponse,
+  type CampaignStats,
+  type CampaignStatsResponse,
+  type JobQueueStats,
+  type SendCampaignInvitesInput,
+  type SendCampaignInvitesResponse,
+  useCampaignPreviewQuery,
+  useCampaignStatsQuery,
+  useSendCampaignInvitesMutation,
+} from './useCampaignInvites';
 // Admin creator mutations
 export {
   useDeleteCreatorMutation,
@@ -185,6 +199,12 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Growth plan early access request
+export {
+  type GrowthAccessRequestInput,
+  type GrowthAccessRequestResponse,
+  useGrowthAccessRequestMutation,
+} from './useGrowthAccessRequestMutation';
 // Handle availability query
 export {
   type HandleAvailabilityResponse,
@@ -216,6 +236,8 @@ export {
   useNotificationStatusQuery,
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
+  useUpdateContentPreferencesMutation,
+  useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
 // Pixel settings mutation
 export {

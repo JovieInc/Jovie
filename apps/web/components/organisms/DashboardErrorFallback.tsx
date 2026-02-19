@@ -1,10 +1,9 @@
 'use client';
 
-import { AlertTriangle, Copy, Home, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, Home, RefreshCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
-import { toast } from 'sonner';
+import { ErrorDetails } from '@/components/feedback/ErrorDetails';
 
 /**
  * Error fallback UI specifically for dashboard components.
@@ -17,28 +16,7 @@ export function DashboardErrorFallback({
   resetErrorBoundary,
 }: FallbackProps) {
   const router = useRouter();
-  const [timestamp] = useState(() => new Date());
-
-  const errorDigest = (error as Error & { digest?: string })?.digest;
-
-  const handleCopyErrorDetails = () => {
-    const details = [
-      `Error ID: ${errorDigest || 'unknown'}`,
-      `Time: ${timestamp.toISOString()}`,
-      `Context: Dashboard`,
-      `URL: ${globalThis.location?.href ?? 'N/A'}`,
-      `User Agent: ${globalThis.navigator?.userAgent ?? 'N/A'}`,
-    ].join('\n');
-
-    navigator.clipboard
-      .writeText(details)
-      .then(() => {
-        toast.success('Error details copied to clipboard');
-      })
-      .catch(() => {
-        toast.error('Failed to copy error details');
-      });
-  };
+  const errorWithDigest = error as Error & { digest?: string };
 
   return (
     <div className='flex flex-col items-center justify-center gap-6 p-8 text-center min-h-[500px]'>
@@ -82,40 +60,10 @@ export function DashboardErrorFallback({
           </button>
         </div>
 
-        <div className='mt-6 space-y-2 border-t border-subtle pt-4'>
-          {errorDigest && (
-            <p className='text-xs text-muted-foreground text-center'>
-              Error ID: {errorDigest}
-            </p>
-          )}
-          <p className='text-xs text-muted-foreground text-center'>
-            Occurred at: {timestamp.toLocaleString()}
-          </p>
-
-          <div className='flex justify-center'>
-            <button
-              type='button'
-              onClick={handleCopyErrorDetails}
-              className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors'
-              aria-label='Copy error details to clipboard'
-            >
-              <Copy className='h-3 w-3' aria-hidden='true' />
-              Copy Error Details
-            </button>
-          </div>
-        </div>
-
-        {process.env.NODE_ENV === 'development' && error?.message && (
-          <details className='mt-4 rounded-md bg-secondary/30 p-3'>
-            <summary className='cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground'>
-              Developer Info (dev only)
-            </summary>
-            <pre className='mt-2 overflow-auto text-xs text-muted-foreground whitespace-pre-wrap break-words'>
-              {error.message}
-              {error.stack && `\n\n${error.stack}`}
-            </pre>
-          </details>
-        )}
+        <ErrorDetails
+          error={errorWithDigest}
+          extraContext={{ Context: 'Dashboard' }}
+        />
       </div>
     </div>
   );

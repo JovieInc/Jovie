@@ -22,12 +22,11 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
-
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { CreatorActionsMenuProps } from './types';
-import { copyTextToClipboard } from './utils';
 
 interface MenuItemsProps {
   readonly profile: CreatorActionsMenuProps['profile'];
@@ -162,6 +161,13 @@ export function CreatorActionsMenu({
   onOpenChange,
 }: Readonly<CreatorActionsMenuProps>) {
   const [copySuccess, setCopySuccess] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
   const isSuccess = status === 'success';
@@ -172,11 +178,12 @@ export function CreatorActionsMenu({
 
     const baseUrl = getBaseUrl();
     const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
-    const success = await copyTextToClipboard(claimUrl);
+    const success = await copyToClipboard(claimUrl);
 
     if (success) {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
     }
   }, [profile.claimToken, profile.username]);
 

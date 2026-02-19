@@ -10,6 +10,7 @@ import { vi } from 'vitest';
 export const {
   mockDbSelect,
   mockCaptureCriticalError,
+  mockCaptureWarning,
   mockUsersTable,
   mockBillingAuditLog,
   mockDb,
@@ -18,6 +19,7 @@ export const {
   return {
     mockDbSelect: _mockDbSelect,
     mockCaptureCriticalError: vi.fn(),
+    mockCaptureWarning: vi.fn(),
     mockUsersTable: {
       id: Symbol('users.id'),
       clerkId: Symbol('users.clerkId'),

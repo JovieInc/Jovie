@@ -46,7 +46,7 @@ describe('Input', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('border-default');
-      expect(input.className).toContain('bg-surface-1');
+      expect(input.className).toContain('bg-surface-input');
     });
 
     it('applies error variant classes', () => {
@@ -64,7 +64,7 @@ describe('Input', () => {
     it('applies sm size classes', () => {
       render(<Input inputSize='sm' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-8');
+      expect(input.className).toContain('h-7');
       expect(input.className).toContain('text-xs');
     });
 
@@ -72,20 +72,20 @@ describe('Input', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('h-10');
-      expect(input.className).toContain('text-sm');
+      expect(input.className).toContain('text-[13px]');
     });
 
     it('applies lg size classes', () => {
       render(<Input inputSize='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-12');
-      expect(input.className).toContain('text-base');
+      expect(input.className).toContain('h-[68px]');
+      expect(input.className).toContain('text-[13px]');
     });
 
     it('supports size prop as alias for inputSize', () => {
       render(<Input size='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-12');
+      expect(input.className).toContain('h-[68px]');
     });
 
     it('merges custom className', () => {

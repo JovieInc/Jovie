@@ -15,7 +15,9 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
+import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import {
@@ -193,6 +195,8 @@ const fetchProfileAndLinks = async (
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
+      location: result.location ?? null,
+      active_since_year: result.activeSinceYear ?? null,
       is_featured: result.isFeatured || false,
       marketing_opt_out: result.marketingOptOut || false,
       profile_views: result.profileViews || 0,
@@ -335,7 +339,7 @@ interface Props {
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
+    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about';
   }>;
 }
 
@@ -370,8 +374,16 @@ export default async function ArtistPage({
     genres,
     status,
     creatorIsPro,
-    latestRelease,
+    latestRelease: fetchedLatestRelease,
   } = profileResult;
+
+  // Feature-flagged: latest release card is disabled by default (gate defaults to false)
+  const showLatestRelease = await checkGate(
+    null,
+    FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD,
+    false
+  );
+  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
 
   if (status === 'error') {
     return (
@@ -396,6 +408,13 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
+  // Evaluate two-step subscribe experiment per-artist (deterministic bucketing)
+  const subscribeTwoStep = await checkGate(
+    profile.id,
+    FEATURE_FLAG_KEYS.SUBSCRIBE_TWO_STEP,
+    false
+  );
+
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
     artist.name
@@ -407,6 +426,16 @@ export default async function ArtistPage({
   const hasVenmoLink = links.some(link => link.platform === 'venmo');
   const showTipButton = mode === 'profile' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
+
+  // Read profile photo download settings
+  const profileSettings =
+    (profile.settings as Record<string, unknown> | null) ?? {};
+  const allowPhotoDownloads =
+    profileSettings.allowProfilePhotoDownloads === true;
+  const photoDownloadSizes = buildAvatarSizes(
+    profileSettings.avatarSizes as Record<string, string> | null | undefined,
+    profile.avatar_url
+  );
 
   // Generate structured data for SEO
   const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
@@ -446,6 +475,10 @@ export default async function ArtistPage({
         showBackButton={showBackButton}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
+        photoDownloadSizes={photoDownloadSizes}
+        allowPhotoDownloads={allowPhotoDownloads}
+        subscribeTwoStep={subscribeTwoStep}
+        genres={genres}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

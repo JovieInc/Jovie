@@ -39,8 +39,8 @@ describe('Avatar Component', () => {
       expect(image).toHaveAttribute('alt', '');
     });
 
-    it('applies correct ARIA attributes', () => {
-      render(
+    it('applies aria-hidden on inner container', () => {
+      const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -48,12 +48,12 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveAttribute('aria-label', 'User avatar');
+      const innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toBeInTheDocument();
     });
 
     it('applies correct size classes', () => {
-      const { rerender } = render(
+      const { container, rerender } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -62,8 +62,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      let container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('size-8');
+      let innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toHaveClass('size-8');
 
       rerender(
         <Avatar
@@ -74,12 +74,12 @@ describe('Avatar Component', () => {
         />
       );
 
-      container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('size-16');
+      innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toHaveClass('size-16');
     });
 
     it('applies correct rounded classes', () => {
-      const { rerender } = render(
+      const { container, rerender } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -88,8 +88,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      let container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('rounded-sm');
+      let innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toHaveClass('rounded-sm');
 
       rerender(
         <Avatar
@@ -100,8 +100,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      container = screen.getByLabelText('User avatar');
-      expect(container).toHaveClass('rounded-full');
+      innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toHaveClass('rounded-full');
     });
   });
 
@@ -163,8 +163,8 @@ describe('Avatar Component', () => {
   });
 
   describe('Accessibility', () => {
-    it('has correct role attribute', () => {
-      render(
+    it('inner container is aria-hidden', () => {
+      const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -172,11 +172,11 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveAttribute('role', 'img');
+      const innerDiv = container.querySelector('[aria-hidden="true"]');
+      expect(innerDiv).toBeInTheDocument();
     });
 
-    it('has correct aria-label', () => {
+    it('image alt is empty for decorative use', () => {
       render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -185,11 +185,8 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('Profile picture of John Doe');
-      expect(container).toHaveAttribute(
-        'aria-label',
-        'Profile picture of John Doe'
-      );
+      const image = screen.getByTestId('avatar-image');
+      expect(image).toHaveAttribute('alt', '');
     });
 
     it('fallback initials are not selectable', () => {
@@ -202,7 +199,7 @@ describe('Avatar Component', () => {
 
   describe('Custom Props', () => {
     it('accepts custom className', () => {
-      render(
+      const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -211,14 +208,14 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container.parentElement).toHaveClass('custom-avatar-class');
+      const wrapper = container.querySelector('.relative');
+      expect(wrapper).toHaveClass('custom-avatar-class');
     });
 
     it('accepts custom style props', () => {
       const customStyle = { border: '2px solid red', opacity: '0.5' };
 
-      render(
+      const { container } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
@@ -227,9 +224,7 @@ describe('Avatar Component', () => {
         />
       );
 
-      const container = screen.getByLabelText('User avatar');
-      const wrapper = container.parentElement;
-      // Check that style attribute exists and contains our custom styles
+      const wrapper = container.querySelector('.relative');
       expect(wrapper).toHaveAttribute('style');
       const style = wrapper?.getAttribute('style');
       expect(style).toContain('border');
@@ -283,8 +278,9 @@ describe('Avatar Component', () => {
       // After load, image should have opacity-100 class
       expect(image).toHaveClass('opacity-100');
 
-      const container = screen.getByLabelText('User avatar');
-      expect(container).toHaveAttribute('aria-busy', 'false');
+      // Shimmer should be removed after load
+      const shimmer = document.querySelector('.skeleton');
+      expect(shimmer).not.toBeInTheDocument();
     });
   });
 });

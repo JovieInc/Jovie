@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
 import {
@@ -77,7 +78,7 @@ export async function GET(
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
-    console.error('Failed to load tracks:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Failed to load tracks' },
       { status: 500, headers: NO_STORE_HEADERS }

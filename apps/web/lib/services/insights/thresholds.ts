@@ -38,8 +38,8 @@ export const MAX_INSIGHTS_PER_RUN = 8;
 /** Rate limit: minimum hours between generation runs per user */
 export const GENERATION_COOLDOWN_HOURS = 1;
 
-/** Maximum profiles to process per cron batch */
-export const MAX_CRON_BATCH_SIZE = 100;
+/** Maximum profiles to process per cron batch (reduced from 100 to control LLM costs) */
+export const MAX_CRON_BATCH_SIZE = 25;
 
 /** Minimum confidence score for an insight to be stored */
 export const MIN_CONFIDENCE = 0.5;

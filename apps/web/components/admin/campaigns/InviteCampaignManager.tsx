@@ -12,7 +12,7 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -62,30 +62,20 @@ export function InviteCampaignManager() {
 
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
+  const { mutateAsync: sendInvites } = sendInvitesMutation;
 
-  const handleRefreshClick = () => {
+  const handleRefreshClick = useCallback(() => {
     refetchPreview();
-  };
+  }, [refetchPreview]);
 
-  const handleSendClick = () => {
-    if (!preview || preview.sample.withEmails === 0) return;
-
-    // Show confirmation for large batches
-    if (preview.sample.withEmails >= LARGE_BATCH_THRESHOLD) {
-      setShowConfirmModal(true);
-    } else {
-      handleConfirmSend();
-    }
-  };
-
-  const handleConfirmSend = async () => {
+  const handleConfirmSend = useCallback(async () => {
     setShowConfirmModal(false);
     if (!preview || preview.sample.withEmails === 0) return;
 
     setSendResult(null);
 
     try {
-      const result = await sendInvitesMutation.mutateAsync({
+      const result = await sendInvites({
         fitScoreThreshold,
         limit,
         minDelayMs: throttling.minDelayMs,
@@ -98,7 +88,18 @@ export function InviteCampaignManager() {
     } catch {
       // Error is handled by the mutation
     }
-  };
+  }, [preview, fitScoreThreshold, limit, throttling, sendInvites]);
+
+  const handleSendClick = useCallback(() => {
+    if (!preview || preview.sample.withEmails === 0) return;
+
+    // Show confirmation for large batches
+    if (preview.sample.withEmails >= LARGE_BATCH_THRESHOLD) {
+      setShowConfirmModal(true);
+    } else {
+      handleConfirmSend();
+    }
+  }, [preview, handleConfirmSend]);
 
   const avgDelaySeconds = Math.round(
     (throttling.minDelayMs + throttling.maxDelayMs) / 2 / 1000
@@ -113,7 +114,7 @@ export function InviteCampaignManager() {
     (stats?.jobQueue?.processing ?? 0) > 0;
 
   return (
-    <div className='space-y-8'>
+    <div className='space-y-8' data-testid='admin-campaigns-content'>
       {/* Campaign Results Dashboard */}
       <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
         <div className='flex items-center justify-between mb-4'>
@@ -493,15 +494,12 @@ export function InviteCampaignManager() {
 
         {sendResult?.ok && (
           <div className='mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3'>
-            <Icon
-              name='CheckCircle'
-              className='h-3.5 w-3.5 text-green-600 dark:text-green-400'
-            />
+            <Icon name='CheckCircle' className='h-3.5 w-3.5 text-success' />
             <div>
               <p className='text-sm font-medium text-green-700 dark:text-green-300'>
                 Successfully queued {sendResult.jobsEnqueued} invites!
               </p>
-              <p className='text-xs text-green-600 dark:text-green-400'>
+              <p className='text-xs text-success'>
                 Estimated completion: ~{sendResult.estimatedMinutes} minutes
               </p>
             </div>

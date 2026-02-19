@@ -106,6 +106,9 @@ export interface CreatorProfile {
   is_claimed: boolean;
   claim_token: string | null;
   claimed_at: string | null;
+  // About / bio metadata
+  location?: string | null;
+  active_since_year?: number | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -142,6 +145,9 @@ export interface Artist {
   apple_music_url?: string;
   youtube_url?: string;
   venmo_handle?: string;
+  location?: string | null;
+  active_since_year?: number | null;
+  genres?: string[] | null;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;
@@ -375,6 +381,8 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     spotify_url: profile.spotify_url || undefined,
     apple_music_url: profile.apple_music_url || undefined,
     youtube_url: profile.youtube_url || undefined,
+    location: profile.location ?? null,
+    active_since_year: profile.active_since_year ?? null,
     published: profile.is_public,
     is_verified: profile.is_verified,
     is_featured: profile.is_featured,
@@ -426,6 +434,9 @@ export function convertDrizzleCreatorProfileToArtist(
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
     venmo_handle: profile.venmoHandle || undefined,
+    location: profile.location ?? null,
+    active_since_year: profile.activeSinceYear ?? null,
+    genres: profile.genres ?? null,
     published: profile.isPublic ?? false,
     is_verified: profile.isVerified ?? false,
     is_featured: profile.isFeatured ?? false,

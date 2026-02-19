@@ -182,7 +182,7 @@ export function ContactMode({
         <Button
           size='sm'
           variant='secondary'
-          onClick={() => router.push(APP_ROUTES.CONTACTS)}
+          onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
         >
           Add contacts
         </Button>
@@ -214,7 +214,7 @@ export function ContactMode({
         <Button
           size='sm'
           variant='ghost'
-          onClick={() => router.push(APP_ROUTES.CONTACTS)}
+          onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
           className='w-full text-xs text-secondary-token'
         >
           Manage contacts

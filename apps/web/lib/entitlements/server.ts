@@ -4,10 +4,10 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
-  getPlanLimits,
+  getEntitlements,
   hasAdvancedFeatures,
   isProPlan,
-} from '@/lib/stripe/config';
+} from '@/lib/entitlements/registry';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import type { UserEntitlements, UserPlan } from '@/types';
@@ -24,8 +24,13 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   canExportContacts: false,
   canAccessAdvancedAnalytics: false,
   canFilterSelfFromAnalytics: false,
+  canAccessAdPixels: false,
+  canBeVerified: false,
+  aiCanUseTools: false,
   analyticsRetentionDays: 7,
   contactsLimit: 100,
+  smartLinksLimit: 5,
+  aiDailyMessageLimit: 5,
 };
 
 /**
@@ -69,7 +74,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   if (!billing.success) {
     // Billing lookup failed — throw so callers surface an error state
     // instead of silently revoking pro features for paying users.
-    logger.error('Billing lookup failed in entitlements', {
+    logger.warn('Billing lookup failed in entitlements (transient)', {
       userId,
       error: billing.error,
     });
@@ -98,7 +103,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     plan = (dbPlan as UserPlan) || 'pro';
   }
 
-  const limits = getPlanLimits(plan);
+  const ent = getEntitlements(plan);
 
   return {
     userId,
@@ -108,11 +113,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     plan,
     isPro: isProPlan(plan),
     hasAdvancedFeatures: hasAdvancedFeatures(plan),
-    canRemoveBranding: limits.canRemoveBranding,
-    canExportContacts: limits.canExportContacts,
-    canAccessAdvancedAnalytics: limits.canAccessAdvancedAnalytics,
-    canFilterSelfFromAnalytics: limits.canFilterSelfFromAnalytics,
-    analyticsRetentionDays: limits.analyticsRetentionDays,
-    contactsLimit: limits.contactsLimit,
+    ...ent.booleans,
+    ...ent.limits,
   };
 }

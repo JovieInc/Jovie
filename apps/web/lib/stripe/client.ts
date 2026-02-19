@@ -128,6 +128,7 @@ export async function createCheckoutSession({
   successUrl,
   cancelUrl,
   idempotencyKey,
+  referralCode,
 }: {
   customerId: string;
   priceId: string;
@@ -135,6 +136,7 @@ export async function createCheckoutSession({
   successUrl: string;
   cancelUrl: string;
   idempotencyKey?: string;
+  referralCode?: string;
 }): Promise<Stripe.Checkout.Session> {
   try {
     const stripeClient = getStripe();
@@ -157,12 +159,14 @@ export async function createCheckoutSession({
         // Add metadata for tracking
         metadata: {
           clerk_user_id: userId,
+          ...(referralCode ? { referral_code: referralCode } : {}),
         },
 
         // Subscription settings
         subscription_data: {
           metadata: {
             clerk_user_id: userId,
+            ...(referralCode ? { referral_code: referralCode } : {}),
           },
         },
 

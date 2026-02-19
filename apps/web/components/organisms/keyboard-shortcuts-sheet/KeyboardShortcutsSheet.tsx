@@ -167,35 +167,33 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='w-full sm:max-w-md p-0 flex flex-col gap-0'
+        className='w-full sm:max-w-md p-0 flex flex-col gap-0 top-1 right-1 bottom-1 h-auto rounded-xl border border-subtle'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
         {/* Header with back button and title */}
-        <SheetHeader className='px-4 py-3 border-b border-subtle flex-shrink-0'>
-          <div className='flex items-center gap-3'>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-8 w-8 shrink-0'
-              onClick={close}
-              aria-label='Close keyboard shortcuts'
-            >
-              <ChevronLeft className='h-4 w-4' />
-            </Button>
-            <SheetTitle className='text-base font-semibold'>
-              Keyboard Shortcuts
-            </SheetTitle>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-8 w-8 shrink-0 ml-auto'
-              onClick={close}
-              aria-label='Close'
-            >
-              <X className='h-4 w-4' />
-            </Button>
-          </div>
+        <SheetHeader className='px-4 py-3 border-b border-subtle flex-shrink-0 flex-row items-center gap-3 space-y-0'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-8 w-8 shrink-0'
+            onClick={close}
+            aria-label='Close keyboard shortcuts'
+          >
+            <ChevronLeft className='h-4 w-4' />
+          </Button>
+          <SheetTitle className='text-sm font-medium'>
+            Keyboard Shortcuts
+          </SheetTitle>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-8 w-8 shrink-0 ml-auto'
+            onClick={close}
+            aria-label='Close'
+          >
+            <X className='h-4 w-4' />
+          </Button>
         </SheetHeader>
 
         {/* Search input */}

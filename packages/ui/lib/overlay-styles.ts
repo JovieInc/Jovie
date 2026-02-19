@@ -29,7 +29,7 @@ export const centeredContentStyles = {
   // fails to composite: https://github.com/shadcn-ui/ui/issues/7507
   position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
   layout: 'grid w-full max-w-lg gap-4',
-  surface: 'border border-subtle bg-surface-2 p-6 text-primary-token shadow-lg',
+  surface: 'border border-subtle bg-surface-2 p-6 text-primary-token shadow-xl',
   // fade + zoom only; slide animations conflict with the translate centering
   // because tw-animate-css slide uses transform: translate3d() in keyframes
   animation:

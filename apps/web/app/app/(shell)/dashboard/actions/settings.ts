@@ -17,6 +17,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { userSettings, users } from '@/lib/db/schema/auth';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Updates the sidebar collapsed state for the current user.
@@ -29,36 +30,42 @@ import { userSettings, users } from '@/lib/db/schema/auth';
  * @throws Error if the user is not authenticated or not found
  */
 export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
-  'use server';
   noStore();
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
+  try {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
+    await withDbSession(async clerkUserId => {
+      // Get DB user id
+      const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+
+      if (!user?.id) throw new TypeError('User not found');
+
+      // Upsert into user_settings
+      await db
+        .insert(userSettings)
+        .values({
+          userId: user.id,
+          sidebarCollapsed: collapsed,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: userSettings.userId,
+          set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
+        });
+    });
+    updateTag('dashboard-data');
+    revalidateTag('dashboard-data', 'max');
+  } catch (error) {
+    await captureError('setSidebarCollapsed failed', error, {
+      route: 'dashboard/actions/settings',
+    });
+    throw error;
   }
-
-  await withDbSession(async clerkUserId => {
-    // Get DB user id
-    const [user] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (!user?.id) throw new TypeError('User not found');
-
-    // Upsert into user_settings
-    await db
-      .insert(userSettings)
-      .values({
-        userId: user.id,
-        sidebarCollapsed: collapsed,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: userSettings.userId,
-        set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
-      });
-  });
-  updateTag('dashboard-data');
-  revalidateTag('dashboard-data', 'max');
 }

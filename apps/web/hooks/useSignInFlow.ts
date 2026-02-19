@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  isCodeExpired,
   isSessionExists,
   isSignUpSuggested,
   parseClerkError,
@@ -16,6 +17,10 @@ import {
 import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 import { useSignInSafe } from './useClerkSafe';
+
+/** Use current origin for OAuth callbacks so localhost works correctly */
+const getOAuthBaseUrl = () =>
+  typeof window !== 'undefined' ? window.location.origin : APP_URL;
 
 // Re-export types for backwards compatibility
 export type { AuthMethod, LoadingState } from '@/lib/auth/types';
@@ -139,6 +144,11 @@ export function useSignInFlow(): UseSignInFlowReturn {
     async (verificationCode: string): Promise<boolean> => {
       if (!signIn || !isLoaded) return false;
 
+      // Prevent double-submission (auto-submit + manual submit can race)
+      if (base.loadingState.type === 'verifying') {
+        return false;
+      }
+
       clearError();
       base.setLoadingState({ type: 'verifying' });
       base.setCode(verificationCode);
@@ -169,8 +179,11 @@ export function useSignInFlow(): UseSignInFlowReturn {
         base.setError(message);
         base.handleCodeExpiredError(err);
 
-        // Clear the code on error so user can re-enter
-        base.setCode('');
+        // Keep the entered code visible so the user can see what they typed.
+        // Only clear if the code expired (user needs a fresh one anyway).
+        if (isCodeExpired(err)) {
+          base.setCode('');
+        }
         base.setLoadingState({ type: 'idle' });
         return false;
       }
@@ -229,12 +242,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.storeRedirectUrl();
 
       try {
-        // Use absolute URLs (APP_URL) for OAuth callbacks to ensure consistent
-        // behavior across local, preview, and production environments
+        // Use current origin for OAuth callbacks so localhost, preview, and
+        // production all redirect correctly after the OAuth round-trip.
+        const oauthBase = getOAuthBaseUrl();
+        const storedRedirect = base.getRedirectUrl();
         await signIn.authenticateWithRedirect({
           strategy: `oauth_${provider}`,
-          redirectUrl: `${APP_URL}/signin/sso-callback`,
-          redirectUrlComplete: `${APP_URL}/`,
+          redirectUrl: `${oauthBase}/signin/sso-callback`,
+          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
         });
       } catch (err) {
         // If user already has a session, redirect to dashboard

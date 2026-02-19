@@ -19,7 +19,13 @@ vi.stubGlobal('fetch', mockFetch);
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: {
+        retry: false,
+        // Ensure any query-level retries resolve immediately in tests
+        // (billingStatusQueryOptions has its own retry fn that overrides
+        // retry:false, so we set retryDelay:0 to avoid 1s exponential delay)
+        retryDelay: 0,
+      },
     },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -63,7 +69,9 @@ describe('usePlanGate – edge cases', () => {
   });
 
   it('handles network error gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    // Use mockRejectedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
     const { result } = renderHook(() => usePlanGate(), {
       wrapper: createWrapper(),
@@ -80,7 +88,9 @@ describe('usePlanGate – edge cases', () => {
   });
 
   it('handles 500 server error gracefully', async () => {
-    mockFetch.mockResolvedValueOnce(
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(
       new Response('Internal Server Error', {
         status: 500,
         statusText: 'Internal Server Error',
@@ -100,7 +110,7 @@ describe('usePlanGate – edge cases', () => {
     expect(result.current.analyticsRetentionDays).toBe(7);
   });
 
-  it('pro user with isPro=true but no plan string → pro entitlements', async () => {
+  it('pro user with isPro=true but no plan string → free-tier entitlements from registry', async () => {
     mockBillingResponse({
       isPro: true,
       plan: null,
@@ -116,12 +126,12 @@ describe('usePlanGate – edge cases', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // isPro drives all boolean features
+    // isPro flag is still true from billing response
     expect(result.current.isPro).toBe(true);
-    expect(result.current.canRemoveBranding).toBe(true);
-    expect(result.current.canExportContacts).toBe(true);
-    expect(result.current.canAccessAdvancedAnalytics).toBe(true);
-    // But retention and contacts are plan-derived → null plan = free values
+    // But entitlements are derived from plan string via registry — null plan = free
+    expect(result.current.canRemoveBranding).toBe(false);
+    expect(result.current.canExportContacts).toBe(false);
+    expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.analyticsRetentionDays).toBe(7);
     expect(result.current.contactsLimit).toBe(100);
   });
@@ -218,9 +228,9 @@ describe('usePlanGate – feature consistency', () => {
   });
 
   it('error state defaults all features to free tier', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response('Bad Gateway', { status: 502 })
-    );
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(new Response('Bad Gateway', { status: 502 }));
 
     const { result } = renderHook(() => usePlanGate(), {
       wrapper: createWrapper(),

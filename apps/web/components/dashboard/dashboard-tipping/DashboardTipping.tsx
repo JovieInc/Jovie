@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { BASE_URL } from '@/constants/domains';

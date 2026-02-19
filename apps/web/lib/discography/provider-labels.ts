@@ -9,4 +9,12 @@ export const PROVIDER_LABELS: Record<string, string> = {
   amazon_music: 'Amazon Music',
   bandcamp: 'Bandcamp',
   beatport: 'Beatport',
+  pandora: 'Pandora',
+  napster: 'Napster',
+  audiomack: 'Audiomack',
+  qobuz: 'Qobuz',
+  anghami: 'Anghami',
+  boomplay: 'Boomplay',
+  iheartradio: 'iHeartRadio',
+  tiktok: 'TikTok',
 };

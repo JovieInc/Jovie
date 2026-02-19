@@ -1,19 +1,24 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ArrowLeft, SquarePen } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@jovie/ui';
+import { ArrowLeft, ChevronDown, Copy, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   artistSettingsNavigation,
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
   Sidebar,
   SidebarContent,
@@ -27,68 +32,70 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
+import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { copyToClipboard } from '@/hooks/useClipboard';
+import { useProfileData } from '@/hooks/useProfileData';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
 }
 
-/**
- * Extract profile data from dashboard context
- */
-function useProfileData(isDashboardOrAdmin: boolean) {
-  const dashboardDataRaw = useDashboardData();
-  const dashboardData = isDashboardOrAdmin ? dashboardDataRaw : null;
-
-  const username = dashboardData
-    ? (dashboardData.selectedProfile?.usernameNormalized ??
-      dashboardData.selectedProfile?.username)
-    : undefined;
-
-  return {
-    username,
-    profileHref: username ? `/${username}` : undefined,
-    displayName: dashboardData
-      ? dashboardData.selectedProfile?.displayName?.trim() ||
-        dashboardData.selectedProfile?.username ||
-        'Your profile'
-      : 'Your profile',
-    avatarUrl: dashboardData?.selectedProfile?.avatarUrl,
-  };
-}
-
 /** Render a group of nav items */
 function SettingsNavGroup({
   items,
   pathname,
-}: {
+}: Readonly<{
   items: NavItem[];
   pathname: string;
-}) {
+}>) {
   return (
     <SidebarMenu>
       {items.map(item => {
         const isActive =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
-          <SidebarMenuItem key={item.id}>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive}
-              tooltip={item.name}
-              className='font-medium'
-            >
-              <Link
-                href={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className='flex w-full min-w-0 items-center gap-3'
+          <ContextMenu key={item.id}>
+            <ContextMenuTrigger asChild>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  tooltip={item.name}
+                >
+                  <Link
+                    href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className='flex w-full min-w-0 items-center gap-2'
+                  >
+                    <item.icon className='size-3.5' />
+                    <span className='truncate'>{item.name}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onSelect={async () => {
+                  const origin =
+                    globalThis.window === undefined
+                      ? BASE_URL
+                      : globalThis.location.origin;
+                  const url = `${origin}${item.href}`;
+                  const ok = await copyToClipboard(url);
+                  if (ok) {
+                    toast.success('Link copied to clipboard');
+                  } else {
+                    toast.error('Failed to copy link');
+                  }
+                }}
               >
-                <item.icon className='size-4' />
-                <span className='truncate'>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+                <Copy className='mr-2 h-4 w-4' />
+                Copy link
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
     </SidebarMenu>
@@ -103,78 +110,35 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
+  const { selectedProfile } = useDashboardData();
+  const artistName = selectedProfile?.displayName?.trim() || undefined;
+
+  // Replace "Profile" label with the artist's display name when available
+  const artistItems = useMemo(() => {
+    if (!artistName) return artistSettingsNavigation;
+    return artistSettingsNavigation.map(item =>
+      item.id === 'artist-profile' ? { ...item, name: artistName } : item
+    );
+  }, [artistName]);
+
   return (
     <nav
       aria-label={`${section} navigation`}
       className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
-      <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
-      <div className='mx-2 border-t border-sidebar-border group-data-[collapsible=icon]:mx-0' />
       <div>
-        <span className='mb-1 block px-2 text-[11px] font-medium text-sidebar-muted group-data-[collapsible=icon]:hidden'>
-          Artist
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          General
         </span>
-        <SettingsNavGroup
-          items={artistSettingsNavigation}
-          pathname={pathname}
-        />
+        <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
+      </div>
+      <div>
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+          {artistName || 'Artist'}
+        </span>
+        <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
     </nav>
-  );
-}
-
-/** Mobile profile card shown in sidebar on small screens */
-function MobileProfileCard({
-  displayName,
-  username,
-  avatarUrl,
-  profileHref,
-}: Readonly<{
-  displayName: string;
-  username: string | undefined;
-  avatarUrl: string | null | undefined;
-  profileHref: string | undefined;
-}>) {
-  return (
-    <div className='px-2 pb-3 pt-2 lg:hidden'>
-      <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
-        <OptimizedAvatar
-          src={avatarUrl}
-          alt={displayName}
-          size={64}
-          className='h-10 w-10'
-        />
-        <div className='min-w-0'>
-          <p className='truncate text-sm font-semibold text-sidebar-foreground'>
-            {displayName}
-          </p>
-          {username ? (
-            <p className='truncate text-xs text-sidebar-muted'>@{username}</p>
-          ) : null}
-        </div>
-      </div>
-      {profileHref ? (
-        <div className='mt-3 flex items-center gap-2'>
-          <Button
-            asChild
-            size='sm'
-            variant='secondary'
-            className='flex-1 min-h-[44px]'
-          >
-            <Link href={profileHref} target='_blank' rel='noopener noreferrer'>
-              View profile
-            </Link>
-          </Button>
-          <CopyToClipboardButton
-            relativePath={profileHref}
-            idleLabel='Copy link'
-            successLabel='Copied'
-            errorLabel='Copy failed'
-            className='flex-1 min-h-[44px]'
-          />
-        </div>
-      ) : null}
-    </div>
   );
 }
 
@@ -197,12 +161,12 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium text-sidebar-item-foreground transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
+            'inline-flex h-7 items-center gap-1.5 rounded-md px-1 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
-          <ArrowLeft className='size-4' aria-hidden='true' />
-          <span className='truncate group-data-[collapsible=icon]:hidden'>
+          <ArrowLeft className='size-3.5' aria-hidden='true' />
+          <span className='truncate text-app tracking-tight group-data-[collapsible=icon]:hidden'>
             Back to app
           </span>
         </Link>
@@ -215,14 +179,18 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 items-center gap-2 rounded-md px-2 py-0.5 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 items-center gap-1.5 rounded-md px-1 transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-sm font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden'>
+              <span className='text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
+              <ChevronDown
+                className='size-3 shrink-0 text-sidebar-item-icon opacity-60 group-data-[collapsible=icon]:hidden'
+                aria-hidden='true'
+              />
             </button>
           }
         />
@@ -232,9 +200,9 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)] hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
-          <SquarePen className='size-4' />
+          <SquarePen className='size-3.5' />
         </Link>
       )}
     </div>
@@ -256,8 +224,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
 
-  const { username, profileHref, displayName, avatarUrl } =
-    useProfileData(isDashboardOrAdmin);
+  const { profileHref } = useProfileData(isDashboardOrAdmin);
 
   return (
     <Sidebar
@@ -265,28 +232,20 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='icon'
       className={cn(
         'bg-base',
-        '[--sidebar-width:220px]',
+        '[--sidebar-width:232px]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
       )}
     >
-      <SidebarHeader className='relative h-[52px] justify-center gap-0 px-2 py-0'>
+      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 pt-2 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
         />
-        {isDashboardOrAdmin && (
-          <MobileProfileCard
-            displayName={displayName}
-            username={username}
-            avatarUrl={avatarUrl}
-            profileHref={profileHref}
-          />
-        )}
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -298,8 +257,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='px-3 pb-2 pt-1 group-data-[collapsible=icon]:hidden'>
-        <span className='text-[11px] text-sidebar-muted select-none'>
+      <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
+        <span className='text-2xs text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

@@ -92,51 +92,47 @@ interface ErrorMetadata {
   requestId?: string;
 }
 
-export function extractErrorMetadata(error: Error): ErrorMetadata {
-  const errorObj = error as unknown as Record<string, unknown>;
-  const metadata: ErrorMetadata = {};
-
+/**
+ * Extracts metadata fields from a record-like source into the metadata object.
+ * Overwrites existing fields if the source has valid values.
+ */
+function applyMetadataFields(
+  metadata: ErrorMetadata,
+  source: Record<string, unknown>
+): void {
   if (
-    typeof errorObj.retryAfter === 'number' &&
-    Number.isFinite(errorObj.retryAfter)
+    typeof source.retryAfter === 'number' &&
+    Number.isFinite(source.retryAfter)
   ) {
     metadata.retryAfter = Math.min(
-      Math.max(Math.ceil(errorObj.retryAfter), 1),
+      Math.max(Math.ceil(source.retryAfter), 1),
       3600
     );
   }
 
-  if (typeof errorObj.errorCode === 'string') {
-    metadata.errorCode = errorObj.errorCode;
-  } else if (typeof errorObj.code === 'string') {
-    metadata.errorCode = errorObj.code;
+  if (typeof source.errorCode === 'string') {
+    metadata.errorCode = source.errorCode;
+  } else if (typeof source.code === 'string') {
+    metadata.errorCode = source.code;
   }
 
-  if (typeof errorObj.requestId === 'string') {
-    metadata.requestId = errorObj.requestId;
+  if (typeof source.requestId === 'string') {
+    metadata.requestId = source.requestId;
   }
+}
+
+export function extractErrorMetadata(error: Error): ErrorMetadata {
+  const metadata: ErrorMetadata = {};
+
+  applyMetadataFields(metadata, error as unknown as Record<string, unknown>);
 
   const message = error.message.trim();
   if (message.startsWith('{') && message.endsWith('}')) {
     try {
-      const parsed = JSON.parse(message) as Record<string, unknown>;
-      if (
-        typeof parsed.retryAfter === 'number' &&
-        Number.isFinite(parsed.retryAfter)
-      ) {
-        metadata.retryAfter = Math.min(
-          Math.max(Math.ceil(parsed.retryAfter), 1),
-          3600
-        );
-      }
-      if (typeof parsed.errorCode === 'string') {
-        metadata.errorCode = parsed.errorCode;
-      } else if (typeof parsed.code === 'string') {
-        metadata.errorCode = parsed.code;
-      }
-      if (typeof parsed.requestId === 'string') {
-        metadata.requestId = parsed.requestId;
-      }
+      applyMetadataFields(
+        metadata,
+        JSON.parse(message) as Record<string, unknown>
+      );
     } catch {
       // Ignore JSON parse failures - metadata may be on structured fields already.
     }

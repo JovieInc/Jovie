@@ -3,7 +3,6 @@ export interface AppleStyleOnboardingFormProps {
   readonly initialHandle?: string;
   readonly userEmail?: string | null;
   readonly userId: string;
-  readonly skipNameStep?: boolean;
 }
 
 export interface OnboardingState {
@@ -28,11 +27,6 @@ export interface HandleValidationState {
 }
 
 export const ONBOARDING_STEPS = [
-  {
-    id: 'name',
-    title: 'What should we call you?',
-    prompt: '',
-  },
   {
     id: 'handle',
     title: 'Claim your handle',

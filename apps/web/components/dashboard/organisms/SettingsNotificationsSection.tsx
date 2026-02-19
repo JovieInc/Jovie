@@ -7,15 +7,10 @@ import { useNotificationSettingsMutation } from '@/lib/queries';
 
 export function SettingsNotificationsSection() {
   const [marketingEmails, setMarketingEmails] = useState(true);
-  const [doubleOptIn, setDoubleOptIn] = useState(true);
   const { updateNotifications, isPending } = useNotificationSettingsMutation();
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
+    <DashboardCard variant='settings' padding='none'>
       <div className='px-5 py-4'>
         <SettingsToggleRow
           title='Marketing Emails'
@@ -27,19 +22,6 @@ export function SettingsNotificationsSection() {
           }}
           disabled={isPending}
           ariaLabel='Toggle marketing emails'
-        />
-      </div>
-      <div className='px-5 py-4'>
-        <SettingsToggleRow
-          title='Require Email Verification'
-          description='New fans must confirm their email before receiving notifications.'
-          checked={doubleOptIn}
-          onCheckedChange={(enabled: boolean) => {
-            setDoubleOptIn(enabled);
-            updateNotifications({ require_double_opt_in: enabled });
-          }}
-          disabled={isPending}
-          ariaLabel='Toggle email verification requirement'
         />
       </div>
     </DashboardCard>

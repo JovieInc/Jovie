@@ -186,8 +186,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   if (shouldShowFallback) {
     return (
       <div ref={ref} className={cn('relative', className)} style={style}>
-        {/* Fallback avatar wrapper needs role="img"; contains initials, not an actual image */}
-        <div // NOSONAR S6819
+        <div
           className={cn(
             sizeClass,
             roundedClass,
@@ -195,9 +194,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
             BORDER_RING,
             'shadow-sm transition-colors duration-200'
           )}
-          role='img'
-          aria-label={alt}
-          aria-busy='false'
+          aria-hidden='true'
         >
           <span
             className={cn('font-medium leading-none select-none', textSize)}
@@ -216,8 +213,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
   return (
     <div ref={ref} className={cn('relative', className)} style={style}>
-      {/* Avatar wrapper needs role="img" for loading state accessibility; contains Image component */}
-      <div // NOSONAR S6819
+      <div
         className={cn(
           sizeClass,
           roundedClass,
@@ -226,9 +222,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           BORDER_RING,
           'shadow-sm transition-colors duration-200'
         )}
-        role='img'
-        aria-label={alt}
-        aria-busy={!isLoaded}
+        aria-hidden='true'
       >
         <Image
           src={src}

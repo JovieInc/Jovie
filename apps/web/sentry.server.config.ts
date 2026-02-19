@@ -20,6 +20,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
 
+  // Suppress known non-actionable errors
+  ignoreErrors: [
+    // Clerk SSR race condition: auth()/currentUser() called before request
+    // context is available during edge/serverless cold starts. Not a code bug —
+    // all usages are correctly in server components/actions/API routes.
+    /Clerk: (?:auth\(\)|currentUser\(\)|clerkClient\(\)).+only supported/,
+    // Node.js TransformStream internal bug — not application code.
+    // Occurs during streaming responses (chat API). Only 2 users affected.
+    /transformAlgorithm is not a function/,
+  ],
+
   // Sample 10% of transactions in production, 100% in development
   tracesSampleRate: isProduction ? 0.1 : 1.0,
 
@@ -42,6 +53,16 @@ Sentry.init({
 
   // Scrub sensitive data before sending to Sentry
   beforeSend(event) {
+    // EPIPE/ECONNRESET on /api/chat are expected client disconnects (tab close,
+    // navigation). Drop them only for that path; surface them everywhere else.
+    const isChatPath = event.request?.url?.includes('/api/chat');
+    if (isChatPath) {
+      const msg = event.exception?.values?.[0]?.value ?? '';
+      if (/write EPIPE/.test(msg) || /ECONNRESET/.test(msg)) {
+        return null;
+      }
+    }
+
     // Anonymize IP addresses
     if (event.user?.ip_address) {
       event.user.ip_address = '{{auto}}';

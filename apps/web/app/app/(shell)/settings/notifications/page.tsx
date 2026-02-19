@@ -1,22 +1,7 @@
 import { redirect } from 'next/navigation';
 
-import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+import { APP_ROUTES } from '@/constants/routes';
 
-export const runtime = 'nodejs';
-
-export default async function SettingsNotificationsPage() {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/notifications');
-  }
-
-  const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding) {
-    redirect('/onboarding');
-  }
-
-  return <DashboardSettings focusSection='notifications' />;
+export default function SettingsNotificationsPage() {
+  redirect(APP_ROUTES.SETTINGS);
 }

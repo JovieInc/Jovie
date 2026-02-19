@@ -215,7 +215,12 @@ export function ClaimHandleForm({
       }
 
       if (!isSignedIn) {
-        router.push('/waitlist');
+        // Send to signup with redirect_url pointing to onboarding with the handle.
+        // This preserves the handle through the auth flow so onboarding can pre-fill it.
+        const onboardingUrl = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
+        router.push(
+          `/signup?redirect_url=${encodeURIComponent(onboardingUrl)}`
+        );
         return;
       }
 
@@ -274,13 +279,13 @@ export function ClaimHandleForm({
       <div className='space-y-2'>
         <label
           htmlFor={fieldId}
-          className='text-sm font-semibold text-gray-900 dark:text-white'
+          className='text-sm font-semibold text-primary-token'
         >
           Choose your handle
         </label>
 
         <div className='relative'>
-          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-700 dark:text-gray-200'>
+          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-secondary-token'>
             {displayDomain}/
           </span>
           <Input

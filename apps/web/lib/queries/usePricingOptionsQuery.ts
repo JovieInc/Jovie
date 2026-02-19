@@ -4,6 +4,8 @@
  * Pricing options query hook for fetching available Stripe pricing.
  *
  * Uses STABLE_CACHE since pricing options rarely change during a session.
+ * Normalizes the dual-field API response (`pricingOptions` / `options`)
+ * into a single `options` array so consumers don't need to merge.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -23,46 +25,46 @@ export interface PricingOption {
 }
 
 /**
- * Response from the pricing options API.
+ * Raw response from the pricing options API.
+ * The API returns both fields for backwards compatibility.
+ */
+interface PricingOptionsRawResponse {
+  pricingOptions?: PricingOption[];
+  options?: PricingOption[];
+}
+
+/**
+ * Normalized response with a single `options` array.
  */
 export interface PricingOptionsResponse {
-  pricingOptions: PricingOption[];
   options: PricingOption[];
 }
 
-// Create the fetch function using createQueryFn for consistent error handling
-const fetchPricingOptions = createQueryFn<PricingOptionsResponse>(
+const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
   '/api/stripe/pricing-options'
 );
+
+async function fetchPricingOptions({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<PricingOptionsResponse> {
+  const raw = await fetchPricingOptionsRaw({ signal });
+  return {
+    options: [...(raw.pricingOptions ?? []), ...(raw.options ?? [])],
+  };
+}
 
 /**
  * Query hook for fetching available pricing options.
  *
  * Uses STABLE_CACHE (15 min stale) since pricing rarely changes.
- *
- * @example
- * ```tsx
- * function PricingDisplay() {
- *   const { data, isLoading, error } = usePricingOptionsQuery();
- *
- *   if (isLoading) return <Spinner />;
- *   if (error) return <ErrorMessage />;
- *
- *   return (
- *     <ul>
- *       {data?.pricingOptions.map(option => (
- *         <li key={option.priceId}>{option.description}</li>
- *       ))}
- *     </ul>
- *   );
- * }
- * ```
+ * Returns normalized `data.options` array.
  */
 export function usePricingOptionsQuery() {
   return useQuery<PricingOptionsResponse, Error>({
     queryKey: queryKeys.billing.pricingOptions(),
     queryFn: fetchPricingOptions,
-    // STABLE_CACHE: 15 min stale, 1 hour gc - pricing rarely changes
     ...STABLE_CACHE,
   });
 }

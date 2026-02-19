@@ -4,14 +4,11 @@ import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
+  type FanNotificationPreferences,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  buildSubscribeConfirmUrl,
-  generateSubscribeConfirmToken,
-} from '@/lib/email/subscribe-confirm-token';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
@@ -25,6 +22,13 @@ import {
   trackUnsubscribeError,
   trackUnsubscribeSuccess,
 } from '@/lib/notifications/analytics';
+import {
+  buildEmailOtpExpiry,
+  EMAIL_OTP_TTL_MINUTES,
+  generateEmailOtpCode,
+  hashEmailOtp,
+  isValidEmailOtpFormat,
+} from '@/lib/notifications/email-otp';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildInvalidRequestResponse,
@@ -51,6 +55,8 @@ import {
   statusSchema,
   subscribeSchema,
   unsubscribeSchema,
+  updateContentPreferencesSchema,
+  verifyEmailOtpSchema,
 } from '@/lib/validation/schemas';
 import type {
   NotificationChannel,
@@ -315,35 +321,29 @@ async function sendSubscriptionConfirmationEmail(
 }
 
 /**
- * Sends double opt-in verification email with confirmation link.
+ * Sends email OTP verification code for fan subscription confirmation.
  */
 async function sendSubscriptionVerificationEmail(
-  subscriptionId: string,
   artist_id: string,
   normalizedEmail: string,
-  artistProfile: { displayName: string | null; username: string | null }
+  artistProfile: { displayName: string | null; username: string | null },
+  otpCode: string
 ): Promise<Awaited<ReturnType<typeof sendNotification>>> {
   const artistName =
     artistProfile.displayName || artistProfile.username || 'this artist';
-  const confirmUrl = buildSubscribeConfirmUrl(subscriptionId, normalizedEmail);
   const dedupKey = `notification_verify:${artist_id}:${normalizedEmail}`;
-
-  const confirmLink = confirmUrl ?? '#';
 
   return sendNotification(
     {
       id: dedupKey,
       dedupKey,
       category: 'transactional',
-      subject: `Confirm your subscription to ${artistName} on Jovie`,
-      text: `Please confirm your subscription to ${artistName} on Jovie.\n\nClick here to confirm: ${confirmLink}\n\nIf you didn't request this, you can safely ignore this email.`,
+      subject: `Your verification code for ${artistName}`,
+      text: `Use this code to confirm notifications for ${artistName}: ${otpCode}. This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes.`,
       html: `
-        <p>Please confirm your subscription to <strong>${artistName}</strong> on Jovie.</p>
-        <p>Click the button below to start receiving updates when ${artistName} drops new music.</p>
-        <p style="margin:24px 0;">
-          <a href="${confirmLink}" style="padding:12px 24px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">Confirm subscription</a>
-        </p>
-        <p style="font-size:14px;color:#555;">If you didn't request this, you can safely ignore this email. You won't receive any notifications unless you confirm.</p>
+        <p>Use this code to confirm notifications for <strong>${artistName}</strong>.</p>
+        <p style="font-size:30px;letter-spacing:8px;font-weight:700;margin:20px 0;">${otpCode}</p>
+        <p style="font-size:14px;color:#555;">This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes. If this wasn't you, you can ignore this email.</p>
       `,
       channels: ['email'],
       respectUserPreferences: false,
@@ -356,59 +356,42 @@ async function sendSubscriptionVerificationEmail(
   );
 }
 
-/**
- * Check if creator has double opt-in enabled.
- * Defaults to true when the setting is not explicitly set.
- */
-function isDoubleOptInEnabled(
-  settings: Record<string, unknown> | null
-): boolean {
-  if (!settings) return true;
-  const value = settings.require_double_opt_in;
-  if (typeof value === 'boolean') return value;
-  return true; // default: on
+interface EmailOtpResult {
+  otpCode: string;
+  otpHash: string;
+  otpExpiresAt: Date;
+}
+
+function createEmailOtp(): EmailOtpResult {
+  const otpCode = generateEmailOtpCode();
+  return {
+    otpCode,
+    otpHash: hashEmailOtp(otpCode),
+    otpExpiresAt: buildEmailOtpExpiry(),
+  };
 }
 
 /**
- * Generates and stores a double opt-in confirmation token for a subscription.
- */
-async function handleDoubleOptInToken(
-  doubleOptIn: boolean,
-  subscriptionId: string | undefined,
-  normalizedEmail: string | null
-): Promise<void> {
-  if (!doubleOptIn || !subscriptionId || !normalizedEmail) return;
-  const token = generateSubscribeConfirmToken(subscriptionId, normalizedEmail);
-  if (!token) return;
-  await db
-    .update(notificationSubscriptions)
-    .set({
-      confirmationToken: token,
-      confirmationSentAt: new Date(),
-    })
-    .where(eq(notificationSubscriptions.id, subscriptionId));
-}
-
-/**
- * Dispatches the appropriate subscription email based on opt-in type.
+ * Dispatches the appropriate subscription email based on channel type.
  */
 async function dispatchSubscriptionEmail(
   channel: NotificationChannel,
   normalizedEmail: string | null,
-  subscriptionId: string | undefined,
-  doubleOptIn: boolean,
   artist_id: string,
-  artistProfile: { displayName: string | null; username: string | null }
+  artistProfile: { displayName: string | null; username: string | null },
+  otpCode: string | null
 ): Promise<Awaited<ReturnType<typeof sendNotification>> | null> {
-  if (channel !== 'email' || !normalizedEmail || !subscriptionId) return null;
-  if (doubleOptIn) {
+  if (channel !== 'email' || !normalizedEmail) return null;
+
+  if (otpCode) {
     return sendSubscriptionVerificationEmail(
-      subscriptionId,
       artist_id,
       normalizedEmail,
-      artistProfile
+      artistProfile,
+      otpCode
     );
   }
+
   return sendSubscriptionConfirmationEmail(
     artist_id,
     normalizedEmail,
@@ -485,24 +468,38 @@ export const subscribeToNotificationsDomain = async (
       return suppressionError;
     }
 
-    const conflictTarget =
-      channel === 'email'
-        ? [
-            notificationSubscriptions.creatorProfileId,
-            notificationSubscriptions.email,
-          ]
-        : [
-            notificationSubscriptions.creatorProfileId,
-            notificationSubscriptions.phone,
-          ];
+    // Default preferences: all content categories enabled
+    const defaultPreferences: FanNotificationPreferences = {
+      releasePreview: true,
+      releaseDay: true,
+      newMusic: true,
+      tourDates: true,
+      merch: true,
+      general: true,
+    };
 
-    // Determine double opt-in requirement
-    const doubleOptIn =
-      channel === 'email' &&
-      normalizedEmail &&
-      isDoubleOptInEnabled(artistProfile.settings);
+    // Check if email subscriber already exists and is confirmed to avoid
+    // resetting their confirmedAt status (Sentry HIGH bug fix)
+    const existingEmail =
+      channel === 'email' && normalizedEmail
+        ? await db
+            .select({ confirmedAt: notificationSubscriptions.confirmedAt })
+            .from(notificationSubscriptions)
+            .where(
+              and(
+                eq(notificationSubscriptions.creatorProfileId, artist_id),
+                eq(notificationSubscriptions.channel, 'email'),
+                eq(notificationSubscriptions.email, normalizedEmail)
+              )
+            )
+            .limit(1)
+        : [];
+    const shouldVerifyEmail =
+      channel === 'email' && !existingEmail[0]?.confirmedAt;
 
-    const [insertedSubscription] = await db
+    const emailOtp = shouldVerifyEmail ? createEmailOtp() : null;
+
+    await db
       .insert(notificationSubscriptions)
       .values({
         creatorProfileId: artist_id,
@@ -513,20 +510,45 @@ export const subscribeToNotificationsDomain = async (
         city: cityValue,
         ipAddress,
         source,
-        // If double opt-in: leave confirmedAt null (pending). Otherwise: confirm immediately.
-        confirmedAt: doubleOptIn ? null : new Date(),
+        preferences: defaultPreferences,
+        confirmedAt: shouldVerifyEmail ? null : new Date(),
+        emailOtpHash: emailOtp?.otpHash,
+        emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+        emailOtpLastSentAt: emailOtp ? new Date() : null,
+        emailOtpAttempts: 0,
       })
-      .onConflictDoNothing({ target: conflictTarget })
-      .returning({
-        id: notificationSubscriptions.id,
+      .onConflictDoUpdate({
+        target:
+          channel === 'email'
+            ? [
+                notificationSubscriptions.creatorProfileId,
+                notificationSubscriptions.email,
+              ]
+            : [
+                notificationSubscriptions.creatorProfileId,
+                notificationSubscriptions.phone,
+              ],
+        set:
+          channel === 'email'
+            ? {
+                ...(shouldVerifyEmail
+                  ? {
+                      confirmedAt: null,
+                      emailOtpHash: emailOtp?.otpHash,
+                      emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+                      emailOtpLastSentAt: new Date(),
+                      emailOtpAttempts: 0,
+                    }
+                  : {}),
+                ipAddress,
+                source,
+              }
+            : {
+                confirmedAt: new Date(),
+                ipAddress,
+                source,
+              },
       });
-
-    // Generate and store confirmation token for double opt-in
-    await handleDoubleOptInToken(
-      !!doubleOptIn,
-      insertedSubscription?.id,
-      normalizedEmail
-    );
 
     await trackSubscribeSuccess({
       artist_id,
@@ -547,23 +569,96 @@ export const subscribeToNotificationsDomain = async (
     const dispatchResult = await dispatchSubscriptionEmail(
       channel,
       normalizedEmail,
-      insertedSubscription?.id,
-      !!doubleOptIn,
       artist_id,
-      artistProfile
+      artistProfile,
+      emailOtp?.otpCode ?? null
     );
 
     return buildSubscribeSuccessResponse(
       dynamicEnabled,
       dispatchResult?.delivered.includes('email') ?? false,
       Math.round(Date.now() - runtimeStart),
-      !!doubleOptIn
+      shouldVerifyEmail
     );
   } catch (error) {
     await trackServerError('subscribe', error);
     captureError('Notifications Subscribe Domain Error', error);
     return buildSubscribeServerError();
   }
+};
+
+export const verifyEmailOtpDomain = async (
+  payload: unknown
+): Promise<NotificationDomainResponse<{ success: true; message: string }>> => {
+  const parsed = verifyEmailOtpSchema.safeParse(payload);
+  if (!parsed.success) {
+    return buildValidationErrorResponse('Invalid verification code');
+  }
+
+  const normalizedEmail = normalizeSubscriptionEmail(parsed.data.email);
+  if (!normalizedEmail || !isValidEmailOtpFormat(parsed.data.otp_code)) {
+    return buildValidationErrorResponse('Invalid verification code');
+  }
+
+  const [subscription] = await db
+    .select({
+      id: notificationSubscriptions.id,
+      emailOtpHash: notificationSubscriptions.emailOtpHash,
+      emailOtpExpiresAt: notificationSubscriptions.emailOtpExpiresAt,
+      emailOtpAttempts: notificationSubscriptions.emailOtpAttempts,
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, parsed.data.artist_id),
+        eq(notificationSubscriptions.channel, 'email'),
+        eq(notificationSubscriptions.email, normalizedEmail)
+      )
+    )
+    .limit(1);
+
+  if (!subscription) {
+    return buildValidationErrorResponse('Invalid verification code');
+  }
+
+  const now = new Date();
+  if (
+    !subscription.emailOtpHash ||
+    !subscription.emailOtpExpiresAt ||
+    now > subscription.emailOtpExpiresAt
+  ) {
+    return buildValidationErrorResponse('Code expired. Request a new code.');
+  }
+
+  if ((subscription.emailOtpAttempts ?? 0) >= 5) {
+    return buildValidationErrorResponse(
+      'Too many attempts. Request a new code.'
+    );
+  }
+
+  if (hashEmailOtp(parsed.data.otp_code) !== subscription.emailOtpHash) {
+    await db
+      .update(notificationSubscriptions)
+      .set({ emailOtpAttempts: (subscription.emailOtpAttempts ?? 0) + 1 })
+      .where(eq(notificationSubscriptions.id, subscription.id));
+    return buildValidationErrorResponse('Invalid verification code');
+  }
+
+  await db
+    .update(notificationSubscriptions)
+    .set({
+      confirmedAt: now,
+      confirmationToken: null,
+      emailOtpHash: null,
+      emailOtpExpiresAt: null,
+      emailOtpAttempts: 0,
+    })
+    .where(eq(notificationSubscriptions.id, subscription.id));
+
+  return {
+    status: 200,
+    body: { success: true, message: 'Email verified successfully' },
+  };
 };
 
 async function validateUnsubscribeIdentifiers(
@@ -697,6 +792,70 @@ export const unsubscribeFromNotificationsDomain = async (
   }
 };
 
+/**
+ * Build subscription query clauses for the given contact details.
+ */
+function buildSubscriptionClauses(
+  normalizedEmail: string | null,
+  normalizedPhone: string | null
+): Array<ReturnType<typeof and>> {
+  const clauses: Array<ReturnType<typeof and>> = [];
+
+  if (normalizedEmail) {
+    clauses.push(
+      and(
+        eq(notificationSubscriptions.channel, 'email'),
+        eq(notificationSubscriptions.email, normalizedEmail)
+      )
+    );
+  }
+
+  if (normalizedPhone) {
+    clauses.push(
+      and(
+        eq(notificationSubscriptions.channel, 'sms'),
+        eq(notificationSubscriptions.phone, normalizedPhone)
+      )
+    );
+  }
+
+  return clauses;
+}
+
+/**
+ * Merge subscription rows into channel states, contact details, and preferences.
+ */
+function mergeSubscriptionRows(
+  rows: Array<{
+    channel: string;
+    email: string | null;
+    phone: string | null;
+    preferences: FanNotificationPreferences | null;
+  }>
+) {
+  const channels: NotificationSubscriptionState = { email: false, sms: false };
+  const details: NotificationContactValues = {};
+  let mergedPrefs: FanNotificationPreferences | undefined;
+
+  for (const row of rows) {
+    if (row.channel === 'email' && row.email) {
+      channels.email = true;
+      details.email = row.email;
+    }
+
+    if (row.channel === 'sms' && row.phone) {
+      channels.sms = true;
+      details.sms = row.phone;
+    }
+
+    if (!mergedPrefs && row.preferences) {
+      mergedPrefs = row.preferences;
+    }
+  }
+
+  return { channels, details, mergedPrefs };
+}
+
 export const getNotificationStatusDomain = async (
   payload: unknown
 ): Promise<NotificationDomainResponse<NotificationStatusResponse>> => {
@@ -717,31 +876,10 @@ export const getNotificationStatusDomain = async (
       );
     }
 
-    const channels: NotificationSubscriptionState = {
-      email: false,
-      sms: false,
-    };
-    const details: NotificationContactValues = {};
-
-    const valueClauses: Array<ReturnType<typeof and>> = [];
-
-    if (normalizedEmail) {
-      valueClauses.push(
-        and(
-          eq(notificationSubscriptions.channel, 'email'),
-          eq(notificationSubscriptions.email, normalizedEmail)
-        )
-      );
-    }
-
-    if (normalizedPhone) {
-      valueClauses.push(
-        and(
-          eq(notificationSubscriptions.channel, 'sms'),
-          eq(notificationSubscriptions.phone, normalizedPhone)
-        )
-      );
-    }
+    const valueClauses = buildSubscriptionClauses(
+      normalizedEmail,
+      normalizedPhone
+    );
 
     if (valueClauses.length === 0) {
       return buildValidationErrorResponse('Contact required to check status');
@@ -752,6 +890,7 @@ export const getNotificationStatusDomain = async (
         channel: notificationSubscriptions.channel,
         email: notificationSubscriptions.email,
         phone: notificationSubscriptions.phone,
+        preferences: notificationSubscriptions.preferences,
       })
       .from(notificationSubscriptions)
       .where(
@@ -762,19 +901,9 @@ export const getNotificationStatusDomain = async (
       )
       .limit(2);
 
-    for (const row of rows) {
-      if (row.channel === 'email' && row.email) {
-        channels.email = true;
-        details.email = row.email;
-      }
+    const { channels, details, mergedPrefs } = mergeSubscriptionRows(rows);
 
-      if (row.channel === 'sms' && row.phone) {
-        channels.sms = true;
-        details.sms = row.phone;
-      }
-    }
-
-    return buildStatusSuccessResponse(channels, details);
+    return buildStatusSuccessResponse(channels, details, mergedPrefs);
   } catch (error) {
     captureError('Notifications Status Domain Error', error);
     return buildServerErrorResponse();
@@ -786,6 +915,85 @@ export const updateNotificationPreferencesDomain = async (
   updates: Partial<NotificationPreferences>
 ) => {
   await updateNotificationPreferences(target, updates);
+};
+
+/**
+ * Update content notification preferences for a subscription.
+ * Merges new preferences into the existing JSONB preferences column.
+ */
+export const updateContentPreferencesDomain = async (
+  payload: unknown
+): Promise<NotificationDomainResponse<{ success: true; updated: number }>> => {
+  try {
+    const result = updateContentPreferencesSchema.safeParse(payload);
+
+    if (!result.success) {
+      return buildValidationErrorResponse('Invalid request data');
+    }
+
+    const { artist_id, email, phone, preferences } = result.data;
+    const normalizedEmail = normalizeSubscriptionEmail(email) ?? null;
+    const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
+
+    if (!normalizedEmail && !normalizedPhone) {
+      return buildMissingIdentifierResponse(
+        'Contact required to update preferences'
+      );
+    }
+
+    // Build WHERE clause to find all matching subscriptions for this artist
+    const contactClauses: Array<ReturnType<typeof eq>> = [];
+    if (normalizedEmail) {
+      contactClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
+    }
+    if (normalizedPhone) {
+      contactClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
+    }
+
+    // First read existing preferences so we can merge
+    const existing = await db
+      .select({
+        id: notificationSubscriptions.id,
+        preferences: notificationSubscriptions.preferences,
+      })
+      .from(notificationSubscriptions)
+      .where(
+        and(
+          eq(notificationSubscriptions.creatorProfileId, artist_id),
+          or(...contactClauses)
+        )
+      )
+      .limit(2);
+
+    if (existing.length === 0) {
+      return buildValidationErrorResponse('No subscription found');
+    }
+
+    // Merge new preferences into each subscription row
+    let totalUpdated = 0;
+    for (const row of existing) {
+      const merged: FanNotificationPreferences = {
+        ...row.preferences,
+        ...preferences,
+      };
+
+      const [updated] = await db
+        .update(notificationSubscriptions)
+        .set({ preferences: merged })
+        .where(eq(notificationSubscriptions.id, row.id))
+        .returning({ id: notificationSubscriptions.id });
+
+      if (updated) totalUpdated++;
+    }
+
+    return {
+      status: 200,
+      body: { success: true, updated: totalUpdated },
+    };
+  } catch (error) {
+    captureError('Content preferences update error', error);
+    return buildServerErrorResponse();
+  }
 };
 
 export const AUDIENCE_COOKIE_NAME = AUDIENCE_IDENTIFIED_COOKIE;

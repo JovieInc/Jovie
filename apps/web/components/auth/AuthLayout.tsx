@@ -32,13 +32,12 @@ interface AuthLayoutProps {
   readonly logoutRedirectUrl?: string;
 }
 
-const LINK_FOCUS_CLASSES =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md';
+const LINK_FOCUS_CLASSES = 'focus-ring-themed rounded-md';
 
 export function AuthLayout({
   children,
   formTitle,
-  formTitleClassName = 'text-[18px] leading-[22px] font-medium text-[#1f2023] dark:text-[#e3e4e6] text-center',
+  formTitleClassName = 'text-[18px] leading-[22px] font-medium text-primary-token text-center',
   footerPrompt = "Don't have access?",
   footerLinkText = 'Join the waitlist',
   footerLinkHref = '/waitlist',
@@ -217,11 +216,11 @@ export function AuthLayout({
 
       {/* Footer - hide when keyboard is visible */}
       {showFooterPrompt && !isKeyboardVisible && (
-        <p className='mt-8 text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center relative z-10 animate-in fade-in-0 duration-200'>
+        <p className='mt-8 text-[13px] font-[450] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-[#1f2023] dark:text-[#e3e4e6] hover:underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-primary-token hover:underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>

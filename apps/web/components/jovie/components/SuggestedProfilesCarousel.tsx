@@ -3,6 +3,7 @@
 import {
   Camera,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -12,10 +13,7 @@ import {
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  ProfileSuggestion,
-  SuggestionsStarterContext,
-} from '@/app/api/suggestions/route';
+import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +22,8 @@ import { useSuggestedProfiles } from '../hooks/useSuggestedProfiles';
 // ============================================================================
 // Platform icon mapping (provider_id -> SocialIcon platform name)
 // ============================================================================
+
+type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
   if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
@@ -91,6 +91,99 @@ function CarouselDots({
   );
 }
 
+function ProfileReadyCard({
+  displayName,
+  username,
+  avatarUrl,
+  onDismiss,
+  direction,
+}: {
+  readonly displayName?: string;
+  readonly username?: string;
+  readonly avatarUrl?: string | null;
+  readonly onDismiss: () => void;
+  readonly direction: SlideDirection;
+}) {
+  return (
+    <div
+      className={cn(
+        'chat-card rounded-xl border border-white/[0.06] bg-surface-1 overflow-hidden',
+        'transition-all duration-300 ease-out',
+        direction === 'left' && 'animate-slide-out-left',
+        direction === 'right' && 'animate-slide-out-right'
+      )}
+    >
+      <div className='relative p-4'>
+        {/* Dismiss button */}
+        <button
+          type='button'
+          onClick={onDismiss}
+          className='absolute right-3 top-3 rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+          aria-label='Dismiss'
+        >
+          <X className='h-3.5 w-3.5' />
+        </button>
+
+        {/* Header */}
+        <div className='flex items-center gap-2 mb-4'>
+          <CheckCircle2 className='h-4 w-4 text-emerald-400' />
+          <p className='text-sm font-medium text-primary-token'>
+            Your profile is live
+          </p>
+        </div>
+
+        {/* Profile info */}
+        <div className='flex items-center gap-3 mb-4'>
+          {avatarUrl ? (
+            <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-surface-2'>
+              <Image
+                src={avatarUrl}
+                alt={displayName ?? 'Profile'}
+                fill
+                className='object-cover'
+                sizes='48px'
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-surface-2 text-tertiary-token'>
+              <span className='text-lg font-medium'>
+                {displayName?.[0]?.toUpperCase() ?? '?'}
+              </span>
+            </div>
+          )}
+          <div className='min-w-0'>
+            <p className='truncate text-sm font-medium text-primary-token'>
+              {displayName ?? 'Your profile'}
+            </p>
+            {username && (
+              <p className='truncate text-xs text-tertiary-token'>
+                jov.ie/{username}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <a
+          href={username ? `/${username}` : '/'}
+          target='_blank'
+          rel='noopener noreferrer'
+          className={cn(
+            'flex w-full items-center justify-center gap-1.5 rounded-lg',
+            'bg-accent px-3 py-2.5 text-[13px] font-medium text-on-accent',
+            'transition-colors hover:bg-accent/90',
+            'focus:outline-none'
+          )}
+        >
+          View your profile
+          <ExternalLink className='h-3.5 w-3.5' />
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function SuggestionCard({
   suggestion,
   onConfirm,
@@ -102,7 +195,7 @@ function SuggestionCard({
   readonly onConfirm: () => void;
   readonly onReject: () => void;
   readonly isActioning: boolean;
-  readonly direction: 'left' | 'right' | null;
+  readonly direction: SlideDirection;
 }) {
   const isAvatar = suggestion.type === 'avatar';
   const iconPlatform =
@@ -111,7 +204,7 @@ function SuggestionCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-subtle bg-surface-1 overflow-hidden',
+        'chat-card rounded-xl border border-white/[0.06] bg-surface-1 overflow-hidden',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -120,7 +213,7 @@ function SuggestionCard({
       <div className='p-4'>
         {/* Header with platform icon */}
         <div className='flex items-center gap-2.5 mb-3'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.04] bg-white/[0.04]'>
             {isAvatar ? (
               <Camera className='h-4 w-4 text-secondary-token' />
             ) : (
@@ -193,7 +286,7 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'border border-subtle px-3 py-2 text-sm font-medium',
+              'border border-white/[0.06] px-3 py-3 text-[13px] font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
@@ -201,9 +294,9 @@ function SuggestionCard({
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <X className='h-3.5 w-3.5' />
+              <X className='h-4 w-4' />
             )}
             {isAvatar ? 'Skip' : 'Not me'}
           </button>
@@ -213,16 +306,16 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'bg-accent px-3 py-2 text-sm font-medium text-on-accent',
+              'bg-accent px-3 py-3 text-[13px] font-medium text-on-accent sm:py-2',
               'transition-colors hover:bg-accent/90',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
             {isActioning ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2 className='h-4 w-4 animate-spin' />
             ) : (
-              <Check className='h-3.5 w-3.5' />
+              <Check className='h-4 w-4' />
             )}
             {isAvatar ? 'Use photo' : "That's me"}
           </button>
@@ -238,12 +331,16 @@ function SuggestionCard({
 
 interface SuggestedProfilesCarouselProps {
   readonly profileId: string;
-  readonly onContextLoad?: (context: SuggestionsStarterContext | null) => void;
+  readonly username?: string;
+  readonly displayName?: string;
+  readonly avatarUrl?: string | null;
 }
 
 export function SuggestedProfilesCarousel({
   profileId,
-  onContextLoad,
+  username,
+  displayName,
+  avatarUrl,
 }: SuggestedProfilesCarouselProps) {
   const {
     suggestions,
@@ -255,12 +352,9 @@ export function SuggestedProfilesCarousel({
     confirm,
     reject,
     isActioning,
-    starterContext,
   } = useSuggestedProfiles(profileId);
 
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(
-    null
-  );
+  const [slideDirection, setSlideDirection] = useState<SlideDirection>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Clean up timeout on unmount
@@ -293,10 +387,6 @@ export function SuggestedProfilesCarousel({
     next();
   }, [next]);
 
-  useEffect(() => {
-    onContextLoad?.(starterContext);
-  }, [onContextLoad, starterContext]);
-
   // Don't render anything while loading or if there are no suggestions
   if (isLoading || total === 0) return null;
 
@@ -304,10 +394,14 @@ export function SuggestedProfilesCarousel({
   if (!current) return null;
 
   // Determine the section heading based on current card type
-  const heading =
-    current.type === 'avatar'
-      ? 'Choose your profile photo'
-      : 'We found profiles that might be yours';
+  let heading: string;
+  if (current.type === 'profile_ready') {
+    heading = 'Welcome';
+  } else if (current.type === 'avatar') {
+    heading = 'Choose your profile photo';
+  } else {
+    heading = 'We found profiles that might be yours';
+  }
 
   return (
     <div className='space-y-2'>
@@ -327,26 +421,28 @@ export function SuggestedProfilesCarousel({
                 onClick={handlePrev}
                 disabled={currentIndex === 0 || isActioning}
                 className={cn(
-                  'rounded-md p-1 text-tertiary-token transition-colors',
+                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
                   'hover:bg-surface-2 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Previous suggestion'
               >
-                <ChevronLeft className='h-3.5 w-3.5' />
+                <ChevronLeft className='h-5 w-5' />
               </button>
               <button
                 type='button'
                 onClick={handleNext}
                 disabled={currentIndex === total - 1 || isActioning}
                 className={cn(
-                  'rounded-md p-1 text-tertiary-token transition-colors',
+                  'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
+                  'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
                   'hover:bg-surface-2 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Next suggestion'
               >
-                <ChevronRight className='h-3.5 w-3.5' />
+                <ChevronRight className='h-5 w-5' />
               </button>
             </div>
           )}
@@ -354,14 +450,25 @@ export function SuggestedProfilesCarousel({
       </div>
 
       {/* Card */}
-      <SuggestionCard
-        key={current.id}
-        suggestion={current}
-        onConfirm={handleConfirm}
-        onReject={handleReject}
-        isActioning={isActioning}
-        direction={slideDirection}
-      />
+      {current.type === 'profile_ready' ? (
+        <ProfileReadyCard
+          key={current.id}
+          displayName={displayName}
+          username={username}
+          avatarUrl={avatarUrl}
+          onDismiss={handleReject}
+          direction={slideDirection}
+        />
+      ) : (
+        <SuggestionCard
+          key={current.id}
+          suggestion={current}
+          onConfirm={handleConfirm}
+          onReject={handleReject}
+          isActioning={isActioning}
+          direction={slideDirection}
+        />
+      )}
 
       {/* Progress dots */}
       <CarouselDots total={total} current={currentIndex} />

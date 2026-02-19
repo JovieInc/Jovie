@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
+import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
@@ -8,7 +9,6 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
-import { PWAInstallToastActivator } from '@/components/feedback/PWAInstallToastActivator';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -144,25 +144,27 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Dynamic import gated on process.env.NODE_ENV so webpack eliminates the
-  // toolbar code from production bundles entirely. The static import that was
-  // here previously forced the @vercel/toolbar client runtime (which uses
-  // eval()) into every build, violating Content Security Policy.
-  const VercelToolbar =
-    process.env.NODE_ENV === 'development'
-      ? (await import('@vercel/toolbar/next')).VercelToolbar
-      : null;
+  // Vercel Toolbar: visible only to authenticated Vercel team members.
+  // Dynamically imported to keep it code-split. Disable with NEXT_DISABLE_TOOLBAR=1.
+  const VercelToolbar = process.env.NEXT_DISABLE_TOOLBAR
+    ? null
+    : (await import('@vercel/toolbar/next')).VercelToolbar;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  // Read CSP nonce from request headers (set by middleware) to prevent
+  // hydration mismatch: server renders nonce="" but client expects undefined
+  const headersList = await headers();
+  const nonce = headersList.get('x-nonce') || undefined;
 
   const headContent = (
     <head>
-      <Script src='/theme-init.js' strategy='beforeInteractive' />
+      <Script src='/theme-init.js' strategy='beforeInteractive' nonce={nonce} />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
       {/* Spotify CDN - artist images */}
       <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
+      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='anonymous' />
       {/* Note: Font preloading is handled automatically by Next.js localFont */}
       {/* Spotify API */}
       <link rel='dns-prefetch' href='https://api.spotify.com' />
@@ -171,19 +173,45 @@ export default async function RootLayout({
       <link
         rel='preconnect'
         href='https://public.blob.vercel-storage.com'
-        crossOrigin=''
+        crossOrigin='anonymous'
       />
       {/* Clerk Auth - authentication */}
       <link rel='dns-prefetch' href='https://clerk.jov.ie' />
-      <link rel='preconnect' href='https://clerk.jov.ie' crossOrigin='' />
+      <link
+        rel='preconnect'
+        href='https://clerk.jov.ie'
+        crossOrigin='anonymous'
+      />
       <link rel='dns-prefetch' href='https://img.clerk.com' />
-      <link rel='preconnect' href='https://img.clerk.com' crossOrigin='' />
+      <link
+        rel='preconnect'
+        href='https://img.clerk.com'
+        crossOrigin='anonymous'
+      />
+      {/* Cloudinary - media assets */}
+      <link rel='dns-prefetch' href='https://res.cloudinary.com' />
+      <link
+        rel='preconnect'
+        href='https://res.cloudinary.com'
+        crossOrigin='anonymous'
+      />
+      {/* Clerk Auth API */}
+      <link
+        rel='preconnect'
+        href='https://api.clerk.com'
+        crossOrigin='anonymous'
+      />
+      <link
+        rel='preconnect'
+        href='https://images.clerk.dev'
+        crossOrigin='anonymous'
+      />
       {/* Unsplash - fallback images */}
       <link rel='dns-prefetch' href='https://images.unsplash.com' />
       <link
         rel='preconnect'
         href='https://images.unsplash.com'
-        crossOrigin=''
+        crossOrigin='anonymous'
       />
 
       {/* Structured Data for Organization */}
@@ -191,6 +219,7 @@ export default async function RootLayout({
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
@@ -260,7 +289,7 @@ export default async function RootLayout({
   // publishableKey may be undefined in test/dev mode
   // CoreProviders handle base client providers; Clerk is mounted per route.
   return (
-    <html lang='en' suppressHydrationWarning>
+    <html lang='en' className='dark' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
         {/* Skip to main content link for keyboard accessibility */}
@@ -273,7 +302,6 @@ export default async function RootLayout({
         <CoreProviders>{children}</CoreProviders>
 
         <CookieBannerSection />
-        <PWAInstallToastActivator />
         {VercelToolbar && <VercelToolbar />}
       </body>
     </html>

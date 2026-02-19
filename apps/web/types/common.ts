@@ -45,6 +45,15 @@ export interface SocialLinkFormData {
   url: string;
 }
 
+/**
+ * Standard Next.js error page component props.
+ * Used by all error.tsx files in the app directory.
+ */
+export interface ErrorProps {
+  readonly error: Error & { digest?: string };
+  readonly reset: () => void;
+}
+
 export interface AnalyticsData {
   totalClicks: number;
   listenClicks: number;

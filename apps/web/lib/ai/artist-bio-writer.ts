@@ -79,21 +79,32 @@ export function buildArtistBioDraft(
       ? `The artist profile has already drawn ${formatNumber(input.profileViews)} views, reinforcing sustained fan curiosity.`
       : 'The profile presence is in an early phase, with runway for sharper positioning and conversion.';
 
+  const ellipsis = existingBio && existingBio.length > 180 ? '…' : '';
+  const bioExcerpt = existingBio ? existingBio.slice(0, 180) + ellipsis : null;
+
   const draft = [
     genreLine,
     marketSignal,
     catalogSignal,
     profileSignal,
-    existingBio
-      ? `Their current positioning emphasizes: "${existingBio.slice(0, 180)}${existingBio.length > 180 ? '…' : ''}".`
+    bioExcerpt
+      ? `Their current positioning emphasizes: "${bioExcerpt}".`
       : null,
   ]
     .filter(Boolean)
     .join(' ');
 
+  const followersText =
+    input.spotifyFollowers == null
+      ? 'not available'
+      : formatNumber(input.spotifyFollowers);
+  const popularityText =
+    input.spotifyPopularity == null
+      ? 'not available'
+      : `${input.spotifyPopularity} / 100`;
   const facts = [
-    `Spotify followers: ${input.spotifyFollowers != null ? formatNumber(input.spotifyFollowers) : 'not available'}`,
-    `Spotify popularity: ${input.spotifyPopularity != null ? `${input.spotifyPopularity} / 100` : 'not available'}`,
+    `Spotify followers: ${followersText}`,
+    `Spotify popularity: ${popularityText}`,
     `Catalog size: ${input.releaseCount} release${input.releaseCount === 1 ? '' : 's'}`,
     `Spotify profile linked: ${input.spotifyUrl ? 'yes' : 'no'}`,
     `Apple Music profile linked: ${input.appleMusicUrl ? 'yes' : 'no'}`,

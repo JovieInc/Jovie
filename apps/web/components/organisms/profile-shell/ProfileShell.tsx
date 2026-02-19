@@ -50,6 +50,8 @@ export function ProfileShell({
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
+  photoDownloadSizes = [],
+  allowPhotoDownloads = false,
 }: ProfileShellProps) {
   const {
     notificationsEnabled,
@@ -79,6 +81,7 @@ export function ProfileShell({
 
   const {
     channelBusy,
+    contentPreferences,
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,
@@ -100,7 +103,9 @@ export function ProfileShell({
     if (hasActiveSubscriptions) {
       return (
         <ProfileNotificationsMenu
+          artistId={artist.id}
           channelBusy={channelBusy}
+          contentPreferences={contentPreferences}
           hasActiveSubscriptions={hasActiveSubscriptions}
           notificationsState={notificationsState}
           onAddChannel={openSubscription}
@@ -127,7 +132,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
+        className='relative w-full min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -136,8 +141,8 @@ export function ProfileShell({
 
         {showGradientBlurs && (
           <>
-            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
-            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
+            <div className='absolute left-1/4 top-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
+            <div className='absolute bottom-1/4 right-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
           </>
         )}
 
@@ -157,7 +162,12 @@ export function ProfileShell({
           <div className='relative z-10 flex min-h-screen flex-col py-12'>
             <div className='flex flex-1 flex-col items-center justify-start px-4'>
               <div className={`${maxWidthClass} space-y-6 md:space-y-8`}>
-                <ArtistInfo artist={artist} subtitle={subtitle} />
+                <ArtistInfo
+                  artist={artist}
+                  subtitle={subtitle}
+                  photoDownloadSizes={photoDownloadSizes}
+                  allowPhotoDownloads={allowPhotoDownloads}
+                />
                 {children}
                 {/* Social bar with contacts and tip buttons inline */}
                 {(showSocialBar || hasTipSupport || hasActiveSubscriptions) && (
@@ -186,11 +196,11 @@ export function ProfileShell({
                         (isMobile ? (
                           <>
                             <CircleIconButton
-                              size='xs'
-                              variant='surface'
+                              size='md'
+                              variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className='hover:scale-105'
+                              className='border border-transparent hover:border-subtle hover:bg-surface-2'
                               onClick={() => setTipDrawerOpen(true)}
                             >
                               <DollarSign
@@ -209,11 +219,11 @@ export function ProfileShell({
                           </>
                         ) : (
                           <CircleIconButton
-                            size='xs'
-                            variant='surface'
+                            size='md'
+                            variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className='hover:scale-105'
+                            className='border border-transparent hover:border-subtle hover:bg-surface-2'
                             asChild
                           >
                             <Link href={`/${artist.handle}?mode=tip`}>

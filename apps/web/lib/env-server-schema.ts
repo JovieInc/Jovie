@@ -43,6 +43,9 @@ export const ServerEnvSchema = z.object({
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
 
+  // Waitlist gate toggle (defaults to OFF when missing — new users skip waitlist)
+  WAITLIST_ENABLED: z.string().optional(),
+
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
 
@@ -98,6 +101,9 @@ export const ServerEnvSchema = z.object({
   APPLE_MUSIC_TEAM_ID: z.string().optional(),
   APPLE_MUSIC_PRIVATE_KEY: z.string().optional(),
 
+  // MusicFetch.io (cross-platform DSP profiles + social links via ISRC/UPC)
+  MUSICFETCH_API_TOKEN: z.string().optional(),
+
   // Mercury (banking metrics)
   MERCURY_API_BASE_URL: z.string().url().optional(),
   MERCURY_API_TOKEN: z.string().optional(),
@@ -121,9 +127,19 @@ export const ServerEnvSchema = z.object({
 
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
+  SENTRY_WEBHOOK_SECRET: z.string().optional(),
+
+  // Linear webhook automation
+  LINEAR_WEBHOOK_SECRET: z.string().optional(),
+
+  // GitHub dispatch (Sentry autofix pipeline)
+  GH_DISPATCH_TOKEN: z.string().optional(),
 
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
+
+  // AI Gateway auth (required for chat completions)
+  AI_GATEWAY_API_KEY: z.string().optional(),
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
@@ -156,6 +172,7 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
+  'WAITLIST_ENABLED',
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
@@ -185,6 +202,7 @@ export const ENV_KEYS = [
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
+  'MUSICFETCH_API_TOKEN',
   'MERCURY_API_BASE_URL',
   'MERCURY_API_TOKEN',
   'MERCURY_API_KEY',
@@ -199,7 +217,11 @@ export const ENV_KEYS = [
   'ENABLE_IMPERSONATION',
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
+  'SENTRY_WEBHOOK_SECRET',
+  'LINEAR_WEBHOOK_SECRET',
+  'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
+  'AI_GATEWAY_API_KEY',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',

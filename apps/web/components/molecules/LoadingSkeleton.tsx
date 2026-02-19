@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
 
 // Generate stable keys for skeleton items to avoid array index key warnings
 function generateSkeletonKeys(prefix: string, count: number): string[] {
@@ -101,8 +102,10 @@ const VALID_SIZE_CLASSES = new Set([
 
 function validateSizeClass(value: string, propName: string): string {
   if (!VALID_SIZE_CLASSES.has(value)) {
-    console.warn(
-      `LoadingSkeleton: Invalid ${propName} class "${value}". Using default value instead.`
+    logger.warn(
+      `Invalid ${propName} class "${value}". Using default value instead.`,
+      undefined,
+      'LoadingSkeleton'
     );
     return propName === 'height' ? 'h-4' : 'w-full';
   }

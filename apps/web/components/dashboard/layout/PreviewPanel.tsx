@@ -4,7 +4,10 @@ import { Button, type CommonDropdownItem } from '@jovie/ui';
 import { Copy, Download, ExternalLink, QrCode } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import { usePreviewPanel } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  usePreviewPanelData,
+  usePreviewPanelState,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -27,7 +30,8 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function PreviewPanel() {
-  const { isOpen, close, previewData } = usePreviewPanel();
+  const { isOpen, close } = usePreviewPanelState();
+  const { previewData } = usePreviewPanelData();
 
   const profileUrl = useMemo(() => {
     if (!previewData) return '';

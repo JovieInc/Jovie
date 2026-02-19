@@ -156,6 +156,8 @@ export const creatorProfiles = pgTable(
     fitScoreUpdatedAt: timestamp('fit_score_updated_at'),
     // Spotify enrichment data
     genres: text('genres').array(),
+    location: text('location'),
+    activeSinceYear: integer('active_since_year'),
     spotifyFollowers: integer('spotify_followers'),
     spotifyPopularity: integer('spotify_popularity'),
     // Ingestion source tracking for fit scoring

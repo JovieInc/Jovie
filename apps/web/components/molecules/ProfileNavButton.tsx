@@ -118,7 +118,7 @@ export function ProfileNavButton({
 
           {hideBranding ? null : (
             <DropdownMenuItem asChild>
-              <Link href='/waitlist'>Claim your profile</Link>
+              <Link href='/signup'>Claim your profile</Link>
             </DropdownMenuItem>
           )}
 

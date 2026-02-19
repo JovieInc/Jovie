@@ -405,6 +405,92 @@ async function createNewWaitlistEntry(params: {
 }
 
 /**
+ * Process a validated waitlist request: detect platform, check for existing entry, create or update.
+ */
+async function processValidatedRequest(params: {
+  data: {
+    primaryGoal?: string | null;
+    primarySocialUrl: string;
+    spotifyUrl?: string | null;
+    spotifyArtistName?: string | null;
+    heardAbout?: string | null;
+    selectedPlan?: string | null;
+  };
+  userId: string;
+  emailRaw: string;
+  email: string;
+  fullName: string;
+}): Promise<NextResponse> {
+  const { data, userId, emailRaw, email, fullName } = params;
+  const {
+    primaryGoal,
+    primarySocialUrl,
+    spotifyUrl,
+    spotifyArtistName,
+    heardAbout,
+    selectedPlan,
+  } = data;
+  const sanitizedHeardAbout = heardAbout?.trim() || null;
+  const sanitizedSpotifyArtistName = spotifyArtistName?.trim() || null;
+
+  // Detect platform and normalize primary social URL
+  const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
+
+  // Normalize Spotify URL if provided
+  const spotifyUrlNormalized = spotifyUrl
+    ? normalizeSpotifyUrl(spotifyUrl)
+    : null;
+
+  const [existing] = await db
+    .select({ id: waitlistEntries.id, status: waitlistEntries.status })
+    .from(waitlistEntries)
+    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+    .limit(1);
+
+  if (existing) {
+    return handleExistingEntry({
+      existing,
+      userId,
+      emailRaw,
+      fullName,
+      primaryGoal,
+      primarySocialUrl,
+      platform,
+      normalizedUrl,
+      spotifyUrl,
+      spotifyUrlNormalized,
+      spotifyArtistName: sanitizedSpotifyArtistName,
+      sanitizedHeardAbout,
+      selectedPlan,
+    });
+  }
+
+  // Create new waitlist entry with profile
+  await createNewWaitlistEntry({
+    userId,
+    emailRaw,
+    email,
+    fullName,
+    primaryGoal,
+    primarySocialUrl,
+    platform,
+    normalizedUrl,
+    spotifyUrl,
+    spotifyUrlNormalized,
+    spotifyArtistName: sanitizedSpotifyArtistName,
+    sanitizedHeardAbout,
+    selectedPlan,
+  });
+
+  // Send Slack notification for new waitlist entry (fire-and-forget)
+  notifySlackWaitlist(fullName, email).catch(err => {
+    logger.warn('[waitlist] Slack notification failed', err);
+  });
+
+  return successResponse({ status: 'new' });
+}
+
+/**
  * Build error response for POST failures
  */
 function buildPostErrorResponse(error: unknown, isDev: boolean): NextResponse {
@@ -530,72 +616,13 @@ export async function POST(request: Request) {
       return badRequestResponse(parseResult.error.flatten().fieldErrors);
     }
 
-    const {
-      primaryGoal,
-      primarySocialUrl,
-      spotifyUrl,
-      spotifyArtistName,
-      heardAbout,
-      selectedPlan,
-    } = parseResult.data;
-    const sanitizedHeardAbout = heardAbout?.trim() || null;
-    const sanitizedSpotifyArtistName = spotifyArtistName?.trim() || null;
-
-    // Detect platform and normalize primary social URL
-    const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
-
-    // Normalize Spotify URL if provided
-    const spotifyUrlNormalized = spotifyUrl
-      ? normalizeSpotifyUrl(spotifyUrl)
-      : null;
-
-    const [existing] = await db
-      .select({ id: waitlistEntries.id, status: waitlistEntries.status })
-      .from(waitlistEntries)
-      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-      .limit(1);
-
-    if (existing) {
-      return handleExistingEntry({
-        existing,
-        userId,
-        emailRaw,
-        fullName,
-        primaryGoal,
-        primarySocialUrl,
-        platform,
-        normalizedUrl,
-        spotifyUrl,
-        spotifyUrlNormalized,
-        spotifyArtistName: sanitizedSpotifyArtistName,
-        sanitizedHeardAbout,
-        selectedPlan,
-      });
-    }
-
-    // Create new waitlist entry with profile
-    await createNewWaitlistEntry({
+    return processValidatedRequest({
+      data: parseResult.data,
       userId,
       emailRaw,
       email,
       fullName,
-      primaryGoal,
-      primarySocialUrl,
-      platform,
-      normalizedUrl,
-      spotifyUrl,
-      spotifyUrlNormalized,
-      spotifyArtistName: sanitizedSpotifyArtistName,
-      sanitizedHeardAbout,
-      selectedPlan,
     });
-
-    // Send Slack notification for new waitlist entry (fire-and-forget)
-    notifySlackWaitlist(fullName, email).catch(err => {
-      logger.warn('[waitlist] Slack notification failed', err);
-    });
-
-    return successResponse({ status: 'new' });
   } catch (error) {
     logger.error('Waitlist API error', error);
     await captureError('Waitlist signup failed', error, {

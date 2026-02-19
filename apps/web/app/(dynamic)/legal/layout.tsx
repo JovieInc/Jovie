@@ -1,6 +1,6 @@
 import { Container } from '@/components/site/Container';
-import { Footer } from '@/components/site/Footer';
 import { Header } from '@/components/site/Header';
+import { MarketingFooter } from '@/components/site/MarketingFooter';
 
 // Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
 // Legal pages will still be dynamic by default
@@ -16,7 +16,7 @@ export default function LegalLayout({
       <main className='flex-1 py-16 sm:py-20' style={{ paddingTop: '112px' }}>
         <Container size='lg'>{children}</Container>
       </main>
-      <Footer />
+      <MarketingFooter />
     </div>
   );
 }

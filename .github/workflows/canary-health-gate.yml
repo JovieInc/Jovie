@@ -215,7 +215,7 @@ jobs:
 
           # Install Vercel CLI if not already available
           if ! command -v vercel &> /dev/null; then
-            npm install -g vercel@latest
+            pnpm add -g vercel@latest
           fi
 
           # Attempt rollback to previous deployment

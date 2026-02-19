@@ -14,6 +14,8 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 export * from './admin';
 // Analytics (Clicks, Audience, Tips)
 export * from './analytics';
+// Audit (Ingest Audit Logs)
+export * from './audit';
 // Auth & Users
 export * from './auth';
 // Billing (Stripe, Audit)
@@ -40,6 +42,8 @@ export * from './links';
 export * from './pixels';
 // Creator Profiles
 export * from './profiles';
+// Referral Program (Codes, Referrals, Commissions)
+export * from './referrals';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export * from './sender';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)

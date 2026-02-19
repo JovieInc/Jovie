@@ -19,6 +19,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { logSearchEvent, logSearchRateLimited } from '@/lib/audit/ingest';
+import { captureError } from '@/lib/error-tracking';
 import {
   handleIngestError,
   rateLimitedError,
@@ -135,6 +136,7 @@ export async function searchArtists(
       data: results,
     };
   } catch (error) {
+    await captureError('searchArtists failed', error, { route: 'spotify' });
     const handled = handleIngestError(error, { action: 'searchArtists' });
     return {
       success: false,
@@ -204,6 +206,9 @@ export async function searchArtistsPublic(
       data: results,
     };
   } catch (error) {
+    await captureError('searchArtistsPublic failed', error, {
+      route: 'spotify',
+    });
     const handled = handleIngestError(error, { action: 'searchArtistsPublic' });
     return {
       success: false,
@@ -261,6 +266,7 @@ export async function getArtist(
       data: artist,
     };
   } catch (error) {
+    await captureError('getArtist failed', error, { route: 'spotify' });
     const handled = handleIngestError(error, {
       action: 'getArtist',
       spotifyArtistId,
@@ -320,6 +326,7 @@ export async function checkArtistExists(
       data: exists,
     };
   } catch (error) {
+    await captureError('checkArtistExists failed', error, { route: 'spotify' });
     const handled = handleIngestError(error, {
       action: 'checkArtistExists',
       spotifyArtistId,

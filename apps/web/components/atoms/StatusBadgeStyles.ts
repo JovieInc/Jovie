@@ -1,10 +1,10 @@
 export const variantClasses = {
-  blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-  green: 'bg-green-500/10 border-green-500/20 text-green-400',
-  purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-  orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
-  red: 'bg-red-500/10 border-red-500/20 text-red-400',
-  gray: 'bg-gray-500/10 border-gray-500/20 text-gray-400',
+  blue: 'bg-info-subtle border-info/20 text-info',
+  green: 'bg-success-subtle border-success/20 text-success',
+  purple: 'bg-accent-subtle border-accent/20 text-accent',
+  orange: 'bg-warning-subtle border-warning/20 text-warning',
+  red: 'bg-error-subtle border-error/20 text-error',
+  gray: 'bg-surface-2 border-subtle text-tertiary-token',
 } as const;
 
 export const sizeClasses = {

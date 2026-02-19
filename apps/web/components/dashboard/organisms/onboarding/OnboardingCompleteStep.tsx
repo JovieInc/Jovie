@@ -45,7 +45,7 @@ export function OnboardingCompleteStep({
 
         <div className={FORM_LAYOUT.footerHint}>
           {copied && (
-            <span className='text-green-600 dark:text-green-400 animate-in fade-in-0 duration-200'>
+            <span className='text-success animate-in fade-in-0 duration-200'>
               Link copied to clipboard!
             </span>
           )}

@@ -178,11 +178,14 @@ const DASHBOARD_PAGES = [
   { path: '/app/dashboard/analytics', name: 'Analytics' },
   { path: '/app/dashboard/audience', name: 'Audience' },
   { path: '/app/dashboard/chat', name: 'Chat' },
-  { path: '/app/dashboard/contacts', name: 'Contacts' },
   { path: '/app/dashboard/earnings', name: 'Earnings' },
   { path: '/app/dashboard/profile', name: 'Profile' },
   { path: '/app/dashboard/releases', name: 'Releases' },
-  { path: '/app/dashboard/tour-dates', name: 'Tour Dates' },
+  { path: '/app/settings/contacts', name: 'Contacts' },
+  { path: '/app/settings/touring', name: 'Touring' },
+  { path: '/app/settings/billing', name: 'Settings Billing' },
+  { path: '/billing', name: 'Billing' },
+  { path: '/account', name: 'Account' },
 ] as const;
 
 /**
@@ -238,7 +241,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test('All dashboard pages load without errors', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(300_000); // 5 minutes for 8 pages (dev mode is slow)
+    test.setTimeout(300_000); // 5 minutes for 11 pages (dev mode is slow)
 
     const results: PageHealthResult[] = [];
 
@@ -280,11 +283,14 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           continue;
         }
 
-        // Check if redirected to different dashboard page (feature gate, etc.)
+        // Check if redirected to different dashboard/settings/billing page (feature gate, etc.)
         // This is okay - the page exists, it just redirected based on permissions
         if (
           !currentUrl.includes(pageConfig.path) &&
-          currentUrl.includes('/app/dashboard')
+          (currentUrl.includes('/app/dashboard') ||
+            currentUrl.includes('/app/settings') ||
+            currentUrl.includes('/billing') ||
+            currentUrl.includes('/account'))
         ) {
           results.push({
             path: pageConfig.path,
@@ -295,14 +301,19 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           continue;
         }
 
-        // Check if redirected outside dashboard entirely (e.g., to onboarding)
+        // Check if redirected outside dashboard/settings entirely (e.g., to onboarding)
         if (
           !currentUrl.includes(pageConfig.path) &&
-          !currentUrl.includes('/app/dashboard')
+          !currentUrl.includes('/app/dashboard') &&
+          !currentUrl.includes('/app/settings')
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          const validRedirectDestinations = ['/onboarding', '/app/'];
+          const validRedirectDestinations = [
+            '/onboarding',
+            '/app/',
+            '/app/settings',
+          ];
           // Parse URL to check origin for root path redirect safety
           const parsedUrl = new URL(currentUrl);
           const expectedOrigin = new URL(page.url()).origin;
@@ -510,6 +521,17 @@ test.describe('Admin Pages Health Check @smoke', () => {
   test('All admin pages load without errors', async ({ page }, testInfo) => {
     test.setTimeout(360_000); // 6 minutes for 6 admin pages (dev mode is slow, especially under load)
 
+    // Capture browser console errors for debugging page failures
+    const consoleErrors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(`[console.error] ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', err => {
+      consoleErrors.push(`[pageerror] ${err.message}\n${err.stack ?? ''}`);
+    });
+
     const results: PageHealthResult[] = [];
     let hasAdminAccess = true;
 
@@ -583,7 +605,11 @@ test.describe('Admin Pages Health Check @smoke', () => {
         ) {
           // This might be a redirect to onboarding, home, etc.
           // Count as pass if it's a valid redirect destination
-          const validRedirectDestinations = ['/onboarding', '/app/'];
+          const validRedirectDestinations = [
+            '/onboarding',
+            '/app/',
+            '/app/settings',
+          ];
           // Parse URL to check origin for root path redirect safety
           const parsedUrl = new URL(currentUrl);
           const expectedOrigin = new URL(page.url()).origin;
@@ -635,6 +661,17 @@ test.describe('Admin Pages Health Check @smoke', () => {
             });
           }
 
+          // Log captured console errors for this page
+          if (consoleErrors.length > 0) {
+            console.log(
+              `\n🔍 Console errors on ${pageConfig.name}:\n${consoleErrors.join('\n')}`
+            );
+            await testInfo.attach(`console-errors-${pageConfig.name}`, {
+              body: consoleErrors.join('\n'),
+              contentType: 'text/plain',
+            });
+          }
+
           results.push({
             path: pageConfig.path,
             name: pageConfig.name,
@@ -650,6 +687,8 @@ test.describe('Admin Pages Health Check @smoke', () => {
             loadTimeMs,
           });
         }
+        // Clear console errors for next page
+        consoleErrors.length = 0;
       } catch (error) {
         results.push({
           path: pageConfig.path,
@@ -658,6 +697,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
+        consoleErrors.length = 0;
       }
     }
 

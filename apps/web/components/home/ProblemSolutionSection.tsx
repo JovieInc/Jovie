@@ -16,7 +16,7 @@ export function ProblemSolutionSection() {
     >
       <div className='mx-auto max-w-5xl px-4 py-14 md:py-18 text-center'>
         {/* Unified badge with Linear-inspired styling */}
-        <div className='inline-flex items-center rounded-full bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white/80 backdrop-blur-sm border border-subtle'>
+        <div className='inline-flex items-center rounded-full bg-surface-1/80 px-4 py-2 text-sm font-medium text-secondary-token backdrop-blur-sm border border-subtle'>
           <div className='flex h-2 w-2 items-center justify-center mr-2'>
             <div className='h-1.5 w-1.5 rounded-full bg-amber-400 dark:bg-amber-500 animate-pulse motion-reduce:animate-none' />
           </div>
@@ -26,26 +26,26 @@ export function ProblemSolutionSection() {
         {/* Unified heading */}
         <h2
           id='problem-solution-heading'
-          className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-gray-900 dark:text-white'
+          className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-primary-token'
         >
           Your bio link is a speed bump.
           <br />
-          <span className='text-3xl md:text-5xl text-gray-600 dark:text-white/70 font-semibold'>
+          <span className='text-3xl md:text-5xl text-secondary-token font-semibold'>
             We built the off-ramp.
           </span>
         </h2>
 
-        <h3 className='mt-6 text-2xl md:text-3xl font-bold text-gray-900 dark:text-white'>
+        <h3 className='mt-6 text-2xl md:text-3xl font-bold text-primary-token'>
           Stop designing. Start converting.
         </h3>
 
         {/* Unified narrative flow */}
         <div className='mt-6 space-y-4 max-w-4xl mx-auto'>
-          <p className='text-lg text-gray-600 dark:text-white/70 leading-relaxed'>
+          <p className='text-lg text-secondary-token leading-relaxed'>
             Every extra tap taxes attention. &ldquo;Cute&rdquo; layouts bleed
             streams, follows, and ticket sales.
           </p>
-          <p className='text-lg text-gray-700 dark:text-white/80 leading-relaxed font-medium'>
+          <p className='text-lg text-secondary-token leading-relaxed font-medium'>
             Jovie ships a locked, elite artist page in seconds—built for streams
             and sales, not vibes. One link. One funnel. More plays, more pay.
           </p>
@@ -56,7 +56,7 @@ export function ProblemSolutionSection() {
           <Link
             href='/onboarding'
             onClick={handleClick}
-            className='inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white bg-gray-900 hover:bg-gray-800 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-200 rounded-lg border border-gray-900 dark:border-gray-50 transition-all duration-200 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-400 dark:focus-visible:ring-gray-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none group'
+            className='inline-flex items-center justify-center px-8 py-4 text-base font-semibold bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 rounded-lg transition-all duration-200 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none group'
           >
             <span>Request Early Access</span>
             <svg
@@ -74,7 +74,7 @@ export function ProblemSolutionSection() {
               />
             </svg>
           </Link>
-          <p className='mt-3 text-sm text-gray-500 dark:text-white/50'>
+          <p className='mt-3 text-sm text-tertiary-token'>
             Go live in 60 seconds
           </p>
         </div>

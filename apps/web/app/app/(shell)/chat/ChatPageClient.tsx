@@ -1,18 +1,12 @@
 'use client';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import { Archive, Copy, Ellipsis, Loader2, Pencil, Pin } from 'lucide-react';
+import { SimpleTooltip } from '@jovie/ui';
+import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -61,41 +55,23 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
 
   const headerActions = useMemo(
     () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <CircleIconButton
-            size='sm'
-            variant='outline'
-            ariaLabel='Open thread actions'
-          >
-            <Ellipsis aria-hidden='true' className='size-4' />
-          </CircleIconButton>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent align='start' sideOffset={10} className='w-56'>
-          <DropdownMenuItem disabled>
-            <Pin className='size-4' aria-hidden='true' />
-            Pin thread
-            <DropdownMenuShortcut>⌘⇧P</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <Pencil className='size-4' aria-hidden='true' />
-            Rename thread
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <Archive className='size-4' aria-hidden='true' />
-            Archive thread
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleCopyConversationId}>
-            <Copy className='size-4' aria-hidden='true' />
-            Copy session ID
-            <DropdownMenuShortcut>⌘⇧C</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <>
+        {conversationId && (
+          <SimpleTooltip content='Copy session ID'>
+            <CircleIconButton
+              size='sm'
+              variant='outline'
+              ariaLabel='Copy session ID'
+              onClick={handleCopyConversationId}
+            >
+              <Copy aria-hidden='true' className='size-4' />
+            </CircleIconButton>
+          </SimpleTooltip>
+        )}
+        <PreviewToggleButton />
+      </>
     ),
-    [handleCopyConversationId]
+    [conversationId, handleCopyConversationId]
   );
 
   const handleConversationCreate = useCallback(
@@ -142,11 +118,26 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
     }
   }, [rawQuery, conversationId]);
 
-  // Show loading state until profile is available to avoid sending undefined profileId
+  // Profile unavailable — show actionable error instead of infinite spinner.
+  // This happens when billing/entitlements fail or the DB query times out,
+  // causing getDashboardData to return selectedProfile: null.
   if (!selectedProfile) {
     return (
       <div className='flex h-full items-center justify-center'>
-        <Loader2 className='h-8 w-8 animate-spin text-secondary-token' />
+        <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+          <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          <p className='text-sm text-secondary-token'>
+            Could not load your profile. This is usually temporary.
+          </p>
+          <button
+            type='button'
+            onClick={() => globalThis.location.reload()}
+            className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+          >
+            <RefreshCw className='h-4 w-4' />
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -158,6 +149,9 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       onConversationCreate={handleConversationCreate}
       onTitleChange={handleTitleChange}
       initialQuery={initialQuery ?? undefined}
+      displayName={selectedProfile.displayName ?? undefined}
+      avatarUrl={selectedProfile.avatarUrl}
+      username={selectedProfile.username ?? undefined}
     />
   );
 }

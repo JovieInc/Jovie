@@ -204,7 +204,7 @@ This project includes comprehensive guidelines for AI coding tools:
 #### Drizzle migrations & indexes
 
 - Drizzle's SQL migrator runs inside a transaction; PostgreSQL does not allow `CREATE INDEX CONCURRENTLY` inside a transaction block.
-- In migrations, use `CREATE INDEX IF NOT EXISTS ...` and, if a concurrent build is ever required operationally, run `CREATE INDEX CONCURRENTLY` manually outside of Drizzle. See `db_indexes.md` for details.
+- In migrations, use `CREATE INDEX IF NOT EXISTS ...` and, if a concurrent build is ever required operationally, run `CREATE INDEX CONCURRENTLY` manually outside of Drizzle. See `docs/db_indexes.md` for details.
 
 ### E2E Tests
 

@@ -6,7 +6,6 @@ import { AuthBackButton } from '@/components/auth';
 import {
   OnboardingCompleteStep,
   OnboardingHandleStep,
-  OnboardingNameStep,
 } from '@/components/dashboard/organisms/onboarding';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
@@ -23,26 +22,24 @@ export function AppleStyleOnboardingForm({
   initialHandle = '',
   userEmail = null,
   userId,
-  skipNameStep = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
   const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);
-  const [fullName, setFullName] = useState(initialDisplayName);
+  const [fullName] = useState(initialDisplayName);
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
   const { copy, isSuccess: copied } = useClipboard({ resetDelay: 2000 });
 
-  const nameInputRef = useRef<HTMLInputElement | null>(null);
   const handleInputRef = useRef<HTMLInputElement | null>(null);
 
   const displayDomain = PRODUCTION_PROFILE_DOMAIN;
 
   const { currentStepIndex, isTransitioning, goToNextStep, goBack } =
-    useStepNavigation({ skipNameStep });
+    useStepNavigation();
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
@@ -61,25 +58,6 @@ export function AppleStyleOnboardingForm({
     setProfileReadyHandle,
   });
 
-  const namePlaceholder = useMemo(() => {
-    const options = [
-      'Madonna',
-      'BLACKPINK',
-      'Tiësto',
-      'FISHER',
-      'Neon Hitch',
-      'U2',
-      'Imagine Dragons',
-      'ODESZA',
-    ];
-    return options[Math.floor(Math.random() * options.length)];
-  }, []);
-
-  const isDisplayNameValid = useMemo(() => {
-    const trimmed = fullName.trim();
-    return trimmed.length > 0 && trimmed.length <= 50;
-  }, [fullName]);
-
   useEffect(() => {
     if (userId) {
       track('onboarding_started', {
@@ -90,10 +68,8 @@ export function AppleStyleOnboardingForm({
   }, [userId]);
 
   useEffect(() => {
-    const target =
-      currentStepIndex === 0 ? nameInputRef.current : handleInputRef.current;
-    if (target) {
-      target.focus();
+    if (currentStepIndex === 0 && handleInputRef.current) {
+      handleInputRef.current.focus();
     }
   }, [currentStepIndex]);
 
@@ -149,25 +125,9 @@ export function AppleStyleOnboardingForm({
     switch (currentStepIndex) {
       case 0:
         return (
-          <OnboardingNameStep
+          <OnboardingHandleStep
             title={ONBOARDING_STEPS[0].title}
             prompt={ONBOARDING_STEPS[0].prompt}
-            fullName={fullName}
-            namePlaceholder={namePlaceholder}
-            isValid={isDisplayNameValid}
-            isTransitioning={isTransitioning}
-            isSubmitting={state.isSubmitting}
-            inputRef={nameInputRef}
-            onNameChange={setFullName}
-            onSubmit={goToNextStep}
-          />
-        );
-
-      case 1:
-        return (
-          <OnboardingHandleStep
-            title={ONBOARDING_STEPS[1].title}
-            prompt={ONBOARDING_STEPS[1].prompt}
             handleInput={handleInput}
             handleValidation={handleValidation}
             stateError={state.error}
@@ -181,11 +141,11 @@ export function AppleStyleOnboardingForm({
           />
         );
 
-      case 2:
+      case 1:
         return (
           <OnboardingCompleteStep
-            title={ONBOARDING_STEPS[2].title}
-            prompt={ONBOARDING_STEPS[2].prompt}
+            title={ONBOARDING_STEPS[1].title}
+            prompt={ONBOARDING_STEPS[1].prompt}
             displayDomain={displayDomain}
             handle={profileReadyHandle || handle}
             copied={copied}

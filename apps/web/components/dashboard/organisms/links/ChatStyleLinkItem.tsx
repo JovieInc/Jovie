@@ -27,6 +27,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 import {
@@ -41,6 +42,9 @@ type LinkItemMenuItem = {
   variant?: 'default' | 'destructive';
   onSelect: () => void;
 };
+
+const SWIPE_ACTION_CLASS =
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-medium transition-colors active:opacity-80';
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
   readonly id: string;
@@ -135,122 +139,167 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
     },
   ];
 
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      style={cardStyle}
-      className={cn(
-        'flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
-        'transition-all duration-200',
-        !visible && 'opacity-50',
-        isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
-      )}
-    >
-      {/* Drag handle - 44px tap target on mobile */}
-      {draggable && (
-        <button
-          type='button'
-          className={cn(
-            'flex h-11 w-11 cursor-grab items-center justify-center rounded-lg sm:h-8 sm:w-8',
-            'text-tertiary-token transition-colors',
-            'hover:text-secondary-token active:cursor-grabbing active:scale-95',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
-          )}
-          aria-label='Drag to reorder'
-          {...listeners}
-        >
-          <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />
-        </button>
-      )}
-
-      {/* Platform icon - larger on mobile */}
-      <div
-        className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-lg'
-        style={{
-          backgroundColor: brandColor,
-          color: getContrastTextOnBrand(brandColor),
-        }}
-      >
-        <SocialIcon
-          platform={link.platform.icon}
-          className='h-6 w-6 sm:h-5 sm:w-5'
-        />
-      </div>
-
-      {/* Content */}
-      <div className='min-w-0 flex-1'>
-        <div className='truncate text-[15px] font-medium text-primary-token sm:text-sm'>
-          {link.platform.name || link.platform.id}
-        </div>
-        {handle && (
-          <div className='truncate text-sm text-secondary-token'>{handle}</div>
-        )}
-      </div>
-
-      {/* Menu button - 44px tap target on mobile */}
+  const swipeActions = (
+    <>
       <button
         type='button'
-        aria-label={`Open actions for ${link.platform.name}`}
-        ref={floatingRefs.setReference}
-        className={cn(
-          'inline-flex h-11 w-11 items-center justify-center rounded-xl sm:h-9 sm:w-9 sm:rounded-full',
-          'text-secondary-token transition-colors',
-          'hover:bg-surface-1 hover:text-primary-token',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-          'active:scale-95'
-        )}
-        {...getReferenceProps()}
+        onClick={() => onEdit(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
+        aria-label={`Edit ${link.platform.name}`}
       >
-        <MoreHorizontal className='h-5 w-5 sm:h-4 sm:w-4' />
+        <Icon name='Pencil' className='h-4 w-4' />
+        <span>Edit</span>
       </button>
+      <button
+        type='button'
+        onClick={() => onToggle(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
+        aria-label={visible ? 'Hide link' : 'Show link'}
+      >
+        <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
+        <span>{visible ? 'Hide' : 'Show'}</span>
+      </button>
+      <button
+        type='button'
+        onClick={() => onRemove(index)}
+        className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
+        aria-label={`Delete ${link.platform.name}`}
+      >
+        <Icon name='Trash' className='h-4 w-4' />
+        <span>Delete</span>
+      </button>
+    </>
+  );
 
-      {/* Dropdown menu */}
-      {isMenuOpen && (
-        <FloatingPortal>
-          <FloatingFocusManager
-            context={context}
-            modal
-            initialFocus={firstItemRef}
-          >
-            {/* eslint-disable react-hooks/refs -- floating-ui ref callback is intentional */}
-            <div
-              ref={floatingRefs.setFloating}
-              tabIndex={-1}
-              style={floatingStyles}
-              className={cn('z-100 min-w-[176px]', dropdownMenuContentClasses)}
-              {...getFloatingProps()}
+  return (
+    <div ref={setNodeRef} {...attributes} style={cardStyle}>
+      <SwipeToReveal
+        itemId={id}
+        actions={swipeActions}
+        actionsWidth={180}
+        className='rounded-2xl'
+      >
+        <div
+          className={cn(
+            'flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
+            'transition-all duration-200',
+            !visible && 'opacity-50',
+            isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
+          )}
+        >
+          {/* Drag handle - 44px tap target on mobile */}
+          {draggable && (
+            <button
+              type='button'
+              className={cn(
+                'flex h-11 w-11 cursor-grab items-center justify-center rounded-lg sm:h-8 sm:w-8',
+                'text-tertiary-token transition-colors',
+                'hover:text-secondary-token active:cursor-grabbing active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              )}
+              aria-label='Drag to reorder'
+              {...listeners}
             >
-              {menuItems.map((item, itemIndex) => (
-                <button
-                  key={item.id}
-                  type='button'
-                  ref={itemIndex === 0 ? firstItemRef : undefined}
-                  onClick={() => {
-                    closeMenu();
-                    item.onSelect();
-                  }}
-                  className={cn(
-                    MENU_ITEM_BASE,
-                    'min-h-[44px] w-full text-left active:scale-[0.98]',
-                    item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
-                  )}
-                  {...getItemProps()}
-                >
-                  {item.iconName && (
-                    <Icon
-                      name={item.iconName}
-                      className='h-5 w-5 shrink-0 opacity-80 sm:h-4 sm:w-4'
-                    />
-                  )}
-                  <span className='min-w-0 flex-1 truncate'>{item.label}</span>
-                </button>
-              ))}
+              <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />
+            </button>
+          )}
+
+          {/* Platform icon - larger on mobile */}
+          <div
+            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-lg'
+            style={{
+              backgroundColor: brandColor,
+              color: getContrastTextOnBrand(brandColor),
+            }}
+          >
+            <SocialIcon
+              platform={link.platform.icon}
+              className='h-6 w-6 sm:h-5 sm:w-5'
+            />
+          </div>
+
+          {/* Content */}
+          <div className='min-w-0 flex-1'>
+            <div className='truncate text-[15px] font-medium text-primary-token sm:text-sm'>
+              {link.platform.name || link.platform.id}
             </div>
-            {/* eslint-enable react-hooks/refs */}
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
+            {handle && (
+              <div className='truncate text-sm text-secondary-token'>
+                {handle}
+              </div>
+            )}
+          </div>
+
+          {/* Menu button - 44px tap target on mobile */}
+          <button
+            type='button'
+            aria-label={`Open actions for ${link.platform.name}`}
+            ref={floatingRefs.setReference}
+            className={cn(
+              'inline-flex h-11 w-11 items-center justify-center rounded-xl sm:h-9 sm:w-9 sm:rounded-full',
+              'text-secondary-token transition-colors',
+              'hover:bg-surface-1 hover:text-primary-token',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+              'active:scale-95'
+            )}
+            {...getReferenceProps()}
+          >
+            <MoreHorizontal className='h-5 w-5 sm:h-4 sm:w-4' />
+          </button>
+
+          {/* Dropdown menu */}
+          {isMenuOpen && (
+            <FloatingPortal>
+              <FloatingFocusManager
+                context={context}
+                modal
+                initialFocus={firstItemRef}
+              >
+                {/* eslint-disable react-hooks/refs -- floating-ui ref callback is intentional */}
+                <div
+                  ref={floatingRefs.setFloating}
+                  tabIndex={-1}
+                  style={floatingStyles}
+                  className={cn(
+                    'z-100 min-w-[176px]',
+                    dropdownMenuContentClasses
+                  )}
+                  {...getFloatingProps()}
+                >
+                  {menuItems.map((item, itemIndex) => (
+                    <button
+                      key={item.id}
+                      type='button'
+                      ref={itemIndex === 0 ? firstItemRef : undefined}
+                      onClick={() => {
+                        closeMenu();
+                        item.onSelect();
+                      }}
+                      className={cn(
+                        MENU_ITEM_BASE,
+                        'min-h-[44px] w-full text-left active:scale-[0.98]',
+                        item.variant === 'destructive' && MENU_ITEM_DESTRUCTIVE
+                      )}
+                      {...getItemProps()}
+                    >
+                      {item.iconName && (
+                        <Icon
+                          name={item.iconName}
+                          className='h-5 w-5 shrink-0 opacity-80 sm:h-4 sm:w-4'
+                        />
+                      )}
+                      <span className='min-w-0 flex-1 truncate'>
+                        {item.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {/* eslint-enable react-hooks/refs */}
+              </FloatingFocusManager>
+            </FloatingPortal>
+          )}
+        </div>
+      </SwipeToReveal>
     </div>
   );
 }) as <T extends DetectedLink = DetectedLink>(

@@ -74,7 +74,7 @@ describe('useSequentialShortcuts', () => {
       fireKey('o');
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/app/tour-dates');
+    expect(mockPush).toHaveBeenCalledWith('/app/settings/touring');
   });
 
   it('does not navigate if sequence times out', () => {

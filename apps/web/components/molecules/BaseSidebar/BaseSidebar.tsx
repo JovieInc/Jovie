@@ -18,7 +18,7 @@ import type {
   BaseSidebarHeaderProps,
   BaseSidebarProps,
 } from './types';
-import { useSidebarState } from './useSidebarState';
+import { useSidebarEscapeKey } from './useSidebarEscapeKey';
 
 /**
  * Get the transform class for sidebar visibility state.
@@ -50,7 +50,7 @@ export const BaseSidebar = forwardRef<HTMLElement, BaseSidebarProps>(
     },
     ref
   ) {
-    useSidebarState({ isOpen, onClose, closeOnEscape });
+    useSidebarEscapeKey({ isOpen, onClose, closeOnEscape });
 
     const isLeft = position === 'left';
 

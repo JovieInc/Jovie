@@ -1,6 +1,7 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   BellRing,
   Copy,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
@@ -24,6 +25,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
@@ -150,6 +152,65 @@ const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
 ];
 
+/** Estimated height of each mobile card row in px. */
+const MOBILE_CARD_HEIGHT = 72;
+
+/** Virtualized mobile card list to avoid rendering all rows at once. */
+const MobileCardList = memo(function MobileCardList({
+  rows,
+  mode,
+  selectedMemberId,
+  onTap,
+}: {
+  rows: AudienceMember[];
+  mode: 'members' | 'subscribers';
+  selectedMemberId: string | null;
+  onTap: (member: AudienceMember) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => MOBILE_CARD_HEIGHT,
+    overscan: 5,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className='md:hidden overflow-auto'
+      style={{ maxHeight: '100%' }}
+    >
+      <div
+        className='relative w-full'
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map(virtualRow => {
+          const member = rows[virtualRow.index];
+          return (
+            <div
+              key={member.id}
+              className='absolute left-0 w-full border-b border-subtle/60'
+              style={{
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <AudienceMobileCard
+                member={member}
+                mode={mode}
+                isSelected={selectedMemberId === member.id}
+                onTap={onTap}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
 export const DashboardAudienceTableUnified = memo(
   function DashboardAudienceTableUnified({
     mode,
@@ -195,7 +256,10 @@ export const DashboardAudienceTableUnified = memo(
 
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
-        if (!profileId) return;
+        if (!profileId) {
+          toast.error('Unable to block member — profile not loaded');
+          return;
+        }
         try {
           const res = await fetch('/api/dashboard/audience/members', {
             method: 'DELETE',
@@ -361,122 +425,118 @@ export const DashboardAudienceTableUnified = memo(
       [selectedMember]
     );
 
+    // Register right panel with AuthShell instead of rendering inline
+    const sidebarPanel = useMemo(
+      () => (
+        <AudienceMemberSidebar
+          member={selectedMember}
+          isOpen={Boolean(selectedMember)}
+          onClose={() => setSelectedMember(null)}
+          contextMenuItems={
+            selectedMember
+              ? convertToCommonDropdownItems(
+                  getContextMenuItems(selectedMember)
+                )
+              : undefined
+          }
+        />
+      ),
+      [selectedMember, getContextMenuItems, setSelectedMember]
+    );
+
+    useRegisterTablePanel(sidebarPanel);
+
     return (
       <AudienceTableProvider value={contextValue}>
         <div
-          className='flex h-full min-h-0 flex-row'
+          className='flex h-full min-h-0 flex-col overflow-hidden'
           data-testid='dashboard-audience-table'
         >
-          {/* Main table content */}
-          <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
-            <h1 className='sr-only'>
-              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-            </h1>
-            <p className='sr-only'>
-              {getSrDescription(rows.length === 0, mode)}
-            </p>
+          <h1 className='sr-only'>
+            {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+          </h1>
+          <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
 
-            {/* Subheader with view filter tabs and export */}
-            <AudienceTableSubheader
-              view={view}
-              onViewChange={onViewChange}
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              rows={rows}
-              selectedIds={selectedIds}
-              subscriberCount={subscriberCount}
-              total={total}
-            />
+          {/* Subheader with filter dropdown and export */}
+          <AudienceTableSubheader
+            view={view}
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            rows={rows}
+            selectedIds={selectedIds}
+            subscriberCount={subscriberCount}
+            total={total}
+          />
 
-            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-              {/* Scrollable content area */}
-              <div className='flex-1 min-h-0 overflow-auto'>
-                {rows.length === 0 ? (
-                  <EmptyState
-                    icon={emptyStateIcon}
-                    heading={emptyStateHeading}
-                    description={emptyStateDescription}
-                    action={emptyStatePrimaryAction}
-                    secondaryAction={emptyStateSecondaryAction}
-                  />
-                ) : (
-                  <>
-                    {/* Mobile card list */}
-                    <div className='flex flex-col divide-y divide-subtle/60 md:hidden'>
-                      {rows.map(member => (
-                        <AudienceMobileCard
-                          key={member.id}
-                          member={member}
-                          mode={mode}
-                          isSelected={selectedMember?.id === member.id}
-                          onTap={setSelectedMember}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Desktop table */}
-                    <div className='hidden md:block h-full'>
-                      <UnifiedTable
-                        data={rows}
-                        columns={columns}
-                        isLoading={false}
-                        emptyState={
-                          <EmptyState
-                            icon={emptyStateIcon}
-                            heading={emptyStateHeading}
-                            description={emptyStateDescription}
-                            action={emptyStatePrimaryAction}
-                            secondaryAction={emptyStateSecondaryAction}
-                          />
-                        }
-                        getRowId={row => row.id}
-                        enableVirtualization={true}
-                        enableKeyboardNavigation={true}
-                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                        className='text-[13px]'
-                        getRowClassName={getRowClassName}
-                        onRowClick={row => setSelectedMember(row)}
-                        getContextMenuItems={getContextMenuItems}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Pagination footer — uses the shared component for consistency */}
-              <div className='shrink-0'>
-                <TablePaginationFooter
-                  currentPage={page}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalItems={total}
-                  onPageChange={onPageChange}
-                  onPageSizeChange={onPageSizeChange}
+          <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+            {/* Scrollable content area */}
+            <div className='flex-1 min-h-0 overflow-auto'>
+              {rows.length === 0 ? (
+                <EmptyState
+                  icon={emptyStateIcon}
+                  heading={emptyStateHeading}
+                  description={emptyStateDescription}
+                  action={emptyStatePrimaryAction}
+                  secondaryAction={emptyStateSecondaryAction}
                 />
-              </div>
+              ) : (
+                <>
+                  {/* Mobile card list (virtualized) */}
+                  <MobileCardList
+                    rows={rows}
+                    mode={mode}
+                    selectedMemberId={selectedMember?.id ?? null}
+                    onTap={setSelectedMember}
+                  />
+
+                  {/* Desktop table */}
+                  <div className='hidden md:block h-full'>
+                    <UnifiedTable
+                      data={rows}
+                      columns={columns}
+                      isLoading={false}
+                      emptyState={
+                        <EmptyState
+                          icon={emptyStateIcon}
+                          heading={emptyStateHeading}
+                          description={emptyStateDescription}
+                          action={emptyStatePrimaryAction}
+                          secondaryAction={emptyStateSecondaryAction}
+                        />
+                      }
+                      getRowId={row => row.id}
+                      enableVirtualization={true}
+                      enableKeyboardNavigation={true}
+                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                      className='text-[13px]'
+                      getRowClassName={getRowClassName}
+                      onRowClick={row => setSelectedMember(row)}
+                      getContextMenuItems={getContextMenuItems}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className='sr-only' aria-live='polite' aria-atomic='true'>
-              {total > 0 &&
-                `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
-              {selectedCount > 0 &&
-                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+            {/* Pagination footer — uses the shared component for consistency */}
+            <div className='shrink-0'>
+              <TablePaginationFooter
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={total}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+              />
             </div>
           </div>
 
-          {/* Right sidebar - sibling in flex-row */}
-          <AudienceMemberSidebar
-            member={selectedMember}
-            isOpen={Boolean(selectedMember)}
-            onClose={() => setSelectedMember(null)}
-            contextMenuItems={
-              selectedMember
-                ? convertToCommonDropdownItems(
-                    getContextMenuItems(selectedMember)
-                  )
-                : undefined
-            }
-          />
+          <div className='sr-only' aria-live='polite' aria-atomic='true'>
+            {total > 0 &&
+              `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
+            {selectedCount > 0 &&
+              `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+          </div>
         </div>
       </AudienceTableProvider>
     );

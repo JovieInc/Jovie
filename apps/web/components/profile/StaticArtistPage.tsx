@@ -1,6 +1,10 @@
 import { Suspense } from 'react';
+import { AboutSection } from '@/components/profile/AboutSection';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
+import {
+  ArtistNotificationsCTA,
+  TwoStepNotificationsCTA,
+} from '@/components/profile/artist-notifications-cta';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
@@ -8,6 +12,7 @@ import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionCo
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
@@ -79,6 +84,14 @@ interface StaticArtistPageProps {
   readonly primaryAction?: PrimaryAction;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
+  /** Available download sizes for profile photo */
+  readonly photoDownloadSizes?: AvatarSize[];
+  /** Whether profile photo downloads are allowed */
+  readonly allowPhotoDownloads?: boolean;
+  /** Whether to show the two-step notification subscribe variant */
+  readonly subscribeTwoStep?: boolean;
+  /** Artist genres for the about section */
+  readonly genres?: string[] | null;
 }
 
 /**
@@ -127,14 +140,27 @@ function getMergedDSPs(
   return Array.from(byKey.values());
 }
 
-function renderContent(
-  mode: string,
-  artist: Artist,
-  socialLinks: LegacySocialLink[],
-  mergedDSPs: AvailableDSP[],
-  primaryAction: PrimaryAction,
-  enableDynamicEngagement: boolean
-) {
+interface RenderContentOptions {
+  readonly mode: string;
+  readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
+  readonly mergedDSPs: AvailableDSP[];
+  readonly primaryAction: PrimaryAction;
+  readonly enableDynamicEngagement: boolean;
+  readonly subscribeTwoStep: boolean;
+  readonly genres?: string[] | null;
+}
+
+function renderContent({
+  mode,
+  artist,
+  socialLinks,
+  mergedDSPs,
+  primaryAction,
+  enableDynamicEngagement,
+  subscribeTwoStep,
+  genres,
+}: RenderContentOptions) {
   switch (mode) {
     case 'listen':
       return (
@@ -182,9 +208,16 @@ function renderContent(
       // Subscribe mode - show notification subscription form directly
       return (
         <div className='space-y-4 py-4 sm:py-5'>
-          <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+          {subscribeTwoStep ? (
+            <TwoStepNotificationsCTA artist={artist} />
+          ) : (
+            <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+          )}
         </div>
       );
+
+    case 'about':
+      return <AboutSection artist={artist} genres={genres} />;
 
     default: // 'profile' mode
       // spotifyPreferred is now read client-side in ProfilePrimaryCTA
@@ -211,6 +244,10 @@ export function StaticArtistPage({
   primaryAction = 'subscribe',
   enableDynamicEngagement = false,
   latestRelease,
+  photoDownloadSizes = [],
+  allowPhotoDownloads = false,
+  subscribeTwoStep = false,
+  genres,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -227,6 +264,8 @@ export function StaticArtistPage({
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}
+        photoDownloadSizes={photoDownloadSizes}
+        allowPhotoDownloads={allowPhotoDownloads}
       >
         <div>
           <Suspense>
@@ -251,18 +290,21 @@ export function StaticArtistPage({
                   enableDynamicEngagement={enableDynamicEngagement}
                   autoOpenCapture={resolvedAutoOpenCapture}
                   showCapture
+                  subscribeTwoStep={subscribeTwoStep}
                 />
               </div>
             </div>
           ) : (
-            renderContent(
+            renderContent({
               mode,
               artist,
               socialLinks,
               mergedDSPs,
               primaryAction,
-              enableDynamicEngagement
-            )
+              enableDynamicEngagement,
+              subscribeTwoStep,
+              genres,
+            })
           )}
         </div>
       </ArtistPageShell>

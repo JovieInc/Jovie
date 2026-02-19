@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
           description: `Someone${locationLabel} just subscribed.`,
           icon: row.channel === 'sms' ? '📱' : '📩',
           timestamp: toISOStringSafe(row.createdAt),
-          href: APP_ROUTES.CONTACTS,
+          href: APP_ROUTES.SETTINGS_CONTACTS,
         };
       });
 

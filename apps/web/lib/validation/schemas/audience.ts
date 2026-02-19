@@ -85,6 +85,16 @@ export const visitSchema = z.object({
   deviceType: deviceTypeSchema.optional(),
   /** HMAC-SHA256 signed tracking token for request authentication */
   trackingToken: z.string().optional(),
+  /** UTM campaign tracking parameters from landing page URL */
+  utmParams: z
+    .object({
+      source: z.string().max(200).optional(),
+      medium: z.string().max(200).optional(),
+      campaign: z.string().max(200).optional(),
+      content: z.string().max(200).optional(),
+      term: z.string().max(200).optional(),
+    })
+    .optional(),
 });
 
 /**

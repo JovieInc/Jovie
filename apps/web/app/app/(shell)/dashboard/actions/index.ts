@@ -19,7 +19,11 @@
  */
 
 // Creator profile management server actions
-export { publishProfileBasics, updateCreatorProfile } from './creator-profile';
+export {
+  publishProfileBasics,
+  updateAllowProfilePhotoDownloads,
+  updateCreatorProfile,
+} from './creator-profile';
 
 // Core dashboard data fetching
 export {

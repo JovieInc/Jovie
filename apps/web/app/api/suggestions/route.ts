@@ -17,11 +17,12 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, desc, eq, isNotNull, or } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { chatConversations } from '@/lib/db/schema/chat';
 import { discogReleases } from '@/lib/db/schema/content';
 import {
   dspArtistMatches,
@@ -39,7 +40,7 @@ import { captureError } from '@/lib/error-tracking';
 
 export interface ProfileSuggestion {
   id: string;
-  type: 'dsp_match' | 'social_link' | 'avatar';
+  type: 'dsp_match' | 'social_link' | 'avatar' | 'profile_ready';
   platform: string;
   platformLabel: string;
   title: string;
@@ -53,6 +54,8 @@ export interface SuggestionsStarterContext {
   latestReleaseTitle: string | null;
   pendingArtistMatches: number;
   pendingLinkSuggestions: number;
+  isRecentlyOnboarded: boolean;
+  conversationCount: number;
 }
 
 // ============================================================================
@@ -83,6 +86,7 @@ export async function GET(request: Request) {
         clerkId: users.clerkId,
         avatarUrl: creatorProfiles.avatarUrl,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -104,82 +108,93 @@ export async function GET(request: Request) {
     }
 
     // Fetch all suggestion types in parallel
-    const [dspMatches, socialSuggestions, avatarCandidates, latestRelease] =
-      await Promise.all([
-        // DSP matches with status 'suggested'
-        db
-          .select({
-            id: dspArtistMatches.id,
-            providerId: dspArtistMatches.providerId,
-            externalArtistName: dspArtistMatches.externalArtistName,
-            externalArtistUrl: dspArtistMatches.externalArtistUrl,
-            externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
-            confidenceScore: dspArtistMatches.confidenceScore,
-          })
-          .from(dspArtistMatches)
-          .where(
-            and(
-              eq(dspArtistMatches.creatorProfileId, profileId),
-              eq(dspArtistMatches.status, 'suggested')
+    const [
+      dspMatches,
+      socialSuggestions,
+      avatarCandidates,
+      latestRelease,
+      conversationCountResult,
+    ] = await Promise.all([
+      // DSP matches with status 'suggested'
+      db
+        .select({
+          id: dspArtistMatches.id,
+          providerId: dspArtistMatches.providerId,
+          externalArtistName: dspArtistMatches.externalArtistName,
+          externalArtistUrl: dspArtistMatches.externalArtistUrl,
+          externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
+          confidenceScore: dspArtistMatches.confidenceScore,
+        })
+        .from(dspArtistMatches)
+        .where(
+          and(
+            eq(dspArtistMatches.creatorProfileId, profileId),
+            eq(dspArtistMatches.status, 'suggested')
+          )
+        )
+        .orderBy(desc(dspArtistMatches.confidenceScore))
+        .limit(20),
+
+      // Social link suggestions with status 'pending'
+      db
+        .select({
+          id: socialLinkSuggestions.id,
+          platform: socialLinkSuggestions.platform,
+          url: socialLinkSuggestions.url,
+          username: socialLinkSuggestions.username,
+          sourceProvider: socialLinkSuggestions.sourceProvider,
+          confidenceScore: socialLinkSuggestions.confidenceScore,
+        })
+        .from(socialLinkSuggestions)
+        .where(
+          and(
+            eq(socialLinkSuggestions.creatorProfileId, profileId),
+            eq(socialLinkSuggestions.status, 'pending')
+          )
+        )
+        .orderBy(desc(socialLinkSuggestions.confidenceScore))
+        .limit(20),
+
+      // Avatar candidates (only if avatar is not locked by user)
+      profile.avatarLockedByUser
+        ? Promise.resolve([])
+        : db
+            .select({
+              id: creatorAvatarCandidates.id,
+              sourcePlatform: creatorAvatarCandidates.sourcePlatform,
+              avatarUrl: creatorAvatarCandidates.avatarUrl,
+              confidenceScore: creatorAvatarCandidates.confidenceScore,
+            })
+            .from(creatorAvatarCandidates)
+            .where(eq(creatorAvatarCandidates.creatorProfileId, profileId))
+            .orderBy(desc(creatorAvatarCandidates.confidenceScore))
+            .limit(10),
+
+      // Latest release for contextual starter prompts
+      db
+        .select({ title: discogReleases.title })
+        .from(discogReleases)
+        .where(
+          and(
+            eq(discogReleases.creatorProfileId, profileId),
+            or(
+              isNotNull(discogReleases.releaseDate),
+              isNotNull(discogReleases.createdAt)
             )
           )
-          .orderBy(desc(dspArtistMatches.confidenceScore))
-          .limit(20),
+        )
+        .orderBy(
+          desc(discogReleases.releaseDate),
+          desc(discogReleases.createdAt)
+        )
+        .limit(1),
 
-        // Social link suggestions with status 'pending'
-        db
-          .select({
-            id: socialLinkSuggestions.id,
-            platform: socialLinkSuggestions.platform,
-            url: socialLinkSuggestions.url,
-            username: socialLinkSuggestions.username,
-            sourceProvider: socialLinkSuggestions.sourceProvider,
-            confidenceScore: socialLinkSuggestions.confidenceScore,
-          })
-          .from(socialLinkSuggestions)
-          .where(
-            and(
-              eq(socialLinkSuggestions.creatorProfileId, profileId),
-              eq(socialLinkSuggestions.status, 'pending')
-            )
-          )
-          .orderBy(desc(socialLinkSuggestions.confidenceScore))
-          .limit(20),
-
-        // Avatar candidates (only if avatar is not locked by user)
-        profile.avatarLockedByUser
-          ? Promise.resolve([])
-          : db
-              .select({
-                id: creatorAvatarCandidates.id,
-                sourcePlatform: creatorAvatarCandidates.sourcePlatform,
-                avatarUrl: creatorAvatarCandidates.avatarUrl,
-                confidenceScore: creatorAvatarCandidates.confidenceScore,
-              })
-              .from(creatorAvatarCandidates)
-              .where(eq(creatorAvatarCandidates.creatorProfileId, profileId))
-              .orderBy(desc(creatorAvatarCandidates.confidenceScore))
-              .limit(10),
-
-        // Latest release for contextual starter prompts
-        db
-          .select({ title: discogReleases.title })
-          .from(discogReleases)
-          .where(
-            and(
-              eq(discogReleases.creatorProfileId, profileId),
-              or(
-                isNotNull(discogReleases.releaseDate),
-                isNotNull(discogReleases.createdAt)
-              )
-            )
-          )
-          .orderBy(
-            desc(discogReleases.releaseDate),
-            desc(discogReleases.createdAt)
-          )
-          .limit(1),
-      ]);
+      // Count chat conversations for this profile
+      db
+        .select({ value: count() })
+        .from(chatConversations)
+        .where(eq(chatConversations.creatorProfileId, profileId)),
+    ]);
 
     // Filter out avatar candidates that match the current profile avatar
     const filteredAvatars = avatarCandidates.filter(
@@ -230,10 +245,19 @@ export async function GET(request: Request) {
       })),
     ];
 
+    const onboardingDate = profile.onboardingCompletedAt;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const isRecentlyOnboarded = onboardingDate
+      ? onboardingDate > sevenDaysAgo
+      : false;
+    const conversationCountValue = conversationCountResult[0]?.value ?? 0;
+
     const starterContext: SuggestionsStarterContext = {
       latestReleaseTitle: latestRelease[0]?.title ?? null,
       pendingArtistMatches: dspMatches.length,
       pendingLinkSuggestions: socialSuggestions.length,
+      isRecentlyOnboarded,
+      conversationCount: conversationCountValue,
     };
 
     return NextResponse.json({ success: true, suggestions, starterContext });

@@ -3,12 +3,14 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border border-transparent font-semibold transition-colors',
+  'inline-flex items-center rounded-[var(--radius-xs)] border font-[510] transition-colors',
   {
     variants: {
       variant: {
-        primary: 'bg-btn-primary text-btn-primary-foreground',
-        secondary: 'bg-surface-1 text-primary-token',
+        primary:
+          'bg-btn-primary text-btn-primary-foreground border-transparent',
+        secondary:
+          'bg-[var(--color-badge-bg)] text-[var(--color-badge-text)] border-[var(--color-badge-border)]',
         success:
           'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-200',
         warning:
@@ -16,13 +18,13 @@ const badgeVariants = cva(
         error: 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-200',
       },
       size: {
-        sm: 'px-2 py-0.5 text-xs',
-        md: 'px-2.5 py-0.5 text-sm',
-        lg: 'px-3 py-1 text-base',
+        sm: 'px-2 py-0 text-[10px] leading-[20px]',
+        md: 'px-2 py-0 text-[11px] leading-[20px]',
+        lg: 'px-3 py-0.5 text-xs',
       },
     },
     defaultVariants: {
-      variant: 'primary',
+      variant: 'secondary',
       size: 'md',
     },
   }

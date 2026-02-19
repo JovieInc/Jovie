@@ -57,10 +57,9 @@ export function ArtistCard({
       };
 
   const avatarWhileHover: MotionProps['whileHover'] = prefersReducedMotion
-    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+    ? { boxShadow: 'var(--shadow-sm)' }
     : {
-        boxShadow:
-          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        boxShadow: 'var(--shadow-lg)',
       };
 
   const avatarTransition: MotionProps['transition'] = prefersReducedMotion

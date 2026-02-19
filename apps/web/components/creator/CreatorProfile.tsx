@@ -1,9 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Card, CardContent, CardHeader } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { Avatar } from '@/components/molecules/Avatar';
-import { Card, CardContent, CardHeader } from '@/components/molecules/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkeleton';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import { useCreator } from '@/hooks/useCreator';
@@ -28,7 +27,7 @@ export function CreatorProfile({ username }: Readonly<{ username: string }>) {
 
   if (error || !creator) {
     return (
-      <div className='rounded-lg border border-red-200 bg-red-50 p-4 text-red-800'>
+      <div className='rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-destructive'>
         <p>Failed to load creator profile. Please try again later.</p>
       </div>
     );

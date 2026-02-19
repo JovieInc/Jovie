@@ -1,7 +1,8 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createMutationFn, fetchWithTimeout } from './fetch';
+import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 export interface PixelSettingsInput {
@@ -44,10 +45,15 @@ const updatePixelSettings = createMutationFn<
  * });
  */
 export function usePixelSettingsMutation() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: updatePixelSettings,
     onSuccess: () => {
       handleMutationSuccess('Pixels saved');
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pixels.all,
+      });
     },
     onError: error => {
       handleMutationError(error, 'Failed to save pixels');
@@ -72,10 +78,15 @@ async function deletePixelSettings(): Promise<PixelSettingsResponse> {
  * clearPixels();
  */
 export function usePixelSettingsDeleteMutation() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: deletePixelSettings,
     onSuccess: () => {
       handleMutationSuccess('Pixel settings cleared');
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.pixels.all,
+      });
     },
     onError: error => {
       handleMutationError(error, 'Failed to clear pixel settings');

@@ -83,6 +83,8 @@ export const Sidebar = React.forwardRef<
                 'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
                 'group-data-[collapsible=offcanvas]:w-0',
                 'group-data-[side=right]:rotate-180',
+                // Prevent pointer events from leaking into content area during width transition
+                'group-data-[collapsible=icon]:pointer-events-none',
                 variant === 'floating' &&
                   'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
                 variant === 'inset' &&
@@ -95,7 +97,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

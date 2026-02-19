@@ -2,12 +2,15 @@ import type React from 'react';
 import type {
   NotificationChannel,
   NotificationContactValues,
+  NotificationContentPreferences,
   NotificationSubscriptionState,
 } from '@/types/notifications';
 import type { ProfileNotificationsState } from '../hooks/useProfileNotificationsController';
 
 export interface ProfileNotificationsMenuProps {
+  readonly artistId: string;
   readonly channelBusy: Partial<Record<NotificationChannel, boolean>>;
+  readonly contentPreferences?: NotificationContentPreferences;
   readonly hasActiveSubscriptions: boolean;
   readonly notificationsState: ProfileNotificationsState;
   readonly onAddChannel: (channel?: NotificationChannel) => void;

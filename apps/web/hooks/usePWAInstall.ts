@@ -22,7 +22,14 @@ const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 let _earlyPromptEvent: BeforeInstallPromptEvent | null = null;
 
 if (typeof window !== 'undefined') {
+  // Register the service worker early -- Chrome requires a registered SW with
+  // a fetch handler before it will fire beforeinstallprompt.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
   window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
     _earlyPromptEvent = e as BeforeInstallPromptEvent;
   });
 }
@@ -111,7 +118,16 @@ export function usePWAInstall() {
 
     try {
       await prompt.prompt();
-      await prompt.userChoice;
+      const { outcome } = await prompt.userChoice;
+      // If user declined the native prompt, persist dismissal so the banner
+      // doesn't reappear on the next page load.
+      if (outcome === 'dismissed') {
+        try {
+          localStorage.setItem(DISMISSED_KEY, String(Date.now()));
+        } catch {
+          // ignore
+        }
+      }
     } catch {
       // prompt() can throw if the event was already consumed or invalidated
     } finally {

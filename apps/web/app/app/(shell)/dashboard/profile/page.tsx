@@ -1,9 +1,12 @@
+import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
-import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
+import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData, getProfileSocialLinks } from '../actions';
+import { ProfilePageChat } from './ProfilePageChat';
+import { ProfilePreviewOpener } from './ProfilePreviewOpener';
 
 export const runtime = 'nodejs';
 
@@ -30,11 +33,16 @@ export default async function ProfilePage() {
       ? await getProfileSocialLinks(profileId)
       : [];
 
-    // Pass server-fetched data to lazy-loaded client component
-    return <LazyEnhancedDashboardLinks initialLinks={initialLinks} />;
+    return (
+      <>
+        <ProfilePreviewOpener />
+        <PreviewDataHydrator initialLinks={initialLinks} />
+        <ProfilePageChat />
+      </>
+    );
   } catch (error) {
     throwIfRedirect(error);
-    console.error('Error loading profile:', error);
+    Sentry.captureException(error);
 
     return (
       <PageErrorState message='Failed to load profile data. Please refresh the page.' />

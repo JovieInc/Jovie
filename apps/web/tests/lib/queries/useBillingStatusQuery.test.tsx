@@ -26,6 +26,10 @@ describe('useBillingStatusQuery', () => {
         queries: {
           retry: false,
           gcTime: 0,
+          // Ensure any query-level retries resolve immediately in tests
+          // (billingStatusQueryOptions has its own retry fn that overrides
+          // retry:false, so we set retryDelay:0 to avoid 1s exponential delay)
+          retryDelay: 0,
         },
       },
     });
@@ -107,7 +111,9 @@ describe('useBillingStatusQuery', () => {
     });
 
     it('handles fetch error', async () => {
-      mockFetch.mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle the built-in retry in
+      // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
@@ -250,7 +256,9 @@ describe('useBillingStatusQuery', () => {
     });
 
     it('handles error state', async () => {
-      mockFetch.mockResolvedValueOnce({
+      // Use mockResolvedValue (not Once) to handle the built-in retry in
+      // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',

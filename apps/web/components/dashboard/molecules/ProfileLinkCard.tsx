@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { BASE_URL } from '@/constants/domains';
 import { DashboardCard } from '../atoms/DashboardCard';
 

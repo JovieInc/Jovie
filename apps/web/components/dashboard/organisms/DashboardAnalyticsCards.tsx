@@ -28,13 +28,13 @@ const numberFormatter = new Intl.NumberFormat();
 
 function SkeletonCards() {
   const skeletonMetric = (
-    <div className='space-y-2 py-1 animate-pulse'>
+    <div className='space-y-2 py-1'>
       <div className='flex items-center gap-2'>
-        <div className='h-7 w-7 rounded-lg bg-surface-2' />
-        <div className='h-3 w-20 rounded bg-surface-2' />
+        <div className='h-7 w-7 rounded-lg skeleton' />
+        <div className='h-3 w-20 rounded skeleton' />
       </div>
-      <div className='h-8 w-16 rounded bg-surface-2' />
-      <div className='h-3 w-24 rounded bg-surface-2' />
+      <div className='h-8 w-16 rounded skeleton' />
+      <div className='h-3 w-24 rounded skeleton' />
     </div>
   );
   return (

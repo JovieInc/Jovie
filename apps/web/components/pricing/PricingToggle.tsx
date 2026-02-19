@@ -11,45 +11,54 @@ const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
 export function PricingToggle({ onChange }: PricingToggleProps) {
   const [isYearly, setIsYearly] = useState(false);
 
-  const handleToggle = () => {
-    const newValue = !isYearly;
-    setIsYearly(newValue);
-    onChange(newValue);
+  const handleToggle = (yearly: boolean) => {
+    if (yearly !== isYearly) {
+      setIsYearly(yearly);
+      onChange(yearly);
+    }
   };
 
   return (
-    <div className='inline-flex items-center rounded-lg bg-neutral-100 dark:bg-neutral-800 p-1'>
-      <button
-        type='button'
-        onClick={() => {
-          if (isYearly) handleToggle();
-        }}
-        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
+    <div
+      role='radiogroup'
+      aria-label='Billing interval'
+      className='inline-flex items-center rounded-lg bg-surface-2 p-1'
+    >
+      <label
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 ${
           isYearly
-            ? 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
-            : 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
+            ? 'text-tertiary-token hover:text-secondary-token'
+            : 'bg-surface-1 text-primary-token shadow-sm'
         }`}
         style={FONT_SYNTHESIS_STYLE}
       >
+        <input
+          type='radio'
+          name='billing-interval'
+          checked={!isYearly}
+          onChange={() => handleToggle(false)}
+          className='sr-only'
+        />{' '}
         Monthly $5
-      </button>
-      <button
-        type='button'
-        onClick={() => {
-          if (!isYearly) handleToggle();
-        }}
-        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 ${
+      </label>
+      <label
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1 ${
           isYearly
-            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
-            : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
+            ? 'bg-surface-1 text-primary-token shadow-sm'
+            : 'text-tertiary-token hover:text-secondary-token'
         }`}
         style={FONT_SYNTHESIS_STYLE}
       >
+        <input
+          type='radio'
+          name='billing-interval'
+          checked={isYearly}
+          onChange={() => handleToggle(true)}
+          className='sr-only'
+        />
         Yearly $50{' '}
-        <span className='text-xs text-emerald-600 dark:text-emerald-400 font-medium'>
-          Save $10
-        </span>
-      </button>
+        <span className='text-xs text-success font-medium'>Save $10</span>
+      </label>
     </div>
   );
 }

@@ -44,7 +44,8 @@ type ErrorContext = Record<string, unknown>;
  */
 function getEnvironment(): string {
   if (typeof window !== 'undefined') {
-    const host = globalThis.location.hostname;
+    const host = globalThis.location?.hostname;
+    if (!host) return nodeEnv || 'development';
     if (host === 'localhost' || host === '127.0.0.1') return 'development';
     if (host.includes('preview') || host.includes('vercel.app'))
       return 'preview';
@@ -61,12 +62,20 @@ function logToConsole(
   message: string,
   data: Record<string, unknown>
 ): void {
-  const consoleMessage = `[${severity.toUpperCase()}] ${message}`;
+  // Stringify data inline because Next.js RSC console forwarding
+  // serialises object arguments as `{}`, losing all context.
+  let serialised: string;
+  try {
+    serialised = JSON.stringify(data, null, 2);
+  } catch {
+    serialised = '[unserializable data]';
+  }
+  const consoleMessage = `[${severity.toUpperCase()}] ${message} ${serialised}`;
 
   if (severity === 'warning') {
-    console.warn(consoleMessage, data);
+    console.warn(consoleMessage);
   } else {
-    console.error(consoleMessage, data);
+    console.error(consoleMessage);
   }
 }
 

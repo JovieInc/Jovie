@@ -1,11 +1,12 @@
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
+import { forwardEvent } from '@/lib/tracking/forwarding';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -131,22 +132,38 @@ export async function POST(request: NextRequest) {
       utmContent: eventData?.utm_content,
     };
 
-    // Insert pixel event
-    await db.insert(pixelEvents).values({
-      profileId,
-      sessionId,
-      eventType,
-      eventData: enrichedEventData,
-      consentGiven: consent,
-      clientIp: clientIP, // Raw IP for ad platform forwarding (Facebook CAPI, TikTok Events API)
-      ipHash, // Hashed IP for analytics
-      userAgent,
-      forwardingStatus: {},
-      forwardAt: new Date(),
-    });
+    // Insert pixel event and get it back for immediate forwarding
+    const [insertedEvent] = await db
+      .insert(pixelEvents)
+      .values({
+        profileId,
+        sessionId,
+        eventType,
+        eventData: enrichedEventData,
+        consentGiven: consent,
+        clientIp: clientIP, // Raw IP for ad platform forwarding (Facebook CAPI, TikTok Events API)
+        ipHash, // Hashed IP for analytics
+        userAgent,
+        forwardingStatus: {},
+        forwardAt: new Date(),
+      })
+      .returning();
 
-    // Return success
-    // The forwarding happens asynchronously via cron job
+    // Forward to ad platforms after sending response (non-blocking).
+    // On failure, the event stays in DB for retry by the cron job.
+    if (insertedEvent) {
+      after(async () => {
+        try {
+          await forwardEvent(insertedEvent);
+        } catch (error) {
+          logger.error('[Pixel] After-response forwarding failed', {
+            eventId: insertedEvent.id,
+            error,
+          });
+        }
+      });
+    }
+
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('[Pixel] Error recording event', error);

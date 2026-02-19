@@ -14,7 +14,7 @@ export function NewUpgradeTeaser() {
             {/* Badge */}
             <div className='flex justify-center mb-6'>
               <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-secondary-token bg-surface-2 border border-subtle rounded-full'>
-                Standard
+                Pro
               </span>
             </div>
 
@@ -26,13 +26,13 @@ export function NewUpgradeTeaser() {
             {/* Pricing */}
             <div className='mt-4 flex items-baseline justify-center gap-2'>
               <span className='text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token'>
-                $5
+                $39
               </span>
               <span className='text-sm text-secondary-token'>/month</span>
             </div>
 
             <p className='mt-2 text-center text-sm text-secondary-token'>
-              or $50/year{' '}
+              or $348/year{' '}
               <span className='text-emerald-600 dark:text-emerald-400 font-medium'>
                 — save 2 months
               </span>

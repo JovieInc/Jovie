@@ -13,6 +13,14 @@ export const PROVIDER_CONFIG: Record<
   amazon_music: { label: 'Amazon Music', accent: '#146EB4' },
   bandcamp: { label: 'Bandcamp', accent: '#629AA0' },
   beatport: { label: 'Beatport', accent: '#A3E422' },
+  pandora: { label: 'Pandora', accent: '#224099' },
+  napster: { label: 'Napster', accent: '#2259FF' },
+  audiomack: { label: 'Audiomack', accent: '#FFA200' },
+  qobuz: { label: 'Qobuz', accent: '#0070EF' },
+  anghami: { label: 'Anghami', accent: '#F300F9' },
+  boomplay: { label: 'Boomplay', accent: '#0052FF' },
+  iheartradio: { label: 'iHeartRadio', accent: '#C6002B' },
+  tiktok: { label: 'TikTok', accent: '#000000' },
 };
 
 export const PRIMARY_PROVIDER_KEYS: ProviderKey[] = [

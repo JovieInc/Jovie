@@ -109,7 +109,6 @@ describe('DashboardNav', () => {
     const { getByRole } = renderDashboardNav();
 
     expect(getByRole('link', { name: 'Profile' })).toBeDefined();
-    expect(getByRole('link', { name: 'Contacts' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
@@ -146,11 +145,11 @@ describe('DashboardNav', () => {
   });
 
   it('renders with different pathname', () => {
-    mockUsePathname.mockReturnValueOnce('/app/contacts');
+    mockUsePathname.mockReturnValueOnce('/app/audience');
 
     const { getByRole } = renderDashboardNav();
 
-    const contactsLink = getByRole('link', { name: 'Contacts' });
-    expect(contactsLink.getAttribute('aria-current')).toBe('page');
+    const audienceLink = getByRole('link', { name: 'Audience' });
+    expect(audienceLink.getAttribute('aria-current')).toBe('page');
   });
 });

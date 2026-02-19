@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import Image from 'next/image';
 import { QRCode } from '@/components/molecules/QRCode';
@@ -63,16 +64,10 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
 
   // Use validated env for fallback URL (includes protocol)
   const base = publicEnv.NEXT_PUBLIC_APP_URL;
-  if (host) {
-    console.warn(
-      '[HUD] Invalid host header detected:',
-      host,
-      '- using fallback:',
-      base
-    );
-  } else {
-    console.warn('[HUD] Missing host header, using fallback:', base);
-  }
+  Sentry.captureMessage('HUD: host header invalid or missing, using fallback', {
+    level: 'warning',
+    extra: { host, fallback: base },
+  });
   const url = new URL('/hud', base);
   if (kioskToken) {
     url.searchParams.set('kiosk', kioskToken);

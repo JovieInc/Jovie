@@ -165,6 +165,12 @@ export function MethodSelector({
         <h1 className={FORM_LAYOUT.title}>
           {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
         </h1>
+        {mode === 'signup' && (
+          <p className={FORM_LAYOUT.hint}>
+            Your link-in-bio built for music. Smart links, fan capture, and
+            audience growth — all in one page.
+          </p>
+        )}
       </div>
 
       <div className={FORM_LAYOUT.errorContainer}>
@@ -205,9 +211,9 @@ export function MethodSelector({
       <p className={FORM_LAYOUT.footerHint}>
         {mode === 'signin' ? (
           <>
-            Don&apos;t have access?{' '}
-            <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
-              Join the waitlist
+            Don&apos;t have an account?{' '}
+            <Link href='/signup' className={FOOTER_LINK_CLASSES}>
+              Create an account
             </Link>
           </>
         ) : (

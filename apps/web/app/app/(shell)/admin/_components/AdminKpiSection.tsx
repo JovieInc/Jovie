@@ -18,7 +18,7 @@ export async function AdminKpiSection() {
         mercuryAvailability={metrics.mercuryAvailability}
       />
 
-      <section id='users' className='space-y-4'>
+      <section id='users' className='space-y-4' data-testid='admin-kpi-section'>
         <KpiCards
           mrrUsd={metrics.mrrUsd}
           balanceUsd={metrics.balanceUsd}

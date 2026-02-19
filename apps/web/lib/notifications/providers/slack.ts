@@ -182,6 +182,60 @@ export async function notifySlackSignup(
 }
 
 /**
+ * Send a Growth plan early access request notification to Slack.
+ *
+ * @param name - The name of the user requesting access
+ * @param email - The email of the user
+ * @param currentPlan - The user's current plan
+ * @param reason - What feature they're most excited about
+ */
+export async function notifySlackGrowthRequest(
+  name: string,
+  email: string,
+  currentPlan: string,
+  reason: string
+): Promise<SlackNotificationResult> {
+  const text = `🚀 ${name} requested early access to the Growth plan!`;
+  const message: SlackMessage = {
+    text,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `🚀 *${name}* requested early access to the *Growth* plan!`,
+        },
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `📧 ${email}  •  Current plan: *${currentPlan}*`,
+          },
+        ],
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `> ${reason}`,
+        },
+      },
+    ],
+  };
+
+  const result = await sendSlackMessage(message);
+  if (result.status === 'sent') {
+    logger.info('[slack] Growth access request notification sent', {
+      name,
+      email,
+    });
+  }
+  return result;
+}
+
+/**
  * Send a waitlist notification to Slack.
  *
  * @param name - The name of the user who joined the waitlist

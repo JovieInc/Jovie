@@ -12,13 +12,9 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
-import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
-import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDspMatchesForProfile } from '@/lib/dsp-enrichment/queries.server';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import { captureError } from '@/lib/error-tracking';
 
@@ -46,84 +42,40 @@ export async function GET(request: Request) {
       );
     }
 
-    // Verify user owns this profile (join with users to check clerkId)
-    const [profile] = await db
-      .select({ id: creatorProfiles.id, clerkId: users.clerkId })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
-      .limit(1);
+    const matches = await getDspMatchesForProfile(
+      profileId,
+      userId,
+      statusFilter ?? undefined
+    );
 
-    if (!profile) {
+    return NextResponse.json({
+      success: true,
+      matches,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Internal server error';
+
+    // Return 404/403 for known auth/ownership errors
+    if (message === 'Profile not found') {
       return NextResponse.json(
-        { success: false, error: 'Profile not found' },
+        { success: false, error: message },
         { status: 404 }
       );
     }
-
-    if (profile.clerkId !== userId) {
+    if (message.includes('permission')) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'You do not have permission to view this profile',
-        },
+        { success: false, error: message },
         { status: 403 }
       );
     }
 
-    // Build query conditions
-    const conditions = [eq(dspArtistMatches.creatorProfileId, profileId)];
-
-    if (statusFilter) {
-      conditions.push(eq(dspArtistMatches.status, statusFilter));
-    }
-
-    // Fetch matches (capped to prevent unbounded result sets)
-    const MAX_MATCHES = 200;
-    const matches = await db
-      .select({
-        id: dspArtistMatches.id,
-        providerId: dspArtistMatches.providerId,
-        externalArtistId: dspArtistMatches.externalArtistId,
-        externalArtistName: dspArtistMatches.externalArtistName,
-        externalArtistUrl: dspArtistMatches.externalArtistUrl,
-        externalArtistImageUrl: dspArtistMatches.externalArtistImageUrl,
-        confidenceScore: dspArtistMatches.confidenceScore,
-        confidenceBreakdown: dspArtistMatches.confidenceBreakdown,
-        matchingIsrcCount: dspArtistMatches.matchingIsrcCount,
-        matchingUpcCount: dspArtistMatches.matchingUpcCount,
-        totalTracksChecked: dspArtistMatches.totalTracksChecked,
-        status: dspArtistMatches.status,
-        createdAt: dspArtistMatches.createdAt,
-        updatedAt: dspArtistMatches.updatedAt,
-      })
-      .from(dspArtistMatches)
-      .where(and(...conditions))
-      .orderBy(dspArtistMatches.createdAt)
-      .limit(MAX_MATCHES);
-
-    // Transform decimal to number for JSON response
-    const transformedMatches = matches.map(match => ({
-      ...match,
-      confidenceScore: match.confidenceScore
-        ? Number.parseFloat(match.confidenceScore)
-        : null,
-    }));
-
-    return NextResponse.json({
-      success: true,
-      matches: transformedMatches,
-    });
-  } catch (error) {
     await captureError('DSP Matches list failed', error, {
       route: '/api/dsp/matches',
     });
 
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Internal server error',
-      },
+      { success: false, error: message },
       { status: 500 }
     );
   }

@@ -11,10 +11,12 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
+import { AudienceHeaderBadge } from './dashboard-audience-table/AudienceHeaderBadge';
 import type {
   AudienceFilters,
   AudienceView,
@@ -36,15 +38,12 @@ const DashboardAudienceTable = dynamic(
     loading: () => (
       <div className='h-full w-full space-y-4 p-4'>
         <div className='flex items-center justify-between'>
-          <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
-          <div className='h-8 w-32 animate-pulse rounded bg-surface-1' />
+          <div className='h-8 w-48 rounded skeleton' />
+          <div className='h-8 w-32 rounded skeleton' />
         </div>
         <div className='space-y-2'>
           {DASHBOARD_AUDIENCE_LOADING_ROW_KEYS.map(key => (
-            <div
-              key={key}
-              className='h-14 animate-pulse rounded-lg bg-surface-1'
-            />
+            <div key={key} className='h-14 rounded-lg skeleton' />
           ))}
         </div>
       </div>
@@ -55,12 +54,10 @@ const DashboardAudienceTable = dynamic(
 
 export type AudienceMode = 'members' | 'subscribers';
 
-type AudienceServerRow = AudienceMember;
-
 export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
-  readonly initialRows: AudienceServerRow[];
+  readonly initialRows: AudienceMember[];
   readonly total: number;
   readonly page: number;
   readonly pageSize: number;
@@ -168,31 +165,50 @@ export function DashboardAudienceClient({
     [setSegments, setUrlParams]
   );
 
+  // Push audience segment control into the breadcrumb header bar
+  const { setHeaderBadge } = useSetHeaderActions();
+
+  const headerBadge = React.useMemo(
+    () => <AudienceHeaderBadge view={view} onViewChange={handleViewChange} />,
+    [view, handleViewChange]
+  );
+
+  React.useEffect(() => {
+    setHeaderBadge(headerBadge);
+    return () => setHeaderBadge(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge is a stable context setter
+  }, [headerBadge]);
+
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
-      <div data-testid='dashboard-audience-client'>
-        <div className='px-4 pt-4 sm:px-6 sm:pt-5'>
+      <div
+        data-testid='dashboard-audience-client'
+        className='flex h-full min-h-0 flex-col'
+      >
+        <div className='shrink-0 px-4 pt-4 sm:px-6 sm:pt-5'>
           <AudienceFunnelMetrics />
         </div>
-        <DashboardAudienceTable
-          mode={mode}
-          view={view}
-          rows={initialRows}
-          total={total}
-          page={page}
-          pageSize={pageSize}
-          sort={sort}
-          direction={direction}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onSortChange={handleSortChange}
-          onViewChange={handleViewChange}
-          onFiltersChange={handleFiltersChange}
-          profileUrl={profileUrl}
-          profileId={profileId}
-          subscriberCount={subscriberCount}
-          filters={initialFilters}
-        />
+        <div className='flex-1 min-h-0 flex flex-col'>
+          <DashboardAudienceTable
+            mode={mode}
+            view={view}
+            rows={initialRows}
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            sort={sort}
+            direction={direction}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onSortChange={handleSortChange}
+            onViewChange={handleViewChange}
+            onFiltersChange={handleFiltersChange}
+            profileUrl={profileUrl}
+            profileId={profileId}
+            subscriberCount={subscriberCount}
+            filters={initialFilters}
+          />
+        </div>
       </div>
     </QueryErrorBoundary>
   );

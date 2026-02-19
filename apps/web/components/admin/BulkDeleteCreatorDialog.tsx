@@ -34,7 +34,7 @@ export function BulkDeleteCreatorDialog({
       <AlertDialogContent className='max-w-md'>
         <AlertDialogHeader className='gap-4'>
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10'>
-            <Icon name='AlertTriangle' className='h-6 w-6 text-red-500' />
+            <Icon name='AlertTriangle' className='h-6 w-6 text-destructive' />
           </div>
 
           <div className='space-y-2 text-center'>
@@ -51,9 +51,9 @@ export function BulkDeleteCreatorDialog({
         <div className='flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2'>
           <Icon
             name='AlertCircle'
-            className='h-3.5 w-3.5 text-red-500 shrink-0'
+            className='h-3.5 w-3.5 text-destructive shrink-0'
           />
-          <p className='text-xs font-medium text-red-500'>
+          <p className='text-xs font-medium text-destructive'>
             This action cannot be undone
           </p>
         </div>

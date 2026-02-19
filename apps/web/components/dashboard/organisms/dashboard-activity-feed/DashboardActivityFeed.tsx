@@ -15,15 +15,11 @@ function ActivityLoadingSkeleton() {
   return (
     <div className='space-y-2' aria-busy='true'>
       {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
-        <div
-          key={key}
-          className='flex items-center gap-3 animate-pulse'
-          aria-hidden='true'
-        >
-          <div className='h-7 w-7 rounded-lg bg-surface-2' />
+        <div key={key} className='flex items-center gap-3' aria-hidden='true'>
+          <div className='h-7 w-7 rounded-lg skeleton' />
           <div className='flex-1 space-y-1.5'>
-            <div className='h-3 w-3/4 rounded bg-surface-2' />
-            <div className='h-2.5 w-1/3 rounded bg-surface-2' />
+            <div className='h-3 w-3/4 rounded skeleton' />
+            <div className='h-2.5 w-1/3 rounded skeleton' />
           </div>
         </div>
       ))}

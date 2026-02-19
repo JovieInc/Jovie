@@ -106,3 +106,5 @@ export * from './cache';
 export * from './errors';
 // Export application-specific hooks
 export * from './hooks';
+// Export retry utilities
+export * from './retry';

@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  type PricingOption,
   useCheckoutMutation,
   usePortalMutation,
   usePricingOptionsQuery,
@@ -98,15 +99,15 @@ export function useUserMenuActions({
 
       // Use cached data or fetch pricing options
       let pricing = pricingData;
-      if (!pricing?.pricingOptions?.length) {
+      if (!pricing?.options?.length) {
         const result = await fetchPricing();
         pricing = result.data;
       }
 
-      const monthPrice = pricing?.pricingOptions?.find(option =>
+      const monthPrice = pricing?.options?.find((option: PricingOption) =>
         MONTHLY_INTERVALS.has(option.interval)
       );
-      const selectedPrice = monthPrice ?? pricing?.pricingOptions?.[0];
+      const selectedPrice = monthPrice ?? pricing?.options?.[0];
 
       if (!selectedPrice?.priceId) {
         throw new TypeError('Pricing option missing');

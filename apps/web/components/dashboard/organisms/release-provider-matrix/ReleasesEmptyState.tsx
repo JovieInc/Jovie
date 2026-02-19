@@ -101,17 +101,17 @@ export function ReleasesEmptyState({
 
   return (
     <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-      <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-2'>
         <Icon
           name='Disc3'
-          className='h-8 w-8 text-tertiary-token'
+          className='h-6 w-6 text-tertiary-token'
           aria-hidden='true'
         />
       </div>
-      <h3 className='mt-4 text-sm font-medium text-secondary-token'>
+      <h3 className='mt-4 text-[13px] font-medium text-primary-token'>
         Connect your music
       </h3>
-      <p className='mt-1 max-w-sm text-sm text-tertiary-token'>
+      <p className='mt-1 max-w-sm text-[13px] text-tertiary-token'>
         Search for your Spotify artist profile to import your releases.
       </p>
 
@@ -133,7 +133,7 @@ export function ReleasesEmptyState({
               <div className='absolute right-3 top-1/2 -translate-y-1/2'>
                 <SocialIcon
                   platform='spotify'
-                  className='h-5 w-5 text-brand-spotify'
+                  className='h-4 w-4 text-tertiary-token'
                 />
               </div>
             </div>
@@ -141,13 +141,13 @@ export function ReleasesEmptyState({
               <button
                 type='submit'
                 disabled={isPending || !formState.manualUrl.trim()}
-                className='flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-spotify px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-spotify-hover disabled:opacity-50'
+                className='flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-white/[0.08] px-3 py-2 text-[13px] font-medium text-primary-token transition-colors hover:bg-white/[0.12] disabled:opacity-50'
               >
                 {isPending ? (
                   <>
                     <Icon
                       name='Loader2'
-                      className='h-4 w-4 animate-spin'
+                      className='h-3.5 w-3.5 animate-spin'
                       aria-hidden='true'
                     />
                     Connecting...
@@ -161,7 +161,7 @@ export function ReleasesEmptyState({
                 onClick={() => {
                   dispatch({ type: 'RESET_MANUAL_MODE' });
                 }}
-                className='rounded-lg border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-2'
+                className='rounded-md border border-white/[0.08] bg-transparent px-3 py-2 text-[13px] font-medium text-secondary-token transition-colors hover:bg-white/[0.04]'
               >
                 Back
               </button>
@@ -171,17 +171,15 @@ export function ReleasesEmptyState({
           <div className='relative'>
             <div
               className={cn(
-                'relative flex w-full items-center gap-2 rounded-xl border bg-surface-1 px-3 py-2 shadow-sm transition-colors',
-                'focus-within:ring-2 focus-within:ring-brand-spotify/50 focus-within:border-brand-spotify',
+                'relative flex w-full items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-2 transition-colors',
+                'focus-within:border-white/[0.16]',
                 isPending && 'opacity-50'
               )}
             >
-              <div className='flex h-8 w-8 items-center justify-center rounded-full bg-brand-spotify-subtle'>
-                <SocialIcon
-                  platform='spotify'
-                  className='h-4 w-4 text-brand-spotify'
-                />
-              </div>
+              <SocialIcon
+                platform='spotify'
+                className='h-4 w-4 shrink-0 text-tertiary-token'
+              />
               <Input
                 ref={inputRef}
                 type='text'
@@ -203,7 +201,7 @@ export function ReleasesEmptyState({
                 }
                 disabled={isPending}
                 autoComplete='off'
-                className='border-0 bg-transparent px-0 focus-visible:ring-0 focus-visible:ring-offset-0'
+                className='border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0 focus-visible:ring-offset-0'
                 role='combobox'
                 aria-expanded={formState.showResults && results.length > 0}
                 aria-controls='artist-search-results'
@@ -214,26 +212,26 @@ export function ReleasesEmptyState({
                 }
               />
               {(searchState === 'loading' || isPending) && (
-                <div className='h-4 w-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin' />
+                <div className='h-3.5 w-3.5 border-[1.5px] border-tertiary-token border-t-transparent rounded-full animate-spin shrink-0' />
               )}
             </div>
 
             {formState.showResults && (
-              <div className='absolute z-100 w-full mt-2 rounded-xl border border-subtle bg-surface-1 shadow-lg overflow-hidden'>
+              <div className='absolute z-100 w-full mt-1 rounded-lg border border-white/[0.06] bg-surface-2 shadow-[0px_4px_32px_rgba(8,9,10,0.6)] overflow-hidden'>
                 {searchState === 'loading' && results.length === 0 && (
-                  <div className='p-3 space-y-2'>
+                  <div className='p-2 space-y-1'>
                     {Array.from(
                       { length: 3 },
                       (_, i) => `releases-empty-loading-${i + 1}`
                     ).map(key => (
                       <div
                         key={key}
-                        className='flex items-center gap-3 animate-pulse'
+                        className='flex items-center gap-3 px-2 py-1.5 animate-pulse'
                       >
-                        <div className='w-10 h-10 rounded-full bg-surface-3' />
+                        <div className='w-8 h-8 rounded-full bg-white/[0.05]' />
                         <div className='flex-1 space-y-1'>
-                          <div className='h-4 w-32 bg-surface-3 rounded' />
-                          <div className='h-3 w-20 bg-surface-3 rounded' />
+                          <div className='h-3.5 w-28 bg-white/[0.05] rounded' />
+                          <div className='h-3 w-16 bg-white/[0.05] rounded' />
                         </div>
                       </div>
                     ))}
@@ -241,8 +239,8 @@ export function ReleasesEmptyState({
                 )}
 
                 {searchState === 'empty' && (
-                  <div className='p-4 text-center'>
-                    <p className='text-sm text-secondary-token'>
+                  <div className='px-3 py-4 text-center'>
+                    <p className='text-[13px] text-tertiary-token'>
                       No artists found
                     </p>
                     <button
@@ -250,7 +248,7 @@ export function ReleasesEmptyState({
                       onClick={() =>
                         dispatch({ type: 'SET_MANUAL_MODE', payload: true })
                       }
-                      className='mt-2 text-xs text-accent hover:underline'
+                      className='mt-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors'
                     >
                       Add link manually
                     </button>
@@ -258,14 +256,14 @@ export function ReleasesEmptyState({
                 )}
 
                 {searchError && (
-                  <div className='p-4 text-center'>
-                    <p className='text-sm text-red-500'>{searchError}</p>
+                  <div className='px-3 py-4 text-center'>
+                    <p className='text-[13px] text-red-400'>{searchError}</p>
                     <button
                       type='button'
                       onClick={() =>
                         dispatch({ type: 'SET_MANUAL_MODE', payload: true })
                       }
-                      className='mt-2 text-xs text-accent hover:underline'
+                      className='mt-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors'
                     >
                       Add link manually
                     </button>
@@ -312,7 +310,7 @@ export function ReleasesEmptyState({
                     </select>
                     <div
                       ref={resultsListRef}
-                      className='max-h-64 overflow-y-auto'
+                      className='max-h-64 overflow-y-auto py-1'
                       aria-hidden='true'
                     >
                       {results.map((artist, index) => (
@@ -321,10 +319,10 @@ export function ReleasesEmptyState({
                           type='button'
                           tabIndex={0}
                           className={cn(
-                            'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
+                            'flex items-center gap-3 px-2 py-1.5 mx-1 rounded-md cursor-pointer transition-colors border-0 bg-transparent w-[calc(100%-0.5rem)] text-left',
                             index === formState.activeResultIndex
-                              ? 'bg-surface-2'
-                              : 'hover:bg-surface-2/50'
+                              ? 'bg-white/[0.06]'
+                              : 'hover:bg-white/[0.04]'
                           )}
                           onClick={() => handleArtistSelect(artist)}
                           onKeyDown={event =>
@@ -339,13 +337,13 @@ export function ReleasesEmptyState({
                             })
                           }
                         >
-                          <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
+                          <div className='w-8 h-8 rounded-full bg-white/[0.05] overflow-hidden shrink-0 relative'>
                             {artist.imageUrl ? (
                               <Image
                                 src={artist.imageUrl}
                                 alt={artist.name}
                                 fill
-                                sizes='40px'
+                                sizes='32px'
                                 className='object-cover'
                                 unoptimized
                               />
@@ -353,37 +351,30 @@ export function ReleasesEmptyState({
                               <div className='w-full h-full flex items-center justify-center'>
                                 <SocialIcon
                                   platform='spotify'
-                                  className='w-5 h-5 text-tertiary-token'
+                                  className='w-4 h-4 text-tertiary-token'
                                 />
                               </div>
                             )}
                           </div>
 
                           <div className='flex-1 min-w-0'>
-                            <div className='font-medium text-primary-token truncate'>
+                            <div className='text-[13px] font-medium text-primary-token truncate'>
                               {artist.name}
                             </div>
                             {artist.followers && (
-                              <div className='text-xs text-tertiary-token'>
+                              <div className='text-[11px] text-tertiary-token'>
                                 {formatFollowers(artist.followers)}
                               </div>
                             )}
                           </div>
 
                           {artist.verified && (
-                            <div className='shrink-0 text-brand-spotify'>
-                              <svg
-                                className='w-4 h-4'
-                                viewBox='0 0 20 20'
-                                fill='currentColor'
+                            <div className='shrink-0 text-tertiary-token'>
+                              <Icon
+                                name='BadgeCheck'
+                                className='w-3.5 h-3.5'
                                 aria-hidden='true'
-                              >
-                                <path
-                                  fillRule='evenodd'
-                                  d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-                                  clipRule='evenodd'
-                                />
-                              </svg>
+                              />
                             </div>
                           )}
                         </button>
@@ -397,7 +388,7 @@ export function ReleasesEmptyState({
         )}
 
         {formState.error && (
-          <p className='mt-2 text-sm text-red-500' role='alert'>
+          <p className='mt-2 text-[13px] text-red-400' role='alert'>
             {formState.error}
           </p>
         )}

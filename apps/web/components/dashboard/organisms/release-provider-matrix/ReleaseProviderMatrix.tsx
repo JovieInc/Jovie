@@ -25,9 +25,11 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
@@ -40,6 +42,7 @@ import {
   ReleaseTableSubheader,
   type ReleaseView,
 } from './ReleaseTableSubheader';
+import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -135,6 +138,29 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return true;
     });
   }, [rows, filters]);
+
+  // Smart link gating: free tier gets 5 oldest releases unlocked
+  const { smartLinksLimit, isPro } = usePlanGate();
+
+  const freeReleaseIds = useMemo(() => {
+    if (!smartLinksLimit) return null; // null = unlimited (pro/growth)
+    const sorted = [...rows]
+      .sort((a, b) => {
+        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+        return dateA - dateB; // oldest first
+      })
+      .slice(0, smartLinksLimit);
+    return new Set(sorted.map(r => r.id));
+  }, [rows, smartLinksLimit]);
+
+  const isSmartLinkLocked = useCallback(
+    (releaseId: string) => {
+      if (!freeReleaseIds) return false; // unlimited plan
+      return !freeReleaseIds.has(releaseId);
+    },
+    [freeReleaseIds]
+  );
 
   // Empty selection for subheader export (simplified - no bulk selection)
   const selectedIds = useMemo(() => new Set<string>(), []);
@@ -373,10 +399,71 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
   }, [headerBadges, headerActions]);
 
+  // Register right panel with AuthShell instead of rendering inline
+  const sidebarPanel = useMemo(
+    () =>
+      isSidebarOpen ? (
+        <Suspense
+          fallback={
+            <div
+              className='h-full animate-pulse bg-surface-2'
+              style={{ width: SIDEBAR_WIDTH }}
+            />
+          }
+        >
+          <ReleaseSidebar
+            release={editingRelease}
+            mode='admin'
+            isOpen={isSidebarOpen}
+            providerConfig={providerConfig}
+            artistName={artistName}
+            onClose={closeEditor}
+            onRefresh={
+              editingRelease
+                ? () => handleRefreshRelease(editingRelease.id)
+                : undefined
+            }
+            onAddDspLink={handleAddUrl}
+            onRescanIsrc={
+              editingRelease
+                ? () => handleRescanIsrc(editingRelease.id)
+                : undefined
+            }
+            isRescanningIsrc={isRescanningIsrc}
+            onArtworkUpload={handleArtworkUpload}
+            onArtworkRevert={handleArtworkRevert}
+            onReleaseChange={handleReleaseChange}
+            isSaving={isSaving}
+            allowDownloads={allowArtworkDownloads}
+          />
+        </Suspense>
+      ) : null,
+    [
+      isSidebarOpen,
+      editingRelease,
+      providerConfig,
+      artistName,
+      closeEditor,
+      handleRefreshRelease,
+      handleAddUrl,
+      handleRescanIsrc,
+      isRescanningIsrc,
+      handleArtworkUpload,
+      handleArtworkRevert,
+      handleReleaseChange,
+      isSaving,
+      allowArtworkDownloads,
+    ]
+  );
+
+  useRegisterTablePanel(sidebarPanel);
+
   return (
-    <div className='flex h-full min-h-0 flex-row' data-testid='releases-matrix'>
-      {/* Main content area */}
-      <div className='flex h-full min-h-0 min-w-0 flex-1 flex-col'>
+    <>
+      <div
+        className='flex h-full min-h-0 min-w-0 flex-col'
+        data-testid='releases-matrix'
+      >
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col'>
           {/* Sticky subheader - outside scroll container */}
@@ -437,6 +524,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
 
+            {/* Smart link gate banner for free users */}
+            {showReleasesTable &&
+              !isPro &&
+              rows.length > (smartLinksLimit ?? Infinity) && (
+                <SmartLinkGateBanner
+                  totalReleases={rows.length}
+                  smartLinksLimit={smartLinksLimit ?? 5}
+                  className='mx-4 mt-2'
+                />
+              )}
+
             {showReleasesTable && (
               <QueryErrorBoundary>
                 <ReleaseTable
@@ -449,6 +547,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  isSmartLinkLocked={isSmartLinkLocked}
                 />
               </QueryErrorBoundary>
             )}
@@ -506,7 +605,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle px-4 py-2 text-xs text-secondary-token'>
+            <div className='flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
               <span>
                 {filteredRows.length === rows.length
                   ? `${totalReleases}`
@@ -531,44 +630,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </div>
       </div>
 
-      {/* Release Sidebar - Lazy loaded to reduce initial bundle */}
-      {isSidebarOpen && (
-        <Suspense
-          fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
-            />
-          }
-        >
-          <ReleaseSidebar
-            release={editingRelease}
-            mode='admin'
-            isOpen={isSidebarOpen}
-            providerConfig={providerConfig}
-            artistName={artistName}
-            onClose={closeEditor}
-            onRefresh={
-              editingRelease
-                ? () => handleRefreshRelease(editingRelease.id)
-                : undefined
-            }
-            onAddDspLink={handleAddUrl}
-            onRescanIsrc={
-              editingRelease
-                ? () => handleRescanIsrc(editingRelease.id)
-                : undefined
-            }
-            isRescanningIsrc={isRescanningIsrc}
-            onArtworkUpload={handleArtworkUpload}
-            onArtworkRevert={handleArtworkRevert}
-            onReleaseChange={handleReleaseChange}
-            isSaving={isSaving}
-            allowDownloads={allowArtworkDownloads}
-          />
-        </Suspense>
-      )}
-
       {/* Apple Music artist search command palette */}
       <ArtistSearchCommandPalette
         open={amPaletteOpen}
@@ -576,6 +637,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         provider='apple_music'
         onArtistSelect={handleAppleMusicConnect}
       />
-    </div>
+    </>
   );
 });

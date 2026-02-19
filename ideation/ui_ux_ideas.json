@@ -1,0 +1,340 @@
+[
+  {
+    "id": "uiux-001",
+    "type": "ui_ux_improvements",
+    "title": "Strengthen primary CTA hierarchy in hero",
+    "description": "Increase contrast and visual prominence of the primary hero action while preserving the minimalist visual direction.",
+    "rationale": "The hero currently has subtle controls and low-contrast tertiary supporting text, which weakens first-click confidence.",
+    "category": "usability",
+    "affected_components": [
+      "apps/web/components/home/NewHomeHero.tsx",
+      "packages/ui/atoms/button.tsx"
+    ],
+    "screenshots": [
+      "ideation/screenshots/landing_page.png",
+      "ideation/screenshots/interactive_state.png"
+    ],
+    "current_state": "Hero CTA group appears compact and visually close in weight; secondary action can compete with primary at a glance.",
+    "proposed_change": "Increase primary CTA weight (size/padding and contrast), add stronger hover/focus token treatment, and reduce secondary CTA visual emphasis by one step.",
+    "user_benefit": "Users identify the main next step faster and make fewer hesitant interactions.",
+    "severity": "medium",
+    "effort": "low",
+    "user_impact": "high",
+    "acceptance_criteria": [
+      "Primary CTA is visibly dominant over secondary CTA in default state",
+      "Primary CTA has distinct hover and focus-visible states",
+      "Secondary CTA remains discoverable but clearly secondary"
+    ],
+    "subtasks": [
+      {
+        "title": "Tune hero CTA spacing and contrast",
+        "description": "Adjust CTA layout and visual tokens in hero section.",
+        "affected_components": ["apps/web/components/home/NewHomeHero.tsx"],
+        "acceptance_criteria": [
+          "CTA spacing follows existing token scale",
+          "Contrast remains WCAG AA compliant"
+        ]
+      }
+    ],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-002",
+    "type": "ui_ux_improvements",
+    "title": "Improve top-nav orientation and active-state clarity",
+    "description": "Add clearer active/hover affordances in the marketing header navigation.",
+    "rationale": "Current nav has minimal differentiation and limited wayfinding cues for where the user is.",
+    "category": "interaction",
+    "affected_components": [
+      "apps/web/components/site/MarketingHeader.tsx",
+      "apps/web/components/site/Header.tsx"
+    ],
+    "screenshots": ["ideation/screenshots/navigation.png"],
+    "current_state": "Header shows sparse links with very subtle interaction cues.",
+    "proposed_change": "Introduce explicit active-link styling (underline/bar or tokenized text shift), expand hover area to 40px+ tap-friendly targets, and preserve current aesthetic.",
+    "user_benefit": "Users orient more quickly and can navigate with less uncertainty.",
+    "severity": "medium",
+    "effort": "medium",
+    "user_impact": "medium",
+    "acceptance_criteria": [
+      "Current route is visually distinguishable in nav",
+      "Hover and focus-visible states are visible on each nav item",
+      "Clickable area is comfortably tappable on touch devices"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-003",
+    "type": "ui_ux_improvements",
+    "title": "Reduce cookie banner obstruction on mobile",
+    "description": "Compress the cookie banner footprint and avoid overlap with bottom UI elements on small screens.",
+    "rationale": "The fixed cookie bar consumes meaningful vertical space and competes with other bottom overlays.",
+    "category": "usability",
+    "affected_components": [
+      "apps/web/components/organisms/CookieBannerSection.tsx",
+      "apps/web/components/molecules/CookieActions.tsx"
+    ],
+    "screenshots": [
+      "ideation/screenshots/mobile_view.png",
+      "ideation/screenshots/interactive_state.png"
+    ],
+    "current_state": "Cookie controls remain fixed at bottom with dense controls while hero content is in view.",
+    "proposed_change": "Introduce compact mobile variant: one-line message + single 'Manage' action with expandable controls; preserve full control set in expanded mode.",
+    "user_benefit": "Less visual obstruction and easier reading/interaction on first visit.",
+    "severity": "high",
+    "effort": "medium",
+    "user_impact": "high",
+    "acceptance_criteria": [
+      "Mobile banner occupies less vertical space by default",
+      "All consent actions remain reachable in expanded state",
+      "No overlap with persistent bottom UI elements"
+    ],
+    "subtasks": [
+      {
+        "title": "Add compact mobile cookie-banner layout",
+        "description": "Implement collapsed/expanded interaction model under mobile breakpoints.",
+        "affected_components": [
+          "apps/web/components/organisms/CookieBannerSection.tsx"
+        ],
+        "acceptance_criteria": [
+          "Collapsed mode is default on small screens",
+          "Expanded mode exposes Reject/Customize/Accept actions"
+        ]
+      }
+    ],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-004",
+    "type": "ui_ux_improvements",
+    "title": "Clarify hero search action affordance",
+    "description": "Make the Spotify search field's completion behavior clearer with explicit action affordances.",
+    "rationale": "Input-only flow can feel ambiguous (search vs submit vs redirect), especially for first-time users.",
+    "category": "usability",
+    "affected_components": ["apps/web/components/home/HeroSpotifySearch.tsx"],
+    "screenshots": [
+      "ideation/screenshots/forms.png",
+      "ideation/screenshots/interactive_state.png"
+    ],
+    "current_state": "Field uses icon and dynamic dropdown, but no explicit submit action or explanatory helper near control.",
+    "proposed_change": "Add a tokenized trailing action label/button (e.g., 'Continue') when input is valid, plus concise helper text for expected behavior.",
+    "user_benefit": "Users understand what happens next and recover from uncertainty faster.",
+    "severity": "medium",
+    "effort": "medium",
+    "user_impact": "high",
+    "acceptance_criteria": [
+      "Valid input presents a clear actionable next step",
+      "Search, URL-paste, and continue flows remain keyboard-accessible",
+      "Error/empty guidance remains visible and concise"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-005",
+    "type": "ui_ux_improvements",
+    "title": "Tighten mobile typography and vertical rhythm",
+    "description": "Rebalance hero text scale and spacing for handheld readability.",
+    "rationale": "On mobile capture, heading and supporting text stack feels dense while below-the-fold spacing becomes sparse/empty.",
+    "category": "visual",
+    "affected_components": [
+      "apps/web/components/home/NewHomeHero.tsx",
+      "apps/web/styles/linear-tokens.css"
+    ],
+    "screenshots": ["ideation/screenshots/mobile_view.png"],
+    "current_state": "Very small visual content block at top with large uninterrupted dark sections below.",
+    "proposed_change": "Adjust mobile hero min-height/padding and use responsive text tokens so first screen balances headline, subcopy, CTA, and immediate continuation content.",
+    "user_benefit": "Improved scannability and stronger perceived polish on mobile devices.",
+    "severity": "medium",
+    "effort": "medium",
+    "user_impact": "medium",
+    "acceptance_criteria": [
+      "Hero content fills first viewport more intentionally on 375x812",
+      "Line lengths remain readable without crowding",
+      "No excessive dead vertical space before next content section"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-006",
+    "type": "ui_ux_improvements",
+    "title": "Replace blank dashboard wait with content skeleton",
+    "description": "Ensure dashboard loading states show structure, not an empty canvas + spinner.",
+    "rationale": "The captured app dashboard state shows a mostly empty page with central spinner, which feels stalled and uninformative.",
+    "category": "performance",
+    "affected_components": [
+      "apps/web/app/app/loading.tsx",
+      "apps/web/app/app/(shell)/dashboard/loading.tsx",
+      "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx"
+    ],
+    "screenshots": ["ideation/screenshots/empty_state.png"],
+    "current_state": "Users can land on a sparse white dashboard area with loading spinner and little context.",
+    "proposed_change": "Use section-aware skeleton blocks and contextual loading text for dashboard panels while data resolves.",
+    "user_benefit": "Higher trust and lower perceived wait time.",
+    "severity": "high",
+    "effort": "medium",
+    "user_impact": "high",
+    "acceptance_criteria": [
+      "Loading state shows placeholder structure matching final layout",
+      "No blank full-page canvas while loading",
+      "Loading transitions avoid layout jumps"
+    ],
+    "subtasks": [
+      {
+        "title": "Audit route-level loading fallbacks",
+        "description": "Confirm all dashboard routes use skeletons over generic spinners.",
+        "affected_components": [
+          "apps/web/app/app/(shell)/dashboard/**/loading.tsx"
+        ],
+        "acceptance_criteria": [
+          "Each dashboard route has content-matched loading state"
+        ]
+      }
+    ],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-007",
+    "type": "ui_ux_improvements",
+    "title": "Standardize focus-visible style between primitives and marketing links",
+    "description": "Apply consistent focus-visible treatment to custom links/buttons that bypass shared primitives.",
+    "rationale": "UI primitives include robust focus rings, but some hand-authored marketing links use custom classes with weaker focus consistency.",
+    "category": "accessibility",
+    "affected_components": [
+      "packages/ui/atoms/button.tsx",
+      "apps/web/components/home/NewHomeHero.tsx",
+      "apps/web/components/home/HeroSpotifySearch.tsx"
+    ],
+    "screenshots": [
+      "ideation/screenshots/navigation.png",
+      "ideation/screenshots/interactive_state.png"
+    ],
+    "current_state": "Focus styling varies by surface and is less predictable in marketing-specific custom controls.",
+    "proposed_change": "Extract and apply a shared focus utility/token class for all interactive marketing controls, including in-hero links and dropdown options.",
+    "user_benefit": "Improved keyboard navigation confidence and consistent accessibility affordances.",
+    "severity": "medium",
+    "effort": "low",
+    "user_impact": "medium",
+    "acceptance_criteria": [
+      "All interactive controls show visible focus ring at keyboard focus",
+      "Focus appearance is visually consistent across nav, hero CTA, and dropdown",
+      "No regression to pointer-only interaction cues"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-008",
+    "type": "ui_ux_improvements",
+    "title": "Improve low-contrast tertiary copy on dark hero",
+    "description": "Increase readability of tertiary text in key first-view surfaces.",
+    "rationale": "Small tertiary copy under the hero and in utility links is difficult to read against dark backgrounds at mobile scale.",
+    "category": "accessibility",
+    "affected_components": [
+      "apps/web/components/home/NewHomeHero.tsx",
+      "apps/web/components/home/HeroSpotifySearch.tsx",
+      "apps/web/styles/linear-tokens.css"
+    ],
+    "screenshots": [
+      "ideation/screenshots/landing_page.png",
+      "ideation/screenshots/mobile_view.png"
+    ],
+    "current_state": "Tertiary text is used in small font sizes where perceived contrast drops on handheld screens.",
+    "proposed_change": "Use secondary text token for critical helper text and reserve tertiary token for non-critical metadata; optionally bump tertiary token lightness slightly for small text usage.",
+    "user_benefit": "Better readability and reduced eye strain, especially on mobile.",
+    "severity": "medium",
+    "effort": "low",
+    "user_impact": "medium",
+    "acceptance_criteria": [
+      "Body/help text in first viewport meets or exceeds WCAG AA contrast",
+      "Critical explanatory copy is not rendered using weakest contrast token",
+      "Visual hierarchy is preserved after contrast adjustments"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-009",
+    "type": "ui_ux_improvements",
+    "title": "Introduce actionable empty-state messaging in app shell",
+    "description": "Add contextual empty-state guidance with clear next actions for dashboard areas that can appear blank.",
+    "rationale": "A mostly blank dashboard frame can feel broken without explanation, even when data is simply unavailable or still resolving.",
+    "category": "usability",
+    "affected_components": [
+      "apps/web/app/app/(shell)/dashboard/page.tsx",
+      "apps/web/components/feedback/PageErrorState.tsx",
+      "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx"
+    ],
+    "screenshots": ["ideation/screenshots/empty_state.png"],
+    "current_state": "Blank frame with spinner provides minimal context and no immediate user action.",
+    "proposed_change": "Add explicit empty/loading copy with route-aware CTA (e.g., 'Create your first release', 'Complete profile', 'Retry').",
+    "user_benefit": "Users understand why content is missing and what to do next.",
+    "severity": "high",
+    "effort": "medium",
+    "user_impact": "high",
+    "acceptance_criteria": [
+      "Empty or no-data states include one clear primary action",
+      "Message explains why the panel is empty in plain language",
+      "State is distinguishable from error and loading"
+    ],
+    "subtasks": [],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  },
+  {
+    "id": "uiux-010",
+    "type": "ui_ux_improvements",
+    "title": "Unify token usage between marketing surfaces and base theme",
+    "description": "Reduce mixed use of base-theme classes and linear token styles in the same hero surfaces.",
+    "rationale": "Current marketing views mix `bg-base`/tokenized utility classes with explicit linear variables, creating visual inconsistencies across breakpoints and themes.",
+    "category": "visual",
+    "affected_components": [
+      "apps/web/components/home/NewHomeHero.tsx",
+      "apps/web/app/(marketing)/layout.tsx",
+      "apps/web/styles/linear-tokens.css",
+      "apps/web/tailwind.config.js"
+    ],
+    "screenshots": [
+      "ideation/screenshots/landing_page.png",
+      "ideation/screenshots/mobile_view.png"
+    ],
+    "current_state": "Some sections inherit marketing dark shell while local blocks still use base theme classes and mixed token families.",
+    "proposed_change": "Define a small marketing semantic token layer (text/bg/border/interactive) and migrate hero/header controls to that layer consistently.",
+    "user_benefit": "More cohesive visual identity and fewer edge-case style regressions.",
+    "severity": "medium",
+    "effort": "high",
+    "user_impact": "medium",
+    "acceptance_criteria": [
+      "Marketing hero and header use one consistent token system",
+      "No mixed semantic drift between base and linear token classes in the same surface",
+      "Visual output remains consistent across desktop and mobile"
+    ],
+    "subtasks": [
+      {
+        "title": "Create marketing semantic token aliases",
+        "description": "Add semantic aliases for marketing text/background/interactive states and migrate primary hero controls.",
+        "affected_components": [
+          "apps/web/styles/linear-tokens.css",
+          "apps/web/components/home/NewHomeHero.tsx",
+          "apps/web/components/home/HeroSpotifySearch.tsx"
+        ],
+        "acceptance_criteria": [
+          "Hero and header rely on semantic aliases rather than ad-hoc token picks",
+          "No visual regressions in existing marketing snapshots"
+        ]
+      }
+    ],
+    "status": "draft",
+    "created_at": "2026-02-16T00:14:26Z"
+  }
+]

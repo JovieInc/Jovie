@@ -1,0 +1,392 @@
+name: Linear AI Orchestrator
+
+on:
+  repository_dispatch:
+    types: [linear_todo_ready]
+  workflow_dispatch:
+    inputs:
+      issue_id:
+        description: 'Linear issue UUID (required for manual replay)'
+        required: true
+        type: string
+      issue_identifier:
+        description: 'Optional human identifier (for example JOV-123)'
+        required: false
+        type: string
+      issue_title:
+        description: 'Optional issue title override'
+        required: false
+        type: string
+      issue_url:
+        description: 'Optional Linear issue URL'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: linear-ai-${{ github.event.client_payload.issue_id || github.event.inputs.issue_id || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  MAX_PLAN_WAIT_ATTEMPTS: '45'
+  PLAN_POLL_INTERVAL_SECONDS: '20'
+
+jobs:
+  guard:
+    name: Guard + Deduplicate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_run: ${{ steps.gather.outputs.should_run }}
+      issue_id: ${{ steps.gather.outputs.issue_id }}
+      issue_identifier: ${{ steps.gather.outputs.issue_identifier }}
+      issue_title: ${{ steps.gather.outputs.issue_title }}
+      issue_description: ${{ steps.gather.outputs.issue_description }}
+      issue_url: ${{ steps.gather.outputs.issue_url }}
+      branch_name: ${{ steps.gather.outputs.branch_name }}
+    steps:
+      - name: Gather payload
+        id: gather
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PAYLOAD_ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          PAYLOAD_ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+          PAYLOAD_ISSUE_TITLE: ${{ github.event.client_payload.issue_title }}
+          PAYLOAD_ISSUE_DESCRIPTION: ${{ github.event.client_payload.issue_description }}
+          PAYLOAD_ISSUE_URL: ${{ github.event.client_payload.issue_url }}
+          INPUT_ISSUE_ID: ${{ inputs.issue_id }}
+          INPUT_ISSUE_IDENTIFIER: ${{ inputs.issue_identifier }}
+          INPUT_ISSUE_TITLE: ${{ inputs.issue_title }}
+          INPUT_ISSUE_URL: ${{ inputs.issue_url }}
+        run: |
+          ISSUE_ID="$PAYLOAD_ISSUE_ID"
+          ISSUE_IDENTIFIER="$PAYLOAD_ISSUE_IDENTIFIER"
+          ISSUE_TITLE="$PAYLOAD_ISSUE_TITLE"
+          ISSUE_DESCRIPTION="$PAYLOAD_ISSUE_DESCRIPTION"
+          ISSUE_URL="$PAYLOAD_ISSUE_URL"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            ISSUE_ID="$INPUT_ISSUE_ID"
+            ISSUE_IDENTIFIER="$INPUT_ISSUE_IDENTIFIER"
+            ISSUE_TITLE="$INPUT_ISSUE_TITLE"
+            ISSUE_URL="$INPUT_ISSUE_URL"
+          fi
+
+          if [[ -z "$ISSUE_ID" ]]; then
+            echo "Missing issue_id; cannot continue"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "$ISSUE_IDENTIFIER" ]]; then
+            ISSUE_IDENTIFIER="LINEAR-${ISSUE_ID:0:8}"
+          fi
+
+          if [[ -z "$ISSUE_TITLE" ]]; then
+            ISSUE_TITLE="Linear issue ${ISSUE_IDENTIFIER}"
+          fi
+
+          SAFE_ID=$(echo "$ISSUE_IDENTIFIER" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-' | sed 's/^-//;s/-$//')
+          if [[ -z "$SAFE_ID" ]]; then
+            SAFE_ID="issue-${ISSUE_ID:0:8}"
+          fi
+          BRANCH_NAME="linear/${SAFE_ID}"
+
+          EXISTING_PR=$(gh pr list --state open --json number,title,body --jq '
+            map(
+              select(
+                ((.title // "") + "\n" + (.body // "")) as $text
+                | ($text | test(env.ISSUE_IDENTIFIER; "i"))
+                  or ($text | contains("linear-issue-id:" + env.ISSUE_ID))
+              )
+            )
+            | .[0].number // empty
+          ')
+          if [[ -n "$EXISTING_PR" ]]; then
+            echo "Open PR #${EXISTING_PR} already exists for ${ISSUE_IDENTIFIER}; skipping"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "issue_id=$ISSUE_ID" >> "$GITHUB_OUTPUT"
+          echo "issue_identifier=$ISSUE_IDENTIFIER" >> "$GITHUB_OUTPUT"
+          echo "issue_title=$ISSUE_TITLE" >> "$GITHUB_OUTPUT"
+          echo "issue_description<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$ISSUE_DESCRIPTION" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+  wait_for_coderabbit_plan:
+    name: Wait for CodeRabbit Plan
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Poll Linear comments for CodeRabbit plan marker
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
+          ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
+          MAX_ATTEMPTS: ${{ env.MAX_PLAN_WAIT_ATTEMPTS }}
+          SLEEP_SECONDS: ${{ env.PLAN_POLL_INTERVAL_SECONDS }}
+        run: |
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "Missing LINEAR_API_KEY secret"
+            exit 1
+          fi
+
+          ATTEMPT=1
+          while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
+            echo "Checking for CodeRabbit plan for ${ISSUE_IDENTIFIER} (attempt ${ATTEMPT}/${MAX_ATTEMPTS})"
+
+            RESPONSE=$(curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(cat <<JSON
+          {
+            \"query\": \"query IssueForPlanGate($issueId: String!) { issue(id: $issueId) { identifier title state { name type } comments(first: 50) { nodes { body user { name displayName } } } } }\",
+            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
+          }
+          JSON
+          )")
+
+            HAS_ERRORS=$(echo "$RESPONSE" | jq -r '.errors != null')
+            if [[ "$HAS_ERRORS" == "true" ]]; then
+              echo "Linear API returned errors"
+              echo "$RESPONSE" | jq -r '.errors'
+              exit 1
+            fi
+
+            STATE_NAME=$(echo "$RESPONSE" | jq -r '.data.issue.state.name // ""')
+            STATE_TYPE=$(echo "$RESPONSE" | jq -r '.data.issue.state.type // ""')
+            PLAN_READY=$(echo "$RESPONSE" | jq -r '
+              .data.issue.comments.nodes
+              | map(
+                  select(
+                    ((.user.name // .user.displayName // "") | ascii_downcase | contains("coderabbit"))
+                    and (
+                      (.body // "")
+                      | test("coderabbit-plan-ready|##[[:space:]]+Implementation[[:space:]]+Plan"; "i")
+                    )
+                  )
+                )
+              | length > 0
+            ')
+
+            if [[ "$PLAN_READY" == "true" ]]; then
+              echo "CodeRabbit plan marker found. Continuing."
+              exit 0
+            fi
+
+            if [[ "${STATE_NAME,,}" != "todo" && "${STATE_TYPE,,}" != "unstarted" ]]; then
+              echo "Issue is no longer in Todo/Unstarted (state: ${STATE_NAME}, type: ${STATE_TYPE}); stopping run"
+              exit 1
+            fi
+
+            echo "Plan not ready yet (state: ${STATE_NAME:-unknown}); sleeping ${SLEEP_SECONDS}s"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "CodeRabbit plan marker not found after ${MAX_ATTEMPTS} attempts"
+          exit 1
+
+  implement_and_open_pr:
+    name: Implement + PR
+    needs: [guard, wait_for_coderabbit_plan]
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    outputs:
+      pr_url: ${{ steps.create_pr.outputs.pr_url }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create feature branch
+        env:
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+        run: |
+          git checkout -b "$BRANCH_NAME"
+
+      - name: Run Claude Code for implementation
+        uses: anthropics/claude-code-action@68cfeead1890300cc87935dbe2c023825be87b8a # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Implement the Linear issue below with a minimal root-cause change and open-ready quality.
+
+            Issue:
+            - ID: ${{ needs.guard.outputs.issue_identifier }}
+            - Title: ${{ needs.guard.outputs.issue_title }}
+            - URL: ${{ needs.guard.outputs.issue_url }}
+            - Description:
+              ${{ needs.guard.outputs.issue_description }}
+
+            Hard requirements:
+            1) Node.js 24.x and pnpm 9.15.4 conventions only.
+            2) Run from repo root. Use pnpm/turbo commands only.
+            3) Never edit drizzle/migrations files.
+            4) Never add // biome-ignore.
+            5) Find and fix sibling occurrences if this is a bug-pattern issue.
+            6) Keep changes focused and minimal.
+
+            Validation requirements:
+            - Run: pnpm turbo typecheck --affected
+            - Run: pnpm turbo lint --affected
+            - Run targeted tests for touched areas.
+
+            Do not create commits yourself. Leave changes in working tree for the workflow commit step.
+
+      - name: Commit, push, and create PR
+        id: create_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+          ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
+          ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
+          ISSUE_TITLE: ${{ needs.guard.outputs.issue_title }}
+          ISSUE_URL: ${{ needs.guard.outputs.issue_url }}
+        run: |
+          if git diff --quiet && git diff --staged --quiet && [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes produced by automation"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "feat: implement ${ISSUE_IDENTIFIER} - ${ISSUE_TITLE}"
+          git push origin "HEAD:${BRANCH_NAME}"
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "feat: ${ISSUE_IDENTIFIER} - ${ISSUE_TITLE}" \
+            --body "$(cat <<EOF
+          ## Goal
+
+          Implement ${ISSUE_IDENTIFIER} from Linear with no-human-intervention automation.
+
+          ## Changes
+
+          - Implements the issue requirements from Linear.
+          - Includes validation and guardrail-compliant updates.
+
+          ## Testing
+
+          - [x] pnpm turbo typecheck --affected
+          - [x] pnpm turbo lint --affected
+          - [x] Targeted tests for touched areas
+
+          ## Linear
+
+          - Issue: ${ISSUE_IDENTIFIER}
+          - URL: ${ISSUE_URL}
+          - ID: ${ISSUE_ID}
+
+          <!-- linear-issue-id:${ISSUE_ID} -->
+          <!-- linear-issue-identifier:${ISSUE_IDENTIFIER} -->
+
+          EOF
+          )")
+
+          gh pr comment "$PR_URL" --body "@claude review this PR"
+
+          echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.create_pr.outputs.pr_url }}
+        run: |
+          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge unavailable for this PR"
+
+  sync_linear_in_review:
+    name: Sync Linear to In Review
+    needs: [guard, implement_and_open_pr]
+    if: needs.guard.outputs.should_run == 'true' && needs.implement_and_open_pr.outputs.pr_url != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Update Linear status/comment
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
+          ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
+          PR_URL: ${{ needs.implement_and_open_pr.outputs.pr_url }}
+        run: |
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "Missing LINEAR_API_KEY; skipping Linear sync"
+            exit 0
+          fi
+
+          ISSUE_DATA=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<JSON
+          {
+            \"query\": \"query IssueStateTargets($issueId: String!) { issue(id: $issueId) { team { states { nodes { id name type } } } } }\",
+            \"variables\": { \"issueId\": \"${ISSUE_ID}\" }
+          }
+          JSON
+          )")
+
+          REVIEW_STATE_ID=$(echo "$ISSUE_DATA" | jq -r '
+            .data.issue.team.states.nodes
+            | map(select((.name // "") | ascii_downcase | test("in review|review")))
+            | .[0].id // empty
+          ')
+
+          if [[ -n "$REVIEW_STATE_ID" ]]; then
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(cat <<JSON
+            {
+              \"query\": \"mutation SetIssueReview($issueId: String!, $stateId: String!) { issueUpdate(id: $issueId, input: { stateId: $stateId }) { success } }\",
+              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"stateId\": \"${REVIEW_STATE_ID}\" }
+            }
+            JSON
+            )" > /dev/null
+          fi
+
+          curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<JSON
+          {
+            \"query\": \"mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
+            \"variables\": {
+              \"issueId\": \"${ISSUE_ID}\",
+              \"body\": \"Automated PR opened for ${ISSUE_IDENTIFIER}: ${PR_URL}\"
+            }
+          }
+          JSON
+          )" > /dev/null

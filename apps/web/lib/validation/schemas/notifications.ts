@@ -95,6 +95,14 @@ export const subscribeSchema = z
  */
 export type SubscribeInput = z.infer<typeof subscribeSchema>;
 
+export const verifyEmailOtpSchema = z.object({
+  artist_id: uuidSchema,
+  email: z.string().email(),
+  otp_code: z.string().regex(/^\d{6}$/),
+});
+
+export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
+
 // =============================================================================
 // Unsubscribe Schema
 // =============================================================================
@@ -164,3 +172,41 @@ export const statusSchema = z
  * Inferred TypeScript type for status check input.
  */
 export type StatusInput = z.infer<typeof statusSchema>;
+
+// =============================================================================
+// Content Preferences Schema
+// =============================================================================
+
+/**
+ * Schema for content preference keys.
+ * Must match FanNotificationContentType from analytics schema.
+ */
+export const contentPreferenceKeySchema = z.enum([
+  'newMusic',
+  'tourDates',
+  'merch',
+  'general',
+]);
+
+/**
+ * Schema for updating content notification preferences.
+ * Requires artist_id + at least one identifier (email/phone) + partial prefs.
+ */
+export const updateContentPreferencesSchema = z
+  .object({
+    artist_id: uuidSchema,
+    email: z.string().email().optional(),
+    phone: z.string().min(1).max(64).optional(),
+    preferences: z.record(contentPreferenceKeySchema, z.boolean()),
+  })
+  .refine(
+    data => Boolean(data.email) || Boolean(data.phone),
+    'Email or phone is required'
+  );
+
+/**
+ * Inferred TypeScript type for content preferences update input.
+ */
+export type UpdateContentPreferencesInput = z.infer<
+  typeof updateContentPreferencesSchema
+>;

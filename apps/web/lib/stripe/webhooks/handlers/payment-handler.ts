@@ -23,6 +23,7 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { getInternalUserId, recordCommission } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
@@ -129,6 +130,67 @@ export class PaymentHandler extends BaseSubscriptionHandler {
   }
 
   /**
+   * Record referral commission for a successful payment, if applicable.
+   * Failures are logged but do not propagate — commission tracking is secondary.
+   * @private
+   */
+  private async tryRecordReferralCommission(
+    userId: string,
+    invoice: Stripe.Invoice
+  ): Promise<void> {
+    if (invoice.amount_paid <= 0) return;
+
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (!internalId) return;
+
+      await recordCommission({
+        referredUserId: internalId,
+        stripeInvoiceId: invoice.id,
+        paymentAmountCents: invoice.amount_paid,
+        currency: invoice.currency,
+        periodStart: invoice.period_start
+          ? new Date(invoice.period_start * 1000)
+          : undefined,
+        periodEnd: invoice.period_end
+          ? new Date(invoice.period_end * 1000)
+          : undefined,
+      });
+    } catch (error) {
+      logger.warn('Failed to record referral commission', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stripeInvoiceId: invoice.id,
+      });
+    }
+  }
+
+  /**
+   * Send a recovery email if this payment recovered from a previous failure.
+   * Fire-and-forget — failures are logged but do not propagate.
+   * @private
+   */
+  private sendRecoveryEmailIfNeeded(
+    invoice: Stripe.Invoice,
+    subscription: Stripe.Subscription,
+    userId: string
+  ): void {
+    if (!invoice.attempt_count || invoice.attempt_count <= 1) return;
+
+    const priceId = subscription.items.data[0]?.price?.id;
+    sendPaymentRecoveredEmail({
+      userId,
+      amountPaid: invoice.amount_paid,
+      currency: invoice.currency,
+      priceId,
+    }).catch(error => {
+      logger.warn('Failed to send payment recovery email', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    });
+  }
+
+  /**
    * Handle invoice.payment_succeeded event.
    *
    * When a subscription payment succeeds, ensures the user has pro access.
@@ -142,10 +204,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
-    // Extract subscription ID from invoice
     const subscriptionId = this.extractSubscriptionId(invoice);
 
-    // Skip if this invoice is not for a subscription (e.g., one-time payment)
     if (!subscriptionId) {
       return {
         success: true,
@@ -155,13 +215,9 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
 
     try {
-      // Retrieve full subscription from Stripe API
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const userId = subscription.metadata?.clerk_user_id;
 
-      // Skip if we can't identify the user
-      // Note: For payment_succeeded, we don't do fallback lookup since it's less critical
-      // than payment_failed - the subscription.updated event will handle status changes
       if (!userId) {
         return {
           success: true,
@@ -170,7 +226,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         };
       }
 
-      // Process subscription to ensure user has correct billing status
       const result = await this.processSubscription({
         subscription,
         userId,
@@ -180,23 +235,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       });
 
       await invalidateBillingCache();
-
-      // Check if this is a recovery from a failed payment (attempt_count > 1)
-      // If so, send a recovery confirmation email
-      if (invoice.attempt_count && invoice.attempt_count > 1) {
-        const priceId = subscription.items.data[0]?.price?.id;
-        sendPaymentRecoveredEmail({
-          userId,
-          amountPaid: invoice.amount_paid,
-          currency: invoice.currency,
-          priceId,
-        }).catch(error => {
-          logger.warn('Failed to send payment recovery email', {
-            userId,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        });
-      }
+      await this.tryRecordReferralCommission(userId, invoice);
+      this.sendRecoveryEmailIfNeeded(invoice, subscription, userId);
 
       return result;
     } catch (error) {
@@ -209,7 +249,6 @@ export class PaymentHandler extends BaseSubscriptionHandler {
           event: 'invoice.payment_succeeded',
         }
       );
-      // For payment succeeded, we don't throw - subscription.updated will handle it
       return {
         success: true,
         skipped: true,
@@ -353,17 +392,27 @@ export class PaymentHandler extends BaseSubscriptionHandler {
   /**
    * Extract subscription ID from an invoice.
    *
-   * The subscription field can be:
-   * - A string subscription ID
-   * - An expanded Subscription object with an 'id' field
-   * - null (for invoices not tied to a subscription)
+   * Stripe SDK v20 moved the subscription reference from the top-level
+   * `invoice.subscription` field to `invoice.parent.subscription_details.subscription`.
+   * We check the new location first and fall back to the legacy field so
+   * the handler works regardless of which Stripe API version is active.
    *
    * @param invoice - The Stripe invoice object
    * @returns The subscription ID if present, null otherwise
    * @private
    */
   private extractSubscriptionId(invoice: Stripe.Invoice): string | null {
-    // Handle the subscription field which can be string | Subscription | null
+    // SDK v20+: subscription lives under parent.subscription_details
+    const parent = invoice.parent;
+    if (parent?.subscription_details?.subscription) {
+      const sub = parent.subscription_details.subscription;
+      if (typeof sub === 'string') return sub;
+      if (sub && typeof sub === 'object' && 'id' in sub) {
+        return (sub as { id: string }).id;
+      }
+    }
+
+    // Legacy fallback: top-level subscription field (pre-v20 SDK / older API versions)
     const raw = invoice as unknown as Record<string, unknown>;
     const subField = raw['subscription'];
 

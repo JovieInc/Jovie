@@ -148,8 +148,8 @@ export const cardTokens = {
     settings: tw`
       bg-[var(--color-bg-surface-2)]
       border border-[var(--color-border-subtle)]
-      rounded-lg sm:rounded-xl
-      p-3 sm:p-5
+      rounded-lg
+      px-4 py-2.5
     `,
 
     // Analytics/metric card - minimal, data-focused

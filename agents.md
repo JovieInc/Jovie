@@ -12,7 +12,7 @@
 |------|------------------|-------------|
 | **Node.js** | **24.x** (24.0.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
-| **Turbo** | 2.7.4+ | Root devDependencies |
+| **Turbo** | 2.8+ | Root devDependencies |
 
 ### Why This Matters
 
@@ -71,6 +71,51 @@ pnpm --filter web drizzle:generate   # Generate migrations
 pnpm --filter web drizzle:migrate    # Apply migrations
 pnpm --filter web drizzle:studio     # Open Drizzle Studio
 ```
+
+---
+
+### Turborepo 2.8 Features
+
+All tasks in `turbo.json` have `description` fields that explain their purpose. These are readable by AI agents and help with onboarding. Run `pnpm turbo build --dry` to see task descriptions and the execution plan.
+
+**Search Turborepo docs from the terminal:**
+
+```bash
+turbo docs "task configuration"     # Search for any topic
+turbo docs "remote caching setup"   # Caching documentation
+turbo docs "environment variables"  # Env var handling
+```
+
+Machine-readable docs: append `.md` to any URL at `turborepo.dev` (e.g., `turborepo.dev/docs/reference/configuration.md`). Full sitemap: `turborepo.dev/sitemap.md`.
+
+### Git Worktrees for Parallel Agents
+
+Turbo 2.8 automatically shares local cache across Git worktrees. Use worktrees to run multiple agents in parallel on the same repo:
+
+```bash
+# Create a worktree for parallel work
+git worktree add ../Jovie-agent-1 -b agent/task-name
+
+# Each worktree needs its own node_modules but shares turbo cache
+cd ../Jovie-agent-1 && pnpm install && pnpm turbo build
+
+# Clean up when done
+git worktree remove ../Jovie-agent-1
+```
+
+No configuration is needed -- Turbo detects worktrees automatically and shares the local cache. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
+
+### Affected Builds (CI Optimization)
+
+Use `--affected` to run tasks only for packages that changed relative to the base branch:
+
+```bash
+pnpm turbo build --affected    # Build only changed packages
+pnpm turbo test --affected     # Test only changed packages
+pnpm turbo lint --affected     # Lint only changed packages
+```
+
+This is particularly useful in CI to avoid rebuilding the entire monorepo on every PR. For non-standard setups, set `TURBO_SCM_BASE` and `TURBO_SCM_HEAD` explicitly.
 
 ---
 
@@ -450,6 +495,124 @@ Tests are part of the deploy path. Slow tests slow shipping. Test runtime perfor
 
 ---
 
+## Infrastructure & Scheduling Guardrails (CRITICAL)
+
+AI agents lack context about operational costs, API billing, and infrastructure consequences. These guardrails exist because agents have historically created expensive, redundant, and architecturally unsound infrastructure without understanding the impact.
+
+### The Decision Hierarchy: Before Creating Any Scheduled/Background Work
+
+**STOP.** Before creating a cron job, scheduled task, background worker, or polling loop, walk through this hierarchy **in order**. Use the first option that works:
+
+| Priority | Approach | When to Use |
+|----------|----------|-------------|
+| 1 | **Webhook / Event handler** | An external service (Stripe, Clerk, etc.) can notify you when state changes. **This is almost always the right answer.** |
+| 2 | **Inline after-action** | The work can happen synchronously after the triggering action (e.g., clean up a record right after it's used). |
+| 3 | **On-demand / lazy evaluation** | The work can happen when the data is next accessed (e.g., check if a token is expired when it's read, not on a timer). |
+| 4 | **Add to existing scheduled job** | If a nightly/periodic job already exists, add your logic there instead of creating a new one. |
+| 5 | **New scheduled job** | Only if none of the above work, AND you've documented why in the PR. |
+
+### Rules for Cron Jobs & Scheduled Tasks
+
+1. **NEVER create a new cron job without explicit approval.** Document in the PR description:
+   - Why a webhook/event-driven approach won't work
+   - Why it can't be added to an existing scheduled job
+   - Expected API call volume and cost impact
+   - Proposed frequency and why that frequency is necessary
+
+2. **Consolidate, don't proliferate.** Multiple cleanup tasks that run at similar times should be a single job with multiple steps. One nightly cleanup job that handles photos, keys, retention, etc. is better than four separate cron entries.
+
+3. **Frequency must be justified by business need, not convenience.**
+   - Hourly jobs must justify why daily isn't sufficient
+   - "Near real-time" requirements should use webhooks, not polling
+   - If you can't explain what bad thing happens between intervals, the interval is too frequent
+
+4. **Cron jobs are NOT a substitute for proper event handling.** If Stripe, Clerk, or any external service provides webhooks:
+   - Use the webhook to react to state changes in real time
+   - Do NOT poll the external API to check for changes
+   - Reconciliation jobs (if needed at all) should run at most daily and serve as a safety net, not the primary mechanism
+
+### External API Call Budget Awareness
+
+**Every external API call has a cost.** Agents MUST consider API call volume before writing code that interacts with third-party services.
+
+| Rule | Rationale |
+|------|-----------|
+| **NEVER iterate over all users to call an external API** | Calling Stripe/Clerk/etc. once per user per run = O(users) calls per run × runs per day. At 1,000 users hourly, that's 24,000 calls/day. At 10,000 users, it's 240,000. |
+| **NEVER poll external APIs for state you can receive via webhook** | Stripe, Clerk, Resend, and most services push state changes. Use those. |
+| **Batch where possible** | If you must call an external API, use batch/list endpoints instead of per-record fetches. |
+| **Cache aggressively** | If you need external data, cache it with appropriate TTLs. Don't re-fetch what hasn't changed. |
+| **Log and monitor call volume** | Any new external API integration must log call counts so we can track costs. |
+
+**Stripe-Specific Rules:**
+- Stripe webhooks are the **primary** mechanism for billing state changes. The webhook handlers already exist and are hardened with deduplication, optimistic locking, and audit logging.
+- Reconciliation (if any) is a **safety net**, not a primary mechanism. It should run at most once daily and only check users whose state actually looks inconsistent (e.g., `isPro = true` but `stripeSubscriptionId` is null).
+- NEVER enumerate all Stripe customers/subscriptions. Query the local database for anomalies, then spot-check individual records against Stripe only when something looks wrong.
+- Before adding any Stripe API call, calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If this number exceeds 1,000/month, justify it in the PR.
+
+### Forbidden Infrastructure Patterns
+
+| Forbidden | Why | Do This Instead |
+|-----------|-----|-----------------|
+| New Vercel Cron entry without PR approval | Cron proliferation leads to unmanageable scheduled work | Add logic to existing cron or use events |
+| Polling loop that calls external APIs | Burns through API budgets and rate limits | Use webhooks |
+| Per-user external API call in a loop | O(N) API calls scale linearly with user growth | Batch endpoints or event-driven approach |
+| Creating a new job queue / worker system | We already have an in-database job queue (`ingestionJobs`) | Use the existing system or justify why it's insufficient |
+| Adding Bull, Agenda, BullMQ, or similar | Adds operational complexity for no benefit at our scale | Use existing in-database queue or Vercel Cron |
+| `setInterval` or `setTimeout` in server code | Serverless functions don't persist; these silently fail | Use Vercel Cron or the existing job queue |
+| Creating a dedicated "sync" service | Polling-based sync is almost always the wrong pattern | Webhook + reconciliation safety net |
+
+### Cost Impact Disclosure
+
+When a PR introduces or modifies any of the following, the PR description MUST include a **Cost Impact** section:
+
+- New external API calls (Stripe, Clerk, Resend, AI providers, etc.)
+- New or modified cron job frequency
+- New database queries that run on a schedule
+- New third-party service integrations
+
+**Cost Impact template:**
+
+```markdown
+## Cost Impact
+- **External API calls**: ~X calls/day to [Service] (X calls/run × Y runs/day)
+- **Monthly projection**: ~X calls/month at current user count
+- **Scaling factor**: O(1) / O(users) / O(records) per run
+- **Monthly cost estimate**: $X based on [pricing tier]
+```
+
+---
+
+## General Agent Decision-Making Rules
+
+### You Don't Know What You Don't Know
+
+AI agents confidently make decisions about topics they have zero context on. These rules exist to prevent that.
+
+1. **Don't architect what you don't understand.** If you're unsure about the billing model, pricing tiers, API rate limits, or infrastructure costs of a service, ASK before building. "I'll just add a cron job" is not a low-risk default — it has real operational and financial consequences.
+
+2. **Prefer boring, proven patterns.** The existing codebase has established patterns for webhooks, job queues, caching, and API integration. Use them. Don't invent new patterns for solved problems.
+
+3. **Scope your changes to what was asked.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer. Do the thing that was asked and nothing more.
+
+4. **When adding integrations, read the provider's docs on webhooks first.** Almost every SaaS provider (Stripe, Clerk, Resend, Vercel, etc.) has webhook support. Check for it before building a polling solution.
+
+5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
+
+### Operational Awareness Checklist
+
+Before merging any PR that introduces background/scheduled work, verify:
+
+- [ ] Is there already a webhook for this event? (Check the provider's docs)
+- [ ] Can this logic run inline after the triggering action?
+- [ ] Can this be lazy-evaluated when the data is next read?
+- [ ] If a cron job is truly needed, can it be added to an existing one?
+- [ ] What's the API call volume at 100 users? 1,000? 10,000? 100,000?
+- [ ] What happens if this job fails? Is there retry logic? Dead letter handling?
+- [ ] Is the frequency justified? What breaks if we run it less often?
+- [ ] Have I included a Cost Impact section in the PR description?
+
+---
+
 ## Environment Variables
 
 **NEVER** hardcode secrets. Always use environment validation:
@@ -500,6 +663,21 @@ pnpm turbo clean
 rm -rf node_modules/.cache
 ```
 
+### "Test OOM / Out of Memory"
+```bash
+# Run tests with reduced concurrency to lower memory pressure
+pnpm turbo test --concurrency=1
+
+# Run only tests for changed packages
+pnpm turbo test --affected
+
+# Combine both for maximum memory savings
+pnpm turbo test --affected --concurrency=1
+
+# The web app already uses NODE_OPTIONS=--max-old-space-size=4096
+# and --pool=forks --maxWorkers=2 for memory safety.
+```
+
 ### "Type errors after pull"
 ```bash
 pnpm install  # Ensure deps are synced
@@ -513,6 +691,40 @@ pnpm typecheck  # Re-run type check
 - **Copilot-specific**: `.github/copilot-instructions.md`
 - **Cursor-specific**: `apps/web/.cursorrules`
 - **Hooks documentation**: `.claude/hooks/README.md` (if exists)
+
+---
+
+## Turborepo Quick Reference (Agent Index)
+
+Compressed documentation index for AI agents. Use `turbo docs "topic"` or the `/turbo-docs` command for full details.
+
+```
+topic|config/command|notes
+task-deps|dependsOn: ["^build"]|^ = topological (upstream first), no prefix = same-package
+task-inputs|inputs: ["$TURBO_DEFAULT$", "!**/*.test.ts"]|narrow cache key, exclude tests from build
+task-outputs|outputs: [".next/**", "dist/**"]|what turbo caches and restores on hit
+task-description|description: "what this task does"|human/agent-readable, no execution effect (2.8+)
+env-vars|env: ["NODE_ENV", "NEXT_PUBLIC_*"]|wildcards supported, affects cache hash
+global-deps|globalDependencies: [".env.*local"]|changes invalidate ALL task caches
+pass-through-env|globalPassThroughEnv: ["SENTRY_AUTH_TOKEN"]|available at runtime but doesn't affect cache
+persistent|"persistent": true|long-running (dev servers), can't be depended on
+interruptible|"interruptible": true|turbo watch can restart if inputs change
+no-cache|"cache": false|always re-runs (dev, format, lint:fix, drizzle:generate)
+remote-cache|remoteCache.enabled: true|share cache across CI and local machines
+affected|--affected|run only changed packages vs base branch (CI optimization)
+concurrency|--concurrency=N or --concurrency=50%|limit parallel tasks (OOM mitigation)
+dry-run|--dry / --dry=json|preview execution plan without running
+filter|--filter=@jovie/web|run task for specific package only
+graph|--graph|visualize task dependency graph (svg, png, json, html)
+force|--force|ignore cache, re-execute all tasks
+output-logs|outputLogs: "errors-only"|reduce log noise (full, hash-only, new-only, errors-only, none)
+summarize|--summarize|generate JSON metadata for timing/cache analysis
+turbo-clean|pnpm turbo clean|clear local cache when debugging
+turbo-docs|turbo docs "query"|search turborepo.dev documentation from terminal (2.8+)
+worktrees|git worktree add ../dir -b branch|cache shared automatically across worktrees (2.8+)
+schema|$schema: turborepo.dev/schema.json|validates turbo.json in editors, use turborepo.dev domain
+daemon|daemon: false|background process for optimization (disabled in Jovie due to gRPC issues)
+```
 
 ---
 

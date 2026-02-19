@@ -66,8 +66,8 @@ export function useHelperState({
 }
 
 export const HELPER_TONE_CLASSES = {
-  idle: 'text-gray-600 dark:text-gray-300',
-  pending: 'text-gray-600 dark:text-gray-300',
-  success: 'text-emerald-600 dark:text-emerald-400',
-  error: 'text-red-600 dark:text-red-400',
+  idle: 'text-secondary-token',
+  pending: 'text-secondary-token',
+  success: 'text-success',
+  error: 'text-destructive',
 } as const;

@@ -8,7 +8,7 @@
  * - Suppression statistics
  */
 
-import { count, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
@@ -179,12 +179,8 @@ async function buildEngagementStats(
     whereConditions.push(eq(emailEngagement.referenceId, campaignId));
   }
 
-  // Pre-build the where clause separator to avoid nested template literals
-  const andSeparator = drizzleSql` AND `;
   const whereClause =
-    whereConditions.length > 0
-      ? drizzleSql`${drizzleSql.join(whereConditions, andSeparator)}`
-      : undefined;
+    whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
   const baseQuery = db
     .select({

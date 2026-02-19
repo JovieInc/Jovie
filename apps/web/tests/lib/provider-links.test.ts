@@ -22,7 +22,7 @@ describe('provider link discovery', () => {
         'https://music.apple.com/us/search?term=USUM72212345%20Taylor%20Swift%20Anti-Hero'
       );
 
-      expect(buildSearchUrl('youtube_music', baseTrack)).toBe(
+      expect(buildSearchUrl('youtube', baseTrack)).toBe(
         'https://music.youtube.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
       );
 
@@ -40,6 +40,38 @@ describe('provider link discovery', () => {
 
       expect(buildSearchUrl('tidal', baseTrack)).toBe(
         'https://tidal.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('pandora', baseTrack)).toBe(
+        'https://www.pandora.com/search/USUM72212345%20Taylor%20Swift%20Anti-Hero/tracks'
+      );
+
+      expect(buildSearchUrl('napster', baseTrack)).toBe(
+        'https://web.napster.com/search?query=USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('audiomack', baseTrack)).toBe(
+        'https://audiomack.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('qobuz', baseTrack)).toBe(
+        'https://www.qobuz.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('anghami', baseTrack)).toBe(
+        'https://play.anghami.com/search/USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('boomplay', baseTrack)).toBe(
+        'https://www.boomplay.com/search/default/USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('iheartradio', baseTrack)).toBe(
+        'https://www.iheart.com/search/?query=USUM72212345%20Taylor%20Swift%20Anti-Hero'
+      );
+
+      expect(buildSearchUrl('tiktok', baseTrack)).toBe(
+        'https://www.tiktok.com/search?q=USUM72212345%20Taylor%20Swift%20Anti-Hero'
       );
     });
 

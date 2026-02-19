@@ -21,6 +21,10 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
+import {
+  expireReferralOnChurn,
+  getInternalUserId,
+} from '@/lib/referrals/service';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -131,6 +135,22 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     stripeEventId: string,
     stripeEventTimestamp: Date
   ): Promise<HandlerResult> {
+    // Skip subscriptions still awaiting initial payment.
+    // Stripe fires `customer.subscription.created` before the first invoice is
+    // paid, so the status is often `incomplete`.  Processing it would
+    // incorrectly downgrade the user.  The `checkout.session.completed` or
+    // `customer.subscription.updated` (→ active) event will handle activation.
+    if (
+      subscription.status === 'incomplete' ||
+      subscription.status === 'incomplete_expired'
+    ) {
+      return {
+        success: true,
+        skipped: true,
+        reason: `subscription_created_with_status_${subscription.status}`,
+      };
+    }
+
     const userId = await this.extractUserId(
       subscription,
       'customer.subscription.created'
@@ -262,6 +282,21 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         }
       );
       throw new Error(`Failed to downgrade user: ${result.error}`);
+    }
+
+    // Mark referral as churned on cancellation.
+    // Awaited so failures are surfaced instead of silently dropped.
+    // If the user re-subscribes later via a new referral link, a fresh referral is created.
+    try {
+      const internalId = await getInternalUserId(userId);
+      if (internalId) {
+        await expireReferralOnChurn(internalId);
+      }
+    } catch (error) {
+      // Log but don't fail the webhook — referral churn tracking is secondary
+      logger.warn('Failed to expire referral on subscription deletion', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
 
     await invalidateBillingCache();

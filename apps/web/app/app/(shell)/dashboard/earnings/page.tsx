@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGate';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
@@ -30,7 +31,7 @@ export default async function EarningsPage() {
     return <DashboardTippingGate />;
   } catch (error) {
     throwIfRedirect(error);
-    console.error('Error loading earnings data:', error);
+    Sentry.captureException(error);
 
     return (
       <PageErrorState message='Failed to load earnings data. Please refresh the page.' />

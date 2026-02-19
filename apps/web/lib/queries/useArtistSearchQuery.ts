@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { SEARCH_CACHE } from './cache-strategies';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 // Response shape from /api/spotify/search
@@ -61,28 +62,37 @@ export interface UseArtistSearchQueryReturn {
 }
 
 const DEFAULT_LIMIT = 5;
-const DEFAULT_MIN_QUERY_LENGTH = 2;
+const DEFAULT_MIN_QUERY_LENGTH = 1;
 
 async function fetchArtistSearch(
   query: string,
   limit: number,
   signal?: AbortSignal
 ): Promise<SpotifyArtistResult[]> {
-  const response = await fetch(
-    `/api/spotify/search?q=${encodeURIComponent(query)}&limit=${limit}`,
-    { signal }
-  );
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const errorCode = data?.code || 'UNKNOWN';
-    if (errorCode === 'RATE_LIMITED') {
-      throw new RangeError('Too many requests. Please wait a moment.');
+  try {
+    return await fetchWithTimeout<SpotifyArtistResult[]>(
+      `/api/spotify/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      { signal }
+    );
+  } catch (error) {
+    if (error instanceof FetchError) {
+      if (error.status === 429) {
+        // Non-retryable: preserve rate limit budget
+        const rateLimitError = new Error(
+          'Too many requests. Please wait a moment.'
+        );
+        rateLimitError.name = 'RateLimitError';
+        throw rateLimitError;
+      }
+      // Parse API error body for user-friendly messages
+      if (error.response) {
+        const data = await error.response.json().catch(() => ({}));
+        error.message = data?.error || error.message || 'Search failed';
+        throw error; // Preserve FetchError so retry policy can call isRetryable()
+      }
     }
-    throw new Error(data?.error || 'Search failed');
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
@@ -146,6 +156,13 @@ export function useArtistSearchQuery(
     queryFn: ({ signal }) => fetchArtistSearch(debouncedQuery, limit, signal),
     enabled: debouncedQuery.length >= minQueryLength,
     ...SEARCH_CACHE,
+    // Don't retry rate limit or client errors - only retry server/network errors
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.name === 'RateLimitError')
+        return false;
+      if (error instanceof FetchError && !error.isRetryable()) return false;
+      return failureCount < 2;
+    },
   });
 
   // Derive state from query status
@@ -184,6 +201,14 @@ export function useArtistSearchQuery(
       if (trimmed.length < minQueryLength) {
         asyncDebouncer.cancel();
         setDebouncedQuery('');
+        setIsPending(false);
+        return;
+      }
+
+      // Single letter: bypass debounce for instant alphabet pre-cache results
+      if (trimmed.length === 1 && /^[a-zA-Z]$/.test(trimmed)) {
+        asyncDebouncer.cancel();
+        setDebouncedQuery(trimmed);
         setIsPending(false);
         return;
       }

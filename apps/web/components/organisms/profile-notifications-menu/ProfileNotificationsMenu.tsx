@@ -15,16 +15,34 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Switch,
 } from '@jovie/ui';
-import type { NotificationChannel } from '@/types/notifications';
+import { useCallback, useEffect, useState } from 'react';
+import { useUpdateContentPreferencesMutation } from '@/lib/queries';
+import {
+  NOTIFICATION_CONTENT_TYPES,
+  type NotificationChannel,
+  type NotificationContentType,
+} from '@/types/notifications';
 import { formatE164PhoneForDisplay } from '../hooks/useProfileNotificationsController';
 import { ProfileNotificationsButton } from '../ProfileNotificationsButton';
 import type { ProfileNotificationsMenuProps } from './types';
 import { useNotificationConfirm } from './useNotificationConfirm';
 import { labelForChannel } from './utils';
 
+type ContentPrefs = Record<NotificationContentType, boolean>;
+
+const DEFAULT_CONTENT_PREFS: ContentPrefs = {
+  newMusic: true,
+  tourDates: true,
+  merch: true,
+  general: true,
+};
+
 export function ProfileNotificationsMenu({
+  artistId,
   channelBusy,
+  contentPreferences,
   hasActiveSubscriptions,
   notificationsState,
   onAddChannel,
@@ -42,6 +60,47 @@ export function ProfileNotificationsMenu({
     closeConfirmDialog,
     handleConfirm,
   } = useNotificationConfirm();
+
+  const updatePrefsMutation = useUpdateContentPreferencesMutation();
+
+  // Initialize from server-provided preferences, falling back to defaults
+  const [contentPrefs, setContentPrefs] = useState<ContentPrefs>(() => ({
+    ...DEFAULT_CONTENT_PREFS,
+    ...contentPreferences,
+  }));
+
+  // Sync when server preferences change (e.g. after status re-fetch)
+  useEffect(() => {
+    if (contentPreferences) {
+      setContentPrefs(prev => ({ ...prev, ...contentPreferences }));
+    }
+  }, [contentPreferences]);
+
+  const handleContentToggle = useCallback(
+    (key: NotificationContentType) => {
+      // Guard: no subscribed channel → nothing to update
+      if (!subscriptionDetails.email && !subscriptionDetails.sms) return;
+
+      setContentPrefs(prev => {
+        const next = { ...prev, [key]: !prev[key] };
+
+        updatePrefsMutation.mutate({
+          artistId,
+          email: subscriptionDetails.email,
+          phone: subscriptionDetails.sms,
+          preferences: { [key]: next[key] },
+        });
+
+        return next;
+      });
+    },
+    [
+      artistId,
+      subscriptionDetails.email,
+      subscriptionDetails.sms,
+      updatePrefsMutation,
+    ]
+  );
 
   const renderChannelMenuItem = (
     targetChannel: NotificationChannel,
@@ -126,8 +185,9 @@ export function ProfileNotificationsMenu({
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
+          {/* ── Channels ─────────────────────────────── */}
           <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
-            Manage notifications
+            How you get notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {renderChannelMenuItem('sms', 'SMS')}
@@ -147,6 +207,38 @@ export function ProfileNotificationsMenu({
               …
             </span>
           </DropdownMenuItem>
+
+          {/* ── Content types ────────────────────────── */}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+            What you hear about
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {NOTIFICATION_CONTENT_TYPES.map(({ key, label, description }) => (
+            <DropdownMenuItem
+              key={key}
+              className='flex items-center gap-3 focus-visible:outline-none'
+              onSelect={event => {
+                // Prevent menu from closing on toggle
+                event.preventDefault();
+                handleContentToggle(key);
+              }}
+            >
+              <div className='flex-1 min-w-0'>
+                <p className='text-sm font-semibold text-primary-token'>
+                  {label}
+                </p>
+                <p className='text-xs text-tertiary-token truncate'>
+                  {description}
+                </p>
+              </div>
+              <Switch
+                checked={contentPrefs[key]}
+                aria-label={`${label} notifications`}
+                className='shrink-0 pointer-events-none'
+              />
+            </DropdownMenuItem>
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

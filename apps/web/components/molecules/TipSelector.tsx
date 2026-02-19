@@ -9,6 +9,8 @@ interface TipSelectorProps {
   readonly onContinue: (amount: number) => void;
   readonly isLoading?: boolean;
   readonly className?: string;
+  /** Label for the payment method shown on the continue button (e.g. "Venmo", "Apple Pay") */
+  readonly paymentLabel?: string;
 }
 
 export function TipSelector({
@@ -16,6 +18,7 @@ export function TipSelector({
   onContinue,
   isLoading = false,
   className = '',
+  paymentLabel,
 }: TipSelectorProps) {
   const defaultIdx = Math.floor(Math.max(0, amounts.length - 1) / 2);
   const [selectedIdx, setSelectedIdx] = useState<number>(defaultIdx);
@@ -38,6 +41,13 @@ export function TipSelector({
     }
   }, [selectedAmount]);
 
+  let continueLabel = `Continue with $${selectedAmount}`;
+  if (isLoading) {
+    continueLabel = 'Processing...';
+  } else if (paymentLabel) {
+    continueLabel = `Continue with ${paymentLabel}`;
+  }
+
   return (
     <div className={`space-y-5 ${className}`} data-test='tip-selector'>
       <h3 id='tip-selector-heading' className='sr-only'>
@@ -51,10 +61,8 @@ export function TipSelector({
         Choose amount
       </p>
 
-      {/* role="group" is appropriate for button groups; <fieldset> has styling constraints */}
-      <div // NOSONAR S6819
-        className='grid grid-cols-3 gap-3'
-        role='group'
+      <fieldset
+        className='grid grid-cols-3 gap-3 border-0 p-0 m-0'
         aria-label='Tip amount options'
       >
         {amounts.map((amount, idx) => (
@@ -66,7 +74,7 @@ export function TipSelector({
             index={idx}
           />
         ))}
-      </div>
+      </fieldset>
 
       <Button
         onClick={handleContinue}
@@ -74,9 +82,13 @@ export function TipSelector({
         size='lg'
         disabled={isLoading}
         variant='primary'
-        aria-label={`Continue with $${selectedAmount} tip`}
+        aria-label={
+          paymentLabel
+            ? `Continue with ${paymentLabel} for $${selectedAmount} tip`
+            : `Continue with $${selectedAmount} tip`
+        }
       >
-        {isLoading ? 'Processing...' : `Continue with $${selectedAmount}`}
+        {continueLabel}
       </Button>
     </div>
   );

@@ -37,6 +37,9 @@ export const APP_ROUTES = {
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
   SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
+  SETTINGS_CONTACTS: '/app/settings/contacts',
+  SETTINGS_TOURING: '/app/settings/touring',
+  SETTINGS_AUDIENCE: '/app/settings/audience',
 
   // Admin
   ADMIN: '/app/admin',
@@ -51,6 +54,9 @@ export const APP_ROUTES = {
   ADMIN_ACTIVITY: '/app/admin/activity',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
+  // Marketing
+  PRICING: '/pricing',
+
   // Auth & Onboarding
   SIGNIN: '/signin',
   SIGNUP: '/signup',
@@ -61,6 +67,9 @@ export const APP_ROUTES = {
   BILLING: '/billing',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
+
+  // Referrals
+  REFERRALS: '/app/referrals',
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];

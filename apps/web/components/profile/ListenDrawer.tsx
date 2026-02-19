@@ -1,5 +1,6 @@
 'use client';
 
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
@@ -73,7 +74,7 @@ export function ListenDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
         <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t'
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
           style={{
             backgroundColor: 'var(--liquid-glass-bg)',
             backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
@@ -91,6 +92,15 @@ export function ListenDrawer({
 
           {/* Drag handle */}
           <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+
+          <button
+            type='button'
+            onClick={() => handleOpenChange(false)}
+            className='absolute right-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full text-secondary-token transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25'
+            aria-label='Close'
+          >
+            <X size={18} />
+          </button>
 
           <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
             Listen on

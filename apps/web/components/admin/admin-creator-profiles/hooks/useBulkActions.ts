@@ -61,7 +61,9 @@ export function useBulkActions({
         `Verified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
       );
     }
-  }, [profiles, selectedIds, toggleVerification]);
+    clearSelection();
+    router.refresh();
+  }, [profiles, selectedIds, toggleVerification, clearSelection, router]);
 
   const handleBulkUnverify = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
@@ -78,7 +80,9 @@ export function useBulkActions({
         `Unverified ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
       );
     }
-  }, [profiles, selectedIds, toggleVerification]);
+    clearSelection();
+    router.refresh();
+  }, [profiles, selectedIds, toggleVerification, clearSelection, router]);
 
   const handleBulkFeature = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
@@ -95,7 +99,9 @@ export function useBulkActions({
         `Featured ${selectedProfiles.length} creator${selectedProfiles.length > 1 ? 's' : ''}`
       );
     }
-  }, [profiles, selectedIds, toggleFeatured]);
+    clearSelection();
+    router.refresh();
+  }, [profiles, selectedIds, toggleFeatured, clearSelection, router]);
 
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));

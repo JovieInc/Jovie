@@ -2,6 +2,9 @@
   "name": "@jovie/ui",
   "version": "26.2.0",
   "private": true,
+  "sideEffects": [
+    "*.css"
+  ],
   "engines": {
     "node": ">=24.0.0"
   },
@@ -38,7 +41,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "react-hook-form": "^7.71.1",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.4.1"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",

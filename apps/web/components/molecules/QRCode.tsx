@@ -54,10 +54,8 @@ export function QRCode({
 
   if (hasError) {
     return (
-      // Fallback state container needs role="img" for accessibility
-      <div // NOSONAR S6819
-        role='img'
-        aria-label={`${label} unavailable`}
+      <div
+        aria-hidden='true'
         className={cn(
           'flex items-center justify-center rounded bg-gray-100 text-gray-500',
           className

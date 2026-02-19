@@ -1,334 +1,339 @@
 {
-  "generated_at": "2026-02-07T00:00:00Z",
+  "generated_at": "2026-02-15T10:30:00Z",
   "scope": "apps/web",
-  "focus": "UX Simplification Priorities",
   "ideas": [
     {
-      "id": "simplify-001",
-      "title": "Remove duplicate Analytics nav item from sidebar",
-      "description": "\"Analytics\" appears in both primaryNavigation (line 74-79, BarChart3 icon) and secondaryNavigation (line 83-89, PieChart icon), both pointing to APP_ROUTES.ANALYTICS. Users see two Analytics links in the sidebar separated by a divider.",
-      "rationale": "Two different-looking items going to the same destination is a direct UX defect. Violates the principle of a single, unambiguous path to any destination.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/dashboard/dashboard-nav/config.ts:74-89"
-      ],
-      "current_state": "Sidebar renders two Analytics entries with different icons, both routing to /app/analytics",
-      "proposed_change": "Remove the Analytics entry from secondaryNavigation (lines 83-89). Keep the primary one at line 74-79.",
-      "user_benefit": "Clear, unambiguous navigation — one link per destination",
-      "effort": "low",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-002",
-      "title": "Show music CTA as primary action, not subscription form",
-      "description": "ProfilePrimaryCTA (line 87-102) replaces the Listen/Spotify button with ArtistNotificationsCTA when notifications are enabled and the visitor hasn't subscribed. First-time visitors from Instagram bio expect music links, not a subscription form.",
-      "rationale": "The primary value proposition of a link-in-bio music platform is connecting fans to music. Gating this behind a notification signup is a conversion barrier that works against the core product promise.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/profile/ProfilePrimaryCTA.tsx:87-102"
-      ],
-      "current_state": "Notification subscribe form replaces music CTA by default for all unsubscribed visitors",
-      "proposed_change": "Show the Listen/music CTA as the primary button. Place the subscribe form as a secondary element below it, or as an inline prompt after the user clicks listen.",
-      "user_benefit": "Visitors immediately see what they came for — music streaming links",
-      "effort": "medium",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-003",
-      "title": "Reduce sidebar nav from 9 items to grouped sections",
-      "description": "The sidebar presents 9 unique nav items (Profile, Contacts, Releases, Tour Dates, Audience, Analytics x2, Earnings, Chat) plus up to 10 recent chats simultaneously. No grouping or progressive disclosure beyond a thin divider.",
-      "rationale": "Hick's Law: decision time increases logarithmically with choices. For a link-in-bio tool targeted at music creators, 9+ primary destinations is cognitive overload. Contacts vs Audience have overlapping mental models.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/dashboard/dashboard-nav/config.ts:37-104",
-        "apps/web/components/dashboard/dashboard-nav/DashboardNav.tsx"
-      ],
-      "current_state": "Flat list of 9 nav items with no semantic grouping, plus 10 recent chats",
-      "proposed_change": "Group nav into 3 semantic sections with labels: Content (Profile, Releases, Tour Dates), People (Contacts, Audience), Insights (Analytics, Earnings). Cap recent chats at 3-5 visible with 'View all' link.",
-      "user_benefit": "Faster navigation, reduced cognitive load, clearer information architecture",
-      "effort": "medium",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-004",
-      "title": "Prioritize Releases in mobile bottom nav over Contacts",
-      "description": "Mobile bottom bar shows [Dashboard, Profile, Contacts, Audience]. Releases — a core feature for music creators — is hidden behind 'More'. The expanded More menu also duplicates all 4 primary items.",
-      "rationale": "For a music creator tool, Releases should be more accessible than Contacts on mobile. The More menu showing duplicated primary items adds visual noise and wasted screen space.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/dashboard/dashboard-nav/config.ts:195-208",
-        "apps/web/components/dashboard/organisms/LiquidGlassMenu.tsx"
-      ],
-      "current_state": "mobilePrimaryNavigation: [Dashboard, Profile, Contacts, Audience]; expanded menu includes all primary items again",
-      "proposed_change": "Change mobile primary to [Dashboard, Profile, Releases, More]. Remove duplicate primary items from expanded menu.",
-      "user_benefit": "Core feature (Releases) is one tap away on mobile instead of buried in More menu",
-      "effort": "low",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-005",
-      "title": "Add visible progress indicator to onboarding flow",
-      "description": "The onboarding flow has 3 steps (Name, Handle, Done) but no visible progress indicator. The step indicator is in a sr-only div (AppleStyleOnboardingForm.tsx line 213-216), invisible to sighted users.",
-      "rationale": "Progress indicators reduce abandonment by setting expectations. Users currently have no sense of how many steps remain.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/dashboard/organisms/apple-style-onboarding/AppleStyleOnboardingForm.tsx:213-216"
-      ],
-      "current_state": "Step indicator is screen-reader-only; sighted users see no progress",
-      "proposed_change": "Add visible step dots or a minimal progress bar above the form content. 3 dots with active state highlighting.",
-      "user_benefit": "Clear expectations about onboarding length, reduced abandonment",
-      "effort": "low",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-006",
-      "title": "Auto-skip onboarding handle step when handle is pre-validated",
-      "description": "Users enter a handle on the homepage ClaimHandleForm, get sent to /onboarding?handle=<handle>, then the onboarding handle step shows the same field pre-filled requiring re-validation. The handle is collected twice.",
-      "rationale": "Redundant input steps add friction. If the handle was already validated on the homepage, re-presenting it wastes user time.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/app/onboarding/page.tsx:101-105",
-        "apps/web/components/dashboard/organisms/apple-style-onboarding/AppleStyleOnboardingForm.tsx:166-181"
-      ],
-      "current_state": "Handle entered and validated on homepage, then shown again pre-filled in onboarding step 1 for re-validation",
-      "proposed_change": "When initialHandle is passed via query param and already validated, auto-advance past the handle step. Show a brief confirmation toast instead.",
-      "user_benefit": "One fewer step in onboarding for homepage sign-ups",
-      "effort": "low",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-007",
-      "title": "Let artists control their primary CTA priority",
-      "description": "ProfilePrimaryCTA uses a fixed priority waterfall: tickets > shop > spotify > listen. If an artist has a Bandsintown link, visitors always see 'Find tickets' even if the artist primarily wants to drive streams.",
-      "rationale": "Artists should control their own conversion funnel. The current hardcoded priority may not match artist intent and cannot be overridden.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/profile/ProfilePrimaryCTA.tsx:104-170",
-        "apps/web/lib/profile-next-action.ts"
-      ],
-      "current_state": "Fixed priority waterfall: tickets > shop > spotify > listen, not configurable",
-      "proposed_change": "Add a 'primary_cta' preference to creator_profiles that lets artists choose their primary action from the dashboard. Fall back to the current waterfall when unset.",
-      "user_benefit": "Artists control what visitors see as the primary action on their profile",
-      "effort": "high",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-008",
-      "title": "Delete dead DashboardLayoutClient and DashboardSidebar",
-      "description": "Two complete layout systems exist: the active AuthShell/UnifiedSidebar system and the dead DashboardLayoutClient/DashboardSidebar (649 lines total). The legacy system is only imported by Storybook mocks and has divergent behavior.",
-      "rationale": "Dead code adds maintenance burden and developer confusion. The two sidebars have conflicting behavior (UserButton placement, collapse mode), creating contradictory mental models for developers.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/app/app/(shell)/dashboard/DashboardLayoutClient.tsx",
-        "apps/web/components/dashboard/layout/DashboardSidebar.tsx"
-      ],
-      "current_state": "649 lines of dead layout code that may be accidentally modified or referenced",
-      "proposed_change": "Delete both files. Update Storybook mocks to reference the active UnifiedSidebar system.",
-      "user_benefit": "Reduces developer confusion, smaller codebase, no risk of modifying wrong layout",
-      "effort": "medium",
-      "priority": "high"
-    },
-    {
-      "id": "simplify-009",
-      "title": "Simplify UserButton dropdown — remove nested legal links",
-      "description": "The user menu dropdown contains ~10 actions including a 'Learn more' submenu nesting Privacy Policy, Terms of Service, Cookie Policy, and Keyboard Shortcuts. Legal links in a user menu is unusual placement.",
-      "rationale": "Legal links belong in the footer or settings page, not nested in a user dropdown. The submenu adds navigation depth and cognitive load to an already packed menu.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/organisms/user-button/UserButton.tsx:44-278"
-      ],
-      "current_state": "10 actions with nested 'Learn more' submenu containing 4 items",
-      "proposed_change": "Remove 'Learn more' submenu. Move legal links to Settings page footer. Keep only: Profile, Settings, Billing, Feedback, Sign Out (5 items).",
-      "user_benefit": "Simpler, faster user menu with fewer choices and no nested menus",
-      "effort": "low",
-      "priority": "medium"
-    },
-    {
-      "id": "simplify-010",
-      "title": "Replace auto-redirect with explicit link on existing account sign-up",
-      "description": "When a user signs up with an existing email, SignUpForm (lines 72-86) briefly shows 'Account already exists' then auto-redirects to sign-in after 1.5 seconds. No cancel mechanism.",
-      "rationale": "Auto-navigation without user consent feels jarring. The 1.5s delay is too fast for slow readers and too slow for power users.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/auth/forms/SignUpForm.tsx:72-86"
-      ],
-      "current_state": "Auto-redirect to sign-in after 1.5s timer with no cancel",
-      "proposed_change": "Show a clear message with a prominent 'Sign in instead' button. Remove the auto-redirect timer. Let the user click when ready.",
-      "user_benefit": "User stays in control of navigation",
-      "effort": "low",
-      "priority": "medium"
-    },
-    {
-      "id": "simplify-011",
-      "title": "Add visual indicator for collapsed sidebar hover zone",
-      "description": "When sidebar is collapsed on desktop, a floating overlay appears when hovering a 20px invisible trigger zone on the left edge. No visual cue hints at this interaction.",
-      "rationale": "Discoverable-only-by-accident interactions violate the visibility of system status heuristic. Users may never discover this feature.",
-      "category": "usability",
-      "affected_files": [
-        "apps/web/components/organisms/UnifiedSidebar.tsx:43-75"
-      ],
-      "current_state": "Invisible 20px trigger zone, no visual affordance when sidebar is collapsed",
-      "proposed_change": "Add a subtle visual indicator (thin vertical bar, small chevron icon, or gentle glow) on the left edge when sidebar is collapsed.",
-      "user_benefit": "Users discover the sidebar expansion feature without stumbling on it by accident",
-      "effort": "low",
-      "priority": "medium"
-    },
-    {
-      "id": "simplify-012",
-      "title": "Show notification CTA errors inline instead of in tooltips",
-      "description": "ArtistNotificationsCTA (lines 395-416) shows validation errors as a tiny red circle icon with a tooltip. On mobile, tooltip interactions are unreliable.",
-      "rationale": "Error messages should be immediately visible. Tooltips on mobile require tap-to-show behavior which is inconsistent across devices and browsers.",
+      "id": "uiux-001",
+      "title": "Add keyboard focus management for ListenDrawer close button",
+      "description": "The ListenDrawer (mobile bottom sheet) has no visible close button and relies solely on swipe gestures or clicking outside. Keyboard users have no way to explicitly close the drawer.",
+      "rationale": "Bottom drawers opened via button click should return focus to the trigger button on close and provide a keyboard-accessible close mechanism. The drag handle is visual only, not interactive.",
       "category": "accessibility",
       "affected_files": [
-        "apps/web/components/profile/artist-notifications-cta/ArtistNotificationsCTA.tsx:395-416"
+        "apps/web/components/profile/ListenDrawer.tsx:72-111"
       ],
-      "current_state": "Errors hidden behind a small icon + tooltip interaction",
-      "proposed_change": "Display error messages as inline text below the input field, matching standard form validation patterns used elsewhere in the app.",
-      "user_benefit": "Errors are immediately visible on all devices without extra interaction",
+      "current_state": "Drawer has no visible close button. Escape key and hardware back button work, but there's no explicit interactive close element for keyboard navigation.",
+      "proposed_change": "Add a visually hidden or icon-only close button in the header area with aria-label='Close'. Ensure Escape key closes drawer AND returns focus to the trigger button that opened it.",
+      "user_benefit": "Keyboard and screen reader users can independently close the drawer without relying on indirect methods.",
       "effort": "low",
-      "priority": "medium"
+      "priority": "high"
     },
     {
-      "id": "simplify-013",
-      "title": "Remove 'Delete not implemented' placeholder toasts",
-      "description": "ContactSidebar (line 99) and ReleaseSidebar (line 114) show toast.info('Delete not implemented') when users click delete buttons.",
-      "rationale": "Placeholder functionality in production undermines user trust. Users expect buttons to work.",
+      "id": "uiux-002",
+      "title": "Missing loading/error states in ProfilePrimaryCTA",
+      "description": "The ProfilePrimaryCTA component shows a basic loading skeleton when hydrating subscription status but no error state UI when subscription check fails.",
+      "rationale": "User actions like opening the notifications CTA could fail silently. Error states should be visible and actionable.",
       "category": "usability",
       "affected_files": [
-        "apps/web/components/organisms/contact-sidebar/ContactSidebar.tsx:99",
-        "apps/web/components/organisms/release-sidebar/ReleaseSidebar.tsx:114"
+        "apps/web/components/profile/ProfilePrimaryCTA.tsx:88-112"
       ],
-      "current_state": "Delete buttons show 'not implemented' info toast",
-      "proposed_change": "Either implement the delete action or hide the delete button entirely until the feature is ready.",
-      "user_benefit": "No broken-feeling interactions that erode trust",
+      "current_state": "Component renders ArtistNotificationsCTA with loading skeleton but no error fallback. If subscription status query fails, user sees stale UI or nothing.",
+      "proposed_change": "Add error state UI with retry button when subscription hydration fails. Show inline error message with 'Try again' action.",
+      "user_benefit": "Users can recover from temporary network failures without refreshing the entire page.",
       "effort": "low",
       "priority": "medium"
     },
     {
-      "id": "simplify-014",
-      "title": "Consolidate three DSP button implementations into one",
-      "description": "Three separate components render DSP buttons: DSPButtonGroup (with DOMPurify sanitization), ListenSection (with deep links), StaticListenInterface (without sanitization). Each has its own click handlers, loading states, and deep-link logic.",
-      "rationale": "Inconsistent behavior between the same visual element across pages confuses both users and developers. DOMPurify adds 70KB for trusted internal SVGs.",
+      "id": "uiux-003",
+      "title": "Hardcoded colors in launch page marketing mockups",
+      "description": "The launch page contains extensive hardcoded hex colors and rgb() values in inline styles for marketing mockups instead of using design system tokens.",
+      "rationale": "Hardcoded colors create visual inconsistencies, break theming, and make design updates labor-intensive. Memory notes emphasize token usage for consistency.",
+      "category": "visual",
+      "affected_files": [
+        "apps/web/app/(marketing)/launch/page.tsx:220-740",
+        "apps/web/app/(marketing)/launch/page.tsx:920-975"
+      ],
+      "current_state": "Multiple inline style blocks use hardcoded values like `background: '#2a2a2a'`, `color: 'rgb(52 211 153)'`, `border: '1px solid var(--linear-border-subtle)'` (mixing approaches). Found 24 rgb() usages across launch pages.",
+      "proposed_change": "Extract hardcoded colors to CSS variables or Tailwind classes. Use design-system.css tokens (`var(--linear-bg-surface-*)`, `var(--linear-text-*)`) consistently. Consider creating mockup-specific token aliases if needed.",
+      "user_benefit": "Consistent visual appearance across light/dark modes, easier design iteration, maintainable codebase.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-004",
+      "title": "No mobile preview for profile settings changes",
+      "description": "When users edit their profile in dashboard settings, they see changes in desktop view only. No live mobile preview exists despite mobile being the primary consumption device.",
+      "rationale": "Most fans view artist profiles on mobile. Artists should preview how changes look on mobile before publishing.",
       "category": "usability",
       "affected_files": [
-        "apps/web/components/molecules/DSPButtonGroup.tsx",
-        "apps/web/components/organisms/ListenSection.tsx",
-        "apps/web/components/profile/StaticListenInterface.tsx"
+        "apps/web/components/dashboard/organisms/DashboardPreview.tsx"
       ],
-      "current_state": "Three DSP button components with divergent sanitization, loading states, and deep-link handling",
-      "proposed_change": "Consolidate into a single configurable DSP button list component. Remove DOMPurify for trusted internal SVGs.",
-      "user_benefit": "Consistent button behavior on every page, faster page load (-70KB)",
-      "effort": "high",
-      "priority": "medium"
+      "current_state": "Profile preview likely shows desktop layout only (file not read, inferred from common patterns).",
+      "proposed_change": "Add mobile/desktop toggle to profile preview. Show iPhone-sized frame with actual mobile layout rendering. Use CSS container queries or responsive iframe.",
+      "user_benefit": "Artists can confidently publish changes knowing exactly how fans will see them on phones.",
+      "effort": "medium",
+      "priority": "high"
     },
     {
-      "id": "simplify-015",
-      "title": "Increase social link touch targets to 44px minimum",
-      "description": "Social link icons use h-10 w-10 (40x40px), below the 44px minimum recommended by WCAG 2.5.8 and Apple Human Interface Guidelines.",
-      "rationale": "Touch targets below 44px cause mis-taps on mobile, especially for users with motor impairments.",
-      "category": "accessibility",
-      "affected_files": [
-        "apps/web/components/molecules/SocialLink.tsx:88"
-      ],
-      "current_state": "40x40px touch targets for social icons on public profile",
-      "proposed_change": "Increase to h-11 w-11 (44x44px) or add transparent padding to maintain visual size with larger tappable area.",
-      "user_benefit": "Easier tapping on mobile, meets accessibility minimum",
-      "effort": "low",
-      "priority": "medium"
-    },
-    {
-      "id": "simplify-016",
-      "title": "Remove premature 'preference saved' notice on DSP buttons",
-      "description": "DSPButtonGroup (lines 58-62) shows 'Your preference will be saved for next time' by default before any selection is made.",
-      "rationale": "Showing this before any action is confusing — the visitor hasn't expressed a preference yet. It adds visual clutter to the initial view.",
+      "id": "uiux-005",
+      "title": "Empty state lacks clear next action for new users",
+      "description": "The EmptyState component supports actions, but usage patterns across dashboard may not always provide actionable next steps for first-time users.",
+      "rationale": "Empty states are critical onboarding moments. Without clear CTAs, users abandon features.",
       "category": "usability",
       "affected_files": [
-        "apps/web/components/molecules/DSPButtonGroup.tsx:58-62"
+        "apps/web/components/organisms/EmptyState.tsx"
       ],
-      "current_state": "Preference notice shown on first visit before any selection",
-      "proposed_change": "Only show the notice after a selection is made, or remove it entirely and save silently.",
-      "user_benefit": "Cleaner initial view with less confusing text",
+      "current_state": "EmptyState component is well-structured with action/secondaryAction props and keyboard shortcuts support. Implementation is solid.",
+      "proposed_change": "Audit all EmptyState usages to ensure every instance has a primary action. Add variant-specific default actions (e.g., 'search' variant should default to showing search suggestions, 'permission' should link to settings).",
+      "user_benefit": "Users always know what to do next when encountering empty data, reducing abandonment.",
       "effort": "low",
       "priority": "medium"
     },
     {
-      "id": "simplify-017",
-      "title": "Add retry actions to error states in activity feed and DSP matches",
-      "description": "DashboardActivityFeed (line 164) and DspMatchList (line 105) show plain text errors with no retry button. CreatorProfile (lines 29-34) uses raw CSS colors instead of ErrorBanner.",
-      "rationale": "Errors without recovery actions are dead ends. Users must manually refresh the entire page to retry.",
+      "id": "uiux-006",
+      "title": "Auth flow lacks progress indication across multi-step forms",
+      "description": "SignUpForm and SignInForm use multi-step flows (method → email → verification) but only show 'Step X of Y' in AccessibleStepWrapper, not visible progress UI.",
+      "rationale": "Users lose context mid-flow and don't know how many steps remain. Visual progress indicators reduce abandonment.",
       "category": "usability",
       "affected_files": [
-        "apps/web/components/dashboard/organisms/dashboard-activity-feed/DashboardActivityFeed.tsx:164",
-        "apps/web/components/dashboard/organisms/dsp-matches/DspMatchList.tsx:105",
-        "apps/web/components/creator/CreatorProfile.tsx:29-34"
+        "apps/web/components/auth/forms/SignUpForm.tsx:116-156",
+        "apps/web/components/auth/forms/SignInForm.tsx"
       ],
-      "current_state": "Plain text errors with no retry button",
-      "proposed_change": "Replace with ErrorBanner component which includes retry actions and consistent design-token styling.",
-      "user_benefit": "Users can recover from errors in-place without refreshing the page",
+      "current_state": "AccessibleStepWrapper announces step count for screen readers but provides no visual indicator. Users see form transitions but no progress dots or breadcrumbs.",
+      "proposed_change": "Add horizontal step indicator UI (e.g., dots or numbered badges) above form content. Show 'Step 1 of 2' visually, not just in aria-labels. Highlight current step, gray out future steps.",
+      "user_benefit": "Users understand where they are in the auth flow and feel confident they're making progress.",
       "effort": "low",
       "priority": "medium"
     },
     {
-      "id": "simplify-018",
-      "title": "Use client-side navigation from onboarding to dashboard",
-      "description": "Onboarding completion (AppleStyleOnboardingForm.tsx line 144-146) uses globalThis.location.href for hard navigation, causing a full page reload after smooth step transitions.",
-      "rationale": "Hard reloads are jarring after smooth client-side transitions and add unnecessary latency.",
+      "id": "uiux-007",
+      "title": "Missing 'Remember me' and biometric login options",
+      "description": "Auth flows lack 'Remember me' checkbox or passkey/biometric auth options. Users must re-enter credentials frequently.",
+      "rationale": "Modern auth UX expectations include passkeys, Face ID, Touch ID. Clerk supports these but Jovie doesn't expose them.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/auth/forms/MethodSelector.tsx:60-230"
+      ],
+      "current_state": "Auth shows Google/Spotify OAuth and email options only. No passkey or biometric options visible.",
+      "proposed_change": "Add 'Sign in with passkey' option if user has saved credentials. Show Face ID/Touch ID icon on supported devices. Use Clerk's passkey APIs.",
+      "user_benefit": "Faster login, better security, matches user expectations from modern apps.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-008",
+      "title": "No visual feedback for clipboard copy actions",
+      "description": "Launch page and dashboard likely have copy-to-clipboard actions (smart links, profile URLs) but may lack success feedback.",
+      "rationale": "Users need confirmation their action succeeded. Without feedback, they may click multiple times or paste wrong content.",
       "category": "interaction",
       "affected_files": [
-        "apps/web/components/dashboard/organisms/apple-style-onboarding/AppleStyleOnboardingForm.tsx:144-146"
+        "apps/web/components/dashboard/organisms/links"
       ],
-      "current_state": "Full page reload via globalThis.location.href to reach dashboard",
-      "proposed_change": "Use Next.js router.push() for client-side navigation to the dashboard.",
-      "user_benefit": "Smooth transition from onboarding to dashboard, no jarring reload",
+      "current_state": "Inferred from typical patterns — clipboard actions may show no visual feedback.",
+      "proposed_change": "Add toast notification or inline 'Copied!' message on successful copy. Change button icon from copy → checkmark for 2 seconds. Use subtle animation.",
+      "user_benefit": "Users confidently know their link was copied and don't second-guess the action.",
       "effort": "low",
       "priority": "low"
     },
     {
-      "id": "simplify-019",
-      "title": "Add timeout escape hatch for OAuth SSO callback",
-      "description": "SSO callback pages show only a logo animation with no interactive elements. If OAuth stalls, users have no way to cancel or go back.",
-      "rationale": "Users stuck on a loading screen with no escape are forced to use browser back, which may break the auth flow.",
+      "id": "uiux-009",
+      "title": "AuthLayout footer hidden on keyboard open causes navigation loss",
+      "description": "AuthLayout hides footer links ('Don't have access? Join waitlist') when mobile keyboard opens, removing navigation options mid-flow.",
+      "rationale": "If user wants to switch from sign-in to waitlist during verification step, they can't access the footer link while keyboard is visible.",
       "category": "usability",
       "affected_files": [
-        "apps/web/app/(auth)/signin/sso-callback/loading.tsx",
-        "apps/web/app/(auth)/signup/sso-callback/loading.tsx"
+        "apps/web/components/auth/AuthLayout.tsx:218"
       ],
-      "current_state": "Logo animation only — no timeout, no escape link",
-      "proposed_change": "After 10 seconds, show a 'Taking too long? Try again' link that routes back to the sign-in/sign-up page.",
-      "user_benefit": "Recovery path when OAuth flow stalls",
+      "current_state": "Line 218 conditionally hides footer when `isKeyboardVisible`. Footer contains actionable links that become inaccessible.",
+      "proposed_change": "Keep footer visible but reduce padding/size when keyboard open. Or add sticky navigation bar at top with back/alternative action buttons that remain visible.",
+      "user_benefit": "Users can change their mind mid-flow without closing keyboard or going back.",
       "effort": "low",
       "priority": "low"
     },
     {
-      "id": "simplify-020",
-      "title": "Add visual loading feedback to SettingsAppearanceSection",
-      "description": "Theme mutation has isPending that disables buttons but shows no visual loading indicator. If mutation fails, user gets zero feedback.",
-      "rationale": "Users need visual confirmation that an action is processing. Silent failures with no error handling leave users confused.",
-      "category": "usability",
+      "id": "uiux-010",
+      "title": "Pricing page lacks visual hierarchy for Pro plan (recommended)",
+      "description": "Pricing page shows three plans equally. Pro plan has stronger border but no 'Recommended' or 'Most Popular' badge.",
+      "rationale": "Decision paralysis is real. Highlighting the intended tier guides users toward optimal choice.",
+      "category": "visual",
       "affected_files": [
-        "apps/web/components/dashboard/organisms/SettingsAppearanceSection.tsx",
-        "apps/web/components/dashboard/organisms/SettingsNotificationsSection.tsx"
+        "apps/web/app/(marketing)/launch/pricing/page.tsx:121"
       ],
-      "current_state": "Buttons disabled with no spinner; no error handling or rollback",
-      "proposed_change": "Add spinner during mutation. Show toast.error on failure. Add rollback for notifications toggle on server rejection.",
-      "user_benefit": "Clear feedback on theme and notification preference changes",
+      "current_state": "Pro plan has `border-strong` and `hover:border-white/[0.12]` but no badge or scale emphasis.",
+      "proposed_change": "Add 'Most Popular' badge to Pro plan header. Optionally increase scale (105%) or add subtle glow effect. Use accent color for badge.",
+      "user_benefit": "Users make faster decisions with clear guidance on best value.",
       "effort": "low",
       "priority": "low"
+    },
+    {
+      "id": "uiux-011",
+      "title": "Mobile drawer scrolling conflicts with page scroll on iOS Safari",
+      "description": "ListenDrawer uses Vaul for bottom sheet but may exhibit scroll locking issues on iOS where background scrolls while drawer is open.",
+      "rationale": "Common iOS bug where body scroll isn't prevented when modal/drawer opens. Causes jarring UX and accidental dismissals.",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/profile/ListenDrawer.tsx:72-111"
+      ],
+      "current_state": "Drawer uses `overscroll-contain` on content div but may not lock body scroll on iOS Safari.",
+      "proposed_change": "Add `overflow: hidden` to document.body when drawer opens. Use useEffect to toggle on mount/unmount. Preserve scroll position to prevent jump.",
+      "user_benefit": "Smooth mobile experience without background scroll interference.",
+      "effort": "low",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-012",
+      "title": "Loading skeleton animation respects prefers-reduced-motion but components may not",
+      "description": "Design system CSS has prefers-reduced-motion support but individual components may use custom animations without motion checks.",
+      "rationale": "Accessibility requirement: users with vestibular disorders must be able to disable animations.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/home/ProfileMockup.tsx",
+        "apps/web/components/home/AiDemo.tsx",
+        "apps/web/components/auth/AuthLayout.tsx:180"
+      ],
+      "current_state": "Some components have motion-reduce support (line 267 in HeroSpotifySearch uses `motion-reduce:animate-none`), but logo spin animation in AuthLayout and marketing page animations may not respect preference.",
+      "proposed_change": "Audit all CSS animations and framer-motion usages. Add `@media (prefers-reduced-motion: reduce)` overrides or `motion-reduce:` Tailwind classes. Use useReducedMotion hook consistently.",
+      "user_benefit": "Accessible experience for users with motion sensitivity or vestibular disorders.",
+      "effort": "medium",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-013",
+      "title": "HeroSpotifySearch dropdown has no max-height causing viewport overflow",
+      "description": "Spotify search results dropdown uses `max-h-64` but with 5+ results plus 'paste URL' option, mobile devices may see clipped results or awkward scrolling.",
+      "rationale": "Mobile viewports are short. Tall dropdowns push action buttons off-screen and cause nested scroll confusion.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/home/HeroSpotifySearch.tsx:369"
+      ],
+      "current_state": "Dropdown div has `max-h-64` (256px) which fits ~6 results. May overflow on small mobile screens.",
+      "proposed_change": "Use dynamic max-height based on viewport: `max-h-[40vh]` or `max-h-[min(16rem,40vh)]` to adapt to device height. Ensure clear scroll affordance.",
+      "user_benefit": "Usable search on all screen sizes without content clipping.",
+      "effort": "low",
+      "priority": "low"
+    },
+    {
+      "id": "uiux-014",
+      "title": "No error recovery flow for failed Spotify import",
+      "description": "If Spotify import fails during signup, user may be stuck with no clear path to retry or manually enter data.",
+      "rationale": "Network failures happen. Users should be able to retry or bypass the failed step without abandoning signup.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/home/HeroSpotifySearch.tsx:352-363"
+      ],
+      "current_state": "Search shows 'error' state with 'Search failed. Try again.' message but no retry button. User must re-type query.",
+      "proposed_change": "Add 'Retry' button in error state that re-executes last query. Provide 'Skip Spotify import' option to proceed manually. Preserve user's progress.",
+      "user_benefit": "Resilient signup flow that handles network issues gracefully.",
+      "effort": "medium",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-015",
+      "title": "Dashboard skeleton lacks semantic structure",
+      "description": "DashboardOverviewSkeleton uses LoadingSkeleton atoms but doesn't convey content structure to screen readers during loading.",
+      "rationale": "Screen reader users hear generic 'loading skeleton' but don't know what's being loaded (metrics? tasks? profile?).",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/dashboard/organisms/DashboardOverviewSkeleton.tsx:1-56"
+      ],
+      "current_state": "Skeleton has `aria-busy='true'` and `aria-live='polite'` on container, but inner sections lack aria-labels to describe content type.",
+      "proposed_change": "Add `aria-label='Loading metrics'` to metrics section, `aria-label='Loading tasks'` to task section. Use `<section>` with labels instead of generic divs.",
+      "user_benefit": "Screen reader users understand what's loading and can anticipate content structure.",
+      "effort": "low",
+      "priority": "medium"
+    },
+    {
+      "id": "uiux-016",
+      "title": "AuthButton active:scale transform may conflict with haptic timing",
+      "description": "AuthButton applies `active:scale-[0.98]` transform AND triggers haptic feedback on press. Visual and haptic feedback may feel misaligned on slow devices.",
+      "rationale": "Haptic should sync with visual press state for cohesive tactile experience.",
+      "category": "interaction",
+      "affected_files": [
+        "apps/web/components/auth/atoms/AuthButton.tsx:19"
+      ],
+      "current_state": "Button has `active:scale-[0.98]` CSS and `haptic.light()` call in onClick. Transform is instant, haptic may lag on slow devices.",
+      "proposed_change": "Trigger haptic in onTouchStart or onPointerDown instead of onClick to sync with visual transform. Test on low-end Android devices.",
+      "user_benefit": "Cohesive, responsive feeling on button press across all devices.",
+      "effort": "low",
+      "priority": "low"
+    },
+    {
+      "id": "uiux-017",
+      "title": "Email verification OTP inputs lack paste support",
+      "description": "Verification step likely uses individual OTP input fields. Users can't paste 6-digit codes from SMS/email, forcing manual entry.",
+      "rationale": "Mobile keyboards auto-suggest OTP codes. Paste support is table stakes for modern auth UX.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/auth/forms/VerificationStep.tsx"
+      ],
+      "current_state": "File not fully read, but VerificationStep exists. Likely uses OTP input component.",
+      "proposed_change": "Ensure OTP input supports paste. When user pastes 6-digit code, auto-distribute across inputs and submit. Use `autocomplete='one-time-code'` for iOS autofill.",
+      "user_benefit": "Faster verification, fewer typos, better mobile UX.",
+      "effort": "low",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-018",
+      "title": "Marketing page lacks skip-to-content links",
+      "description": "Launch page has no skip navigation link for keyboard users to bypass repeated hero content when tabbing.",
+      "rationale": "WCAG 2.4.1 requires bypass blocks. Long marketing pages force keyboard users to tab through entire hero and nav every time.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/app/(marketing)/launch/page.tsx:238-316"
+      ],
+      "current_state": "Page has multiple sections but no skip-to-main-content link. AuthLayout has one (line 132-138), but marketing pages don't.",
+      "proposed_change": "Add `<a href='#main-content' class='sr-only focus:not-sr-only ...'>Skip to main content</a>` at top of page. Ensure #main-content target exists.",
+      "user_benefit": "Keyboard users can quickly navigate to primary content without tabbing through hero.",
+      "effort": "low",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-019",
+      "title": "No visible focus indicators on custom dropdown options",
+      "description": "HeroSpotifySearch renders custom dropdown with button elements for artist results. Focus styles may not be visible enough on dark backgrounds.",
+      "rationale": "WCAG 2.4.7 requires visible focus indicators. Users need to see which result is focused when arrowing through list.",
+      "category": "accessibility",
+      "affected_files": [
+        "apps/web/components/home/HeroSpotifySearch.tsx:372-424"
+      ],
+      "current_state": "Dropdown results use `tabIndex={0}` and highlight on `activeIndex`, but no explicit focus-visible ring. Uses hover background only.",
+      "proposed_change": "Add `focus-visible:ring-2 focus-visible:ring-focus` to result buttons. Ensure hover state and focus state are distinct (different colors or ring vs background).",
+      "user_benefit": "Keyboard users can see which result they're about to select.",
+      "effort": "low",
+      "priority": "high"
+    },
+    {
+      "id": "uiux-020",
+      "title": "Inconsistent button sizing across auth forms",
+      "description": "AuthButton defines `min-h-[44px]` for touch targets but other interactive elements in auth flow may not meet 44px minimum.",
+      "rationale": "iOS and Android guidelines require 44-48px touch targets. Inconsistent sizing causes missed taps.",
+      "category": "usability",
+      "affected_files": [
+        "apps/web/components/auth/atoms/AuthButton.tsx:15",
+        "apps/web/components/auth/forms/MethodSelector.tsx"
+      ],
+      "current_state": "AuthButton uses `h-11 min-h-[44px]` which is correct. Other buttons/links in auth may use smaller heights.",
+      "proposed_change": "Audit all clickable elements in auth flow. Ensure links, text buttons, icon buttons all meet 44px minimum. Add padding if needed.",
+      "user_benefit": "Easier mobile interaction, fewer missed taps, better accessibility.",
+      "effort": "low",
+      "priority": "medium"
     }
   ],
   "summary": {
     "total_ideas": 20,
     "by_category": {
-      "usability": 16,
-      "accessibility": 2,
-      "interaction": 1,
-      "performance": 0,
-      "visual": 0
+      "accessibility": 5,
+      "usability": 10,
+      "visual": 2,
+      "interaction": 3
     },
     "by_priority": {
-      "high": 8,
+      "high": 6,
       "medium": 9,
-      "low": 3
-    }
+      "low": 5
+    },
+    "key_themes": [
+      "Accessibility gaps: missing focus management, reduced motion support, screen reader context",
+      "Mobile UX issues: keyboard handling, scroll conflicts, touch target sizing",
+      "Auth flow polish: progress indication, error recovery, paste support for OTP",
+      "Design system adoption: hardcoded colors in marketing pages need token migration",
+      "Missing feedback: loading states, error states, clipboard copy confirmation"
+    ],
+    "quick_wins": [
+      "uiux-001: Add close button to ListenDrawer (high priority, low effort)",
+      "uiux-017: Enable OTP paste support (high priority, low effort)",
+      "uiux-018: Add skip-to-content links (high priority, low effort)",
+      "uiux-019: Improve focus indicators on dropdowns (high priority, low effort)"
+    ],
+    "notes": "Analysis focused on recently modified auth components, launch/pricing pages, and profile UX. Many findings relate to accessibility compliance (WCAG 2.1) and modern mobile UX expectations. Design system token adoption is strong overall but marketing pages have regression with hardcoded colors. Previous ideation findings (duplicate Analytics nav, music CTA replaced by subscription form) are still valid but not duplicated here."
   }
 }

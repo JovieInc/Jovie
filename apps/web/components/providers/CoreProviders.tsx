@@ -4,7 +4,7 @@ import { TooltipProvider } from '@jovie/ui';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
@@ -172,13 +172,15 @@ const MARKETING_PREFIXES = [
 
 export function CoreProviders({
   children,
-  initialThemeMode = 'system',
+  initialThemeMode = 'dark',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
-  const isMarketingRoute =
-    pathname === '/' ||
-    MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix));
-  const enableAnalytics = !isMarketingRoute;
+  const enableAnalytics = useMemo(
+    () =>
+      pathname !== '/' &&
+      !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
+    [pathname]
+  );
 
   return (
     <React.StrictMode>

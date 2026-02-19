@@ -10,11 +10,13 @@ import type { Artist } from '@/types/db';
 export interface SettingsBrandingSectionProps {
   readonly artist: Artist;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
+  readonly isPro?: boolean;
 }
 
 export function SettingsBrandingSection({
   artist,
   onArtistUpdate,
+  isPro = true,
 }: SettingsBrandingSectionProps) {
   const [hideBranding, setHideBranding] = useState(
     artist.settings?.hide_branding ?? false
@@ -70,10 +72,11 @@ export function SettingsBrandingSection({
           onCheckedChange={handleBrandingToggle}
           disabled={isPending}
           ariaLabel='Hide Jovie branding'
+          gated={!isPro}
         />
       </div>
 
-      {hideBranding && (
+      {isPro && hideBranding && (
         <div className='px-5 py-4 flex items-center gap-3'>
           <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
           <p className='text-sm text-emerald-600 dark:text-emerald-400'>

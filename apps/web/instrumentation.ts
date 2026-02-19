@@ -179,6 +179,19 @@ export async function register() {
         extra: { context: 'startup_environment_validation' },
       });
     }
+
+    // Validate Stripe billing config (separate from general env validation)
+    try {
+      const { validateStripeBillingConfig } = await import(
+        '@/lib/stripe/startup-validation'
+      );
+      validateStripeBillingConfig();
+    } catch (error) {
+      console.error('[STARTUP] Stripe billing validation failed:', error);
+      Sentry.captureException(error, {
+        extra: { context: 'stripe_startup_validation' },
+      });
+    }
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {

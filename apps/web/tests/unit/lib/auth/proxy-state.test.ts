@@ -55,6 +55,11 @@ vi.mock('@/lib/redis', () => ({
   getRedis: vi.fn().mockReturnValue(null),
 }));
 
+// Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
+vi.mock('@/lib/auth/waitlist-config', () => ({
+  isWaitlistEnabled: vi.fn().mockReturnValue(true),
+}));
+
 describe('proxy-state.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -337,12 +342,18 @@ describe('proxy-state.ts', () => {
       await getUserState('clerk_test_user');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[ERROR] Database query failed in proxy state check',
-        expect.objectContaining({
-          clerkUserId: 'clerk_test_user',
-          message: 'Connection timeout',
-          operation: 'getProxyUserState',
-        })
+        expect.stringContaining(
+          '[ERROR] Database query failed in proxy state check'
+        )
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Connection timeout')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('clerk_test_user')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('getProxyUserState')
       );
 
       consoleSpy.mockRestore();
@@ -373,13 +384,18 @@ describe('proxy-state.ts', () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[ERROR] Database query failed in proxy state check',
-        expect.objectContaining({
-          clerkUserId: 'clerk_123',
-          message: 'String error',
-          operation: 'getProxyUserState',
-          type: 'StringError',
-        })
+        expect.stringContaining(
+          '[ERROR] Database query failed in proxy state check'
+        )
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('String error')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('StringError')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('clerk_123')
       );
 
       consoleSpy.mockRestore();

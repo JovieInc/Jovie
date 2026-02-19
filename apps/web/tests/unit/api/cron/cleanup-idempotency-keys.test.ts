@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockDbDelete = vi.hoisted(() => vi.fn());
+const mockDbExecute = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
-    delete: mockDbDelete,
+    execute: mockDbExecute,
   },
   dashboardIdempotencyKeys: {
     id: 'id',
@@ -45,19 +45,7 @@ describe('GET /api/cron/cleanup-idempotency-keys', () => {
   });
 
   it('cleans up expired idempotency keys', async () => {
-    mockDbDelete.mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: vi
-          .fn()
-          .mockResolvedValue([
-            { id: 'key_1' },
-            { id: 'key_2' },
-            { id: 'key_3' },
-            { id: 'key_4' },
-            { id: 'key_5' },
-          ]),
-      }),
-    });
+    mockDbExecute.mockResolvedValue({ rowCount: 5 });
 
     const { GET } = await import(
       '@/app/api/cron/cleanup-idempotency-keys/route'

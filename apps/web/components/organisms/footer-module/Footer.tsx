@@ -48,7 +48,7 @@ export function Footer({
     return null;
   }
 
-  const variantConfigs = getVariantConfigs(maxWidthClass);
+  const variantConfigs = getVariantConfigs(maxWidthClass, containerSize);
   const config = variantConfigs[variant];
 
   if (variant === 'profile') {
@@ -105,15 +105,23 @@ export function Footer({
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
         className={className}
-        style={{
-          backgroundColor: 'var(--linear-bg-footer)',
-          borderTop: '1px solid var(--linear-border-subtle)',
-        }}
+        style={{ backgroundColor: 'var(--linear-bg-footer)' }}
         aria-label='Site footer'
       >
+        {/* Gradient separator — matches logo bar treatment */}
+        <div
+          aria-hidden='true'
+          className='h-px'
+          style={{
+            background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+          }}
+        />
         <div
           className={cn(
-            'mx-auto px-6 lg:px-8 pt-16 pb-12 lg:pt-20 lg:pb-16',
+            containerSize === 'homepage'
+              ? 'px-5 sm:px-6 lg:px-[77px]'
+              : 'mx-auto px-6 lg:px-8',
+            'pt-14 pb-14',
             maxWidthClass
           )}
         >
@@ -139,7 +147,7 @@ export function Footer({
                 >
                   Product
                 </h2>
-                <ul className='space-y-1'>
+                <ul className='flex flex-col gap-0.5'>
                   {productLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link
@@ -165,7 +173,7 @@ export function Footer({
                 >
                   Company
                 </h2>
-                <ul className='space-y-1'>
+                <ul className='flex flex-col gap-0.5'>
                   {companyLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link
@@ -194,7 +202,7 @@ export function Footer({
                 >
                   Legal
                 </h2>
-                <ul className='space-y-1'>
+                <ul className='flex flex-col gap-0.5'>
                   {legalLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link
@@ -223,15 +231,12 @@ export function Footer({
             </div>
           </div>
 
-          <div
-            className='mt-12 lg:mt-16 pt-8 lg:pt-10'
-            style={{ borderTop: '1px solid var(--linear-border-subtle)' }}
-          >
+          <div className='mt-20'>
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[12px] leading-4 font-normal tracking-[-0.01em] order-2 sm:order-1'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] order-2 sm:order-1'
+                style={{ color: 'rgb(98, 102, 109)' }}
               />
               {showThemeToggle && (
                 <div className='flex items-center gap-3 order-1 sm:order-2'>
@@ -262,14 +267,22 @@ export function Footer({
   return (
     <footer
       className={className}
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        borderTop: '1px solid var(--linear-border-subtle)',
-      }}
+      style={{ backgroundColor: 'var(--linear-bg-footer)' }}
     >
+      {/* Gradient separator — matches logo bar treatment */}
+      <div
+        aria-hidden='true'
+        className='h-px'
+        style={{
+          background: `linear-gradient(to right, var(--linear-border-footer), var(--linear-border-footer) 40%, transparent)`,
+        }}
+      />
       <div
         className={cn(
-          'mx-auto px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
+          containerSize === 'homepage'
+            ? 'px-5 sm:px-6 lg:px-[77px]'
+            : 'mx-auto px-6 lg:px-8',
+          'flex flex-col md:flex-row items-center justify-between gap-4 py-8 md:py-10',
           CONTAINER_SIZES[containerSize]
         )}
       >
@@ -280,8 +293,8 @@ export function Footer({
             >
               <Copyright
                 variant={config.colorVariant}
-                className='text-[12px] leading-4 font-normal tracking-[-0.01em]'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]'
+                style={{ color: 'rgb(98, 102, 109)' }}
               />
               {variant === 'minimal' && (
                 <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
@@ -299,8 +312,8 @@ export function Footer({
                     <Link
                       key={link.href}
                       href={link.href}
-                      className='text-[12px] leading-4 font-normal tracking-[-0.01em] transition-colors duration-150 hover:[color:var(--linear-text-secondary)]'
-                      style={{ color: 'var(--linear-text-tertiary)' }}
+                      className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)]'
+                      style={{ color: 'rgb(98, 102, 109)' }}
                     >
                       {link.label}
                     </Link>

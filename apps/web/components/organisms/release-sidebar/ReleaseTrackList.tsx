@@ -20,7 +20,7 @@ import {
   Loader2,
   MoreHorizontal,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
@@ -51,9 +51,13 @@ type SidebarTrack = Pick<
  * Server action calls trigger RSC tree reconciliation which can
  * cause the parent drawer to unmount.
  */
-async function fetchTracks(releaseId: string): Promise<SidebarTrack[]> {
+async function fetchTracks(
+  releaseId: string,
+  signal?: AbortSignal
+): Promise<SidebarTrack[]> {
   const res = await fetch(
-    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`
+    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`,
+    { signal }
   );
   if (!res.ok) throw new Error('Failed to load tracks');
   return res.json() as Promise<SidebarTrack[]>;
@@ -68,10 +72,30 @@ export function ReleaseTrackList({
   release,
   onTrackClick,
 }: ReleaseTrackListProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  // Auto-fetch tracks on mount since tracklist starts expanded
+  useEffect(() => {
+    if (release.totalTracks === 0) return;
+    const controller = new AbortController();
+    setIsLoading(true);
+    fetchTracks(release.id, controller.signal)
+      .then(data => {
+        if (!controller.signal.aborted) setTracks(data);
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setTracks(null);
+        setHasError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, [release.id, release.totalTracks]);
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {

@@ -19,7 +19,7 @@ export function CTASection({
   className = '',
 }: CTASectionProps) {
   const variantClasses = {
-    primary: 'border-t border-subtle bg-white dark:bg-black',
+    primary: 'border-t border-subtle bg-base',
     secondary: 'bg-zinc-900 text-white',
   };
 
@@ -46,9 +46,7 @@ export function CTASection({
           {description && (
             <p
               className={`text-lg sm:text-xl leading-relaxed ${
-                variant === 'secondary'
-                  ? 'text-white'
-                  : 'text-gray-600 dark:text-gray-300'
+                variant === 'secondary' ? 'text-white' : 'text-secondary-token'
               }`}
             >
               {description}

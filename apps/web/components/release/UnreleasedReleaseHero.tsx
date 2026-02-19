@@ -69,7 +69,7 @@ export function UnreleasedReleaseHero({
 
           <div className='w-full max-w-[272px]'>
             {/* Release Artwork */}
-            <div className='relative aspect-square w-full overflow-hidden rounded-2xl bg-white/[0.04] shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
+            <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-white/[0.04] shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
               {release.artworkUrl ? (
                 <Image
                   src={release.artworkUrl}

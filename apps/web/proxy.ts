@@ -12,6 +12,7 @@ import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
@@ -364,7 +365,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         req.nextUrl.searchParams.get('redirect_url')
       );
 
-      if (userState.needsWaitlist) {
+      if (isWaitlistEnabled() && userState.needsWaitlist) {
         return NextResponse.redirect(new URL('/waitlist', req.url));
       }
       if (userState.needsOnboarding) {
@@ -383,6 +384,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // manifest as "page not found" errors on the client.
     if (userState) {
       if (
+        isWaitlistEnabled() &&
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&
@@ -409,7 +411,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           });
         }
       } else if (
-        !userState.needsWaitlist &&
+        (!isWaitlistEnabled() || !userState.needsWaitlist) &&
         pathname === '/waitlist' &&
         !isRSCPrefetch
       ) {

@@ -181,6 +181,13 @@ export const queryKeys = {
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },
 
+  // Contacts queries
+  contacts: {
+    all: ['contacts'] as const,
+    list: (profileId: string) =>
+      [...queryKeys.contacts.all, 'list', profileId] as const,
+  },
+
   // Tour dates queries
   tourDates: {
     all: ['tour-dates'] as const,
@@ -210,6 +217,7 @@ export const queryKeys = {
   health: {
     all: ['health'] as const,
     buildInfo: () => [...queryKeys.health.all, 'build-info'] as const,
+    env: () => [...queryKeys.health.all, 'env'] as const,
   },
 
   // Admin queries
@@ -250,6 +258,12 @@ export const queryKeys = {
       ] as const,
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
+  },
+
+  // Ad pixel settings
+  pixels: {
+    all: ['pixels'] as const,
+    settings: () => [...queryKeys.pixels.all, 'settings'] as const,
   },
 } as const;
 

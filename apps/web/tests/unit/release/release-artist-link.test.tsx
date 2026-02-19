@@ -45,9 +45,14 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
 }));
 
-vi.mock('@/components/atoms/DspLogo', () => ({
-  DspLogo: () => <span data-testid='dsp-logo' />,
-}));
+vi.mock('@/components/atoms/DspLogo', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/components/atoms/DspLogo')>();
+  return {
+    ...actual,
+    DspLogo: () => <span data-testid='dsp-logo' />,
+  };
+});
 
 // Lazy-import after mocks are set up
 const { ReleaseLandingPage } = await import(

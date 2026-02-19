@@ -16,7 +16,8 @@ import { getRedis } from '@/lib/redis';
  * where sidebar and layout might see different values).
  */
 const REDIS_CACHE_TTL_SECONDS = 60; // 1 minute (reduced from 5 for faster revocation)
-const MEMORY_CACHE_TTL_MS = 15 * 1000; // 15 seconds - shorter for multi-instance consistency
+const MEMORY_CACHE_TTL_MS = 60 * 1000; // 60 seconds - matches Redis TTL for consistency
+const STALE_GRACE_MS = 5 * 60 * 1000; // 5 minutes - keep expired entries as DB-failure fallback
 const REDIS_KEY_PREFIX = 'admin:role:';
 const MAX_FALLBACK_CACHE_SIZE = 100; // Max users to cache in memory
 
@@ -27,13 +28,14 @@ const fallbackCache = new Map<
 >();
 
 /**
- * Prune expired entries and enforce max cache size.
+ * Prune stale entries beyond the grace period and enforce max cache size.
+ * Entries within the stale grace window are kept as DB-failure fallbacks.
  * Called before adding new entries to prevent unbounded memory growth.
  */
 function pruneFallbackCache(now: number): void {
-  // First pass: remove expired entries
+  // First pass: remove entries past the stale grace period
   for (const [key, entry] of fallbackCache) {
-    if (entry.expiresAt <= now) {
+    if (entry.expiresAt + STALE_GRACE_MS <= now) {
       fallbackCache.delete(key);
     }
   }
@@ -66,6 +68,103 @@ async function queryAdminRoleFromDB(userId: string): Promise<boolean> {
 }
 
 /**
+ * Query admin role from DB with a single retry on transient errors.
+ * Returns the result on success, or null if both attempts fail.
+ * The last error is returned for the caller to handle.
+ * @internal
+ */
+async function queryWithRetry(
+  userId: string
+): Promise<{ result: boolean } | { error: unknown }> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return { result: await queryAdminRoleFromDB(userId) };
+    } catch (err) {
+      lastError = err;
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+  }
+  return { error: lastError };
+}
+
+/**
+ * Handle DB query failure by falling back to stale cache or denying access.
+ *
+ * When the DB is unreachable, we prefer returning stale cached results over
+ * revoking access. This prevents transient DB issues (Neon cold starts,
+ * connection pool exhaustion) from intermittently hiding admin nav items
+ * or returning 404s on admin routes.
+ *
+ * @internal
+ */
+function handleDbFailure(
+  userId: string,
+  staleEntry: { isAdmin: boolean; expiresAt: number } | undefined,
+  lastError: unknown,
+  now: number = Date.now()
+): boolean {
+  if (staleEntry !== undefined && staleEntry.expiresAt + STALE_GRACE_MS > now) {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, using stale cache',
+      { userId, isAdmin: staleEntry.isAdmin, expiredAt: staleEntry.expiresAt }
+    );
+    return staleEntry.isAdmin;
+  }
+  if (staleEntry === undefined) {
+    captureError(
+      '[admin/roles] DB query failed after retry, no cache available — denying access',
+      lastError
+    );
+  } else {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
+      { userId, expiredAt: staleEntry.expiresAt }
+    );
+  }
+  return false;
+}
+
+/**
+ * Try Redis cache, returning the cached value or querying DB and storing result.
+ * Returns null if Redis is unavailable or errors out (caller falls through to memory).
+ * @internal
+ */
+async function tryRedisPath(
+  userId: string,
+  cacheKey: string,
+  redis: NonNullable<ReturnType<typeof getRedis>>
+): Promise<boolean | null> {
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached !== null) {
+      // Upstash REST API may return number 1 instead of string '1'
+      // Use loose equality or String() to handle both types
+      return String(cached) === '1';
+    }
+
+    const dbResult = await queryWithRetry(userId);
+    if ('result' in dbResult) {
+      await redis.set(cacheKey, dbResult.result ? '1' : '0', {
+        ex: REDIS_CACHE_TTL_SECONDS,
+      });
+      return dbResult.result;
+    }
+
+    // DB retry exhausted — use stale memory cache or deny
+    const staleEntry = fallbackCache.get(userId);
+    return handleDbFailure(userId, staleEntry, dbResult.error);
+  } catch (error) {
+    captureWarning('[admin/roles] Redis cache failed, falling back to memory', {
+      error,
+    });
+    return null; // Signal caller to fall through to memory cache
+  }
+}
+
+/**
  * Check if a user has admin role based on database verification.
  * Results are cached for 1 minute (distributed via Redis, or in-memory fallback).
  *
@@ -85,38 +184,8 @@ export const isAdmin = cache(async function isAdmin(
 
   // 1. Try Redis first (distributed cache)
   if (redis) {
-    try {
-      const cached = await redis.get(cacheKey);
-
-      if (cached !== null) {
-        return cached === '1'; // '1' = admin, '0' = not admin
-      }
-
-      // Cache miss - query database
-      try {
-        const isUserAdmin = await queryAdminRoleFromDB(userId);
-
-        // Only cache definitive DB results — never cache failure fallbacks
-        await redis.set(cacheKey, isUserAdmin ? '1' : '0', {
-          ex: REDIS_CACHE_TTL_SECONDS,
-        });
-
-        return isUserAdmin;
-      } catch (dbError) {
-        captureError('[admin/roles] DB query failed, denying access', dbError);
-        // Fail closed but do NOT write to Redis — avoids poisoning
-        // the cache with a false negative for 60 seconds
-        return false;
-      }
-    } catch (error) {
-      captureWarning(
-        '[admin/roles] Redis cache failed, falling back to memory',
-        {
-          error,
-        }
-      );
-      // Fall through to memory cache
-    }
+    const redisResult = await tryRedisPath(userId, cacheKey, redis);
+    if (redisResult !== null) return redisResult;
   }
 
   // 2. Fallback to in-memory cache
@@ -127,25 +196,18 @@ export const isAdmin = cache(async function isAdmin(
     return memCached.isAdmin;
   }
 
-  // Query database — only cache on success
-  try {
-    const isUserAdmin = await queryAdminRoleFromDB(userId);
-
-    // Prune cache before adding new entry to prevent memory leaks
+  // Query database with retry
+  const dbResult = await queryWithRetry(userId);
+  if ('result' in dbResult) {
     pruneFallbackCache(now);
-
-    // Store in memory cache
     fallbackCache.set(userId, {
-      isAdmin: isUserAdmin,
+      isAdmin: dbResult.result,
       expiresAt: now + MEMORY_CACHE_TTL_MS,
     });
-
-    return isUserAdmin;
-  } catch (error) {
-    captureError('[admin/roles] DB query failed, denying access', error);
-    // Fail closed but do NOT write to memory cache
-    return false;
+    return dbResult.result;
   }
+
+  return handleDbFailure(userId, memCached, dbResult.error);
 });
 
 /**

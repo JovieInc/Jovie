@@ -392,3 +392,47 @@ export function generateAccessibleCaption(context: {
 
   return parts.join(', ');
 }
+
+/**
+ * Detect image encoding format from a URL extension.
+ * Falls back to 'image/jpeg' if unrecognizable.
+ */
+function detectEncodingFormat(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes('.avif')) return 'image/avif';
+  if (lower.includes('.webp')) return 'image/webp';
+  if (lower.includes('.png')) return 'image/png';
+  if (lower.includes('.jpg') || lower.includes('.jpeg')) return 'image/jpeg';
+  // Default for blob storage URLs without extension
+  return 'image/jpeg';
+}
+
+/**
+ * Generate a schema.org ImageObject for album/track artwork.
+ * Used in JSON-LD structured data for music content pages.
+ */
+export function generateArtworkImageObject(
+  artworkUrl: string,
+  context: {
+    title: string;
+    artistName: string;
+    contentType: 'release' | 'track';
+    artworkSizes?: Record<string, string> | null;
+  }
+): Record<string, unknown> {
+  const typeLabel = context.contentType === 'release' ? 'album cover' : 'track';
+
+  return {
+    '@type': 'ImageObject',
+    url: artworkUrl,
+    width: 640,
+    height: 640,
+    caption: `${context.title} ${typeLabel} art by ${context.artistName}`,
+    name: `${context.title} artwork`,
+    representativeOfPage: true,
+    encodingFormat: detectEncodingFormat(artworkUrl),
+    ...(context.artworkSizes?.['250'] && {
+      thumbnailUrl: context.artworkSizes['250'],
+    }),
+  };
+}

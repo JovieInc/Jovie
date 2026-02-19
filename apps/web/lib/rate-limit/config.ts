@@ -5,8 +5,8 @@
  * Consolidates configurations from multiple sources into one place.
  */
 
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
-import { PLAN_LIMITS } from '@/lib/stripe/config';
 import type { RateLimitConfig } from './types';
 
 // ============================================================================
@@ -364,28 +364,28 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Free): derived from PLAN_LIMITS */
+  /** AI Chat daily quota (Free): derived from ENTITLEMENT_REGISTRY */
   aiChatDailyFree: {
     name: 'AI Chat Daily (Free)',
-    limit: PLAN_LIMITS.free.aiDailyMessageLimit,
+    limit: ENTITLEMENT_REGISTRY.free.limits.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:free',
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Pro): derived from PLAN_LIMITS */
+  /** AI Chat daily quota (Pro): derived from ENTITLEMENT_REGISTRY */
   aiChatDailyPro: {
     name: 'AI Chat Daily (Pro)',
-    limit: PLAN_LIMITS.pro.aiDailyMessageLimit,
+    limit: ENTITLEMENT_REGISTRY.pro.limits.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:pro',
     analytics: true,
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Growth): derived from PLAN_LIMITS */
+  /** AI Chat daily quota (Growth): derived from ENTITLEMENT_REGISTRY */
   aiChatDailyGrowth: {
     name: 'AI Chat Daily (Growth)',
-    limit: PLAN_LIMITS.growth.aiDailyMessageLimit,
+    limit: ENTITLEMENT_REGISTRY.growth.limits.aiDailyMessageLimit,
     window: '1 d',
     prefix: 'ai:chat:daily:growth',
     analytics: true,

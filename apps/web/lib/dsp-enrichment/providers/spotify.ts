@@ -121,6 +121,7 @@ async function getAccessToken(): Promise<string> {
       ).toString('base64')}`,
     },
     body: 'grant_type=client_credentials',
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -153,7 +154,11 @@ const DEFAULT_BASE_DELAY_MS = 1000;
 function isNonRetryableError(error: unknown): boolean {
   if (error instanceof SpotifyNotConfiguredError) return true;
   if (error instanceof SpotifyError) {
-    return error.statusCode === 401 || error.statusCode === 404;
+    return (
+      error.statusCode === 401 ||
+      error.statusCode === 404 ||
+      error.statusCode === 429
+    );
   }
   return false;
 }
@@ -234,6 +239,13 @@ async function spotifyRequest<T>(
     }
 
     if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      Sentry.addBreadcrumb({
+        category: 'spotify-provider',
+        message: `Rate limited (429), retry-after: ${retryAfter ?? 'unknown'}s`,
+        level: 'warning',
+        data: { endpoint, retryAfter },
+      });
       throw new SpotifyError('Rate limit exceeded', 429, 'RATE_LIMITED');
     }
 
