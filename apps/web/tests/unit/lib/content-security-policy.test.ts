@@ -17,34 +17,48 @@ describe('buildContentSecurityPolicy', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
-  it('includes unsafe-eval for Vercel Toolbar support', () => {
+  it('includes unsafe-eval when toolbar is enabled', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
       isDev: false,
+      enableToolbar: true,
     });
     const scriptSrc = findDirective(csp, 'script-src');
 
     expect(scriptSrc).toContain("'unsafe-eval'");
   });
 
-  it('includes vercel.live in frame-src for production', () => {
+  it('excludes unsafe-eval when toolbar is disabled', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
       isDev: false,
+      enableToolbar: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+
+    expect(scriptSrc).not.toContain("'unsafe-eval'");
+  });
+
+  it('includes vercel.live in frame-src when toolbar is enabled', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+      enableToolbar: true,
     });
     const frameSrc = findDirective(csp, 'frame-src');
 
     expect(frameSrc).toContain('https://vercel.live');
   });
 
-  it('includes unsafe-eval in development', () => {
+  it('excludes vercel.live from frame-src when toolbar is disabled', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
-      isDev: true,
+      isDev: false,
+      enableToolbar: false,
     });
-    const scriptSrc = findDirective(csp, 'script-src');
+    const frameSrc = findDirective(csp, 'frame-src');
 
-    expect(scriptSrc).toContain("'unsafe-eval'");
+    expect(frameSrc).not.toContain('https://vercel.live');
   });
 
   it('does not include report directives in enforcing CSP', () => {
