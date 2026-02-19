@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +30,10 @@ export function ReleaseArtworkThumb({
   fallbackIconClass = 'h-5 w-5',
 }: ReleaseArtworkThumbProps) {
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
 
   return (
     <div

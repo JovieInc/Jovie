@@ -8,7 +8,7 @@
  */
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -53,6 +53,10 @@ export function ReleaseArtwork({
 
   const [imgError, setImgError] = useState(false);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [artworkUrl]);
+
   const artworkImage = (
     <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
       {artworkUrl && !imgError ? (
@@ -68,7 +72,7 @@ export function ReleaseArtwork({
         <div className='flex h-full w-full items-center justify-center'>
           <Icon
             name='Disc3'
-            className='h-8 w-8 text-tertiary-token'
+            className='h-6 w-6 text-tertiary-token'
             aria-hidden='true'
           />
         </div>
