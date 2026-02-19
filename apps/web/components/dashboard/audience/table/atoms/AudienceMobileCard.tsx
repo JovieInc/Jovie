@@ -5,7 +5,27 @@ import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
-import type { AudienceIntentLevel, AudienceMember } from '@/types';
+import type {
+  AudienceIntentLevel,
+  AudienceMember,
+  AudienceMemberType,
+} from '@/types';
+
+/** Derive a meaningful fallback name from member type instead of generic "Visitor" */
+function getFallbackName(type: AudienceMemberType): string {
+  switch (type) {
+    case 'email':
+      return 'Email Subscriber';
+    case 'sms':
+      return 'SMS Subscriber';
+    case 'spotify':
+      return 'Spotify Listener';
+    case 'customer':
+      return 'Customer';
+    default:
+      return 'Visitor';
+  }
+}
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
@@ -38,7 +58,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
   isSelected,
   onTap,
 }: AudienceMobileCardProps) {
-  const displayName = member.displayName || 'Visitor';
+  const displayName = member.displayName || getFallbackName(member.type);
   const isHighIntent = member.intentLevel === 'high';
 
   return (

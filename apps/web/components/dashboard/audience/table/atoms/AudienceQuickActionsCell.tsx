@@ -28,7 +28,7 @@ export function AudienceQuickActionsCell({
       <button
         type='button'
         onClick={onExport}
-        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token'
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label='Export contact'
         title='Export vCard'
       >
@@ -37,7 +37,7 @@ export function AudienceQuickActionsCell({
       <button
         type='button'
         onClick={onBlock}
-        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-error/10 hover:text-error'
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-error focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label='Block member'
         title='Block'
       >

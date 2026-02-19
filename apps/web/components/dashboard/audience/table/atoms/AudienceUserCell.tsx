@@ -13,6 +13,22 @@ export interface AudienceUserCellProps {
   readonly className?: string;
 }
 
+/** Derive a meaningful fallback name from member type instead of generic "Visitor" */
+function getFallbackName(type: AudienceMemberType): string {
+  switch (type) {
+    case 'email':
+      return 'Email Subscriber';
+    case 'sms':
+      return 'SMS Subscriber';
+    case 'spotify':
+      return 'Spotify Listener';
+    case 'customer':
+      return 'Customer';
+    default:
+      return 'Visitor';
+  }
+}
+
 /**
  * AudienceUserCell - Display user information in the audience table
  *
@@ -48,7 +64,7 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div className={cn('text-xs text-primary-token min-w-0', className)}>
       <TruncatedText lines={1} className='font-medium'>
-        {displayName || 'Visitor'}
+        {displayName || getFallbackName(type)}
       </TruncatedText>
       {secondaryLabel && (
         <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
