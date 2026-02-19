@@ -64,7 +64,7 @@ export function AdminTablePagination({
   const showPageSizeSelector = pageSize !== undefined && onPageSizeChange;
 
   return (
-    <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-secondary-token'>
+    <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
       {/* Page info */}
       <div className='flex items-center gap-2'>
         <span>

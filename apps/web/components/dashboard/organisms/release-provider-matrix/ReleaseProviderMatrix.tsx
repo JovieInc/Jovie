@@ -605,7 +605,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle px-4 py-2 text-xs text-secondary-token'>
+            <div className='flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
               <span>
                 {filteredRows.length === rows.length
                   ? `${totalReleases}`

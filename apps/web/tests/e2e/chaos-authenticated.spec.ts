@@ -1,5 +1,5 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
-import { Page, test } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import { isClerkTestEmail, signInUser } from '../helpers/clerk-auth';
 import {
   SMOKE_TIMEOUTS,
@@ -332,25 +332,19 @@ async function runChaosTestGroup(
 
 /**
  * Sets up authentication for chaos tests.
- * Returns false if setup failed and test should be skipped.
+ * Throws if credentials are missing or sign-in fails — chaos tests must not silently skip.
  */
-async function setupChaosAuth(page: Page, useAdmin = false): Promise<boolean> {
+async function setupChaosAuth(page: Page, useAdmin = false): Promise<void> {
   if (!hasClerkCredentials()) {
-    console.log('Skipping chaos tests - no Clerk credentials');
-    return false;
+    throw new Error(
+      'Chaos tests require Clerk credentials. Ensure E2E_CLERK_USER_USERNAME, E2E_CLERK_USER_PASSWORD, and CLERK_TESTING_SETUP_SUCCESS are set. Run with: doppler run -- pnpm exec playwright test'
+    );
   }
 
   await setupClerkTestingToken({ page });
 
   const credentials = useAdmin ? getAdminCredentials() : undefined;
-
-  try {
-    await signInUser(page, credentials);
-    return true;
-  } catch (error) {
-    console.error('Failed to sign in:', error);
-    return false;
-  }
+  await signInUser(page, credentials);
 }
 
 // ============================================================================
@@ -391,8 +385,7 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
   test.setTimeout(720_000); // 12 minutes per test - signInUser (180s) + chaos clicks (many pages)
 
   test.beforeEach(async ({ page }) => {
-    const success = await setupChaosAuth(page);
-    if (!success) test.skip();
+    await setupChaosAuth(page);
   });
 
   test('Dashboard pages chaos test', async ({ page }, testInfo) => {
@@ -403,12 +396,10 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
       testInfo
     );
 
-    // Log errors but don't fail the test (chaos tests are informational)
-    if (errors.length > 0) {
-      console.log(
-        `\n[WARNING] Found ${errors.length} React errors in dashboard pages`
-      );
-    }
+    expect(
+      errors,
+      `Found ${errors.length} React errors in dashboard pages: ${errors.map(e => `${e.page} → ${e.element}: ${e.error}`).join('; ')}`
+    ).toHaveLength(0);
   });
 
   test('Settings pages chaos test', async ({ page }, testInfo) => {
@@ -419,11 +410,10 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
       testInfo
     );
 
-    if (errors.length > 0) {
-      console.log(
-        `\n[WARNING] Found ${errors.length} React errors in settings pages`
-      );
-    }
+    expect(
+      errors,
+      `Found ${errors.length} React errors in settings pages: ${errors.map(e => `${e.page} → ${e.element}: ${e.error}`).join('; ')}`
+    ).toHaveLength(0);
   });
 });
 
@@ -431,8 +421,7 @@ test.describe('Admin Chaos Testing @chaos', () => {
   test.setTimeout(300_000);
 
   test.beforeEach(async ({ page }) => {
-    const success = await setupChaosAuth(page, true);
-    if (!success) test.skip();
+    await setupChaosAuth(page, true);
   });
 
   test('Admin pages chaos test', async ({ page }, testInfo) => {
@@ -442,10 +431,8 @@ test.describe('Admin Chaos Testing @chaos', () => {
     });
 
     if (response?.status() === 404) {
-      console.log(
-        'Test user does not have admin access - skipping admin chaos tests'
-      );
-      test.skip();
+      // Admin access is a legitimate skip — not all test users are admins
+      test.skip(true, 'Test user does not have admin access');
       return;
     }
 
@@ -456,11 +443,10 @@ test.describe('Admin Chaos Testing @chaos', () => {
       testInfo
     );
 
-    if (errors.length > 0) {
-      console.log(
-        `\n[WARNING] Found ${errors.length} React errors in admin pages`
-      );
-    }
+    expect(
+      errors,
+      `Found ${errors.length} React errors in admin pages: ${errors.map(e => `${e.page} → ${e.element}: ${e.error}`).join('; ')}`
+    ).toHaveLength(0);
   });
 });
 
@@ -468,11 +454,7 @@ test.describe('Full Chaos Sweep @chaos-full', () => {
   test.setTimeout(600_000); // 10 minutes
 
   test('All authenticated pages', async ({ page }, testInfo) => {
-    const success = await setupChaosAuth(page, true);
-    if (!success) {
-      test.skip();
-      return;
-    }
+    await setupChaosAuth(page, true);
 
     const allErrors: ChaosError[] = [];
     const allResults: ChaosResult[] = [];
@@ -540,5 +522,10 @@ test.describe('Full Chaos Sweep @chaos-full', () => {
       body: JSON.stringify(allErrors, null, 2),
       contentType: 'application/json',
     });
+
+    expect(
+      allErrors,
+      `Found ${allErrors.length} React errors across all pages: ${allErrors.map(e => `${e.page} → ${e.element}: ${e.error}`).join('; ')}`
+    ).toHaveLength(0);
   });
 });
