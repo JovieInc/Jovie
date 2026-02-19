@@ -193,6 +193,11 @@ module.exports = {
         slowest: 'var(--duration-slowest)', // 300ms
       },
 
+      // Transition timing functions
+      transitionTimingFunction: {
+        interactive: 'var(--ease-interactive)',
+      },
+
       // Ring colors (for focus rings)
       ringColor: {
         accent: 'var(--color-accent)',
