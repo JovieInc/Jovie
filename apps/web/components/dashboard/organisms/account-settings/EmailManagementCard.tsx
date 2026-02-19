@@ -65,7 +65,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
         return (
           <div
             key={email.id}
-            className='flex items-center justify-between px-5 py-4'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div className='flex items-center gap-3'>
               <div>
@@ -121,7 +121,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
       })}
 
       {/* Add email row */}
-      <div className='px-5 py-4'>
+      <div className='px-4 py-3'>
         <form
           onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
           className='flex flex-col gap-3 sm:flex-row sm:items-end'

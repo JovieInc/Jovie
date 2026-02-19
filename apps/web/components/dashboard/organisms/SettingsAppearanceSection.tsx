@@ -32,7 +32,7 @@ export function SettingsAppearanceSection() {
 
   return (
     <DashboardCard variant='settings' padding='none'>
-      <div className='flex items-center justify-between px-5 py-4'>
+      <div className='flex items-center justify-between px-4 py-3'>
         <div className='flex-1 min-w-0'>
           <h3 className='text-sm text-primary-token'>Interface theme</h3>
           <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>

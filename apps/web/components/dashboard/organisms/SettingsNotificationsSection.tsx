@@ -11,7 +11,7 @@ export function SettingsNotificationsSection() {
 
   return (
     <DashboardCard variant='settings' padding='none'>
-      <div className='px-5 py-4'>
+      <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Marketing Emails'
           description='Receive updates about new features, tips, and promotional offers.'

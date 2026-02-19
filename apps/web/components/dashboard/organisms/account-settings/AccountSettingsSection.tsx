@@ -66,7 +66,7 @@ function ClerkAccountSections() {
 
 export function AccountSettingsSection() {
   return (
-    <div className='space-y-8' data-testid='account-settings-section'>
+    <div className='space-y-6' data-testid='account-settings-section'>
       <ClerkAccountSections />
       <div>
         <h3 className='text-[13px] font-medium text-secondary-token mb-3'>

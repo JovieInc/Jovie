@@ -84,7 +84,7 @@ export function SessionManagementCard({
   if (sessionsLoading) {
     return (
       <DashboardCard variant='settings' padding='none'>
-        <div className='px-5 py-4 space-y-3'>
+        <div className='px-4 py-3 space-y-3'>
           <LoadingSkeleton height='h-10' />
           <LoadingSkeleton height='h-10' />
         </div>
@@ -95,7 +95,7 @@ export function SessionManagementCard({
   if (sessionsError) {
     return (
       <DashboardCard variant='settings' padding='none'>
-        <div className='px-5 py-4 text-sm text-destructive'>
+        <div className='px-4 py-3 text-sm text-destructive'>
           {sessionsError}
         </div>
       </DashboardCard>
@@ -119,7 +119,7 @@ export function SessionManagementCard({
         return (
           <div
             key={session.id}
-            className='flex items-center justify-between px-5 py-4'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div>
               <p className='text-sm text-primary-token flex items-center gap-2'>
