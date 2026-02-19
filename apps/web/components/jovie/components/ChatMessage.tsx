@@ -5,11 +5,18 @@ import { Check, Copy, User } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useMemo } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-import type { MessagePart } from '../types';
+import {
+  isToolInvocationPart,
+  type MessagePart,
+  type SocialLinkToolResult,
+} from '../types';
 import { getMessageText } from '../utils';
+import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
+import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
@@ -24,6 +31,8 @@ interface ChatMessageProps {
   readonly isStreaming?: boolean;
   /** Avatar URL for user messages. */
   readonly avatarUrl?: string | null;
+  /** Profile ID for interactive tool cards (avatar upload, link confirmation). */
+  readonly profileId?: string;
 }
 
 export function ChatMessage({
@@ -32,6 +41,7 @@ export function ChatMessage({
   parts,
   isStreaming,
   avatarUrl,
+  profileId,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess } = useClipboard();
@@ -43,6 +53,11 @@ export function ChatMessage({
       typeof p.url === 'string' &&
       typeof p.mediaType === 'string' &&
       p.mediaType.startsWith('image/')
+  );
+
+  const toolInvocations = useMemo(
+    () => parts.filter(isToolInvocationPart),
+    [parts]
   );
 
   return (
@@ -86,13 +101,59 @@ export function ChatMessage({
         </div>
       ) : (
         <div className='flex max-w-[80%] flex-col'>
-          <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
-            <ChatMarkdown
-              content={messageText}
-              isStreaming={Boolean(isStreaming)}
-            />
-          </div>
-          {!isStreaming && (
+          {messageText && (
+            <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
+              <ChatMarkdown
+                content={messageText}
+                isStreaming={Boolean(isStreaming)}
+              />
+            </div>
+          )}
+
+          {/* Interactive tool cards */}
+          {toolInvocations.map(toolInvocation => {
+            if (
+              toolInvocation.toolName === 'proposeAvatarUpload' &&
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success
+            ) {
+              return (
+                <div
+                  key={toolInvocation.toolInvocationId}
+                  className={cn(messageText && 'mt-3')}
+                >
+                  <ChatAvatarUploadCard />
+                </div>
+              );
+            }
+
+            if (
+              toolInvocation.toolName === 'proposeSocialLink' &&
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success &&
+              profileId
+            ) {
+              const result =
+                toolInvocation.result as unknown as SocialLinkToolResult;
+              return (
+                <div
+                  key={toolInvocation.toolInvocationId}
+                  className={cn(messageText && 'mt-3')}
+                >
+                  <ChatLinkConfirmationCard
+                    profileId={profileId}
+                    platform={result.platform}
+                    normalizedUrl={result.normalizedUrl}
+                    originalUrl={result.originalUrl}
+                  />
+                </div>
+              );
+            }
+
+            return null;
+          })}
+
+          {!isStreaming && messageText && (
             <div className='mt-1 flex items-center gap-0.5 pl-1'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
                 <button
