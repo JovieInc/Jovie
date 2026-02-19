@@ -44,8 +44,9 @@ export function DashboardHeader({
             <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
               {action}
             </div>
-          ) : null}
-          {mobileProfileSlot}
+          ) : (
+            mobileProfileSlot
+          )}
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}

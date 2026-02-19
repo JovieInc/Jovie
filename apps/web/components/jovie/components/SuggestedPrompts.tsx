@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3, Target, UserSearch } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -9,9 +9,7 @@ import { type ChatSuggestion, DEFAULT_SUGGESTIONS } from '../types';
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  BarChart3,
-  Target,
-  UserSearch,
+  Camera,
 };
 
 const ACCENT_TEXT_CLASSES = {

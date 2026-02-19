@@ -103,10 +103,19 @@ function useCloseOnEscapeOrOutside(
 // Sub-components
 // ============================================================================
 
-function GlassHighlight({ subtle = false }: { readonly subtle?: boolean }) {
+function GlassHighlight({
+  subtle = false,
+  rounded = true,
+}: {
+  readonly subtle?: boolean;
+  readonly rounded?: boolean;
+}) {
   return (
     <div
-      className='absolute inset-0 pointer-events-none rounded-2xl'
+      className={cn(
+        'absolute inset-0 pointer-events-none',
+        rounded && 'rounded-2xl'
+      )}
       style={
         subtle
           ? GLASS_LAYER_STYLES.highlightSubtle
@@ -117,10 +126,16 @@ function GlassHighlight({ subtle = false }: { readonly subtle?: boolean }) {
   );
 }
 
-function GlassBlur({ intense = false }: { readonly intense?: boolean }) {
+function GlassBlur({
+  intense = false,
+  rounded = true,
+}: {
+  readonly intense?: boolean;
+  readonly rounded?: boolean;
+}) {
   return (
     <div
-      className='absolute inset-0 rounded-2xl'
+      className={cn('absolute inset-0', rounded && 'rounded-2xl')}
       style={intense ? GLASS_LAYER_STYLES.blur : GLASS_LAYER_STYLES.blurLight}
       aria-hidden='true'
     />
@@ -301,8 +316,8 @@ export function LiquidGlassMenu({
           borderTop: '1px solid var(--liquid-glass-border)',
         }}
       >
-        <GlassHighlight subtle />
-        <GlassBlur />
+        <GlassHighlight subtle rounded={false} />
+        <GlassBlur rounded={false} />
 
         <div className='relative z-10 flex items-stretch justify-around px-2 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1.5'>
           {/* Primary nav items with labels */}
