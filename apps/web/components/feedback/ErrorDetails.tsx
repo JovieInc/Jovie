@@ -42,7 +42,7 @@ interface ErrorDetailsProps {
 
 /**
  * Shared error details section: error ID, timestamp, copy button, and dev info.
- * Used across PageErrorState, ErrorDialog, DashboardErrorFallback, and ErrorBoundary
+ * Used across PageErrorState, ErrorDialog, DashboardErrorBoundary, and ErrorBoundary
  * to eliminate copy-pasted code.
  */
 export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {

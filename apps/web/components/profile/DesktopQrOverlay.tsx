@@ -4,7 +4,7 @@ import { Smartphone, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { QRCode } from '@/components/molecules/QRCode';
+import { QRCodeDisplay } from '@/components/molecules/QRCodeDisplay';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 interface DesktopQrOverlayProps {
@@ -161,7 +161,11 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             <X className='h-4 w-4' />
           </button>
           {url && (
-            <QRCode data={url} size={120} label='Scan to view on mobile' />
+            <QRCodeDisplay
+              data={url}
+              size={120}
+              label='Scan to view on mobile'
+            />
           )}
           <p className='mt-2 text-xs text-secondary-token'>View on mobile</p>
         </motion.div>

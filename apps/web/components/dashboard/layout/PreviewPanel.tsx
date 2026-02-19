@@ -12,7 +12,7 @@ import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview'
 import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { getQrCodeUrl } from '@/components/molecules/QRCode';
+import { getQrCodeUrl } from '@/components/molecules/QRCodeDisplay';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 

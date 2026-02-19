@@ -219,6 +219,30 @@ module.exports = [
       'import/no-cycle': 'off',
     },
   },
+  {
+    files: ['**/components/atoms/**/*.ts', '**/components/atoms/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              importNames: [
+                'useState',
+                'useEffect',
+                'useMemo',
+                'useCallback',
+                'useRef',
+              ],
+              message:
+                'Atoms must be props-only. Move hook logic to molecules or organisms.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   // NOTE: Test file overrides for @typescript-eslint/no-explicit-any removed
   // - Biome already disables suspicious/noExplicitAny for test files
   // Disable server/client boundary rules for server-only contexts

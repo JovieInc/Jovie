@@ -1,6 +1,6 @@
 'use client';
 
-import ErrorBoundary from '@/components/organisms/ErrorBoundary';
+import ErrorBoundary from '@/components/organisms/ErrorBoundaryProvider';
 import type { ErrorProps } from '@/types/common';
 
 export default function ReleasesError({ error, reset }: ErrorProps) {
