@@ -208,7 +208,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
               <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium'>
                 Followers
               </div>
-              <span className='text-sm text-secondary-token'>
+              <span className='text-sm text-secondary-token tabular-nums'>
                 {entry.primarySocialFollowerCount.toLocaleString()}
               </span>
             </div>

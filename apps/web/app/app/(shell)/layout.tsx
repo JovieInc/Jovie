@@ -4,7 +4,7 @@ import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBann
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { PWAInstallToastActivator } from '@/components/feedback/PWAInstallToastActivator';
-import { VersionUpdateToastActivator } from '@/components/feedback/VersionUpdateToastActivator';
+import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -73,7 +73,7 @@ export default async function AppShellLayout({
         {/* ENG-004: Show environment issues to admins in non-production */}
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
-        <VersionUpdateToastActivator />
+        <VersionUpdateBannerWrapper />
         <PWAInstallToastActivator />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>

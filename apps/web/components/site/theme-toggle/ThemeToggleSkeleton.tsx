@@ -25,9 +25,9 @@ export function ThemeToggleSkeleton({
         aria-label='Theme'
         className={`inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
       >
-        <div className='h-7 w-7 rounded-full bg-surface-1' />
-        <div className='h-7 w-7 rounded-full bg-surface-1' />
-        <div className='h-7 w-7 rounded-full bg-surface-1' />
+        <div className='h-7 w-7 rounded-full skeleton motion-reduce:animate-none' />
+        <div className='h-7 w-7 rounded-full skeleton motion-reduce:animate-none' />
+        <div className='h-7 w-7 rounded-full skeleton motion-reduce:animate-none' />
       </div>
     );
   }
@@ -35,7 +35,7 @@ export function ThemeToggleSkeleton({
   return (
     <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
       <span className='sr-only'>Loading theme toggle</span>
-      <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded-sm bg-surface-2' />
+      <div className='h-4 w-4 skeleton motion-reduce:animate-none rounded-sm' />
     </Button>
   );
 }
