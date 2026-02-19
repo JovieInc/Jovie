@@ -72,7 +72,7 @@ setup('authenticate', async ({ page, baseURL }) => {
           strategyError instanceof Error
             ? strategyError.message
             : String(strategyError);
-        if (strategyMsg.toLowerCase().includes('strategy')) {
+        if (strategyMsg.includes('strategy')) {
           console.log(
             '  Password strategy not available, falling back to email_code'
           );
@@ -93,7 +93,7 @@ setup('authenticate', async ({ page, baseURL }) => {
     if (msg.includes('already signed in')) {
       console.log('  Already signed in via testing token, continuing...');
     } else if (
-      msg.toLowerCase().includes('strategy') ||
+      msg.includes('strategy') ||
       msg.includes('infinite redirect') ||
       msg.includes('instance keys')
     ) {
