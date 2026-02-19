@@ -1,11 +1,20 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import { Check, ChevronDown } from 'lucide-react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import {
   DrawerPropertyRow,
   DrawerSection,
 } from '@/components/molecules/drawer';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import type { Release } from './types';
 
@@ -19,7 +28,10 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
-const CANVAS_STATUS_CONFIG = {
+const CANVAS_STATUS_CONFIG: Record<
+  CanvasStatus,
+  { label: string; className: string }
+> = {
   uploaded: {
     label: 'Live',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
@@ -32,7 +44,13 @@ const CANVAS_STATUS_CONFIG = {
     label: 'Not set',
     className: 'bg-surface-2 text-secondary-token',
   },
-} as const;
+};
+
+const CANVAS_STATUS_OPTIONS: CanvasStatus[] = [
+  'not_set',
+  'generated',
+  'uploaded',
+];
 
 function PopularityBar({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -53,10 +71,14 @@ function PopularityBar({ value }: { readonly value: number }) {
 
 interface ReleaseMetadataProps {
   readonly release: Release;
+  readonly onCanvasStatusChange?: (status: CanvasStatus) => void;
 }
 
-export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
-  const canvasStatus = release.canvasStatus ?? 'not_set';
+export function ReleaseMetadata({
+  release,
+  onCanvasStatusChange,
+}: ReleaseMetadataProps) {
+  const canvasStatus: CanvasStatus = release.canvasStatus ?? 'not_set';
   const canvasStatusConfig =
     CANVAS_STATUS_CONFIG[canvasStatus] ?? CANVAS_STATUS_CONFIG.not_set;
 
@@ -121,12 +143,64 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
         <DrawerPropertyRow
           label='Canvas'
           value={
-            <Badge
-              variant='secondary'
-              className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
-            >
-              {canvasStatusConfig.label}
-            </Badge>
+            onCanvasStatusChange ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type='button'
+                    className='inline-flex items-center gap-1 rounded-md px-0.5 -mx-0.5 py-0.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+                  >
+                    <Badge
+                      variant='secondary'
+                      className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
+                    >
+                      {canvasStatusConfig.label}
+                    </Badge>
+                    <ChevronDown
+                      size={12}
+                      className='text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='start' className='w-44'>
+                  {CANVAS_STATUS_OPTIONS.map(status => {
+                    const config = CANVAS_STATUS_CONFIG[status];
+                    const isActive = status === canvasStatus;
+                    return (
+                      <DropdownMenuItem
+                        key={status}
+                        onClick={() => onCanvasStatusChange(status)}
+                        className={cn(isActive && 'font-medium')}
+                      >
+                        <span className='flex items-center gap-2 w-full'>
+                          <Badge
+                            variant='secondary'
+                            className={`text-[10px] font-medium ${config.className}`}
+                          >
+                            {config.label}
+                          </Badge>
+                          {isActive && (
+                            <Check
+                              size={14}
+                              className='ml-auto text-primary-token'
+                              aria-hidden='true'
+                            />
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Badge
+                variant='secondary'
+                className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
+              >
+                {canvasStatusConfig.label}
+              </Badge>
+            )
           }
         />
 
