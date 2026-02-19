@@ -1,6 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import * as Sentry from '@sentry/nextjs';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -102,9 +103,14 @@ export function useJovieChat({
     () =>
       new DefaultChatTransport({
         api: '/api/chat',
-        body: profileId ? { profileId } : { artistContext },
+        body: {
+          ...(profileId ? { profileId } : { artistContext }),
+          ...(activeConversationId
+            ? { conversationId: activeConversationId }
+            : {}),
+        },
       }),
-    [profileId, artistContext]
+    [profileId, artistContext, activeConversationId]
   );
 
   // Convert loaded messages to the UIMessage format useChat expects
@@ -129,6 +135,18 @@ export function useJovieChat({
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
     onError: error => {
+      Sentry.captureException(error, {
+        tags: {
+          feature: 'ai-chat',
+          source: 'useJovieChat',
+          errorType: 'stream',
+        },
+        extra: {
+          profileId: profileId ?? null,
+          conversationId: activeConversationId,
+        },
+      });
+
       const errorType = getErrorType(error);
       const metadata = extractErrorMetadata(error);
 
@@ -278,6 +296,18 @@ export function useJovieChat({
           }
         },
         onError: err => {
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'message-persistence',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+              messageCount: messagesToPersist.length,
+            },
+          });
           console.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
@@ -299,6 +329,7 @@ export function useJovieChat({
     addMessagesMutation,
     queryClient,
     messages,
+    profileId,
   ]);
 
   // Core submit logic
@@ -347,6 +378,17 @@ export function useJovieChat({
             assistantMessage: '', // Will be filled when response completes
           };
         } catch (err) {
+          Sentry.captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'conversation-create',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+            },
+          });
           console.error('[useJovieChat] Failed to create conversation:', err);
           setChatError({
             type: 'server',
@@ -378,6 +420,7 @@ export function useJovieChat({
       activeConversationId,
       createConversationMutation,
       onConversationCreate,
+      profileId,
     ]
   );
 

@@ -21,7 +21,7 @@ export const homepageLabelLogos = flag({
 export const homepageHowItWorks = flag({
   key: 'homepage_how_it_works',
   description: 'Show the How It Works section on the homepage',
-  defaultValue: false,
+  defaultValue: true,
   decide() {
     return this.defaultValue as boolean;
   },
@@ -93,7 +93,7 @@ export const homepageSeeItInAction = flag({
 export const homepageFinalCta = flag({
   key: 'homepage_final_cta',
   description: 'Show the final CTA section on the homepage',
-  defaultValue: false,
+  defaultValue: true,
   decide() {
     return this.defaultValue as boolean;
   },

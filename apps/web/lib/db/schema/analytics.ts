@@ -230,6 +230,10 @@ export const notificationSubscriptions = pgTable(
     // HMAC token hash for email verification link
     confirmationToken: text('confirmation_token'),
     confirmationSentAt: timestamp('confirmation_sent_at'),
+    emailOtpHash: text('email_otp_hash'),
+    emailOtpExpiresAt: timestamp('email_otp_expires_at'),
+    emailOtpLastSentAt: timestamp('email_otp_last_sent_at'),
+    emailOtpAttempts: integer('email_otp_attempts').notNull().default(0),
     unsubscribedAt: timestamp('unsubscribed_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },

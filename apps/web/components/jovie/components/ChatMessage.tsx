@@ -87,10 +87,10 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[80%] flex-col'>
           <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
-            <ChatMarkdown content={messageText} />
-            {isStreaming && (
-              <span className='inline-block w-[2px] h-[1em] ml-0.5 align-text-bottom bg-current animate-pulse motion-reduce:hidden' />
-            )}
+            <ChatMarkdown
+              content={messageText}
+              isStreaming={Boolean(isStreaming)}
+            />
           </div>
           {!isStreaming && (
             <div className='mt-1 flex items-center gap-0.5 pl-1'>

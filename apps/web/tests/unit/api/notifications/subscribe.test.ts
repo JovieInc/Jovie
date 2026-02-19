@@ -3,8 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGeneralLimiterLimit = vi.hoisted(() => vi.fn());
 const mockSubscribeToNotificationsDomain = vi.hoisted(() => vi.fn());
+const mockEmailOtpLimiterLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
+  createRateLimiter: vi.fn().mockReturnValue({
+    limit: mockEmailOtpLimiterLimit,
+  }),
   generalLimiter: {
     limit: mockGeneralLimiterLimit,
   },
@@ -29,6 +33,12 @@ describe('POST /api/notifications/subscribe', () => {
       success: true,
       limit: 100,
       remaining: 99,
+      reset: new Date(Date.now() + 60000),
+    });
+    mockEmailOtpLimiterLimit.mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
       reset: new Date(Date.now() + 60000),
     });
   });
