@@ -151,16 +151,20 @@ describe('AvatarUploadable - Analytics Tracking', () => {
 
     fireEvent.change(fileInput, { target: { files: [file] } });
 
+    // Allow async HEIC check + state updates to settle
+    await Promise.resolve();
     await Promise.resolve();
     expect(track).toHaveBeenCalledWith('avatar_upload_start', {
       file_size: 2048,
       file_type: 'image/jpeg',
+      original_file_type: 'image/jpeg',
     });
 
-    await Promise.resolve();
-    vi.runAllTimers();
+    // Flush microtasks so the upload promise resolves, then advance timers
+    await vi.advanceTimersByTimeAsync(500);
     expect(track).toHaveBeenCalledWith('avatar_upload_success', {
       file_size: 2048,
+      file_type: 'image/jpeg',
     });
   });
 

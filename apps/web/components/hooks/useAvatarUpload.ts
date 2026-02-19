@@ -157,6 +157,7 @@ export function useAvatarUpload({
         } catch {
           const message =
             'Could not process this HEIC photo. Please try a JPEG or PNG image.';
+          setUploadProgress(100);
           setUploadStatus('error');
           onError?.(message);
           track('avatar_upload_error', {

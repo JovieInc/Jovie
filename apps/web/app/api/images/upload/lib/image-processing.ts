@@ -33,15 +33,16 @@ export async function canProcessMimeTypeWithSharp(
   }
 
   const sharp = await getSharp();
-  const sharpWithFormat = sharp as unknown as {
+
+  interface SharpWithFormat {
     format?: {
       heif?: {
-        input?: {
-          buffer?: boolean;
-        };
+        input?: { buffer?: boolean };
       };
     };
-  };
+  }
+
+  const sharpWithFormat = sharp as unknown as SharpWithFormat;
 
   const heifBufferSupport = sharpWithFormat.format?.heif?.input?.buffer;
 
