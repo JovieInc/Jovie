@@ -61,39 +61,34 @@ export function ReleaseArtwork({
     </div>
   );
 
-  const artworkImage =
+  const innerImage =
     canUploadArtwork && onArtworkUpload ? (
-      <AlbumArtworkContextMenu
-        title={title}
-        sizes={sizes}
-        allowDownloads={allowDownloads}
-        releaseId={releaseId}
-        canRevert={canRevert}
-        onRevert={onRevert}
-      >
-        <AvatarUploadable
-          src={artworkUrl}
-          alt={altText}
-          name={title}
-          size='lg'
-          uploadable={canUploadArtwork}
-          onUpload={onArtworkUpload}
-          showHoverOverlay
-          className='rounded-lg'
-        />
-      </AlbumArtworkContextMenu>
+      <AvatarUploadable
+        src={artworkUrl}
+        alt={altText}
+        name={title}
+        size='lg'
+        uploadable={canUploadArtwork}
+        onUpload={onArtworkUpload}
+        showHoverOverlay
+        className='rounded-lg'
+      />
     ) : (
-      <AlbumArtworkContextMenu
-        title={title}
-        sizes={sizes}
-        allowDownloads={allowDownloads}
-        releaseId={releaseId}
-        canRevert={canRevert}
-        onRevert={onRevert}
-      >
-        {staticImage}
-      </AlbumArtworkContextMenu>
+      staticImage
     );
+
+  const artworkImage = (
+    <AlbumArtworkContextMenu
+      title={title}
+      sizes={sizes}
+      allowDownloads={allowDownloads}
+      releaseId={releaseId}
+      canRevert={canRevert}
+      onRevert={onRevert}
+    >
+      {innerImage}
+    </AlbumArtworkContextMenu>
+  );
 
   return (
     <EntityHeaderCard

@@ -35,8 +35,8 @@ export const ContactAvatar = memo(function ContactAvatar({
       alt={altText}
       name={displayName}
       size='lg'
-      uploadable={canUploadAvatar}
-      onUpload={canUploadAvatar ? onAvatarUpload : undefined}
+      uploadable
+      onUpload={onAvatarUpload}
       showHoverOverlay
     />
   ) : (
