@@ -71,11 +71,11 @@ interface ReleaseTableSubheaderProps {
 
 /** Options for release view segmented control */
 const RELEASE_VIEW_OPTIONS = [
-  { value: 'tracks', label: 'Tracks' },
-  { value: 'releases', label: 'Releases' },
+  { value: 'tracks', label: 'Tracks', icon: 'ListMusic' },
+  { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
-/** Segmented control for release type filter */
+/** Linear-style full-width segmented control with icons */
 function ReleaseViewSegmentedControl({
   value,
   onChange,
@@ -84,7 +84,7 @@ function ReleaseViewSegmentedControl({
   onChange: (value: ReleaseView) => void;
 }) {
   return (
-    <fieldset className='inline-flex rounded-md bg-transparent p-0'>
+    <fieldset className='grid grid-cols-2 gap-1.5 rounded-lg'>
       <legend className='sr-only'>Release type filter</legend>
       {RELEASE_VIEW_OPTIONS.map(option => (
         <button
@@ -93,12 +93,13 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'h-7 px-2.5 text-xs font-medium rounded-md transition-colors',
+            'flex flex-col items-center gap-1 rounded-lg py-3 text-xs font-medium transition-colors',
             value === option.value
-              ? 'bg-surface-2 text-primary-token'
-              : 'text-tertiary-token hover:text-secondary-token'
+              ? 'bg-surface-2 text-primary-token border border-subtle'
+              : 'text-tertiary-token hover:text-secondary-token border border-transparent'
           )}
         >
+          <Icon name={option.icon} className='h-4 w-4' aria-hidden='true' />
           {option.label}
         </button>
       ))}
@@ -128,7 +129,7 @@ function ToggleSwitch({
       <span
         className={cn(
           'flex h-[18px] w-[30px] items-center rounded-full p-[3px] transition-colors',
-          checked ? 'bg-primary' : 'bg-white/[0.12]'
+          checked ? 'bg-primary' : 'bg-surface-3'
         )}
       >
         <span
@@ -200,7 +201,7 @@ function LinearStyleDisplayMenu({
         {/* List options */}
         {onGroupByYearChange && (
           <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
-            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
+            <p className='px-1 py-1 text-[11px] font-medium text-secondary-token'>
               List options
             </p>
             {onGroupByYearChange && (
@@ -216,7 +217,7 @@ function LinearStyleDisplayMenu({
         {/* Column visibility (Fields) */}
         {availableColumns.length > 0 && (
           <div className='px-2 py-1.5'>
-            <p className='px-1 py-1 text-[11px] font-medium text-tertiary-token'>
+            <p className='px-1 py-1 text-[11px] font-medium text-secondary-token'>
               Properties
             </p>
             <div className='flex flex-wrap gap-1 px-1'>
@@ -232,8 +233,8 @@ function LinearStyleDisplayMenu({
                     className={cn(
                       'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
                       isVisible
-                        ? 'bg-white/[0.08] text-secondary-token'
-                        : 'text-tertiary-token hover:text-secondary-token hover:bg-white/[0.04]'
+                        ? 'bg-interactive-active text-secondary-token'
+                        : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
                     )}
                   >
                     {col.label}

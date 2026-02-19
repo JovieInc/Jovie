@@ -7,8 +7,9 @@
  * Supports drag-and-drop upload and right-click context menu for downloads.
  */
 
-import { Disc3 } from 'lucide-react';
 import Image from 'next/image';
+import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -50,19 +51,26 @@ export function ReleaseArtwork({
   const altText = title ? `${title} artwork` : 'Release artwork';
   const sizes = buildArtworkSizes(artworkSizes, artworkUrl);
 
+  const [imgError, setImgError] = useState(false);
+
   const artworkImage = (
     <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-      {artworkUrl ? (
+      {artworkUrl && !imgError ? (
         <Image
           src={artworkUrl}
           alt={altText}
           fill
           className='object-cover'
           sizes='64px'
+          onError={() => setImgError(true)}
         />
       ) : (
         <div className='flex h-full w-full items-center justify-center'>
-          <Disc3 className='h-8 w-8 text-tertiary-token' aria-hidden='true' />
+          <Icon
+            name='Disc3'
+            className='h-8 w-8 text-tertiary-token'
+            aria-hidden='true'
+          />
         </div>
       )}
     </div>

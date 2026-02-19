@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   AlbumArtworkContextMenu,
@@ -31,6 +32,7 @@ export function SmartLinkArtwork({
   allowDownloads = false,
 }: SmartLinkArtworkProps) {
   const sizes = buildArtworkSizes(artworkSizes, src);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className='flex justify-center'>
@@ -40,7 +42,7 @@ export function SmartLinkArtwork({
         allowDownloads={allowDownloads}
       >
         <div className='relative size-56 overflow-hidden rounded-lg bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'>
-          {src ? (
+          {src && !imgError ? (
             <Image
               src={src}
               alt={alt}
@@ -48,6 +50,7 @@ export function SmartLinkArtwork({
               className='object-cover'
               sizes='224px'
               priority
+              onError={() => setImgError(true)}
             />
           ) : (
             <div className='flex h-full w-full items-center justify-center'>
