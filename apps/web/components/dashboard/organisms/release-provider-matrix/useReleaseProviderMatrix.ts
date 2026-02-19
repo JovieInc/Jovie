@@ -16,7 +16,6 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
   ReleaseProviderMatrixProps,
-  SortState,
   UseReleaseProviderMatrixReturn,
 } from './types';
 
@@ -58,15 +57,6 @@ export function useReleaseProviderMatrix({
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
   const isSyncing = syncMutation.isPending;
-
-  // These are no longer needed since UnifiedTable handles sorting internally,
-  // but kept for backward compatibility with return interface
-  const headerElevated = false;
-  const sortState: SortState = { column: 'releaseDate', direction: 'desc' };
-  const toggleSort = useCallback(() => {
-    // No-op: UnifiedTable handles sorting internally now
-  }, []);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   // Refs for stable callback access (prevents recreation on state changes)
   const rawRowsRef = useRef(rawRows);
@@ -189,7 +179,8 @@ export function useReleaseProviderMatrix({
         }
       );
     },
-    [saveProviderMutation]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
+    [saveProviderMutation.mutate]
   );
 
   const handleReset = (provider: ProviderKey) => {
@@ -329,13 +320,9 @@ export function useReleaseProviderMatrix({
     drafts,
     isSaving,
     isSyncing,
-    headerElevated,
-    tableContainerRef,
     providerList,
     totalReleases,
     totalOverrides,
-    sortState,
-    toggleSort,
     openEditor,
     closeEditor,
     handleCopy,

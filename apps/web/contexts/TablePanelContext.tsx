@@ -1,14 +1,37 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { createContext, useContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
-interface TablePanelContextValue {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface TablePanelState {
   panel: ReactNode;
+}
+
+interface TablePanelDispatch {
   setPanel: (node: ReactNode) => void;
 }
 
-const TablePanelContext = createContext<TablePanelContextValue | null>(null);
+// ---------------------------------------------------------------------------
+// Contexts (split: state vs dispatch)
+// ---------------------------------------------------------------------------
+
+const TablePanelStateContext = createContext<TablePanelState | null>(null);
+const TablePanelDispatchContext = createContext<TablePanelDispatch | null>(
+  null
+);
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
 
 export function TablePanelProvider({
   children,
@@ -17,18 +40,30 @@ export function TablePanelProvider({
 }) {
   const [panel, setPanel] = useState<ReactNode>(null);
 
-  const value = useMemo(() => ({ panel, setPanel }), [panel]);
+  const state = useMemo(() => ({ panel }), [panel]);
+
+  // useState setters are referentially stable, so this memo never recomputes.
+  const dispatch = useMemo(() => ({ setPanel }), [setPanel]);
 
   return (
-    <TablePanelContext.Provider value={value}>
-      {children}
-    </TablePanelContext.Provider>
+    <TablePanelDispatchContext.Provider value={dispatch}>
+      <TablePanelStateContext.Provider value={state}>
+        {children}
+      </TablePanelStateContext.Provider>
+    </TablePanelDispatchContext.Provider>
   );
 }
 
-/** Used by pages to register/unregister their sidebar content */
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+/**
+ * Used by pages to register/unregister their sidebar content.
+ * Subscribes to dispatch only — no re-render when panel changes.
+ */
 export function useSetTablePanel() {
-  const ctx = useContext(TablePanelContext);
+  const ctx = useContext(TablePanelDispatchContext);
   if (!ctx) {
     throw new TypeError(
       'useSetTablePanel must be used within TablePanelProvider'
@@ -37,8 +72,11 @@ export function useSetTablePanel() {
   return ctx.setPanel;
 }
 
-/** Used by AuthShell to read the current panel */
+/**
+ * Used by AuthShell to read the current panel.
+ * Subscribes to state only — re-renders when panel changes.
+ */
 export function useTablePanel(): ReactNode {
-  const ctx = useContext(TablePanelContext);
+  const ctx = useContext(TablePanelStateContext);
   return ctx?.panel ?? null;
 }
