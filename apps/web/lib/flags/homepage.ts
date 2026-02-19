@@ -99,6 +99,15 @@ export const homepageFinalCta = flag({
   },
 });
 
+export const homepageDashboardShowcase = flag({
+  key: 'homepage_dashboard_showcase',
+  description: 'Show the dashboard showcase demo section on the homepage',
+  defaultValue: true,
+  decide() {
+    return this.defaultValue as boolean;
+  },
+});
+
 /** All homepage flags for bulk operations (discovery endpoint, layout encryption) */
 export const homepageFlags = [
   homepageHero,
@@ -112,4 +121,5 @@ export const homepageFlags = [
   homepageWhatYouGet,
   homepageSeeItInAction,
   homepageFinalCta,
+  homepageDashboardShowcase,
 ] as const;
