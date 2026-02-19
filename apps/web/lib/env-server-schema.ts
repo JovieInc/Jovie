@@ -138,6 +138,9 @@ export const ServerEnvSchema = z.object({
   // Statsig server-side (feature flags)
   STATSIG_SERVER_SECRET: z.string().optional(),
 
+  // AI Gateway auth (required for chat completions)
+  AI_GATEWAY_API_KEY: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
@@ -218,6 +221,7 @@ export const ENV_KEYS = [
   'LINEAR_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
+  'AI_GATEWAY_API_KEY',
   'JOVIE_DEV_MEMORY_MONITOR',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',

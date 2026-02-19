@@ -204,6 +204,24 @@ const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) => {
 };
 
 /**
+ * Validation rule: Check AI Gateway API key in production/preview.
+ */
+const checkAiGatewayApiKey: ValidationRule = ({ server, vercelEnv }) => {
+  if (
+    (vercelEnv === 'production' || vercelEnv === 'preview') &&
+    !server.AI_GATEWAY_API_KEY
+  ) {
+    return {
+      type: 'critical',
+      message:
+        'AI_GATEWAY_API_KEY is required in production/preview for chat completions',
+    };
+  }
+
+  return null;
+};
+
+/**
  * Runtime validation rules (checked in runtime context)
  */
 export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
@@ -215,4 +233,5 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripePairConsistency,
   checkCloudinaryConfig,
   checkUrlEncryptionKey,
+  checkAiGatewayApiKey,
 ];
