@@ -38,6 +38,64 @@ describe('Environment Validation', () => {
         runtimeResult.critical.length
       );
     });
+
+    it('flags missing AI_GATEWAY_API_KEY as critical in preview', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
+      process.env.VERCEL_ENV = 'preview';
+      delete process.env.AI_GATEWAY_API_KEY;
+
+      try {
+        const result = validateEnvironment('runtime');
+
+        expect(
+          result.critical.some(message =>
+            message.includes('AI_GATEWAY_API_KEY is required')
+          )
+        ).toBe(true);
+      } finally {
+        if (originalVercelEnv) {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        } else {
+          delete process.env.VERCEL_ENV;
+        }
+
+        if (originalGatewayKey) {
+          process.env.AI_GATEWAY_API_KEY = originalGatewayKey;
+        } else {
+          delete process.env.AI_GATEWAY_API_KEY;
+        }
+      }
+    });
+
+    it('passes AI gateway validation when AI_GATEWAY_API_KEY is set in preview', () => {
+      const originalVercelEnv = process.env.VERCEL_ENV;
+      const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
+      process.env.VERCEL_ENV = 'preview';
+      process.env.AI_GATEWAY_API_KEY = 'test-ai-gateway-key';
+
+      try {
+        const result = validateEnvironment('runtime');
+
+        expect(
+          result.critical.some(message =>
+            message.includes('AI_GATEWAY_API_KEY is required')
+          )
+        ).toBe(false);
+      } finally {
+        if (originalVercelEnv) {
+          process.env.VERCEL_ENV = originalVercelEnv;
+        } else {
+          delete process.env.VERCEL_ENV;
+        }
+
+        if (originalGatewayKey) {
+          process.env.AI_GATEWAY_API_KEY = originalGatewayKey;
+        } else {
+          delete process.env.AI_GATEWAY_API_KEY;
+        }
+      }
+    });
   });
 
   describe('validateAndLogEnvironment', () => {
