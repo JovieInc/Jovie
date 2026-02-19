@@ -9,9 +9,9 @@ export default function BlogIndexLoading() {
       <Container>
         <header className='mb-8 md:mb-12'>
           {/* Title skeleton */}
-          <div className='h-10 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+          <div className='h-10 w-32 skeleton motion-reduce:animate-none rounded-lg' />
           {/* Subtitle skeleton */}
-          <div className='mt-2 h-5 w-64 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+          <div className='mt-2 h-5 w-64 skeleton motion-reduce:animate-none rounded-lg' />
         </header>
 
         {/* Blog post cards grid */}
@@ -22,15 +22,15 @@ export default function BlogIndexLoading() {
               className='rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden'
             >
               {/* Image placeholder */}
-              <div className='aspect-video w-full animate-pulse bg-gray-200 dark:bg-gray-800' />
+              <div className='aspect-video w-full skeleton motion-reduce:animate-none' />
               <div className='p-6 space-y-3'>
                 {/* Title */}
-                <div className='h-6 w-5/6 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
+                <div className='h-6 w-5/6 skeleton motion-reduce:animate-none rounded' />
                 {/* Excerpt lines */}
-                <div className='h-4 w-full animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
-                <div className='h-4 w-4/5 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
+                <div className='h-4 w-full skeleton motion-reduce:animate-none rounded' />
+                <div className='h-4 w-4/5 skeleton motion-reduce:animate-none rounded' />
                 {/* Date */}
-                <div className='h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
+                <div className='h-3 w-24 skeleton motion-reduce:animate-none rounded' />
               </div>
             </article>
           ))}
