@@ -1,7 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
-
 interface ProgressStep {
   readonly id: string;
   readonly title: string;
@@ -25,15 +23,9 @@ export function ProgressIndicator({
   className = '',
 }: ProgressIndicatorProps) {
   const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
-
-  // Calculate remaining time estimate
-  const remainingTime = useMemo(
-    () =>
-      steps
-        .slice(currentStep + 1)
-        .reduce((total, step) => total + (step.estimatedTimeSeconds || 30), 0),
-    [steps, currentStep]
-  );
+  const remainingTime = steps
+    .slice(currentStep + 1)
+    .reduce((total, step) => total + (step.estimatedTimeSeconds || 30), 0);
 
   const formatTime = (seconds: number): string => {
     if (seconds < 60) return `${seconds}s`;
@@ -48,7 +40,6 @@ export function ProgressIndicator({
       value={currentStep + 1}
       max={totalSteps}
     >
-      {/* Progress bar */}
       <div className='space-y-2'>
         <div className='flex justify-between items-center text-sm'>
           <span className='font-medium text-primary-token'>
@@ -68,7 +59,6 @@ export function ProgressIndicator({
         </div>
       </div>
 
-      {/* Step indicators */}
       <div className='flex justify-between items-center'>
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
@@ -85,7 +75,6 @@ export function ProgressIndicator({
                 return `${baseClasses} text-quaternary-token`;
               })()}
             >
-              {/* Step circle */}
               <div
                 className={(() => {
                   const baseClasses =
@@ -115,15 +104,12 @@ export function ProgressIndicator({
                 )}
               </div>
 
-              {/* Step title */}
-              <div className='text-center'>
-                <div
-                  className={`text-xs sm:text-sm font-medium ${isCurrent ? 'font-semibold' : ''} max-w-16 sm:max-w-none`}
-                >
+              <div className='text-center max-w-20 sm:max-w-none'>
+                <div className='text-xs sm:text-sm font-medium truncate'>
                   {step.title}
                 </div>
-                {step.description && isCurrent && (
-                  <div className='hidden sm:block text-xs text-tertiary-token mt-1 max-w-20 leading-tight'>
+                {isCurrent && step.description && (
+                  <div className='text-xs opacity-75 hidden sm:block truncate'>
                     {step.description}
                   </div>
                 )}

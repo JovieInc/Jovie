@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AmountSelectorProps {
@@ -20,14 +20,10 @@ export const AmountSelector = memo(function AmountSelector({
   className,
   disabled,
 }: AmountSelectorProps) {
-  const handleClick = useCallback(() => {
-    onClick(index);
-  }, [onClick, index]);
-
   return (
     <button
       type='button'
-      onClick={handleClick}
+      onClick={() => onClick(index)}
       aria-pressed={isSelected}
       aria-label={`Select $${amount} tip amount`}
       disabled={disabled}

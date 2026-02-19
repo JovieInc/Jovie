@@ -1,41 +1,26 @@
 'use client';
 
-import { memo, useCallback, useState } from 'react';
+import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 interface CopyableMonospaceCellProps {
-  /** The value to display and copy */
   readonly value: string | null | undefined;
-  /** Label for the copy tooltip (e.g., "ISRC", "UPC") */
   readonly label: string;
-  /** Maximum width for truncation (default: 100px) */
   readonly maxWidth?: number;
-  /** Additional class name */
   readonly className?: string;
+  readonly copied?: boolean;
+  readonly onCopy?: () => void;
 }
 
-/**
- * CopyableMonospaceCell - Display a monospace value with copy functionality
- *
- * Used for technical identifiers like ISRC, UPC, IDs, etc.
- * Shows a copy icon on hover and provides visual feedback on copy.
- */
 export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   value,
   label,
   maxWidth = 100,
   className,
+  copied = false,
+  onCopy,
 }: CopyableMonospaceCellProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    if (!value) return;
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [value]);
-
   if (!value) {
     return <span className='text-tertiary-token'>—</span>;
   }
@@ -43,7 +28,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   return (
     <button
       type='button'
-      onClick={handleCopy}
+      onClick={onCopy}
       className={cn(
         'group/copy inline-flex items-center gap-1 font-mono text-xs text-secondary-token hover:text-primary-token',
         className

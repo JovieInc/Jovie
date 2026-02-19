@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -16,6 +15,7 @@ import {
   ReleaseCell,
   SmartLinkCell,
 } from '@/components/dashboard/organisms/releases/cells';
+import { CopyableMonospaceValue } from '@/components/molecules/CopyableMonospaceValue';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
@@ -342,14 +342,14 @@ export function renderReleaseTypeCell({
 export function renderIsrcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='ISRC' />;
+  return <CopyableMonospaceValue value={getValue()} label='ISRC' />;
 }
 
 /** Renders the UPC cell */
 export function renderUpcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='UPC' />;
+  return <CopyableMonospaceValue value={getValue()} label='UPC' />;
 }
 
 /** Renders the label cell with truncation and tooltip */
