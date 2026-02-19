@@ -113,15 +113,15 @@ function handleDbFailure(
     );
     return staleEntry.isAdmin;
   }
-  if (staleEntry !== undefined) {
-    captureWarning(
-      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
-      { userId, expiredAt: staleEntry.expiresAt }
-    );
-  } else {
+  if (staleEntry === undefined) {
     captureError(
       '[admin/roles] DB query failed after retry, no cache available — denying access',
       lastError
+    );
+  } else {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
+      { userId, expiredAt: staleEntry.expiresAt }
     );
   }
   return false;
