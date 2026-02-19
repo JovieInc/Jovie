@@ -3,14 +3,15 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+
 import { db } from '@/lib/db';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
-import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { logger } from '@/lib/utils/logger';
+import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
 const confirmLinkSchema = z.object({
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { profileId, platform, url, normalizedUrl } = parseResult.data;
+  const { profileId, platform, normalizedUrl } = parseResult.data;
 
   try {
     // Verify profile ownership
@@ -87,6 +88,12 @@ export async function POST(req: Request) {
 
     // Re-detect platform server-side for safety
     const detected = detectPlatform(normalizedUrl);
+    if (!detected.isValid) {
+      return NextResponse.json(
+        { error: detected.error ?? 'Unsupported platform URL' },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
+    }
 
     // Insert the social link
     await db.insert(socialLinks).values({

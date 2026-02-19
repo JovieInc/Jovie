@@ -20,6 +20,38 @@ interface ChatLinkConfirmationCardProps {
 
 type CardState = 'pending' | 'adding' | 'added' | 'dismissed';
 
+/** Canonical SocialIcon platform values. Falls back to 'link' for unknown platforms. */
+const VALID_SOCIAL_PLATFORMS = new Set([
+  'spotify',
+  'applemusic',
+  'soundcloud',
+  'bandcamp',
+  'instagram',
+  'twitter',
+  'x',
+  'tiktok',
+  'youtube',
+  'youtubemusic',
+  'facebook',
+  'discord',
+  'reddit',
+  'github',
+  'patreon',
+  'twitch',
+  'linkedin',
+  'snapchat',
+  'pinterest',
+  'threads',
+  'mastodon',
+  'bluesky',
+  'link',
+]);
+
+function normalizeSocialPlatform(icon: string): string {
+  const lower = icon.toLowerCase();
+  return VALID_SOCIAL_PLATFORMS.has(lower) ? lower : 'link';
+}
+
 export function ChatLinkConfirmationCard({
   profileId,
   platform,
@@ -27,9 +59,11 @@ export function ChatLinkConfirmationCard({
   originalUrl,
 }: ChatLinkConfirmationCardProps) {
   const [state, setState] = useState<CardState>('pending');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmLink = useConfirmChatLinkMutation();
 
   const handleAdd = useCallback(() => {
+    setErrorMessage(null);
     setState('adding');
     confirmLink.mutate(
       {
@@ -40,7 +74,10 @@ export function ChatLinkConfirmationCard({
       },
       {
         onSuccess: () => setState('added'),
-        onError: () => setState('pending'),
+        onError: () => {
+          setState('pending');
+          setErrorMessage('Unable to add link. Please try again.');
+        },
       }
     );
   }, [profileId, platform.id, originalUrl, normalizedUrl, confirmLink]);
@@ -77,7 +114,7 @@ export function ChatLinkConfirmationCard({
     <div className='rounded-xl border border-accent/20 bg-accent/5 p-4'>
       <div className='flex items-center gap-3'>
         <SocialIcon
-          platform={platform.icon}
+          platform={normalizeSocialPlatform(platform.icon)}
           className='h-5 w-5 shrink-0'
           aria-hidden
         />
@@ -88,6 +125,11 @@ export function ChatLinkConfirmationCard({
           <p className='truncate text-xs text-tertiary-token'>
             {normalizedUrl}
           </p>
+          {errorMessage && (
+            <output className='mt-1 block text-xs text-danger-token'>
+              {errorMessage}
+            </output>
+          )}
         </div>
         <div className='flex items-center gap-1.5 shrink-0'>
           <button

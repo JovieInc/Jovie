@@ -19,6 +19,18 @@ const ChatMarkdown = dynamic(
   { ssr: false }
 );
 
+interface SocialLinkToolResult {
+  readonly success: boolean;
+  readonly platform: {
+    readonly id: string;
+    readonly name: string;
+    readonly icon: string;
+    readonly color: string;
+  };
+  readonly normalizedUrl: string;
+  readonly originalUrl: string;
+}
+
 interface ToolInvocationPart {
   type: 'tool-invocation';
   toolInvocationId: string;
@@ -28,11 +40,19 @@ interface ToolInvocationPart {
 }
 
 function isToolInvocationPart(part: unknown): part is ToolInvocationPart {
+  if (typeof part !== 'object' || part === null) {
+    return false;
+  }
+  const candidate = part as Partial<ToolInvocationPart>;
   return (
-    typeof part === 'object' &&
-    part !== null &&
-    'type' in part &&
-    (part as { type: string }).type === 'tool-invocation'
+    candidate.type === 'tool-invocation' &&
+    typeof candidate.toolInvocationId === 'string' &&
+    candidate.toolInvocationId.length > 0 &&
+    typeof candidate.toolName === 'string' &&
+    candidate.toolName.length > 0 &&
+    (candidate.state === 'call' ||
+      candidate.state === 'result' ||
+      candidate.state === 'partial-call')
   );
 }
 
@@ -146,16 +166,8 @@ export function ChatMessage({
               toolInvocation.result?.success &&
               profileId
             ) {
-              const result = toolInvocation.result as {
-                platform: {
-                  id: string;
-                  name: string;
-                  icon: string;
-                  color: string;
-                };
-                normalizedUrl: string;
-                originalUrl: string;
-              };
+              const result =
+                toolInvocation.result as unknown as SocialLinkToolResult;
               return (
                 <div
                   key={toolInvocation.toolInvocationId}

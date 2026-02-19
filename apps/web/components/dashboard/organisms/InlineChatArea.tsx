@@ -59,6 +59,19 @@ export interface InlineChatAreaRef {
   isLoading: boolean;
 }
 
+// Type for social link tool results
+interface SocialLinkToolResult {
+  readonly success: boolean;
+  readonly platform: {
+    readonly id: string;
+    readonly name: string;
+    readonly icon: string;
+    readonly color: string;
+  };
+  readonly normalizedUrl: string;
+  readonly originalUrl: string;
+}
+
 // Type for tool invocation parts
 interface ToolInvocationPart {
   type: 'tool-invocation';
@@ -172,17 +185,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           toolInvocation.state === 'result' &&
           toolInvocation.result?.success
         ) {
-          const result = toolInvocation.result as {
-            success: boolean;
-            platform: {
-              id: string;
-              name: string;
-              icon: string;
-              color: string;
-            };
-            normalizedUrl: string;
-            originalUrl: string;
-          };
+          const result = toolInvocation.result as SocialLinkToolResult;
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ChatLinkConfirmationCard

@@ -34,9 +34,9 @@ import {
 } from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
-import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const maxDuration = 30;
 
