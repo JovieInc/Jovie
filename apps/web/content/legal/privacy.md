@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: December 2024_
+_Last updated: February 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -9,6 +9,10 @@ This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 Jovie exists so musicians can share their story with confidence. That means keeping your information safe, using it transparently, and never selling it. We aim for clarity, control, and fast responses whenever you need help.
 
 ## Information We Collect
+
+### Age Requirement
+
+Jovie is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will promptly delete it. If you believe a child under 13 has provided us with personal information, please contact privacy@meetjovie.com.
 
 ### Account Information
 
@@ -58,6 +62,11 @@ Our stack uses a small set of trusted partners:
 - **Stripe** for billing and customer subscriptions
 - **Spotify** for artist discovery and metadata enrichment
 - **Statsig** for analytics, experimentation, and feature gating
+- **Anthropic** for AI-powered chat assistance and analytics insights (Claude language models)
+- **Google AI** for AI-generated conversation titles (Gemini language models)
+- **Vercel** for hosting, edge functions, file storage, web analytics, and AI Gateway routing
+- **Sentry** for error tracking and performance monitoring
+- **Resend** for transactional email delivery
 
 We never introduce other analytics platforms or tracking cookies without explicit notice.
 
@@ -95,11 +104,38 @@ Spotify user data (email, name, profile picture, user ID) is used exclusively fo
 
 We do **not** use Spotify user data for advertising, marketing to third parties, or any purpose unrelated to providing the Jovie service.
 
+## Artificial Intelligence Features
+
+Jovie uses artificial intelligence to power optional in-app features. When you use these features, certain data is processed by third-party AI providers:
+
+### AI Chat Assistant
+
+When you use the Jovie AI assistant in your dashboard, your messages and artist profile context (display name, bio, genres, streaming stats, and analytics summaries) are sent to **Anthropic** (Claude) via the **Vercel AI Gateway** to generate responses. Your conversation content is processed in real time and is not stored by Anthropic beyond the duration of the request.
+
+### Conversation Titles
+
+When you start a new chat conversation, the first messages are sent to **Google** (Gemini) via the Vercel AI Gateway to generate a short descriptive title.
+
+### AI-Powered Insights
+
+Aggregated analytics data (profile views, click patterns, geographic distribution) may be sent to **Anthropic** (Claude) to generate personalized career insights. This data consists of anonymized summaries, not raw user activity.
+
+### What We Do NOT Send to AI Providers
+
+- Your email address or authentication credentials
+- Your payment information
+- Your IP address
+- Raw click-level analytics data identifying your fans
+
+### Your Controls
+
+You can choose not to use AI features. The AI chat assistant is optional and does not activate unless you open it. There is no AI processing of your data outside of features you explicitly use.
+
 ## Data Sharing
 
 We do not sell data to anyone. We may share data with:
 
-- Service providers who assist in operating Jovie (Clerk, Neon, Stripe, Statsig)
+- Service providers who assist in operating Jovie (Clerk, Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend)
 - Legal authorities when required by law or to protect against fraud
 - Partners only when you explicitly connect a service (e.g., Spotify)
 

@@ -32,7 +32,7 @@ export function AudienceQuickActionsCell({
         aria-label='Export contact'
         title='Export vCard'
       >
-        <Download className='h-3.5 w-3.5' />
+        <Download className='h-4 w-4' />
       </button>
       <button
         type='button'
@@ -41,7 +41,7 @@ export function AudienceQuickActionsCell({
         aria-label='Block member'
         title='Block'
       >
-        <ShieldBan className='h-3.5 w-3.5' />
+        <ShieldBan className='h-4 w-4' />
       </button>
     </div>
   );

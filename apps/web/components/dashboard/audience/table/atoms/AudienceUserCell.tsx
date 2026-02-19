@@ -3,6 +3,7 @@
 import React from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
+import { getFallbackName } from '@/lib/utils/audience';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
@@ -11,22 +12,6 @@ export interface AudienceUserCellProps {
   readonly email?: string | null;
   readonly phone?: string | null;
   readonly className?: string;
-}
-
-/** Derive a meaningful fallback name from member type instead of generic "Visitor" */
-function getFallbackName(type: AudienceMemberType): string {
-  switch (type) {
-    case 'email':
-      return 'Email Subscriber';
-    case 'sms':
-      return 'SMS Subscriber';
-    case 'spotify':
-      return 'Spotify Listener';
-    case 'customer':
-      return 'Customer';
-    default:
-      return 'Visitor';
-  }
 }
 
 /**
@@ -41,7 +26,7 @@ function getFallbackName(type: AudienceMemberType): string {
  * - Improves scroll performance in large audience lists
  *
  * @param displayName - User's display name or null for anonymous visitors
- * @param type - Audience member type: 'anonymous', 'email', 'sms', 'connected'
+ * @param type - Audience member type: 'anonymous', 'email', 'sms', 'spotify', 'customer'
  * @param email - User's email address (for email type members)
  * @param phone - User's phone number (for SMS type members)
  */

@@ -59,6 +59,7 @@ export function ReleaseArtworkThumb({
             className={cn('text-tertiary-token', fallbackIconClass)}
             aria-hidden='true'
           />
+          <span className='sr-only'>{alt}</span>
         </div>
       )}
     </div>

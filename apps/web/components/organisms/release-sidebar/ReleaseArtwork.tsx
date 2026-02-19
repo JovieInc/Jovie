@@ -11,7 +11,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
-import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { EntityHeaderCard } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
@@ -57,7 +57,7 @@ export function ReleaseArtwork({
     setImgError(false);
   }, [artworkUrl]);
 
-  const artworkImage = (
+  const staticImage = (
     <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
       {artworkUrl && !imgError ? (
         <Image
@@ -80,53 +80,41 @@ export function ReleaseArtwork({
     </div>
   );
 
+  const innerImage =
+    canUploadArtwork && onArtworkUpload ? (
+      <AvatarUploadable
+        src={artworkUrl}
+        alt={altText}
+        name={title}
+        size='lg'
+        uploadable={canUploadArtwork}
+        onUpload={onArtworkUpload}
+        showHoverOverlay
+        className='rounded-lg'
+      />
+    ) : (
+      staticImage
+    );
+
+  const artworkImage = (
+    <AlbumArtworkContextMenu
+      title={title}
+      sizes={sizes}
+      allowDownloads={allowDownloads}
+      releaseId={releaseId}
+      canRevert={canRevert}
+      onRevert={onRevert}
+    >
+      {innerImage}
+    </AlbumArtworkContextMenu>
+  );
+
   return (
-    <div className='flex items-center gap-3' data-testid='release-artwork'>
-      {canUploadArtwork && onArtworkUpload ? (
-        <AlbumArtworkContextMenu
-          title={title}
-          sizes={sizes}
-          allowDownloads={allowDownloads}
-          releaseId={releaseId}
-          canRevert={canRevert}
-          onRevert={onRevert}
-        >
-          <AvatarUploadable
-            src={artworkUrl}
-            alt={altText}
-            name={title}
-            size='lg'
-            uploadable={canUploadArtwork}
-            onUpload={onArtworkUpload}
-            showHoverOverlay
-            className='rounded-lg'
-          />
-        </AlbumArtworkContextMenu>
-      ) : (
-        <AlbumArtworkContextMenu
-          title={title}
-          sizes={sizes}
-          allowDownloads={allowDownloads}
-          releaseId={releaseId}
-          canRevert={canRevert}
-          onRevert={onRevert}
-        >
-          {artworkImage}
-        </AlbumArtworkContextMenu>
-      )}
-      <div className='min-w-0 flex-1'>
-        <TruncatedText
-          lines={1}
-          className='text-sm font-medium text-primary-token'
-        >
-          {title || 'Untitled'}
-        </TruncatedText>
-        {artistName && (
-          <TruncatedText lines={1} className='text-xs text-tertiary-token'>
-            {artistName}
-          </TruncatedText>
-        )}
-      </div>
-    </div>
+    <EntityHeaderCard
+      image={artworkImage}
+      title={title || 'Untitled'}
+      subtitle={artistName}
+      data-testid='release-artwork'
+    />
   );
 }

@@ -21,8 +21,6 @@ export interface AdminTableShellProps {
   readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
-const TOOLBAR_HEIGHT_PX = 56;
-
 /**
  * Throttle interval for scroll handler (ms).
  * 100ms provides smooth visual updates while reducing state updates from 60+/sec to 10/sec.
@@ -41,8 +39,10 @@ export function AdminTableShell({
   const internalRef = React.useRef<HTMLDivElement | null>(null);
   const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
+  const [stickyTopPx, setStickyTopPx] = React.useState(0);
   const lastScrollTimeRef = React.useRef(0);
   const rafIdRef = React.useRef<number | null>(null);
+  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     const container = tableContainerRef.current;
@@ -88,7 +88,30 @@ export function AdminTableShell({
     };
   }, [tableContainerRef]);
 
-  const stickyTopPx = toolbar ? TOOLBAR_HEIGHT_PX : 0;
+  React.useEffect(() => {
+    if (!toolbar) {
+      setStickyTopPx(0);
+      return;
+    }
+
+    const toolbarElement = toolbarRef.current;
+    if (!toolbarElement) {
+      return;
+    }
+
+    const updateToolbarHeight = () => {
+      setStickyTopPx(toolbarElement.getBoundingClientRect().height);
+    };
+
+    updateToolbarHeight();
+
+    const resizeObserver = new ResizeObserver(updateToolbarHeight);
+    resizeObserver.observe(toolbarElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [toolbar]);
 
   return (
     <div
@@ -105,6 +128,7 @@ export function AdminTableShell({
       >
         {toolbar ? (
           <div
+            ref={toolbarRef}
             className={cn(
               'sticky top-0 z-30 border-b border-subtle bg-surface-1',
               headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'

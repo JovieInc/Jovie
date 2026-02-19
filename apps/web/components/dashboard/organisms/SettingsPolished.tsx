@@ -194,7 +194,7 @@ export function SettingsPolished({
   return (
     <div className='space-y-0 pb-4 sm:pb-6' data-testid='settings-polished'>
       {/* General settings */}
-      <div className='space-y-0'>
+      <div>
         <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3 first:pt-0'>
           General
         </h3>
@@ -204,6 +204,7 @@ export function SettingsPolished({
             id={section.id}
             title={section.title}
             description={section.description}
+            className='mt-6 first:mt-0'
           >
             {section.render()}
           </SettingsSection>
@@ -211,7 +212,7 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div className='space-y-0'>
+      <div>
         <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Artist
         </h3>
@@ -221,6 +222,7 @@ export function SettingsPolished({
             id={section.id}
             title={section.title}
             description={section.description}
+            className='mt-6 first:mt-0'
           >
             {section.render()}
           </SettingsSection>

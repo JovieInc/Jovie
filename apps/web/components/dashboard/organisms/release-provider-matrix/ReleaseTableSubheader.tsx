@@ -93,13 +93,13 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'flex flex-col items-center gap-1 rounded-lg py-3 text-xs font-medium transition-colors',
+            'flex flex-col items-center gap-1 rounded-lg py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
             value === option.value
               ? 'bg-surface-2 text-primary-token border border-subtle'
               : 'text-tertiary-token hover:text-secondary-token border border-transparent'
           )}
         >
-          <Icon name={option.icon} className='h-4 w-4' aria-hidden='true' />
+          <Icon name={option.icon} className='h-4 w-4' />
           {option.label}
         </button>
       ))}

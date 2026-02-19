@@ -1,6 +1,6 @@
 ## Terms of Service
 
-_Last updated: January 2025_
+_Last updated: February 2026_
 
 These Terms are between you and {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -68,6 +68,34 @@ You retain ownership of what you publish on your profile. By using Jovie you gra
 
 Jovie and all associated technology, interface, and trademarks are proprietary. You agree not to copy, resell, or redistribute our service without permission.
 
+## DMCA / Copyright Infringement
+
+If you believe that content on Jovie infringes your copyright, you may submit a takedown notice to our designated agent:
+
+**DMCA Agent**
+{{LEGAL_ENTITY_NAME}}
+Email: legal@jov.ie
+
+Your notice must include:
+
+1. Identification of the copyrighted work you claim is infringed
+2. Identification of the material on Jovie that you claim is infringing, with enough detail for us to locate it
+3. Your contact information (name, address, phone number, email)
+4. A statement that you have a good faith belief the use is not authorized by the copyright owner
+5. A statement, under penalty of perjury, that the information in your notice is accurate and that you are the copyright owner or authorized to act on their behalf
+6. Your physical or electronic signature
+
+We will respond to valid DMCA notices within 10 business days. Repeat infringers may have their accounts terminated.
+
+### Counter-Notice
+
+If you believe your content was removed in error, you may submit a counter-notice to legal@jov.ie containing:
+
+1. Identification of the material that was removed
+2. A statement under penalty of perjury that you have a good faith belief the material was removed by mistake
+3. Your name, address, phone number, and consent to jurisdiction of the federal court in your district
+4. Your physical or electronic signature
+
 ## Privacy and Data
 
 We value your privacy. Please review the [Privacy Policy](#privacy-and-data) to understand how we collect, use, and protect your information.
@@ -96,7 +124,23 @@ We may modify the Terms from time to time. We will notify you via email, dashboa
 
 ## Governing Law & Dispute Resolution
 
-These Terms are governed by the laws of the State of California, USA. Any disputes will be resolved via binding arbitration.
+These Terms are governed by the laws of the State of California, USA, without regard to conflict of law principles.
+
+### Binding Arbitration
+
+Any dispute arising under these Terms will be resolved through binding arbitration administered by JAMS under its Streamlined Arbitration Rules. The arbitration will take place in San Francisco, California, unless both parties agree to a different location or virtual proceedings.
+
+### Class Action Waiver
+
+**You and Jovie agree that any dispute resolution proceedings will be conducted only on an individual basis and not in a class, consolidated, or representative action.** You waive any right to participate in a class action lawsuit or class-wide arbitration against {{LEGAL_ENTITY_NAME}}.
+
+### Small Claims Exception
+
+Either party may bring qualifying claims in small claims court in San Francisco County, California.
+
+### Opt-Out
+
+You may opt out of this arbitration agreement by sending written notice to legal@jov.ie within 30 days of first using Jovie. Your notice must include your name, email address, and a clear statement that you wish to opt out of arbitration.
 
 ## Contact Information
 
