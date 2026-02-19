@@ -46,6 +46,15 @@ export {
   searchDeezerArtist,
   toDeezerEnrichedArtist,
 } from './deezer';
+// MusicBrainz Provider
+export {
+  bulkLookupMusicBrainzByIsrc,
+  getMusicBrainzArtist,
+  getMusicBrainzStats,
+  isMusicBrainzAvailable,
+  lookupMusicBrainzByIsrc,
+  MusicBrainzError,
+} from './musicbrainz';
 // Spotify Provider
 export {
   clearSpotifyTokenCache,
