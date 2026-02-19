@@ -151,19 +151,26 @@ describe('AvatarUploadable - Analytics Tracking', () => {
 
     fireEvent.change(fileInput, { target: { files: [file] } });
 
+    // Allow async HEIC check + state updates to settle
+    await Promise.resolve();
     await Promise.resolve();
     expect(track).toHaveBeenCalledWith('avatar_upload_start', {
       file_size: 2048,
       file_type: 'image/jpeg',
+      original_file_type: 'image/jpeg',
     });
 
-    await Promise.resolve();
-    vi.runAllTimers();
+    // Flush microtasks so the upload promise resolves, then advance timers
+    await vi.advanceTimersByTimeAsync(500);
     expect(track).toHaveBeenCalledWith('avatar_upload_success', {
       file_size: 2048,
+      file_type: 'image/jpeg',
     });
   });
 
+  // TODO: Unskip once validation error tracking is wired into the upload hook.
+  // Currently skipped because the component validates via the browser's accept
+  // attribute rather than firing a JS-level validation error event.
   it.skip('tracks validation errors', async () => {
     render(
       <AvatarUploadable

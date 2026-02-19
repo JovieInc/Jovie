@@ -5,6 +5,7 @@
  */
 
 import type { OutputInfo } from 'sharp';
+import { HEIC_MIME_TYPES } from '@/lib/images/config';
 import { AVATAR_CANONICAL_SIZE } from './constants';
 import type { SharpConstructor } from './types';
 
@@ -16,6 +17,31 @@ export async function getSharp(): Promise<SharpConstructor> {
     return moduleWithDefault.default;
   }
   return sharpModule as unknown as SharpConstructor;
+}
+
+export async function canProcessMimeTypeWithSharp(
+  mimeType: string
+): Promise<boolean> {
+  if (!HEIC_MIME_TYPES.has(mimeType.toLowerCase())) {
+    return true;
+  }
+
+  const sharp = await getSharp();
+
+  interface SharpWithFormat {
+    format?: {
+      heif?: {
+        input?: { buffer?: boolean };
+      };
+    };
+  }
+
+  const sharpWithFormat = sharp as unknown as SharpWithFormat;
+
+  const heifBufferSupport = sharpWithFormat.format?.heif?.input?.buffer;
+
+  // If runtime metadata is unavailable, don't block valid uploads.
+  return heifBufferSupport ?? true;
 }
 
 export async function fileToBuffer(file: File): Promise<Buffer> {
