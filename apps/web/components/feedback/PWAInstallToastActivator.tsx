@@ -41,7 +41,6 @@ export function PWAInstallToastActivator() {
               label: 'Install',
               onClick: () => {
                 install();
-                dismiss();
               },
             },
           }),
