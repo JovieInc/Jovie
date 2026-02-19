@@ -123,6 +123,12 @@ export interface NotificationSubscribeResponse {
   emailDispatched: boolean;
   durationMs: number;
   pendingConfirmation?: boolean;
+  requiresOtp?: boolean;
+}
+
+export interface NotificationVerifyEmailOtpResponse {
+  success: true;
+  message: string;
 }
 
 export interface NotificationUnsubscribeResponse {

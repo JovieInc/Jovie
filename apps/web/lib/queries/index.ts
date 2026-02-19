@@ -236,6 +236,7 @@ export {
   useNotificationStatusQuery,
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
+  useVerifyEmailOtpMutation,
   useUpdateContentPreferencesMutation,
 } from './useNotificationStatusQuery';
 // Pixel settings mutation

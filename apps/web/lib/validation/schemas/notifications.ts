@@ -95,6 +95,14 @@ export const subscribeSchema = z
  */
 export type SubscribeInput = z.infer<typeof subscribeSchema>;
 
+export const verifyEmailOtpSchema = z.object({
+  artist_id: uuidSchema,
+  email: z.string().email(),
+  otp_code: z.string().regex(/^\d{6}$/),
+});
+
+export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
+
 // =============================================================================
 // Unsubscribe Schema
 // =============================================================================

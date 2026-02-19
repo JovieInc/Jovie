@@ -10,6 +10,7 @@ import { AlertCircle, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { OtpInput } from '@/components/auth/atoms/otp-input';
 import { CTAButton } from '@/components/atoms/CTAButton';
 import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
@@ -209,6 +210,8 @@ export function ArtistNotificationsCTA({
     phoneInput,
     emailInput,
     error,
+    otpCode,
+    otpStep,
     isSubmitting,
     isCountryOpen,
     setIsCountryOpen,
@@ -216,7 +219,9 @@ export function ArtistNotificationsCTA({
     handlePhoneChange,
     handleEmailChange,
     handleFieldBlur,
+    handleOtpChange,
     handleSubscribe,
+    handleVerifyOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
@@ -253,7 +258,8 @@ export function ArtistNotificationsCTA({
     subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
-  const shouldShowCountrySelector = channel === 'sms' && phoneInput.length > 0;
+  const shouldShowCountrySelector =
+    otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
 
   // Show loading skeleton while checking subscription status
   if (hydrationStatus === 'checking') {
@@ -299,7 +305,9 @@ export function ArtistNotificationsCTA({
         className='text-center text-[13px] font-[450] tracking-wide text-tertiary-token'
         style={noFontSynthesisStyle}
       >
-        Never miss a release.
+        {otpStep === 'verify'
+          ? 'Check your inbox. Enter your code.'
+          : 'Never miss a release.'}
       </p>
 
       <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
@@ -320,39 +328,63 @@ export function ArtistNotificationsCTA({
           )}
 
           <div className='flex-1 min-w-0'>
-            <label htmlFor={inputId} className='sr-only'>
-              {inputConfig.label}
-            </label>
-            <input
-              ref={inputRef}
-              id={inputId}
-              aria-describedby={disclaimerId}
-              type={inputConfig.type}
-              inputMode={inputConfig.inputMode}
-              className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
-              placeholder={inputConfig.placeholder}
-              value={inputValue}
-              onChange={event => handleInputChange(event.target.value)}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={handleInputBlur}
-              onKeyDown={handleKeyDown}
-              disabled={isSubmitting}
-              autoComplete={inputConfig.autoComplete}
-              maxLength={inputConfig.maxLength}
-              style={noFontSynthesisStyle}
-            />
+            {otpStep === 'verify' ? (
+              <div className='px-3 py-2'>
+                <OtpInput
+                  value={otpCode}
+                  onChange={handleOtpChange}
+                  onComplete={() => {
+                    void handleVerifyOtp();
+                  }}
+                  autoFocus
+                  aria-label='Enter 6-digit verification code'
+                  disabled={isSubmitting}
+                  error={Boolean(error)}
+                />
+              </div>
+            ) : (
+              <>
+                <label htmlFor={inputId} className='sr-only'>
+                  {inputConfig.label}
+                </label>
+                <input
+                  ref={inputRef}
+                  id={inputId}
+                  aria-describedby={disclaimerId}
+                  type={inputConfig.type}
+                  inputMode={inputConfig.inputMode}
+                  className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
+                  placeholder={inputConfig.placeholder}
+                  value={inputValue}
+                  onChange={event => handleInputChange(event.target.value)}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={handleInputBlur}
+                  onKeyDown={handleKeyDown}
+                  disabled={isSubmitting}
+                  autoComplete={inputConfig.autoComplete}
+                  maxLength={inputConfig.maxLength}
+                  style={noFontSynthesisStyle}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
 
       <button
         type='button'
-        onClick={() => void handleSubscribe()}
+        onClick={() =>
+          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe())
+        }
         disabled={isSubmitting}
         className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
         style={noFontSynthesisStyle}
       >
-        {isSubmitting ? 'Subscribing…' : 'Get Notified'}
+        {isSubmitting
+          ? 'Working…'
+          : otpStep === 'verify'
+            ? 'Verify Code'
+            : 'Get Notified'}
       </button>
 
       <div className='flex items-center justify-center gap-2'>

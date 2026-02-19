@@ -8,8 +8,10 @@ import {
   getNotificationStatus,
   type NotificationStatusPayload,
   type NotificationSubscribePayload,
+  type NotificationVerifyEmailOtpPayload,
   type NotificationUnsubscribePayload,
   subscribeToNotifications,
+  verifyEmailOtp,
   type UpdateContentPreferencesPayload,
   unsubscribeFromNotifications,
   updateContentPreferences,
@@ -145,6 +147,26 @@ export function useUpdateContentPreferencesMutation() {
       void captureWarning('Content preferences update mutation failed', {
         error,
         artistId: variables.artistId,
+      });
+    },
+    retry: 1,
+    retryDelay: getRetryDelay,
+  });
+}
+
+export function useVerifyEmailOtpMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: NotificationVerifyEmailOtpPayload) =>
+      verifyEmailOtp(input),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.status({
+          artistId: variables.artistId,
+          email: variables.email,
+          phone: null,
+        }),
       });
     },
     retry: 1,
