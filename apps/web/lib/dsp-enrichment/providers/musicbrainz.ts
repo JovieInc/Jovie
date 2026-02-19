@@ -52,6 +52,8 @@ async function withRetry<T>(
       lastError = error instanceof Error ? error : new Error(String(error));
       if (isNonRetryableError(error)) throw error;
       if (attempt >= maxRetries) throw lastError;
+      // Bounded retry backoff required by MusicBrainz API terms of use (1 req/sec).
+      // Max total delay is ~5s across all retries — safe within serverless limits.
       const delayMs = calculateBackoffDelay(attempt, baseDelayMs);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
@@ -129,6 +131,7 @@ export async function bulkLookupMusicBrainzByIsrc(
     if (recordings.length > 0) {
       results.set(isrc.toUpperCase(), recordings[0]);
     }
+    // MusicBrainz API rate limit: max 1 request per second (terms of use requirement).
     await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
   }
   return results;
