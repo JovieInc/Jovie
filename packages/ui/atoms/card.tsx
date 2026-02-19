@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const cardVariants = cva(
-  'rounded-lg border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal',
+  'rounded-lg border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal ease-interactive',
   {
     variants: {
       variant: {

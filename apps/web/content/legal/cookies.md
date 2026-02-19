@@ -1,6 +1,6 @@
 ## Cookie Policy
 
-_Last updated: January 2025_
+_Last updated: February 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 

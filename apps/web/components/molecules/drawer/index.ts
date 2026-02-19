@@ -16,4 +16,8 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export {
+  EntityHeaderCard,
+  type EntityHeaderCardProps,
+} from './EntityHeaderCard';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';

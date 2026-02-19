@@ -13,7 +13,7 @@ export const SidebarGroup = React.forwardRef<
       ref={ref}
       data-sidebar='group'
       className={cn(
-        'relative flex w-full min-w-0 flex-col py-1 transition-all duration-200 ease-out',
+        'relative flex w-full min-w-0 flex-col py-1 transition-all duration-normal ease-interactive',
         'group-data-[collapsible=icon]:px-0',
         className
       )}
@@ -34,7 +34,7 @@ export const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar='group-label'
       className={cn(
-        'flex h-7 shrink-0 items-center rounded-md px-2 text-2xs font-medium text-sidebar-item-icon outline-none transition-all duration-slow ease-out focus-visible:bg-sidebar-accent [&>svg]:size-3.5 [&>svg]:shrink-0',
+        'flex h-7 shrink-0 items-center rounded-md px-2 text-2xs font-medium text-sidebar-item-icon outline-none transition-all duration-slow ease-interactive focus-visible:bg-sidebar-accent [&>svg]:size-3.5 [&>svg]:shrink-0',
         'group-data-[collapsible=icon]:-mt-7 group-data-[collapsible=icon]:opacity-0',
         className
       )}

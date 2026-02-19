@@ -420,7 +420,9 @@ This project has evolved through several migrations:
 
 ## License
 
-This project is proprietary and confidential.
+This project is proprietary and confidential. All rights reserved by Jovie Technology Inc.
+
+See [LICENSE](LICENSE) for full terms. Unauthorized copying, distribution, or use of this software is strictly prohibited.
 
 ### Release Versioning & Changelog
 

@@ -80,7 +80,7 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-out',
+                'duration-normal relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-interactive',
                 'group-data-[collapsible=offcanvas]:w-0',
                 'group-data-[side=right]:rotate-180',
                 // Prevent pointer events from leaking into content area during width transition
