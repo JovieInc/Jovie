@@ -38,16 +38,16 @@ function InsightsSkeleton() {
     <div className='max-w-3xl space-y-6'>
       <div className='flex items-center justify-between'>
         <div className='space-y-1.5'>
-          <div className='h-5 w-28 animate-pulse rounded bg-surface-1' />
-          <div className='h-3 w-48 animate-pulse rounded bg-surface-1' />
+          <div className='h-5 w-28 skeleton motion-reduce:animate-none rounded' />
+          <div className='h-3 w-48 skeleton motion-reduce:animate-none rounded' />
         </div>
-        <div className='h-8 w-28 animate-pulse rounded-lg bg-surface-1' />
+        <div className='h-8 w-28 skeleton motion-reduce:animate-none rounded-lg' />
       </div>
       <div className='flex gap-1.5'>
         {FILTER_SKELETON_KEYS.map(key => (
           <div
             key={key}
-            className='h-7 w-20 animate-pulse rounded-full bg-surface-1'
+            className='h-7 w-20 skeleton motion-reduce:animate-none rounded-full'
           />
         ))}
       </div>
@@ -55,7 +55,7 @@ function InsightsSkeleton() {
         {SKELETON_KEYS.map(key => (
           <div
             key={key}
-            className='h-28 animate-pulse rounded-xl border border-subtle bg-surface-1'
+            className='h-28 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
           />
         ))}
       </div>
