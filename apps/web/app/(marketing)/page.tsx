@@ -24,6 +24,7 @@ const DeeplinksGrid = dynamic(
   { loading: () => <div style={{ height: 480 }} /> }
 );
 
+import { DashboardShowcase } from '@/components/home/DashboardShowcase';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
@@ -37,6 +38,7 @@ import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
   homepageComparison,
+  homepageDashboardShowcase,
   homepageDeeplinksGrid,
   homepageExampleProfiles,
   homepageFinalCta,
@@ -258,6 +260,7 @@ export default async function HomePage() {
     showHero,
     showLabelLogos,
     showHowItWorks,
+    showDashboardShowcase,
     showProductPreview,
     showExampleProfiles,
     showDeeplinksGrid,
@@ -270,6 +273,7 @@ export default async function HomePage() {
     homepageHero(),
     homepageLabelLogos(),
     homepageHowItWorks(),
+    homepageDashboardShowcase(),
     homepageProductPreview(),
     homepageExampleProfiles(),
     homepageDeeplinksGrid(),
@@ -318,6 +322,12 @@ export default async function HomePage() {
       </div>
 
       {showHowItWorks && <HowItWorksRich />}
+
+      {showDashboardShowcase && (
+        <DeferredSection placeholderHeight={640}>
+          <DashboardShowcase />
+        </DeferredSection>
+      )}
 
       {showProductPreview && (
         <DeferredSection placeholderHeight={640}>

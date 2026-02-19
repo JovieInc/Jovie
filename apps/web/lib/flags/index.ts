@@ -1,5 +1,6 @@
 export {
   homepageComparison,
+  homepageDashboardShowcase,
   homepageDeeplinksGrid,
   homepageExampleProfiles,
   homepageFinalCta,
