@@ -14,7 +14,6 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
-import { DashboardCard } from '../../atoms/DashboardCard';
 import type { ClerkSessionResource, ClerkUserResource } from './types';
 import { extractErrorMessage, formatRelativeDate } from './utils';
 
@@ -83,23 +82,15 @@ export function SessionManagementCard({
 
   if (sessionsLoading) {
     return (
-      <DashboardCard variant='settings' padding='none'>
-        <div className='px-4 py-3 space-y-3'>
-          <LoadingSkeleton height='h-10' />
-          <LoadingSkeleton height='h-10' />
-        </div>
-      </DashboardCard>
+      <div className='py-3 space-y-3'>
+        <LoadingSkeleton height='h-10' />
+        <LoadingSkeleton height='h-10' />
+      </div>
     );
   }
 
   if (sessionsError) {
-    return (
-      <DashboardCard variant='settings' padding='none'>
-        <div className='px-4 py-3 text-sm text-destructive'>
-          {sessionsError}
-        </div>
-      </DashboardCard>
-    );
+    return <div className='py-3 text-sm text-destructive'>{sessionsError}</div>;
   }
 
   if (sessions.length === 0) {
@@ -107,11 +98,7 @@ export function SessionManagementCard({
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
+    <div className='divide-y divide-subtle'>
       {sessions.map(session => {
         const isCurrent = session.id === activeSessionId;
         const activity = session.latestActivity;
@@ -119,7 +106,7 @@ export function SessionManagementCard({
         return (
           <div
             key={session.id}
-            className='flex items-center justify-between px-4 py-3'
+            className='flex items-center justify-between py-3'
           >
             <div>
               <p className='text-sm text-primary-token flex items-center gap-2'>
@@ -168,6 +155,6 @@ export function SessionManagementCard({
           if (sessionToEnd) await handleEndSession(sessionToEnd);
         }}
       />
-    </DashboardCard>
+    </div>
   );
 }
