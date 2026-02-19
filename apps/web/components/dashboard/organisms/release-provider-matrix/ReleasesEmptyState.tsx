@@ -161,7 +161,7 @@ export function ReleasesEmptyState({
                 onClick={() => {
                   dispatch({ type: 'RESET_MANUAL_MODE' });
                 }}
-                className='rounded-md border border-white/[0.08] bg-transparent px-3 py-2 text-[13px] font-medium text-secondary-token transition-colors hover:bg-white/[0.04]'
+                className='rounded-md border border-white/[0.08] bg-transparent px-3 py-2 text-[13px] font-medium text-secondary-token transition-colors hover:bg-interactive-hover'
               >
                 Back
               </button>
@@ -322,7 +322,7 @@ export function ReleasesEmptyState({
                             'flex items-center gap-3 px-2 py-1.5 mx-1 rounded-md cursor-pointer transition-colors border-0 bg-transparent w-[calc(100%-0.5rem)] text-left',
                             index === formState.activeResultIndex
                               ? 'bg-white/[0.06]'
-                              : 'hover:bg-white/[0.04]'
+                              : 'hover:bg-interactive-hover'
                           )}
                           onClick={() => handleArtistSelect(artist)}
                           onKeyDown={event =>

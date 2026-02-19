@@ -103,8 +103,10 @@ export function DefaultStatusBanner({
           </div>
         </div>
         <div className='mt-2 flex flex-row justify-between gap-4 border-t border-subtle pt-3 text-sm text-tertiary-token sm:mt-0 sm:flex-col sm:gap-2 sm:border-t-0 sm:pt-0 md:text-right'>
-          <span className='font-medium text-primary-token'>{runwayCopy}</span>
-          <span className='text-right'>
+          <span className='font-medium text-primary-token tabular-nums'>
+            {runwayCopy}
+          </span>
+          <span className='text-right tabular-nums'>
             <span className='hidden sm:inline'>MRR growth (30d): </span>
             <span className='sm:hidden'>30d: </span>
             {growthLabel}

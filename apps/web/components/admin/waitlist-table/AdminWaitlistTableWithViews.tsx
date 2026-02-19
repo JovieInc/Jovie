@@ -226,7 +226,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
 
             {/* Main toolbar (always visible) */}
             <div className='flex items-center justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3'>
-              <div className='text-xs text-secondary-token'>
+              <div className='text-xs text-secondary-token tabular-nums'>
                 <span className='hidden sm:inline'>Showing </span>
                 {from.toLocaleString()}–{to.toLocaleString()} of{' '}
                 {total.toLocaleString()}

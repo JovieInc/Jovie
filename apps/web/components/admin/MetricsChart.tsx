@@ -48,7 +48,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
           </h3>
           <p className='text-xs text-tertiary-token'>Last 14 days</p>
         </div>
-        <div className='flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400'>
+        <div className='flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums'>
           <TrendingUp className='h-3.5 w-3.5' />
           {deltaPct >= 0 ? '+' : ''}
           {deltaPct.toFixed(1)}%
