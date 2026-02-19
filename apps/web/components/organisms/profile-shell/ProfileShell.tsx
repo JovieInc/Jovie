@@ -132,7 +132,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
+        className='relative w-full min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -141,8 +141,8 @@ export function ProfileShell({
 
         {showGradientBlurs && (
           <>
-            <div className='absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
-            <div className='absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
+            <div className='absolute left-1/4 top-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-2 blur-3xl opacity-20' />
+            <div className='absolute bottom-1/4 right-1/4 h-48 w-48 sm:h-72 sm:w-72 md:h-96 md:w-96 rounded-full bg-surface-3 blur-3xl opacity-15' />
           </>
         )}
 
