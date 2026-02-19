@@ -35,21 +35,27 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             <CheckCircle2 className='size-4 text-emerald-500' />
             Error rate
           </div>
-          <span className='text-primary-token'>{errorRateLabel}</span>
+          <span className='text-primary-token tabular-nums'>
+            {errorRateLabel}
+          </span>
         </div>
         <div className='flex items-center justify-between py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
             <Clock3 className='size-4 text-blue-500' />
             p95 latency
           </div>
-          <span className='text-primary-token'>{latencyLabel}</span>
+          <span className='text-primary-token tabular-nums'>
+            {latencyLabel}
+          </span>
         </div>
         <div className='flex items-center justify-between py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
             <AlertTriangle className='size-4 text-amber-500' />
             Incidents (24h)
           </div>
-          <span className='text-primary-token'>{incidentsLabel}</span>
+          <span className='text-primary-token tabular-nums'>
+            {incidentsLabel}
+          </span>
         </div>
       </div>
       <p className='text-xs text-tertiary-token'>
