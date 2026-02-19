@@ -4,11 +4,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { ChatMarkdown } from '@/components/jovie/components/ChatMarkdown';
 import { fastRender } from '@/tests/utils/fast-render';
 
+interface StreamdownMockProps {
+  readonly mode?: string;
+  readonly caret?: string;
+  readonly isAnimating?: boolean;
+  readonly children?: React.ReactNode;
+}
+
 vi.mock('streamdown', () => ({
-  Streamdown: ({
-    children,
-    ...props
-  }: React.PropsWithChildren<Record<string, unknown>>) =>
+  Streamdown: ({ children, ...props }: StreamdownMockProps) =>
     React.createElement(
       'div',
       {
