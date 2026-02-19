@@ -1,16 +1,9 @@
 'use client';
 
-/**
- * ReleaseArtwork Component
- *
- * Artwork section showing release's album cover and basic info.
- * Supports drag-and-drop upload and right-click context menu for downloads.
- */
-
 import { Disc3 } from 'lucide-react';
 import Image from 'next/image';
 
-import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { EntityHeaderCard } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
@@ -50,7 +43,7 @@ export function ReleaseArtwork({
   const altText = title ? `${title} artwork` : 'Release artwork';
   const sizes = buildArtworkSizes(artworkSizes, artworkUrl);
 
-  const artworkImage = (
+  const staticImage = (
     <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
       {artworkUrl ? (
         <Image
@@ -68,53 +61,46 @@ export function ReleaseArtwork({
     </div>
   );
 
+  const artworkImage =
+    canUploadArtwork && onArtworkUpload ? (
+      <AlbumArtworkContextMenu
+        title={title}
+        sizes={sizes}
+        allowDownloads={allowDownloads}
+        releaseId={releaseId}
+        canRevert={canRevert}
+        onRevert={onRevert}
+      >
+        <AvatarUploadable
+          src={artworkUrl}
+          alt={altText}
+          name={title}
+          size='lg'
+          uploadable={canUploadArtwork}
+          onUpload={onArtworkUpload}
+          showHoverOverlay
+          className='rounded-lg'
+        />
+      </AlbumArtworkContextMenu>
+    ) : (
+      <AlbumArtworkContextMenu
+        title={title}
+        sizes={sizes}
+        allowDownloads={allowDownloads}
+        releaseId={releaseId}
+        canRevert={canRevert}
+        onRevert={onRevert}
+      >
+        {staticImage}
+      </AlbumArtworkContextMenu>
+    );
+
   return (
-    <div className='flex items-center gap-3' data-testid='release-artwork'>
-      {canUploadArtwork && onArtworkUpload ? (
-        <AlbumArtworkContextMenu
-          title={title}
-          sizes={sizes}
-          allowDownloads={allowDownloads}
-          releaseId={releaseId}
-          canRevert={canRevert}
-          onRevert={onRevert}
-        >
-          <AvatarUploadable
-            src={artworkUrl}
-            alt={altText}
-            name={title}
-            size='lg'
-            uploadable={canUploadArtwork}
-            onUpload={onArtworkUpload}
-            showHoverOverlay
-            className='rounded-lg'
-          />
-        </AlbumArtworkContextMenu>
-      ) : (
-        <AlbumArtworkContextMenu
-          title={title}
-          sizes={sizes}
-          allowDownloads={allowDownloads}
-          releaseId={releaseId}
-          canRevert={canRevert}
-          onRevert={onRevert}
-        >
-          {artworkImage}
-        </AlbumArtworkContextMenu>
-      )}
-      <div className='min-w-0 flex-1'>
-        <TruncatedText
-          lines={1}
-          className='text-sm font-medium text-primary-token'
-        >
-          {title || 'Untitled'}
-        </TruncatedText>
-        {artistName && (
-          <TruncatedText lines={1} className='text-xs text-tertiary-token'>
-            {artistName}
-          </TruncatedText>
-        )}
-      </div>
-    </div>
+    <EntityHeaderCard
+      image={artworkImage}
+      title={title || 'Untitled'}
+      subtitle={artistName}
+      data-testid='release-artwork'
+    />
   );
 }

@@ -1,15 +1,8 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button } from '@jovie/ui';
-import {
-  Copy,
-  ExternalLink,
-  RefreshCw,
-  Share2,
-  Trash2,
-  User,
-} from 'lucide-react';
+import { Button, SegmentControl } from '@jovie/ui';
+import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -26,15 +19,14 @@ import { ContactFields } from './ContactFields';
 import { ContactSidebarHeader } from './ContactSidebarHeader';
 import { ContactSocialLinks } from './ContactSocialLinks';
 import { ContactWebsite } from './ContactWebsite';
-import { DrawerNav, type DrawerNavItem } from './DrawerNav';
 import type { ContactSidebarProps } from './types';
 import { useContactSidebar } from './useContactSidebar';
 
-type DrawerTab = 'details' | 'social';
+type SidebarTab = 'details' | 'social';
 
-const NAV_ITEMS: readonly DrawerNavItem<DrawerTab>[] = [
-  { value: 'details', label: 'Details', icon: <User className='size-4' /> },
-  { value: 'social', label: 'Social', icon: <Share2 className='size-4' /> },
+const SIDEBAR_TAB_OPTIONS = [
+  { value: 'details' as const, label: 'Details' },
+  { value: 'social' as const, label: 'Social' },
 ];
 
 export const ContactSidebar = memo(function ContactSidebar({
@@ -48,7 +40,7 @@ export const ContactSidebar = memo(function ContactSidebar({
   isSaving,
   onAvatarUpload,
 }: ContactSidebarProps) {
-  const [activeTab, setActiveTab] = useState<DrawerTab>('details');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('details');
 
   const {
     isAddingLink,
@@ -134,34 +126,38 @@ export const ContactSidebar = memo(function ContactSidebar({
 
       {contact ? (
         <>
-          <DrawerNav
-            items={NAV_ITEMS}
-            value={activeTab}
-            onValueChange={setActiveTab}
-          />
+          {/* Always-visible avatar + name */}
+          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+            <ContactAvatar
+              avatarUrl={contact.avatarUrl ?? null}
+              fullName={fullName}
+              username={contact.username}
+              isVerified={contact.isVerified}
+              canUploadAvatar={canUploadAvatar}
+              onAvatarUpload={canUploadAvatar ? handleAvatarUpload : undefined}
+            />
+          </div>
 
-          <div className='flex-1 space-y-4 overflow-auto p-4'>
+          {/* Tab navigation */}
+          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+            <SegmentControl
+              value={activeTab}
+              onValueChange={setActiveTab}
+              options={SIDEBAR_TAB_OPTIONS}
+              size='sm'
+              aria-label='Contact sidebar view'
+            />
+          </div>
+
+          <div className='flex-1 space-y-4 overflow-auto px-4 py-4'>
             {activeTab === 'details' && (
-              <>
-                <ContactAvatar
-                  avatarUrl={contact.avatarUrl ?? null}
-                  fullName={fullName}
-                  username={contact.username}
-                  isVerified={contact.isVerified}
-                  canUploadAvatar={canUploadAvatar}
-                  onAvatarUpload={
-                    canUploadAvatar ? handleAvatarUpload : undefined
-                  }
-                />
-
-                <ContactFields
-                  firstName={contact.firstName}
-                  lastName={contact.lastName}
-                  username={contact.username}
-                  onNameChange={handleNameChange}
-                  onUsernameChange={handleUsernameChange}
-                />
-              </>
+              <ContactFields
+                firstName={contact.firstName}
+                lastName={contact.lastName}
+                username={contact.username}
+                onNameChange={handleNameChange}
+                onUsernameChange={handleUsernameChange}
+              />
             )}
 
             {activeTab === 'social' && (
