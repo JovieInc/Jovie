@@ -21,6 +21,14 @@ export const SUPPORTED_IMAGE_MIME_TYPES_SET = new Set<string>(
   SUPPORTED_IMAGE_MIME_TYPES
 );
 
+/** HEIC/HEIF MIME types for client-side conversion and server-side detection. */
+export const HEIC_MIME_TYPES = new Set([
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
 export const AVATAR_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB API limit
 
 // Square targets, ordered from largest to smallest
