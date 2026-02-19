@@ -60,8 +60,9 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     ];
   }, [pathname]);
 
-  // Determine UI flags based on section and pathname
-  const showMobileTabs = section === 'dashboard';
+  // Show mobile bottom tabs on all authenticated sections so users always
+  // have persistent navigation on mobile (dashboard, settings, and admin).
+  const showMobileTabs = true;
 
   // Table routes that need different overflow behavior
   const isTableRoute =

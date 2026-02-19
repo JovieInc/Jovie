@@ -83,7 +83,7 @@ export const borders = {
 
 // Loading Skeleton Styles
 export const skeleton = {
-  base: 'animate-pulse bg-surface-2 rounded',
+  base: 'skeleton motion-reduce:animate-none rounded',
   text: 'h-4 w-24',
   avatar: 'h-8 w-8 rounded-full',
   badge: 'h-5 w-16 rounded-full',

@@ -118,7 +118,7 @@ export function AdminCreatorsToolbar({
       ) : (
         // Normal Mode
         <>
-          <div className='hidden text-xs text-secondary-token md:block'>
+          <div className='hidden text-xs text-secondary-token tabular-nums md:block'>
             Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
             {total.toLocaleString()} profiles
           </div>

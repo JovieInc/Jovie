@@ -92,7 +92,7 @@ export function AppShellSkeleton() {
               size={32}
               tone='auto'
               alt='Loading'
-              className='animate-pulse'
+              className='opacity-80'
               aria-hidden
             />
             <p className='text-xs text-tertiary-token'>Loading...</p>

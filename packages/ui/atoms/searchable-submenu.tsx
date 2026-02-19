@@ -367,7 +367,7 @@ export function SearchableSubmenu({
                 <button
                   type='button'
                   onClick={handleClearSearch}
-                  className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
+                  className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-interactive-hover hover:text-primary-token'
                   aria-label='Clear search'
                 >
                   <X className='h-3.5 w-3.5' />

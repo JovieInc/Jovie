@@ -129,7 +129,7 @@ export const metadata: Metadata = {
       },
     ],
   },
-  manifest: '/site.webmanifest',
+  // manifest.ts in app/ auto-generates the manifest link
 };
 
 // Viewport configuration with viewport-fit=cover for iOS safe area insets
@@ -241,7 +241,7 @@ export default async function RootLayout({
     </head>
   );
 
-  const bodyClassName = `${inter.variable} font-sans bg-base text-primary-token`;
+  const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
 
   // Early return if no publishable key (only in production)
   if (!publishableKey) {

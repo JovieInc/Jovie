@@ -15,7 +15,7 @@ import { logger } from '@/lib/utils/logger';
 import { imageUploadSchema } from '@/lib/validation/schemas';
 import { UPLOAD_ERROR_CODES } from './constants';
 import { errorResponse } from './error-response';
-import { fileToBuffer } from './image-processing';
+import { canProcessMimeTypeWithSharp, fileToBuffer } from './image-processing';
 
 export interface ValidatedFile {
   file: File;
@@ -74,6 +74,15 @@ export async function validateUploadedFile(
     );
     return errorResponse(
       'File content does not match declared type. Please upload a valid image.',
+      UPLOAD_ERROR_CODES.INVALID_FILE,
+      400
+    );
+  }
+
+  const canProcess = await canProcessMimeTypeWithSharp(normalizedType);
+  if (!canProcess) {
+    return errorResponse(
+      'HEIC/HEIF is not supported in this runtime. Please upload JPEG, PNG, GIF, or WebP.',
       UPLOAD_ERROR_CODES.INVALID_FILE,
       400
     );
