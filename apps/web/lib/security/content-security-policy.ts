@@ -137,10 +137,9 @@ const buildCspDirectives = ({
   nonce,
   isDev = isDevelopment(),
 }: BuildCspOptions): string[] => {
-  // Build script-src with nonce and optional dev 'unsafe-eval'
-  const scriptSrc = isDev
-    ? `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' 'unsafe-eval' ${STATIC_CSP_PARTS.scriptSrcSuffix}`
-    : `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
+  // 'unsafe-eval' is required in all environments because the @vercel/toolbar
+  // client runtime uses eval(). Nonce-based CSP still prevents script injection.
+  const scriptSrc = `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}' 'unsafe-eval' ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
 
   // Build connect-src with optional dev localhost
   // Note: localhost:25000 is Turbopack HMR, localhost:25011 is Vercel toolbar
@@ -148,10 +147,9 @@ const buildCspDirectives = ({
     ? `${STATIC_CSP_PARTS.connectSrcBase} http://localhost:25000 http://localhost:25011 ws://localhost:25000`
     : STATIC_CSP_PARTS.connectSrcBase;
 
-  // Build frame-src with optional dev vercel.live
-  const frameSrc = isDev
-    ? `${STATIC_CSP_PARTS.frameSrcBase} https://vercel.live`
-    : STATIC_CSP_PARTS.frameSrcBase;
+  // https://vercel.live is needed in all environments for the Vercel Toolbar
+  // iframe-based UI (comments, flags panel, etc.)
+  const frameSrc = `${STATIC_CSP_PARTS.frameSrcBase} https://vercel.live`;
 
   return [
     STATIC_CSP_PARTS.defaultSrc,

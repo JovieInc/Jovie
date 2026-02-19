@@ -441,11 +441,11 @@ const nextConfig = {
   },
 };
 
-// Enable Vercel Toolbar in Next.js (local/dev only)
-// The toolbar plugin must NOT run in production builds because it injects
-// client-side code that uses eval(), violating Content Security Policy.
-const enableVercelToolbar =
-  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+// Enable Vercel Toolbar in all environments (including production).
+// The toolbar is only visible to authenticated Vercel team members.
+// Requires 'unsafe-eval' in CSP because the toolbar runtime uses eval().
+// Set NEXT_DISABLE_TOOLBAR=1 to opt out.
+const enableVercelToolbar = !process.env.NEXT_DISABLE_TOOLBAR;
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;

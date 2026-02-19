@@ -17,14 +17,24 @@ describe('buildContentSecurityPolicy', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
-  it('excludes unsafe-eval in production', () => {
+  it('includes unsafe-eval for Vercel Toolbar support', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
       isDev: false,
     });
     const scriptSrc = findDirective(csp, 'script-src');
 
-    expect(scriptSrc).not.toContain("'unsafe-eval'");
+    expect(scriptSrc).toContain("'unsafe-eval'");
+  });
+
+  it('includes vercel.live in frame-src for production', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const frameSrc = findDirective(csp, 'frame-src');
+
+    expect(frameSrc).toContain('https://vercel.live');
   });
 
   it('includes unsafe-eval in development', () => {
