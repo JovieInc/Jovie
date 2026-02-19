@@ -38,5 +38,54 @@
   ],
   "components/organisms/release-sidebar/ReleaseMetadata.tsx": [
     "tests/components/organisms/release-sidebar/ReleaseMetadata.test.tsx"
+  ],
+
+  "lib/auth/gate.ts": ["tests/unit/lib/auth/gate.critical.test.ts"],
+  "lib/stripe/plan-change.ts": [
+    "tests/unit/lib/stripe/plan-change.critical.test.ts"
+  ],
+  "lib/auth/clerk-sync.ts": ["tests/unit/lib/auth/clerk-sync.critical.test.ts"],
+  "lib/rate-limit/limiters.ts": ["tests/unit/lib/rate-limit/limiters.test.ts"],
+  "lib/rate-limit/rate-limiter.ts": [
+    "tests/unit/lib/rate-limit/rate-limiter.test.ts"
+  ],
+  "lib/referrals/service.ts": [
+    "tests/unit/lib/referrals/service.critical.test.ts"
+  ],
+  "app/(shell)/dashboard/releases/actions.ts": [
+    "tests/unit/actions/releases-actions.critical.test.ts"
+  ],
+  "app/(shell)/dashboard/tour-dates/actions.ts": [
+    "tests/unit/actions/tour-dates-actions.test.ts"
+  ],
+  "app/(shell)/admin/actions.ts": ["tests/unit/actions/admin-actions.test.ts"],
+  "lib/services/insights/data-aggregator.ts": [
+    "tests/unit/lib/services/insights/data-aggregator.test.ts"
+  ],
+  "app/(shell)/dashboard/contacts/actions.ts": [
+    "tests/unit/actions/contacts-actions.test.ts"
+  ],
+  "lib/email/campaigns/processor.ts": [
+    "tests/unit/lib/email/campaigns/processor.test.ts"
+  ],
+  "lib/fit-scoring/service.ts": ["tests/unit/lib/fit-scoring/service.test.ts"],
+  "lib/hooks/useFormState.ts": ["tests/unit/hooks/useFormState.test.ts"],
+  "lib/hooks/useNotifications.ts": [
+    "tests/unit/hooks/useNotifications.test.ts"
+  ],
+  "lib/hooks/useChunkErrorHandler.ts": [
+    "tests/unit/hooks/useChunkErrorHandler.test.ts"
+  ],
+  "lib/queries/useBillingMutations.ts": [
+    "tests/unit/lib/queries/useBillingMutations.test.tsx"
+  ],
+  "lib/queries/useAccountMutations.ts": [
+    "tests/unit/lib/queries/useAccountMutations.test.tsx"
+  ],
+  "lib/queries/useSettingsMutation.ts": [
+    "tests/unit/lib/queries/useSettingsMutation.test.tsx"
+  ],
+  "lib/stripe/webhooks/handlers/payment-handler.ts": [
+    "tests/unit/lib/stripe/webhooks/handlers/payment-handler.critical.test.ts"
   ]
 }
