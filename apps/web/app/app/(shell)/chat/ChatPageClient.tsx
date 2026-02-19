@@ -5,13 +5,17 @@ import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { usePreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import {
+  type PreviewPanelLink,
+  usePreviewPanelData,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
@@ -39,18 +43,34 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
 
-  // Hydrate preview panel so the sidebar doesn't stay in skeleton state.
-  // Chat page doesn't have links data, so we hydrate with profile info only.
+  // Fetch social links for the selected profile
+  const profileId = selectedProfile?.id ?? '';
+  const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
+
+  // Convert API links to preview panel format
+  const previewLinks: PreviewPanelLink[] = useMemo(
+    () =>
+      (socialLinks ?? []).map(link => ({
+        id: link.id,
+        title: link.platform,
+        url: link.url,
+        platform: link.platform,
+        isVisible: true,
+      })),
+    [socialLinks]
+  );
+
+  // Hydrate preview panel with profile data and links
   useEffect(() => {
     if (!selectedProfile) return;
     setPreviewData({
       username: selectedProfile.username,
       displayName: selectedProfile.displayName ?? selectedProfile.username,
       avatarUrl: selectedProfile.avatarUrl ?? null,
-      links: [],
+      links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
     });
-  }, [selectedProfile, setPreviewData]);
+  }, [selectedProfile, previewLinks, setPreviewData]);
 
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {
