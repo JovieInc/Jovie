@@ -39,6 +39,13 @@ describe('Button', () => {
         expect(screen.getByRole('button')).toBeInTheDocument();
       });
     });
+
+    it('applies interactive hover token for ghost variant', () => {
+      render(<Button variant='ghost'>Ghost</Button>);
+      expect(screen.getByRole('button')).toHaveClass(
+        'hover:bg-interactive-hover'
+      );
+    });
   });
 
   describe('sizes', () => {

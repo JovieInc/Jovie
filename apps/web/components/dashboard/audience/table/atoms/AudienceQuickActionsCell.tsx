@@ -28,7 +28,7 @@ export function AudienceQuickActionsCell({
       <button
         type='button'
         onClick={onExport}
-        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token'
         aria-label='Export contact'
         title='Export vCard'
       >
