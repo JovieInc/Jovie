@@ -3,15 +3,10 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import {
-  type ContextMenuItemType,
-  UnifiedTable,
-} from '@/components/organisms/table';
+import { UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 import { TrackRowsContainer } from './components';
 import { useExpandedTracks } from './hooks/useExpandedTracks';
 import { useSortingManager } from './hooks/useSortingManager';
@@ -21,6 +16,7 @@ import {
   createReleaseCellRenderer,
   createRightMetaCellRenderer,
 } from './utils/column-renderers';
+import { getReleaseContextMenuItems } from './utils/release-context-actions';
 
 interface ProviderConfig {
   label: string;
@@ -95,126 +91,16 @@ export function ReleaseTable({
   const { sorting, onSortingChange, isSorting, isLargeDataset } =
     useSortingManager({ rowCount: releases.length });
 
-  // Context menu items for right-click
+  // Context menu items for right-click (shared with mobile swipe actions)
   const getContextMenuItems = useCallback(
-    (release: ReleaseViewModel): ContextMenuItemType[] => {
-      const menuIcon = (
-        name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink' | 'Lock'
-      ) => <Icon name={name} className='h-3.5 w-3.5' />;
-
-      const locked = isSmartLinkLocked?.(release.id) ?? false;
-
-      const items: ContextMenuItemType[] = [
-        {
-          id: 'edit',
-          label: 'Edit links',
-          icon: menuIcon('PencilLine'),
-          onClick: () => onEdit(release),
-        },
-        ...(locked
-          ? [
-              {
-                id: 'copy-smart-link',
-                label: 'Smart link (Pro)',
-                icon: menuIcon('Lock'),
-                disabled: true,
-                onClick: () => {},
-              } as ContextMenuItemType,
-            ]
-          : [
-              {
-                id: 'copy-smart-link',
-                label: 'Copy smart link',
-                icon: menuIcon('Link2'),
-                onClick: () => {
-                  void onCopy(
-                    release.smartLinkPath,
-                    `${release.title} smart link`,
-                    `smart-link-copy-${release.id}`
-                  );
-                },
-              } as ContextMenuItemType,
-              // UTM share presets
-              ...getUTMShareContextMenuItems({
-                smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
-                context: buildUTMContext({
-                  smartLinkUrl: `${getBaseUrl()}${release.smartLinkPath}`,
-                  releaseSlug: release.slug,
-                  releaseTitle: release.title,
-                  artistName,
-                  releaseDate: release.releaseDate,
-                }),
-              }),
-            ]),
-        { type: 'separator' },
-        {
-          id: 'copy-release-id',
-          label: 'Copy release ID',
-          icon: menuIcon('Hash'),
-          onClick: () => {
-            navigator.clipboard.writeText(release.id);
-          },
-        },
-      ];
-
-      // Add UPC copy if available
-      if (release.upc) {
-        items.push({
-          id: 'copy-upc',
-          label: 'Copy UPC',
-          icon: menuIcon('Hash'),
-          onClick: () => {
-            navigator.clipboard.writeText(release.upc!);
-          },
-        });
-      }
-
-      // Add ISRC copy if available
-      if (release.primaryIsrc) {
-        items.push({
-          id: 'copy-isrc',
-          label: 'Copy ISRC',
-          icon: menuIcon('Hash'),
-          onClick: () => {
-            navigator.clipboard.writeText(release.primaryIsrc!);
-          },
-        });
-      }
-
-      // Add external link options for available providers
-      const supportedProviders = new Set<ProviderKey>([
-        'spotify',
-        'apple_music',
-        'youtube',
-        'deezer',
-      ]);
-      const providerLabels: Partial<Record<ProviderKey, string>> = {
-        spotify: 'Spotify',
-        apple_music: 'Apple Music',
-        youtube: 'YouTube Music',
-        deezer: 'Deezer',
-      };
-
-      const externalProviders = release.providers.filter(
-        p => supportedProviders.has(p.key) && p.url
-      );
-
-      if (externalProviders.length > 0) {
-        items.push({ type: 'separator' });
-        for (const provider of externalProviders) {
-          items.push({
-            id: `open-${provider.key}`,
-            label: `Open in ${providerLabels[provider.key] || provider.key}`,
-            icon: menuIcon('ExternalLink'),
-            onClick: () => {
-              globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
-            },
-          });
-        }
-      }
-
-      return items;
-    },
+    (release: ReleaseViewModel) =>
+      getReleaseContextMenuItems({
+        release,
+        onEdit,
+        onCopy,
+        artistName,
+        isSmartLinkLocked,
+      }),
     [onEdit, onCopy, artistName, isSmartLinkLocked]
   );
 
@@ -380,6 +266,8 @@ export function ReleaseTable({
         releases={releases}
         artistName={artistName}
         onEdit={onEdit}
+        onCopy={onCopy}
+        isSmartLinkLocked={isSmartLinkLocked}
         groupByYear={groupByYear}
       />
     );

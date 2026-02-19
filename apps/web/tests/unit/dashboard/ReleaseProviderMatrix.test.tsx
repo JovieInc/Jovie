@@ -167,7 +167,7 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
 }));
 
 interface QueryErrorBoundaryProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }
 
 vi.mock('@/lib/queries/QueryErrorBoundary', () => ({

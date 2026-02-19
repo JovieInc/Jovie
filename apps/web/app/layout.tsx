@@ -129,7 +129,7 @@ export const metadata: Metadata = {
       },
     ],
   },
-  manifest: '/site.webmanifest',
+  // manifest.ts in app/ auto-generates the manifest link
 };
 
 // Viewport configuration with viewport-fit=cover for iOS safe area insets

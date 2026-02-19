@@ -9,6 +9,10 @@ import {
   DEFAULT_MAX_FILE_SIZE,
   validateAvatarFile,
 } from '@/lib/avatar/validation';
+import {
+  convertHeicToJpeg,
+  isHeicLikeMimeType,
+} from '@/lib/images/heic-conversion';
 
 export interface UseAvatarUploadProps {
   readonly src?: string | null;
@@ -145,10 +149,32 @@ export function useAvatarUpload({
       setIsUploading(true);
       setUploadStatus('uploading');
       setUploadProgress(5);
-      setPreviewFromFile(file);
+
+      let uploadFile = file;
+      if (isHeicLikeMimeType(file.type)) {
+        try {
+          uploadFile = await convertHeicToJpeg(file);
+        } catch {
+          const message =
+            'Could not process this HEIC photo. Please try a JPEG or PNG image.';
+          setUploadProgress(100);
+          setUploadStatus('error');
+          onError?.(message);
+          track('avatar_upload_error', {
+            error: 'heic_conversion_failed',
+            message,
+          });
+          resetStatus(3000);
+          setIsUploading(false);
+          return;
+        }
+      }
+
+      setPreviewFromFile(uploadFile);
       track('avatar_upload_start', {
-        file_size: file.size,
-        file_type: file.type,
+        file_size: uploadFile.size,
+        file_type: uploadFile.type,
+        original_file_type: file.type,
       });
 
       clearProgressInterval();
@@ -163,12 +189,15 @@ export function useAvatarUpload({
 
       let didError = false;
       try {
-        const imageUrl = await onUpload(file);
+        const imageUrl = await onUpload(uploadFile);
         setUploadStatus('success');
         setUploadProgress(100);
         setPreviewUrl(imageUrl);
         onSuccess?.(imageUrl);
-        track('avatar_upload_success', { file_size: file.size });
+        track('avatar_upload_success', {
+          file_size: uploadFile.size,
+          file_type: uploadFile.type,
+        });
         resetStatus(2000);
       } catch (error) {
         didError = true;
