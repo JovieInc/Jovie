@@ -1091,11 +1091,13 @@ function buildChatErrorResponse(
   error: unknown,
   userId: string,
   messageCount: number,
-  requestId: string
+  requestId: string,
+  profileId: string | null,
+  conversationId: string | null
 ) {
   Sentry.captureException(error, {
     tags: { feature: 'ai-chat' },
-    extra: { userId, messageCount, requestId },
+    extra: { userId, messageCount, requestId, profileId, conversationId },
   });
 
   const message =
@@ -1162,6 +1164,7 @@ export async function POST(req: Request) {
   let body: {
     messages?: unknown;
     profileId?: unknown;
+    conversationId?: unknown;
     artistContext?: unknown;
   };
   try {
@@ -1173,7 +1176,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { messages, profileId } = body;
+  const { messages, profileId, conversationId } = body;
 
   // Validate that either profileId or artistContext is provided
   if (
@@ -1221,6 +1224,10 @@ export async function POST(req: Request) {
     // Build tools: always include profile edit, conditionally include canvas + release creation
     const resolvedProfileId =
       profileId && typeof profileId === 'string' ? profileId : null;
+    const resolvedConversationId =
+      conversationId && typeof conversationId === 'string'
+        ? conversationId
+        : null;
 
     // Gate AI tools behind paid plans — free users get chat-only
     const tools = planLimits.booleans.aiCanUseTools
@@ -1258,6 +1265,8 @@ export async function POST(req: Request) {
             userId,
             messageCount: uiMessages.length,
             requestId,
+            profileId: resolvedProfileId,
+            conversationId: resolvedConversationId,
           },
         });
       },
@@ -1282,6 +1291,15 @@ export async function POST(req: Request) {
       );
     }
 
-    return buildChatErrorResponse(error, userId, uiMessages.length, requestId);
+    return buildChatErrorResponse(
+      error,
+      userId,
+      uiMessages.length,
+      requestId,
+      profileId && typeof profileId === 'string' ? profileId : null,
+      conversationId && typeof conversationId === 'string'
+        ? conversationId
+        : null
+    );
   }
 }

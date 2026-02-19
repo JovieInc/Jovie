@@ -6,6 +6,7 @@ import type {
   NotificationStatusResponse,
   NotificationSubscribeResponse,
   NotificationUnsubscribeResponse,
+  NotificationVerifyEmailOtpResponse,
 } from '@/types/notifications';
 
 export type NotificationSubscribePayload = {
@@ -32,6 +33,12 @@ export type NotificationStatusPayload = {
   email?: string;
   phone?: string;
 };
+
+export interface NotificationVerifyEmailOtpPayload {
+  artistId: string;
+  email: string;
+  otpCode: string;
+}
 
 export type UpdateContentPreferencesPayload = {
   artistId: string;
@@ -148,6 +155,19 @@ export const unsubscribeFromNotifications = async (
       method: payload.method,
     },
     NOTIFICATION_COPY.errors.unsubscribe
+  );
+
+export const verifyEmailOtp = async (
+  payload: NotificationVerifyEmailOtpPayload
+): Promise<NotificationVerifyEmailOtpResponse> =>
+  requestNotifications<NotificationVerifyEmailOtpResponse>(
+    '/api/notifications/verify-email-otp',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      otp_code: payload.otpCode,
+    },
+    NOTIFICATION_COPY.errors.generic
   );
 
 export const getNotificationStatus = async (
