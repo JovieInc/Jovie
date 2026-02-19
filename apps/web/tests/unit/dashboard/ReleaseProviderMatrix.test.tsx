@@ -166,8 +166,12 @@ vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: () => null,
 }));
 
+interface QueryErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
 vi.mock('@/lib/queries/QueryErrorBoundary', () => ({
-  QueryErrorBoundary: ({ children }: { children: React.ReactNode }) => (
+  QueryErrorBoundary: ({ children }: QueryErrorBoundaryProps) => (
     <>{children}</>
   ),
 }));
@@ -185,6 +189,11 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
 const { ReleaseProviderMatrix } = await import(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
 );
+
+interface ProviderConfigEntry {
+  label: string;
+  accent: string;
+}
 
 // ── Helpers ──
 
@@ -243,10 +252,7 @@ const providerConfig = {
   anghami: { label: 'Anghami', accent: '#8B00FF' },
   boomplay: { label: 'Boomplay', accent: '#FF6600' },
   iheartradio: { label: 'iHeartRadio', accent: '#C6002B' },
-} as Record<
-  import('@/lib/discography/types').ProviderKey,
-  { label: string; accent: string }
->;
+} as Record<import('@/lib/discography/types').ProviderKey, ProviderConfigEntry>;
 
 const primaryProviders = [
   'spotify',

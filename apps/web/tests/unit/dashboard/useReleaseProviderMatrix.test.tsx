@@ -74,13 +74,18 @@ const { useReleaseProviderMatrix } = await import(
 
 // ── Test data ──
 
-function makeRelease(
-  overrides?: Partial<{
-    id: string;
-    profileId: string;
-    title: string;
-  }>
-) {
+interface ReleaseOverrides {
+  id: string;
+  profileId: string;
+  title: string;
+}
+
+interface ProviderConfigEntry {
+  label: string;
+  accent: string;
+}
+
+function makeRelease(overrides?: Partial<ReleaseOverrides>) {
   return {
     id: overrides?.id ?? 'release-1',
     profileId: overrides?.profileId ?? 'profile-1',
@@ -132,7 +137,7 @@ const defaultProps = {
     anghami: { label: 'Anghami', accent: '#8B00FF' },
     boomplay: { label: 'Boomplay', accent: '#FF6600' },
     iheartradio: { label: 'iHeartRadio', accent: '#C6002B' },
-  } as Record<ProviderKey, { label: string; accent: string }>,
+  } as Record<ProviderKey, ProviderConfigEntry>,
   primaryProviders: ['spotify', 'apple_music'] as ProviderKey[],
 };
 

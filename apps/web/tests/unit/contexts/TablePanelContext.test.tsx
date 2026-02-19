@@ -15,7 +15,11 @@ import {
  * must re-render when panel changes.
  */
 
-function SetterConsumer({ onRender }: { onRender: () => void }) {
+interface RenderCallbackProps {
+  onRender: () => void;
+}
+
+function SetterConsumer({ onRender }: RenderCallbackProps) {
   const setPanel = useSetTablePanel();
   onRender();
   return (
@@ -25,7 +29,7 @@ function SetterConsumer({ onRender }: { onRender: () => void }) {
   );
 }
 
-function StateConsumer({ onRender }: { onRender: () => void }) {
+function StateConsumer({ onRender }: RenderCallbackProps) {
   const panel = useTablePanel();
   onRender();
   return <div data-testid='panel'>{panel}</div>;
