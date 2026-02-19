@@ -217,6 +217,8 @@ export {
   unsubscribeMethodSchema,
   unsubscribeSchema,
   updateContentPreferencesSchema,
+  type VerifyEmailOtpInput,
+  verifyEmailOtpSchema,
 } from './notifications';
 
 // =============================================================================

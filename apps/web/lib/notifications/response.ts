@@ -73,6 +73,7 @@ export const buildSubscribeSuccessResponse = (
     emailDispatched,
     durationMs,
     pendingConfirmation,
+    requiresOtp: pendingConfirmation,
   },
 });
 

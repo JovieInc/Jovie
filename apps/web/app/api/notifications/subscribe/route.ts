@@ -6,7 +6,12 @@ import {
   buildInvalidRequestResponse,
   subscribeToNotificationsDomain,
 } from '@/lib/notifications/domain';
-import { generalLimiter, getClientIP } from '@/lib/rate-limit';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
+import {
+  createRateLimiter,
+  generalLimiter,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import {
   createNotificationJsonResponse,
@@ -16,6 +21,14 @@ import {
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
+
+const emailOtpSendLimiter = createRateLimiter({
+  name: 'Email OTP Send',
+  limit: 5,
+  window: '10 m',
+  prefix: 'notifications:email-otp:send',
+  analytics: true,
+});
 
 /**
  * POST handler for notification subscriptions
@@ -39,6 +52,20 @@ export async function POST(request: NextRequest) {
       invalidResponse.status,
       rateLimitResult
     );
+  }
+
+  const parsedEmail =
+    body && typeof body === 'object' && 'email' in body
+      ? normalizeSubscriptionEmail(
+          String((body as { email?: string }).email ?? '')
+        )
+      : null;
+
+  if (parsedEmail) {
+    const emailLimitResult = await emailOtpSendLimiter.limit(parsedEmail);
+    if (!emailLimitResult.success) {
+      return createRateLimitedResponse(emailLimitResult);
+    }
   }
 
   try {
