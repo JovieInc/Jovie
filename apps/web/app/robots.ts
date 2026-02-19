@@ -1,7 +1,6 @@
 import { MetadataRoute } from 'next';
-import { headers } from 'next/headers';
 import { BASE_URL } from '@/constants/app';
-import { HOSTNAME } from '@/constants/domains';
+import { env } from '@/lib/env-server';
 
 // Single domain robots.txt configuration
 // Everything is served from jov.ie:
@@ -9,15 +8,15 @@ import { HOSTNAME } from '@/constants/domains';
 // - /app/* dashboard routes: Block indexing
 // - /api/* endpoints: Block indexing
 // - meetjovie.com: 301 redirects to jov.ie (handled in middleware)
+//
+// Uses VERCEL_ENV to distinguish production from preview/staging at build time,
+// making this route statically renderable (no runtime headers() dependency).
 
-export default async function robots(): Promise<MetadataRoute.Robots> {
-  const headersList = await headers();
-  const host = headersList.get('host') || '';
+const isProduction = env.VERCEL_ENV === 'production';
 
-  const isMainDomain = host === HOSTNAME || host === `www.${HOSTNAME}`;
-
+export default function robots(): MetadataRoute.Robots {
   // jov.ie - allow marketing + profiles, block app/api routes
-  if (isMainDomain) {
+  if (isProduction) {
     return {
       rules: [
         {
