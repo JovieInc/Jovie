@@ -33,10 +33,10 @@ export function AdminCreatorsFooter({
   return (
     <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
       <div className='flex items-center gap-2'>
-        <span>
+        <span className='tabular-nums'>
           Page {page} of {totalPages}
         </span>
-        <span className='text-tertiary-token'>
+        <span className='text-tertiary-token tabular-nums'>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
         </span>

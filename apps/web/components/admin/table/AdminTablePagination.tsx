@@ -67,13 +67,13 @@ export function AdminTablePagination({
     <div className='flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
       {/* Page info */}
       <div className='flex items-center gap-2'>
-        <span>
+        <span className='tabular-nums'>
           <span className='hidden sm:inline'>Page </span>
           <span className='font-medium text-primary-token'>{page}</span>
           <span className='hidden sm:inline'> of</span>
           <span className='sm:hidden'> /</span> {totalPages}
         </span>
-        <span className='hidden sm:inline text-tertiary-token'>
+        <span className='hidden sm:inline text-tertiary-token tabular-nums'>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
           {entityLabel ? ` ${entityLabel}` : ''}

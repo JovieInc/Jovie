@@ -60,7 +60,11 @@ function StatCard({
       <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
         {value}
       </p>
-      {meta && <p className='mt-1 text-[11px] text-tertiary-token'>{meta}</p>}
+      {meta && (
+        <p className='mt-1 text-[11px] text-tertiary-token tabular-nums'>
+          {meta}
+        </p>
+      )}
     </div>
   );
 }
