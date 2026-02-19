@@ -12,6 +12,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
  * Clerk IDs follow the pattern: user_[a-zA-Z0-9]+
  */
 export function validateClerkUserId(userId: string): void {
+  if (typeof userId !== 'string' || userId.length === 0) {
+    throw new TypeError('User ID must be a non-empty string');
+  }
+
   // Clerk user IDs are alphanumeric with underscores, typically starting with 'user_'
   const clerkIdPattern = /^[a-zA-Z0-9_-]+$/;
   if (!clerkIdPattern.test(userId)) {
@@ -51,6 +55,8 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
  * @returns SQL statement that sets RLS session variables
  */
 export function getSessionSetupSql(userId: string) {
+  validateClerkUserId(userId);
+
   // Set the session variables for RLS in a single query.
   // is_local=false (session-scoped) because the Neon HTTP driver has no
   // transaction context — is_local=true would be silently discarded.
