@@ -59,6 +59,23 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   }),
 }));
 
+vi.mock(
+  '@/app/app/(shell)/dashboard/PreviewPanelContext',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/app/app/(shell)/dashboard/PreviewPanelContext')
+      >();
+    return {
+      ...actual,
+      usePreviewPanelData: () => ({
+        previewData: null,
+        setPreviewData: vi.fn(),
+      }),
+    };
+  }
+);
+
 vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: true }),
   StatsigContext: React.createContext({ client: {} }),

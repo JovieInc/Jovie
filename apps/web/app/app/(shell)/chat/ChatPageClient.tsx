@@ -5,6 +5,7 @@ import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -31,11 +32,25 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
 
 export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const { selectedProfile } = useDashboardData();
+  const { setPreviewData } = usePreviewPanelData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+
+  // Hydrate preview panel so the sidebar doesn't stay in skeleton state.
+  // Chat page doesn't have links data, so we hydrate with profile info only.
+  useEffect(() => {
+    if (!selectedProfile) return;
+    setPreviewData({
+      username: selectedProfile.username,
+      displayName: selectedProfile.displayName ?? selectedProfile.username,
+      avatarUrl: selectedProfile.avatarUrl ?? null,
+      links: [],
+      profilePath: `/${selectedProfile.username}`,
+    });
+  }, [selectedProfile, setPreviewData]);
 
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {

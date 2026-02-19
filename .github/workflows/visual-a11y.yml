@@ -36,7 +36,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
+        run: |
+          # Install browsers for @playwright/test (1.58.x)
+          pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
+          # Install browsers for @storybook/test-runner's bundled playwright-core (1.57.x)
+          pnpm --filter web exec npx playwright-core@1.57.0 install chromium chromium-headless-shell
 
       - name: Build Storybook
         run: pnpm --filter web build-storybook

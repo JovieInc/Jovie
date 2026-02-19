@@ -110,16 +110,11 @@ export function useAutoSave<TData>({
 
   const asyncDebouncer = useAsyncDebouncer(
     async (data: TData) => {
-      try {
-        await executeSaveWithRetry(data);
-        setLastSaved(new Date());
-        setError(null);
-        setErrorMessage(null);
-        onSuccessRef.current?.();
-      } catch (err) {
-        // Let the debouncer's onError handler handle state updates
-        throw err;
-      }
+      await executeSaveWithRetry(data);
+      setLastSaved(new Date());
+      setError(null);
+      setErrorMessage(null);
+      onSuccessRef.current?.();
     },
     {
       wait,
