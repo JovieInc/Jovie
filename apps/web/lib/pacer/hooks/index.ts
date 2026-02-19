@@ -7,6 +7,12 @@
  * built on top of TanStack Pacer's primitives.
  */
 
+// Retry utilities
+export {
+  executeWithRetry,
+  type RetryOperationOptions,
+  shouldRetryPacerNetworkError,
+} from './retry';
 // Timing constants
 export { PACER_TIMING } from './timing';
 // Search hook

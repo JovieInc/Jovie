@@ -7,7 +7,8 @@
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isAbortError } from '../errors';
+import { isAbortError, toPacerError } from '../errors';
+import { executeWithRetry } from './retry';
 import { PACER_TIMING } from './timing';
 
 export interface UseAsyncSearchOptions<TResult> {
@@ -81,9 +82,9 @@ export function useAsyncSearch<TResult>({
   const executeSearch = useCallback(
     async (trimmedQuery: string, controller: AbortController) => {
       try {
-        const searchResults = await searchFnRef.current(
-          trimmedQuery,
-          controller.signal
+        const searchResults = await executeWithRetry(
+          () => searchFnRef.current(trimmedQuery, controller.signal),
+          { maxAttempts: 3 }
         );
 
         if (controller.signal.aborted) {
@@ -97,8 +98,11 @@ export function useAsyncSearch<TResult>({
           return;
         }
 
-        const searchError =
-          err instanceof Error ? err : new Error('Search failed');
+        const searchError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Search failed',
+          },
+        });
         setError(searchError);
         setResults([]);
         setSearchState('error');
@@ -113,8 +117,11 @@ export function useAsyncSearch<TResult>({
     () => ({
       wait,
       onError: (err: unknown) => {
-        const searchError =
-          err instanceof Error ? err : new Error('Search failed');
+        const searchError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Search failed',
+          },
+        });
         setError(searchError);
         setSearchState('error');
         onErrorRef.current?.(searchError);
