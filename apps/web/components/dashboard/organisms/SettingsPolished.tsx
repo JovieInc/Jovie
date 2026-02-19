@@ -44,7 +44,7 @@ export function SettingsPolished({
         ) : (
           <DashboardCard variant='settings'>
             <div className='text-center py-4'>
-              <h3 className='text-[14px] font-medium text-primary-token mb-2'>
+              <h3 className='text-[14px] font-medium text-primary-token mb-3'>
                 Account settings unavailable
               </h3>
               <p className='text-sm text-secondary'>
@@ -178,7 +178,7 @@ export function SettingsPolished({
     if (!section) return null;
 
     return (
-      <div className='space-y-0 pb-4 sm:pb-6' data-testid='settings-polished'>
+      <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -192,10 +192,10 @@ export function SettingsPolished({
 
   // Full settings view with group headers
   return (
-    <div className='space-y-0 pb-4 sm:pb-6' data-testid='settings-polished'>
+    <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
       {/* General settings */}
-      <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3 first:pt-0'>
+      <div className='space-y-6'>
+        <h3 className='text-[13px] font-medium text-secondary-token'>
           General
         </h3>
         {userSections.map(section => (
@@ -212,8 +212,8 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+      <div className='space-y-6'>
+        <h3 className='text-[13px] font-medium text-secondary-token'>
           Artist
         </h3>
         {artistSections.map(section => (

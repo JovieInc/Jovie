@@ -35,7 +35,7 @@ export default async function SettingsPage() {
           <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
             Something went wrong
           </h1>
-          <p className='mb-4 text-secondary-token'>
+          <p className='text-secondary-token'>
             Failed to load settings data. Please refresh the page.
           </p>
         </div>
