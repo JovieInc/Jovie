@@ -13,6 +13,10 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 
 import { env } from '@/lib/env-server';
+import {
+  MusicfetchRequestError,
+  musicfetchRequest,
+} from '@/lib/musicfetch/resilient-client';
 
 import { musicfetchCircuitBreaker } from './musicfetch-circuit-breaker';
 
@@ -20,7 +24,6 @@ import { musicfetchCircuitBreaker } from './musicfetch-circuit-breaker';
 // Configuration
 // ============================================================================
 
-const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /**
@@ -154,49 +157,27 @@ export async function lookupByIsrc(
   const services = options?.services ?? TARGET_SERVICES;
   const servicesParam = services.join(',');
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
     const result = await musicfetchCircuitBreaker.execute(async () => {
-      const url = `${MUSICFETCH_API_BASE}/isrc?isrc=${encodeURIComponent(isrc)}&services=${encodeURIComponent(servicesParam)}`;
-
-      const response = await fetch(url, {
-        headers: {
-          'x-token': token,
-          Accept: 'application/json',
-        },
-        signal: controller.signal,
+      const params = new URLSearchParams({
+        isrc,
+        services: servicesParam,
       });
 
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After');
-        const retrySeconds = retryAfter
-          ? Number.parseInt(retryAfter, 10)
-          : undefined;
-
-        Sentry.addBreadcrumb({
-          category: 'musicfetch',
-          message: `Rate limited (429), retry-after: ${retrySeconds ?? 'unknown'}s`,
-          level: 'warning',
-          data: { isrc, retryAfter: retrySeconds },
+      try {
+        return await musicfetchRequest<MusicfetchResponse>('/isrc', params, {
+          timeoutMs: REQUEST_TIMEOUT_MS,
         });
-
-        throw new MusicfetchError(
-          `Musicfetch rate limit exceeded`,
-          429,
-          Number.isNaN(retrySeconds) ? undefined : retrySeconds
-        );
+      } catch (error) {
+        if (error instanceof MusicfetchRequestError) {
+          throw new MusicfetchError(
+            error.message,
+            error.statusCode,
+            error.retryAfterSeconds
+          );
+        }
+        throw error;
       }
-
-      if (!response.ok) {
-        throw new MusicfetchError(
-          `Musicfetch API error: ${response.status}`,
-          response.status
-        );
-      }
-
-      return (await response.json()) as MusicfetchResponse;
     });
 
     if (!result?.result?.services) return null;
@@ -232,8 +213,6 @@ export async function lookupByIsrc(
     });
 
     return null;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 

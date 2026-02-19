@@ -11,13 +11,15 @@
 import 'server-only';
 
 import { env } from '@/lib/env-server';
+import {
+  MusicfetchRequestError,
+  musicfetchRequest,
+} from '@/lib/musicfetch/resilient-client';
 import { logger } from '@/lib/utils/logger';
 
 // ============================================================================
 // Configuration
 // ============================================================================
-
-const MUSICFETCH_API_BASE = 'https://api.musicfetch.io';
 
 /** Request timeout — external API may be slow */
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -95,37 +97,10 @@ export async function fetchArtistBySpotifyUrl(
     services: ARTIST_LOOKUP_SERVICES,
   });
 
-  const url = `${MUSICFETCH_API_BASE}/url?${params.toString()}`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-token': env.MUSICFETCH_API_TOKEN!,
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
+    const data = await musicfetchRequest<MusicFetchResponse>('/url', params, {
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
-
-    if (response.status === 429) {
-      logger.warn('MusicFetch rate limit hit', {
-        retryAfter: response.headers.get('retry-after'),
-      });
-      return null;
-    }
-
-    if (!response.ok) {
-      logger.warn('MusicFetch API error', {
-        status: response.status,
-        statusText: response.statusText,
-      });
-      return null;
-    }
-
-    const data: MusicFetchResponse = await response.json();
 
     if (!data.result || data.result?.type !== 'artist') {
       logger.warn('MusicFetch returned non-artist result', {
@@ -137,8 +112,13 @@ export async function fetchArtistBySpotifyUrl(
 
     return data.result;
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      logger.warn('MusicFetch request timed out', { spotifyUrl });
+    if (error instanceof MusicfetchRequestError) {
+      logger.warn('MusicFetch request failed', {
+        spotifyUrl,
+        statusCode: error.statusCode,
+        retryAfterSeconds: error.retryAfterSeconds,
+        message: error.message,
+      });
     } else {
       logger.warn('MusicFetch request failed', {
         spotifyUrl,
@@ -146,8 +126,6 @@ export async function fetchArtistBySpotifyUrl(
       });
     }
     return null;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
