@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
+import { DRAWER_OVERLAY_CLASS } from '../drawer-overlay-styles';
 import { ChannelIcon } from './ContactIcons';
 
 interface ContactDrawerProps {
@@ -70,7 +71,7 @@ export function ContactDrawer({
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/60 backdrop-blur-sm' />
+        <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
         <Drawer.Content
           className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
           style={{

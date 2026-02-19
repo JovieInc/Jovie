@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { track } from '@/lib/analytics';
+import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
@@ -90,7 +91,7 @@ export function TipDrawer({
   return (
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className='fixed inset-0 z-40 bg-black/40 backdrop-blur-sm' />
+        <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
         <Drawer.Content
           className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
           aria-describedby={undefined}

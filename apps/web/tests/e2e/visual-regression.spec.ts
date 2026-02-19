@@ -191,6 +191,74 @@ test.describe('Visual Regression @visual-regression', () => {
         ...snapshotOptions,
       });
     });
+
+    test('public profile - mobile tip drawer open', async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
+      await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
+
+      const is404 = await page
+        .locator('text=not found')
+        .isVisible()
+        .catch(() => false);
+      if (is404) {
+        test.skip(true, `Test profile @${testHandle} not found`);
+        return;
+      }
+
+      // Open the tip drawer (only visible on mobile)
+      const tipTrigger = page.locator('[data-testid="tip-trigger"]');
+      if (!(await tipTrigger.isVisible().catch(() => false))) {
+        test.skip(true, 'Tip button not available on this profile');
+        return;
+      }
+      await tipTrigger.click();
+
+      // Wait for drawer to animate in
+      await page
+        .locator('[data-test="tip-selector"]')
+        .waitFor({ state: 'visible', timeout: 5000 });
+      await page.waitForTimeout(300); // Allow animation to settle
+
+      await maskDynamicContent(page);
+
+      await expect(page).toHaveScreenshot('profile-tip-drawer-mobile.png', {
+        ...snapshotOptions,
+      });
+    });
+
+    test('public profile - mobile listen drawer open', async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
+      await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
+
+      const is404 = await page
+        .locator('text=not found')
+        .isVisible()
+        .catch(() => false);
+      if (is404) {
+        test.skip(true, `Test profile @${testHandle} not found`);
+        return;
+      }
+
+      // Click "Listen now" to open the listen drawer
+      const listenButton = page
+        .locator('button')
+        .filter({ hasText: /listen now/i })
+        .first();
+      if (!(await listenButton.isVisible().catch(() => false))) {
+        test.skip(true, 'Listen button not available on this profile');
+        return;
+      }
+      await listenButton.click();
+
+      // Wait for drawer animation
+      await page.waitForTimeout(500);
+
+      await maskDynamicContent(page);
+
+      await expect(page).toHaveScreenshot('profile-listen-drawer-mobile.png', {
+        ...snapshotOptions,
+      });
+    });
   });
 
   test.describe('Dashboard (Authenticated)', () => {
