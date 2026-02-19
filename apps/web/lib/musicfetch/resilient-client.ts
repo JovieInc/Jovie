@@ -60,6 +60,9 @@ function backoffMs(attempt: number, retryAfterSeconds?: number): number {
   return base + jitter;
 }
 
+// Intentional setTimeout-based delay for retry backoff and rate-limit compliance.
+// Delays are bounded (max ~5s total across retries) and required to respect
+// third-party API rate limits. Safe in serverless — well within execution limits.
 async function delay(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -76,7 +79,9 @@ async function withRedisDedup<T>(
 
   const cached = await redis.get<string>(resultKey);
   if (cached) {
-    return JSON.parse(cached) as T;
+    // Guard against double-parse: some Redis clients (e.g. Upstash REST)
+    // auto-deserialize JSON strings, returning an object instead of a string.
+    return (typeof cached === 'string' ? JSON.parse(cached) : cached) as T;
   }
 
   const owner = crypto.randomUUID();
