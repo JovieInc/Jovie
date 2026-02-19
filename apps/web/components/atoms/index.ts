@@ -39,6 +39,7 @@ export * from './PlaceholderImage';
 export * from './Popover';
 export * from './ProgressIndicator';
 export * from './ProviderIcon';
+export * from './ReleaseArtworkThumb';
 export * from './SectionHeading';
 export * from './Select';
 export * from './Separator';
