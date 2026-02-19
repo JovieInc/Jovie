@@ -74,7 +74,7 @@ Your branch is: tim/jov-<NUMBER>-<slug>
 RULES:
 1. ALL file operations MUST use /tmp/jovie-worktrees/jov-<NUMBER>/ as the base path
 2. ALL bash commands MUST run from /tmp/jovie-worktrees/jov-<NUMBER>/
-3. NEVER cd to or modify /Users/timwhite/Documents/GitHub/TBF/Jovie (the main repo)
+3. NEVER cd to or modify the main repo checkout (use `git rev-parse --show-toplevel` if needed)
 4. Use absolute paths: /tmp/jovie-worktrees/jov-<NUMBER>/apps/web/...
 
 SETUP (do this first):

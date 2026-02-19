@@ -168,14 +168,6 @@ function createInsertChain(result: unknown[]) {
   return { values: mockValues };
 }
 
-/** Creates an update chain: db.update(...).set(...).where(...).returning(...) */
-function _createUpdateChain(result: unknown[]) {
-  const mockReturning = vi.fn().mockResolvedValue(result);
-  const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
-  const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-  return { set: mockSet };
-}
-
 /** Standard mock Clerk user with verified email */
 function mockClerkUser(email = 'test@example.com') {
   return {

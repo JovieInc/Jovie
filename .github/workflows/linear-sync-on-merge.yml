@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [closed]
 
+concurrency:
+  group: linear-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   pull-requests: read
@@ -71,7 +75,7 @@ jobs:
           ')
 
           if [[ -n "$DONE_STATE_ID" ]]; then
-            curl -sS https://api.linear.app/graphql \
+            UPDATE_RESP=$(curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H 'Content-Type: application/json' \
               -d "$(cat <<JSON
@@ -80,10 +84,13 @@ jobs:
               \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"stateId\": \"${DONE_STATE_ID}\" }
             }
             JSON
-            )" > /dev/null
+            )") || echo "::warning::Linear state update API call failed"
+            if echo "$UPDATE_RESP" | jq -e '.errors' > /dev/null 2>&1; then
+              echo "::warning::Linear state update returned errors: $UPDATE_RESP"
+            fi
           fi
 
-          curl -sS https://api.linear.app/graphql \
+          COMMENT_RESP=$(curl -sS https://api.linear.app/graphql \
             -H "Authorization: ${LINEAR_API_KEY}" \
             -H 'Content-Type: application/json' \
             -d "$(cat <<JSON
@@ -95,4 +102,7 @@ jobs:
             }
           }
           JSON
-          )" > /dev/null
+          )") || echo "::warning::Linear comment API call failed"
+          if echo "$COMMENT_RESP" | jq -e '.errors' > /dev/null 2>&1; then
+            echo "::warning::Linear comment returned errors: $COMMENT_RESP"
+          fi
