@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -57,11 +58,17 @@ export async function POST(req: Request) {
   const { profileId, platform, normalizedUrl } = parseResult.data;
 
   try {
-    // Verify profile ownership
-    const profile = await db.query.creatorProfiles.findFirst({
-      where: eq(creatorProfiles.id, profileId),
-      columns: { id: true, userId: true },
-    });
+    // Verify profile ownership by joining users table to compare Clerk IDs
+    const [profile] = await db
+      .select({
+        id: creatorProfiles.id,
+        internalUserId: creatorProfiles.userId,
+        clerkId: users.clerkId,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
 
     if (!profile) {
       return NextResponse.json(
@@ -70,7 +77,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (profile.userId !== userId) {
+    if (profile.clerkId !== userId) {
       return NextResponse.json(
         { error: 'Unauthorized - not your profile' },
         { status: 403, headers: NO_CACHE_HEADERS }
@@ -115,7 +122,7 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get('user-agent');
 
     await db.insert(chatAuditLog).values({
-      userId,
+      userId: profile.internalUserId!,
       creatorProfileId: profileId,
       action: 'add_social_link',
       field: 'social_links',

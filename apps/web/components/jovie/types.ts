@@ -54,6 +54,46 @@ export const MAX_MESSAGE_LENGTH = 4000;
 /** Minimum time between message submissions (ms) */
 export const SUBMIT_THROTTLE_MS = 1000;
 
+export interface SocialLinkToolResult {
+  readonly success: boolean;
+  readonly platform: {
+    readonly id: string;
+    readonly name: string;
+    readonly icon: string;
+    readonly color: string;
+  };
+  readonly normalizedUrl: string;
+  readonly originalUrl: string;
+}
+
+export interface ToolInvocationPart {
+  type: 'tool-invocation';
+  toolInvocationId: string;
+  toolName: string;
+  state: 'call' | 'result' | 'partial-call';
+  args?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+}
+
+export function isToolInvocationPart(
+  part: unknown
+): part is ToolInvocationPart {
+  if (typeof part !== 'object' || part === null) {
+    return false;
+  }
+  const candidate = part as Partial<ToolInvocationPart>;
+  return (
+    candidate.type === 'tool-invocation' &&
+    typeof candidate.toolInvocationId === 'string' &&
+    candidate.toolInvocationId.length > 0 &&
+    typeof candidate.toolName === 'string' &&
+    candidate.toolName.length > 0 &&
+    (candidate.state === 'call' ||
+      candidate.state === 'result' ||
+      candidate.state === 'partial-call')
+  );
+}
+
 export interface MessagePart {
   readonly type: string;
   readonly text?: string;

@@ -33,7 +33,12 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
-import type { ArtistContext } from '@/components/jovie/types';
+import {
+  type ArtistContext,
+  isToolInvocationPart,
+  type SocialLinkToolResult,
+  type ToolInvocationPart,
+} from '@/components/jovie/types';
 import { getMessageText } from '@/components/jovie/utils';
 import { cn } from '@/lib/utils';
 import {
@@ -57,43 +62,6 @@ export interface InlineChatAreaRef {
   submitMessage: (message: string) => void;
   /** Whether chat is currently loading/streaming */
   isLoading: boolean;
-}
-
-// Type for social link tool results
-interface SocialLinkToolResult {
-  readonly success: boolean;
-  readonly platform: {
-    readonly id: string;
-    readonly name: string;
-    readonly icon: string;
-    readonly color: string;
-  };
-  readonly normalizedUrl: string;
-  readonly originalUrl: string;
-}
-
-// Type for tool invocation parts
-interface ToolInvocationPart {
-  type: 'tool-invocation';
-  toolInvocationId: string;
-  toolName: string;
-  args: Record<string, unknown>;
-  state: 'call' | 'result' | 'partial-call';
-  result?: {
-    success: boolean;
-    preview?: ProfileEditPreview;
-    error?: string;
-  };
-}
-
-// Helper to check if a part is a tool invocation
-function isToolInvocationPart(part: unknown): part is ToolInvocationPart {
-  return (
-    typeof part === 'object' &&
-    part !== null &&
-    'type' in part &&
-    (part as { type: string }).type === 'tool-invocation'
-  );
 }
 
 // Helper to extract tool invocation parts from message
@@ -161,7 +129,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ProfileEditPreviewCard
-                preview={toolInvocation.result.preview}
+                preview={toolInvocation.result.preview as ProfileEditPreview}
                 profileId={profileId}
               />
             </div>
@@ -185,7 +153,8 @@ const InlineChatMessage = memo(function InlineChatMessage({
           toolInvocation.state === 'result' &&
           toolInvocation.result?.success
         ) {
-          const result = toolInvocation.result as SocialLinkToolResult;
+          const result =
+            toolInvocation.result as unknown as SocialLinkToolResult;
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ChatLinkConfirmationCard

@@ -9,7 +9,11 @@ import { useMemo } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-import type { MessagePart } from '../types';
+import {
+  isToolInvocationPart,
+  type MessagePart,
+  type SocialLinkToolResult,
+} from '../types';
 import { getMessageText } from '../utils';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
@@ -18,43 +22,6 @@ const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
-
-interface SocialLinkToolResult {
-  readonly success: boolean;
-  readonly platform: {
-    readonly id: string;
-    readonly name: string;
-    readonly icon: string;
-    readonly color: string;
-  };
-  readonly normalizedUrl: string;
-  readonly originalUrl: string;
-}
-
-interface ToolInvocationPart {
-  type: 'tool-invocation';
-  toolInvocationId: string;
-  toolName: string;
-  state: 'call' | 'result' | 'partial-call';
-  result?: Record<string, unknown>;
-}
-
-function isToolInvocationPart(part: unknown): part is ToolInvocationPart {
-  if (typeof part !== 'object' || part === null) {
-    return false;
-  }
-  const candidate = part as Partial<ToolInvocationPart>;
-  return (
-    candidate.type === 'tool-invocation' &&
-    typeof candidate.toolInvocationId === 'string' &&
-    candidate.toolInvocationId.length > 0 &&
-    typeof candidate.toolName === 'string' &&
-    candidate.toolName.length > 0 &&
-    (candidate.state === 'call' ||
-      candidate.state === 'result' ||
-      candidate.state === 'partial-call')
-  );
-}
 
 interface ChatMessageProps {
   readonly id: string;
