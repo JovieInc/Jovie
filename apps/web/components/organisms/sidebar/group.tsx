@@ -55,7 +55,7 @@ export const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar='group-action'
       className={cn(
-        'absolute right-2 top-2 flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-transform hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent [&>svg]:size-3.5 [&>svg]:shrink-0',
+        'absolute right-2 top-2 flex aspect-square w-4 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:bg-sidebar-accent [&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0',
         // Increases the hit area of the button on mobile.
         'after:absolute after:-inset-2 after:lg:hidden',
         'group-data-[collapsible=icon]:hidden',
