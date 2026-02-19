@@ -52,6 +52,31 @@ function buildAllowedHostnames(): Set<string> {
 }
 
 /**
+ * Validates and normalizes the remote avatar image URL to prevent SSRF.
+ * Only allows HTTP(S) URLs whose hostnames are in the allowed set.
+ */
+function getSafeImageUrl(imageUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(imageUrl);
+  } catch {
+    throw new TypeError('Invalid avatar image URL');
+  }
+
+  // Only allow HTTP(S) schemes
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new TypeError('Invalid avatar image URL protocol');
+  }
+
+  const allowedHostnames = buildAllowedHostnames();
+  if (!allowedHostnames.has(url.hostname)) {
+    throw new TypeError('Avatar image host is not allowed');
+  }
+
+  return url.toString();
+}
+
+/**
  * Checks if a hostname is a known Vercel preview deployment for this project.
  * Only matches our specific project prefixes, not arbitrary .vercel.app domains.
  */
@@ -93,7 +118,8 @@ function getSafeUploadUrl(baseUrl: string): string {
  * Fetches the remote avatar image and validates content type.
  */
 async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
-  const source = await fetch(imageUrl, {
+  const safeImageUrl = getSafeImageUrl(imageUrl);
+  const source = await fetch(safeImageUrl, {
     signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
   });
 
