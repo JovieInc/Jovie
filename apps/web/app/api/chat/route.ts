@@ -1084,6 +1084,18 @@ function buildChatTools(
   };
 }
 
+function toNullableString(value: unknown): string | null {
+  return value && typeof value === 'string' ? value : null;
+}
+
+function isClientDisconnect(
+  error: unknown,
+  signal: AbortSignal | undefined
+): boolean {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  return (code === 'EPIPE' || code === 'ECONNRESET') && !!signal?.aborted;
+}
+
 /**
  * Build a standardized error response for chat streaming failures.
  */
@@ -1180,7 +1192,7 @@ export async function POST(req: Request) {
 
   // Validate that either profileId or artistContext is provided
   if (
-    (!profileId || typeof profileId !== 'string') &&
+    !toNullableString(profileId) &&
     (!body.artistContext || typeof body.artistContext !== 'object')
   ) {
     return NextResponse.json(
@@ -1212,22 +1224,16 @@ export async function POST(req: Request) {
   }
   const artistContext = contextResult.context;
 
+  const resolvedProfileId = toNullableString(profileId);
+  const resolvedConversationId = toNullableString(conversationId);
+
   const systemPrompt = buildSystemPrompt(artistContext, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
   });
 
   try {
-    // Convert UIMessages (from the client) to ModelMessages (for streamText)
     const modelMessages = await convertToModelMessages(uiMessages);
-
-    // Build tools: always include profile edit, conditionally include canvas + release creation
-    const resolvedProfileId =
-      profileId && typeof profileId === 'string' ? profileId : null;
-    const resolvedConversationId =
-      conversationId && typeof conversationId === 'string'
-        ? conversationId
-        : null;
 
     // Gate AI tools behind paid plans — free users get chat-only
     const tools = planLimits.booleans.aiCanUseTools
@@ -1247,17 +1253,7 @@ export async function POST(req: Request) {
         functionId: 'jovie-chat',
       },
       onError: ({ error }) => {
-        // EPIPE/ECONNRESET occur when clients disconnect mid-stream (e.g.
-        // navigating away, closing the tab, or losing network). Only treat
-        // them as client disconnects when the request's abort signal confirms
-        // the client actually disconnected; otherwise surface the error.
-        const code = (error as NodeJS.ErrnoException)?.code;
-        if (
-          (code === 'EPIPE' || code === 'ECONNRESET') &&
-          req.signal?.aborted
-        ) {
-          return;
-        }
+        if (isClientDisconnect(error, req.signal)) return;
 
         Sentry.captureException(error, {
           tags: { feature: 'ai-chat', errorType: 'streaming' },
@@ -1279,9 +1275,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    // Client disconnections during stream setup are not actionable
-    const code = (error as NodeJS.ErrnoException)?.code;
-    if ((code === 'EPIPE' || code === 'ECONNRESET') && req.signal?.aborted) {
+    if (isClientDisconnect(error, req.signal)) {
       return new NextResponse(
         JSON.stringify({ error: 'Client disconnected', requestId }),
         {
@@ -1296,10 +1290,8 @@ export async function POST(req: Request) {
       userId,
       uiMessages.length,
       requestId,
-      profileId && typeof profileId === 'string' ? profileId : null,
-      conversationId && typeof conversationId === 'string'
-        ? conversationId
-        : null
+      resolvedProfileId,
+      resolvedConversationId
     );
   }
 }

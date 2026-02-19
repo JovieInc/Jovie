@@ -1,8 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  SwipeToReveal,
+  SwipeToRevealGroup,
+} from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -12,6 +16,12 @@ interface MobileReleaseListProps {
   readonly releases: ReleaseViewModel[];
   readonly artistName?: string | null;
   readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onCopy?: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   readonly groupByYear?: boolean;
 }
 
@@ -19,6 +29,9 @@ interface YearGroup {
   year: string;
   releases: ReleaseViewModel[];
 }
+
+/** Width of the revealed swipe action buttons (px) */
+const SWIPE_ACTIONS_WIDTH = 128;
 
 function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
@@ -41,91 +54,186 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   }));
 }
 
+/** Swipe action buttons revealed on left-swipe */
+const SwipeActions = memo(function SwipeActions({
+  release,
+  onEdit,
+  onCopy,
+  isLocked,
+}: {
+  readonly release: ReleaseViewModel;
+  readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onCopy?: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly isLocked: boolean;
+}) {
+  const handleCopy = useCallback(() => {
+    if (onCopy && !isLocked) {
+      void onCopy(
+        release.smartLinkPath,
+        `${release.title} smart link`,
+        `smart-link-copy-${release.id}`
+      );
+    }
+  }, [onCopy, isLocked, release]);
+
+  return (
+    <div className='flex h-full items-stretch'>
+      <button
+        type='button'
+        onClick={() => onEdit(release)}
+        className='flex w-16 flex-col items-center justify-center gap-1 bg-indigo-500 text-white active:bg-indigo-600'
+        aria-label={`Edit ${release.title}`}
+      >
+        <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
+        <span className='text-[10px] font-medium'>Edit</span>
+      </button>
+      <button
+        type='button'
+        onClick={handleCopy}
+        disabled={isLocked || !onCopy}
+        className={cn(
+          'flex w-16 flex-col items-center justify-center gap-1 text-white active:opacity-80',
+          isLocked
+            ? 'bg-neutral-400 opacity-60'
+            : 'bg-sky-500 active:bg-sky-600'
+        )}
+        aria-label={
+          isLocked
+            ? 'Smart link locked (Pro)'
+            : `Copy smart link for ${release.title}`
+        }
+      >
+        <Icon
+          name={isLocked ? 'Lock' : 'Link2'}
+          className='h-4 w-4'
+          aria-hidden='true'
+        />
+        <span className='text-[10px] font-medium'>
+          {isLocked ? 'Pro' : 'Link'}
+        </span>
+      </button>
+    </div>
+  );
+});
+
 /** Single release row in the mobile list */
 const MobileReleaseRow = memo(function MobileReleaseRow({
   release,
   artistName,
   onEdit,
+  onCopy,
+  isSmartLinkLocked,
 }: {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
   readonly onEdit: (release: ReleaseViewModel) => void;
+  readonly onCopy?: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly isSmartLinkLocked?: (releaseId: string) => boolean;
 }) {
   const year = release.releaseDate
     ? new Date(release.releaseDate).getFullYear()
     : null;
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
+  const isLocked = isSmartLinkLocked?.(release.id) ?? false;
+
+  const actions = useMemo(
+    () => (
+      <SwipeActions
+        release={release}
+        onEdit={onEdit}
+        onCopy={onCopy}
+        isLocked={isLocked}
+      />
+    ),
+    [release, onEdit, onCopy, isLocked]
+  );
 
   return (
-    <button
-      type='button'
-      onClick={() => onEdit(release)}
-      className='flex w-full items-center gap-3 border-b border-subtle px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
+    <SwipeToReveal
+      itemId={release.id}
+      actionsWidth={SWIPE_ACTIONS_WIDTH}
+      actions={actions}
+      className='border-b border-subtle'
+      contentClassName='bg-base'
     >
-      {/* Artwork thumbnail */}
-      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
-        {release.artworkUrl ? (
-          <Image
-            src={release.artworkUrl}
-            alt={`${release.title} artwork`}
-            fill
-            className='object-cover'
-            sizes='40px'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center'>
-            <Icon
-              name='Disc3'
-              className='h-5 w-5 text-tertiary-token'
-              aria-hidden='true'
+      <button
+        type='button'
+        onClick={() => onEdit(release)}
+        className='flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
+      >
+        {/* Artwork thumbnail */}
+        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
+          {release.artworkUrl ? (
+            <Image
+              src={release.artworkUrl}
+              alt={`${release.title} artwork`}
+              fill
+              className='object-cover'
+              sizes='40px'
             />
-          </div>
-        )}
-      </div>
-
-      {/* Title + metadata */}
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-1.5'>
-          <TruncatedText
-            lines={1}
-            className='text-sm font-semibold text-primary-token'
-          >
-            {release.title}
-          </TruncatedText>
-          <span
-            className={cn(
-              'shrink-0 text-[10px] font-medium uppercase tracking-wide',
-              typeStyle.text
-            )}
-          >
-            {typeStyle.label}
-          </span>
+          ) : (
+            <div className='flex h-full w-full items-center justify-center'>
+              <Icon
+                name='Disc3'
+                className='h-5 w-5 text-tertiary-token'
+                aria-hidden='true'
+              />
+            </div>
+          )}
         </div>
-        {artistName && (
-          <TruncatedText
-            lines={1}
-            className='mt-0.5 text-xs text-secondary-token'
-          >
-            {artistName}
-          </TruncatedText>
+
+        {/* Title + metadata */}
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center gap-1.5'>
+            <TruncatedText
+              lines={1}
+              className='text-sm font-semibold text-primary-token'
+            >
+              {release.title}
+            </TruncatedText>
+            <span
+              className={cn(
+                'shrink-0 text-[10px] font-medium uppercase tracking-wide',
+                typeStyle.text
+              )}
+            >
+              {typeStyle.label}
+            </span>
+          </div>
+          {artistName && (
+            <TruncatedText
+              lines={1}
+              className='mt-0.5 text-xs text-secondary-token'
+            >
+              {artistName}
+            </TruncatedText>
+          )}
+        </div>
+
+        {/* Year on the right */}
+        {year && (
+          <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
+            {year}
+          </span>
         )}
-      </div>
 
-      {/* Year on the right */}
-      {year && (
-        <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
-          {year}
-        </span>
-      )}
-
-      {/* Chevron indicator */}
-      <Icon
-        name='ChevronRight'
-        className='h-4 w-4 shrink-0 text-tertiary-token'
-        aria-hidden='true'
-      />
-    </button>
+        {/* Chevron indicator */}
+        <Icon
+          name='ChevronRight'
+          className='h-4 w-4 shrink-0 text-tertiary-token'
+          aria-hidden='true'
+        />
+      </button>
+    </SwipeToReveal>
   );
 });
 
@@ -145,17 +253,20 @@ function YearGroupHeader({
 /**
  * MobileReleaseList - Card/list-based mobile view for releases
  *
- * Inspired by Linear's mobile approach:
+ * Features:
  * - Full-width tap targets
  * - Artwork visible (not hidden like in table view)
  * - Vertically stacked info instead of columns
  * - Optional year grouping with sticky headers
+ * - iOS-style swipe-to-reveal actions (Edit, Copy smart link)
  * - No horizontal scrolling
  */
 export const MobileReleaseList = memo(function MobileReleaseList({
   releases,
   artistName,
   onEdit,
+  onCopy,
+  isSmartLinkLocked,
   groupByYear = false,
 }: MobileReleaseListProps) {
   const yearGroups = useMemo(
@@ -165,34 +276,45 @@ export const MobileReleaseList = memo(function MobileReleaseList({
 
   if (yearGroups) {
     return (
-      <div className='flex flex-col'>
-        {yearGroups.map(group => (
-          <div key={group.year}>
-            <YearGroupHeader year={group.year} count={group.releases.length} />
-            {group.releases.map(release => (
-              <MobileReleaseRow
-                key={release.id}
-                release={release}
-                artistName={artistName}
-                onEdit={onEdit}
+      <SwipeToRevealGroup>
+        <div className='flex flex-col'>
+          {yearGroups.map(group => (
+            <div key={group.year}>
+              <YearGroupHeader
+                year={group.year}
+                count={group.releases.length}
               />
-            ))}
-          </div>
-        ))}
-      </div>
+              {group.releases.map(release => (
+                <MobileReleaseRow
+                  key={release.id}
+                  release={release}
+                  artistName={artistName}
+                  onEdit={onEdit}
+                  onCopy={onCopy}
+                  isSmartLinkLocked={isSmartLinkLocked}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </SwipeToRevealGroup>
     );
   }
 
   return (
-    <div className='flex flex-col'>
-      {releases.map(release => (
-        <MobileReleaseRow
-          key={release.id}
-          release={release}
-          artistName={artistName}
-          onEdit={onEdit}
-        />
-      ))}
-    </div>
+    <SwipeToRevealGroup>
+      <div className='flex flex-col'>
+        {releases.map(release => (
+          <MobileReleaseRow
+            key={release.id}
+            release={release}
+            artistName={artistName}
+            onEdit={onEdit}
+            onCopy={onCopy}
+            isSmartLinkLocked={isSmartLinkLocked}
+          />
+        ))}
+      </div>
+    </SwipeToRevealGroup>
   );
 });

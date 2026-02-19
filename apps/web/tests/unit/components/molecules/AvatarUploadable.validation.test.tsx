@@ -5,6 +5,18 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+
+const mockConvertHeicToJpeg = vi.fn(
+  async (file: File) => new File([file], 'photo.jpg', { type: 'image/jpeg' })
+);
+
+vi.mock('@/lib/images/heic-conversion', () => ({
+  convertHeicToJpeg: (...args: [File]) => mockConvertHeicToJpeg(...args),
+  isHeicLikeMimeType: (mimeType: string) =>
+    mimeType.toLowerCase() === 'image/heic' ||
+    mimeType.toLowerCase() === 'image/heif',
+}));
+
 import {
   createMockCallbacks,
   createMockFile,
@@ -17,6 +29,7 @@ describe('AvatarUploadable - File Validation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockConvertHeicToJpeg.mockClear();
     vi.useFakeTimers();
     restoreUrlMocks = setupUrlMocks();
   });
@@ -133,10 +146,11 @@ describe('AvatarUploadable - File Validation', () => {
 
       unmount();
       vi.clearAllMocks();
+      mockConvertHeicToJpeg.mockClear();
     }
   });
 
-  it('accepts HEIC by default to match API support', async () => {
+  it('converts HEIC to JPEG before upload by default', async () => {
     mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
 
     render(
@@ -155,8 +169,14 @@ describe('AvatarUploadable - File Validation', () => {
 
     fireEvent.change(fileInput, { target: { files: [heicFile] } });
 
+    await vi.runAllTimersAsync();
     await Promise.resolve();
-    expect(mockOnUpload).toHaveBeenCalledWith(heicFile);
+    expect(mockOnUpload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      })
+    );
     expect(mockOnError).not.toHaveBeenCalled();
   });
 

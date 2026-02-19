@@ -120,6 +120,43 @@ async function withRedisDedup<T>(
   return request();
 }
 
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function wrapUnknownError(error: unknown): MusicfetchRequestError {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new MusicfetchRequestError('MusicFetch request timed out');
+  }
+  return new MusicfetchRequestError(
+    error instanceof Error ? error.message : 'MusicFetch request failed'
+  );
+}
+
+async function handleHttpResponse<T>(
+  response: Response,
+  attempt: number
+): Promise<{ result: T } | { shouldRetry: true }> {
+  if (response.ok) {
+    return { result: (await response.json()) as T };
+  }
+
+  const retryAfterSeconds = parseRetryAfterSeconds(
+    response.headers.get('retry-after')
+  );
+
+  if (isRetryableStatus(response.status) && attempt < MAX_RETRY_ATTEMPTS - 1) {
+    await delay(backoffMs(attempt, retryAfterSeconds));
+    return { shouldRetry: true };
+  }
+
+  throw new MusicfetchRequestError(
+    `MusicFetch API error: ${response.status}`,
+    response.status,
+    retryAfterSeconds
+  );
+}
+
 async function requestWithRetries<T>(
   endpoint: string,
   params: URLSearchParams,
@@ -160,43 +197,18 @@ async function requestWithRetries<T>(
         signal: controller.signal,
       });
 
-      if (response.ok) {
-        return (await response.json()) as T;
-      }
-
-      const retryAfterSeconds = parseRetryAfterSeconds(
-        response.headers.get('retry-after')
-      );
-
-      if (response.status === 429 || response.status >= 500) {
-        if (attempt < MAX_RETRY_ATTEMPTS - 1) {
-          await delay(backoffMs(attempt, retryAfterSeconds));
-          continue;
-        }
-      }
-
-      throw new MusicfetchRequestError(
-        `MusicFetch API error: ${response.status}`,
-        response.status,
-        retryAfterSeconds
-      );
+      const handled = await handleHttpResponse<T>(response, attempt);
+      if ('shouldRetry' in handled) continue;
+      return handled.result;
     } catch (error) {
-      if (error instanceof MusicfetchRequestError) {
-        throw error;
-      }
+      if (error instanceof MusicfetchRequestError) throw error;
 
       if (attempt < MAX_RETRY_ATTEMPTS - 1) {
         await delay(backoffMs(attempt));
         continue;
       }
 
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new MusicfetchRequestError('MusicFetch request timed out');
-      }
-
-      throw new MusicfetchRequestError(
-        error instanceof Error ? error.message : 'MusicFetch request failed'
-      );
+      throw wrapUnknownError(error);
     } finally {
       clearTimeout(timeout);
     }
