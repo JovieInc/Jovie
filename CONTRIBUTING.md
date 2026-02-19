@@ -10,6 +10,19 @@
 - If the pipeline is stuck, fix issues on your feature branch or `main` and let CI handle the rest
 - Direct pushes to protected branches will be rejected and can break the pipeline
 
+## Contributor License Agreement (CLA)
+
+By submitting a pull request to this repository, you agree that:
+
+1. Your contributions are your original work (or you have the right to submit them)
+2. You grant Jovie Technology Inc. a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce, modify, distribute, and sublicense your contributions as part of the Jovie platform
+3. You understand that your contributions may be used in a proprietary product
+4. You have the legal authority to grant these rights
+
+If you are contributing on behalf of your employer, you confirm that your employer has authorized you to make the contribution under these terms.
+
+For significant contributions, we may ask you to sign a formal CLA document.
+
 ### **Branch Protection**
 
 - `main` and `production` are protected branches

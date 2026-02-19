@@ -100,10 +100,10 @@ function AudienceSkeleton() {
   return (
     <div className='space-y-6'>
       <div className='flex items-center justify-between'>
-        <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
-        <div className='h-10 w-32 animate-pulse rounded bg-surface-1' />
+        <div className='h-8 w-48 skeleton motion-reduce:animate-none rounded' />
+        <div className='h-10 w-32 skeleton motion-reduce:animate-none rounded' />
       </div>
-      <div className='h-96 animate-pulse rounded-lg bg-surface-1' />
+      <div className='h-96 skeleton motion-reduce:animate-none rounded-lg' />
     </div>
   );
 }

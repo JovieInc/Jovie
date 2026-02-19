@@ -14,7 +14,7 @@
 
 // Animation tokens - Linear-style timing
 const timing = {
-  fast: 'duration-normal',
+  fast: 'duration-fast',
   normal: 'duration-normal',
   slow: 'duration-slow',
   easing: 'ease-interactive', // Linear's signature easing

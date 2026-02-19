@@ -40,14 +40,14 @@ function AnalyticsSkeleton() {
   return (
     <div className='max-w-5xl space-y-6 lg:space-y-8'>
       <div className='flex items-center justify-between'>
-        <div className='h-4 w-24 animate-pulse rounded bg-surface-1' />
-        <div className='h-8 w-32 animate-pulse rounded-full bg-surface-1' />
+        <div className='h-4 w-24 skeleton motion-reduce:animate-none rounded' />
+        <div className='h-8 w-32 skeleton motion-reduce:animate-none rounded-full' />
       </div>
       <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5'>
         {SKELETON_STAT_KEYS.map(key => (
           <div
             key={key}
-            className='h-24 animate-pulse rounded-xl border border-subtle bg-surface-1'
+            className='h-24 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
           />
         ))}
       </div>
@@ -55,7 +55,7 @@ function AnalyticsSkeleton() {
         {SKELETON_LIST_KEYS.map(key => (
           <div
             key={key}
-            className='h-56 animate-pulse rounded-xl border border-subtle bg-surface-1'
+            className='h-56 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
           />
         ))}
       </div>
