@@ -14,10 +14,10 @@
 
 // Animation tokens - Linear-style timing
 const timing = {
-  fast: 'duration-150',
-  normal: 'duration-200',
-  slow: 'duration-300',
-  easing: 'ease-[cubic-bezier(0.16,1,0.3,1)]', // Linear's signature easing
+  fast: 'duration-normal',
+  normal: 'duration-normal',
+  slow: 'duration-slow',
+  easing: 'ease-interactive', // Linear's signature easing
 } as const;
 
 /** Collapse multi-line template class strings into a single line. */
