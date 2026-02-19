@@ -77,6 +77,8 @@ export interface FileUIPart {
 /** User-friendly labels for AI tool invocations shown during streaming. */
 export const TOOL_LABELS: Record<string, string> = {
   proposeProfileEdit: 'Editing profile...',
+  proposeAvatarUpload: 'Preparing photo upload...',
+  proposeSocialLink: 'Adding link...',
   checkCanvasStatus: 'Checking canvas status...',
   suggestRelatedArtists: 'Finding related artists...',
   generateCanvasPlan: 'Planning canvas video...',

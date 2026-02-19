@@ -30,6 +30,8 @@ import {
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
+import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
 import type { ArtistContext } from '@/components/jovie/types';
 import { getMessageText } from '@/components/jovie/utils';
@@ -152,6 +154,47 @@ const InlineChatMessage = memo(function InlineChatMessage({
             </div>
           );
         }
+
+        if (
+          toolInvocation.toolName === 'proposeAvatarUpload' &&
+          toolInvocation.state === 'result' &&
+          toolInvocation.result?.success
+        ) {
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatAvatarUploadCard />
+            </div>
+          );
+        }
+
+        if (
+          toolInvocation.toolName === 'proposeSocialLink' &&
+          toolInvocation.state === 'result' &&
+          toolInvocation.result?.success
+        ) {
+          const result = toolInvocation.result as {
+            success: boolean;
+            platform: {
+              id: string;
+              name: string;
+              icon: string;
+              color: string;
+            };
+            normalizedUrl: string;
+            originalUrl: string;
+          };
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatLinkConfirmationCard
+                profileId={profileId}
+                platform={result.platform}
+                normalizedUrl={result.normalizedUrl}
+                originalUrl={result.originalUrl}
+              />
+            </div>
+          );
+        }
+
         return null;
       })}
     </div>

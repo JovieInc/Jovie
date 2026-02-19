@@ -1,4 +1,6 @@
+export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 export { ChatInput } from './ChatInput';
+export { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 export { ChatMarkdown } from './ChatMarkdown';
 export { ChatMessage } from './ChatMessage';
 export { ChatMessageSkeleton } from './ChatMessageSkeleton';

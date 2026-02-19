@@ -273,6 +273,7 @@ export function JovieChat({
                   parts={message.parts}
                   isStreaming={isStreaming && index === lastAssistantIndex}
                   avatarUrl={message.role === 'user' ? avatarUrl : undefined}
+                  profileId={profileId}
                 />
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
