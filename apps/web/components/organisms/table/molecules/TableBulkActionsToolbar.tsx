@@ -35,7 +35,7 @@ export function TableBulkActionsToolbar({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 px-4 py-3 bg-surface-1 border-b border-subtle',
+        'flex flex-wrap items-center gap-2 bg-surface-1 px-3 py-2.5 border-b border-subtle sm:gap-3 sm:px-4 sm:py-3',
         className
       )}
     >

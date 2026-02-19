@@ -55,16 +55,16 @@ export function AdminCreatorsToolbar({
   const someSelectedVerified = selectedProfiles.some(p => p.isVerified);
 
   return (
-    <div className='flex h-14 w-full items-center gap-3 px-4'>
+    <div className='flex min-h-14 w-full flex-wrap items-center gap-3 px-3 py-2 sm:px-4 sm:py-0'>
       {hasSelection ? (
         // Bulk Actions Mode - replaces "Creator" text
         <>
-          <div className='flex items-center gap-3'>
+          <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3'>
             <div className='text-sm font-medium text-primary-token'>
               {selectedCount} {selectedCount === 1 ? 'creator' : 'creators'}{' '}
               selected
             </div>
-            <div className='flex items-center gap-2'>
+            <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
               {someSelectedVerified ? (
                 <Button
                   size='sm'
@@ -118,15 +118,15 @@ export function AdminCreatorsToolbar({
       ) : (
         // Normal Mode
         <>
-          <div className='hidden sm:block text-xs text-secondary-token'>
+          <div className='hidden text-xs text-secondary-token md:block'>
             Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
             {total.toLocaleString()} profiles
           </div>
-          <div className='ml-auto flex items-center gap-3'>
+          <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3'>
             <form
               action={basePath}
               method='get'
-              className='relative isolate flex items-center gap-2'
+              className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
             >
               <input type='hidden' name='sort' value={sort} />
               <input type='hidden' name='pageSize' value={pageSize} />
@@ -137,7 +137,7 @@ export function AdminCreatorsToolbar({
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setSearchTerm(event.target.value)
                 }
-                className='w-[240px]'
+                className='w-full sm:w-[240px]'
               />
               <input type='hidden' name='page' value='1' />
               <Button type='submit' size='sm' variant='secondary'>
