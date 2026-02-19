@@ -6,12 +6,12 @@ import {
   buildInvalidRequestResponse,
   subscribeToNotificationsDomain,
 } from '@/lib/notifications/domain';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import {
   createRateLimiter,
   generalLimiter,
   getClientIP,
 } from '@/lib/rate-limit';
-import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { logger } from '@/lib/utils/logger';
 import {
   createNotificationJsonResponse,

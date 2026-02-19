@@ -1,7 +1,8 @@
 import { createHash, randomInt } from 'node:crypto';
 
 const EMAIL_OTP_LENGTH = 6;
-export const EMAIL_OTP_TTL_MS = 10 * 60 * 1000;
+export const EMAIL_OTP_TTL_MINUTES = 10;
+export const EMAIL_OTP_TTL_MS = EMAIL_OTP_TTL_MINUTES * 60 * 1000;
 const EMAIL_OTP_SECRET_NAMESPACE = 'jovie:notifications:email-otp:v1';
 
 const normalizeOtp = (value: string) => value.trim();

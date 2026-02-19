@@ -97,6 +97,8 @@ export function useSubscriptionForm({
       if (isSubmitting) return;
       setChannel(next);
       setError(null);
+      setOtpStep('input');
+      setOtpCode('');
       if (next === 'email') {
         setPhoneInput('');
       } else {

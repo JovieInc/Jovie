@@ -10,12 +10,6 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import {
-  buildEmailOtpExpiry,
-  generateEmailOtpCode,
-  hashEmailOtp,
-  isValidEmailOtpFormat,
-} from '@/lib/notifications/email-otp';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   extractPayloadProps,
@@ -28,6 +22,13 @@ import {
   trackUnsubscribeError,
   trackUnsubscribeSuccess,
 } from '@/lib/notifications/analytics';
+import {
+  buildEmailOtpExpiry,
+  EMAIL_OTP_TTL_MINUTES,
+  generateEmailOtpCode,
+  hashEmailOtp,
+  isValidEmailOtpFormat,
+} from '@/lib/notifications/email-otp';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildInvalidRequestResponse,
@@ -338,11 +339,11 @@ async function sendSubscriptionVerificationEmail(
       dedupKey,
       category: 'transactional',
       subject: `Your verification code for ${artistName}`,
-      text: `Use this code to confirm notifications for ${artistName}: ${otpCode}. This code expires in 10 minutes.`,
+      text: `Use this code to confirm notifications for ${artistName}: ${otpCode}. This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes.`,
       html: `
         <p>Use this code to confirm notifications for <strong>${artistName}</strong>.</p>
         <p style="font-size:30px;letter-spacing:8px;font-weight:700;margin:20px 0;">${otpCode}</p>
-        <p style="font-size:14px;color:#555;">This code expires in 10 minutes. If this wasn't you, you can ignore this email.</p>
+        <p style="font-size:14px;color:#555;">This code expires in ${EMAIL_OTP_TTL_MINUTES} minutes. If this wasn't you, you can ignore this email.</p>
       `,
       channels: ['email'],
       respectUserPreferences: false,
@@ -477,8 +478,26 @@ export const subscribeToNotificationsDomain = async (
       general: true,
     };
 
-    const emailOtp =
-      channel === 'email' && normalizedEmail ? createEmailOtp() : null;
+    // Check if email subscriber already exists and is confirmed to avoid
+    // resetting their confirmedAt status (Sentry HIGH bug fix)
+    const existingEmail =
+      channel === 'email' && normalizedEmail
+        ? await db
+            .select({ confirmedAt: notificationSubscriptions.confirmedAt })
+            .from(notificationSubscriptions)
+            .where(
+              and(
+                eq(notificationSubscriptions.creatorProfileId, artist_id),
+                eq(notificationSubscriptions.channel, 'email'),
+                eq(notificationSubscriptions.email, normalizedEmail)
+              )
+            )
+            .limit(1)
+        : [];
+    const shouldVerifyEmail =
+      channel === 'email' && !existingEmail[0]?.confirmedAt;
+
+    const emailOtp = shouldVerifyEmail ? createEmailOtp() : null;
 
     await db
       .insert(notificationSubscriptions)
@@ -492,7 +511,7 @@ export const subscribeToNotificationsDomain = async (
         ipAddress,
         source,
         preferences: defaultPreferences,
-        confirmedAt: channel === 'email' ? null : new Date(),
+        confirmedAt: shouldVerifyEmail ? null : new Date(),
         emailOtpHash: emailOtp?.otpHash,
         emailOtpExpiresAt: emailOtp?.otpExpiresAt,
         emailOtpLastSentAt: emailOtp ? new Date() : null,
@@ -512,11 +531,15 @@ export const subscribeToNotificationsDomain = async (
         set:
           channel === 'email'
             ? {
-                confirmedAt: null,
-                emailOtpHash: emailOtp?.otpHash,
-                emailOtpExpiresAt: emailOtp?.otpExpiresAt,
-                emailOtpLastSentAt: new Date(),
-                emailOtpAttempts: 0,
+                ...(shouldVerifyEmail
+                  ? {
+                      confirmedAt: null,
+                      emailOtpHash: emailOtp?.otpHash,
+                      emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+                      emailOtpLastSentAt: new Date(),
+                      emailOtpAttempts: 0,
+                    }
+                  : {}),
                 ipAddress,
                 source,
               }
@@ -555,7 +578,7 @@ export const subscribeToNotificationsDomain = async (
       dynamicEnabled,
       dispatchResult?.delivered.includes('email') ?? false,
       Math.round(Date.now() - runtimeStart),
-      channel === 'email'
+      shouldVerifyEmail
     );
   } catch (error) {
     await trackServerError('subscribe', error);

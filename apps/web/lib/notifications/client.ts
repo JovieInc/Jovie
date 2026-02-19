@@ -34,11 +34,11 @@ export type NotificationStatusPayload = {
   phone?: string;
 };
 
-export type NotificationVerifyEmailOtpPayload = {
+export interface NotificationVerifyEmailOtpPayload {
   artistId: string;
   email: string;
   otpCode: string;
-};
+}
 
 export type UpdateContentPreferencesPayload = {
   artistId: string;

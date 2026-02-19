@@ -9,9 +9,8 @@ import {
 import { AlertCircle, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
-
-import { OtpInput } from '@/components/auth/atoms/otp-input';
 import { CTAButton } from '@/components/atoms/CTAButton';
+import { OtpInput } from '@/components/auth/atoms/otp-input';
 import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
 import {

@@ -1,15 +1,20 @@
 import { NextRequest } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   buildInvalidRequestResponse,
   verifyEmailOtpDomain,
 } from '@/lib/notifications/domain';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import {
   createRateLimiter,
   generalLimiter,
   getClientIP,
 } from '@/lib/rate-limit';
-import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
-import { createNotificationJsonResponse } from '../route-helpers';
+import { logger } from '@/lib/utils/logger';
+import {
+  createNotificationJsonResponse,
+  createServerErrorResponse,
+} from '../route-helpers';
 
 export const runtime = 'nodejs';
 
@@ -70,10 +75,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await verifyEmailOtpDomain(body);
-  return createNotificationJsonResponse(
-    result.body,
-    result.status,
-    limitResult
-  );
+  try {
+    const result = await verifyEmailOtpDomain(body);
+    return createNotificationJsonResponse(
+      result.body,
+      result.status,
+      limitResult
+    );
+  } catch (error) {
+    logger.error('[Notifications Verify OTP] Error:', error);
+    await captureError('Notification verify email OTP failed', error, {
+      route: '/api/notifications/verify-email-otp',
+      method: 'POST',
+    });
+    return createServerErrorResponse(limitResult);
+  }
 }

@@ -8,13 +8,13 @@ import {
   getNotificationStatus,
   type NotificationStatusPayload,
   type NotificationSubscribePayload,
-  type NotificationVerifyEmailOtpPayload,
   type NotificationUnsubscribePayload,
+  type NotificationVerifyEmailOtpPayload,
   subscribeToNotifications,
-  verifyEmailOtp,
   type UpdateContentPreferencesPayload,
   unsubscribeFromNotifications,
   updateContentPreferences,
+  verifyEmailOtp,
 } from '@/lib/notifications/client';
 import type { NotificationStatusResponse } from '@/types/notifications';
 
