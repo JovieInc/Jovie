@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
@@ -29,6 +29,10 @@ export function useContactSave({
   onSaveSuccess,
 }: UseContactSaveOptions = {}): UseContactSaveReturn {
   const queryClient = useQueryClient();
+
+  // Ref to avoid recreating callbacks when onSaveSuccess changes
+  const onSaveSuccessRef = useRef(onSaveSuccess);
+  onSaveSuccessRef.current = onSaveSuccess;
 
   const { mutateAsync, isPending: isSaving } = useMutation({
     mutationKey: ['admin-contact-save'],
@@ -87,7 +91,7 @@ export function useContactSave({
       await queryClient.invalidateQueries({
         queryKey: queryKeys.creators.socialLinks(contact.id ?? ''),
       });
-      onSaveSuccess?.(updatedContact);
+      onSaveSuccessRef.current?.(updatedContact);
     },
     onError: error => {
       const toastId = toast.loading('Saving contact...');
@@ -107,7 +111,7 @@ export function useContactSave({
       try {
         const updatedContact = await mutateAsync(contact);
         toast.success('Contact saved', { id: toastId });
-        onSaveSuccess?.(updatedContact);
+        onSaveSuccessRef.current?.(updatedContact);
         return true;
       } catch (error) {
         console.error('Failed to save contact:', error);
@@ -115,7 +119,7 @@ export function useContactSave({
         return false;
       }
     },
-    [mutateAsync, onSaveSuccess]
+    [mutateAsync]
   );
 
   return {
