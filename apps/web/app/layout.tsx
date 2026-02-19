@@ -144,14 +144,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Dynamic import gated on process.env.NODE_ENV so webpack eliminates the
-  // toolbar code from production bundles entirely. The static import that was
-  // here previously forced the @vercel/toolbar client runtime (which uses
-  // eval()) into every build, violating Content Security Policy.
-  const VercelToolbar =
-    process.env.NODE_ENV === 'development'
-      ? (await import('@vercel/toolbar/next')).VercelToolbar
-      : null;
+  // Vercel Toolbar: visible only to authenticated Vercel team members.
+  // Dynamically imported to keep it code-split. Disable with NEXT_DISABLE_TOOLBAR=1.
+  const VercelToolbar = process.env.NEXT_DISABLE_TOOLBAR
+    ? null
+    : (await import('@vercel/toolbar/next')).VercelToolbar;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // Read CSP nonce from request headers (set by middleware) to prevent
