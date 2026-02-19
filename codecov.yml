@@ -24,10 +24,10 @@ coverage:
     # Patch coverage: coverage of new/modified lines
     patch:
       default:
-        target: 80%
+        target: 60%
         threshold: 5%
-        # Don't fail CI initially, just report
-        informational: true
+        # Block PRs with insufficient coverage on new/modified lines
+        informational: false
 
 # PR comment configuration
 comment:

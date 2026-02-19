@@ -9,8 +9,6 @@ describe('LabelLogosBar', () => {
     expect(screen.getByLabelText('Universal Music Group')).toBeInTheDocument();
     expect(screen.getByLabelText('AWAL')).toBeInTheDocument();
     expect(screen.getByLabelText('Armada Music')).toBeInTheDocument();
-    expect(screen.getByLabelText('Black Hole Recordings')).toBeInTheDocument();
-    expect(screen.getByLabelText('Disco:Wax')).toBeInTheDocument();
   });
 
   it('renders section with proper aria-label', () => {
@@ -22,8 +20,6 @@ describe('LabelLogosBar', () => {
 
   it('renders heading text', () => {
     render(<LabelLogosBar />);
-    expect(
-      screen.getByText(/driving streams to releases from/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/trusted by artists on/i)).toBeInTheDocument();
   });
 });

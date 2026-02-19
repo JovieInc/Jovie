@@ -124,7 +124,11 @@ function renderBillingDashboard(
 ): ReturnType<typeof render> {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: {
+        retry: false,
+        // Ensure any query-level retries happen immediately in tests
+        retryDelay: 0,
+      },
       mutations: { retry: false },
     },
   });

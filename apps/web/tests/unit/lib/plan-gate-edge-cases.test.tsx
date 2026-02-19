@@ -19,7 +19,13 @@ vi.stubGlobal('fetch', mockFetch);
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: {
+        retry: false,
+        // Ensure any query-level retries resolve immediately in tests
+        // (billingStatusQueryOptions has its own retry fn that overrides
+        // retry:false, so we set retryDelay:0 to avoid 1s exponential delay)
+        retryDelay: 0,
+      },
     },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -63,7 +69,9 @@ describe('usePlanGate – edge cases', () => {
   });
 
   it('handles network error gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    // Use mockRejectedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
     const { result } = renderHook(() => usePlanGate(), {
       wrapper: createWrapper(),
@@ -80,7 +88,9 @@ describe('usePlanGate – edge cases', () => {
   });
 
   it('handles 500 server error gracefully', async () => {
-    mockFetch.mockResolvedValueOnce(
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(
       new Response('Internal Server Error', {
         status: 500,
         statusText: 'Internal Server Error',
@@ -218,9 +228,9 @@ describe('usePlanGate – feature consistency', () => {
   });
 
   it('error state defaults all features to free tier', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response('Bad Gateway', { status: 502 })
-    );
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(new Response('Bad Gateway', { status: 502 }));
 
     const { result } = renderHook(() => usePlanGate(), {
       wrapper: createWrapper(),

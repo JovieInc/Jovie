@@ -219,6 +219,7 @@ export default async function RootLayout({
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
+        nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{

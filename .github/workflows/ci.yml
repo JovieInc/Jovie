@@ -773,38 +773,12 @@ jobs:
           COVERAGE_FLAG="--coverage"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "🚀 Main branch: Running critical tests with coverage"
-            # Run only *.critical.test.ts files - vitest matches "critical" substring in file paths
-            # Full test suite runs in nightly CI, not on every main push
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            echo "🚀 Main branch: Running full test suite with coverage"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running critical tests with coverage + PR-modified test files"
-            # First run critical tests (~8s) with coverage - vitest matches "critical" substring in file paths
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
-            # Then run test files directly modified/added in this PR
-            # (avoids vitest --changed which builds full module graph and can OOM
-            #  when widely-imported files like AuthShellWrapper are modified)
-            git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-            CHANGED_TESTS=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'apps/web/**/*.test.ts' 'apps/web/**/*.test.tsx' 'apps/web/**/*.spec.ts' 'apps/web/**/*.spec.tsx' | sed 's|^apps/web/||' || true)
-            # Look up changed source components in the critical map
-            CHANGED_SRC=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'apps/web/components/**/*.ts' 'apps/web/components/**/*.tsx' | sed 's|^apps/web/||' || true)
-            MAPPED_TESTS=""
-            if [ -n "$CHANGED_SRC" ] && [ -f apps/web/tests/critical-component-map.json ]; then
-              for src in $CHANGED_SRC; do
-                TESTS=$(node -e "const m=require('./apps/web/tests/critical-component-map.json');const t=m['$src'];if(t)console.log(t.join(' '))" 2>/dev/null || true)
-                if [ -n "$TESTS" ]; then
-                  MAPPED_TESTS="$MAPPED_TESTS $TESTS"
-                fi
-              done
-              MAPPED_TESTS=$(echo "$MAPPED_TESTS" | xargs -n1 | sort -u | xargs)
-            fi
-            ALL_EXTRA_TESTS=$(echo "$CHANGED_TESTS $MAPPED_TESTS" | xargs -n1 | sort -u | xargs)
-            if [ -n "$ALL_EXTRA_TESTS" ]; then
-              echo "📋 Running PR-modified + mapped test files: $ALL_EXTRA_TESTS"
-              cd apps/web && pnpm vitest run --config=vitest.config.mts ${{ steps.quarantine.outputs.unit_excludes }} $ALL_EXTRA_TESTS
-            else
-              echo "ℹ️ No test files modified in this PR (critical tests already ran)"
-            fi
+            echo "🔍 PR: Running full test suite with coverage"
+            # Run all tests on PRs to catch regressions before merge
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
