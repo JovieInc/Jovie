@@ -145,8 +145,8 @@ describe('ContactSidebar', () => {
 
     // Social content visible — Website label
     expect(screen.getByText('Website')).toBeInTheDocument();
-    // Avatar no longer visible
-    expect(screen.queryByTestId('contact-avatar')).not.toBeInTheDocument();
+    // Avatar still visible above tabs
+    expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
 
   it('Details tab shows avatar and name fields', () => {

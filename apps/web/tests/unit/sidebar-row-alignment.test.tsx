@@ -22,7 +22,9 @@ vi.mock('@/components/organisms/Sidebar', () => ({
     </div>
   ),
   SidebarMenu: ({ children }: SidebarMenuProps) => <div>{children}</div>,
-  SidebarMenuItem: ({ children }: SidebarMenuItemProps) => <div>{children}</div>,
+  SidebarMenuItem: ({ children }: SidebarMenuItemProps) => (
+    <div>{children}</div>
+  ),
   SidebarMenuButton: ({
     children,
     className,

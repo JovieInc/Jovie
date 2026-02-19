@@ -10,9 +10,9 @@ export default function ChangelogLoading() {
       <Container>
         <header className='mb-8 md:mb-10'>
           {/* Title skeleton */}
-          <div className='h-10 w-48 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+          <div className='h-10 w-48 skeleton motion-reduce:animate-none rounded-lg' />
           {/* Subtitle skeleton */}
-          <div className='mt-2 h-5 w-96 max-w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+          <div className='mt-2 h-5 w-96 max-w-full skeleton motion-reduce:animate-none rounded-lg' />
         </header>
 
         {/* Content skeleton - multiple version sections */}
@@ -21,15 +21,15 @@ export default function ChangelogLoading() {
             key => (
               <div key={key} className='space-y-4'>
                 {/* Version header */}
-                <div className='h-8 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+                <div className='h-8 w-32 skeleton motion-reduce:animate-none rounded-lg' />
                 {/* Date */}
-                <div className='h-4 w-24 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800' />
+                <div className='h-4 w-24 skeleton motion-reduce:animate-none rounded-lg' />
                 {/* Content lines */}
                 <div className='space-y-2'>
-                  <div className='h-4 w-full animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
-                  <div className='h-4 w-5/6 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
-                  <div className='h-4 w-4/6 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
-                  <div className='h-4 w-3/4 animate-pulse rounded bg-gray-200 dark:bg-gray-800' />
+                  <div className='h-4 w-full skeleton motion-reduce:animate-none rounded' />
+                  <div className='h-4 w-5/6 skeleton motion-reduce:animate-none rounded' />
+                  <div className='h-4 w-4/6 skeleton motion-reduce:animate-none rounded' />
+                  <div className='h-4 w-3/4 skeleton motion-reduce:animate-none rounded' />
                 </div>
               </div>
             )

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { DrawerHeader } from '@/components/molecules/drawer';
 import {
   useDeleteTourDateMutation,
   useUpdateTourDateMutation,
@@ -108,19 +109,7 @@ export function TourDateSidebar({
 
   return (
     <div className='flex h-full flex-col border-l border-subtle bg-surface-1'>
-      {/* Header */}
-      <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
-        <h2 className='text-sm font-semibold text-primary-token'>
-          Edit Tour Date
-        </h2>
-        <button
-          type='button'
-          onClick={onClose}
-          className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token'
-        >
-          <Icon name='X' className='h-4 w-4' />
-        </button>
-      </div>
+      <DrawerHeader title='Edit Tour Date' onClose={onClose} />
 
       {/* Form */}
       <div className='flex-1 overflow-y-auto p-4'>

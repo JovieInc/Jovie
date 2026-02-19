@@ -688,12 +688,8 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-linear: cubic-bezier(
-    0.25,
-    0.46,
-    0.45,
-    0.94
-  ); /* Linear's marketing ease */
+  --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-linear: var(--ease-interactive); /* Legacy alias */
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -702,12 +698,13 @@
     color var(--duration-normal), opacity var(--duration-normal);
   --transition-bg: background-color var(--duration-normal);
   --transition-opacity: opacity var(--duration-normal);
-  --transition-opacity-fast: opacity var(--duration-instant) ease-in-out;
+  --transition-opacity-fast: opacity var(--duration-instant)
+    var(--ease-interactive);
   --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
   --transition-transform: transform var(--duration-normal);
   --transition-collapse:
-    height var(--duration-slow) ease-out,
-    min-height var(--duration-slow) ease-out;
+    height var(--duration-slow) var(--ease-interactive),
+    min-height var(--duration-slow) var(--ease-interactive);
   --transition-shadow:
     box-shadow var(--duration-normal), background-color var(--duration-normal);
 }
