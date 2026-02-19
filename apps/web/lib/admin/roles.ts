@@ -140,7 +140,9 @@ async function tryRedisPath(
   try {
     const cached = await redis.get(cacheKey);
     if (cached !== null) {
-      return cached === '1';
+      // Upstash REST API may return number 1 instead of string '1'
+      // Use loose equality or String() to handle both types
+      return String(cached) === '1';
     }
 
     const dbResult = await queryWithRetry(userId);
