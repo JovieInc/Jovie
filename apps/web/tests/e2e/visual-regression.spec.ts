@@ -194,7 +194,8 @@ test.describe('Visual Regression @visual-regression', () => {
 
     test('public profile - mobile tip drawer open', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
-      await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
+      await page.goto(`/${testHandle}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
 
       const is404 = await page
         .locator('text=not found')
@@ -228,7 +229,8 @@ test.describe('Visual Regression @visual-regression', () => {
 
     test('public profile - mobile listen drawer open', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
-      await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
+      await page.goto(`/${testHandle}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
 
       const is404 = await page
         .locator('text=not found')
