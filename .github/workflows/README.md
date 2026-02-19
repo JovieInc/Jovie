@@ -54,6 +54,19 @@ The `auto-merge.yml` workflow handles automatic merging for:
 - Codegen PRs
 - PRs with `auto-merge` label (after CI passes)
 
+## Linear AI Automation
+
+The Linear automation path uses two workflows:
+
+- **`linear-ai-orchestrator.yml`**
+  - Trigger: `repository_dispatch` (`linear_todo_ready`) from `/api/webhooks/linear`
+  - Behavior: waits for a CodeRabbit plan marker, runs Claude Code, opens PR, enables auto-merge, updates Linear to review
+  - Includes bounded polling with configurable loop counts (`MAX_PLAN_WAIT_ATTEMPTS`, `PLAN_POLL_INTERVAL_SECONDS`)
+
+- **`linear-sync-on-merge.yml`**
+  - Trigger: `pull_request.closed` (merged)
+  - Behavior: reads Linear markers from PR body, moves issue to done, comments merge details back to Linear
+
 ## Synthetic Monitoring
 
 The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on a schedule to catch production issues.
