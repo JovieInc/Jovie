@@ -14,7 +14,6 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
-import { DashboardCard } from '../../atoms/DashboardCard';
 import type { ClerkExternalAccountResource, ClerkUserResource } from './types';
 import { extractErrorMessage } from './utils';
 
@@ -83,11 +82,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
+    <div className='divide-y divide-subtle'>
       {accounts.map(account => {
         const label = getProviderLabel(account.provider);
         const identifier = getProviderIdentifier(account);
@@ -96,7 +91,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
         return (
           <div
             key={account.id}
-            className='flex items-center justify-between px-4 py-3'
+            className='flex items-center justify-between py-3'
           >
             <div className='flex items-center gap-3'>
               <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10'>
@@ -144,6 +139,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </DashboardCard>
+    </div>
   );
 }
