@@ -129,6 +129,9 @@ export const ServerEnvSchema = z.object({
   SENTRY_DSN: z.string().optional(),
   SENTRY_WEBHOOK_SECRET: z.string().optional(),
 
+  // Linear webhook automation
+  LINEAR_WEBHOOK_SECRET: z.string().optional(),
+
   // GitHub dispatch (Sentry autofix pipeline)
   GH_DISPATCH_TOKEN: z.string().optional(),
 
@@ -212,6 +215,7 @@ export const ENV_KEYS = [
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
   'SENTRY_WEBHOOK_SECRET',
+  'LINEAR_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'JOVIE_DEV_MEMORY_MONITOR',

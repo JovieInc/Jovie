@@ -9,7 +9,7 @@
 # - Reviewer is CodeRabbit (coderabbitai[bot])
 # - Review state is blocking (changes_requested)
 # - PR is not draft
-# - This PR head SHA has not exhausted retries (max 2 attempts)
+# - This PR head SHA has not exhausted retries (max 3 attempts)
 #
 # SAFETY:
 # - Uses least-privilege credentials (GitHub App token for write access)
@@ -17,7 +17,7 @@
 # - Does NOT expose secrets to the agent
 # - Implements per-SHA retry guard to prevent infinite loops
 #
-# ESCALATION: If automation fails after 2 attempts, labels PR 'needs-human'
+# ESCALATION: If automation fails after 3 attempts, labels PR 'needs-human'
 
 name: CodeRabbit Autofix
 
@@ -97,7 +97,7 @@ jobs:
 
       # GUARD 4: Check retry count via label marker
       # Uses a label format: coderabbit-autofix-attempt-{sha}-{n}
-      # This prevents infinite loops and ensures max 2 attempts per SHA
+      # This prevents infinite loops and ensures max 3 attempts per SHA
       - name: Check retry guard
         id: check-retry
         env:
@@ -115,20 +115,26 @@ jobs:
           # Check for existing attempt markers for this SHA
           ATTEMPT_1_LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-1"
           ATTEMPT_2_LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-2"
+          ATTEMPT_3_LABEL="coderabbit-autofix-attempt-${SHORT_SHA}-3"
           
           HAS_ATTEMPT_1=$(echo "$LABELS" | grep -c "^${ATTEMPT_1_LABEL}$" || true)
           HAS_ATTEMPT_2=$(echo "$LABELS" | grep -c "^${ATTEMPT_2_LABEL}$" || true)
+          HAS_ATTEMPT_3=$(echo "$LABELS" | grep -c "^${ATTEMPT_3_LABEL}$" || true)
           
-          if [[ "$HAS_ATTEMPT_2" -gt 0 ]]; then
-            echo "❌ SHA $SHORT_SHA has exhausted retries (2/2 attempts used)"
+          if [[ "$HAS_ATTEMPT_3" -gt 0 ]]; then
+            echo "❌ SHA $SHORT_SHA has exhausted retries (3/3 attempts used)"
             echo "retries_available=false" >> $GITHUB_OUTPUT
             echo "attempt_number=0" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_ATTEMPT_2" -gt 0 ]]; then
+            echo "⚠️ SHA $SHORT_SHA on attempt 3/3 (final retry)"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=3" >> $GITHUB_OUTPUT
           elif [[ "$HAS_ATTEMPT_1" -gt 0 ]]; then
-            echo "⚠️ SHA $SHORT_SHA on attempt 2/2 (final retry)"
+            echo "⚠️ SHA $SHORT_SHA on attempt 2/3"
             echo "retries_available=true" >> $GITHUB_OUTPUT
             echo "attempt_number=2" >> $GITHUB_OUTPUT
           else
-            echo "✅ SHA $SHORT_SHA on attempt 1/2"
+            echo "✅ SHA $SHORT_SHA on attempt 1/3"
             echo "retries_available=true" >> $GITHUB_OUTPUT
             echo "attempt_number=1" >> $GITHUB_OUTPUT
           fi
@@ -435,7 +441,7 @@ jobs:
           # Post comment explaining the failure
           gh pr comment $PR_NUMBER --body "## ⚠️ CodeRabbit Autofix Failed
           
-          The automated fix workflow was unable to resolve the CodeRabbit review feedback after 2 attempts.
+          The automated fix workflow was unable to resolve the CodeRabbit review feedback after 3 attempts.
           
           **What happened:**
           - CodeRabbit requested changes
