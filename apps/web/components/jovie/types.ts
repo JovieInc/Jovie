@@ -107,28 +107,12 @@ export interface StarterSuggestionContext {
 
 /**
  * Default suggestions shown on the empty chat state.
- * These are the 3 most universally useful starter tasks.
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
-    icon: 'UserSearch',
-    label: 'Review my profile and suggest improvements',
-    prompt:
-      'Review my full profile — bio, links, and stats — and suggest specific improvements I should make.',
+    icon: 'Camera',
+    label: 'Change profile photo',
+    prompt: 'Help me change my profile photo.',
     accent: 'purple',
-  },
-  {
-    icon: 'BarChart3',
-    label: 'Break down my stats and what they mean',
-    prompt:
-      'Break down all my current stats — Spotify followers, popularity, profile views, tip revenue — and tell me what they mean for my career.',
-    accent: 'blue',
-  },
-  {
-    icon: 'Target',
-    label: 'Give me 3 things to focus on this week',
-    prompt:
-      'Based on my profile and stats, give me 3 specific, actionable things I should focus on this week to grow.',
-    accent: 'orange',
   },
 ] as const;
