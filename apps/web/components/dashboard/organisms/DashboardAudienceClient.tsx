@@ -10,7 +10,7 @@ import {
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
-import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { DashboardErrorBoundary } from '@/components/organisms/DashboardErrorBoundary';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -180,7 +180,7 @@ export function DashboardAudienceClient({
   }, [headerBadge]);
 
   return (
-    <QueryErrorBoundary fallback={DashboardErrorFallback}>
+    <QueryErrorBoundary fallback={DashboardErrorBoundary}>
       <div
         data-testid='dashboard-audience-client'
         className='flex h-full min-h-0 flex-col'

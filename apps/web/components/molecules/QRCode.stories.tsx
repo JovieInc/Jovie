@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { QRCode } from './QRCode';
+import { QRCodeDisplay } from './QRCodeDisplay';
 
-const meta: Meta<typeof QRCode> = {
-  title: 'Molecules/QRCode',
-  component: QRCode,
+const meta: Meta<typeof QRCodeDisplay> = {
+  title: 'Molecules/QRCodeDisplay',
+  component: QRCodeDisplay,
   parameters: {
     layout: 'centered',
   },
@@ -68,7 +68,7 @@ export const WithCustomURL: Story = {
 export const InContainer: Story = {
   render: () => (
     <div className='text-center space-y-4 p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg'>
-      <QRCode
+      <QRCodeDisplay
         data='https://jovie.fm/arianagrande'
         size={180}
         label='Scan to tip via Apple Pay'

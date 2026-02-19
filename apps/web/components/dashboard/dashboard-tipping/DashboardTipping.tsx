@@ -16,8 +16,8 @@ import {
 import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
-import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
+import { getQrCodeUrl } from '@/components/molecules/QRCodeDisplay';
 import { BASE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';

@@ -1,4 +1,4 @@
-import { QRCode } from '@/components/molecules/QRCode';
+import { QRCodeDisplay } from '@/components/molecules/QRCodeDisplay';
 
 interface QRCodeCardProps {
   readonly data: string;
@@ -17,7 +17,12 @@ export function QRCodeCard({
 }: QRCodeCardProps) {
   return (
     <div className={`space-y-3 text-center ${className}`}>
-      <QRCode data={data} size={qrSize} label={title} className='mx-auto' />
+      <QRCodeDisplay
+        data={data}
+        size={qrSize}
+        label={title}
+        className='mx-auto'
+      />
       {title && (
         <h3 className='text-sm font-medium text-primary-token'>{title}</h3>
       )}
@@ -27,3 +32,5 @@ export function QRCodeCard({
     </div>
   );
 }
+
+export { QRCodeCard as QRCodeDisplayCard };

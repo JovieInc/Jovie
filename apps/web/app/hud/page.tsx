@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
 import Image from 'next/image';
-import { QRCode } from '@/components/molecules/QRCode';
+import { QRCode } from '@/components/molecules/QRCodeDisplay';
 import { publicEnv } from '@/lib/env-public';
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
