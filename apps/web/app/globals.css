@@ -14,9 +14,11 @@
 @import "../styles/design-system.css";
 @import "../styles/theme.css";
 @import "tw-animate-css";
+@import "streamdown/styles.css";
 
 /* Scan @jovie/ui package so Tailwind v4 detects its class usage */
 @source "../../../packages/ui";
+@source "../../../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
