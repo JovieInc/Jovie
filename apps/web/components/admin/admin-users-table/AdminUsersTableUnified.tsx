@@ -8,7 +8,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { TableErrorFallbackWithDetails } from '@/components/molecules/TableErrorFallbackWithDetails';
 import {
   type ContextMenuItemType,
   ExportCSVButton,
@@ -275,7 +275,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   }, []);
 
   return (
-    <QueryErrorBoundary fallback={TableErrorFallback}>
+    <QueryErrorBoundary fallback={TableErrorFallbackWithDetails}>
       <AdminTableShell
         testId='admin-users-content'
         toolbar={

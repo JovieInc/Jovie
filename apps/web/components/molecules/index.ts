@@ -7,6 +7,7 @@ export * from './AuthActions';
 // Migrated from atoms (uses hooks/state - atomic design compliance)
 export * from './Avatar';
 export * from './CookieActions';
+export * from './CopyableMonospaceValue';
 export * from './DSPButtonGroup';
 export * from './FeatureCard';
 export * from './FrostedContainer';
@@ -17,6 +18,7 @@ export * from './QRCode';
 export * from './QRCodeCard';
 export * from './SocialLink';
 export * from './StepCard';
+export * from './TableErrorFallbackWithDetails';
 export * from './TipSelector';
 // Migrated from atoms (has business logic - useState, useEffect, API calls)
 export * from './WrappedSocialLink';

@@ -8,7 +8,7 @@ import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
-import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { TableErrorFallbackWithDetails } from '@/components/molecules/TableErrorFallbackWithDetails';
 import {
   DisplayMenuDropdown,
   ExportCSVButton,
@@ -210,7 +210,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   return (
-    <QueryErrorBoundary fallback={TableErrorFallback}>
+    <QueryErrorBoundary fallback={TableErrorFallbackWithDetails}>
       <AdminTableShell
         testId='admin-waitlist-table'
         toolbar={

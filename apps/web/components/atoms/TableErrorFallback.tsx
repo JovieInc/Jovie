@@ -1,42 +1,23 @@
 'use client';
 
 import { AlertTriangle, Copy, RefreshCcw } from 'lucide-react';
-import { useState } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
-import { toast } from 'sonner';
 
-/**
- * Error fallback UI specifically for table components.
- * Shows error message with a retry button in a table-friendly layout.
- *
- * Designed to fit within table containers without breaking layout.
- */
+interface TableErrorFallbackProps extends FallbackProps {
+  readonly timestampISO?: string;
+  readonly errorDigest?: string;
+  readonly onCopyErrorDetails?: () => void;
+}
+
 export function TableErrorFallback({
   error,
   resetErrorBoundary,
-}: FallbackProps) {
-  const [timestamp] = useState(() => new Date());
-
-  const errorDigest = (error as Error & { digest?: string })?.digest;
-
-  const handleCopyErrorDetails = () => {
-    const details = [
-      `Error ID: ${errorDigest || 'unknown'}`,
-      `Time: ${timestamp.toISOString()}`,
-      `Context: Table`,
-      `URL: ${globalThis.location?.href ?? 'N/A'}`,
-      `User Agent: ${globalThis.navigator?.userAgent ?? 'N/A'}`,
-    ].join('\n');
-
-    navigator.clipboard
-      .writeText(details)
-      .then(() => {
-        toast.success('Error details copied to clipboard');
-      })
-      .catch(() => {
-        toast.error('Failed to copy error details');
-      });
-  };
+  timestampISO,
+  errorDigest,
+  onCopyErrorDetails,
+}: TableErrorFallbackProps) {
+  const resolvedErrorDigest =
+    errorDigest ?? (error as Error & { digest?: string })?.digest;
 
   return (
     <div
@@ -73,21 +54,28 @@ export function TableErrorFallback({
         </button>
 
         <div className='mt-4 w-full space-y-1.5'>
-          {errorDigest && (
+          {resolvedErrorDigest && (
             <p className='text-xs text-muted-foreground text-center'>
-              Error ID: {errorDigest}
+              Error ID: {resolvedErrorDigest}
             </p>
           )}
 
           <button
             type='button'
-            onClick={handleCopyErrorDetails}
+            onClick={onCopyErrorDetails}
+            disabled={!onCopyErrorDetails}
             className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors'
             aria-label='Copy error details to clipboard'
           >
             <Copy className='h-3 w-3' aria-hidden='true' />
             Copy Details
           </button>
+
+          {timestampISO && (
+            <p className='text-xs text-muted-foreground text-center'>
+              Time: {timestampISO}
+            </p>
+          )}
         </div>
 
         {process.env.NODE_ENV === 'development' && error?.message && (

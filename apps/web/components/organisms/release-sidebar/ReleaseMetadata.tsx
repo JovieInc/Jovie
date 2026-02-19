@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { CopyableMonospaceValue } from '@/components/molecules/CopyableMonospaceValue';
 import {
   DrawerPropertyRow,
   DrawerSection,
@@ -78,7 +78,7 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
         <DrawerPropertyRow
           label='ISRC'
           value={
-            <CopyableMonospaceCell
+            <CopyableMonospaceValue
               value={release.primaryIsrc}
               label='ISRC'
               maxWidth={140}
@@ -89,7 +89,7 @@ export function ReleaseMetadata({ release }: ReleaseMetadataProps) {
         <DrawerPropertyRow
           label='UPC'
           value={
-            <CopyableMonospaceCell
+            <CopyableMonospaceValue
               value={release.upc}
               label='UPC'
               maxWidth={140}

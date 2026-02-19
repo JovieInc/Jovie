@@ -16,7 +16,7 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { TableErrorFallbackWithDetails } from '@/components/molecules/TableErrorFallbackWithDetails';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -272,7 +272,7 @@ export function AdminCreatorProfilesWithSidebar({
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
       <div className='flex-1 min-h-0 overflow-hidden'>
-        <QueryErrorBoundary fallback={TableErrorFallback}>
+        <QueryErrorBoundary fallback={TableErrorFallbackWithDetails}>
           <AdminTableShell
             scrollContainerProps={{
               tabIndex: 0,

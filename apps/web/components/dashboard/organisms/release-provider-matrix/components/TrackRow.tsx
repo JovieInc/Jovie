@@ -2,10 +2,10 @@
 
 import { Badge } from '@jovie/ui';
 import { memo, useMemo } from 'react';
-import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import { CopyableMonospaceValue } from '@/components/molecules/CopyableMonospaceValue';
 import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -177,7 +177,7 @@ export const TrackRow = memo(function TrackRow({
       {/* 9. ISRC */}
       {isVisible('primaryIsrc') && (
         <td className='py-2'>
-          <CopyableMonospaceCell value={track.isrc} label='ISRC' />
+          <CopyableMonospaceValue value={track.isrc} label='ISRC' />
         </td>
       )}
 
