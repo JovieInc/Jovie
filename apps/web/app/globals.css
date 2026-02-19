@@ -24,6 +24,7 @@
 html,
 body {
   height: 100%;
+  overflow-x: hidden; /* fallback for browsers without clip support (Safari <16) */
   overflow-x: clip;
   overscroll-behavior: none;
 }
