@@ -1,27 +1,34 @@
 import { render, screen } from '@testing-library/react';
+import type { ComponentProps, PropsWithChildren } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { SidebarGroupLabel } from '@/components/organisms/sidebar/group';
 
+type SidebarGroupProps = PropsWithChildren<{ className?: string }>;
+type SidebarGroupContentProps = PropsWithChildren<{ className?: string }>;
+type SidebarMenuProps = PropsWithChildren;
+type SidebarMenuItemProps = PropsWithChildren;
+type SidebarMenuButtonProps = ComponentProps<'button'> & { isActive?: boolean };
+
 vi.mock('@/components/organisms/Sidebar', () => ({
-  SidebarGroup: ({ children, className }: any) => (
+  SidebarGroup: ({ children, className }: SidebarGroupProps) => (
     <div data-testid='sidebar-group' className={className}>
       {children}
     </div>
   ),
-  SidebarGroupContent: ({ children, className }: any) => (
+  SidebarGroupContent: ({ children, className }: SidebarGroupContentProps) => (
     <div data-testid='sidebar-group-content' className={className}>
       {children}
     </div>
   ),
-  SidebarMenu: ({ children }: any) => <div>{children}</div>,
-  SidebarMenuItem: ({ children }: any) => <div>{children}</div>,
+  SidebarMenu: ({ children }: SidebarMenuProps) => <div>{children}</div>,
+  SidebarMenuItem: ({ children }: SidebarMenuItemProps) => <div>{children}</div>,
   SidebarMenuButton: ({
     children,
     className,
     isActive: _isActive,
     ...props
-  }: any) => (
+  }: SidebarMenuButtonProps) => (
     <button type='button' className={className} {...props}>
       {children}
     </button>
