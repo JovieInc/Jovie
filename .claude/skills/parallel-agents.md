@@ -85,7 +85,7 @@ Your branch is: tim/jov-<NUMBER>-<slug>
 
 1. ALL file operations MUST use /tmp/jovie-worktrees/jov-<NUMBER> as the base path
 2. ALL bash commands MUST cd to /tmp/jovie-worktrees/jov-<NUMBER> first
-3. NEVER cd to or modify the main repo (use `git rev-parse --show-toplevel` to locate it if needed)
+3. NEVER cd to or modify the main repo at /Users/timwhite/Documents/GitHub/TBF/Jovie
 4. Run `pnpm install` before starting work (one-time, ~20s)
 5. After implementation, run: pnpm run typecheck && pnpm run biome:check && pnpm run test
 6. Commit with conventional commit format: fix|feat|refactor: description (JOV-<NUMBER>)
@@ -102,7 +102,7 @@ LINEAR ISSUE:
 
 | Wrong | Correct | Why |
 |-------|---------|-----|
-| `cd <main-repo-root>` from agent | Stay in `/tmp/jovie-worktrees/jov-XXX` | Main repo is shared — touching it causes conflicts |
+| `cd /Users/timwhite/Documents/GitHub/TBF/Jovie` from agent | Stay in `/tmp/jovie-worktrees/jov-XXX` | Main repo is shared — touching it causes conflicts |
 | `git checkout` in main repo while agents run | Only use worktrees for branch work | Checkout in main would affect all agents reading from it |
 | Sharing `node_modules` between worktrees | Each worktree runs `pnpm install` | pnpm hard-links from store — fast and isolated |
 | More than 5 concurrent agents | Batch in groups of 5 | Memory/CPU constraints cause OOM |

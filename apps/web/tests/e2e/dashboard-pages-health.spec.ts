@@ -521,6 +521,17 @@ test.describe('Admin Pages Health Check @smoke', () => {
   test('All admin pages load without errors', async ({ page }, testInfo) => {
     test.setTimeout(360_000); // 6 minutes for 6 admin pages (dev mode is slow, especially under load)
 
+    // Capture browser console errors for debugging page failures
+    const consoleErrors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        consoleErrors.push(`[console.error] ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', err => {
+      consoleErrors.push(`[pageerror] ${err.message}\n${err.stack ?? ''}`);
+    });
+
     const results: PageHealthResult[] = [];
     let hasAdminAccess = true;
 
@@ -650,6 +661,17 @@ test.describe('Admin Pages Health Check @smoke', () => {
             });
           }
 
+          // Log captured console errors for this page
+          if (consoleErrors.length > 0) {
+            console.log(
+              `\n🔍 Console errors on ${pageConfig.name}:\n${consoleErrors.join('\n')}`
+            );
+            await testInfo.attach(`console-errors-${pageConfig.name}`, {
+              body: consoleErrors.join('\n'),
+              contentType: 'text/plain',
+            });
+          }
+
           results.push({
             path: pageConfig.path,
             name: pageConfig.name,
@@ -665,6 +687,8 @@ test.describe('Admin Pages Health Check @smoke', () => {
             loadTimeMs,
           });
         }
+        // Clear console errors for next page
+        consoleErrors.length = 0;
       } catch (error) {
         results.push({
           path: pageConfig.path,
@@ -673,6 +697,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
+        consoleErrors.length = 0;
       }
     }
 

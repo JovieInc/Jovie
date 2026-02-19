@@ -629,6 +629,48 @@ async function discoverMusicBrainzMatch(
 // ============================================================================
 
 /**
+ * Dispatch discovery to the appropriate provider.
+ * Returns null for unsupported providers.
+ */
+function discoverForProvider(
+  tx: DbOrTransaction,
+  providerId: DspProviderId,
+  localTracks: LocalTrackData[],
+  localArtist: LocalArtistData,
+  creatorProfileId: string
+): Promise<{
+  match: ScoredArtistMatch | null;
+  status: DspMatchStatus | null;
+  error?: string;
+}> | null {
+  switch (providerId) {
+    case 'apple_music':
+      return discoverAppleMusicMatch(
+        tx,
+        localTracks,
+        localArtist,
+        creatorProfileId
+      );
+    case 'deezer':
+      return discoverDeezerMatch(
+        tx,
+        localTracks,
+        localArtist,
+        creatorProfileId
+      );
+    case 'musicbrainz':
+      return discoverMusicBrainzMatch(
+        tx,
+        localTracks,
+        localArtist,
+        creatorProfileId
+      );
+    default:
+      return null;
+  }
+}
+
+/**
  * Process a DSP artist discovery job.
  */
 export async function processDspArtistDiscoveryJob(
@@ -662,39 +704,20 @@ export async function processDspArtistDiscoveryJob(
 
   for (const providerId of targetProviders) {
     try {
-      let discoveryResult: {
-        match: ScoredArtistMatch | null;
-        status: DspMatchStatus | null;
-        error?: string;
-      };
+      const discoveryPromise = discoverForProvider(
+        tx,
+        providerId,
+        localTracks,
+        localArtist,
+        creatorProfileId
+      );
 
-      if (providerId === 'apple_music') {
-        discoveryResult = await discoverAppleMusicMatch(
-          tx,
-          localTracks,
-          localArtist,
-          creatorProfileId
-        );
-      } else if (providerId === 'deezer') {
-        discoveryResult = await discoverDeezerMatch(
-          tx,
-          localTracks,
-          localArtist,
-          creatorProfileId
-        );
-      } else if (providerId === 'musicbrainz') {
-        discoveryResult = await discoverMusicBrainzMatch(
-          tx,
-          localTracks,
-          localArtist,
-          creatorProfileId
-        );
-      } else {
+      if (!discoveryPromise) {
         result.errors.push(`${providerId}: Unsupported provider`);
         continue;
       }
 
-      const { match, status, error } = discoveryResult;
+      const { match, status, error } = await discoveryPromise;
       if (match && status) {
         result.matches.push({
           providerId,

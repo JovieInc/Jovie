@@ -9,10 +9,6 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Best-effort dedup for burst protection within a single serverless instance.
-// This Map does NOT persist across cold starts or different instances — it only
-// prevents duplicate GitHub dispatches when Linear sends rapid-fire retries to
-// the same warm instance (common within a ~60s window).
 const recentDispatches = new Map<string, number>();
 const DEDUPE_TTL_MS = 60_000;
 

@@ -262,6 +262,17 @@ export function AdminCreatorProfilesUnified({
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
 
+  // Refs to avoid recreating handleRowSelectionChange when selection state changes
+  const rowSelectionRef = useRef(rowSelection);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  rowSelectionRef.current = rowSelection;
+  const filteredProfilesLengthRef = useRef(filteredProfiles.length);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  filteredProfilesLengthRef.current = filteredProfiles.length;
+  const selectedIdsSizeRef = useRef(selectedIds.size);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  selectedIdsSizeRef.current = selectedIds.size;
+
   const handleRowSelectionChange = useCallback(
     (
       updaterOrValue:
@@ -270,7 +281,7 @@ export function AdminCreatorProfilesUnified({
     ) => {
       const newSelection =
         typeof updaterOrValue === 'function'
-          ? updaterOrValue(rowSelection)
+          ? updaterOrValue(rowSelectionRef.current)
           : updaterOrValue;
 
       // Update our custom row selection state
@@ -282,13 +293,13 @@ export function AdminCreatorProfilesUnified({
 
       // Toggle all if all selected or all deselected
       if (
-        newSelectedIds.size === filteredProfiles.length ||
-        (newSelectedIds.size === 0 && selectedIds.size > 0)
+        newSelectedIds.size === filteredProfilesLengthRef.current ||
+        (newSelectedIds.size === 0 && selectedIdsSizeRef.current > 0)
       ) {
         toggleSelectAll();
       }
     },
-    [rowSelection, filteredProfiles.length, selectedIds.size, toggleSelectAll]
+    [toggleSelectAll]
   );
 
   // Define columns using factory function
