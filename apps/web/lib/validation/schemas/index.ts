@@ -214,10 +214,10 @@ export {
   type UnsubscribeInput,
   type UnsubscribeMethod,
   type UpdateContentPreferencesInput,
-  type VerifyEmailOtpInput,
   unsubscribeMethodSchema,
   unsubscribeSchema,
   updateContentPreferencesSchema,
+  type VerifyEmailOtpInput,
   verifyEmailOtpSchema,
 } from './notifications';
 
