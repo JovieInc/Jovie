@@ -186,9 +186,17 @@ vi.mock('sharp', () => {
   const pipeline = createPipeline();
   sharpMock.mockImplementation(() => pipeline);
 
+  const sharpDefault = (...args: unknown[]) => sharpMock(...args);
+  Object.defineProperty(sharpDefault, 'format', {
+    get: () => (sharpMock as unknown as { format?: unknown }).format,
+    set: value => {
+      (sharpMock as unknown as { format?: unknown }).format = value;
+    },
+  });
+
   return {
     __esModule: true,
-    default: (...args: unknown[]) => sharpMock(...args),
+    default: sharpDefault,
   };
 });
 
@@ -243,6 +251,7 @@ describe('/api/images/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sharpMetadataMock.mockResolvedValue({ width: 800, height: 800 });
+    delete (sharpMock as unknown as { format?: unknown }).format;
 
     // Default authenticated user; individual tests override as needed
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
@@ -439,6 +448,26 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(202);
     const data = await response.json();
     expect(data.blobUrl).toContain('.avif');
+  });
+
+  it('should reject HEIC images when Sharp lacks HEIF support', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+    (sharpMock as unknown as { format?: unknown }).format = {
+      heif: { input: { buffer: false } },
+    };
+
+    const formData = new FormData();
+    const file = new File(['fake-heic'], 'test.heic', { type: 'image/heic' });
+    formData.append('file', file);
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toContain('HEIC/HEIF is not supported in this runtime');
+    expect(data.code).toBe('INVALID_FILE');
   });
 
   it('should reject files with spoofed MIME type (magic bytes mismatch)', async () => {

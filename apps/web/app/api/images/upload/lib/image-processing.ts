@@ -18,6 +18,37 @@ export async function getSharp(): Promise<SharpConstructor> {
   return sharpModule as unknown as SharpConstructor;
 }
 
+const HEIC_MIME_TYPES = new Set([
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+]);
+
+export async function canProcessMimeTypeWithSharp(
+  mimeType: string
+): Promise<boolean> {
+  if (!HEIC_MIME_TYPES.has(mimeType.toLowerCase())) {
+    return true;
+  }
+
+  const sharp = await getSharp();
+  const sharpWithFormat = sharp as unknown as {
+    format?: {
+      heif?: {
+        input?: {
+          buffer?: boolean;
+        };
+      };
+    };
+  };
+
+  const heifBufferSupport = sharpWithFormat.format?.heif?.input?.buffer;
+
+  // If runtime metadata is unavailable, don't block valid uploads.
+  return heifBufferSupport ?? true;
+}
+
 export async function fileToBuffer(file: File): Promise<Buffer> {
   const arrayBuffer =
     typeof file.arrayBuffer === 'function'
