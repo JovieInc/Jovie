@@ -1,9 +1,4 @@
-const HEIC_MIME_TYPES = new Set([
-  'image/heic',
-  'image/heif',
-  'image/heic-sequence',
-  'image/heif-sequence',
-]);
+import { HEIC_MIME_TYPES } from './config';
 
 const JPEG_MIME_TYPE = 'image/jpeg';
 

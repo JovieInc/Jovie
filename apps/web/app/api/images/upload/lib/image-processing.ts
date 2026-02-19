@@ -5,6 +5,7 @@
  */
 
 import type { OutputInfo } from 'sharp';
+import { HEIC_MIME_TYPES } from '@/lib/images/config';
 import { AVATAR_CANONICAL_SIZE } from './constants';
 import type { SharpConstructor } from './types';
 
@@ -17,13 +18,6 @@ export async function getSharp(): Promise<SharpConstructor> {
   }
   return sharpModule as unknown as SharpConstructor;
 }
-
-const HEIC_MIME_TYPES = new Set([
-  'image/heic',
-  'image/heif',
-  'image/heic-sequence',
-  'image/heif-sequence',
-]);
 
 export async function canProcessMimeTypeWithSharp(
   mimeType: string
