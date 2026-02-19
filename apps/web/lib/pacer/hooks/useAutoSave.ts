@@ -7,6 +7,8 @@
 import type { AsyncDebouncerState } from '@tanstack/react-pacer';
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useRef, useState } from 'react';
+import { toPacerError } from '../errors';
+import { executeWithRetry } from './retry';
 import { PACER_TIMING } from './timing';
 
 export interface UseAutoSaveOptions<TData> {
@@ -71,12 +73,16 @@ export function useAutoSave<TData>({
   const asyncDebouncer = useAsyncDebouncer(
     async (data: TData) => {
       try {
-        await saveFn(data);
+        await executeWithRetry(() => saveFn(data), { maxAttempts: 3 });
         setLastSaved(new Date());
         setError(null);
         onSuccess?.();
       } catch (err) {
-        const saveError = err instanceof Error ? err : new Error('Save failed');
+        const saveError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Save failed',
+          },
+        });
         setError(saveError);
         onError?.(saveError);
         throw err;
@@ -85,7 +91,11 @@ export function useAutoSave<TData>({
     {
       wait,
       onError: err => {
-        const saveError = err instanceof Error ? err : new Error('Save failed');
+        const saveError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Save failed',
+          },
+        });
         setError(saveError);
         onError?.(saveError);
       },
@@ -108,13 +118,18 @@ export function useAutoSave<TData>({
   const flush = useCallback(async () => {
     if (pendingDataRef.current !== null) {
       asyncDebouncer.cancel();
+      const data = pendingDataRef.current;
       try {
-        await saveFn(pendingDataRef.current);
+        await executeWithRetry(() => saveFn(data), { maxAttempts: 3 });
         setLastSaved(new Date());
         setError(null);
         onSuccess?.();
       } catch (err) {
-        const saveError = err instanceof Error ? err : new Error('Save failed');
+        const saveError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Save failed',
+          },
+        });
         setError(saveError);
         onError?.(saveError);
       } finally {

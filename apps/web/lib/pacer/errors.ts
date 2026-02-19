@@ -133,6 +133,30 @@ export function formatPacerError(
 }
 
 /**
+ * Normalize unknown errors into Error instances with a formatted message.
+ */
+export function toPacerError(
+  err: unknown,
+  options?: {
+    wasTimedOut?: boolean;
+    customMessages?: Partial<Record<PacerErrorType, string>>;
+  }
+): Error {
+  const message = formatPacerError(err, options);
+
+  if (err instanceof Error) {
+    if (err.message === message) {
+      return err;
+    }
+    const formattedError = new Error(message, { cause: err });
+    formattedError.name = err.name;
+    return formattedError;
+  }
+
+  return new Error(message, { cause: err });
+}
+
+/**
  * Create an error handler that automatically formats errors.
  *
  * @example

@@ -14,7 +14,8 @@ import type { AsyncDebouncerState } from '@tanstack/react-pacer';
 import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CACHE_PRESETS, createValidationCache } from '../cache';
-import { isAbortError } from '../errors';
+import { isAbortError, toPacerError } from '../errors';
+import { executeWithRetry } from './retry';
 import { PACER_TIMING } from './timing';
 
 export interface UseAsyncValidationOptions<TValue, TResult> {
@@ -110,7 +111,10 @@ export function useAsyncValidation<TValue, TResult>({
       }, timeout);
 
       try {
-        const validationResult = await validatorFn(value, controller.signal);
+        const validationResult = await executeWithRetry(
+          () => validatorFn(value, controller.signal),
+          { maxAttempts: 3 }
+        );
 
         clearTimeout(timeoutId);
 
@@ -134,8 +138,11 @@ export function useAsyncValidation<TValue, TResult>({
           return undefined;
         }
 
-        const validationError =
-          err instanceof Error ? err : new Error('Validation failed');
+        const validationError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Validation failed',
+          },
+        });
         setError(validationError);
         onError?.(validationError);
 
@@ -145,8 +152,11 @@ export function useAsyncValidation<TValue, TResult>({
     {
       wait,
       onError: err => {
-        const validationError =
-          err instanceof Error ? err : new Error('Validation failed');
+        const validationError = toPacerError(err, {
+          customMessages: {
+            unknown: 'Validation failed',
+          },
+        });
         setError(validationError);
         onError?.(validationError);
       },
