@@ -15,15 +15,28 @@ import type { AvatarFetchResult, AvatarUploadResult } from './types';
 /** Known Vercel project prefixes for this workspace. */
 const VERCEL_PROJECT_PREFIXES = ['jovie-', 'shouldimake-'] as const;
 
+/** OAuth provider hostnames that serve user avatar images. */
+const OAUTH_AVATAR_HOSTNAMES = [
+  'lh3.googleusercontent.com', // Google
+  'platform-lookaside.fbsbx.com', // Facebook
+  'avatars.githubusercontent.com', // GitHub
+  'img.clerk.com', // Clerk
+  'images.clerk.dev', // Clerk (legacy)
+  'gravatar.com', // Gravatar
+  'www.gravatar.com', // Gravatar
+  'cdn.discordapp.com', // Discord
+] as const;
+
 /**
  * Builds the set of allowed hostnames for avatar uploads.
  * Includes:
  * - localhost for development
  * - The hostname from NEXT_PUBLIC_APP_URL (e.g., jov.ie)
  * - The normalized NEXT_PUBLIC_PROFILE_HOSTNAME
+ * - Known OAuth provider hostnames (Google, GitHub, Clerk, etc.)
  */
 function buildAllowedHostnames(): Set<string> {
-  const allowed = new Set<string>(['localhost']);
+  const allowed = new Set<string>(['localhost', ...OAUTH_AVATAR_HOSTNAMES]);
 
   // Add hostname from NEXT_PUBLIC_APP_URL
   const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
@@ -120,6 +133,7 @@ function getSafeUploadUrl(baseUrl: string): string {
 async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
   const safeImageUrl = getSafeImageUrl(imageUrl);
   const source = await fetch(safeImageUrl, {
+    redirect: 'error', // Prevent SSRF via redirect to internal services
     signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
   });
 
