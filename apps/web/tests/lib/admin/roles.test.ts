@@ -178,7 +178,7 @@ describe('Admin Roles', () => {
 
       expect(result).toBe(false); // Fail closed
       expect(mockCaptureError).toHaveBeenCalledWith(
-        '[admin/roles] DB query failed after retry, denying access',
+        '[admin/roles] DB query failed after retry, no cache available — denying access',
         expect.any(Error)
       );
     });

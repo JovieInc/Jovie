@@ -53,6 +53,16 @@ Sentry.init({
 
   // Scrub sensitive data before sending to Sentry
   beforeSend(event) {
+    // EPIPE/ECONNRESET on /api/chat are expected client disconnects (tab close,
+    // navigation). Drop them only for that path; surface them everywhere else.
+    const isChatPath = event.request?.url?.includes('/api/chat');
+    if (isChatPath) {
+      const msg = event.exception?.values?.[0]?.value ?? '';
+      if (/write EPIPE/.test(msg) || /ECONNRESET/.test(msg)) {
+        return null;
+      }
+    }
+
     // Anonymize IP addresses
     if (event.user?.ip_address) {
       event.user.ip_address = '{{auto}}';

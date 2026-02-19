@@ -79,6 +79,24 @@ describe('@critical session.ts', () => {
     });
   });
 
+  describe('getSessionSetupSql', () => {
+    it('builds session setup SQL for a valid Clerk user ID', async () => {
+      const { getSessionSetupSql } = await import('@/lib/auth/session');
+
+      const sql = getSessionSetupSql('user_valid_123');
+
+      expect(sql).toBeDefined();
+    });
+
+    it('throws for an empty Clerk user ID', async () => {
+      const { getSessionSetupSql } = await import('@/lib/auth/session');
+
+      expect(() => getSessionSetupSql('')).toThrow(
+        'User ID must be a non-empty string'
+      );
+    });
+  });
+
   describe('setupDbSession', () => {
     it('sets session variables for provided clerkUserId', async () => {
       const { setupDbSession } = await import('@/lib/auth/session');

@@ -419,7 +419,9 @@ export function CommonDropdown(props: CommonDropdownProps) {
         key={item.id}
         onClick={e => {
           e.stopPropagation();
-          item.onClick?.();
+          if (!item.disabled) {
+            item.onClick?.();
+          }
         }}
         disabled={item.disabled}
         className={cn(

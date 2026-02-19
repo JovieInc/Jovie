@@ -113,15 +113,15 @@ function handleDbFailure(
     );
     return staleEntry.isAdmin;
   }
-  if (staleEntry !== undefined) {
-    captureWarning(
-      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
-      { userId, expiredAt: staleEntry.expiresAt }
-    );
-  } else {
+  if (staleEntry === undefined) {
     captureError(
       '[admin/roles] DB query failed after retry, no cache available — denying access',
       lastError
+    );
+  } else {
+    captureWarning(
+      '[admin/roles] DB query failed after retry, stale cache expired — denying access',
+      { userId, expiredAt: staleEntry.expiresAt }
     );
   }
   return false;
@@ -140,7 +140,9 @@ async function tryRedisPath(
   try {
     const cached = await redis.get(cacheKey);
     if (cached !== null) {
-      return cached === '1';
+      // Upstash REST API may return number 1 instead of string '1'
+      // Use loose equality or String() to handle both types
+      return String(cached) === '1';
     }
 
     const dbResult = await queryWithRetry(userId);
