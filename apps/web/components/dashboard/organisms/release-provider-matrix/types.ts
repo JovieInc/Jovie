@@ -39,13 +39,9 @@ export interface UseReleaseProviderMatrixReturn {
   drafts: DraftState;
   isSaving: boolean;
   isSyncing: boolean;
-  headerElevated: boolean;
-  tableContainerRef: React.RefObject<HTMLDivElement | null>;
   providerList: ProviderListItem[];
   totalReleases: number;
   totalOverrides: number;
-  sortState: SortState;
-  toggleSort: (column: SortColumn) => void;
   openEditor: (release: ReleaseViewModel) => void;
   closeEditor: () => void;
   handleCopy: (path: string, label: string, testId: string) => Promise<string>;
