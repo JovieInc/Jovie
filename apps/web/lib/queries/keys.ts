@@ -260,6 +260,25 @@ export const queryKeys = {
       [...queryKeys.chat.all, 'conversation', id] as const,
   },
 
+  // Audience infinite scroll
+  audience: {
+    all: ['audience'] as const,
+    members: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.audience.all,
+        'members',
+        profileId,
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    subscribers: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.audience.all,
+        'subscribers',
+        profileId,
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+  },
+
   // Ad pixel settings
   pixels: {
     all: ['pixels'] as const,
