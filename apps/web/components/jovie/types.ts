@@ -16,6 +16,11 @@ export interface ArtistContext {
   };
 }
 
+export interface ProfileCompletionSummary {
+  readonly percentage: number;
+  readonly remainingSteps: string[];
+}
+
 export interface JovieChatProps {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
@@ -35,6 +40,8 @@ export interface JovieChatProps {
   readonly avatarUrl?: string | null;
   /** Artist username for profile links */
   readonly username?: string;
+  /** Profile setup progress shown in empty chat state */
+  readonly profileCompletion?: ProfileCompletionSummary;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';

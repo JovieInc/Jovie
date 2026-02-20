@@ -31,6 +31,7 @@ export interface AuthShellProps {
   readonly onSidebarOpenChange?: (open: boolean) => void;
   /** Server-provided sidebar default open state (from cookie). Eliminates layout flash. */
   readonly sidebarDefaultOpen?: boolean;
+  readonly showProfileCompletionCard?: boolean;
   readonly children: ReactNode;
 }
 
@@ -46,6 +47,7 @@ function AuthShellInner({
   isTableRoute = false,
   previewPanel,
   children,
+  showProfileCompletionCard = true,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
   const tablePanel = useTablePanel();
@@ -82,11 +84,13 @@ function AuthShellInner({
             )}
           >
             <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
-              {!isInSettings && section !== 'admin' && (
-                <div className='px-4 pt-4 sm:px-6 sm:pt-6'>
-                  <ProfileCompletionCard />
-                </div>
-              )}
+              {!isInSettings &&
+                section !== 'admin' &&
+                showProfileCompletionCard && (
+                  <div className='px-4 pt-4 sm:px-6 sm:pt-6'>
+                    <ProfileCompletionCard />
+                  </div>
+                )}
               {children}
             </div>
             {tablePanel}
@@ -99,9 +103,9 @@ function AuthShellInner({
                 showMobileTabs && 'pb-20 lg:pb-6'
               )}
             >
-              {!isInSettings && section !== 'admin' && (
-                <ProfileCompletionCard />
-              )}
+              {!isInSettings &&
+                section !== 'admin' &&
+                showProfileCompletionCard && <ProfileCompletionCard />}
               {children}
             </div>
             {previewPanel}

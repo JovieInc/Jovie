@@ -21,6 +21,7 @@ const ACCENT_TEXT_CLASSES = {
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
+  readonly suggestions?: readonly ChatSuggestion[];
 }
 
 function SuggestionPill({
@@ -60,10 +61,13 @@ function SuggestionPill({
   );
 }
 
-export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
+export function SuggestedPrompts({
+  onSelect,
+  suggestions = DEFAULT_SUGGESTIONS,
+}: SuggestedPromptsProps) {
   return (
     <div className='flex flex-col gap-2'>
-      {DEFAULT_SUGGESTIONS.map(suggestion => (
+      {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
           suggestion={suggestion}

@@ -5,7 +5,12 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { JovieChat } from '@/components/jovie/JovieChat';
 
 export function ProfilePageChat() {
-  const { selectedProfile } = useDashboardData();
+  const { selectedProfile, profileCompletion } = useDashboardData();
+
+  const profileCompletionSummary = {
+    percentage: profileCompletion.percentage,
+    remainingSteps: profileCompletion.steps.map(step => step.label),
+  };
 
   if (!selectedProfile) {
     return (
@@ -30,6 +35,7 @@ export function ProfilePageChat() {
       profileId={selectedProfile.id}
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
+      profileCompletion={profileCompletionSummary}
     />
   );
 }

@@ -35,13 +35,21 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
 }
 
 export function ChatPageClient({ conversationId }: ChatPageClientProps) {
-  const { selectedProfile } = useDashboardData();
+  const { selectedProfile, profileCompletion } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+
+  const profileCompletionSummary = useMemo(
+    () => ({
+      percentage: profileCompletion.percentage,
+      remainingSteps: profileCompletion.steps.map(step => step.label),
+    }),
+    [profileCompletion.percentage, profileCompletion.steps]
+  );
 
   // Fetch social links for the selected profile
   const profileId = selectedProfile?.id ?? '';
@@ -187,6 +195,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
       username={selectedProfile.username ?? undefined}
+      profileCompletion={profileCompletionSummary}
     />
   );
 }

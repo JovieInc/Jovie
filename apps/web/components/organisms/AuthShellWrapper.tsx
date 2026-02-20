@@ -180,6 +180,7 @@ function AuthShellWrapperInner({
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined
             }
             sidebarDefaultOpen={sidebarDefaultOpen}
+            showProfileCompletionCard={config.showProfileCompletionCard}
           >
             {children}
           </AuthShell>

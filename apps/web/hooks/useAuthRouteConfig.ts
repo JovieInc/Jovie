@@ -13,6 +13,7 @@ export interface AuthRouteConfig {
   showMobileTabs: boolean;
   isTableRoute: boolean;
   isArtistProfileSettings: boolean;
+  showProfileCompletionCard: boolean;
 }
 
 /**
@@ -77,11 +78,16 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
     pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`);
 
+  const isDashboardProfileRoute =
+    pathname === APP_ROUTES.DASHBOARD_PROFILE ||
+    pathname.startsWith(`${APP_ROUTES.DASHBOARD_PROFILE}/`);
+
   return {
     section,
     breadcrumbs,
     showMobileTabs,
     isTableRoute,
     isArtistProfileSettings,
+    showProfileCompletionCard: !isDashboardProfileRoute,
   };
 }

@@ -17,8 +17,13 @@ import {
   SuggestedPrompts,
 } from './components';
 import { useChatImageAttachments, useJovieChat } from './hooks';
-import type { JovieChatProps, MessagePart } from './types';
-import { TOOL_LABELS } from './types';
+import {
+  type ChatSuggestion,
+  DEFAULT_SUGGESTIONS,
+  type JovieChatProps,
+  type MessagePart,
+  TOOL_LABELS,
+} from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
 const SCROLL_THRESHOLD = 200;
@@ -48,6 +53,27 @@ function getActiveToolLabel(
   return null;
 }
 
+function formatCompletionPrompt(stepLabel: string): string {
+  const normalizedLabel = stepLabel.toLowerCase();
+  if (
+    normalizedLabel.startsWith('add ') ||
+    normalizedLabel.startsWith('write ')
+  ) {
+    return `Help me ${normalizedLabel}.`;
+  }
+  return `Help me with ${normalizedLabel}.`;
+}
+
+function buildProfileSuggestions(
+  remainingSteps: string[]
+): readonly ChatSuggestion[] {
+  return remainingSteps.slice(0, 3).map(stepLabel => ({
+    icon: 'Camera',
+    label: stepLabel,
+    prompt: formatCompletionPrompt(stepLabel),
+    accent: 'purple',
+  }));
+}
 export function JovieChat({
   profileId,
   artistContext, // NOSONAR - intentional backward compatibility for deprecated prop
@@ -58,6 +84,7 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
+  profileCompletion,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -200,6 +227,19 @@ export function JovieChat({
     [isLoading, messages]
   );
   const thinkingLabel = activeToolLabel ?? 'Thinking...';
+
+  const suggestedPrompts = useMemo(
+    () =>
+      profileCompletion &&
+      profileCompletion.percentage < 100 &&
+      profileCompletion.remainingSteps.length > 0
+        ? [
+            ...buildProfileSuggestions(profileCompletion.remainingSteps),
+            ...DEFAULT_SUGGESTIONS,
+          ]
+        : DEFAULT_SUGGESTIONS,
+    [profileCompletion]
+  );
 
   // Show skeleton while fetching existing conversation
   if (isLoadingConversation) {
@@ -361,11 +401,38 @@ export function JovieChat({
                 />
               )}
 
+              {profileCompletion &&
+                profileCompletion.percentage < 100 &&
+                profileCompletion.remainingSteps.length > 0 && (
+                  <div className='mx-auto w-full max-w-xl space-y-2 rounded-xl bg-white/[0.03] px-4 py-3'>
+                    <div
+                      className='h-1.5 w-full overflow-hidden rounded-full bg-white/10'
+                      role='progressbar'
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={profileCompletion.percentage}
+                      aria-label='Profile completion'
+                    >
+                      <div
+                        className='h-full rounded-full bg-white transition-all duration-500'
+                        style={{ width: `${profileCompletion.percentage}%` }}
+                      />
+                    </div>
+                    <p className='text-center text-[13px] text-secondary-token'>
+                      Your profile is {profileCompletion.percentage}% complete —
+                      let&apos;s finish the final touches.
+                    </p>
+                  </div>
+                )}
+
               <p className='text-center text-[15px] text-secondary-token'>
                 What can I help you with?
               </p>
 
-              <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+              <SuggestedPrompts
+                onSelect={handleSuggestedPrompt}
+                suggestions={suggestedPrompts}
+              />
             </div>
           </div>
 
