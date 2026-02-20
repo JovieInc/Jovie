@@ -316,7 +316,7 @@ describe('useThemeMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
-      updates: { theme: { preference: 'dark' } },
+      updates: { theme: { preference: 'dark', highContrast: false } },
     });
   });
 
@@ -330,7 +330,7 @@ describe('useThemeMutation', () => {
     });
 
     expect(mockMutationFn.mock.calls[0][0]).toEqual({
-      updates: { theme: { preference: 'system' } },
+      updates: { theme: { preference: 'system', highContrast: false } },
     });
   });
 
