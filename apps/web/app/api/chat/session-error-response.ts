@@ -7,6 +7,20 @@ const UNAUTHORIZED_MESSAGES = new Set([
 ]);
 
 /**
+ * Checks whether the error matches a known session/auth failure pattern
+ * without constructing a response object.
+ */
+function isKnownSessionErrorMessage(error: unknown): boolean {
+  if (!(error instanceof TypeError)) {
+    return false;
+  }
+  return (
+    UNAUTHORIZED_MESSAGES.has(error.message) ||
+    error.message === 'Profile not found'
+  );
+}
+
+/**
  * Converts known auth/session failures into stable API responses.
  */
 export function getSessionErrorResponse(
@@ -35,5 +49,5 @@ export function getSessionErrorResponse(
 }
 
 export function isSessionError(error: unknown): boolean {
-  return getSessionErrorResponse(error, {}) !== null;
+  return isKnownSessionErrorMessage(error);
 }

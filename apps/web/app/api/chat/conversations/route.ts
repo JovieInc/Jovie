@@ -5,10 +5,7 @@ import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import {
-  getSessionErrorResponse,
-  isSessionError,
-} from '../session-error-response';
+import { getSessionErrorResponse } from '../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -64,13 +61,6 @@ export async function GET(req: Request) {
   } catch (error) {
     logger.error('Error listing conversations:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Failed to list conversations', error, {
-        route: '/api/chat/conversations',
-        method: 'GET',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_STORE_HEADERS
@@ -78,6 +68,11 @@ export async function GET(req: Request) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Failed to list conversations', error, {
+      route: '/api/chat/conversations',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to list conversations' },
@@ -164,13 +159,6 @@ export async function POST(req: Request) {
   } catch (error) {
     logger.error('Error creating conversation:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Failed to create conversation', error, {
-        route: '/api/chat/conversations',
-        method: 'POST',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_STORE_HEADERS
@@ -178,6 +166,11 @@ export async function POST(req: Request) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Failed to create conversation', error, {
+      route: '/api/chat/conversations',
+      method: 'POST',
+    });
 
     return NextResponse.json(
       { error: 'Failed to create conversation' },

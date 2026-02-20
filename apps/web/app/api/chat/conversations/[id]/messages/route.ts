@@ -10,10 +10,7 @@ import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
-import {
-  getSessionErrorResponse,
-  isSessionError,
-} from '../../../session-error-response';
+import { getSessionErrorResponse } from '../../../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -204,13 +201,6 @@ export async function POST(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error adding message:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Chat messages fetch failed', error, {
-        route: '/api/chat/conversations/[id]/messages',
-        method: 'POST',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_CACHE_HEADERS
@@ -218,6 +208,11 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Chat messages fetch failed', error, {
+      route: '/api/chat/conversations/[id]/messages',
+      method: 'POST',
+    });
 
     return NextResponse.json(
       { error: 'Failed to add message' },

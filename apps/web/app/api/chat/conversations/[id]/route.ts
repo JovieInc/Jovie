@@ -5,10 +5,7 @@ import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
-import {
-  getSessionErrorResponse,
-  isSessionError,
-} from '../../session-error-response';
+import { getSessionErrorResponse } from '../../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -103,13 +100,6 @@ export async function GET(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error fetching conversation:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Failed to fetch conversation', error, {
-        route: '/api/chat/conversations/[id]',
-        method: 'GET',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_STORE_HEADERS
@@ -117,6 +107,11 @@ export async function GET(req: Request, { params }: RouteParams) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Failed to fetch conversation', error, {
+      route: '/api/chat/conversations/[id]',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to fetch conversation' },
@@ -182,13 +177,6 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error updating conversation:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Failed to update conversation', error, {
-        route: '/api/chat/conversations/[id]',
-        method: 'PATCH',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_STORE_HEADERS
@@ -196,6 +184,11 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Failed to update conversation', error, {
+      route: '/api/chat/conversations/[id]',
+      method: 'PATCH',
+    });
 
     return NextResponse.json(
       { error: 'Failed to update conversation' },
@@ -245,13 +238,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error deleting conversation:', error);
 
-    if (!isSessionError(error)) {
-      await captureError('Failed to delete conversation', error, {
-        route: '/api/chat/conversations/[id]',
-        method: 'DELETE',
-      });
-    }
-
     const sessionErrorResponse = getSessionErrorResponse(
       error,
       NO_STORE_HEADERS
@@ -259,6 +245,11 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     if (sessionErrorResponse) {
       return sessionErrorResponse;
     }
+
+    await captureError('Failed to delete conversation', error, {
+      route: '/api/chat/conversations/[id]',
+      method: 'DELETE',
+    });
 
     return NextResponse.json(
       { error: 'Failed to delete conversation' },
