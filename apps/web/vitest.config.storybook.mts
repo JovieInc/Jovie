@@ -18,6 +18,14 @@ export default defineConfig({
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
   },
+  resolve: {
+    dedupe: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+    ],
+  },
   optimizeDeps: {
     include: [
       'react',
