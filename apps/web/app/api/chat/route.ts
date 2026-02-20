@@ -1223,9 +1223,9 @@ function createLyricsFormatTool() {
         .describe('Raw lyrics text to format for Apple Music'),
     }),
     execute: async ({ lyrics }) => {
-      const originalLineCount = lyrics.split('\n').length;
+      const originalLineCount = lyrics.trimEnd().split('\n').length;
       const { formatted, changesSummary } = formatLyricsForAppleMusic(lyrics);
-      const formattedLineCount = formatted.split('\n').length;
+      const formattedLineCount = formatted.trimEnd().split('\n').length;
 
       return {
         success: true,
