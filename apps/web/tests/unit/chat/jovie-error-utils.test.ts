@@ -47,6 +47,20 @@ describe('extractErrorMetadata', () => {
     const err = new Error(JSON.stringify({ retryAfter: 99999 }));
     expect(extractErrorMetadata(err)).toEqual({ retryAfter: 3600 });
   });
+
+  it('extracts metadata from prefixed JSON error messages', () => {
+    const err = new Error(
+      'Error: {"error":"Rate limit exceeded","message":"You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.","errorCode":"RATE_LIMITED","retryAfter":3600,"requestId":"req_rate_limit"}'
+    );
+
+    expect(extractErrorMetadata(err)).toEqual({
+      retryAfter: 3600,
+      errorCode: 'RATE_LIMITED',
+      requestId: 'req_rate_limit',
+      message:
+        'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+    });
+  });
 });
 
 describe('chat error classification', () => {

@@ -90,6 +90,7 @@ interface ErrorMetadata {
   retryAfter?: number;
   errorCode?: string;
   requestId?: string;
+  message?: string;
 }
 
 /**
@@ -98,7 +99,8 @@ interface ErrorMetadata {
  */
 function applyMetadataFields(
   metadata: ErrorMetadata,
-  source: Record<string, unknown>
+  source: Record<string, unknown>,
+  options?: { includeMessage?: boolean }
 ): void {
   if (
     typeof source.retryAfter === 'number' &&
@@ -119,6 +121,39 @@ function applyMetadataFields(
   if (typeof source.requestId === 'string') {
     metadata.requestId = source.requestId;
   }
+
+  if (
+    options?.includeMessage &&
+    typeof source.message === 'string' &&
+    source.message.trim().length > 0
+  ) {
+    metadata.message = source.message.trim();
+  }
+}
+
+function tryParseJsonRecord(input: string): Record<string, unknown> | null {
+  const trimmedInput = input.trim();
+
+  if (trimmedInput.startsWith('{') && trimmedInput.endsWith('}')) {
+    try {
+      return JSON.parse(trimmedInput) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  const jsonStart = trimmedInput.indexOf('{');
+  const jsonEnd = trimmedInput.lastIndexOf('}');
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    return null;
+  }
+
+  const maybeJson = trimmedInput.slice(jsonStart, jsonEnd + 1);
+  try {
+    return JSON.parse(maybeJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 export function extractErrorMetadata(error: Error): ErrorMetadata {
@@ -126,16 +161,9 @@ export function extractErrorMetadata(error: Error): ErrorMetadata {
 
   applyMetadataFields(metadata, error as unknown as Record<string, unknown>);
 
-  const message = error.message.trim();
-  if (message.startsWith('{') && message.endsWith('}')) {
-    try {
-      applyMetadataFields(
-        metadata,
-        JSON.parse(message) as Record<string, unknown>
-      );
-    } catch {
-      // Ignore JSON parse failures - metadata may be on structured fields already.
-    }
+  const parsedJsonMessage = tryParseJsonRecord(error.message);
+  if (parsedJsonMessage) {
+    applyMetadataFields(metadata, parsedJsonMessage, { includeMessage: true });
   }
 
   return metadata;
