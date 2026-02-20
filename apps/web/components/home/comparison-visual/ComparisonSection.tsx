@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp } from 'lucide-react';
+import { ArrowRight, TrendingUp, X } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useMemo } from 'react';
 import { Container } from '@/components/site/Container';
@@ -12,7 +12,7 @@ export function ComparisonSection() {
 
   const fadeInUp = useMemo(
     () => ({
-      initial: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 },
+      initial: reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
       whileInView: { opacity: 1, y: 0 },
     }),
     [reducedMotion]
@@ -20,7 +20,7 @@ export function ComparisonSection() {
 
   const fadeInLeft = useMemo(
     () => ({
-      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 },
+      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: -16 },
       whileInView: { opacity: 1, x: 0 },
     }),
     [reducedMotion]
@@ -28,7 +28,7 @@ export function ComparisonSection() {
 
   const fadeInRight = useMemo(
     () => ({
-      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 },
+      initial: reducedMotion ? { opacity: 1, x: 0 } : { opacity: 0, x: 16 },
       whileInView: { opacity: 1, x: 0 },
     }),
     [reducedMotion]
@@ -39,17 +39,18 @@ export function ComparisonSection() {
       className='relative section-spacing-linear overflow-hidden'
       style={{
         backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
       }}
       aria-label='Comparison: Traditional link pages versus Jovie Profile'
     >
-      {/* Subtle background grid */}
+      {/* Ambient background — dot grid like Linear's section backgrounds */}
       <div
-        className='absolute inset-0 opacity-[0.15]'
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0'
         style={{
-          backgroundImage: `linear-gradient(var(--linear-border-subtle) 1px, transparent 1px),
-                           linear-gradient(90deg, var(--linear-border-subtle) 1px, transparent 1px)`,
-          backgroundSize: '48px 48px',
+          backgroundImage:
+            'radial-gradient(circle, var(--linear-border-subtle) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          opacity: 0.5,
         }}
       />
 
@@ -58,9 +59,23 @@ export function ComparisonSection() {
         <motion.div
           {...fadeInUp}
           viewport={{ once: true }}
-          transition={{ duration: reducedMotion ? 0 : 0.5 }}
+          transition={{
+            duration: reducedMotion ? 0 : 0.5,
+            ease: [0.25, 0.46, 0.45, 0.94],
+          }}
           className='text-center heading-gap-linear'
         >
+          <p
+            className='mb-4 uppercase'
+            style={{
+              fontSize: '13px',
+              fontWeight: 510,
+              letterSpacing: '0.08em',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
+            Why Jovie
+          </p>
           <h2
             style={{
               fontSize: 'var(--linear-h2-size)',
@@ -68,16 +83,19 @@ export function ComparisonSection() {
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
               color: 'var(--linear-text-primary)',
-              marginBottom: 'var(--linear-space-4)',
+              marginBottom: '16px',
             }}
           >
-            Turn profile traffic into meaningful action.
+            Turn profile traffic into
+            <br />
+            meaningful action.
           </h2>
           <p
-            className='max-w-xl mx-auto'
+            className='max-w-lg mx-auto'
             style={{
-              fontSize: 'var(--linear-body-lg-size)',
-              lineHeight: 'var(--linear-body-lg-leading)',
+              fontSize: '15px',
+              lineHeight: '24px',
+              letterSpacing: '-0.011em',
               color: 'var(--linear-text-tertiary)',
             }}
           >
@@ -88,64 +106,90 @@ export function ComparisonSection() {
 
         {/* Comparison Grid */}
         <div
-          className='grid md:grid-cols-2 items-center max-w-4xl mx-auto relative'
-          style={{ gap: 'var(--linear-space-20)' }}
+          className='grid md:grid-cols-[1fr_auto_1fr] items-start max-w-4xl mx-auto relative'
+          style={{ gap: '0' }}
         >
-          {/* VS Divider */}
-          <div className='hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10'>
-            <div
-              className='px-3 py-1.5 rounded-md'
-              style={{
-                backgroundColor: 'var(--linear-bg-surface-0)',
-                border: '1px solid var(--linear-border-default)',
-              }}
-            >
-              <span
-                className='tracking-wider uppercase'
-                style={{
-                  fontSize: 'var(--linear-label-size)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              >
-                vs
-              </span>
-            </div>
-          </div>
-
           {/* Left Side - Traditional */}
           <motion.div
             {...fadeInLeft}
             viewport={{ once: true }}
             transition={{
               duration: reducedMotion ? 0 : 0.5,
-              delay: reducedMotion ? 0 : 0.2,
+              delay: reducedMotion ? 0 : 0.15,
+              ease: [0.25, 0.46, 0.45, 0.94],
             }}
-            className='relative'
+            className='relative flex flex-col items-center'
           >
-            <WallOfLinksUI />
-
-            <div className='mt-8 text-center'>
-              <h3
+            {/* Label */}
+            <div
+              className='mb-5 inline-flex items-center h-7 px-3 rounded-full mx-auto'
+              style={{
+                gap: '6px',
+                backgroundColor: 'rgba(255, 80, 80, 0.08)',
+                border: '1px solid rgba(255, 80, 80, 0.12)',
+              }}
+            >
+              <X className='w-3 h-3' style={{ color: 'oklch(65% 0.18 25)' }} />
+              <span
                 style={{
-                  fontSize: 'var(--linear-h4-size)',
-                  fontWeight: 'var(--linear-h4-weight)',
-                  color: 'var(--linear-text-primary)',
-                  marginBottom: 'var(--linear-space-1)',
+                  fontSize: '12px',
+                  fontWeight: 510,
+                  color: 'oklch(65% 0.18 25)',
+                  letterSpacing: '-0.005em',
                 }}
               >
                 Traditional Link Pages
-              </h3>
-              <p
-                style={{
-                  fontSize: 'var(--linear-body-sm-size)',
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              >
-                More links. Less action.
-              </p>
+              </span>
             </div>
+
+            <WallOfLinksUI />
+
+            <p
+              className='mt-5 text-center'
+              style={{
+                fontSize: '13px',
+                color: 'var(--linear-text-tertiary)',
+                letterSpacing: '-0.01em',
+                maxWidth: '240px',
+              }}
+            >
+              More links. Less action.
+              <br />
+              Visitors bounce without converting.
+            </p>
           </motion.div>
+
+          {/* Center Divider */}
+          <div className='hidden md:flex flex-col items-center justify-center self-center px-6 lg:px-10'>
+            <div
+              className='flex items-center justify-center w-10 h-10 rounded-full'
+              style={{
+                backgroundColor: 'var(--linear-bg-surface-2)',
+                border: '1px solid var(--linear-border-default)',
+              }}
+            >
+              <ArrowRight
+                className='w-4 h-4'
+                style={{ color: 'var(--linear-text-tertiary)' }}
+              />
+            </div>
+          </div>
+
+          {/* Mobile divider */}
+          <div className='flex md:hidden items-center justify-center py-8'>
+            <div
+              className='flex items-center justify-center w-10 h-10 rounded-full'
+              style={{
+                backgroundColor: 'var(--linear-bg-surface-2)',
+                border: '1px solid var(--linear-border-default)',
+              }}
+            >
+              <ArrowRight
+                className='w-4 h-4 rotate-90'
+                style={{ color: 'var(--linear-text-tertiary)' }}
+              />
+            </div>
+          </div>
 
           {/* Right Side - Jovie */}
           <motion.div
@@ -153,64 +197,51 @@ export function ComparisonSection() {
             viewport={{ once: true }}
             transition={{
               duration: reducedMotion ? 0 : 0.5,
-              delay: reducedMotion ? 0 : 0.3,
+              delay: reducedMotion ? 0 : 0.25,
+              ease: [0.25, 0.46, 0.45, 0.94],
             }}
-            className='relative'
+            className='relative flex flex-col items-center'
           >
-            <JovieProfileUI />
-
-            <div className='mt-8 text-center'>
-              <div
-                className='flex items-center justify-center'
+            {/* Label */}
+            <div
+              className='mb-5 inline-flex items-center h-7 px-3 rounded-full mx-auto'
+              style={{
+                gap: '6px',
+                backgroundColor: 'oklch(72% 0.2 145 / 0.08)',
+                border: '1px solid oklch(72% 0.2 145 / 0.15)',
+              }}
+            >
+              <TrendingUp
+                className='w-3 h-3'
+                style={{ color: 'var(--linear-success)' }}
+              />
+              <span
                 style={{
-                  gap: 'var(--linear-space-3)',
-                  marginBottom: 'var(--linear-space-3)',
-                }}
-              >
-                <div
-                  className='inline-flex items-center h-6 px-2.5 rounded-full'
-                  style={{
-                    gap: 'var(--linear-space-2)',
-                    backgroundColor: 'oklch(72% 0.2 145 / 0.15)',
-                    border: '1px solid oklch(72% 0.2 145 / 0.2)',
-                  }}
-                >
-                  <TrendingUp
-                    className='w-3 h-3'
-                    style={{ color: 'var(--linear-success)' }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 'var(--linear-label-size)',
-                      fontWeight: 'var(--linear-font-weight-medium)',
-                      color: 'var(--linear-success)',
-                    }}
-                  >
-                    Conversion-first design
-                  </span>
-                </div>
-              </div>
-              <h3
-                style={{
-                  fontSize: 'var(--linear-h4-size)',
-                  fontWeight: 'var(--linear-h4-weight)',
-                  color: 'var(--linear-text-primary)',
-                  marginBottom: 'var(--linear-space-1)',
+                  fontSize: '12px',
+                  fontWeight: 510,
+                  color: 'var(--linear-success)',
+                  letterSpacing: '-0.005em',
                 }}
               >
                 Jovie Profile
-              </h3>
-              <p
-                style={{
-                  fontSize: 'var(--linear-body-sm-size)',
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              >
-                Clear primary CTA.
-                <br />
-                Optimized for artist growth.
-              </p>
+              </span>
             </div>
+
+            <JovieProfileUI />
+
+            <p
+              className='mt-5 text-center'
+              style={{
+                fontSize: '13px',
+                color: 'var(--linear-text-tertiary)',
+                letterSpacing: '-0.01em',
+                maxWidth: '240px',
+              }}
+            >
+              Clear primary CTA.
+              <br />
+              Optimized for artist growth.
+            </p>
           </motion.div>
         </div>
       </Container>

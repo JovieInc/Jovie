@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
@@ -191,7 +192,7 @@ const fetchProfileAndLinks = async (
       is_public: !!result.isPublic,
       is_verified: !!result.isVerified,
       is_claimed: !!result.isClaimed,
-      claim_token: null,
+      claim_token: result.claimToken ?? null,
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
@@ -273,9 +274,12 @@ const fetchProfileAndLinks = async (
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
 // IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
-// IMPORTANT: Only cache successful (status: 'ok') results. Caching not_found/error
-// results causes stale 404s that persist for up to 1 hour when a profile becomes
-// public (e.g., after onboarding completes for a waitlist profile).
+// IMPORTANT: Successful profile payloads get long TTL. not_found gets a short TTL
+// to reduce repeated probe traffic while still allowing new profiles to appear fast.
+// error responses are never cached.
+
+const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
+const PROFILE_NOT_FOUND_CACHE_TTL_SECONDS = 60; // 1 minute
 
 /** Custom error to pass non-cacheable results without embedding PII in error message. */
 class NoCacheError extends Error {
@@ -283,6 +287,16 @@ class NoCacheError extends Error {
   constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
     super('NoCacheError');
     this.name = 'NoCacheError';
+    this.data = data;
+  }
+}
+
+/** Custom error for values that should not be stored in not_found negative cache. */
+class NoNegativeCacheError extends Error {
+  readonly data: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
+  constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
+    super('NoNegativeCacheError');
+    this.name = 'NoNegativeCacheError';
     this.data = data;
   }
 }
@@ -296,10 +310,51 @@ const getCachedProfileAndLinks = async (username: string) => {
     return fetchProfileAndLinks(username);
   }
 
+  let seededResult: Awaited<ReturnType<typeof fetchProfileAndLinks>> | null =
+    null;
+
+  try {
+    // First: short-lived negative cache to absorb repeated misses for bad usernames.
+    const negativeCachedResult = await unstable_cache(
+      async () => {
+        const data = await fetchProfileAndLinks(username);
+        if (data.status !== 'not_found') {
+          throw new NoNegativeCacheError(data);
+        }
+        return data;
+      },
+      [`public-profile-not-found-${username}`],
+      {
+        tags: ['profiles-all', `profile:${username}`],
+        revalidate: PROFILE_NOT_FOUND_CACHE_TTL_SECONDS,
+      }
+    )();
+
+    return negativeCachedResult;
+  } catch (error) {
+    if (error instanceof NoNegativeCacheError) {
+      seededResult = error.data;
+      if (seededResult.status === 'error') {
+        return seededResult;
+      }
+    } else {
+      // Negative-cache layer failure - fall back to direct fetch
+      void captureWarning(
+        '[profile] Negative cache layer failed, using direct fetch',
+        {
+          error,
+          username,
+        }
+      );
+      return fetchProfileAndLinks(username);
+    }
+  }
+
   try {
     const result = await unstable_cache(
       async () => {
-        const data = await fetchProfileAndLinks(username);
+        const data = seededResult ?? (await fetchProfileAndLinks(username));
+        seededResult = null;
         // Only cache successful results to avoid stale 404s
         // Non-ok results are passed through NoCacheError to avoid double-fetch
         if (data.status !== 'ok') {
@@ -310,7 +365,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       [`public-profile-${username}`],
       {
         tags: ['profiles-all', `profile:${username}`],
-        revalidate: 3600, // 1 hour
+        revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
     )();
     return result;
@@ -463,6 +518,13 @@ export default async function ArtistPage({
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      {!profile.is_claimed && profile.claim_token ? (
+        <ClaimBanner
+          claimToken={profile.claim_token}
+          profileHandle={artist.handle}
+          displayName={artist.name}
+        />
+      ) : null}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       <StaticArtistPage
@@ -568,10 +630,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       locale: 'en_US',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          width: profile.avatar_url ? 400 : 1200,
-          height: profile.avatar_url ? 400 : 630,
-          alt: `${artistName} profile picture`,
+          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          width: 1200,
+          height: 630,
+          alt: `${artistName} profile card`,
         },
       ],
     },
@@ -583,8 +645,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       site: '@jovieapp',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          alt: `${artistName} profile picture`,
+          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          alt: `${artistName} profile card`,
         },
       ],
     },

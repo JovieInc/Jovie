@@ -156,42 +156,46 @@
      ============================================ */
 
   --linear-h1-size: 64px;
-  --linear-h1-weight: var(--linear-font-weight-medium);
-  --linear-h1-leading: 67.84px;
+  --linear-h1-weight: 510;
+  --linear-h1-leading: 64px;
   --linear-h1-tracking: -1.408px;
 
-  --linear-h2-size: 36px;
-  --linear-h2-weight: var(--linear-font-weight-bold);
-  --linear-h2-leading: 47.88px;
-  --linear-h2-tracking: -0.432px;
+  --linear-h2-size: 48px;
+  --linear-h2-weight: 510;
+  --linear-h2-leading: 48px;
+  --linear-h2-tracking: -1.056px;
 
-  --linear-h3-size: 24px;
-  --linear-h3-weight: var(--linear-font-weight-bold);
-  --linear-h3-leading: 31.92px;
-  --linear-h3-tracking: -0.288px;
+  --linear-h3-size: 20px;
+  --linear-h3-weight: 590;
+  --linear-h3-leading: 26.6px;
+  --linear-h3-tracking: -0.24px;
 
   --linear-h4-size: 18px;
-  --linear-h4-weight: var(--linear-font-weight-semibold);
+  --linear-h4-weight: 538;
   --linear-h4-leading: 24px;
 
-  --linear-body-lg-size: 17px;
-  --linear-body-lg-weight: var(--linear-font-weight-normal);
-  --linear-body-lg-leading: 27.2px;
+  --linear-body-lg-size: 24px;
+  --linear-body-lg-weight: 400;
+  --linear-body-lg-leading: 31.92px;
+  --linear-body-lg-tracking: -0.288px;
 
   --linear-body-size: 15px;
-  --linear-body-weight: var(--linear-font-weight-medium);
+  --linear-body-weight: 400;
   --linear-body-leading: 24px;
+  --linear-body-tracking: -0.165px;
 
   --linear-body-sm-size: 14px;
-  --linear-body-sm-weight: var(--linear-font-weight-normal);
-  --linear-body-sm-leading: 22.4px;
+  --linear-body-sm-weight: 400;
+  --linear-body-sm-leading: 21px;
+  --linear-body-sm-tracking: -0.182px;
 
   --linear-caption-size: 13px;
-  --linear-caption-weight: var(--linear-font-weight-medium);
+  --linear-caption-weight: 510;
   --linear-caption-leading: 19.5px;
+  --linear-caption-tracking: -0.13px;
 
   --linear-label-size: 12px;
-  --linear-label-weight: var(--linear-font-weight-normal);
+  --linear-label-weight: 400;
   --linear-label-leading: 19.2px;
 
   /* ============================================
@@ -241,9 +245,12 @@
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
 
-  --linear-section-py-sm: 80px;
-  --linear-section-py-md: 120px;
-  --linear-section-py-lg: 160px;
+  --linear-section-pt-sm: 64px;
+  --linear-section-pb-sm: 80px;
+  --linear-section-pt-md: 80px;
+  --linear-section-pb-md: 96px;
+  --linear-section-pt-lg: 96px;
+  --linear-section-pb-lg: 128px;
 
   --linear-content-gap-sm: 48px;
   --linear-content-gap-md: 64px;
@@ -271,9 +278,9 @@
   --linear-h1-size-md: 52px;
   --linear-h1-size-lg: 64px;
 
-  --linear-h2-size-sm: 24px;
-  --linear-h2-size-md: 32px;
-  --linear-h2-size-lg: 36px;
+  --linear-h2-size-sm: 28px;
+  --linear-h2-size-md: 36px;
+  --linear-h2-size-lg: 48px;
 
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
