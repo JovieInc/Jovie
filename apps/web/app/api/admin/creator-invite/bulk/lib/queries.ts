@@ -4,15 +4,7 @@
  * Database queries for fetching eligible profiles.
  */
 
-import {
-  and,
-  sql as drizzleSql,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-} from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   creatorClaimInvites,
@@ -54,8 +46,7 @@ export async function fetchProfilesById(
     .where(
       and(
         inArray(creatorProfiles.id, profileIds),
-        eq(creatorProfiles.isClaimed, false),
-        isNotNull(creatorProfiles.claimToken)
+        eq(creatorProfiles.isClaimed, false)
       )
     )
     .limit(limit);
@@ -92,7 +83,6 @@ export async function fetchProfilesByFitScore(
     .where(
       and(
         eq(creatorProfiles.isClaimed, false),
-        isNotNull(creatorProfiles.claimToken),
         gte(creatorProfiles.fitScore, fitScoreThreshold),
         isNull(creatorClaimInvites.id) // No existing invites
       )
@@ -123,7 +113,6 @@ export async function getEligibleProfileCount(
     .where(
       and(
         eq(creatorProfiles.isClaimed, false),
-        isNotNull(creatorProfiles.claimToken),
         gte(creatorProfiles.fitScore, fitScoreThreshold),
         isNull(creatorClaimInvites.id)
       )

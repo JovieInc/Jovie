@@ -267,6 +267,13 @@
       "when": 1771480180366,
       "tag": "0037_add_email_otp_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1772000000000,
+      "tag": "0038_hash_claim_tokens",
+      "breakpoints": true
     }
   ]
 }
