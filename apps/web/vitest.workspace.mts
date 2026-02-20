@@ -1,13 +1,13 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
-import { defineWorkspace } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineWorkspace([
+export default [
   './vitest.config.fast.mts',
-  {
+  defineConfig({
     plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
     test: {
       name: 'storybook',
@@ -19,5 +19,5 @@ export default defineWorkspace([
       },
       setupFiles: ['./.storybook/vitest.setup.ts'],
     },
-  },
-]);
+  }),
+];
