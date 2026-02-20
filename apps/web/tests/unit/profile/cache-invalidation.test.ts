@@ -28,7 +28,7 @@ vi.mock('@/lib/services/profile/queries', () => ({
 vi.mock('@/lib/cache/tags', () => ({
   CACHE_TAGS: {
     DASHBOARD_DATA: 'dashboard-data',
-    PUBLIC_PROFILE: 'public-profile',
+    PUBLIC_PROFILE: 'profiles-all',
   },
   createProfileTag: (username: string) => `profile:${username}`,
   createSocialLinksTag: (profileId: string) => `social-links:${profileId}`,
@@ -46,12 +46,12 @@ describe('Profile Cache Invalidation', () => {
       await invalidateProfileCache('testartist');
 
       expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
-      expect(mockRevalidateTag).toHaveBeenCalledWith('public-profile', 'max');
       expect(mockRevalidateTag).toHaveBeenCalledWith(
         'profile:testartist',
         'max'
       );
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
+      expect(mockRevalidateTag).not.toHaveBeenCalledWith('profiles-all', 'max');
       expect(mockInvalidateProfileEdgeCache).toHaveBeenCalledWith('testartist');
     });
 
@@ -115,7 +115,6 @@ describe('Profile Cache Invalidation', () => {
         'social-links:profile-123',
         'max'
       );
-      expect(mockRevalidateTag).toHaveBeenCalledWith('public-profile', 'max');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
     });
 
@@ -136,7 +135,6 @@ describe('Profile Cache Invalidation', () => {
       await invalidateAvatarCache('user-123', 'testartist');
 
       expect(mockRevalidateTag).toHaveBeenCalledWith('avatar:user-123', 'max');
-      expect(mockRevalidateTag).toHaveBeenCalledWith('public-profile', 'max');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
     });
 
