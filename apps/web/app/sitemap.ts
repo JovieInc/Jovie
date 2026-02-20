@@ -9,9 +9,7 @@ import { discogReleases, discogTracks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
-const SITEMAP_CACHE_TTL_SECONDS = 60 * 60;
-
-export const revalidate = SITEMAP_CACHE_TTL_SECONDS;
+export const revalidate = 3600;
 
 type SitemapCatalog = {
   profiles: Array<{ username: string; updatedAt: Date | null }>;
@@ -85,7 +83,7 @@ const getSitemapCatalog = unstable_cache(
     }
   },
   ['sitemap-catalog-v1'],
-  { revalidate: SITEMAP_CACHE_TTL_SECONDS }
+  { revalidate: 3600 }
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
