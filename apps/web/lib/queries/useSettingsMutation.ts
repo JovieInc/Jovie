@@ -24,6 +24,7 @@ export interface SettingsUpdateInput {
   updates: {
     theme?: {
       preference: 'light' | 'dark' | 'system';
+      highContrast?: boolean;
     };
     settings?: {
       marketing_emails?: boolean;
@@ -140,8 +141,40 @@ export function useThemeMutation() {
   const mutation = useUpdateSettingsMutation();
 
   return {
-    updateTheme: (preference: 'light' | 'dark' | 'system') => {
-      mutation.mutate({ updates: { theme: { preference } } });
+    updateTheme: (
+      preference: 'light' | 'dark' | 'system',
+      highContrast?: boolean
+    ) => {
+      mutation.mutate({
+        updates: { theme: { preference, highContrast: highContrast ?? false } },
+      });
+    },
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+  };
+}
+
+/**
+ * Convenience hook specifically for high contrast toggle.
+ *
+ * @example
+ * ```tsx
+ * const { setHighContrast, isPending } = useHighContrastMutation();
+ * setHighContrast(true, 'dark');
+ * ```
+ */
+export function useHighContrastMutation() {
+  const mutation = useUpdateSettingsMutation();
+
+  return {
+    setHighContrast: (
+      highContrast: boolean,
+      currentPreference: 'light' | 'dark' | 'system'
+    ) => {
+      mutation.mutate({
+        updates: { theme: { preference: currentPreference, highContrast } },
+      });
     },
     isPending: mutation.isPending,
     isError: mutation.isError,

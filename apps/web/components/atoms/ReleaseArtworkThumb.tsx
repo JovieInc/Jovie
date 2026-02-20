@@ -17,7 +17,7 @@ interface ReleaseArtworkThumbProps {
 }
 
 /**
- * Square artwork thumbnail with rounded-lg corners.
+ * Square artwork thumbnail with rounded corners.
  * Shows a Disc3 fallback icon when:
  * - No src is provided
  * - The image fails to load (404, CORS, expired CDN URL, etc.)
@@ -38,7 +38,7 @@ export function ReleaseArtworkThumb({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm',
+        'relative shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm',
         className
       )}
       style={{ width: size, height: size }}
