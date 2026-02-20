@@ -76,6 +76,10 @@ vi.mock(
   }
 );
 
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
+}));
+
 vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
   useDashboardSocialLinksQuery: () => ({ data: [], isLoading: false }),
 }));

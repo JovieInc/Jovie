@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { useTablePanel } from '@/contexts/TablePanelContext';
+import { useRightPanel } from '@/contexts/RightPanelContext';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
@@ -26,8 +26,6 @@ export interface AuthShellProps {
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
-  /** Preview panel slot (rendered alongside main content) */
-  readonly previewPanel?: ReactNode;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   /** Server-provided sidebar default open state (from cookie). Eliminates layout flash. */
   readonly sidebarDefaultOpen?: boolean;
@@ -44,11 +42,10 @@ function AuthShellInner({
   headerAction,
   showMobileTabs = false,
   isTableRoute = false,
-  previewPanel,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
-  const tablePanel = useTablePanel();
+  const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
 
   // Sidebar expand button (desktop only, when collapsed)
@@ -77,31 +74,21 @@ function AuthShellInner({
             showDivider={isTableRoute}
           />
         )}
-        {isTableRoute ? (
+        <div className={cn('flex-1 min-h-0 overflow-hidden flex')}>
           <div
             className={cn(
-              'flex-1 min-h-0 overflow-hidden flex',
-              showMobileTabs && 'pb-20 lg:pb-0'
+              'flex-1 min-h-0 min-w-0',
+              isTableRoute
+                ? 'overflow-hidden overflow-x-auto'
+                : 'overflow-y-auto overflow-x-hidden p-4 sm:p-6',
+              showMobileTabs &&
+                (isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6')
             )}
           >
-            <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
-              {children}
-            </div>
-            {tablePanel}
+            {children}
           </div>
-        ) : (
-          <div className='flex-1 min-h-0 overflow-hidden flex'>
-            <div
-              className={cn(
-                'flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6',
-                showMobileTabs && 'pb-20 lg:pb-6'
-              )}
-            >
-              {children}
-            </div>
-            {previewPanel}
-          </div>
-        )}
+          {rightPanel}
+        </div>
       </SidebarInset>
 
       {showMobileTabs && <DashboardMobileTabs />}

@@ -25,7 +25,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -508,7 +508,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     ]
   );
 
-  useRegisterTablePanel(sidebarPanel);
+  useRegisterRightPanel(sidebarPanel);
 
   return (
     <>
