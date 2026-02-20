@@ -14,7 +14,13 @@ vi.stubGlobal('fetch', mockFetch);
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: {
+        retry: false,
+        // Ensure any query-level retries resolve immediately in tests
+        // (billingStatusQueryOptions has its own retry fn that overrides
+        // retry:false, so we set retryDelay:0 to avoid 1s exponential delay)
+        retryDelay: 0,
+      },
     },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -113,7 +119,9 @@ describe('usePlanGate', () => {
   });
 
   it('exposes isError when billing fetch fails', async () => {
-    mockFetch.mockResolvedValueOnce(
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(
       new Response('Service Unavailable', {
         status: 503,
         statusText: 'Service Unavailable',
