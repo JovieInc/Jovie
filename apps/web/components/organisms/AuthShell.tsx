@@ -60,6 +60,7 @@ function AuthShellInner({
 
       <SidebarInset
         id='main-content'
+        tabIndex={-1}
         className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'
       >
         {!isInSettings && (

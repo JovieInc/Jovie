@@ -1,9 +1,8 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
@@ -19,46 +18,27 @@ export function SettingsBrandingSection({
   onArtistUpdate,
   isPro = true,
 }: SettingsBrandingSectionProps) {
-  const [hideBranding, setHideBranding] = useState(
-    artist.settings?.hide_branding ?? false
-  );
+  const { updateBrandingAsync } = useBrandingSettingsMutation();
 
-  const { updateBrandingAsync, isPending } = useBrandingSettingsMutation();
-
-  const handleBrandingToggle = async (enabled: boolean) => {
-    // Save previous value for rollback on error
-    const previousValue = hideBranding;
-    const previousArtistSettings = artist.settings?.hide_branding;
-
-    // Optimistic update
-    setHideBranding(enabled);
-    if (onArtistUpdate) {
-      onArtistUpdate({
-        ...artist,
-        settings: {
-          ...artist.settings,
-          hide_branding: enabled,
-        },
-      });
-    }
-
-    try {
-      await updateBrandingAsync(enabled);
-    } catch {
-      // Rollback on error
-      toast.error('Failed to update setting. Please try again.');
-      setHideBranding(previousValue);
-      if (onArtistUpdate) {
-        onArtistUpdate({
-          ...artist,
-          settings: {
-            ...artist.settings,
-            hide_branding: previousArtistSettings,
-          },
-        });
-      }
-    }
-  };
+  const {
+    checked: hideBranding,
+    handleToggle,
+    isPending,
+  } = useOptimisticToggle({
+    initialValue: artist.settings?.hide_branding ?? false,
+    mutateAsync: updateBrandingAsync,
+    onOptimisticUpdate: onArtistUpdate
+      ? enabled => {
+          onArtistUpdate({
+            ...artist,
+            settings: {
+              ...artist.settings,
+              hide_branding: enabled,
+            },
+          });
+        }
+      : undefined,
+  });
 
   return (
     <DashboardCard
@@ -71,7 +51,7 @@ export function SettingsBrandingSection({
           title='Hide Jovie Branding'
           description='Remove Jovie branding from your profile page for a fully custom experience.'
           checked={hideBranding}
-          onCheckedChange={handleBrandingToggle}
+          onCheckedChange={handleToggle}
           disabled={isPending}
           ariaLabel='Hide Jovie branding'
           gated={!isPro}

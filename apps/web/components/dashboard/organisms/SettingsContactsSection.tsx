@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AlertCircle, Plus, UserPlus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -9,6 +9,7 @@ import {
   type EditableContact,
   useContactsManager,
 } from '@/components/dashboard/hooks/useContactsManager';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ContactDetailSidebar } from '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
@@ -47,17 +48,10 @@ export function SettingsContactsSection({
 
   if (isError) {
     return (
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col items-center justify-center gap-2 py-8'>
-          <AlertCircle className='h-6 w-6 text-destructive' />
-          <p className='text-sm text-secondary-token'>
-            Failed to load contacts.
-          </p>
-          <Button variant='ghost' size='sm' onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      </DashboardCard>
+      <SettingsErrorState
+        message='Failed to load contacts.'
+        onRetry={() => refetch()}
+      />
     );
   }
 

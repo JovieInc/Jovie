@@ -22,7 +22,8 @@
 All tokens are CSS custom properties. **OKLCH color space** for perceptual uniformity.
 
 **Naming convention:**
-```
+
+```css
 --color-{category}-{subcategory}
 --linear-{element}-{property}
 --{scale}-{level}
@@ -42,7 +43,7 @@ All tokens are CSS custom properties. **OKLCH color space** for perceptual unifo
 
 ### Token Registration Pipeline
 
-```
+```text
 design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind utilities
 ```
 
@@ -187,7 +188,7 @@ design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind util
 
 ### Architecture: Atomic Design
 
-```
+```text
 packages/ui/atoms/              # 68 shared primitive components (@jovie/ui)
 apps/web/components/
 ├── atoms/                      # 106 app-specific atoms (extend @jovie/ui)
@@ -337,7 +338,7 @@ import type { ButtonProps, BadgeProps } from '@jovie/ui';
 
 ### Static Assets
 
-```
+```text
 apps/web/public/
 ├── brand/          # Logo variants (Icon, Wordmark, Black, White, Alt)
 ├── images/
@@ -632,7 +633,7 @@ All durations → 0ms via `@media (prefers-reduced-motion: reduce)`.
 
 ## 13. Project Structure
 
-```
+```text
 / (monorepo root)
 ├── apps/
 │   ├── web/                   # Main Next.js 16 app
@@ -685,7 +686,7 @@ All durations → 0ms via `@media (prefers-reduced-motion: reduce)`.
 
 ### Component Reuse Reference
 
-```
+```text
 @jovie/ui atoms:  button, badge, input, card, dialog, dropdown-menu, select,
                   tabs, tooltip, checkbox, switch, separator, avatar,
                   skeleton, progress, slider, toggle, popover, sheet,
