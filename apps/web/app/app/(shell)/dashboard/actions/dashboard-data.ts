@@ -10,13 +10,12 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
-import type { BatchItem } from 'drizzle-orm/batch';
 import {
   unstable_noStore as noStore,
   unstable_cache as unstableCache,
 } from 'next/cache';
 import { cache } from 'react';
-import { getSessionSetupSql, validateClerkUserId } from '@/lib/auth/session';
+import { setupDbSession, validateClerkUserId } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -41,36 +40,30 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 const { logger } = Sentry;
 
 /**
- * Executes a query with RLS session setup using Drizzle's batch API.
- * This ensures session variables are set on the same connection as the query execution.
+ * Executes a query with RLS session setup before query execution.
  *
- * With the Neon HTTP driver, each db.execute() can hit a different connection.
- * By using db.batch(), we guarantee that the session setup and the actual query
- * execute on the same connection, ensuring RLS policies work correctly.
+ * The session setup and query execution happen in sequence to avoid runtime
+ * failures from batching raw SQL values with Neon HTTP's batch API.
  *
  * @param clerkUserId - The Clerk user ID for session setup
  * @param queryFn - Function that returns the Drizzle query builder (not executed yet)
  * @param context - Description for error messages (used for timeout wrapper)
  * @returns The query result with timeout wrapper
  */
-async function executeWithSession<TQuery extends BatchItem<'pg'>>(
+async function executeWithSession<T>(
   clerkUserId: string,
-  queryFn: () => TQuery,
+  queryFn: () => { execute: () => Promise<T> },
   context?: string
-): Promise<TQuery['_']['result']> {
+): Promise<T> {
   validateClerkUserId(clerkUserId);
 
-  const sessionSql = getSessionSetupSql(clerkUserId);
   const query = queryFn();
 
-  // Batch the session setup with the query to ensure they run on the same connection.
-  // The batch API executes all statements as an implicit transaction.
+  // Neon HTTP batch currently requires runnable Drizzle queries only.
+  // setupDbSession() avoids runtime failures from batching db.execute(SQL).
   return dashboardQuery(async () => {
-    const [_sessionResult, queryResult] = await db.batch([
-      db.execute(sessionSql),
-      query,
-    ]);
-    return queryResult as TQuery['_']['result'];
+    await setupDbSession(clerkUserId);
+    return query.execute();
   }, context ?? 'Query with session');
 }
 
