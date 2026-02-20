@@ -57,6 +57,7 @@ export function ReleaseSidebar({
   onRescanIsrc,
   isRescanningIsrc = false,
   allowDownloads = false,
+  readOnly = false,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -65,10 +66,10 @@ export function ReleaseSidebar({
     setNewLinkUrl,
     selectedProvider,
     setSelectedProvider,
-    isEditable,
+    isEditable: _isEditable,
     hasRelease,
-    canUploadArtwork,
-    canRevertArtwork,
+    canUploadArtwork: _canUploadArtwork,
+    canRevertArtwork: _canRevertArtwork,
     isAddingDspLink,
     isRemovingDspLink,
     handleArtworkUpload,
@@ -88,6 +89,11 @@ export function ReleaseSidebar({
     onAddDspLink,
     onRemoveDspLink,
   });
+
+  // When readOnly, disable all editing capabilities
+  const isEditable = readOnly ? false : _isEditable;
+  const canUploadArtwork = readOnly ? false : _canUploadArtwork;
+  const canRevertArtwork = readOnly ? false : _canRevertArtwork;
 
   // Sidebar tab state
   const [activeTab, setActiveTab] = useState<SidebarTab>('catalog');
@@ -193,20 +199,25 @@ export function ReleaseSidebar({
             globalThis.location.reload();
           }
         },
-      },
-      { type: 'separator', id: 'sep-danger' },
-      {
-        type: 'action',
-        id: 'delete',
-        label: 'Delete release',
-        icon: <Trash2 className='h-4 w-4' />,
-        onClick: () => toast.info('Delete not implemented'),
-        variant: 'destructive',
       }
     );
 
+    if (!readOnly) {
+      items.push(
+        { type: 'separator', id: 'sep-danger' },
+        {
+          type: 'action',
+          id: 'delete',
+          label: 'Delete release',
+          icon: <Trash2 className='h-4 w-4' />,
+          onClick: () => toast.info('Delete not implemented'),
+          variant: 'destructive',
+        }
+      );
+    }
+
     return items;
-  }, [release, handleCopySmartLink, onRefresh, artistName]);
+  }, [release, handleCopySmartLink, onRefresh, artistName, readOnly]);
 
   return (
     <RightDrawer

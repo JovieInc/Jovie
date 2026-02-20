@@ -15,6 +15,7 @@ import {
   providerLinks,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
@@ -269,3 +270,14 @@ export const getContentBySlug = cache(
     return cached ? rehydrateContent(cached) : null;
   }
 );
+
+/**
+ * Get a creator's plan entitlements by profile ID.
+ * Used to gate unreleased content on the public smartlink page.
+ */
+export const getCreatorPlan = cache(async (creatorProfileId: string) => {
+  const { entitlements } = await getCreatorEntitlements(creatorProfileId);
+  return {
+    canAccessFutureReleases: entitlements.booleans.canAccessFutureReleases,
+  };
+});

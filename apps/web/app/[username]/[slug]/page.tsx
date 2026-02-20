@@ -10,7 +10,10 @@
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
-import { UnreleasedReleaseHero } from '@/components/release';
+import {
+  ScheduledReleasePage,
+  UnreleasedReleaseHero,
+} from '@/components/release';
 import { BASE_URL } from '@/constants/app';
 import {
   PRIMARY_PROVIDER_KEYS,
@@ -23,7 +26,11 @@ import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
-import { getContentBySlug, getCreatorByUsername } from './_lib/data';
+import {
+  getContentBySlug,
+  getCreatorByUsername,
+  getCreatorPlan,
+} from './_lib/data';
 
 // Use ISR with 5-minute revalidation for smart link pages
 export const revalidate = 300;
@@ -308,6 +315,13 @@ export default async function ContentSmartLinkPage({
   const isUnreleased =
     content.releaseDate && new Date(content.releaseDate) > new Date();
 
+  // Check if the creator's plan allows unreleased content features
+  let showUnreleasedHero = false;
+  if (isUnreleased) {
+    const creatorPlan = await getCreatorPlan(creator.id);
+    showUnreleasedHero = creatorPlan.canAccessFutureReleases;
+  }
+
   return (
     <>
       <script
@@ -325,7 +339,7 @@ export default async function ContentSmartLinkPage({
         }}
       />
 
-      {isUnreleased ? (
+      {isUnreleased && showUnreleasedHero ? (
         <UnreleasedReleaseHero
           release={{
             title: content.title,
@@ -337,6 +351,17 @@ export default async function ContentSmartLinkPage({
             name: creator.displayName ?? creator.username,
             handle: creator.usernameNormalized,
             avatarUrl: creator.avatarUrl,
+          }}
+        />
+      ) : isUnreleased ? (
+        <ScheduledReleasePage
+          release={{
+            title: content.title,
+            artworkUrl: content.artworkUrl,
+          }}
+          artist={{
+            name: creator.displayName ?? creator.username,
+            handle: creator.usernameNormalized,
           }}
         />
       ) : (

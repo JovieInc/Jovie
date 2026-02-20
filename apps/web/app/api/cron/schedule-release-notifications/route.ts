@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -60,6 +61,46 @@ export async function scheduleReleaseNotifications(): Promise<{
     ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
   ];
 
+  // Check which creators can send notifications based on their plan
+  const eligibleCreatorIds = new Set<string>();
+  await Promise.all(
+    creatorProfileIds.map(async profileId => {
+      try {
+        const { entitlements } = await getCreatorEntitlements(profileId);
+        if (entitlements.booleans.canSendNotifications) {
+          eligibleCreatorIds.add(profileId);
+        }
+      } catch {
+        // If plan lookup fails, skip this creator (don't send on error)
+        logger.warn(
+          `[schedule-release-notifications] Failed to check plan for creator ${profileId}, skipping`
+        );
+      }
+    })
+  );
+
+  // Filter to only eligible releases
+  const eligibleReleases = upcomingReleases.filter(r =>
+    eligibleCreatorIds.has(r.creatorProfileId)
+  );
+  const skippedCount = upcomingReleases.length - eligibleReleases.length;
+  if (skippedCount > 0) {
+    logger.info(
+      `[schedule-release-notifications] Skipped ${skippedCount} releases from free-plan creators`
+    );
+  }
+
+  if (eligibleReleases.length === 0) {
+    logger.info(
+      '[schedule-release-notifications] No eligible releases after plan check'
+    );
+    return { scheduled: 0, releasesFound: upcomingReleases.length };
+  }
+
+  const eligibleCreatorProfileIds = [
+    ...new Set(eligibleReleases.map(r => r.creatorProfileId)),
+  ];
+
   const allSubscribers = await db
     .select({
       id: notificationSubscriptions.id,
@@ -72,7 +113,10 @@ export async function scheduleReleaseNotifications(): Promise<{
     .from(notificationSubscriptions)
     .where(
       and(
-        inArray(notificationSubscriptions.creatorProfileId, creatorProfileIds),
+        inArray(
+          notificationSubscriptions.creatorProfileId,
+          eligibleCreatorProfileIds
+        ),
         drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
         drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
         drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
@@ -103,7 +147,7 @@ export async function scheduleReleaseNotifications(): Promise<{
     metadata: { releaseTitle: string | null; channel: string };
   }> = [];
 
-  for (const release of upcomingReleases) {
+  for (const release of eligibleReleases) {
     if (!release.releaseDate) continue;
 
     const subscribers =

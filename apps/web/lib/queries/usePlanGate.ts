@@ -48,6 +48,14 @@ export interface PlanGateEntitlements {
   canBeVerified: boolean;
   /** AI: can use tools (pro/growth) */
   aiCanUseTools: boolean;
+  /** Pro: can create releases manually (not just auto-sync) */
+  canCreateManualReleases: boolean;
+  /** Pro: can access future/unreleased release smartlinks */
+  canAccessFutureReleases: boolean;
+  /** Pro: can send notifications to subscribers */
+  canSendNotifications: boolean;
+  /** Pro: can edit smartlink content (artwork, links, slugs) */
+  canEditSmartLinks: boolean;
   /** Analytics retention days based on plan */
   analyticsRetentionDays: number;
   /** Contact limit based on plan (null = unlimited) */

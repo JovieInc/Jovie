@@ -5,26 +5,27 @@ import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkGateBannerProps {
-  /** Total number of releases the user has */
-  readonly totalReleases: number;
   /** Number of smart links available on the free plan */
   readonly smartLinksLimit: number;
+  /** Number of released releases */
+  readonly releasedCount: number;
+  /** Number of unreleased/scheduled releases */
+  readonly unreleasedCount: number;
   readonly className?: string;
 }
 
 /**
- * Banner shown to free-tier users when they have more releases than the
- * smart link limit. Highlights the value of auto-created smart links
- * and encourages upgrading.
+ * Banner shown to free-tier users when they have more released music than
+ * the smart link cap, or when they have unreleased/scheduled releases.
+ * Encourages upgrading to Pro.
  */
 export function SmartLinkGateBanner({
-  totalReleases,
   smartLinksLimit,
+  releasedCount,
+  unreleasedCount,
   className,
 }: SmartLinkGateBannerProps) {
-  // ~20 minutes saved per auto-created smart link
-  const minutesSaved = totalReleases * 20;
-  const hoursSaved = Math.round(minutesSaved / 60);
+  const overCap = releasedCount > smartLinksLimit;
 
   return (
     <aside
@@ -43,18 +44,35 @@ export function SmartLinkGateBanner({
       </div>
       <div className='min-w-0 flex-1'>
         <p className='text-sm font-medium text-primary-token'>
-          We auto-created all {totalReleases} smart links for you
+          {overCap
+            ? `${smartLinksLimit} of your ${releasedCount} released songs have active smart links`
+            : `Your released music has free smart links`}
         </p>
         <p className='mt-0.5 text-xs text-secondary-token'>
-          {smartLinksLimit} are active on your free plan.{' '}
-          <Link
-            href='/pricing'
-            className='font-medium text-primary underline-offset-2 hover:underline'
-          >
-            Upgrade to Pro
-          </Link>{' '}
-          to unlock all {totalReleases}
-          {hoursSaved > 0 && ` and save ~${hoursSaved}h of setup`}.
+          {overCap && (
+            <>
+              <Link
+                href='/pricing'
+                className='font-medium text-primary underline-offset-2 hover:underline'
+              >
+                Upgrade to Pro
+              </Link>{' '}
+              to unlock all {releasedCount}.{' '}
+            </>
+          )}
+          {unreleasedCount > 0 && (
+            <>
+              You have {unreleasedCount} upcoming{' '}
+              {unreleasedCount === 1 ? 'release' : 'releases'}.{' '}
+              <Link
+                href='/pricing'
+                className='font-medium text-primary underline-offset-2 hover:underline'
+              >
+                {overCap ? 'Pro' : 'Upgrade to Pro'}
+              </Link>{' '}
+              to enable pre-release pages with countdowns and notify-me.
+            </>
+          )}
         </p>
       </div>
     </aside>

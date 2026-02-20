@@ -233,7 +233,8 @@ export function createAvailabilityCellRenderer(
 
 /** Creates a cell renderer for the smart link column */
 export function createSmartLinkCellRenderer(
-  isSmartLinkLocked?: (releaseId: string) => boolean
+  isSmartLinkLocked?: (releaseId: string) => boolean,
+  getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
 ) {
   return function SmartLinkCellRenderer({
     row,
@@ -242,6 +243,7 @@ export function createSmartLinkCellRenderer(
       <SmartLinkCell
         release={row.original}
         locked={isSmartLinkLocked?.(row.original.id)}
+        lockReason={getSmartLinkLockReason?.(row.original.id)}
       />
     );
   };
@@ -249,7 +251,8 @@ export function createSmartLinkCellRenderer(
 
 /** Combined right column: smart link + popularity + year (responsive) */
 export function createRightMetaCellRenderer(
-  isSmartLinkLocked?: (releaseId: string) => boolean
+  isSmartLinkLocked?: (releaseId: string) => boolean,
+  getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
 ) {
   return function RightMetaCellRenderer({
     row,
@@ -265,6 +268,7 @@ export function createRightMetaCellRenderer(
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
+            lockReason={getSmartLinkLockReason?.(release.id)}
           />
         </div>
 

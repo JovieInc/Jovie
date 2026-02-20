@@ -14,7 +14,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(free.limits).toEqual({
         analyticsRetentionDays: 7,
         contactsLimit: 100,
-        smartLinksLimit: 5,
+        smartLinksLimit: 25,
         aiDailyMessageLimit: 5,
       });
       expect(free.booleans).toEqual({
@@ -25,6 +25,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: false,
         canBeVerified: false,
         aiCanUseTools: false,
+        canCreateManualReleases: false,
+        canAccessFutureReleases: false,
+        canSendNotifications: false,
+        canEditSmartLinks: false,
       });
     });
 
@@ -44,6 +48,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: true,
         canBeVerified: true,
         aiCanUseTools: true,
+        canCreateManualReleases: true,
+        canAccessFutureReleases: true,
+        canSendNotifications: true,
+        canEditSmartLinks: true,
       });
     });
 
@@ -63,6 +71,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: true,
         canBeVerified: true,
         aiCanUseTools: true,
+        canCreateManualReleases: true,
+        canAccessFutureReleases: true,
+        canSendNotifications: true,
+        canEditSmartLinks: true,
       });
     });
 
