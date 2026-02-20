@@ -36,23 +36,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: |
-          # Install browsers for @playwright/test (1.58.x)
-          pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
-          # Install browsers for @storybook/test-runner's bundled playwright-core (1.57.x)
-          pnpm dlx playwright-core@1.57.0 install chromium chromium-headless-shell
+        run: pnpm --filter web exec playwright install chromium --with-deps
 
-      - name: Build Storybook
-        run: pnpm --filter web build-storybook
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-
-      - name: Run Storybook Tests (A11y)
+      - name: Run Storybook A11y Tests
         id: a11y-test
-        run: |
-          npx http-server apps/web/storybook-static -p 6006 --silent &
-          timeout 30 bash -c 'until curl -s http://127.0.0.1:6006 > /dev/null; do sleep 1; done'
-          pnpm --filter web storybook:test --url http://127.0.0.1:6006
+        run: pnpm --filter web test:a11y
 
       - name: A11y Results Summary
         if: always()
@@ -67,7 +55,7 @@ jobs:
             echo "Some components have accessibility issues (contrast, labels, etc.)." >> $GITHUB_STEP_SUMMARY
             echo "These are logged as warnings - review the job output for details." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "To run locally: \`pnpm --filter web storybook:test\`" >> $GITHUB_STEP_SUMMARY
+            echo "To run locally: \`pnpm --filter web test:a11y\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "## ✅ A11y Check Results" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
