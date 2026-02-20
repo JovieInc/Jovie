@@ -120,6 +120,24 @@ function safeSerializeError(error: unknown): string {
   return trySerialize({ value: String(error) }) ?? String(error);
 }
 
+export function mapSocialLinkExistence(
+  counts:
+    | {
+        hasLinks?: boolean | number | string | null;
+        hasMusicLinks?: boolean | number | string | null;
+      }
+    | null
+    | undefined
+): { hasLinks: boolean; hasMusicLinks: boolean } {
+  const parseBoolLike = (value: boolean | number | string | null | undefined) =>
+    value === true || value === 1 || value === '1' || value === 't';
+
+  return {
+    hasLinks: parseBoolLike(counts?.hasLinks),
+    hasMusicLinks: parseBoolLike(counts?.hasMusicLinks),
+  };
+}
+
 /**
  * Complete dashboard data structure containing all information
  * needed to render the dashboard UI.
@@ -273,31 +291,38 @@ async function fetchDashboardCoreWithSession(
         () =>
           db
             .select({
-              hasLinks: drizzleSql<number>`count(*)`,
-              hasMusicLinks: drizzleSql<number>`
-                count(*) filter (
-                  where ${or(
+              hasLinks: drizzleSql<boolean>`
+              exists (
+                select 1
+                from ${socialLinks}
+                where ${and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active')
+                )}
+              )
+            `,
+              hasMusicLinks: drizzleSql<boolean>`
+              exists (
+                select 1
+                from ${socialLinks}
+                where ${and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active'),
+                  or(
                     eq(socialLinks.platformType, 'dsp'),
                     eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                  )}
-                )
-              `,
-            })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
+                  )
+                )}
               )
-            ),
+            `,
+            })
+            .from(users)
+            .where(eq(users.id, userData.id))
+            .limit(1),
         'Social links existence query'
       )
         .then(result => {
-          const counts = result?.[0];
-          return {
-            hasLinks: Number(counts?.hasLinks ?? 0) > 0,
-            hasMusicLinks: Number(counts?.hasMusicLinks ?? 0) > 0,
-          };
+          return mapSocialLinkExistence(result?.[0]);
         })
         .catch((error: unknown) => {
           const migrationResult = handleMigrationErrors(error, {

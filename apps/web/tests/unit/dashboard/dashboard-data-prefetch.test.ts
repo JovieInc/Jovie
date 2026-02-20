@@ -254,4 +254,18 @@ describe('dashboard data prefetch', () => {
     // but the actual data fetching is deduplicated via unstable_cache
     expect(getSessionSetupSqlMock).toHaveBeenCalled();
   });
+
+  it('maps postgres bool-like existence values correctly', async () => {
+    const { mapSocialLinkExistence } = await import(
+      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+    );
+
+    expect(
+      mapSocialLinkExistence({ hasLinks: 't', hasMusicLinks: '1' })
+    ).toEqual({ hasLinks: true, hasMusicLinks: true });
+
+    expect(mapSocialLinkExistence({ hasLinks: 'f', hasMusicLinks: 0 })).toEqual(
+      { hasLinks: false, hasMusicLinks: false }
+    );
+  });
 });
