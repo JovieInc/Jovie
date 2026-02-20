@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getEntitlements } from '@/lib/entitlements/registry';
 import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
@@ -272,6 +273,7 @@ export async function POST(request: Request) {
           { route: '/api/admin/creator-ingest', userId: error.userId },
           'warning'
         );
+        const freeEnt = getEntitlements('free');
         entitlements = {
           userId: error.userId,
           email: null,
@@ -280,21 +282,8 @@ export async function POST(request: Request) {
           plan: 'free',
           isPro: false,
           hasAdvancedFeatures: false,
-          canRemoveBranding: false,
-          canExportContacts: false,
-          canAccessAdvancedAnalytics: false,
-          canFilterSelfFromAnalytics: false,
-          canAccessAdPixels: false,
-          canBeVerified: false,
-          aiCanUseTools: false,
-          canCreateManualReleases: false,
-          canAccessFutureReleases: false,
-          canSendNotifications: false,
-          canEditSmartLinks: false,
-          analyticsRetentionDays: 7,
-          contactsLimit: 100,
-          smartLinksLimit: 25,
-          aiDailyMessageLimit: 5,
+          ...freeEnt.booleans,
+          ...freeEnt.limits,
         };
       } else {
         throw error;

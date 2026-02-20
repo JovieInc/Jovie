@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { FREQUENT_CACHE } from './cache-strategies';
-import { createQueryFn } from './fetch';
+import { createQueryFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 
 export interface BillingStatusData {
@@ -48,8 +48,12 @@ export const billingStatusQueryOptions = {
   // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
   ...FREQUENT_CACHE,
   // Billing endpoint can return 503 when billing systems are transiently down.
-  // Allow 1 retry with backoff so transient failures self-heal.
-  retry: (failureCount: number, _error: Error) => {
+  // Allow 1 retry with backoff for transient failures (5xx/429/408).
+  // Don't retry 4xx client errors — they won't self-heal.
+  retry: (failureCount: number, error: Error) => {
+    if (error instanceof FetchError && !error.isRetryable()) {
+      return false;
+    }
     return failureCount < 1;
   },
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
