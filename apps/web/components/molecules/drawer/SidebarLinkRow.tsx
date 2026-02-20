@@ -41,8 +41,10 @@ export function SidebarLinkRow({
   testId,
 }: SidebarLinkRowProps) {
   const [copied, setCopied] = useState(false);
+  const hasUrl = url.trim().length > 0;
 
   const handleCopy = useCallback(() => {
+    if (!hasUrl) return;
     if (!navigator.clipboard?.writeText) return;
     navigator.clipboard
       .writeText(url)
@@ -53,11 +55,12 @@ export function SidebarLinkRow({
       .catch(() => {
         // Silently fail - clipboard may not be available
       });
-  }, [url]);
+  }, [hasUrl, url]);
 
   const handleOpen = useCallback(() => {
+    if (!hasUrl) return;
     globalThis.open(url, '_blank', 'noopener,noreferrer');
-  }, [url]);
+  }, [hasUrl, url]);
 
   const hasRemove = isEditable && onRemove;
   const swipeActionsWidth = hasRemove ? 132 : 88;
@@ -67,6 +70,7 @@ export function SidebarLinkRow({
       <button
         type='button'
         onClick={handleCopy}
+        disabled={!hasUrl}
         className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-accent')}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
@@ -79,6 +83,7 @@ export function SidebarLinkRow({
       <button
         type='button'
         onClick={handleOpen}
+        disabled={!hasUrl}
         className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-surface-3')}
         aria-label={`Open ${label}`}
       >
@@ -141,6 +146,7 @@ export function SidebarLinkRow({
           <button
             type='button'
             onClick={handleOpen}
+            disabled={!hasUrl}
             className={ACTION_BUTTON_CLASS}
             aria-label={`Open ${label}`}
           >
@@ -149,6 +155,7 @@ export function SidebarLinkRow({
           <button
             type='button'
             onClick={handleCopy}
+            disabled={!hasUrl}
             className={ACTION_BUTTON_CLASS}
             aria-label={copied ? 'Copied!' : `Copy ${label} link`}
           >
