@@ -24,6 +24,7 @@ export type ProfileSummary = Pick<
   | 'avatarUrl'
   | 'isPublic'
   | 'isClaimed'
+  | 'claimToken'
   | 'isVerified'
 >;
 
@@ -48,6 +49,7 @@ export type ProfileData = Pick<
   | 'isPublic'
   | 'isVerified'
   | 'isClaimed'
+  | 'claimToken'
   | 'isFeatured'
   | 'marketingOptOut'
   | 'settings'

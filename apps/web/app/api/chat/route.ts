@@ -18,7 +18,7 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
-import { CORS_HEADERS } from '@/lib/http/headers';
+import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   checkAiChatRateLimitForPlan,
   createRateLimitHeaders,
@@ -260,7 +260,8 @@ async function fetchReleasesForChat(
 async function resolveArtistContext(
   profileId: unknown,
   artistContextInput: unknown,
-  userId: string
+  userId: string,
+  corsHeaders: Record<string, string>
 ): Promise<
   | { context: ArtistContext; error?: never }
   | { context?: never; error: NextResponse }
@@ -271,7 +272,7 @@ async function resolveArtistContext(
       return {
         error: NextResponse.json(
           { error: 'Profile not found or unauthorized' },
-          { status: 404, headers: CORS_HEADERS }
+          { status: 404, headers: corsHeaders }
         ),
       };
     }
@@ -287,7 +288,7 @@ async function resolveArtistContext(
           error: 'Invalid artistContext format',
           details: parseResult.error.flatten().fieldErrors,
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400, headers: corsHeaders }
       ),
     };
   }
@@ -1111,11 +1112,16 @@ function createWorldClassBioTool(
 /**
  * OPTIONS - CORS preflight handler
  */
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'POST, OPTIONS'
+  );
+
   return new NextResponse(null, {
     status: 204,
     headers: {
-      ...CORS_HEADERS,
+      ...corsHeaders,
       'Access-Control-Max-Age': '86400',
     },
   });
@@ -1180,7 +1186,8 @@ function buildChatErrorResponse(
   messageCount: number,
   requestId: string,
   profileId: string | null,
-  conversationId: string | null
+  conversationId: string | null,
+  corsHeaders: Record<string, string>
 ) {
   Sentry.captureException(error, {
     tags: { feature: 'ai-chat' },
@@ -1202,19 +1209,23 @@ function buildChatErrorResponse(
       debugMessage: message,
       requestId,
     },
-    { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+    { status: 500, headers: { ...corsHeaders, 'x-request-id': requestId } }
   );
 }
 
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'POST, OPTIONS'
+  );
 
   // Auth check - ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },
-      { status: 401, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 401, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1239,7 +1250,7 @@ export async function POST(req: Request) {
       {
         status: 429,
         headers: {
-          ...CORS_HEADERS,
+          ...corsHeaders,
           ...createRateLimitHeaders(rateLimitResult),
           'x-request-id': requestId,
         },
@@ -1259,7 +1270,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body', requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1272,7 +1283,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: 'Missing profileId or artistContext', requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1281,7 +1292,7 @@ export async function POST(req: Request) {
   if (messagesError) {
     return NextResponse.json(
       { error: messagesError, requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1292,7 +1303,8 @@ export async function POST(req: Request) {
   const contextResult = await resolveArtistContext(
     profileId,
     body.artistContext,
-    userId
+    userId,
+    corsHeaders
   );
   if (contextResult.error) {
     return contextResult.error;
@@ -1347,7 +1359,7 @@ export async function POST(req: Request) {
 
     return result.toUIMessageStreamResponse({
       headers: {
-        ...CORS_HEADERS,
+        ...corsHeaders,
         'x-request-id': requestId,
       },
     });
@@ -1357,7 +1369,7 @@ export async function POST(req: Request) {
         JSON.stringify({ error: 'Client disconnected', requestId }),
         {
           status: 499,
-          headers: { ...CORS_HEADERS, 'x-request-id': requestId },
+          headers: { ...corsHeaders, 'x-request-id': requestId },
         }
       );
     }
@@ -1368,7 +1380,8 @@ export async function POST(req: Request) {
       uiMessages.length,
       requestId,
       resolvedProfileId,
-      resolvedConversationId
+      resolvedConversationId,
+      corsHeaders
     );
   }
 }

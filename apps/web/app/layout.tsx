@@ -10,6 +10,10 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
@@ -155,6 +159,17 @@ export default async function RootLayout({
   // hydration mismatch: server renders nonce="" but client expects undefined
   const headersList = await headers();
   const nonce = headersList.get('x-nonce') || undefined;
+  const cookieHeader = headersList.get('cookie');
+  const cookieRequirement = cookieHeader
+    ?.split(';')
+    .find(cookie =>
+      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
+    )
+    ?.split('=')[1];
+  const cookieBannerRequired =
+    cookieRequirement != null
+      ? cookieRequirement !== '0'
+      : isCookieBannerRequired(headersList.get('x-vercel-ip-country'));
 
   const headContent = (
     <head>
@@ -301,7 +316,7 @@ export default async function RootLayout({
         </a>
         <CoreProviders>{children}</CoreProviders>
 
-        <CookieBannerSection />
+        <CookieBannerSection showBanner={cookieBannerRequired} />
         {VercelToolbar && <VercelToolbar />}
       </body>
     </html>
