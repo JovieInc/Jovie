@@ -1,4 +1,5 @@
 import { type Metadata } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
 import {
@@ -17,6 +18,9 @@ interface Props {
 }
 
 export default async function ClaimPage({ params, searchParams }: Props) {
+  // Claim flows are token-specific and should always bypass ISR/full-route cache.
+  noStore();
+
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const token = resolvedSearchParams?.token;

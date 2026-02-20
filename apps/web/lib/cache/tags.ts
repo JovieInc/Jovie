@@ -32,7 +32,7 @@
  */
 export const CACHE_TAGS = {
   // Public profile caches
-  PUBLIC_PROFILE: 'public-profile',
+  PUBLIC_PROFILE: 'profiles-all',
 
   // Dashboard data caches
   DASHBOARD_DATA: 'dashboard-data',
@@ -63,7 +63,7 @@ export type CacheTag = (typeof CACHE_TAGS)[keyof typeof CACHE_TAGS];
  * ```
  */
 export function createProfileTag(usernameNormalized: string): string {
-  return `${CACHE_TAGS.PUBLIC_PROFILE}:${usernameNormalized}`;
+  return `profile:${usernameNormalized}`;
 }
 
 /**
