@@ -1,4 +1,4 @@
-import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { TooltipProvider } from '@jovie/ui';
 import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';

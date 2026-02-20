@@ -135,36 +135,35 @@ async function analyzeFlakiness(token, owner, repo) {
         j.name.includes('Unit')
     );
 
-    let runHadRetry = false;
+    const runHadRetry = run.run_attempt > 1;
     let runHadFailure = false;
 
     for (const job of testJobs) {
-      const testName = job.name;
+      const executions = extractTestExecutions(job);
 
-      if (!testStats.has(testName)) {
-        testStats.set(testName, {
-          failures: 0,
-          successes: 0,
-          retries: 0,
-          runs: 0,
-          lastFailure: null,
-        });
-      }
+      for (const execution of executions) {
+        if (!testStats.has(execution.name)) {
+          testStats.set(execution.name, {
+            failures: 0,
+            successes: 0,
+            retries: 0,
+            runs: 0,
+            lastFailure: null,
+          });
+        }
 
-      const stats = testStats.get(testName);
-      stats.runs++;
+        const stats = testStats.get(execution.name);
+        stats.runs++;
 
-      if (job.conclusion === 'failure') {
-        stats.failures++;
-        stats.lastFailure = run.created_at;
-        runHadFailure = true;
-      } else if (job.conclusion === 'success') {
-        stats.successes++;
-
-        // Check if job was retried (run_attempt > 1)
-        if (job.run_attempt && job.run_attempt > 1) {
-          stats.retries++;
-          runHadRetry = true;
+        if (execution.conclusion === 'failure') {
+          stats.failures++;
+          stats.lastFailure = run.created_at;
+          runHadFailure = true;
+        } else if (execution.conclusion === 'success') {
+          stats.successes++;
+          if (run.run_attempt > 1) {
+            stats.retries++;
+          }
         }
       }
     }
@@ -179,6 +178,43 @@ async function analyzeFlakiness(token, owner, repo) {
     runsWithRetries,
     runsWithFailures,
   };
+}
+
+/**
+ * Extract concrete test executions from a workflow job.
+ *
+ * Unit test jobs can fail for non-test reasons (dependency install, environment setup),
+ * which creates noisy "Unit Tests" flakiness reports. Prefer explicit test run steps when
+ * available and fall back to job-level status otherwise.
+ */
+function extractTestExecutions(job) {
+  const runStepRegex = /^run .*tests?/i;
+
+  // First, check if any test steps exist at all (regardless of conclusion)
+  const allTestSteps = (job.steps || []).filter(step =>
+    runStepRegex.test(step.name || '')
+  );
+
+  // If test steps exist, only report those that actually completed (success/failure).
+  // Skipped/cancelled test steps mean the job failed before tests ran (e.g. setup failure)
+  // — do NOT fall back to job-level conclusion in that case.
+  if (allTestSteps.length > 0) {
+    const completedSteps = allTestSteps.filter(step =>
+      ['success', 'failure'].includes(step.conclusion)
+    );
+
+    return completedSteps.map(step => ({
+      name: `${job.name} › ${step.name}`,
+      conclusion: step.conclusion,
+    }));
+  }
+
+  // Only fall back to job-level conclusion when there are genuinely no test steps
+  if (['success', 'failure'].includes(job.conclusion)) {
+    return [{ name: job.name, conclusion: job.conclusion }];
+  }
+
+  return [];
 }
 
 /**
@@ -416,4 +452,9 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { analyzeFlakiness, calculateMetrics, generateReport };
+module.exports = {
+  analyzeFlakiness,
+  calculateMetrics,
+  extractTestExecutions,
+  generateReport,
+};

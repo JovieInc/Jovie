@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTable } from './dashboard-audience-table';
 
@@ -127,9 +128,11 @@ const meta: Meta<typeof DashboardAudienceTable> = {
   decorators: [
     Story => (
       <DashboardDataProvider value={mockDashboardData}>
-        <div className='h-[720px] bg-surface-1 text-primary-token'>
-          <Story />
-        </div>
+        <TableMetaProvider>
+          <div className='h-[720px] bg-surface-1 text-primary-token'>
+            <Story />
+          </div>
+        </TableMetaProvider>
       </DashboardDataProvider>
     ),
   ],
