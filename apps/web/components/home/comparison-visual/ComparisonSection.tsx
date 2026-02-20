@@ -39,7 +39,6 @@ export function ComparisonSection() {
       className='relative section-spacing-linear overflow-hidden'
       style={{
         backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
       }}
       aria-label='Comparison: Traditional link pages versus Jovie Profile'
     >

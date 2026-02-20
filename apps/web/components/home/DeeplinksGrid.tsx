@@ -1,51 +1,44 @@
 import type { ReactNode } from 'react';
-import { IGComparisonAside } from '@/components/home/IGComparisonAside';
 import { Container } from '@/components/site/Container';
 
 /* ------------------------------------------------------------------ */
-/*  Card mockups                                                       */
+/*  Card mockups — premium fidelity                                    */
 /* ------------------------------------------------------------------ */
 
 function TipMockup() {
   return (
-    <div className='flex flex-col gap-2'>
-      <div className='flex gap-1.5'>
+    <div className='flex flex-col gap-3'>
+      <div className='flex gap-2'>
         {['$3', '$5', '$10'].map(amt => (
           <div
             key={amt}
-            className='flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium'
+            className='flex items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors duration-100'
             style={{
               backgroundColor:
                 amt === '$10'
-                  ? 'var(--linear-bg-surface-2)'
-                  : 'var(--linear-bg-surface-1)',
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(255,255,255,0.03)',
               color: 'var(--linear-text-primary)',
               border:
                 amt === '$10'
-                  ? '1px solid var(--linear-border-default)'
-                  : '1px solid transparent',
+                  ? '1px solid rgba(255,255,255,0.10)'
+                  : '1px solid rgba(255,255,255,0.05)',
             }}
           >
             {amt}
           </div>
         ))}
       </div>
-      <div className='flex gap-1.5'>
+      <div className='flex gap-2'>
         <div
-          className='flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium flex-1'
-          style={{
-            backgroundColor: '#008CFF',
-            color: '#fff',
-          }}
+          className='flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium flex-1'
+          style={{ backgroundColor: '#008CFF', color: '#fff' }}
         >
           Venmo
         </div>
         <div
-          className='flex items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium flex-1'
-          style={{
-            backgroundColor: '#fff',
-            color: '#000',
-          }}
+          className='flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium flex-1'
+          style={{ backgroundColor: '#fff', color: '#000' }}
         >
           Apple Pay
         </div>
@@ -65,16 +58,18 @@ function TourMockup() {
       {shows.map((show, i) => (
         <div
           key={show.city}
-          className='flex items-center justify-between py-2 text-xs'
+          className='flex items-center justify-between py-2.5'
           style={{
             borderBottom:
               i < shows.length - 1
-                ? '1px solid var(--linear-border-subtle)'
+                ? '1px solid rgba(255,255,255,0.05)'
                 : undefined,
           }}
         >
-          <div>
-            <span style={{ color: 'var(--linear-text-secondary)' }}>
+          <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
+            <span
+              style={{ color: 'var(--linear-text-secondary)', fontWeight: 450 }}
+            >
               {show.city}
             </span>
             <span style={{ color: 'var(--linear-text-tertiary)' }}>
@@ -85,7 +80,7 @@ function TourMockup() {
           <span
             style={{
               color: 'var(--linear-text-tertiary)',
-              fontSize: '14px',
+              fontSize: '13px',
             }}
           >
             →
@@ -107,15 +102,20 @@ function ContactMockup() {
       {contacts.map((c, i) => (
         <div
           key={c.role}
-          className='flex items-center gap-2 py-2 text-xs'
+          className='flex items-center justify-between py-2.5'
           style={{
             borderBottom:
               i < contacts.length - 1
-                ? '1px solid var(--linear-border-subtle)'
+                ? '1px solid rgba(255,255,255,0.05)'
                 : undefined,
+            fontSize: '12px',
           }}
         >
-          <span style={{ color: 'var(--linear-text-tertiary)' }}>{c.role}</span>
+          <span
+            style={{ color: 'var(--linear-text-tertiary)', fontWeight: 450 }}
+          >
+            {c.role}
+          </span>
           <span style={{ color: 'var(--linear-text-secondary)' }}>
             {c.name}
           </span>
@@ -132,15 +132,20 @@ function ListenMockup() {
       {dsps.map((name, i) => (
         <div
           key={name}
-          className='flex items-center justify-between py-2 text-xs'
+          className='flex items-center justify-between py-2.5'
           style={{
             borderBottom:
               i < dsps.length - 1
-                ? '1px solid var(--linear-border-subtle)'
+                ? '1px solid rgba(255,255,255,0.05)'
                 : undefined,
+            fontSize: '12px',
           }}
         >
-          <span style={{ color: 'var(--linear-text-secondary)' }}>{name}</span>
+          <span
+            style={{ color: 'var(--linear-text-secondary)', fontWeight: 450 }}
+          >
+            {name}
+          </span>
           <span
             style={{
               color: 'var(--linear-text-tertiary)',
@@ -161,40 +166,30 @@ function ListenMockup() {
 /* ------------------------------------------------------------------ */
 
 interface CardData {
-  slugBase: string;
   slugPath: string;
   description: string;
-  accent: string;
   mockup: ReactNode;
 }
 
 const cards: CardData[] = [
   {
-    slugBase: 'jov.ie/tim/',
     slugPath: 'tip',
     description: 'QR on merch table. Fans tip in one tap.',
-    accent: '#4ade80',
     mockup: <TipMockup />,
   },
   {
-    slugBase: 'jov.ie/tim/',
     slugPath: 'tour',
     description: 'Drop in your story. Fans see dates instantly.',
-    accent: '#8b5cf6',
     mockup: <TourMockup />,
   },
   {
-    slugBase: 'jov.ie/tim/',
     slugPath: 'contact',
     description: 'One link for every industry inquiry.',
-    accent: '#3b82f6',
     mockup: <ContactMockup />,
   },
   {
-    slugBase: 'jov.ie/tim/',
     slugPath: 'listen',
     description: 'Skip the profile. Opens their preferred DSP.',
-    accent: '#4ade80',
     mockup: <ListenMockup />,
   },
 ];
@@ -206,20 +201,33 @@ const cards: CardData[] = [
 export function DeeplinksGrid() {
   return (
     <section
-      className='section-spacing-linear'
+      className='section-spacing-linear relative overflow-hidden'
       style={{
         backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
       }}
     >
+      {/* Ambient glow behind grid — matches Linear's 400x400 radial glow pattern */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
+        style={{
+          width: '400px',
+          height: '400px',
+          borderRadius: '400px',
+          background:
+            'radial-gradient(50% 50%, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 50%)',
+        }}
+      />
+
       <Container size='homepage'>
+        {/* Heading */}
         <div className='text-center heading-gap-linear'>
           <h2
             style={{
-              fontSize: 'var(--linear-h2-size)',
-              fontWeight: 'var(--linear-font-weight-bold)',
-              lineHeight: 'var(--linear-h2-leading)',
-              letterSpacing: 'var(--linear-h2-tracking)',
+              fontSize: 'clamp(28px, 4vw, 48px)',
+              fontWeight: 510,
+              lineHeight: 1,
+              letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
             }}
           >
@@ -228,60 +236,80 @@ export function DeeplinksGrid() {
               Five destinations.
             </span>
           </h2>
+          <p
+            className='mx-auto mt-4'
+            style={{
+              fontSize: '15px',
+              lineHeight: '24px',
+              letterSpacing: '-0.011em',
+              color: 'var(--linear-text-secondary)',
+              maxWidth: '460px',
+            }}
+          >
+            Every Jovie profile auto-generates smart links for tips, tours,
+            contacts, and every release.
+          </p>
         </div>
 
+        {/* Card grid — 1px border-gap technique */}
         <div
-          className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 overflow-hidden'
+          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden'
           style={{
-            backgroundColor: 'var(--linear-border-subtle)',
+            backgroundColor: 'rgba(255,255,255,0.08)',
             gap: '1px',
             borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 4px 32px rgba(8,9,10,0.6)',
           }}
         >
           {cards.map(card => (
-            <div key={card.slugPath} className='group relative flex flex-col'>
-              <div
-                className='flex flex-1 flex-col gap-3 p-5'
-                style={{
-                  backgroundColor: 'var(--linear-bg-surface-0)',
-                }}
-              >
-                <div>
-                  <p
-                    className='font-mono text-sm'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
-                    {card.slugBase}
-                    <span style={{ color: 'var(--linear-text-secondary)' }}>
-                      {card.slugPath}
-                    </span>
-                  </p>
-                  <p
-                    className='mt-1'
-                    style={{
-                      fontSize: 'var(--linear-body-sm-size)',
-                      lineHeight: 'var(--linear-body-sm-leading)',
-                      color: 'var(--linear-text-secondary)',
-                    }}
-                  >
-                    {card.description}
-                  </p>
-                </div>
-                <div className='mt-auto'>{card.mockup}</div>
+            <div
+              key={card.slugPath}
+              className='group relative flex flex-col'
+              style={{ backgroundColor: 'var(--linear-bg-surface-0)' }}
+            >
+              <div className='flex flex-1 flex-col gap-4 p-6'>
+                {/* URL slug */}
+                <p
+                  className='font-mono'
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 450,
+                    color: 'var(--linear-text-tertiary)',
+                  }}
+                >
+                  jov.ie/tim/
+                  <span style={{ color: 'var(--linear-text-primary)' }}>
+                    {card.slugPath}
+                  </span>
+                </p>
+
+                {/* Description */}
+                <p
+                  style={{
+                    fontSize: '14px',
+                    lineHeight: 1.55,
+                    color: 'var(--linear-text-secondary)',
+                  }}
+                >
+                  {card.description}
+                </p>
+
+                {/* Mockup UI */}
+                <div className='mt-auto pt-2'>{card.mockup}</div>
               </div>
-              {/* Hover accent line — gradient, centered 60% width */}
+
+              {/* Bottom accent line on hover */}
               <div
-                className='absolute bottom-0 left-[20%] h-0.5 w-[60%] opacity-0 transition-opacity duration-200 group-hover:opacity-40'
+                className='absolute bottom-0 left-[15%] h-px w-[70%] opacity-0 transition-opacity duration-200 group-hover:opacity-30'
                 style={{
-                  background: `linear-gradient(90deg, transparent, ${card.accent}, transparent)`,
+                  background:
+                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
                 }}
               />
             </div>
           ))}
         </div>
-
-        {/* IG Comparison Aside */}
-        <IGComparisonAside />
       </Container>
     </section>
   );

@@ -90,7 +90,6 @@ export function SeeItInActionCarousel({ creators }: Props) {
       className='section-spacing-linear overflow-hidden'
       style={{
         backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
       }}
     >
       <div className='w-full px-5 sm:px-6 lg:px-[77px]'>
