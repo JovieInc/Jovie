@@ -290,13 +290,19 @@ describe('HeroSpotifySearch', () => {
   });
 
   describe('URL detection', () => {
-    it('navigates immediately on Spotify URL input', async () => {
+    it('shows Claim Artist button on Spotify URL input and navigates on click', async () => {
       renderComponent();
       const user = userEvent.setup();
       await user.type(
         getInput(),
         'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
       );
+      // Should NOT auto-navigate — user must click "Claim Artist"
+      expect(mockPush).not.toHaveBeenCalled();
+      const claimButton = screen.getByRole('button', {
+        name: /Claim Artist/i,
+      });
+      await user.click(claimButton);
       expect(mockPush).toHaveBeenCalledWith(
         expect.stringContaining('/signup?spotify_url=')
       );
