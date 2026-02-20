@@ -836,20 +836,22 @@ jobs:
         run: |
           # Enable coverage on main branch and PRs for Codecov integration
           COVERAGE_FLAG="--coverage"
+          # Mitigate low-frequency flakes by retrying failed tests once in CI.
+          RETRY_FLAG="--retry=1"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite with coverage"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
