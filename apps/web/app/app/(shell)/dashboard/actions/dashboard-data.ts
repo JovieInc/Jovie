@@ -9,7 +9,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
   unstable_noStore as noStore,
@@ -265,45 +265,65 @@ async function fetchDashboardCoreWithSession(
           });
           throw error;
         }),
-      // Consolidated link count query - counts all active links and music links in one query
+      // Optimized existence queries for link booleans.
+      // We only need true/false values, so limit(1) avoids full-table counting scans.
       executeWithSession(
         clerkUserId,
-        () =>
-          db
-            .select({
-              totalActive: count(),
-              musicActive: drizzleSql<number>`count(*) filter (where ${socialLinks.platformType} = 'dsp' OR ${socialLinks.platform} = ${sqlAny(DSP_PLATFORMS)})`,
-            })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
-              )
-            ),
-        'Social links count query'
-      )
-        .then(result => ({
-          hasLinks: Number(result?.[0]?.totalActive ?? 0) > 0,
-          hasMusicLinks: Number(result?.[0]?.musicActive ?? 0) > 0,
-        }))
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'social_links_count',
-          });
+        () => ({
+          execute: async () => {
+            const [activeLinks, activeMusicLinks] = await Promise.all([
+              db
+                .select({ id: socialLinks.id })
+                .from(socialLinks)
+                .where(
+                  and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true)
+                  )
+                )
+                .limit(1),
+              db
+                .select({ id: socialLinks.id })
+                .from(socialLinks)
+                .where(
+                  and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true),
+                    or(
+                      eq(socialLinks.platformType, 'dsp'),
+                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
+                    )
+                  )
+                )
+                .limit(1),
+            ]);
 
-          if (!migrationResult.shouldRetry) {
-            return { hasLinks: false, hasMusicLinks: false };
-          }
-          Sentry.captureException(error, {
-            tags: {
-              query: 'social_links_count',
-              context: 'dashboard_data',
-            },
-          });
-          throw error;
+            return {
+              hasLinks: activeLinks.length > 0,
+              hasMusicLinks: activeMusicLinks.length > 0,
+            };
+          },
         }),
+        'Social links count query'
+      ).catch((error: unknown) => {
+        const migrationResult = handleMigrationErrors(error, {
+          userId: userData.id,
+          operation: 'social_links_count',
+        });
+
+        if (!migrationResult.shouldRetry) {
+          return { hasLinks: false, hasMusicLinks: false };
+        }
+        Sentry.captureException(error, {
+          tags: {
+            query: 'social_links_count',
+            context: 'dashboard_data',
+          },
+        });
+        throw error;
+      }),
       // Tipping stats now run in parallel with settings and link counts,
       // eliminating the previous waterfall where they waited for chrome data
       fetchTippingStatsWithSession(selected.id, clerkUserId),
