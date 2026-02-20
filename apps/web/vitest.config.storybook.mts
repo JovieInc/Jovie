@@ -24,10 +24,9 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
-    // Mutations may "succeed" with stub data, causing onSuccess handlers to crash
-    // on missing fields. The fetch interceptor in preview.tsx prevents 404 rejections,
-    // but downstream code (e.g. convertDrizzleCreatorProfileToArtist) still throws.
-    dangerouslyIgnoreUnhandledErrors: true,
+    // Retry once in CI to handle transient Vite browser-mode module serving failures
+    // (Storybook's internal React 18 compat chunk occasionally fails to load)
+    retry: process.env.CI ? 1 : 0,
   },
   resolve: {
     dedupe: [
