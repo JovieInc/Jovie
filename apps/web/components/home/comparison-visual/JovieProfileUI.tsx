@@ -30,9 +30,9 @@ const phaseOrder: Phase[] = [
 ];
 
 const dspLinks = [
-  { id: 'spotify', label: 'Spotify', color: 'bg-[#1DB954]' },
-  { id: 'apple', label: 'Apple Music', color: 'bg-[#FA243C]' },
-  { id: 'youtube', label: 'YouTube Music', color: 'bg-[#FF0000]' },
+  { id: 'spotify', label: 'Spotify', bg: '#1DB954', icon: '●' },
+  { id: 'apple', label: 'Apple Music', bg: '#FA243C', icon: '●' },
+  { id: 'youtube', label: 'YouTube Music', bg: '#FF0000', icon: '●' },
 ];
 
 const CTA_BUTTON_LABELS: Record<string, string> = {
@@ -145,29 +145,48 @@ export function JovieProfileUI() {
   return (
     <div ref={containerRef} className='w-full max-w-[320px] mx-auto'>
       <div
-        className='p-6 min-h-[280px]'
+        className='relative overflow-hidden'
         style={{
-          backgroundColor: 'var(--linear-bg-surface-1)',
-          border: '1px solid var(--linear-border-default)',
+          backgroundColor: 'var(--linear-bg-surface-0)',
+          border: '1px solid var(--linear-border-subtle)',
           borderRadius: 'var(--linear-radius-lg)',
+          boxShadow: 'var(--linear-shadow-card-elevated)',
+          padding: '28px 24px',
+          minHeight: '340px',
         }}
       >
         {/* Profile info */}
-        <div style={{ marginBottom: 'var(--linear-space-6)' }}>
+        <div
+          className='flex flex-col items-center'
+          style={{ marginBottom: '24px' }}
+        >
           <div
-            className='flex flex-col items-center'
-            style={{ gap: 'var(--linear-space-3)' }}
+            className='w-14 h-14 rounded-full'
+            style={{
+              background:
+                'linear-gradient(135deg, oklch(65% 0.2 270), oklch(70% 0.18 320))',
+            }}
+          />
+          <div
+            className='mt-2.5'
+            style={{
+              fontSize: '14px',
+              fontWeight: 510,
+              color: 'var(--linear-text-primary)',
+              letterSpacing: '-0.01em',
+            }}
           >
-            <div className='w-16 h-16 rounded-full bg-linear-to-br from-purple-500 to-pink-500' />
-            <div
-              style={{
-                fontSize: 'var(--linear-body-sm-size)',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              @artist
-            </div>
+            @artist
+          </div>
+          <div
+            className='mt-1'
+            style={{
+              fontSize: '12px',
+              color: 'var(--linear-text-tertiary)',
+              letterSpacing: '-0.005em',
+            }}
+          >
+            Singer / Songwriter
           </div>
         </div>
 
@@ -176,7 +195,7 @@ export function JovieProfileUI() {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 'var(--linear-space-3)',
+            gap: '12px',
           }}
         >
           <div className='relative h-[100px]'>
@@ -192,28 +211,29 @@ export function JovieProfileUI() {
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 'var(--linear-space-2)',
+                    gap: '8px',
                   }}
                 >
                   {/* Email input */}
                   <div
-                    className='h-11 px-4 flex items-center'
+                    className='h-10 px-3.5 flex items-center'
                     style={{
-                      backgroundColor: 'var(--linear-bg-surface-0)',
-                      border: '1px solid var(--linear-border-subtle)',
-                      borderRadius: 'var(--linear-radius-sm)',
+                      backgroundColor: 'var(--linear-bg-surface-2)',
+                      border: '1px solid var(--linear-border-default)',
+                      borderRadius: '6px',
                     }}
                   >
                     <span
                       style={{
-                        fontSize: 'var(--linear-body-sm-size)',
+                        fontSize: '13px',
                         color: 'var(--linear-text-primary)',
+                        letterSpacing: '-0.01em',
                       }}
                     >
                       {typedText}
                       <span
                         className='animate-pulse'
-                        style={{ color: 'var(--linear-accent-bg)' }}
+                        style={{ color: 'var(--linear-accent)' }}
                       >
                         |
                       </span>
@@ -222,14 +242,15 @@ export function JovieProfileUI() {
                   {/* Subscribe button */}
                   <button
                     type='button'
-                    className='w-full h-11 px-5 hover:opacity-90 transition-opacity'
+                    className='w-full h-10 px-5 transition-colors'
                     style={{
                       backgroundColor: 'var(--linear-btn-primary-bg)',
                       color: 'var(--linear-btn-primary-fg)',
-                      border: '1px solid var(--linear-border-subtle)',
                       borderRadius: 'var(--linear-radius-sm)',
-                      fontSize: 'var(--linear-body-sm-size)',
-                      fontWeight: 'var(--linear-font-weight-semibold)',
+                      fontSize: '13px',
+                      fontWeight: 510,
+                      letterSpacing: '-0.01em',
+                      border: 'none',
                     }}
                   >
                     Subscribe
@@ -240,19 +261,30 @@ export function JovieProfileUI() {
               {phase === 'subscribing' && (
                 <motion.div
                   key='subscribing'
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.97 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
                   className='absolute inset-0 flex items-center justify-center'
                 >
-                  <div
-                    style={{
-                      fontSize: 'var(--linear-body-sm-size)',
-                      color: 'var(--linear-text-secondary)',
-                    }}
-                  >
-                    Subscribing...
+                  <div className='flex items-center gap-2'>
+                    <div
+                      className='w-4 h-4 rounded-full border-2 border-t-transparent animate-spin motion-reduce:animate-none'
+                      style={{
+                        borderColor: 'var(--linear-accent)',
+                        borderTopColor: 'transparent',
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 450,
+                        color: 'var(--linear-text-secondary)',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      Subscribing...
+                    </span>
                   </div>
                 </motion.div>
               )}
@@ -261,23 +293,27 @@ export function JovieProfileUI() {
                 <motion.div
                   key={phase}
                   initial={
-                    reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }
+                    reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }
                   }
                   animate={{ opacity: 1, y: 0 }}
-                  exit={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3 }}
+                  exit={reducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+                  transition={{
+                    duration: 0.25,
+                    ease: [0.25, 0.46, 0.45, 0.94],
+                  }}
                   className='absolute inset-0 flex items-center'
                 >
                   <button
                     type='button'
-                    className='w-full h-11 px-5 flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity'
+                    className='w-full h-10 px-5 flex items-center justify-center transition-colors'
                     style={{
                       backgroundColor: 'var(--linear-btn-primary-bg)',
                       color: 'var(--linear-btn-primary-fg)',
-                      border: '1px solid var(--linear-border-subtle)',
                       borderRadius: 'var(--linear-radius-sm)',
-                      fontSize: 'var(--linear-body-sm-size)',
-                      fontWeight: 'var(--linear-font-weight-semibold)',
+                      fontSize: '13px',
+                      fontWeight: 510,
+                      letterSpacing: '-0.01em',
+                      border: 'none',
                     }}
                   >
                     {CTA_BUTTON_LABELS[phase]}
@@ -301,14 +337,23 @@ export function JovieProfileUI() {
                       initial={
                         reducedMotion
                           ? { opacity: 1, x: 0 }
-                          : { opacity: 0, x: -10 }
+                          : { opacity: 0, x: -8 }
                       }
                       animate={{ opacity: 1, x: 0 }}
                       transition={{
-                        delay: reducedMotion ? 0 : index * 0.15,
+                        delay: reducedMotion ? 0 : index * 0.12,
                         duration: 0.2,
+                        ease: [0.25, 0.46, 0.45, 0.94],
                       }}
-                      className={`w-full h-8 px-4 rounded-lg ${dsp.color} text-white flex items-center justify-center text-xs font-medium`}
+                      className='w-full h-8 px-4 flex items-center justify-center text-white'
+                      style={{
+                        backgroundColor: dsp.bg,
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 510,
+                        letterSpacing: '-0.005em',
+                        border: 'none',
+                      }}
                     >
                       {dsp.label}
                     </motion.button>
@@ -322,13 +367,24 @@ export function JovieProfileUI() {
           <div
             className='text-center'
             style={{
-              fontSize: 'var(--linear-label-size)',
+              fontSize: '12px',
               color: 'var(--linear-text-tertiary)',
+              letterSpacing: '-0.005em',
             }}
           >
             {isSubscribed ? 'CTA adapts per visitor' : 'Join the community'}
           </div>
         </div>
+
+        {/* Subtle green tint overlay to signal "good" */}
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-0 rounded-xl'
+          style={{
+            background:
+              'linear-gradient(180deg, transparent 50%, oklch(72% 0.08 145 / 0.03) 100%)',
+          }}
+        />
       </div>
     </div>
   );
