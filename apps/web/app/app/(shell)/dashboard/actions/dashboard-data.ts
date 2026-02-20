@@ -49,28 +49,46 @@ const { logger } = Sentry;
  * execute on the same connection, ensuring RLS policies work correctly.
  *
  * @param clerkUserId - The Clerk user ID for session setup
- * @param queryFn - Function that returns the Drizzle query builder (not executed yet)
+ * @param queryFn - Function that returns Drizzle query builder(s) (not executed yet)
  * @param context - Description for error messages (used for timeout wrapper)
  * @returns The query result with timeout wrapper
  */
-async function executeWithSession<T>(
+type SessionBatchItem = BatchItem<'pg'>;
+type SessionBatchItems = readonly SessionBatchItem[];
+type SessionBatchResults<T extends SessionBatchItems> = {
+  [K in keyof T]: T[K]['_']['result'];
+};
+
+async function executeWithSession<T extends SessionBatchItem>(
   clerkUserId: string,
-  queryFn: () => { execute: () => Promise<T> },
+  queryFn: () => T,
   context?: string
-): Promise<T> {
+): Promise<T['_']['result']>;
+async function executeWithSession<T extends SessionBatchItems>(
+  clerkUserId: string,
+  queryFn: () => T,
+  context?: string
+): Promise<SessionBatchResults<T>>;
+async function executeWithSession(
+  clerkUserId: string,
+  queryFn: () => SessionBatchItem | SessionBatchItems,
+  context?: string
+): Promise<unknown> {
   validateClerkUserId(clerkUserId);
 
   const sessionSql = getSessionSetupSql(clerkUserId);
-  const query = queryFn();
+  const batchInput = queryFn();
+  const batchItems = Array.isArray(batchInput) ? batchInput : [batchInput];
 
   // Batch the session setup with the query to ensure they run on the same connection.
   // The batch API executes all statements as an implicit transaction.
   return dashboardQuery(async () => {
-    const [_sessionResult, queryResult] = await db.batch([
-      db.execute(sessionSql),
-      query as unknown as BatchItem<'pg'>,
+    const results = await db.batch([db.execute(sessionSql), ...batchItems] as [
+      SessionBatchItem,
+      ...SessionBatchItem[],
     ]);
-    return queryResult as T;
+    const queryResults = results.slice(1);
+    return Array.isArray(batchInput) ? queryResults : queryResults[0];
   }, context ?? 'Query with session');
 }
 
@@ -270,59 +288,55 @@ async function fetchDashboardCoreWithSession(
       // Both queries share the same RLS session context set by executeWithSession.
       executeWithSession(
         clerkUserId,
-        () => ({
-          execute: async () => {
-            const [activeLinks, activeMusicLinks] = await Promise.all([
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active')
-                  )
+        () => [
+          db
+            .select({ id: socialLinks.id })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.state, 'active')
+              )
+            )
+            .limit(1),
+          db
+            .select({ id: socialLinks.id })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.state, 'active'),
+                or(
+                  eq(socialLinks.platformType, 'dsp'),
+                  eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
                 )
-                .limit(1),
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    or(
-                      eq(socialLinks.platformType, 'dsp'),
-                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                    )
-                  )
-                )
-                .limit(1),
-            ]);
-
-            return {
-              hasLinks: activeLinks.length > 0,
-              hasMusicLinks: activeMusicLinks.length > 0,
-            };
-          },
-        }),
+              )
+            )
+            .limit(1),
+        ],
         'Social links existence query'
-      ).catch((error: unknown) => {
-        const migrationResult = handleMigrationErrors(error, {
-          userId: userData.id,
-          operation: 'social_links_count',
-        });
+      )
+        .then(([activeLinks, activeMusicLinks]) => ({
+          hasLinks: activeLinks.length > 0,
+          hasMusicLinks: activeMusicLinks.length > 0,
+        }))
+        .catch((error: unknown) => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'social_links_count',
+          });
 
-        if (!migrationResult.shouldRetry) {
-          return { hasLinks: false, hasMusicLinks: false };
-        }
-        Sentry.captureException(error, {
-          tags: {
-            query: 'social_links_existence',
-            context: 'dashboard_data',
-          },
-        });
-        throw error;
-      }),
+          if (!migrationResult.shouldRetry) {
+            return { hasLinks: false, hasMusicLinks: false };
+          }
+          Sentry.captureException(error, {
+            tags: {
+              query: 'social_links_existence',
+              context: 'dashboard_data',
+            },
+          });
+          throw error;
+        }),
       // Tipping stats now run in parallel with settings and link counts,
       // eliminating the previous waterfall where they waited for chrome data
       fetchTippingStatsWithSession(selected.id, clerkUserId),
