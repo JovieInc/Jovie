@@ -25,6 +25,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: false,
         canBeVerified: false,
         aiCanUseTools: false,
+        canCreateManualReleases: false,
+        canAccessFutureReleases: false,
+        canSendNotifications: false,
+        canEditSmartLinks: false,
       });
     });
 
@@ -44,6 +48,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: true,
         canBeVerified: true,
         aiCanUseTools: true,
+        canCreateManualReleases: true,
+        canAccessFutureReleases: true,
+        canSendNotifications: true,
+        canEditSmartLinks: true,
       });
     });
 
@@ -63,6 +71,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canAccessAdPixels: true,
         canBeVerified: true,
         aiCanUseTools: true,
+        canCreateManualReleases: true,
+        canAccessFutureReleases: true,
+        canSendNotifications: true,
+        canEditSmartLinks: true,
       });
     });
 
