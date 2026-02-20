@@ -23,11 +23,11 @@ import {
 import type { HandleValidationState, OnboardingState } from './types';
 import { getResolvedHandle, validateDisplayName } from './validation';
 
-type SpotifyImportState = {
+interface SpotifyImportState {
   status: 'idle' | 'importing' | 'success' | 'error';
   stage: 0 | 1 | 2;
   message: string;
-};
+}
 
 async function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>
