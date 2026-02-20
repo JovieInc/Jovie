@@ -5,7 +5,7 @@
  * slow queries from blocking database connections.
  *
  * Default timeouts:
- * - Dashboard queries: 10 seconds
+ * - Dashboard queries: 15 seconds
  * - API queries: 5 seconds
  */
 
@@ -14,7 +14,7 @@ import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 
 // Timeout configuration in milliseconds
 export const QUERY_TIMEOUTS = {
-  dashboard: 10000, // 10 seconds for dashboard queries
+  dashboard: 15000, // 15 seconds for dashboard queries
   api: 5000, // 5 seconds for API queries
   default: 5000, // 5 seconds default
 } as const;
@@ -90,7 +90,7 @@ export async function executeWithTimeout<T>(
 }
 
 /**
- * Dashboard query wrapper with 10s timeout
+ * Dashboard query wrapper with 15s timeout
  */
 export async function dashboardQuery<T>(
   queryFn: () => Promise<T>,
