@@ -372,6 +372,71 @@ function createEmailOtp(): EmailOtpResult {
 }
 
 /**
+ * Determines whether the email subscriber needs OTP verification.
+ * Returns true for new subscribers (no confirmedAt), false for existing confirmed ones.
+ */
+async function shouldRequireEmailVerification(
+  channel: NotificationChannel,
+  normalizedEmail: string | null,
+  artist_id: string
+): Promise<boolean> {
+  if (channel !== 'email' || !normalizedEmail) return false;
+
+  const existing = await db
+    .select({ confirmedAt: notificationSubscriptions.confirmedAt })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, artist_id),
+        eq(notificationSubscriptions.channel, 'email'),
+        eq(notificationSubscriptions.email, normalizedEmail)
+      )
+    )
+    .limit(1);
+
+  return !existing[0]?.confirmedAt;
+}
+
+/**
+ * Builds the upsert conflict target and update set for a subscription insert.
+ */
+function buildUpsertConfig(
+  channel: NotificationChannel,
+  shouldVerifyEmail: boolean,
+  emailOtp: EmailOtpResult | null,
+  ipAddress: string | null,
+  source: string | undefined
+) {
+  const target =
+    channel === 'email'
+      ? [
+          notificationSubscriptions.creatorProfileId,
+          notificationSubscriptions.email,
+        ]
+      : [
+          notificationSubscriptions.creatorProfileId,
+          notificationSubscriptions.phone,
+        ];
+
+  const emailVerifyFields = shouldVerifyEmail
+    ? {
+        confirmedAt: null,
+        emailOtpHash: emailOtp?.otpHash,
+        emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+        emailOtpLastSentAt: new Date(),
+        emailOtpAttempts: 0,
+      }
+    : {};
+
+  const set =
+    channel === 'email'
+      ? { ...emailVerifyFields, ipAddress, source }
+      : { confirmedAt: new Date(), ipAddress, source };
+
+  return { target, set };
+}
+
+/**
  * Dispatches the appropriate subscription email based on channel type.
  */
 async function dispatchSubscriptionEmail(
@@ -478,26 +543,21 @@ export const subscribeToNotificationsDomain = async (
       general: true,
     };
 
-    // Check if email subscriber already exists and is confirmed to avoid
-    // resetting their confirmedAt status (Sentry HIGH bug fix)
-    const existingEmail =
-      channel === 'email' && normalizedEmail
-        ? await db
-            .select({ confirmedAt: notificationSubscriptions.confirmedAt })
-            .from(notificationSubscriptions)
-            .where(
-              and(
-                eq(notificationSubscriptions.creatorProfileId, artist_id),
-                eq(notificationSubscriptions.channel, 'email'),
-                eq(notificationSubscriptions.email, normalizedEmail)
-              )
-            )
-            .limit(1)
-        : [];
-    const shouldVerifyEmail =
-      channel === 'email' && !existingEmail[0]?.confirmedAt;
-
+    // Check if email subscriber needs OTP verification (Sentry HIGH bug fix)
+    const shouldVerifyEmail = await shouldRequireEmailVerification(
+      channel,
+      normalizedEmail,
+      artist_id
+    );
     const emailOtp = shouldVerifyEmail ? createEmailOtp() : null;
+
+    const upsertConfig = buildUpsertConfig(
+      channel,
+      shouldVerifyEmail,
+      emailOtp,
+      ipAddress,
+      source
+    );
 
     await db
       .insert(notificationSubscriptions)
@@ -517,38 +577,7 @@ export const subscribeToNotificationsDomain = async (
         emailOtpLastSentAt: emailOtp ? new Date() : null,
         emailOtpAttempts: 0,
       })
-      .onConflictDoUpdate({
-        target:
-          channel === 'email'
-            ? [
-                notificationSubscriptions.creatorProfileId,
-                notificationSubscriptions.email,
-              ]
-            : [
-                notificationSubscriptions.creatorProfileId,
-                notificationSubscriptions.phone,
-              ],
-        set:
-          channel === 'email'
-            ? {
-                ...(shouldVerifyEmail
-                  ? {
-                      confirmedAt: null,
-                      emailOtpHash: emailOtp?.otpHash,
-                      emailOtpExpiresAt: emailOtp?.otpExpiresAt,
-                      emailOtpLastSentAt: new Date(),
-                      emailOtpAttempts: 0,
-                    }
-                  : {}),
-                ipAddress,
-                source,
-              }
-            : {
-                confirmedAt: new Date(),
-                ipAddress,
-                source,
-              },
-      });
+      .onConflictDoUpdate(upsertConfig);
 
     await trackSubscribeSuccess({
       artist_id,
