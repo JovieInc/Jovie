@@ -101,7 +101,7 @@ function ProfileMockupCard({
           fontSize: '11px',
           color: 'var(--linear-text-tertiary)',
           marginTop: 2,
-          textTransform: 'uppercase' as const,
+          textTransform: 'uppercase',
           letterSpacing: '0.06em',
           fontWeight: 500,
         }}
@@ -271,7 +271,7 @@ export function ExampleProfilesCarousel() {
                 fontSize: '13px',
                 fontWeight: 510,
                 color: 'var(--linear-text-tertiary)',
-                textTransform: 'uppercase' as const,
+                textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 marginBottom: '12px',
               }}

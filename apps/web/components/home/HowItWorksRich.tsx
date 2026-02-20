@@ -40,7 +40,7 @@ export function HowItWorksRich() {
               fontSize: '13px',
               fontWeight: 510,
               color: 'var(--linear-text-tertiary)',
-              textTransform: 'uppercase' as const,
+              textTransform: 'uppercase',
               letterSpacing: '0.08em',
             }}
           >
