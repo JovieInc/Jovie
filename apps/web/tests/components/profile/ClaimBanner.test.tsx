@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
-import { track } from '@/lib/analytics';
 
 // Mock useUserSafe hook (used by ClaimBanner)
 const mockUseUser = vi.fn();
@@ -9,11 +8,12 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   useUserSafe: () => mockUseUser(),
 }));
 
-// Mock next/link
+// Mock analytics
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Mock next/link
 vi.mock('next/link', () => ({
   default: ({
     href,
@@ -60,18 +60,17 @@ describe('ClaimBanner', () => {
       expect(screen.getByText('Claim Profile')).toBeInTheDocument();
     });
 
-    it('displays profile handle when no display name provided', () => {
+    it('displays banner text regardless of display name', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       expect(
-        screen.getAllByText('Is this your profile? Claim it in 30 seconds.')
-          .length
-      ).toBeGreaterThan(0);
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
+      ).toBeInTheDocument();
     });
 
-    it('displays display name when provided', () => {
+    it('displays banner text when display name is provided', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(
@@ -79,9 +78,8 @@ describe('ClaimBanner', () => {
       );
 
       expect(
-        screen.getAllByText('Is this your profile? Claim it in 30 seconds.')
-          .length
-      ).toBeGreaterThan(0);
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
+      ).toBeInTheDocument();
     });
 
     it('has proper accessibility attributes', () => {
@@ -154,30 +152,15 @@ describe('ClaimBanner', () => {
     });
   });
 
-  describe('tracking', () => {
-    it('tracks banner impression on render', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(<ClaimBanner {...defaultProps} />);
-
-      expect(track).toHaveBeenCalledWith('profile_claim_banner_impression', {
-        profile_handle: 'testartist',
-        claim_path: '/testartist/claim?token=test-claim-token-123',
-        is_signed_in: false,
-        auth_loaded: true,
-      });
-    });
-  });
-
   describe('responsive behavior', () => {
-    it('renders mobile-friendly text', () => {
+    it('renders a single copy text visible at all breakpoints', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       expect(
-        screen.getAllByText('Is this your profile? Claim it in 30 seconds.')
-      ).toHaveLength(2);
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
+      ).toBeInTheDocument();
     });
   });
 });

@@ -46,6 +46,7 @@ export function ClaimBanner({
   }, [isLoaded, isSignedIn, claimPath]);
 
   useEffect(() => {
+    if (!isLoaded) return;
     if (hasTrackedImpression.current) return;
     hasTrackedImpression.current = true;
 
@@ -74,12 +75,7 @@ export function ClaimBanner({
               aria-hidden='true'
             />
             <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
-              <span className='sm:hidden'>
-                Is this your profile? Claim it in 30 seconds.
-              </span>
-              <span className='hidden sm:inline'>
-                Is this your profile? Claim it in 30 seconds.
-              </span>
+              Is this your profile? Claim it in 30 seconds.
             </p>
           </div>
 
