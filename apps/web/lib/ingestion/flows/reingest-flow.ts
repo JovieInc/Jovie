@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';
@@ -138,6 +139,11 @@ export async function handleNewProfileIngest({
       });
 
     if (!created) {
+      await captureError(
+        'Failed to create creator profile during ingestion',
+        new Error('Profile insert returned no rows'),
+        { finalHandle, displayName }
+      );
       return NextResponse.json(
         { error: 'Failed to create creator profile' },
         { status: 500, headers: NO_STORE_HEADERS }

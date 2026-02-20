@@ -83,6 +83,13 @@ export async function POST(request: NextRequest) {
                 : String(error),
           });
 
+          await captureError('Ingestion job failed', error, {
+            route: '/api/ingestion/jobs',
+            jobId: job.id,
+            jobType: job.jobType,
+            attempts: job.attempts,
+          });
+
           return { ok: false as const };
         }
       });

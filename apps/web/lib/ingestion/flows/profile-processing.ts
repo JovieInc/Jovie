@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
 import { creatorContacts } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import {
   calculateAndStoreFitScore,
   updatePaidTierScore,
@@ -105,6 +106,10 @@ export async function processProfileExtraction(
     logger.error('Link merge failed', {
       profileId: profile.id,
       error: mergeError,
+    });
+    await captureError('Link merge failed during profile processing', error, {
+      profileId: profile.id,
+      linkCount: extraction.links.length,
     });
   }
 

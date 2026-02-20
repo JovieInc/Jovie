@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import { put as uploadBlob } from '@vercel/blob';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -164,6 +165,10 @@ export async function copyAvatarToBlob(
       sourceUrl,
       handle,
       error,
+    });
+    await captureWarning('Failed to copy avatar to blob', error, {
+      sourceUrl,
+      handle,
     });
     return null;
   }
