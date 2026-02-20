@@ -7,52 +7,202 @@ import { Container } from '@/components/site/Container';
 const EXAMPLE_PROFILES = [
   {
     name: 'Tim White',
-    subtitle: 'Artist',
-    artGradient: 'linear-gradient(135deg, #2a1f3d, #1a1a2e, #1f2d1a)',
+    handle: '@timwhitemusic',
+    subtitle: 'Artist · Producer',
     initial: 'T',
-    trackTitle: 'Never Say A Word',
-    trackMeta: 'Single · 2024',
     accent: '#4ade80',
+    artGradient: 'linear-gradient(135deg, #2a1f3d, #1a1a2e, #1f2d1a)',
+    latestRelease: { title: 'Never Say A Word', type: 'Single', year: '2024' },
+    socialCount: 6,
   },
   {
     name: 'Maya Rivers',
-    subtitle: 'Artist',
-    artGradient: 'linear-gradient(135deg, #1f2d1a, #2a3a1a, #1a2d1f)',
+    handle: '@mayarivers',
+    subtitle: 'Singer · Songwriter',
     initial: 'M',
-    trackTitle: 'Golden Hour',
-    trackMeta: 'EP · 2025',
     accent: '#8b5cf6',
+    artGradient: 'linear-gradient(135deg, #1f2d1a, #2a3a1a, #1a2d1f)',
+    latestRelease: { title: 'Golden Hour', type: 'EP', year: '2025' },
+    socialCount: 5,
   },
   {
     name: 'Kai Nomura',
-    subtitle: 'Artist',
-    artGradient: 'linear-gradient(135deg, #2d1f1a, #3a2a1a, #2d1a1f)',
+    handle: '@kainomura',
+    subtitle: 'Producer · DJ',
     initial: 'K',
-    trackTitle: 'Drift',
-    trackMeta: 'Album · 2025',
     accent: '#3b82f6',
+    artGradient: 'linear-gradient(135deg, #2d1f1a, #3a2a1a, #2d1a1f)',
+    latestRelease: { title: 'Drift', type: 'Album', year: '2025' },
+    socialCount: 7,
   },
   {
     name: 'Jules Park',
-    subtitle: 'Artist',
-    artGradient: 'linear-gradient(135deg, #1a1f2d, #1a2a3a, #1f1a2d)',
+    handle: '@julespark',
+    subtitle: 'Artist · Multi-instrumentalist',
     initial: 'J',
-    trackTitle: 'Neon Sleep',
-    trackMeta: 'Single · 2026',
     accent: '#f59e0b',
+    artGradient: 'linear-gradient(135deg, #1a1f2d, #1a2a3a, #1f1a2d)',
+    latestRelease: { title: 'Neon Sleep', type: 'Single', year: '2026' },
+    socialCount: 4,
   },
   {
     name: 'Sasha Veil',
-    subtitle: 'Artist',
-    artGradient: 'linear-gradient(135deg, #2d1a2a, #3a1a2a, #2a1a2d)',
+    handle: '@sashaveil',
+    subtitle: 'Vocalist · Producer',
     initial: 'S',
-    trackTitle: 'Phantom Limb',
-    trackMeta: 'EP · 2025',
     accent: '#ec4899',
+    artGradient: 'linear-gradient(135deg, #2d1a2a, #3a1a2a, #2a1a2d)',
+    latestRelease: { title: 'Phantom Limb', type: 'EP', year: '2025' },
+    socialCount: 5,
   },
 ];
 
 const ROTATION_INTERVAL = 4000;
+
+/* ------------------------------------------------------------------ */
+/*  Profile mockup — matches real Jovie profile page layout            */
+/* ------------------------------------------------------------------ */
+function ProfileMockupCard({
+  profile,
+}: {
+  profile: (typeof EXAMPLE_PROFILES)[number];
+}) {
+  return (
+    <div className='relative flex flex-col items-center px-8 py-10'>
+      {/* Avatar */}
+      <div
+        className='rounded-full flex items-center justify-center text-xl font-semibold text-white shrink-0'
+        style={{
+          width: 72,
+          height: 72,
+          background: profile.artGradient,
+          boxShadow: `0 0 0 2px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.4)`,
+        }}
+      >
+        {profile.initial}
+      </div>
+
+      {/* Name */}
+      <div
+        style={{
+          fontSize: '16px',
+          fontWeight: 500,
+          color: 'var(--linear-text-primary)',
+          marginTop: 14,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {profile.name}
+      </div>
+
+      {/* Subtitle */}
+      <div
+        style={{
+          fontSize: '11px',
+          color: 'var(--linear-text-tertiary)',
+          marginTop: 2,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          fontWeight: 500,
+        }}
+      >
+        {profile.subtitle}
+      </div>
+
+      {/* Latest release card */}
+      <div
+        className='flex items-center gap-3 w-full mt-6'
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '10px',
+          padding: '12px',
+        }}
+      >
+        {/* Album art */}
+        <div
+          className='shrink-0 rounded-md'
+          style={{
+            width: 48,
+            height: 48,
+            background: profile.artGradient,
+          }}
+        />
+        <div className='flex flex-col min-w-0 flex-1'>
+          <span
+            style={{
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--linear-text-primary)',
+            }}
+          >
+            {profile.latestRelease.title}
+          </span>
+          <span
+            style={{
+              fontSize: '11px',
+              color: 'var(--linear-text-tertiary)',
+              marginTop: 1,
+            }}
+          >
+            {profile.latestRelease.type} · {profile.latestRelease.year}
+          </span>
+        </div>
+        {/* Listen button */}
+        <div
+          className='shrink-0 flex items-center justify-center rounded-full'
+          style={{
+            width: 32,
+            height: 32,
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            fontSize: '11px',
+            color: 'var(--linear-text-secondary)',
+          }}
+        >
+          ▶
+        </div>
+      </div>
+
+      {/* CTA button */}
+      <div
+        className='w-full mt-3 flex items-center justify-center rounded-full'
+        style={{
+          height: 40,
+          fontSize: '13px',
+          fontWeight: 500,
+          color: '#000',
+          backgroundColor: 'rgb(230,230,230)',
+          letterSpacing: '-0.005em',
+        }}
+      >
+        Listen Now
+      </div>
+
+      {/* Social icons row */}
+      <div className='flex items-center gap-2 mt-5'>
+        {Array.from({ length: Math.min(profile.socialCount, 5) }).map(
+          (_, i) => (
+            <div
+              key={`social-${profile.name}-${i}`}
+              className='rounded-full'
+              style={{
+                width: 28,
+                height: 28,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.04)',
+              }}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                    */
+/* ------------------------------------------------------------------ */
 
 export function ExampleProfilesCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -64,7 +214,6 @@ export function ExampleProfilesCarousel() {
     const el = progressRef.current;
     if (!el || prefersReducedMotion) return;
     el.style.animation = 'none';
-    // Force reflow so the animation restarts from 0%
     el.getClientRects();
     el.style.animation = `carouselProgress ${ROTATION_INTERVAL}ms linear forwards`;
   }, [prefersReducedMotion]);
@@ -100,7 +249,6 @@ export function ExampleProfilesCarousel() {
     <section
       className='section-spacing-linear'
       style={{
-        borderTop: '1px solid var(--linear-border-subtle)',
         backgroundColor: 'var(--linear-bg-page)',
       }}
     >
@@ -118,25 +266,24 @@ export function ExampleProfilesCarousel() {
         <div className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center'>
           {/* Left column */}
           <div>
-            {/* Section label */}
             <p
               style={{
-                fontSize: 'var(--linear-caption-size)',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                color: 'var(--linear-text-secondary)',
-                textTransform: 'uppercase' as const,
-                letterSpacing: '0.05em',
-                marginBottom: 'var(--linear-space-3)',
+                fontSize: '13px',
+                fontWeight: 510,
+                color: 'var(--linear-text-tertiary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: '12px',
               }}
             >
               Example profiles
             </p>
             <h2
               style={{
-                fontSize: 'var(--linear-h2-size)',
-                fontWeight: 'var(--linear-h2-weight)',
-                lineHeight: 'var(--linear-h2-leading)',
-                letterSpacing: 'var(--linear-h2-tracking)',
+                fontSize: 'clamp(28px, 4vw, 48px)',
+                fontWeight: 510,
+                lineHeight: 1,
+                letterSpacing: '-0.022em',
                 color: 'var(--linear-text-primary)',
               }}
             >
@@ -144,16 +291,18 @@ export function ExampleProfilesCarousel() {
             </h2>
             <p
               style={{
-                fontSize: 'var(--linear-body-lg-size)',
-                lineHeight: 'var(--linear-body-lg-leading)',
+                fontSize: '15px',
+                lineHeight: '24px',
+                letterSpacing: '-0.011em',
                 color: 'var(--linear-text-secondary)',
                 marginTop: '12px',
+                maxWidth: '360px',
               }}
             >
               Every profile auto-generates from Spotify. Tap to preview.
             </p>
 
-            {/* Avatar row */}
+            {/* Avatar selector row */}
             <div className='flex items-center gap-3 mt-8'>
               {EXAMPLE_PROFILES.map((p, i) => (
                 <button
@@ -162,9 +311,9 @@ export function ExampleProfilesCarousel() {
                   onClick={() => handleSelect(i)}
                   className='relative rounded-full transition-all duration-200 focus-ring-themed'
                   style={{
-                    width: 44,
-                    height: 44,
-                    opacity: i === activeIndex ? 1 : 0.5,
+                    width: 40,
+                    height: 40,
+                    opacity: i === activeIndex ? 1 : 0.4,
                     outline:
                       i === activeIndex
                         ? `2px solid ${p.accent}`
@@ -189,8 +338,8 @@ export function ExampleProfilesCarousel() {
               className='mt-4 rounded-full overflow-hidden'
               style={{
                 height: 2,
-                backgroundColor: 'var(--linear-border-subtle)',
-                maxWidth: EXAMPLE_PROFILES.length * (44 + 12),
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                maxWidth: EXAMPLE_PROFILES.length * (40 + 12),
               }}
             >
               <div
@@ -207,20 +356,24 @@ export function ExampleProfilesCarousel() {
             </div>
           </div>
 
-          {/* Right column — profile preview card */}
+          {/* Right column — profile preview */}
           <div
             className='relative rounded-xl overflow-hidden'
             style={{
-              backgroundColor: '#0D0E12',
-              border: '1px solid var(--linear-border-subtle)',
-              minHeight: 320,
+              backgroundColor: 'rgb(10,11,12)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              boxShadow:
+                '0 0 0 1px rgba(255,255,255,0.03), 0 4px 32px rgba(8,9,10,0.6)',
+              maxWidth: 360,
+              marginLeft: 'auto',
+              marginRight: 'auto',
             }}
           >
-            {/* Subtle radial glow */}
+            {/* Accent glow */}
             <div
               className='absolute inset-0 pointer-events-none'
               style={{
-                background: `radial-gradient(ellipse at 50% 30%, color-mix(in srgb, ${profile.accent} 8%, transparent) 0%, transparent 70%)`,
+                background: `radial-gradient(ellipse at 50% 20%, color-mix(in srgb, ${profile.accent} 6%, transparent) 0%, transparent 70%)`,
               }}
             />
             <AnimatePresence mode='wait'>
@@ -229,70 +382,10 @@ export function ExampleProfilesCarousel() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{
-                  duration: prefersReducedMotion ? 0 : 0.4,
-                }}
-                className='relative p-6 flex flex-col items-center text-center'
+                transition={{ duration: prefersReducedMotion ? 0 : 0.35 }}
+                className='relative'
               >
-                {/* Large avatar */}
-                <div
-                  className='rounded-full flex items-center justify-center text-xl font-semibold text-white shrink-0'
-                  style={{
-                    width: 64,
-                    height: 64,
-                    background: profile.artGradient,
-                  }}
-                >
-                  {profile.initial}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--linear-body-size)',
-                    fontWeight: 'var(--linear-font-weight-semibold)',
-                    color: 'var(--linear-text-primary)',
-                    marginTop: 12,
-                  }}
-                >
-                  {profile.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--linear-caption-size)',
-                    color: 'var(--linear-text-tertiary)',
-                    marginTop: 2,
-                  }}
-                >
-                  {profile.subtitle}
-                </div>
-
-                {/* Album art */}
-                <div
-                  className='mt-5 rounded-lg'
-                  style={{
-                    width: 140,
-                    height: 140,
-                    background: profile.artGradient,
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: 'var(--linear-caption-size)',
-                    fontWeight: 'var(--linear-font-weight-medium)',
-                    color: 'var(--linear-text-primary)',
-                    marginTop: 12,
-                  }}
-                >
-                  {profile.trackTitle}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--linear-label-size)',
-                    color: 'var(--linear-text-tertiary)',
-                    marginTop: 2,
-                  }}
-                >
-                  {profile.trackMeta}
-                </div>
+                <ProfileMockupCard profile={profile} />
               </motion.div>
             </AnimatePresence>
           </div>
