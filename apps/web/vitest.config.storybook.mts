@@ -24,9 +24,6 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
-    // Stories may trigger background fetches (TanStack Query) that 404 in test env.
-    // These are unhandled rejections, not test failures.
-    dangerouslyIgnoreUnhandledErrors: true,
   },
   resolve: {
     dedupe: [
