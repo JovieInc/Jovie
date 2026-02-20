@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
@@ -191,7 +192,7 @@ const fetchProfileAndLinks = async (
       is_public: !!result.isPublic,
       is_verified: !!result.isVerified,
       is_claimed: !!result.isClaimed,
-      claim_token: null,
+      claim_token: result.claimToken ?? null,
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
@@ -463,6 +464,13 @@ export default async function ArtistPage({
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      {!profile.is_claimed && profile.claim_token ? (
+        <ClaimBanner
+          claimToken={profile.claim_token}
+          profileHandle={artist.handle}
+          displayName={artist.name}
+        />
+      ) : null}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       <StaticArtistPage

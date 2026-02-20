@@ -2,8 +2,9 @@
 
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useUserSafe } from '@/hooks/useClerkSafe';
+import { track } from '@/lib/analytics';
 
 export interface ClaimBannerProps {
   /** The claim token for this profile */
@@ -28,32 +29,39 @@ export function ClaimBanner({
   displayName,
 }: ClaimBannerProps) {
   const { isSignedIn, isLoaded } = useUserSafe();
+  const hasTrackedImpression = useRef(false);
 
   const claimPath = `/${encodeURIComponent(profileHandle)}/claim?token=${encodeURIComponent(claimToken)}`;
 
-  // Build the appropriate URL based on auth state
-  const getClaimUrl = useCallback(() => {
+  const claimUrl = useMemo(() => {
     if (!isLoaded) {
-      // While loading, default to signup flow (safer)
       return `/signup?redirect_url=${encodeURIComponent(claimPath)}`;
     }
 
     if (isSignedIn) {
-      // Signed in users go directly to claim
       return claimPath;
     }
 
-    // Signed out users go through signup with redirect
     return `/signup?redirect_url=${encodeURIComponent(claimPath)}`;
   }, [isLoaded, isSignedIn, claimPath]);
+
+  useEffect(() => {
+    if (hasTrackedImpression.current) return;
+    hasTrackedImpression.current = true;
+
+    track('profile_claim_banner_impression', {
+      profile_handle: profileHandle,
+      claim_path: claimPath,
+      is_signed_in: isSignedIn,
+      auth_loaded: isLoaded,
+    });
+  }, [claimPath, isLoaded, isSignedIn, profileHandle]);
 
   const name = displayName || profileHandle;
 
   return (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for banner accessibility
     <header
       className='relative w-full overflow-hidden bg-base text-primary-token border-b border-subtle'
-      aria-label='Claim profile banner'
       data-testid='claim-banner'
     >
       <div className='absolute inset-0 bg-surface-1 opacity-60' aria-hidden />
@@ -66,19 +74,30 @@ export function ClaimBanner({
               aria-hidden='true'
             />
             <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
-              <span className='sm:hidden'>Your profile? Claim {name}</span>
+              <span className='sm:hidden'>
+                Is this your profile? Claim it in 30 seconds.
+              </span>
               <span className='hidden sm:inline'>
-                Is this your profile? Claim {name}
+                Is this your profile? Claim it in 30 seconds.
               </span>
             </p>
           </div>
 
           {/* CTA Button */}
           <Link
-            href={getClaimUrl()}
+            href={claimUrl}
             className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
             data-testid='claim-banner-cta'
             aria-label={`Claim profile for ${name}`}
+            onClick={() => {
+              track('profile_claim_banner_click', {
+                profile_handle: profileHandle,
+                claim_path: claimPath,
+                destination: claimUrl,
+                is_signed_in: isSignedIn,
+                auth_loaded: isLoaded,
+              });
+            }}
           >
             Claim Profile
             <ArrowRight
