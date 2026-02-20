@@ -265,8 +265,8 @@ async function fetchDashboardCoreWithSession(
           });
           throw error;
         }),
-      // Optimized existence queries for link booleans.
-      // We only need true/false values, so limit(1) avoids full-table counting scans.
+      // Optimized existence query for link booleans.
+      // Aggregate counts are scoped to the selected profile's active links.
       // Both queries share the same RLS session context set by executeWithSession.
       executeWithSession(
         clerkUserId,
