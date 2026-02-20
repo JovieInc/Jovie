@@ -845,11 +845,11 @@ jobs:
             # Run all tests on PRs to catch regressions before merge
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           else
-            echo "🔍 Feature branch push: Running critical tests only (no base_ref available)"
+            echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
-            # so we can't determine changed files. Run critical tests only to avoid OOM
+            # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -1145,7 +1145,7 @@ jobs:
             mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
           fi
 
-          ADMIN_SPEC="apps/web/tests/e2e/admin-navigation.spec.ts"
+          ADMIN_SPEC="apps/web/tests/e2e/dashboard-pages-health.spec.ts"
 
           for quarantined in "${QUARANTINED[@]}"; do
             if [[ "$quarantined" == "$ADMIN_SPEC" ]]; then
@@ -1170,7 +1170,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
-        # admin-navigation is temporarily quarantined in apps/web/tests/quarantine.json due to JOV-781 flakiness.
+        # dashboard-pages-health is temporarily quarantined in apps/web/tests/quarantine.json due to JOV-782 flakiness.
         run: pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep "Admin Pages Health Check" --project=chromium
 
       - name: Skip notification (quarantined)

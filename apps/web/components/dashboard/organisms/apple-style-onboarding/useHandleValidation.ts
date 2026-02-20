@@ -31,7 +31,8 @@ interface ApiValidationResult {
 }
 
 /** Maximum time (ms) to stay in "checking" state before resetting */
-const CHECKING_SAFETY_TIMEOUT_MS = 8000;
+const CHECKING_SAFETY_TIMEOUT_MS =
+  PACER_TIMING.VALIDATION_TIMEOUT_MS + PACER_TIMING.VALIDATION_DEBOUNCE_MS;
 
 /**
  * Hook to manage handle validation state and API checks.
@@ -77,7 +78,7 @@ export function useHandleValidation({
 
       return (await response.json()) as ApiValidationResult;
     },
-    wait: 400, // Match existing debounce timing
+    wait: PACER_TIMING.ONBOARDING_HANDLE_DEBOUNCE_MS,
     timeout: PACER_TIMING.VALIDATION_TIMEOUT_MS,
     onSuccess: (result: ApiValidationResult) => {
       if (result.available) {

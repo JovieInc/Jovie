@@ -18,7 +18,7 @@ import {
 describe('Cache Tags', () => {
   describe('CACHE_TAGS', () => {
     it('should have PUBLIC_PROFILE tag', () => {
-      expect(CACHE_TAGS.PUBLIC_PROFILE).toBe('public-profile');
+      expect(CACHE_TAGS.PUBLIC_PROFILE).toBe('profiles-all');
     });
 
     it('should have DASHBOARD_DATA tag', () => {
@@ -103,22 +103,22 @@ describe('Cache Tags', () => {
   describe('createProfileTag', () => {
     it('should create tag with username', () => {
       const tag = createProfileTag('johndoe');
-      expect(tag).toBe('public-profile:johndoe');
+      expect(tag).toBe('profile:johndoe');
     });
 
     it('should preserve username case', () => {
       const tag = createProfileTag('JohnDoe');
-      expect(tag).toBe('public-profile:JohnDoe');
+      expect(tag).toBe('profile:JohnDoe');
     });
 
     it('should handle usernames with special characters', () => {
       const tag = createProfileTag('user_123');
-      expect(tag).toBe('public-profile:user_123');
+      expect(tag).toBe('profile:user_123');
     });
 
     it('should handle empty string', () => {
       const tag = createProfileTag('');
-      expect(tag).toBe('public-profile:');
+      expect(tag).toBe('profile:');
     });
 
     it('should create unique tags for different usernames', () => {
@@ -172,7 +172,7 @@ describe('Cache Tags', () => {
   describe('type safety', () => {
     it('should allow CacheTag type for tag values', () => {
       // Type-level test - these should compile without errors
-      const profileTag: CacheTag = 'public-profile';
+      const profileTag: CacheTag = 'profiles-all';
       const dashboardTag: CacheTag = 'dashboard-data';
 
       expect(profileTag).toBe(CACHE_TAGS.PUBLIC_PROFILE);
@@ -197,7 +197,7 @@ describe('Cache Tags', () => {
     });
 
     it('should have consistent prefix format', () => {
-      expect(createProfileTag('x')).toMatch(/^public-profile:/);
+      expect(createProfileTag('x')).toMatch(/^profile:/);
       expect(createSocialLinksTag('x')).toMatch(/^social-links:/);
       expect(createAvatarTag('x')).toMatch(/^avatar:/);
     });

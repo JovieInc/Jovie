@@ -50,9 +50,8 @@ export const TOAST_MESSAGES = {
 
   // PWA install
   PWA_INSTALL: 'Install Jovie',
-  PWA_INSTALL_DESCRIPTION: 'Add Jovie to your dock for quick access.',
-  PWA_INSTALL_IOS:
-    'Tap the Share button, then "Add to Home Screen" to install.',
+  PWA_INSTALL_DESCRIPTION: 'Add Jovie to your Home Screen for one-tap access.',
+  PWA_INSTALL_IOS: 'Tap Share, then “Add to Home Screen” for instant access.',
 } as const;
 
 /**

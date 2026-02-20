@@ -17,8 +17,18 @@ export const PACER_TIMING = {
   SCROLL_THROTTLE_MS: 16,
   /** Default timeout for validation requests */
   VALIDATION_TIMEOUT_MS: 5000,
+  /** Debounce for Apple-style onboarding handle validation */
+  ONBOARDING_HANDLE_DEBOUNCE_MS: 400,
+  /** Default wait between queue item processing */
+  QUEUE_WAIT_MS: 0,
+  /** Default wait before a batch is flushed */
+  BATCH_WAIT_MS: 100,
+  /** Default rate limiter window duration */
+  RATE_LIMIT_WINDOW_MS: 60_000,
   /** Rate limit for handle validation (requests per window) */
   HANDLE_CHECK_RATE_LIMIT: 10,
+  /** Default rate limiter execution cap per window */
+  DEFAULT_RATE_LIMIT: 60,
   /** Rate limit window for handle validation (1 minute) */
   HANDLE_CHECK_RATE_WINDOW_MS: 60_000,
 } as const;
