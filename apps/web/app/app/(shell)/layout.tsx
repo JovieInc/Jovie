@@ -16,6 +16,7 @@ import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
+import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -77,6 +78,7 @@ export default async function AppShellLayout({
         <PWAInstallToastActivator />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>
+            <ProfileCompletionRedirect />
             <AuthShellWrapper
               persistSidebarCollapsed={setSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
