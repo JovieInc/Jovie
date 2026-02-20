@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
+import { buildHomepageSectionFlags } from './homepage-sections';
 
 const ComparisonSection = dynamic(
   () =>
@@ -256,33 +257,22 @@ const ORGANIZATION_SCHEMA = jsonLd({
 });
 
 export default async function HomePage() {
-  const [
-    showHero,
-    showLabelLogos,
-    showHowItWorks,
-    showDashboardShowcase,
-    showProductPreview,
-    showExampleProfiles,
-    showDeeplinksGrid,
-    showProblem,
-    showComparison,
-    showWhatYouGet,
-    showSeeItInAction,
-    showFinalCta,
-  ] = await Promise.all([
-    homepageHero(),
-    homepageLabelLogos(),
-    homepageHowItWorks(),
-    homepageDashboardShowcase(),
-    homepageProductPreview(),
-    homepageExampleProfiles(),
-    homepageDeeplinksGrid(),
-    homepageProblem(),
-    homepageComparison(),
-    homepageWhatYouGet(),
-    homepageSeeItInAction(),
-    homepageFinalCta(),
-  ]);
+  const showSection = buildHomepageSectionFlags(
+    await Promise.all([
+      homepageHero(),
+      homepageLabelLogos(),
+      homepageHowItWorks(),
+      homepageDashboardShowcase(),
+      homepageProductPreview(),
+      homepageExampleProfiles(),
+      homepageDeeplinksGrid(),
+      homepageProblem(),
+      homepageComparison(),
+      homepageWhatYouGet(),
+      homepageSeeItInAction(),
+      homepageFinalCta(),
+    ])
+  );
 
   return (
     <div
@@ -317,57 +307,57 @@ export default async function HomePage() {
         className='flex flex-col'
         style={{ minHeight: 'calc(100svh - var(--linear-header-height))' }}
       >
-        {showHero && <RedesignedHero />}
-        {showLabelLogos && <LabelLogosBar />}
+        {showSection.hero && <RedesignedHero />}
+        {showSection.labelLogos && <LabelLogosBar />}
       </div>
 
-      {showHowItWorks && <HowItWorksRich />}
+      {showSection.howItWorks && <HowItWorksRich />}
 
-      {showDashboardShowcase && (
+      {showSection.dashboardShowcase && (
         <DeferredSection placeholderHeight={640}>
           <DashboardShowcase />
         </DeferredSection>
       )}
 
-      {showProductPreview && (
+      {showSection.productPreview && (
         <DeferredSection placeholderHeight={640}>
           <ProfileMockup />
         </DeferredSection>
       )}
 
-      {showExampleProfiles && (
+      {showSection.exampleProfiles && (
         <DeferredSection placeholderHeight={400}>
           <ExampleProfilesCarousel />
         </DeferredSection>
       )}
 
-      {showDeeplinksGrid && (
+      {showSection.deeplinksGrid && (
         <DeferredSection placeholderHeight={480}>
           <DeeplinksGrid />
         </DeferredSection>
       )}
 
-      {showProblem && <ProblemSection />}
+      {showSection.problem && <ProblemSection />}
 
-      {showComparison && (
+      {showSection.comparison && (
         <DeferredSection placeholderHeight={480}>
           <ComparisonSection />
         </DeferredSection>
       )}
 
-      {showWhatYouGet && (
+      {showSection.whatYouGet && (
         <DeferredSection placeholderHeight={560}>
           <WhatYouGetSection />
         </DeferredSection>
       )}
 
-      {showSeeItInAction && (
+      {showSection.seeItInAction && (
         <DeferredSection placeholderHeight={520}>
           <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
         </DeferredSection>
       )}
 
-      {showFinalCta && (
+      {showSection.finalCta && (
         <DeferredSection placeholderHeight={480}>
           <FinalCTASection />
         </DeferredSection>
