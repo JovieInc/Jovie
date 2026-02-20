@@ -1,0 +1,549 @@
+# Unified Agent Remediation Workflow
+#
+# PURPOSE: Automatically fix agent-generated PRs that fail CI checks OR receive
+# blocking CodeRabbit reviews. This is the single remediation orchestrator that
+# replaces separate fix workflows.
+#
+# TRIGGERS:
+# 1. CI failure on agent branches (workflow_run of CI completing with failure)
+# 2. CodeRabbit blocking review (pull_request_review with changes_requested)
+#
+# SAFETY:
+# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*)
+# - Max 3 fix attempts per SHA to prevent infinite loops
+# - Escalates to 'needs-human' label after exhaustion
+# - Uses least-privilege credentials
+# - Does NOT execute untrusted PR code
+#
+# FLOW:
+# CI fails / CodeRabbit blocks → Guard validates → Extract error context →
+# Claude agent fixes → Validate (biome + typecheck + tests) → Commit + Push →
+# If still fails: retry up to 3x → Escalate to human
+
+name: Agent Remediation
+
+on:
+  # Trigger 1: CI workflow completes (we check for failure in the guard)
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+  # Trigger 2: CodeRabbit blocking review
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+
+concurrency:
+  group: agent-remediation-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # ==========================================================================
+  # GUARD: Determine trigger type and validate all conditions
+  # ==========================================================================
+  guard:
+    name: Trigger Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should_run: ${{ steps.evaluate.outputs.should_run }}
+      trigger_type: ${{ steps.evaluate.outputs.trigger_type }}
+      pr_number: ${{ steps.evaluate.outputs.pr_number }}
+      pr_head_ref: ${{ steps.evaluate.outputs.pr_head_ref }}
+      pr_head_sha: ${{ steps.evaluate.outputs.pr_head_sha }}
+      attempt_number: ${{ steps.retry-guard.outputs.attempt_number }}
+      error_context: ${{ steps.error-context.outputs.error_context }}
+    steps:
+      - name: Determine trigger type and PR context
+        id: trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EVENT="${{ github.event_name }}"
+
+          if [[ "$EVENT" == "workflow_run" ]]; then
+            echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
+
+            # Get PR info from the workflow run
+            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            if [[ "$CONCLUSION" != "failure" ]]; then
+              echo "CI did not fail (conclusion: $CONCLUSION). Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+
+            # Find the PR for this branch
+            PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
+              --jq ".[] | select(.head.ref == \"$HEAD_BRANCH\" and .state == \"open\") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft}" \
+              | head -1)
+
+            if [[ -z "$PR_DATA" ]]; then
+              echo "No open PR found for branch $HEAD_BRANCH. Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+            PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head_ref')
+            PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
+            IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
+
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
+            echo "is_draft=$IS_DRAFT" >> $GITHUB_OUTPUT
+            echo "should_continue=true" >> $GITHUB_OUTPUT
+
+          elif [[ "$EVENT" == "pull_request_review" ]]; then
+            REVIEWER="${{ github.event.review.user.login }}"
+            STATE="${{ github.event.review.state }}"
+
+            if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
+              echo "Reviewer is not CodeRabbit (got: $REVIEWER). Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            if [[ "$STATE" != "changes_requested" ]]; then
+              echo "Review state is not blocking (got: $STATE). Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            echo "trigger_type=coderabbit_review" >> $GITHUB_OUTPUT
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+            echo "is_draft=${{ github.event.pull_request.draft }}" >> $GITHUB_OUTPUT
+            echo "should_continue=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check agent branch pattern
+        id: branch-check
+        if: steps.trigger.outputs.should_continue == 'true'
+        run: |
+          BRANCH="${{ steps.trigger.outputs.pr_head_ref }}"
+          echo "Branch: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/) ]]; then
+            echo "Agent branch detected"
+            echo "is_agent_branch=true" >> $GITHUB_OUTPUT
+          else
+            echo "Not an agent branch. Skipping remediation."
+            echo "is_agent_branch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check not draft
+        id: draft-check
+        if: steps.trigger.outputs.should_continue == 'true'
+        run: |
+          IS_DRAFT="${{ steps.trigger.outputs.is_draft }}"
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "PR is a draft. Skipping."
+            echo "is_ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_ready=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Retry guard (max 3 attempts per SHA)
+        id: retry-guard
+        if: steps.trigger.outputs.should_continue == 'true' && steps.branch-check.outputs.is_agent_branch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
+          HEAD_SHA="${{ steps.trigger.outputs.pr_head_sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
+          PREFIX="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}"
+
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name')
+
+          HAS_3=$(echo "$LABELS" | grep -c "^${PREFIX}-3$" || true)
+          HAS_2=$(echo "$LABELS" | grep -c "^${PREFIX}-2$" || true)
+          HAS_1=$(echo "$LABELS" | grep -c "^${PREFIX}-1$" || true)
+
+          if [[ "$HAS_3" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA has exhausted retries (3/3) for $TRIGGER_TYPE"
+            echo "retries_available=false" >> $GITHUB_OUTPUT
+            echo "attempt_number=0" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_2" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA on attempt 3/3 (final) for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=3" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_1" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA on attempt 2/3 for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=2" >> $GITHUB_OUTPUT
+          else
+            echo "SHA $SHORT_SHA on attempt 1/3 for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract error context
+        id: error-context
+        if: steps.trigger.outputs.should_continue == 'true' && steps.branch-check.outputs.is_agent_branch == 'true' && steps.retry-guard.outputs.retries_available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
+          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            # Extract failed job names and annotations from the CI run
+            RUN_ID="${{ github.event.workflow_run.id }}"
+
+            FAILED_JOBS=$(gh api repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs \
+              --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[] | select(.conclusion == "failure") | .name]}] | tostring')
+
+            # Get annotations (error messages) from the failed run
+            ANNOTATIONS=$(gh api repos/${{ github.repository }}/check-runs \
+              --method GET \
+              -f "check_suite_id=${{ github.event.workflow_run.check_suite_id }}" \
+              --jq '[.check_runs[] | select(.conclusion == "failure") | {name: .name, output: .output.summary}] | .[0:5] | tostring' 2>/dev/null || echo "[]")
+
+            ERROR_CONTEXT=$(cat <<ERREOF
+          ## CI Failure Context
+
+          **Failed Jobs:** $FAILED_JOBS
+
+          **Error Annotations:** $ANNOTATIONS
+
+          Fix the CI failures above. Focus on:
+          1. TypeScript type errors (run pnpm turbo typecheck)
+          2. Biome lint/format errors (run pnpm biome check . --write then pnpm biome check .)
+          3. Unit test failures (run pnpm --filter=@jovie/web vitest run --config=vitest.config.mts)
+          4. ESLint server boundary violations (run pnpm --filter=@jovie/web lint:server-boundaries)
+          5. Knip dead code detection (run pnpm knip)
+          ERREOF
+          )
+
+          elif [[ "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
+            REVIEW_ID="${{ github.event.review.id }}"
+            REVIEW_BODY=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID --jq '.body // ""')
+            INLINE_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID/comments \
+              --jq '[.[] | {path: .path, line: .line, body: .body}]')
+
+            ERROR_CONTEXT=$(cat <<ERREOF
+          ## CodeRabbit Review Feedback
+
+          **Review Summary:**
+          $REVIEW_BODY
+
+          **Inline Comments:**
+          $(echo "$INLINE_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)**: \(.body)"')
+
+          Fix ONLY the issues described above. Do not make any other changes.
+          ERREOF
+          )
+          fi
+
+          # Base64 encode to handle multiline safely
+          echo "error_context=$(echo "$ERROR_CONTEXT" | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Evaluate all guards
+        id: evaluate
+        run: |
+          SHOULD_CONTINUE="${{ steps.trigger.outputs.should_continue }}"
+          IS_AGENT="${{ steps.branch-check.outputs.is_agent_branch }}"
+          IS_READY="${{ steps.draft-check.outputs.is_ready }}"
+          RETRIES="${{ steps.retry-guard.outputs.retries_available }}"
+          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
+
+          echo "=== Guard Summary ==="
+          echo "Should continue: $SHOULD_CONTINUE"
+          echo "Is agent branch: $IS_AGENT"
+          echo "Is ready (not draft): $IS_READY"
+          echo "Retries available: $RETRIES"
+          echo "Trigger type: $TRIGGER_TYPE"
+
+          if [[ "$SHOULD_CONTINUE" == "true" && "$IS_AGENT" == "true" && "$IS_READY" == "true" && "$RETRIES" == "true" ]]; then
+            echo "All guards passed"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "One or more guards failed"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+          echo "pr_number=${{ steps.trigger.outputs.pr_number }}" >> $GITHUB_OUTPUT
+          echo "pr_head_ref=${{ steps.trigger.outputs.pr_head_ref }}" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=${{ steps.trigger.outputs.pr_head_sha }}" >> $GITHUB_OUTPUT
+
+  # ==========================================================================
+  # FIX: Apply fixes using Claude agent
+  # ==========================================================================
+  fix:
+    name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.guard.outputs.pr_head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark attempt in progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"
+          echo "Adding attempt marker: $LABEL"
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=$LABEL" || true
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Prepare fix instructions
+        id: prepare
+        run: |
+          ERROR_CONTEXT=$(echo "${{ needs.guard.outputs.error_context }}" | base64 -d)
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          cat > /tmp/fix-instructions.md << 'HEADER'
+          # Agent Remediation Instructions
+
+          ## CRITICAL CONSTRAINTS
+
+          1. **Minimal diff**: Make the smallest possible changes to fix the issues
+          2. **Only fix what's broken**: Do not refactor, restructure, or "improve" unrelated code
+          3. **Preserve formatting**: Do not reformat code not related to the fix
+          4. **No dead code**: Do not introduce unused imports, variables, or functions
+          5. **No lint silencing**: Never add // biome-ignore or @ts-ignore unless absolutely necessary
+          6. **Node 24 + pnpm only**: Use pnpm commands, run from repo root
+
+          HEADER
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "$ERROR_CONTEXT" >> /tmp/fix-instructions.md
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "## Attempt $ATTEMPT of 3" >> /tmp/fix-instructions.md
+          echo "" >> /tmp/fix-instructions.md
+          echo "## VALIDATION (run after fixing)" >> /tmp/fix-instructions.md
+          echo "" >> /tmp/fix-instructions.md
+          echo "1. \`pnpm biome check . --write\` (auto-fix formatting)" >> /tmp/fix-instructions.md
+          echo "2. \`pnpm biome check .\` (verify no remaining issues)" >> /tmp/fix-instructions.md
+          echo "3. \`pnpm turbo typecheck\` (verify types)" >> /tmp/fix-instructions.md
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            echo "4. \`pnpm --filter=@jovie/web vitest run --config=vitest.config.mts\` (run unit tests)" >> /tmp/fix-instructions.md
+            echo "5. \`pnpm knip\` (check for dead code)" >> /tmp/fix-instructions.md
+          fi
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "Do NOT commit — just make the fixes and leave changes in working tree." >> /tmp/fix-instructions.md
+
+      - name: Run Claude agent to fix issues
+        id: claude-fix
+        uses: anthropics/claude-code-action@68cfeead1890300cc87935dbe2c023825be87b8a # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read the file at /tmp/fix-instructions.md and apply the fixes described.
+
+            After making changes, run these validation commands:
+            1. pnpm biome check . --write (auto-fix formatting)
+            2. pnpm biome check . (verify no remaining issues)
+            3. pnpm turbo typecheck (verify types)
+
+            If validation fails, analyze the errors and fix them.
+            Do NOT commit the changes - just make the fixes.
+
+      - name: Run validation
+        id: validate
+        run: |
+          set +e
+
+          echo "=== Running Biome auto-fix ==="
+          pnpm biome check . --write 2>&1 | tail -20
+
+          echo "=== Running Biome check ==="
+          pnpm biome check . 2>&1 | tee /tmp/biome-check.log
+          BIOME_EXIT=$?
+
+          echo "=== Running TypeScript typecheck ==="
+          pnpm turbo typecheck 2>&1 | tee /tmp/typecheck.log
+          TYPECHECK_EXIT=$?
+
+          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+            echo "Validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Validation failed (biome=$BIOME_EXIT, typecheck=$TYPECHECK_EXIT)"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+
+            # Capture structured error summary (last 50 lines of each, not full logs)
+            {
+              echo "## Biome Errors"
+              tail -50 /tmp/biome-check.log
+              echo ""
+              echo "## TypeScript Errors"
+              tail -50 /tmp/typecheck.log
+            } > /tmp/validation-errors.log
+
+            echo "validation_errors=$(cat /tmp/validation-errors.log | base64 -w0)" >> $GITHUB_OUTPUT
+          fi
+
+      # RETRY: If validation fails, re-invoke agent with error context (single retry within this attempt)
+      - name: Retry with error context
+        id: retry
+        if: steps.validate.outputs.validation_passed == 'false'
+        uses: anthropics/claude-code-action@68cfeead1890300cc87935dbe2c023825be87b8a # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The previous fix attempt failed validation. Here are the errors:
+
+            ```
+            $(echo "${{ steps.validate.outputs.validation_errors }}" | base64 -d)
+            ```
+
+            Fix these validation errors. Remember:
+            - Make minimal changes
+            - Do not silence errors with comments
+            - Run `pnpm biome check . --write` followed by `pnpm biome check .`
+            - Run `pnpm turbo typecheck`
+
+      - name: Re-validate after retry
+        id: revalidate
+        if: steps.retry.outcome == 'success'
+        run: |
+          set +e
+
+          pnpm biome check . --write 2>&1 | tail -20
+          pnpm biome check . 2>&1 | tee /tmp/biome-check-2.log
+          BIOME_EXIT=$?
+
+          pnpm turbo typecheck 2>&1 | tee /tmp/typecheck-2.log
+          TYPECHECK_EXIT=$?
+
+          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+            echo "Retry validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Retry validation failed"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine final status
+        id: final-status
+        run: |
+          FIRST="${{ steps.validate.outputs.validation_passed }}"
+          RETRY="${{ steps.revalidate.outputs.validation_passed }}"
+
+          if [[ "$FIRST" == "true" || "$RETRY" == "true" ]]; then
+            echo "final_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "final_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push fixes
+        if: steps.final-status.outputs.final_passed == 'true'
+        env:
+          PR_HEAD_REF: ${{ needs.guard.outputs.pr_head_ref }}
+        run: |
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            MSG="fix: resolve CI failures (auto-remediation attempt $ATTEMPT)"
+          else
+            MSG="fix: apply CodeRabbit review fixes (auto-remediation attempt $ATTEMPT)"
+          fi
+
+          git commit -m "$MSG
+
+          Automated fixes applied by agent-remediation workflow.
+
+          Co-authored-by: Claude <claude@anthropic.com>"
+
+          git push origin "HEAD:$PR_HEAD_REF"
+          echo "Changes committed and pushed"
+
+      - name: Escalate to human
+        if: steps.final-status.outputs.final_passed == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=needs-human" || true
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            REASON="CI check failures"
+          else
+            REASON="CodeRabbit review feedback"
+          fi
+
+          gh pr comment $PR_NUMBER --body "## Agent Remediation Failed
+
+          The automated fix workflow was unable to resolve **$REASON** after attempt $ATTEMPT.
+
+          **Trigger:** $TRIGGER_TYPE
+          **What happened:**
+          - The agent attempted to fix the issues automatically
+          - Validation (Biome + TypeScript) still fails after fixes
+
+          **Next steps:**
+          A human developer needs to manually address the failures.
+
+          The \`needs-human\` label has been added to this PR."
+
+      - name: Clean up stale attempt labels
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name' 2>/dev/null || echo "")
+
+          echo "$LABELS" | grep "^agent-fix-" | while read -r label; do
+            if [[ ! "$label" =~ $SHORT_SHA ]]; then
+              echo "Removing stale label: $label"
+              gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels/$label --method DELETE || true
+            fi
+          done

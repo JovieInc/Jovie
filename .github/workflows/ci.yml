@@ -2008,9 +2008,29 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+  sentry-error-gate:
+    name: Sentry Error Gate (production)
+    needs: [deploy, canary-health-gate]
+    if: ${{ always() && needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    uses: ./.github/workflows/sentry-error-gate.yml
+    with:
+      deployment_url: ${{ needs.deploy.outputs.deployment_url }}
+      soak_minutes: 5
+      baseline_window_minutes: 30
+      threshold_multiplier: 3
+      min_baseline_errors: 5
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   deploy-notify:
     name: Notify production deploy
-    needs: [deploy, canary-health-gate]
+    needs: [deploy, canary-health-gate, sentry-error-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -2043,7 +2063,7 @@ jobs:
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
       - name: Slack notify (production deploy)
-        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2068,13 +2088,14 @@ jobs:
 
       - name: Classify failure type
         id: classify-failure
-        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') }}
+        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success' || needs.sentry-error-gate.result == 'failure') }}
         run: |
           # Determine failure type for accurate Slack notification
           MIGRATION_STATUS="${{ needs.deploy.outputs.migration_status }}"
           PREFLIGHT_STATUS="${{ needs.deploy.outputs.preflight_status }}"
           DEPLOY_RESULT="${{ needs.deploy.result }}"
           CANARY_RESULT="${{ needs.canary-health-gate.result }}"
+          SENTRY_RESULT="${{ needs.sentry-error-gate.result }}"
 
           if [ "$PREFLIGHT_STATUS" = "failure" ]; then
             echo "failure_type=migration_preflight" >> "$GITHUB_OUTPUT"
@@ -2096,6 +2117,11 @@ jobs:
             echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
             echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
             echo "failure_detail=Deployment is LIVE but health check failed - investigate immediately" >> "$GITHUB_OUTPUT"
+          elif [ "$SENTRY_RESULT" = "failure" ]; then
+            echo "failure_type=sentry" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=📈" >> "$GITHUB_OUTPUT"
+            echo "failure_title=SENTRY ERROR SPIKE DETECTED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Post-deploy error rate exceeded threshold - auto-rollback triggered" >> "$GITHUB_OUTPUT"
           else
             echo "failure_type=unknown" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=❓" >> "$GITHUB_OUTPUT"
@@ -2173,6 +2199,31 @@ jobs:
                     { "title": "Failure", "value": "Canary health gate failed", "short": true },
                     { "title": "Branch", "value": "main", "short": true },
                     { "title": "Action Required", "value": "Check https://jov.ie immediately - may need rollback", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (sentry error spike - URGENT)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'sentry' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "📈 SENTRY ERROR SPIKE — Auto-rollback triggered: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Status", "value": "📈 Error rate spiked post-deploy — auto-rollback triggered", "short": false },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Check Sentry for new errors, verify rollback succeeded", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
                 }

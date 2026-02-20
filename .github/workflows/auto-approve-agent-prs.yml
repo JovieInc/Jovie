@@ -1,0 +1,270 @@
+# Auto-Approve Agent PRs Workflow
+#
+# PURPOSE: Automatically approves low-risk agent-generated PRs that pass ALL
+# gates, removing the human bottleneck for routine changes. This is the
+# Spotify-inspired pattern: agents produce PRs, deterministic verifiers +
+# LLM judge gate quality, humans only intervene for high-risk changes.
+#
+# TRIGGER: When CI completes successfully on an agent branch PR
+#
+# CONDITIONS FOR AUTO-APPROVE (ALL must be true):
+# 1. PR is on an agent branch (linear/*, claude/*, codegen-bot/*)
+# 2. CI checks all pass (ci-pr-ready = success)
+# 3. Scope judge passes (scope-judge = success)
+# 4. CodeRabbit review is not blocking (no changes_requested)
+# 5. No sensitive files changed (auth, billing, migrations, .github/, security)
+# 6. PR does not have 'needs-human' label
+#
+# WHAT IT DOES:
+# - Approves the PR via GitHub API
+# - Enables auto-merge (enters merge queue)
+# - Comments with evidence of all gates passed
+#
+# SAFETY:
+# - Sensitive path detection prevents auto-approve on high-risk changes
+# - 'needs-human' label overrides all automation
+# - Auto-merge still goes through merge queue checks
+# - Production deploy has canary + Sentry gates as safety net
+
+name: Auto-Approve Agent PRs
+
+on:
+  # Triggered when check suites complete on PRs
+  check_suite:
+    types: [completed]
+
+  # Also triggered when the scope judge reports status
+  status:
+    types: []
+
+  # Triggered when CI workflow completes
+  workflow_run:
+    workflows: ["CI", "Scope Judge"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: read
+
+jobs:
+  auto-approve:
+    name: Auto-Approve Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run when triggered workflows succeed
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: read
+    steps:
+      - name: Find PR for this branch
+        id: find-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+
+          echo "Looking for PR on branch: $HEAD_BRANCH"
+
+          # Check agent branch pattern
+          if [[ ! "$HEAD_BRANCH" =~ ^(linear/|claude/|codegen-bot/) ]]; then
+            echo "Not an agent branch ($HEAD_BRANCH). Skipping."
+            echo "should_continue=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Find open PR
+          PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
+            --jq ".[] | select(.head.ref == \"$HEAD_BRANCH\" and .state == \"open\" and .draft == false) | {number: .number, head_sha: .head.sha, labels: [.labels[].name]}" \
+            | head -1)
+
+          if [[ -z "$PR_DATA" ]]; then
+            echo "No open non-draft PR found for $HEAD_BRANCH. Skipping."
+            echo "should_continue=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+          PR_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
+          HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '.labels | map(select(. == "needs-human")) | length > 0')
+
+          if [[ "$HAS_NEEDS_HUMAN" == "true" ]]; then
+            echo "PR #$PR_NUMBER has 'needs-human' label. Skipping auto-approve."
+            echo "should_continue=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found PR #$PR_NUMBER (SHA: $PR_SHA)"
+          echo "should_continue=true" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_sha=$PR_SHA" >> $GITHUB_OUTPUT
+          echo "head_branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Check all required statuses
+        id: check-statuses
+        if: steps.find-pr.outputs.should_continue == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_SHA="${{ steps.find-pr.outputs.pr_sha }}"
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+
+          # Get all commit statuses and check runs
+          STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
+          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
+
+          # 1. Check scope-judge status
+          SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
+          echo "Scope judge: $SCOPE_STATUS"
+
+          if [[ "$SCOPE_STATUS" != "success" ]]; then
+            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 2. Check CI PR Ready (the aggregate required check)
+          CI_PR_READY=$(echo "$CHECK_RUNS" | jq -r '[.[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"')
+          echo "CI PR Ready: $CI_PR_READY"
+
+          if [[ "$CI_PR_READY" != "success" ]]; then
+            echo "CI PR Ready has not passed (conclusion: $CI_PR_READY). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=PR Ready: $CI_PR_READY" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 3. Check CodeRabbit is not blocking
+          REVIEWS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"')
+          echo "CodeRabbit review state: $REVIEWS"
+
+          if [[ "$REVIEWS" == "CHANGES_REQUESTED" ]]; then
+            echo "CodeRabbit has requested changes. Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=CodeRabbit: changes_requested" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "All status checks passed"
+          echo "all_passed=true" >> $GITHUB_OUTPUT
+
+      - name: Check for sensitive file changes
+        id: sensitive-check
+        if: steps.find-pr.outputs.should_continue == 'true' && steps.check-statuses.outputs.all_passed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+
+          # Get changed files
+          CHANGED_FILES=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null || echo "")
+
+          # Define sensitive paths that require human review
+          SENSITIVE_PATTERNS=(
+            "^\.github/"                         # CI/CD and workflow changes
+            "^drizzle/migrations/"               # Database migrations
+            "^apps/web/lib/auth/"                 # Authentication
+            "^apps/web/lib/db/"                   # Database layer
+            "^apps/web/app/api/.*/billing"        # Billing API routes
+            "^apps/web/lib/stripe/"               # Stripe/payment code
+            "^apps/web/middleware"                 # Middleware (security surface)
+            "^\.env"                              # Environment files
+            "^CODEOWNERS"                         # Code ownership
+            "^agents\.md"                         # Agent guidelines
+            "^CLAUDE\.md"                         # Agent guidelines
+            "package\.json$"                      # Dependency changes
+            "pnpm-lock\.yaml$"                    # Lock file changes
+          )
+
+          SENSITIVE_FOUND=""
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
+            if [[ -n "$MATCHES" ]]; then
+              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
+            fi
+          done
+
+          if [[ -n "$SENSITIVE_FOUND" ]]; then
+            echo "Sensitive files changed — requires human review:"
+            echo -e "$SENSITIVE_FOUND"
+            echo "is_safe=false" >> $GITHUB_OUTPUT
+            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> $GITHUB_OUTPUT
+          else
+            echo "No sensitive files changed"
+            echo "is_safe=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-approve PR
+        if: >-
+          steps.find-pr.outputs.should_continue == 'true' &&
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+
+          echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+
+          # Submit approval review
+          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+            --method POST \
+            -f event="APPROVE" \
+            -f body="## Auto-Approved by Agent Pipeline
+
+          All quality gates passed:
+          - [x] CI checks (typecheck, lint, unit tests, a11y, layout guard)
+          - [x] Scope judge (diff aligns with ticket intent)
+          - [x] CodeRabbit review (no blocking feedback)
+          - [x] Sensitive path check (no auth/billing/migration/CI changes)
+
+          This PR was auto-approved because it meets all criteria for low-risk agent changes.
+          It will now enter the merge queue for final validation.
+
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+
+          echo "PR #$PR_NUMBER approved"
+
+      - name: Enable auto-merge
+        if: >-
+          steps.find-pr.outputs.should_continue == 'true' &&
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+
+          # Enable auto-merge (squash) which will enter the merge queue
+          gh pr merge $PR_NUMBER --auto --squash || echo "Auto-merge already enabled or not available"
+
+          # Add label for tracking
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=auto-approved" || true
+
+          echo "Auto-merge enabled for PR #$PR_NUMBER"
+
+      - name: Skip reason comment
+        if: >-
+          steps.find-pr.outputs.should_continue == 'true' &&
+          (steps.check-statuses.outputs.all_passed != 'true' || steps.sensitive-check.outputs.is_safe != 'true')
+        run: |
+          STATUSES_PASSED="${{ steps.check-statuses.outputs.all_passed }}"
+          SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
+          BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
+          SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+
+          echo "Auto-approve skipped:"
+          if [[ "$STATUSES_PASSED" != "true" ]]; then
+            echo "  - Status checks not all passing: $BLOCKING"
+          fi
+          if [[ "$SENSITIVE_SAFE" != "true" ]]; then
+            echo "  - Sensitive files changed: $SENSITIVE_FILES"
+          fi
