@@ -505,7 +505,7 @@ export function ReleaseFilterDropdown({
         <DropdownMenuContent
           align='start'
           sideOffset={4}
-          className='min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+          className='min-w-[200px] max-w-[calc(100vw-16px)] max-h-[320px] overflow-hidden flex flex-col'
           onCloseAutoFocus={e => e.preventDefault()}
         >
           {/* Main Menu Search */}
@@ -584,7 +584,8 @@ export function ReleaseFilterDropdown({
                     <DropdownMenuSubContent
                       sideOffset={4}
                       alignOffset={-4}
-                      className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+                      collisionPadding={8}
+                      className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
                     >
                       <SearchInput
                         value={labelSearch}

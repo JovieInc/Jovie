@@ -116,7 +116,7 @@ export function SidebarLinkRow({
       <div
         className={cn(
           'group flex items-center justify-between lg:rounded-md',
-          'px-3 py-1.5 bg-transparent hover:bg-interactive-hover',
+          'px-3 py-1.5 bg-surface-2 hover:bg-interactive-hover',
           'transition-colors',
           className
         )}
@@ -135,10 +135,10 @@ export function SidebarLinkRow({
           )}
         </div>
 
-        {/* Right: Actions (visible on hover/focus - desktop only) */}
+        {/* Right: Actions (desktop only — mobile uses swipe-to-reveal) */}
         <div
           className={[
-            'flex items-center gap-0.5 opacity-0',
+            'hidden lg:flex items-center gap-0.5 opacity-0',
             'group-hover:opacity-100 group-focus:opacity-100',
             'group-focus-within:opacity-100 transition-opacity shrink-0',
           ].join(' ')}
