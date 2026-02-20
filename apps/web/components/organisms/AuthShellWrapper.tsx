@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
@@ -118,8 +119,16 @@ function AuthShellWrapperInner({
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
-    () => (config.isTableRoute ? <DrawerToggleButton /> : null),
-    [config.isTableRoute]
+    () =>
+      config.section === 'dashboard' ? (
+        <>
+          <HeaderProfileProgress />
+          {config.isTableRoute && <DrawerToggleButton />}
+        </>
+      ) : config.isTableRoute ? (
+        <DrawerToggleButton />
+      ) : null,
+    [config.isTableRoute, config.section]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
