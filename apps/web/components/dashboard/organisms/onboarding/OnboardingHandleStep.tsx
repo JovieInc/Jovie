@@ -17,6 +17,7 @@ interface OnboardingHandleStepProps {
   readonly title: string;
   readonly prompt?: string;
   readonly handleInput: string;
+  readonly isReservedHandle?: boolean;
   readonly handleValidation: HandleValidationState;
   readonly stateError: string | null;
   readonly isSubmitting: boolean;
@@ -133,6 +134,7 @@ export function OnboardingHandleStep({
   title,
   prompt,
   handleInput,
+  isReservedHandle = false,
   handleValidation,
   stateError,
   isSubmitting,
@@ -164,6 +166,12 @@ export function OnboardingHandleStep({
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
+          {isReservedHandle && handleInput ? (
+            <p className='text-sm text-secondary-token text-center'>
+              We reserved @{handleInput} for you. Prefer something else? Edit
+              it.
+            </p>
+          ) : null}
         </div>
 
         <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>

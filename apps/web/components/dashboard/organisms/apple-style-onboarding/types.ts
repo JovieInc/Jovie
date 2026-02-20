@@ -1,6 +1,7 @@
 export interface AppleStyleOnboardingFormProps {
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
+  readonly isReservedHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
 }

@@ -8,6 +8,7 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
@@ -87,11 +88,15 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
-  const initialHandle =
-    resolvedSearchParams?.handle ||
-    existingProfile?.username ||
-    user?.username ||
-    '';
+  const providedHandle =
+    resolvedSearchParams?.handle || existingProfile?.username || user?.username;
+
+  const shouldReserveHandle = !providedHandle;
+  const reservedHandle = shouldReserveHandle
+    ? await reserveOnboardingHandle(initialDisplayName)
+    : null;
+
+  const initialHandle = providedHandle || reservedHandle || '';
 
   return (
     <AuthLayout
@@ -107,6 +112,7 @@ export default async function OnboardingPage({
         <OnboardingFormWrapper
           initialDisplayName={initialDisplayName}
           initialHandle={initialHandle}
+          isReservedHandle={Boolean(reservedHandle)}
           userEmail={userEmail}
           userId={userId}
         />
