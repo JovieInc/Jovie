@@ -67,11 +67,11 @@ const preview: Preview = {
       return (
         <QueryClientProvider client={queryClient}>
           <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
+            attribute='class'
+            defaultTheme='dark'
             enableSystem
             disableTransitionOnChange
-            storageKey="jovie-theme"
+            storageKey='jovie-theme'
           >
             <TooltipProvider>
               <ToastProvider>
