@@ -147,7 +147,7 @@ export function DashboardOverview({
                 asChild
                 variant='secondary'
                 size='sm'
-                className='h-11 w-11 rounded-full p-0'
+                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full p-0'
               >
                 <Link
                   href={`/${artist.handle}`}
@@ -157,7 +157,7 @@ export function DashboardOverview({
                 >
                   <Icon
                     name='ArrowUpRight'
-                    className='h-5 w-5'
+                    className='h-4 w-4 sm:h-5 sm:w-5'
                     aria-hidden='true'
                   />
                   <span className='sr-only'>View profile</span>
@@ -167,7 +167,7 @@ export function DashboardOverview({
                 relativePath={`/${artist.handle}`}
                 idleLabel='Copy URL'
                 iconName='Copy'
-                className='h-11 w-11 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
               />
             </div>
           </div>

@@ -177,4 +177,24 @@ describe('DashboardOverview', () => {
       { timeout: 3000 }
     );
   });
+
+  it('uses responsive sizing for header action buttons', () => {
+    const profile = makeProfile({
+      userId: 'db-user-123',
+      spotifyUrl: 'https://open.spotify.com/artist/123',
+    });
+    renderDashboard(profile, true);
+
+    // The "View profile" link button should use responsive sizing (smaller on mobile)
+    const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
+    const viewProfileBtn = viewProfileLink.closest('[class*="rounded-full"]');
+    expect(viewProfileBtn).not.toBeNull();
+    const btnClass = viewProfileBtn!.className;
+
+    // Should have mobile-first small size and sm: breakpoint for larger
+    expect(btnClass).toContain('h-8');
+    expect(btnClass).toContain('w-8');
+    expect(btnClass).toContain('sm:h-11');
+    expect(btnClass).toContain('sm:w-11');
+  });
 });
