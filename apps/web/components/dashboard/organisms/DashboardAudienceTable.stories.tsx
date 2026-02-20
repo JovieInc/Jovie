@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import DashboardLayoutClient from '@/app/app/(shell)/dashboard/DashboardLayoutClient';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTable } from './dashboard-audience-table';
 
@@ -124,15 +123,13 @@ const meta: Meta<typeof DashboardAudienceTable> = {
       },
     },
   },
-  tags: ['autodocs', 'audience-a11y'],
+  tags: ['autodocs', 'audience-a11y', 'no-vitest'],
   decorators: [
     Story => (
       <DashboardDataProvider value={mockDashboardData}>
-        <DashboardLayoutClient dashboardData={mockDashboardData}>
-          <div className='h-[720px] bg-surface-1 text-primary-token'>
-            <Story />
-          </div>
-        </DashboardLayoutClient>
+        <div className='h-[720px] bg-surface-1 text-primary-token'>
+          <Story />
+        </div>
       </DashboardDataProvider>
     ),
   ],

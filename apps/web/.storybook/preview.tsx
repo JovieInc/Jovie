@@ -1,7 +1,18 @@
+import { TooltipProvider } from '@radix-ui/react-tooltip';
 import type { Preview } from '@storybook/nextjs-vite';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { ToastProvider } from '../components/providers/ToastProvider';
 import '../app/globals.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      gcTime: 0,
+    },
+  },
+});
 
 const preview: Preview = {
   parameters: {
@@ -46,17 +57,21 @@ const preview: Preview = {
   tags: ['autodocs'],
   decorators: [
     Story => (
-      <ThemeProvider
-        attribute='class'
-        defaultTheme='dark'
-        enableSystem
-        disableTransitionOnChange
-        storageKey='jovie-theme'
-      >
-        <ToastProvider>
-          <Story />
-        </ToastProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute='class'
+          defaultTheme='dark'
+          enableSystem
+          disableTransitionOnChange
+          storageKey='jovie-theme'
+        >
+          <TooltipProvider>
+            <ToastProvider>
+              <Story />
+            </ToastProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     ),
   ],
 };
