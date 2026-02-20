@@ -205,7 +205,7 @@ export async function createNewSocialProfile(
     token: claimToken,
     tokenHash: claimTokenHash,
     expiresAt: claimTokenExpiresAt,
-  } = generateClaimTokenPair();
+  } = await generateClaimTokenPair();
 
   // For Spotify artist IDs, use the fetched artist name if available
   const displayName =

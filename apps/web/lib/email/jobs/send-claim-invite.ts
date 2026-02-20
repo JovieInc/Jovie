@@ -152,7 +152,7 @@ export async function processSendClaimInviteJob(
   let claimToken = inviteMeta.claimToken;
 
   if (!claimToken) {
-    const { token, tokenHash, expiresAt } = generateClaimTokenPair();
+    const { token, tokenHash, expiresAt } = await generateClaimTokenPair();
     claimToken = token;
 
     await tx

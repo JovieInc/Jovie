@@ -18,8 +18,6 @@ jobs:
     name: Storybook A11y Checks
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Non-blocking while stabilizing Vitest addon migration (was broken on Node 24 with old test-runner too)
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -67,8 +65,9 @@ jobs:
   playwright-visual:
     name: Playwright Visual Regression
     runs-on: ubuntu-latest
-    # Non-blocking: continue even if this job fails
-    continue-on-error: true
+    timeout-minutes: 10
+    # Skip on forks — secrets (DATABASE_URL) are not available
+    if: ${{ github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - name: Checkout
@@ -92,9 +91,9 @@ jobs:
       - name: Run Visual Regression Tests
         id: visual-test
         run: pnpm --filter web e2e:visual
-        continue-on-error: true
         env:
           CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # Skip auth-required tests in CI without secrets
           E2E_SKIP_AUTH: true
 

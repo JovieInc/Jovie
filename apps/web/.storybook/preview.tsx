@@ -6,6 +6,32 @@ import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
 import '../app/globals.css';
 
+// Intercept /api/* fetches to prevent unhandled rejections from TanStack Query
+// background refetches that 404 in the Storybook test environment.
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const raw =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    // Only intercept same-origin /api/* requests; let external APIs through
+    const urlObj = new URL(raw, window.location.href);
+    if (
+      urlObj.origin === window.location.origin &&
+      urlObj.pathname.startsWith('/api/')
+    ) {
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return originalFetch(input, init);
+  };
+}
+
 const preview: Preview = {
   parameters: {
     controls: {
