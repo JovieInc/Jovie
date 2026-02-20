@@ -198,6 +198,15 @@ function getInputDisplayValue(
     : emailInput;
 }
 
+/**
+ * Get the submit button label based on current form state.
+ */
+function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
+  if (isSubmitting) return 'Working…';
+  if (otpStep === 'verify') return 'Verify Code';
+  return 'Get Notified';
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -379,11 +388,7 @@ export function ArtistNotificationsCTA({
         className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
         style={noFontSynthesisStyle}
       >
-        {isSubmitting
-          ? 'Working…'
-          : otpStep === 'verify'
-            ? 'Verify Code'
-            : 'Get Notified'}
+        {getSubmitButtonLabel(isSubmitting, otpStep)}
       </button>
 
       <div className='flex items-center justify-center gap-2'>

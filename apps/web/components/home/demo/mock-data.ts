@@ -161,12 +161,12 @@ export interface MonthlyEarnings {
 }
 
 export const MONTHLY_EARNINGS: MonthlyEarnings[] = [
-  { month: 'Sep', amount: 12_50 },
-  { month: 'Oct', amount: 28_00 },
-  { month: 'Nov', amount: 18_50 },
-  { month: 'Dec', amount: 42_00 },
-  { month: 'Jan', amount: 35_75 },
-  { month: 'Feb', amount: 48_50 },
+  { month: 'Sep', amount: 1250 },
+  { month: 'Oct', amount: 2800 },
+  { month: 'Nov', amount: 1850 },
+  { month: 'Dec', amount: 4200 },
+  { month: 'Jan', amount: 3575 },
+  { month: 'Feb', amount: 4850 },
 ];
 
 export interface RecentTip {
@@ -210,8 +210,8 @@ export const RECENT_TIPS: RecentTip[] = [
 ];
 
 export const EARNINGS_SUMMARY = {
-  totalReceivedCents: 235_00,
-  monthReceivedCents: 48_50,
+  totalReceivedCents: 23_500,
+  monthReceivedCents: 4850,
   tipsSubmitted: 47,
   tipClicks: 342,
   qrTipClicks: 89,
