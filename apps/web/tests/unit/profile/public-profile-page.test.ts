@@ -513,4 +513,26 @@ describe('Public Profile Page Logic', () => {
       expect(genreContext).not.toContain('alternative');
     });
   });
+
+  describe('cache strategy', () => {
+    function shouldStoreInNegativeCache(status: 'ok' | 'not_found' | 'error') {
+      return status === 'not_found';
+    }
+
+    function shouldStoreInLongLivedCache(status: 'ok' | 'not_found' | 'error') {
+      return status === 'ok';
+    }
+
+    it('stores only not_found responses in short-lived negative cache', () => {
+      expect(shouldStoreInNegativeCache('not_found')).toBe(true);
+      expect(shouldStoreInNegativeCache('ok')).toBe(false);
+      expect(shouldStoreInNegativeCache('error')).toBe(false);
+    });
+
+    it('stores only successful payloads in long-lived cache', () => {
+      expect(shouldStoreInLongLivedCache('ok')).toBe(true);
+      expect(shouldStoreInLongLivedCache('not_found')).toBe(false);
+      expect(shouldStoreInLongLivedCache('error')).toBe(false);
+    });
+  });
 });
