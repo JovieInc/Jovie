@@ -138,8 +138,9 @@ jobs:
       - name: Check agent branch pattern
         id: branch-check
         if: steps.trigger.outputs.should_continue == 'true'
+        env:
+          BRANCH: ${{ steps.trigger.outputs.pr_head_ref }}
         run: |
-          BRANCH="${{ steps.trigger.outputs.pr_head_ref }}"
           echo "Branch: $BRANCH"
 
           if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/) ]]; then
@@ -261,13 +262,16 @@ jobs:
 
       - name: Evaluate all guards
         id: evaluate
+        env:
+          SHOULD_CONTINUE: ${{ steps.trigger.outputs.should_continue }}
+          IS_AGENT: ${{ steps.branch-check.outputs.is_agent_branch }}
+          IS_READY: ${{ steps.draft-check.outputs.is_ready }}
+          RETRIES: ${{ steps.retry-guard.outputs.retries_available }}
+          TRIGGER_TYPE: ${{ steps.trigger.outputs.trigger_type }}
+          PR_NUMBER: ${{ steps.trigger.outputs.pr_number }}
+          PR_HEAD_REF: ${{ steps.trigger.outputs.pr_head_ref }}
+          PR_HEAD_SHA: ${{ steps.trigger.outputs.pr_head_sha }}
         run: |
-          SHOULD_CONTINUE="${{ steps.trigger.outputs.should_continue }}"
-          IS_AGENT="${{ steps.branch-check.outputs.is_agent_branch }}"
-          IS_READY="${{ steps.draft-check.outputs.is_ready }}"
-          RETRIES="${{ steps.retry-guard.outputs.retries_available }}"
-          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
-
           echo "=== Guard Summary ==="
           echo "Should continue: $SHOULD_CONTINUE"
           echo "Is agent branch: $IS_AGENT"
@@ -284,9 +288,9 @@ jobs:
           fi
 
           echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
-          echo "pr_number=${{ steps.trigger.outputs.pr_number }}" >> $GITHUB_OUTPUT
-          echo "pr_head_ref=${{ steps.trigger.outputs.pr_head_ref }}" >> $GITHUB_OUTPUT
-          echo "pr_head_sha=${{ steps.trigger.outputs.pr_head_sha }}" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
 
   # ==========================================================================
   # FIX: Apply fixes using Claude agent
@@ -326,12 +330,12 @@ jobs:
       - name: Mark attempt in progress
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
         run: |
-          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
-          HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
           SHORT_SHA="${HEAD_SHA:0:7}"
-          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
-          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
 
           LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"
           echo "Adding attempt marker: $LABEL"
@@ -344,10 +348,12 @@ jobs:
 
       - name: Prepare fix instructions
         id: prepare
+        env:
+          ERROR_CONTEXT_B64: ${{ needs.guard.outputs.error_context }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
         run: |
-          ERROR_CONTEXT=$(echo "${{ needs.guard.outputs.error_context }}" | base64 -d)
-          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
-          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+          ERROR_CONTEXT=$(echo "$ERROR_CONTEXT_B64" | base64 -d)
 
           cat > /tmp/fix-instructions.md << 'HEADER'
           # Agent Remediation Instructions
