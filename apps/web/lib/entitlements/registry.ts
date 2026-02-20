@@ -24,7 +24,11 @@ export type BooleanEntitlement =
   | 'canFilterSelfFromAnalytics'
   | 'canAccessAdPixels'
   | 'canBeVerified'
-  | 'aiCanUseTools';
+  | 'aiCanUseTools'
+  | 'canCreateManualReleases'
+  | 'canAccessFutureReleases'
+  | 'canSendNotifications'
+  | 'canEditSmartLinks';
 
 export type NumericEntitlement =
   | 'analyticsRetentionDays'
@@ -66,20 +70,25 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: false,
       canBeVerified: false,
       aiCanUseTools: false,
+      canCreateManualReleases: false,
+      canAccessFutureReleases: false,
+      canSendNotifications: false,
+      canEditSmartLinks: false,
     },
     limits: {
       analyticsRetentionDays: 7,
       contactsLimit: 100,
-      smartLinksLimit: 5,
+      smartLinksLimit: 25,
       aiDailyMessageLimit: 5,
     },
     marketing: {
       displayName: 'Free',
       tagline: 'Free for everyone',
       features: [
-        'AI-powered personalization',
-        'Smart deep links',
+        'Up to 25 smart links for released music',
         'Auto-sync from Spotify',
+        'Smart deep links',
+        'AI-powered personalization',
         'Basic analytics (7 days)',
         'Up to 100 contacts',
       ],
@@ -95,6 +104,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: true,
       canBeVerified: true,
       aiCanUseTools: true,
+      canCreateManualReleases: true,
+      canAccessFutureReleases: true,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
     },
     limits: {
       analyticsRetentionDays: 90,
@@ -107,6 +120,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       tagline: 'For growing artists',
       features: [
         'All Free features +',
+        'Unlimited smart links',
+        'Pre-release & countdown pages',
+        'Release notifications',
+        'Manual release creation',
         'Remove Jovie branding',
         'Extended analytics (90 days)',
         'Unlimited contacts',
@@ -126,6 +143,10 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessAdPixels: true,
       canBeVerified: true,
       aiCanUseTools: true,
+      canCreateManualReleases: true,
+      canAccessFutureReleases: true,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
     },
     limits: {
       analyticsRetentionDays: 365,

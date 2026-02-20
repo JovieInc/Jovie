@@ -1,9 +1,9 @@
-import { AuthLoader } from '@/components/organisms/AuthLoader';
+import EarningsLoading from '@/app/app/(shell)/dashboard/earnings/loading';
 
 /**
  * Tipping dashboard loading screen
- * Uses AuthLoader to match the unified layout (sidebar offset, no layout shift)
+ * Uses earnings skeleton to match redirect destination content.
  */
 export default function TippingLoading() {
-  return <AuthLoader />;
+  return <EarningsLoading />;
 }

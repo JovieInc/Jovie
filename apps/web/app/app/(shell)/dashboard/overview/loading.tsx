@@ -1,9 +1,9 @@
-import { AuthLoader } from '@/components/organisms/AuthLoader';
+import { DashboardOverviewSkeleton } from '@/components/dashboard/organisms/DashboardOverviewSkeleton';
 
 /**
  * Dashboard overview loading screen
- * Uses AuthLoader to match the unified layout (sidebar offset, no layout shift)
+ * Uses content-matching overview skeleton while redirect resolves.
  */
 export default function OverviewLoading() {
-  return <AuthLoader />;
+  return <DashboardOverviewSkeleton />;
 }

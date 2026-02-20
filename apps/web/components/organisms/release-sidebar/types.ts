@@ -74,4 +74,9 @@ export interface ReleaseSidebarProps {
    * Controls the visibility of the "Allow album art downloads" setting.
    */
   readonly allowDownloads?: boolean;
+  /**
+   * When true, disables editing capabilities (artwork upload, add/remove links).
+   * Used for free-plan users who can view but not modify their smartlinks.
+   */
+  readonly readOnly?: boolean;
 }

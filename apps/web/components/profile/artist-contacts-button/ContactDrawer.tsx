@@ -73,41 +73,30 @@ export function ContactDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
         <Drawer.Content
-          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
-          style={{
-            backgroundColor: 'var(--liquid-glass-bg)',
-            backdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            WebkitBackdropFilter: `blur(var(--liquid-glass-blur-intense))`,
-            borderColor: 'var(--liquid-glass-border)',
-            boxShadow: 'var(--liquid-glass-shadow-elevated)',
-          }}
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
+          data-testid='contact-drawer'
           aria-describedby={undefined}
         >
-          {/* Specular highlight */}
-          <div
-            className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-2xl'
-            style={{ background: 'var(--liquid-glass-highlight)' }}
-          />
-
           {/* Drag handle */}
-          <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+          <div className='mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-quaternary-token/40' />
 
-          <Drawer.Title className='relative z-10 px-6 pt-4 pb-2 text-center text-lg font-semibold text-primary-token'>
+          <Drawer.Title className='px-6 pt-4 pb-2 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
             Contact {artistName}
           </Drawer.Title>
 
-          <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
+          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
             <div className='space-y-1'>
               {contacts.map(contact => {
                 const primary = primaryChannel(contact);
                 return (
                   <div
                     key={contact.id}
-                    className='flex items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors duration-150 ease-out active:bg-[--liquid-glass-item-selected]'
+                    className='flex items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors duration-150 ease-out hover:bg-black/5 active:bg-black/8'
+                    data-testid='contact-drawer-item'
                   >
                     <button
                       type='button'
-                      className='flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] rounded-md'
+                      className='flex flex-1 flex-col items-start rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                       onClick={() => performAction(primary, contact)}
                     >
                       <span className='text-sm font-semibold text-primary-token'>
@@ -124,9 +113,10 @@ export function ContactDrawer({
                         <button
                           key={`${contact.id}-${channel.type}`}
                           type='button'
-                          className='flex h-10 w-10 items-center justify-center rounded-full text-primary-token transition-colors active:bg-[--liquid-glass-item-selected] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                          className='flex h-10 w-10 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-black/5 active:bg-black/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                           aria-label={`${channel.type === 'email' ? 'Email' : 'Call'} ${contact.roleLabel}`}
                           onClick={() => performAction(channel, contact)}
+                          data-testid='contact-drawer-channel-action'
                         >
                           <ChannelIcon type={channel.type} />
                         </button>

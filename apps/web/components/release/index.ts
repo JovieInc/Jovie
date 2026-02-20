@@ -5,6 +5,7 @@ export {
 } from './AlbumArtworkContextMenu';
 export { ReleaseCountdown } from './ReleaseCountdown';
 export { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
+export { ScheduledReleasePage } from './ScheduledReleasePage';
 export { SmartLinkArtwork } from './SmartLinkArtwork';
 export { SmartLinkShell } from './SmartLinkShell';
 export { UnreleasedReleaseHero } from './UnreleasedReleaseHero';

@@ -68,6 +68,13 @@ describe('useNotifications', () => {
       expect(TOAST_MESSAGES.LOADING).toBe('Loading...');
       expect(TOAST_MESSAGES.UNSAVED_CHANGES).toBe('You have unsaved changes');
       expect(TOAST_MESSAGES.RATE_LIMIT).toBe('Too many requests. Please wait.');
+      expect(TOAST_MESSAGES.PWA_INSTALL).toBe('Install Jovie');
+      expect(TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION).toBe(
+        'Add Jovie to your Home Screen for one-tap access.'
+      );
+      expect(TOAST_MESSAGES.PWA_INSTALL_IOS).toBe(
+        'Tap Share, then “Add to Home Screen” for instant access.'
+      );
     });
   });
 
