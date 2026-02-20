@@ -213,9 +213,7 @@ export function SettingsPolished({
 
       {/* Artist settings */}
       <div className='space-y-6'>
-        <h3 className='text-[13px] font-medium text-secondary-token'>
-          Artist
-        </h3>
+        <h3 className='text-[13px] font-medium text-secondary-token'>Artist</h3>
         {artistSections.map(section => (
           <SettingsSection
             key={section.id}
