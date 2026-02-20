@@ -45,6 +45,10 @@ interface ReleaseTableProps {
   readonly groupByYear?: boolean;
   /** Check if a release's smart link is locked behind the pro gate */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
+  /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
+  readonly getSmartLinkLockReason?: (
+    releaseId: string
+  ) => 'scheduled' | 'cap' | null;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -75,6 +79,7 @@ export function ReleaseTable({
   showTracks = false,
   groupByYear = false,
   isSmartLinkLocked,
+  getSmartLinkLockReason,
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
@@ -100,8 +105,9 @@ export function ReleaseTable({
         onCopy,
         artistName,
         isSmartLinkLocked,
+        getSmartLinkLockReason,
       }),
-    [onEdit, onCopy, artistName, isSmartLinkLocked]
+    [onEdit, onCopy, artistName, isSmartLinkLocked, getSmartLinkLockReason]
   );
 
   // Stable callbacks for UnifiedTable props
@@ -159,7 +165,10 @@ export function ReleaseTable({
       id: 'meta',
       // NOSONAR S6478: TanStack Table header renderer prop, component already extracted
       header: MetaHeaderCell,
-      cell: createRightMetaCellRenderer(isSmartLinkLocked),
+      cell: createRightMetaCellRenderer(
+        isSmartLinkLocked,
+        getSmartLinkLockReason
+      ),
       size: 300,
       minSize: 200,
       meta: { className: 'hidden sm:table-cell' },
@@ -173,6 +182,7 @@ export function ReleaseTable({
     isLoadingTracks,
     toggleExpansion,
     isSmartLinkLocked,
+    getSmartLinkLockReason,
   ]);
 
   // Transform columnVisibility to TanStack format (always show release)
@@ -268,6 +278,7 @@ export function ReleaseTable({
         onEdit={onEdit}
         onCopy={onCopy}
         isSmartLinkLocked={isSmartLinkLocked}
+        getSmartLinkLockReason={getSmartLinkLockReason}
         groupByYear={groupByYear}
       />
     );

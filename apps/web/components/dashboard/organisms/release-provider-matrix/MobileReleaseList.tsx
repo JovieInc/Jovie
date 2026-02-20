@@ -22,6 +22,9 @@ interface MobileReleaseListProps {
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
+  readonly getSmartLinkLockReason?: (
+    releaseId: string
+  ) => 'scheduled' | 'cap' | null;
   readonly groupByYear?: boolean;
 }
 
@@ -60,6 +63,7 @@ const SwipeActions = memo(function SwipeActions({
   onEdit,
   onCopy,
   isLocked,
+  lockReason,
 }: {
   readonly release: ReleaseViewModel;
   readonly onEdit: (release: ReleaseViewModel) => void;
@@ -69,6 +73,7 @@ const SwipeActions = memo(function SwipeActions({
     testId: string
   ) => Promise<string>;
   readonly isLocked: boolean;
+  readonly lockReason?: 'scheduled' | 'cap' | null;
 }) {
   const handleCopy = useCallback(() => {
     if (onCopy && !isLocked) {
@@ -79,6 +84,12 @@ const SwipeActions = memo(function SwipeActions({
       );
     }
   }, [onCopy, isLocked, release]);
+
+  const lockedLabel = lockReason === 'scheduled' ? 'Scheduled' : 'Pro';
+  const lockedAriaLabel =
+    lockReason === 'scheduled'
+      ? 'Smart link scheduled — goes live on release day'
+      : 'Smart link locked (Pro)';
 
   return (
     <div className='flex h-full items-stretch'>
@@ -102,18 +113,18 @@ const SwipeActions = memo(function SwipeActions({
             : 'bg-sky-500 active:bg-sky-600'
         )}
         aria-label={
-          isLocked
-            ? 'Smart link locked (Pro)'
-            : `Copy smart link for ${release.title}`
+          isLocked ? lockedAriaLabel : `Copy smart link for ${release.title}`
         }
       >
         <Icon
-          name={isLocked ? 'Lock' : 'Link2'}
+          name={
+            isLocked ? (lockReason === 'scheduled' ? 'Clock' : 'Lock') : 'Link2'
+          }
           className='h-4 w-4'
           aria-hidden='true'
         />
         <span className='text-[10px] font-medium'>
-          {isLocked ? 'Pro' : 'Link'}
+          {isLocked ? lockedLabel : 'Link'}
         </span>
       </button>
     </div>
@@ -127,6 +138,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   onEdit,
   onCopy,
   isSmartLinkLocked,
+  getSmartLinkLockReason,
 }: {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
@@ -137,6 +149,9 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
+  readonly getSmartLinkLockReason?: (
+    releaseId: string
+  ) => 'scheduled' | 'cap' | null;
 }) {
   const year = release.releaseDate
     ? new Date(release.releaseDate).getFullYear()
@@ -144,6 +159,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
+  const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
 
   const actions = useMemo(
     () => (
@@ -152,9 +168,10 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         onEdit={onEdit}
         onCopy={onCopy}
         isLocked={isLocked}
+        lockReason={lockReason}
       />
     ),
-    [release, onEdit, onCopy, isLocked]
+    [release, onEdit, onCopy, isLocked, lockReason]
   );
 
   return (
@@ -267,6 +284,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   onEdit,
   onCopy,
   isSmartLinkLocked,
+  getSmartLinkLockReason,
   groupByYear = false,
 }: MobileReleaseListProps) {
   const yearGroups = useMemo(
@@ -292,6 +310,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
                   onEdit={onEdit}
                   onCopy={onCopy}
                   isSmartLinkLocked={isSmartLinkLocked}
+                  getSmartLinkLockReason={getSmartLinkLockReason}
                 />
               ))}
             </div>

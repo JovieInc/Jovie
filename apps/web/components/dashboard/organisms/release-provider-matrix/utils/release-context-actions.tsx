@@ -10,10 +10,11 @@ interface GetReleaseContextMenuItemsOptions {
   onCopy: (path: string, label: string, testId: string) => Promise<string>;
   artistName?: string | null;
   isSmartLinkLocked?: (releaseId: string) => boolean;
+  getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null;
 }
 
 const menuIcon = (
-  name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink' | 'Lock'
+  name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink' | 'Lock' | 'Clock'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
 
 /**
@@ -26,8 +27,10 @@ export function getReleaseContextMenuItems({
   onCopy,
   artistName,
   isSmartLinkLocked,
+  getSmartLinkLockReason,
 }: GetReleaseContextMenuItemsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
+  const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
 
   const items: ContextMenuItemType[] = [
     {
@@ -40,8 +43,11 @@ export function getReleaseContextMenuItems({
       ? [
           {
             id: 'copy-smart-link',
-            label: 'Smart link (Pro)',
-            icon: menuIcon('Lock'),
+            label:
+              lockReason === 'scheduled'
+                ? 'Scheduled (Pro)'
+                : 'Smart link (Pro)',
+            icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
             disabled: true,
             onClick: () => {},
           } as ContextMenuItemType,

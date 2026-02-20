@@ -27,9 +27,13 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   canAccessAdPixels: false,
   canBeVerified: false,
   aiCanUseTools: false,
+  canCreateManualReleases: false,
+  canAccessFutureReleases: false,
+  canSendNotifications: false,
+  canEditSmartLinks: false,
   analyticsRetentionDays: 7,
   contactsLimit: 100,
-  smartLinksLimit: 5,
+  smartLinksLimit: 25,
   aiDailyMessageLimit: 5,
 };
 

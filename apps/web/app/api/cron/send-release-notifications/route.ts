@@ -6,6 +6,7 @@ import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
+import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
@@ -574,9 +575,62 @@ export async function sendPendingNotifications(): Promise<{
       batchFetchStreamingLinks(releaseIds),
     ]);
 
+  // Check which creators can send notifications based on their plan
+  const eligibleCreatorIds = new Set<string>();
+  await Promise.all(
+    creatorProfileIds.map(async profileId => {
+      try {
+        const { entitlements } = await getCreatorEntitlements(profileId);
+        if (entitlements.booleans.canSendNotifications) {
+          eligibleCreatorIds.add(profileId);
+        }
+      } catch {
+        // If plan lookup fails, skip this creator
+        logger.warn(
+          `[send-release-notifications] Failed to check plan for creator ${profileId}, skipping`
+        );
+      }
+    })
+  );
+
+  // Cancel notifications for ineligible creators
+  const ineligibleNotifications = pendingNotifications.filter(
+    n => !eligibleCreatorIds.has(n.creatorProfileId)
+  );
+  if (ineligibleNotifications.length > 0) {
+    const now2 = new Date();
+    await Promise.all(
+      ineligibleNotifications.map(n =>
+        updateNotificationStatus(
+          n.id,
+          now2,
+          'cancelled',
+          'Creator on free plan'
+        )
+      )
+    );
+    logger.info(
+      `[send-release-notifications] Cancelled ${ineligibleNotifications.length} notifications for free-plan creators`
+    );
+  }
+
+  // Filter to only eligible notifications
+  const eligibleNotifications = pendingNotifications.filter(n =>
+    eligibleCreatorIds.has(n.creatorProfileId)
+  );
+
+  if (eligibleNotifications.length === 0) {
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: ineligibleNotifications.length,
+      processed: pendingNotifications.length,
+    };
+  }
+
   // Process notifications in parallel batches
   const totals = await processNotificationBatches(
-    pendingNotifications,
+    eligibleNotifications,
     now,
     releasesMap,
     creatorsMap,
@@ -585,13 +639,13 @@ export async function sendPendingNotifications(): Promise<{
   );
 
   logger.info(
-    `[send-release-notifications] Sent ${totals.totalSent}, skipped ${totals.totalSkipped}, failed ${totals.totalFailed}`
+    `[send-release-notifications] Sent ${totals.totalSent}, skipped ${totals.totalSkipped + ineligibleNotifications.length}, failed ${totals.totalFailed}`
   );
 
   return {
     sent: totals.totalSent,
     failed: totals.totalFailed,
-    skipped: totals.totalSkipped,
+    skipped: totals.totalSkipped + ineligibleNotifications.length,
     processed: pendingNotifications.length,
   };
 }

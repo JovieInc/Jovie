@@ -303,9 +303,13 @@ export interface UserEntitlements {
   canAccessAdPixels: boolean;
   canBeVerified: boolean;
   aiCanUseTools: boolean;
+  canCreateManualReleases: boolean;
+  canAccessFutureReleases: boolean;
+  canSendNotifications: boolean;
+  canEditSmartLinks: boolean;
   // Limits
   analyticsRetentionDays: number;
   contactsLimit: number | null; // null = unlimited
-  smartLinksLimit: number | null; // null = unlimited, 5 for free tier
+  smartLinksLimit: number | null; // null = unlimited, 25 for free tier
   aiDailyMessageLimit: number;
 }

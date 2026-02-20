@@ -139,27 +139,75 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     });
   }, [rows, filters]);
 
-  // Smart link gating: free tier gets 5 oldest releases unlocked
-  const { smartLinksLimit, isPro } = usePlanGate();
+  // Smart link gating: free tier gets smartlinks for released music only (up to cap)
+  const { smartLinksLimit, isPro, canCreateManualReleases, canEditSmartLinks } =
+    usePlanGate();
 
-  const freeReleaseIds = useMemo(() => {
-    if (!smartLinksLimit) return null; // null = unlimited (pro/growth)
-    const sorted = [...rows]
-      .sort((a, b) => {
+  // Partition releases into released vs unreleased, and compute lock state
+  const { unlockedIds, lockReasons, releasedCount, unreleasedCount } =
+    useMemo(() => {
+      if (!smartLinksLimit) {
+        // null = unlimited (pro/growth) — all unlocked
+        return {
+          unlockedIds: null,
+          lockReasons: new Map<string, 'scheduled' | 'cap'>(),
+          releasedCount: rows.length,
+          unreleasedCount: 0,
+        };
+      }
+
+      const now = Date.now();
+      const released: typeof rows = [];
+      const unreleased: typeof rows = [];
+      const reasons = new Map<string, 'scheduled' | 'cap'>();
+
+      for (const r of rows) {
+        const releaseTime = r.releaseDate
+          ? new Date(r.releaseDate).getTime()
+          : 0;
+        if (releaseTime > now) {
+          unreleased.push(r);
+          reasons.set(r.id, 'scheduled');
+        } else {
+          released.push(r);
+        }
+      }
+
+      // Released releases get smartlinks up to cap (oldest first when over cap)
+      const sorted = [...released].sort((a, b) => {
         const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
         const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateA - dateB; // oldest first
-      })
-      .slice(0, smartLinksLimit);
-    return new Set(sorted.map(r => r.id));
-  }, [rows, smartLinksLimit]);
+        return dateA - dateB;
+      });
+      const allowed = sorted.slice(0, smartLinksLimit);
+      const ids = new Set(allowed.map(r => r.id));
+
+      // Mark released releases over cap as 'cap' locked
+      for (const r of sorted.slice(smartLinksLimit)) {
+        reasons.set(r.id, 'cap');
+      }
+
+      return {
+        unlockedIds: ids,
+        lockReasons: reasons,
+        releasedCount: released.length,
+        unreleasedCount: unreleased.length,
+      };
+    }, [rows, smartLinksLimit]);
 
   const isSmartLinkLocked = useCallback(
     (releaseId: string) => {
-      if (!freeReleaseIds) return false; // unlimited plan
-      return !freeReleaseIds.has(releaseId);
+      if (!unlockedIds) return false; // unlimited plan
+      return !unlockedIds.has(releaseId);
     },
-    [freeReleaseIds]
+    [unlockedIds]
+  );
+
+  const getSmartLinkLockReason = useCallback(
+    (releaseId: string): 'scheduled' | 'cap' | null => {
+      return lockReasons.get(releaseId) ?? null;
+    },
+    [lockReasons]
   );
 
   // Empty selection for subheader export (simplified - no bulk selection)
@@ -310,19 +358,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const headerActions = useMemo(
     () => (
       <div className='flex items-center gap-1'>
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={handleNewRelease}
-          className='h-8 gap-1.5 border-none text-secondary-token hover:text-primary-token'
-        >
-          <Icon name='Plus' className='h-4 w-4' />
-          <span className='hidden sm:inline'>New Release</span>
-        </Button>
+        {canCreateManualReleases && (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleNewRelease}
+            className='h-8 gap-1.5 border-none text-secondary-token hover:text-primary-token'
+          >
+            <Icon name='Plus' className='h-4 w-4' />
+            <span className='hidden sm:inline'>New Release</span>
+          </Button>
+        )}
         <DrawerToggleButton />
       </div>
     ),
-    [handleNewRelease]
+    [handleNewRelease, canCreateManualReleases]
   );
 
   const spotifyBadge = useMemo(
@@ -435,6 +485,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             onReleaseChange={handleReleaseChange}
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
+            readOnly={!canEditSmartLinks}
           />
         </Suspense>
       ) : null,
@@ -453,6 +504,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       handleReleaseChange,
       isSaving,
       allowArtworkDownloads,
+      canEditSmartLinks,
     ]
   );
 
@@ -527,10 +579,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Smart link gate banner for free users */}
             {showReleasesTable &&
               !isPro &&
-              rows.length > (smartLinksLimit ?? Infinity) && (
+              (releasedCount > (smartLinksLimit ?? Infinity) ||
+                unreleasedCount > 0) && (
                 <SmartLinkGateBanner
                   totalReleases={rows.length}
-                  smartLinksLimit={smartLinksLimit ?? 5}
+                  smartLinksLimit={smartLinksLimit ?? 25}
+                  releasedCount={releasedCount}
+                  unreleasedCount={unreleasedCount}
                   className='mx-4 mt-2'
                 />
               )}
@@ -548,6 +603,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
                   isSmartLinkLocked={isSmartLinkLocked}
+                  getSmartLinkLockReason={getSmartLinkLockReason}
                 />
               </QueryErrorBoundary>
             )}
@@ -566,8 +622,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   No releases yet
                 </h3>
                 <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                  Sync your releases from Spotify or create one manually to
-                  start generating smart links.
+                  {canCreateManualReleases
+                    ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
+                    : 'Sync your releases from Spotify to start generating smart links.'}
                 </p>
                 <div className='mt-4 flex items-center gap-3'>
                   <Button
@@ -588,16 +645,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     />
                     {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
                   </Button>
-                  <Button
-                    variant='secondary'
-                    size='sm'
-                    onClick={handleNewRelease}
-                    className='inline-flex items-center gap-2'
-                    data-testid='create-release-empty-state'
-                  >
-                    <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
-                    Create Release
-                  </Button>
+                  {canCreateManualReleases && (
+                    <Button
+                      variant='secondary'
+                      size='sm'
+                      onClick={handleNewRelease}
+                      className='inline-flex items-center gap-2'
+                      data-testid='create-release-empty-state'
+                    >
+                      <Icon
+                        name='Plus'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
+                      Create Release
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
