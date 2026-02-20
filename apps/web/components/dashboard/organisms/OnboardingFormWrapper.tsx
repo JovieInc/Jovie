@@ -32,6 +32,7 @@ function readPendingClaimHandle(): string {
 interface OnboardingFormWrapperProps {
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
+  readonly isReservedHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
   readonly shouldAutoSubmitHandle?: boolean;
@@ -40,6 +41,7 @@ interface OnboardingFormWrapperProps {
 export function OnboardingFormWrapper({
   initialDisplayName = '',
   initialHandle = '',
+  isReservedHandle = false,
   userEmail = null,
   userId,
   shouldAutoSubmitHandle = false,
@@ -63,6 +65,7 @@ export function OnboardingFormWrapper({
       <AppleStyleOnboardingForm
         initialDisplayName={initialDisplayName}
         initialHandle={resolvedHandle}
+        isReservedHandle={isReservedHandle}
         userEmail={userEmail}
         userId={userId}
         shouldAutoSubmitHandle={shouldAutoSubmitHandle}

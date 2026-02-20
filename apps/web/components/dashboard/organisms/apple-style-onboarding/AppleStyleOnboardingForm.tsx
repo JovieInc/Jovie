@@ -20,6 +20,7 @@ import { useStepNavigation } from './useStepNavigation';
 export function AppleStyleOnboardingForm({
   initialDisplayName = '',
   initialHandle = '',
+  isReservedHandle = false,
   userEmail = null,
   userId,
   shouldAutoSubmitHandle = false,
@@ -132,6 +133,7 @@ export function AppleStyleOnboardingForm({
             title={ONBOARDING_STEPS[0].title}
             prompt={ONBOARDING_STEPS[0].prompt}
             handleInput={handleInput}
+            isReservedHandle={isReservedHandle}
             handleValidation={handleValidation}
             stateError={state.error}
             isSubmitting={state.isSubmitting}
