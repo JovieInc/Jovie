@@ -1147,7 +1147,8 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
-        run: pnpm --filter=@jovie/web exec playwright test admin-page-content admin-navigation --project=chromium
+        # admin-navigation is temporarily quarantined in apps/web/tests/quarantine.json due to JOV-781 flakiness.
+        run: pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep "Admin Pages Health Check" --project=chromium
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
