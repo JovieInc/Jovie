@@ -61,8 +61,8 @@ export interface UseAsyncValidationReturn<TValue, TResult> {
  *     const response = await fetch(`/api/check?value=${value}`, { signal });
  *     return response.json();
  *   },
- *   wait: 450,
- *   timeout: 5000,
+ *   wait: PACER_TIMING.VALIDATION_DEBOUNCE_MS,
+ *   timeout: PACER_TIMING.VALIDATION_TIMEOUT_MS,
  * });
  *
  * useEffect(() => {
@@ -73,7 +73,7 @@ export interface UseAsyncValidationReturn<TValue, TResult> {
 export function useAsyncValidation<TValue, TResult>({
   validatorFn,
   wait = PACER_TIMING.VALIDATION_DEBOUNCE_MS,
-  timeout = 5000,
+  timeout = PACER_TIMING.VALIDATION_TIMEOUT_MS,
   enabled = true,
   maxRetries = RETRY_DEFAULTS.FAST.maxAttempts,
   onSuccess,
