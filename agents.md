@@ -189,6 +189,29 @@ Global UI elements must only render in root `app/layout.tsx`:
 
 **NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
 
+### 8. Entitlements: Single Source of Truth
+
+Entitlements behavior must stay centralized and predictable. Use these files as the canonical chain:
+
+1. `apps/web/lib/entitlements/registry.ts` — plan matrix (features, limits, marketing metadata)
+2. `apps/web/lib/entitlements/server.ts` — per-request user entitlement resolution
+3. `apps/web/types/index.ts` — shared contract (`UserPlan`, `UserEntitlements`)
+
+Required patterns:
+
+- Always enforce access via `getCurrentUserEntitlements()` in API routes/actions.
+- Always derive plan capabilities from `ENTITLEMENT_REGISTRY`; do not duplicate booleans/limits in call-sites.
+- Treat billing outages as explicit errors (`BillingUnavailableError`), not silent free-plan downgrades.
+- Treat admin role as independent from billing status; use role-check-backed `isAdmin`.
+
+Forbidden patterns:
+
+- Reading billing rows directly in handlers to decide feature access.
+- Recreating entitlement maps in pages/components/tests instead of importing canonical sources.
+- Granting paid access based only on a raw `plan` string when canonical booleans/limits exist.
+
+For deeper implementation guidance, use `.claude/skills/entitlements.md`.
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)
