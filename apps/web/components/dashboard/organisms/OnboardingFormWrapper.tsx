@@ -35,6 +35,7 @@ interface OnboardingFormWrapperProps {
   readonly isReservedHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
+  readonly shouldAutoSubmitHandle?: boolean;
 }
 
 export function OnboardingFormWrapper({
@@ -43,6 +44,7 @@ export function OnboardingFormWrapper({
   isReservedHandle = false,
   userEmail = null,
   userId,
+  shouldAutoSubmitHandle = false,
 }: OnboardingFormWrapperProps) {
   // If the server didn't provide a handle (e.g. OAuth flow stripped the query param),
   // fall back to the pendingClaim stored in sessionStorage by ClaimHandleForm.
@@ -66,6 +68,7 @@ export function OnboardingFormWrapper({
         isReservedHandle={isReservedHandle}
         userEmail={userEmail}
         userId={userId}
+        shouldAutoSubmitHandle={shouldAutoSubmitHandle}
       />
     </div>
   );

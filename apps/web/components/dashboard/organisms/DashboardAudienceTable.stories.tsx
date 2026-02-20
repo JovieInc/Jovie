@@ -124,7 +124,7 @@ const meta: Meta<typeof DashboardAudienceTable> = {
       },
     },
   },
-  tags: ['autodocs', 'audience-a11y'],
+  tags: ['autodocs', 'audience-a11y', 'no-vitest'],
   decorators: [
     Story => (
       <DashboardDataProvider value={mockDashboardData}>

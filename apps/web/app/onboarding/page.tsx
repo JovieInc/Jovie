@@ -88,8 +88,13 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
+  const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
+
   const providedHandle =
-    resolvedSearchParams?.handle || existingProfile?.username || user?.username;
+    resolvedSearchParams?.handle ||
+    existingProfile?.username ||
+    user?.username ||
+    spotifySuggestedHandle;
 
   const shouldReserveHandle = !providedHandle;
   const reservedHandle = shouldReserveHandle
@@ -97,6 +102,12 @@ export default async function OnboardingPage({
     : null;
 
   const initialHandle = providedHandle || reservedHandle || '';
+
+  const shouldAutoSubmitHandle =
+    Boolean(spotifySuggestedHandle) &&
+    !resolvedSearchParams?.handle &&
+    !existingProfile?.username &&
+    !user?.username;
 
   return (
     <AuthLayout
@@ -115,6 +126,7 @@ export default async function OnboardingPage({
           isReservedHandle={Boolean(reservedHandle)}
           userEmail={userEmail}
           userId={userId}
+          shouldAutoSubmitHandle={shouldAutoSubmitHandle}
         />
       </div>
     </AuthLayout>

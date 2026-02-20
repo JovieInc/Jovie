@@ -23,6 +23,7 @@ export function AppleStyleOnboardingForm({
   isReservedHandle = false,
   userEmail = null,
   userId,
+  shouldAutoSubmitHandle = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
   const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
@@ -57,6 +58,7 @@ export function AppleStyleOnboardingForm({
     handleValidation,
     goToNextStep,
     setProfileReadyHandle,
+    shouldAutoSubmitHandle,
   });
 
   useEffect(() => {

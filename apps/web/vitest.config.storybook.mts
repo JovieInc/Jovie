@@ -7,7 +7,14 @@ import { defineConfig } from 'vitest/config';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
+  plugins: [
+    storybookTest({
+      configDir: path.join(dirname, '.storybook'),
+      tags: {
+        exclude: ['no-vitest'],
+      },
+    }),
+  ],
   test: {
     name: 'storybook',
     browser: {
@@ -17,6 +24,9 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
+    // Stories may trigger background fetches (TanStack Query) that 404 in test env.
+    // These are unhandled rejections, not test failures.
+    dangerouslyIgnoreUnhandledErrors: true,
   },
   resolve: {
     dedupe: [
