@@ -14,7 +14,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       expect(free.limits).toEqual({
         analyticsRetentionDays: 7,
         contactsLimit: 100,
-        smartLinksLimit: 5,
+        smartLinksLimit: 25,
         aiDailyMessageLimit: 5,
       });
       expect(free.booleans).toEqual({

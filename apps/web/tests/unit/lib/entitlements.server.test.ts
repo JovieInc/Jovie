@@ -62,7 +62,7 @@ describe('getCurrentUserEntitlements', () => {
       canEditSmartLinks: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
-      smartLinksLimit: 5,
+      smartLinksLimit: 25,
       aiDailyMessageLimit: 5,
     });
   });
@@ -168,7 +168,7 @@ describe('getCurrentUserEntitlements', () => {
       canEditSmartLinks: false,
       analyticsRetentionDays: 7,
       contactsLimit: 100,
-      smartLinksLimit: 5,
+      smartLinksLimit: 25,
       aiDailyMessageLimit: 5,
     });
   });
