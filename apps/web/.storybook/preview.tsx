@@ -57,6 +57,9 @@ const preview: Preview = {
                 retry: false,
                 staleTime: Infinity,
               },
+              mutations: {
+                retry: false,
+              },
             },
           })
       );

@@ -30,8 +30,13 @@ interface SpotifyImportState {
 }
 
 async function tryAutoConnectSpotify(
-  setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>
+  setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
+  signal: AbortSignal
 ): Promise<void> {
+  const safeSetter: typeof setSpotifyImportState = value => {
+    if (!signal.aborted) setSpotifyImportState(value);
+  };
+
   try {
     const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
     if (!spotifyUrl) return;
@@ -41,13 +46,17 @@ async function tryAutoConnectSpotify(
       /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
 
     if (artistMatch?.[1]) {
-      setSpotifyImportState({
+      safeSetter({
         status: 'importing',
         stage: 0,
         message: 'Connecting your Spotify artist…',
       });
       const stageTimer = setInterval(() => {
-        setSpotifyImportState(prev => {
+        if (signal.aborted) {
+          clearInterval(stageTimer);
+          return;
+        }
+        safeSetter(prev => {
           if (prev.status !== 'importing') return prev;
 
           const nextStage = Math.min(prev.stage + 1, 2) as 0 | 1 | 2;
@@ -65,6 +74,11 @@ async function tryAutoConnectSpotify(
         });
       }, 1200);
 
+      // Clear interval on abort (component unmount)
+      signal.addEventListener('abort', () => clearInterval(stageTimer), {
+        once: true,
+      });
+
       try {
         const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
         const importResult = await connectSpotifyArtist({
@@ -74,21 +88,22 @@ async function tryAutoConnectSpotify(
         });
 
         if (importResult.success) {
-          setSpotifyImportState({
+          safeSetter({
             status: 'success',
             stage: 2,
             message: `Spotify connected — imported ${importResult.imported} release${importResult.imported === 1 ? '' : 's'}.`,
           });
         } else {
-          setSpotifyImportState({
+          safeSetter({
             status: 'error',
             stage: 2,
             message:
-              'Spotify connected, but release import is still catching up.',
+              importResult.message ||
+              'Unable to connect Spotify. You can retry from your Dashboard.',
           });
         }
       } catch {
-        setSpotifyImportState({
+        safeSetter({
           status: 'error',
           stage: 2,
           message:
@@ -152,6 +167,15 @@ export function useOnboardingSubmit({
       stage: 0,
       message: '',
     });
+
+  // Abort controller to clean up Spotify import interval on unmount
+  const spotifyAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      spotifyAbortRef.current?.abort();
+    };
+  }, []);
 
   // Refs to track current state values without causing callback recreation
   const isSubmittingRef = useRef(state.isSubmitting);
@@ -303,7 +327,10 @@ export function useOnboardingSubmit({
         goToNextStep();
 
         // Auto-connect Spotify artist from homepage search and report staged progress
-        void tryAutoConnectSpotify(setSpotifyImportState);
+        spotifyAbortRef.current?.abort();
+        const controller = new AbortController();
+        spotifyAbortRef.current = controller;
+        void tryAutoConnectSpotify(setSpotifyImportState, controller.signal);
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
       }
