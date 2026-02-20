@@ -7,7 +7,6 @@
  * debounced saves, and conflict resolution.
  */
 
-import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +14,7 @@ import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/soci
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
+import { useAsyncDebouncer } from '@/lib/pacer';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';

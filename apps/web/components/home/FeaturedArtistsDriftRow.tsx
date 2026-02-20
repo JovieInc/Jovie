@@ -9,12 +9,12 @@
  * @see https://tanstack.com/pacer
  */
 
-import { useThrottler } from '@tanstack/react-pacer';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { useThrottler } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 
 export interface FeaturedArtistsDriftRowProps
