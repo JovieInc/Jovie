@@ -186,228 +186,260 @@ function HeroProfileMockup() {
         }}
       />
 
-      {/* Profile card — phone-width with perspective tilt */}
-      <div
-        className='relative w-[380px] overflow-hidden'
-        style={{
-          backgroundColor: 'rgb(16, 17, 18)',
-          borderRadius: '22px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: [
-            '0 4px 32px rgba(8,9,10,0.6)',
-            '0 12px 48px rgba(0,0,0,0.4)',
-          ].join(', '),
-          transform: 'rotateY(-4deg) rotateX(2deg)',
-          transformStyle: 'preserve-3d',
-        }}
-      >
-        {/* Shine border overlay — Linear's glass edge effect */}
+      {/* Profile card — cropped to top 2/3 with perspective tilt */}
+      <div className='flex flex-col items-center'>
         <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0'
-          style={{
-            borderRadius: '22px',
-            border: '1px solid rgb(56, 59, 63)',
-            zIndex: 5,
-          }}
-        />
-        {/* Top edge highlight — Linear-style glass reflection */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-px'
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.12) 70%, transparent)',
-            zIndex: 6,
-          }}
-        />
-
-        {/* Top bar — browser/app chrome */}
-        <div
-          className='flex items-center justify-between px-6 pb-2 pt-5'
-          style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}
+          className='relative overflow-hidden'
+          style={{ height: 380, width: 380 }}
         >
-          <span style={{ fontWeight: 500, letterSpacing: '0.02em' }}>
-            jov.ie/timwhitemusic
-          </span>
-          <div className='flex items-center gap-1.5'>
-            <div
-              className='h-[5px] w-[5px] rounded-full'
-              style={{ backgroundColor: 'rgba(74,222,128,0.6)' }}
-            />
-            <span style={{ fontSize: '10px', fontWeight: 500 }}>Live</span>
-          </div>
-        </div>
-
-        {/* Profile content */}
-        <div className='flex flex-col items-center px-8 pb-10 pt-5'>
-          {/* Avatar */}
           <div
-            className='relative overflow-hidden rounded-full'
+            className='relative w-[380px] overflow-hidden'
             style={{
-              width: 88,
-              height: 88,
-              background: 'linear-gradient(145deg, #2a1f3d, #1a1a2e, #1f2d1a)',
+              backgroundColor: 'rgb(16, 17, 18)',
+              borderRadius: '22px',
+              border: '1px solid rgba(255,255,255,0.08)',
               boxShadow: [
-                '0 0 0 3px rgba(255,255,255,0.05)',
-                '0 8px 32px rgba(0,0,0,0.5)',
-                '0 2px 8px rgba(0,0,0,0.3)',
+                '0 4px 32px rgba(8,9,10,0.6)',
+                '0 12px 48px rgba(0,0,0,0.4)',
               ].join(', '),
+              transform: 'rotateY(-4deg) rotateX(2deg)',
+              transformStyle: 'preserve-3d',
             }}
           >
-            <div className='flex h-full w-full items-center justify-center text-[26px] font-semibold text-white/90'>
-              T
+            {/* Shine border overlay — Linear's glass edge effect */}
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-0'
+              style={{
+                borderRadius: '22px',
+                border: '1px solid rgb(56, 59, 63)',
+                zIndex: 5,
+              }}
+            />
+            {/* Top edge highlight — Linear-style glass reflection */}
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-x-0 top-0 h-px'
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.12) 70%, transparent)',
+                zIndex: 6,
+              }}
+            />
+
+            {/* Top bar — browser/app chrome */}
+            <div
+              className='flex items-center justify-between px-6 pb-2 pt-5'
+              style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}
+            >
+              <span style={{ fontWeight: 500, letterSpacing: '0.02em' }}>
+                jov.ie/timwhitemusic
+              </span>
+              <div className='flex items-center gap-1.5'>
+                <div
+                  className='h-[5px] w-[5px] rounded-full'
+                  style={{ backgroundColor: 'rgba(74,222,128,0.6)' }}
+                />
+                <span style={{ fontSize: '10px', fontWeight: 500 }}>Live</span>
+              </div>
             </div>
-          </div>
 
-          {/* Name + verified */}
-          <div className='mt-4 flex items-center gap-1.5'>
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 500,
-                color: 'rgba(247,248,248,0.95)',
-                letterSpacing: '-0.015em',
-              }}
-            >
-              Tim White
-            </span>
-            {/* Verified badge — clean checkmark in shield */}
-            <svg
-              aria-hidden='true'
-              width='17'
-              height='17'
-              viewBox='0 0 24 24'
-              className='shrink-0'
-            >
-              <path
-                d='M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z'
-                fill='#5B8DEF'
-              />
-            </svg>
-          </div>
-
-          {/* Subtitle */}
-          <span
-            style={{
-              fontSize: '11px',
-              color: 'rgba(255,255,255,0.3)',
-              marginTop: '3px',
-              textTransform: 'uppercase' as const,
-              letterSpacing: '0.1em',
-              fontWeight: 500,
-            }}
-          >
-            Music Artist
-          </span>
-
-          {/* CTA button */}
-          <div
-            className='mt-7 flex w-full items-center justify-center rounded-full'
-            style={{
-              height: 44,
-              fontSize: '13px',
-              fontWeight: 500,
-              color: 'rgb(8,9,10)',
-              backgroundColor: 'rgb(232,232,232)',
-              letterSpacing: '-0.005em',
-              boxShadow:
-                '0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
-            }}
-          >
-            Listen Now
-          </div>
-
-          {/* Email capture hint */}
-          <div
-            className='mt-3 flex w-full items-center gap-2.5'
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.04)',
-              borderRadius: '12px',
-              padding: '11px 14px',
-            }}
-          >
-            <svg
-              aria-hidden='true'
-              width='14'
-              height='14'
-              viewBox='0 0 24 24'
-              fill='none'
-              stroke='rgba(255,255,255,0.22)'
-              strokeWidth='1.5'
-            >
-              <path d='M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75' />
-            </svg>
-            <span
-              style={{
-                fontSize: '12px',
-                color: 'rgba(255,255,255,0.26)',
-                fontWeight: 400,
-              }}
-            >
-              Get notified on new releases
-            </span>
-          </div>
-
-          {/* Social links row — real platform icons */}
-          <div className='mt-6 flex items-center gap-2.5'>
-            {[
-              { name: 'Spotify', icon: <SpotifyIcon /> },
-              { name: 'Apple Music', icon: <AppleMusicIcon /> },
-              { name: 'YouTube', icon: <YouTubeIcon /> },
-              { name: 'Instagram', icon: <InstagramIcon /> },
-              { name: 'TikTok', icon: <TikTokIcon /> },
-            ].map(platform => (
+            {/* Profile content */}
+            <div className='flex flex-col items-center px-8 pb-10 pt-5'>
+              {/* Avatar */}
               <div
-                key={platform.name}
-                className='flex items-center justify-center rounded-full'
+                className='relative overflow-hidden rounded-full'
                 style={{
-                  width: 32,
-                  height: 32,
-                  backgroundColor: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.04)',
-                  color: 'rgba(255,255,255,0.28)',
+                  width: 88,
+                  height: 88,
+                  background:
+                    'linear-gradient(145deg, #2a1f3d, #1a1a2e, #1f2d1a)',
+                  boxShadow: [
+                    '0 0 0 3px rgba(255,255,255,0.05)',
+                    '0 8px 32px rgba(0,0,0,0.5)',
+                    '0 2px 8px rgba(0,0,0,0.3)',
+                  ].join(', '),
                 }}
               >
-                {platform.icon}
+                <div className='flex h-full w-full items-center justify-center text-[26px] font-semibold text-white/90'>
+                  T
+                </div>
               </div>
-            ))}
+
+              {/* Name + verified */}
+              <div className='mt-4 flex items-center gap-1.5'>
+                <span
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 500,
+                    color: 'rgba(247,248,248,0.95)',
+                    letterSpacing: '-0.015em',
+                  }}
+                >
+                  Tim White
+                </span>
+                {/* Verified badge — clean checkmark in shield */}
+                <svg
+                  aria-hidden='true'
+                  width='17'
+                  height='17'
+                  viewBox='0 0 24 24'
+                  className='shrink-0'
+                >
+                  <path
+                    d='M8.603 3.799A4.49 4.49 0 0112 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 013.498 1.307 4.491 4.491 0 011.307 3.497A4.49 4.49 0 0121.75 12a4.49 4.49 0 01-1.549 3.397 4.491 4.491 0 01-1.307 3.497 4.491 4.491 0 01-3.497 1.307A4.49 4.49 0 0112 21.75a4.49 4.49 0 01-3.397-1.549 4.49 4.49 0 01-3.498-1.306 4.491 4.491 0 01-1.307-3.498A4.49 4.49 0 012.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 011.307-3.497 4.49 4.49 0 013.497-1.307zm7.007 6.387a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z'
+                    fill='#5B8DEF'
+                  />
+                </svg>
+              </div>
+
+              {/* Subtitle */}
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.3)',
+                  marginTop: '3px',
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '0.1em',
+                  fontWeight: 500,
+                }}
+              >
+                Music Artist
+              </span>
+
+              {/* CTA button */}
+              <div
+                className='mt-7 flex w-full items-center justify-center rounded-full'
+                style={{
+                  height: 44,
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  color: 'rgb(8,9,10)',
+                  backgroundColor: 'rgb(232,232,232)',
+                  letterSpacing: '-0.005em',
+                  boxShadow:
+                    '0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
+                }}
+              >
+                Listen Now
+              </div>
+
+              {/* Email capture hint */}
+              <div
+                className='mt-3 flex w-full items-center gap-2.5'
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                  borderRadius: '12px',
+                  padding: '11px 14px',
+                }}
+              >
+                <svg
+                  aria-hidden='true'
+                  width='14'
+                  height='14'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='rgba(255,255,255,0.22)'
+                  strokeWidth='1.5'
+                >
+                  <path d='M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75' />
+                </svg>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    color: 'rgba(255,255,255,0.26)',
+                    fontWeight: 400,
+                  }}
+                >
+                  Get notified on new releases
+                </span>
+              </div>
+
+              {/* Social links row — real platform icons */}
+              <div className='mt-6 flex items-center gap-2.5'>
+                {[
+                  { name: 'Spotify', icon: <SpotifyIcon /> },
+                  { name: 'Apple Music', icon: <AppleMusicIcon /> },
+                  { name: 'YouTube', icon: <YouTubeIcon /> },
+                  { name: 'Instagram', icon: <InstagramIcon /> },
+                  { name: 'TikTok', icon: <TikTokIcon /> },
+                ].map(platform => (
+                  <div
+                    key={platform.name}
+                    className='flex items-center justify-center rounded-full'
+                    style={{
+                      width: 32,
+                      height: 32,
+                      backgroundColor: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      color: 'rgba(255,255,255,0.28)',
+                    }}
+                  >
+                    {platform.icon}
+                  </div>
+                ))}
+              </div>
+
+              {/* Powered by badge */}
+              <div
+                className='mt-6 flex items-center gap-1.5'
+                style={{
+                  fontSize: '10px',
+                  color: 'rgba(255,255,255,0.16)',
+                  fontWeight: 450,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                <svg
+                  aria-hidden='true'
+                  width='10'
+                  height='10'
+                  viewBox='0 0 24 24'
+                  fill='rgba(255,255,255,0.16)'
+                >
+                  <path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' />
+                </svg>
+                <span>jovie.link</span>
+              </div>
+            </div>
+
+            {/* Bottom edge shadow for depth */}
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-x-0 bottom-0 h-24'
+              style={{
+                background:
+                  'linear-gradient(to top, rgba(0,0,0,0.15), transparent)',
+                borderRadius: '0 0 24px 24px',
+              }}
+            />
           </div>
 
-          {/* Powered by badge */}
+          {/* Bottom fade — crop gradient */}
           <div
-            className='mt-6 flex items-center gap-1.5'
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-0 bottom-0'
             style={{
-              fontSize: '10px',
-              color: 'rgba(255,255,255,0.16)',
-              fontWeight: 450,
-              letterSpacing: '0.02em',
+              height: 80,
+              background:
+                'linear-gradient(to bottom, transparent, var(--linear-bg-page))',
             }}
-          >
-            <svg
-              aria-hidden='true'
-              width='10'
-              height='10'
-              viewBox='0 0 24 24'
-              fill='rgba(255,255,255,0.16)'
-            >
-              <path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' />
-            </svg>
-            <span>jovie.link</span>
-          </div>
+          />
         </div>
 
-        {/* Bottom edge shadow for depth */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 bottom-0 h-24'
+        {/* URL label */}
+        <p
+          className='mt-4'
           style={{
-            background:
-              'linear-gradient(to top, rgba(0,0,0,0.15), transparent)',
-            borderRadius: '0 0 24px 24px',
+            fontSize: '14px',
+            fontWeight: 450,
+            letterSpacing: '-0.01em',
+            color: 'var(--linear-text-tertiary)',
           }}
-        />
+        >
+          jov.ie/tim
+        </p>
       </div>
     </div>
   );
