@@ -840,9 +840,9 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
-          elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running full test suite with coverage"
-            # Run all tests on PRs to catch regressions before merge
+          elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "🔍 PR/merge queue: Running full test suite with coverage"
+            # Run all tests on PRs and merge queue to catch regressions before merge
             cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"

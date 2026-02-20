@@ -87,7 +87,7 @@ export function DashboardShowcase() {
             className='text-2xl font-semibold sm:text-3xl'
             style={{ color: 'var(--linear-text-primary)' }}
           >
-            Your dashboard, powered by data
+            One dashboard, all your data.
           </h2>
           <p
             className='mx-auto mt-3 max-w-xl text-base'
