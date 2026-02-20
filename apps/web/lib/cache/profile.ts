@@ -32,7 +32,6 @@ export async function invalidateProfileCache(
   }
 
   if (usernameNormalized) {
-    revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
     revalidateTag(createProfileTag(usernameNormalized), 'max');
   }
 
@@ -80,7 +79,6 @@ export async function invalidateSocialLinksCache(
 
   // Social links affect the public profile display
   if (usernameNormalized) {
-    revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
     revalidateTag(createProfileTag(usernameNormalized), 'max');
     revalidatePath(`/${usernameNormalized}`);
   }
@@ -108,7 +106,6 @@ export async function invalidateAvatarCache(
 
   // Avatar affects public profile display
   if (usernameNormalized) {
-    revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, 'max');
     revalidateTag(createProfileTag(usernameNormalized), 'max');
     revalidatePath(`/${usernameNormalized}`);
   }
