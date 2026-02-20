@@ -266,9 +266,11 @@ describe('useBillingStatusQuery', () => {
 
       const { result } = renderHook(() => useIsPro(), { wrapper });
 
+      // Query-level retryDelay (1s exponential) takes precedence over
+      // QueryClient default retryDelay:0, so we need a longer timeout.
       await waitFor(() => {
         expect(result.current.isError).toBe(true);
-      });
+      }, { timeout: 5000 });
     });
   });
 
