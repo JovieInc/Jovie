@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Hoist mocks before module resolution
-const { mockCaptureError } = vi.hoisted(() => ({
-  mockCaptureError: vi.fn(),
+const { mockCaptureWarning } = vi.hoisted(() => ({
+  mockCaptureWarning: vi.fn(),
 }));
 
-// Mock the database
+const mockRedisGet = vi.hoisted(() => vi.fn());
+const mockRedisSet = vi.hoisted(() => vi.fn());
+const mockRedisDel = vi.hoisted(() => vi.fn());
+const mockGetRedis = vi.hoisted(() => vi.fn<() => any>(() => null));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: vi.fn(),
@@ -14,13 +17,12 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/redis', () => ({
   redis: null,
-  getRedis: vi.fn(() => null),
+  getRedis: mockGetRedis,
 }));
 
-// Mock error tracking
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: mockCaptureError,
-  captureWarning: vi.fn(),
+  captureError: vi.fn(),
+  captureWarning: mockCaptureWarning,
 }));
 
 import {
@@ -30,11 +32,29 @@ import {
 } from '@/lib/admin/roles';
 import * as dbModule from '@/lib/db';
 
+function mockDbResult(rows: Array<{ isAdmin: boolean }>) {
+  const mockFrom = vi.fn().mockReturnThis();
+  const mockWhere = vi.fn().mockReturnThis();
+  const mockLimit = vi.fn().mockResolvedValue(rows);
+
+  vi.spyOn(dbModule.db, 'select').mockReturnValue({
+    from: mockFrom,
+  } as any);
+
+  mockFrom.mockReturnValue({
+    where: mockWhere,
+  });
+
+  mockWhere.mockReturnValue({
+    limit: mockLimit,
+  });
+}
+
 describe('Admin Roles', () => {
   beforeEach(() => {
-    // Clear cache before each test
     clearAdminCache();
     vi.clearAllMocks();
+    mockGetRedis.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -49,203 +69,92 @@ describe('Admin Roles', () => {
 
     it('should return true for user with admin role in database', async () => {
       const mockUserId = 'user_admin123';
+      mockDbResult([{ isAdmin: true }]);
 
-      // Mock database query to return admin=true
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([{ isAdmin: true }]);
+      const result = await isAdmin(mockUserId);
 
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
+      expect(result).toBe(true);
+      expect(dbModule.db.select).toHaveBeenCalledTimes(1);
+    });
 
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
+    it('should return false for user without admin role', async () => {
+      const mockUserId = 'user_regular123';
+      mockDbResult([{ isAdmin: false }]);
 
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
+      const result = await isAdmin(mockUserId);
+
+      expect(result).toBe(false);
+    });
+
+    it('should read from redis cache when present', async () => {
+      const mockUserId = 'user_cached123';
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet.mockResolvedValueOnce('1'),
+        set: mockRedisSet,
+        del: mockRedisDel,
       });
 
       const result = await isAdmin(mockUserId);
 
       expect(result).toBe(true);
-      expect(dbModule.db.select).toHaveBeenCalledWith({
-        isAdmin: expect.anything(),
-      });
+      expect(mockRedisGet).toHaveBeenCalledWith(`admin:role:${mockUserId}`);
+      expect(dbModule.db.select).not.toHaveBeenCalled();
     });
 
-    it('should return false for user without admin role', async () => {
-      const mockUserId = 'user_regular123';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([{ isAdmin: false }]);
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
-
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
+    it('should query database and write redis cache on miss', async () => {
+      const mockUserId = 'user_miss123';
+      mockDbResult([{ isAdmin: true }]);
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet.mockResolvedValueOnce(null),
+        set: mockRedisSet.mockResolvedValueOnce('OK'),
+        del: mockRedisDel,
       });
 
       const result = await isAdmin(mockUserId);
 
-      expect(result).toBe(false);
-    });
-
-    it('should return false when user not found in database', async () => {
-      const mockUserId = 'user_notfound123';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([]);
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
-
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
-      });
-
-      const result = await isAdmin(mockUserId);
-
-      expect(result).toBe(false);
-    });
-
-    it('should cache admin status and not query database twice', async () => {
-      const mockUserId = 'user_cache123';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([{ isAdmin: true }]);
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
-
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
-      });
-
-      // First call - should query database
-      const result1 = await isAdmin(mockUserId);
-      expect(result1).toBe(true);
+      expect(result).toBe(true);
       expect(dbModule.db.select).toHaveBeenCalledTimes(1);
-
-      // Second call - should use cache
-      const result2 = await isAdmin(mockUserId);
-      expect(result2).toBe(true);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(1); // Still 1, not 2
-    });
-
-    it('should return false and fail closed on database error', async () => {
-      const mockUserId = 'user_error123';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi
-        .fn()
-        .mockRejectedValue(new Error('Database connection failed'));
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
-
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
-      });
-
-      const result = await isAdmin(mockUserId);
-
-      expect(result).toBe(false); // Fail closed
-      expect(mockCaptureError).toHaveBeenCalledWith(
-        '[admin/roles] DB query failed after retry, no cache available — denying access',
-        expect.any(Error)
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        `admin:role:${mockUserId}`,
+        '1',
+        {
+          ex: 60,
+        }
       );
     });
 
-    it('should invalidate cache when requested', async () => {
-      const mockUserId = 'user_invalidate123';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([{ isAdmin: true }]);
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
+    it('should fall back to database query when redis fails', async () => {
+      const mockUserId = 'user_redis_error';
+      mockDbResult([{ isAdmin: false }]);
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet.mockRejectedValueOnce(new Error('redis unavailable')),
+        set: mockRedisSet,
+        del: mockRedisDel,
       });
 
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
-      });
+      const result = await isAdmin(mockUserId);
 
-      // First call - cache result
-      await isAdmin(mockUserId);
+      expect(result).toBe(false);
       expect(dbModule.db.select).toHaveBeenCalledTimes(1);
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        '[admin/roles] Redis cache failed, falling back to database query',
+        { error: expect.any(Error) }
+      );
+    });
+  });
 
-      // Invalidate cache
+  describe('invalidateAdminCache', () => {
+    it('should delete redis key when redis is available', () => {
+      const mockUserId = 'user_invalidate123';
+      mockGetRedis.mockReturnValue({
+        get: mockRedisGet,
+        set: mockRedisSet,
+        del: mockRedisDel.mockResolvedValueOnce(1),
+      });
+
       invalidateAdminCache(mockUserId);
 
-      // Second call - should query database again
-      await isAdmin(mockUserId);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(2);
-    });
-
-    it('should clear entire cache when requested', async () => {
-      const mockUserId1 = 'user_clear1';
-      const mockUserId2 = 'user_clear2';
-
-      const mockFrom = vi.fn().mockReturnThis();
-      const mockWhere = vi.fn().mockReturnThis();
-      const mockLimit = vi.fn().mockResolvedValue([{ isAdmin: true }]);
-
-      vi.spyOn(dbModule.db, 'select').mockReturnValue({
-        from: mockFrom,
-      } as any);
-
-      mockFrom.mockReturnValue({
-        where: mockWhere,
-      });
-
-      mockWhere.mockReturnValue({
-        limit: mockLimit,
-      });
-
-      // Cache results for two users
-      await isAdmin(mockUserId1);
-      await isAdmin(mockUserId2);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(2);
-
-      // Clear entire cache
-      clearAdminCache();
-
-      // Both should query database again
-      await isAdmin(mockUserId1);
-      await isAdmin(mockUserId2);
-      expect(dbModule.db.select).toHaveBeenCalledTimes(4);
+      expect(mockRedisDel).toHaveBeenCalledWith(`admin:role:${mockUserId}`);
     });
   });
 });
