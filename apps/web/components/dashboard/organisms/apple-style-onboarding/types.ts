@@ -3,6 +3,7 @@ export interface AppleStyleOnboardingFormProps {
   readonly initialHandle?: string;
   readonly userEmail?: string | null;
   readonly userId: string;
+  readonly shouldAutoSubmitHandle?: boolean;
 }
 
 export interface OnboardingState {
