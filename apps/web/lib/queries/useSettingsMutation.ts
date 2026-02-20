@@ -141,8 +141,13 @@ export function useThemeMutation() {
   const mutation = useUpdateSettingsMutation();
 
   return {
-    updateTheme: (preference: 'light' | 'dark' | 'system') => {
-      mutation.mutate({ updates: { theme: { preference } } });
+    updateTheme: (
+      preference: 'light' | 'dark' | 'system',
+      highContrast?: boolean
+    ) => {
+      mutation.mutate({
+        updates: { theme: { preference, highContrast: highContrast ?? false } },
+      });
     },
     isPending: mutation.isPending,
     isError: mutation.isError,

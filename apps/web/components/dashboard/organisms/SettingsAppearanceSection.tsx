@@ -28,7 +28,7 @@ export function SettingsAppearanceSection() {
   const handleThemeChange = (newTheme: string) => {
     const validTheme = newTheme as 'light' | 'dark' | 'system';
     setTheme(validTheme);
-    updateTheme(validTheme);
+    updateTheme(validTheme, isHighContrast);
   };
 
   const handleHighContrastChange = (enabled: boolean) => {
