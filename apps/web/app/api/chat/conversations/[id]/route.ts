@@ -5,6 +5,10 @@ import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import {
+  getSessionErrorResponse,
+  isSessionError,
+} from '../../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -99,18 +103,19 @@ export async function GET(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error fetching conversation:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
+    if (!isSessionError(error)) {
       await captureError('Failed to fetch conversation', error, {
         route: '/api/chat/conversations/[id]',
         method: 'GET',
       });
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_STORE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
     return NextResponse.json(
@@ -177,18 +182,19 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error updating conversation:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
+    if (!isSessionError(error)) {
       await captureError('Failed to update conversation', error, {
         route: '/api/chat/conversations/[id]',
         method: 'PATCH',
       });
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_STORE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
     return NextResponse.json(
@@ -239,18 +245,19 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error deleting conversation:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
+    if (!isSessionError(error)) {
       await captureError('Failed to delete conversation', error, {
         route: '/api/chat/conversations/[id]',
         method: 'DELETE',
       });
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_STORE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
     return NextResponse.json(

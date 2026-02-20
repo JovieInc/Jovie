@@ -10,6 +10,10 @@ import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
+import {
+  getSessionErrorResponse,
+  isSessionError,
+} from '../../../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -200,18 +204,19 @@ export async function POST(req: Request, { params }: RouteParams) {
   } catch (error) {
     logger.error('Error adding message:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
+    if (!isSessionError(error)) {
       await captureError('Chat messages fetch failed', error, {
         route: '/api/chat/conversations/[id]/messages',
         method: 'POST',
       });
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_CACHE_HEADERS }
-      );
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_CACHE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
     return NextResponse.json(
