@@ -143,7 +143,7 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
-          WINDOW_MINUTES="${{ inputs.soak_minutes }}"
+          WINDOW_MINUTES="${{ inputs.baseline_window_minutes }}"
 
           END_EPOCH=$(date +%s)
           START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))

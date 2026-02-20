@@ -29,15 +29,7 @@
 name: Auto-Approve Agent PRs
 
 on:
-  # Triggered when check suites complete on PRs
-  check_suite:
-    types: [completed]
-
-  # Also triggered when the scope judge reports status
-  status:
-    types: []
-
-  # Triggered when CI workflow completes
+  # Triggered when CI or Scope Judge workflow completes
   workflow_run:
     workflows: ["CI", "Scope Judge"]
     types: [completed]

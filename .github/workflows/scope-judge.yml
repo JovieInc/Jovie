@@ -104,7 +104,7 @@ jobs:
           echo "has_diff=true" >> $GITHUB_OUTPUT
 
           # Get diff stats for context
-          DIFF_STATS=$(gh pr diff $PR_NUMBER --stat 2>/dev/null | tail -5 || echo "")
+          DIFF_STATS=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null | wc -l | xargs -I{} echo "{} files changed" || echo "")
 
           FULL_DIFF=$(cat <<DIFFEOF
           ## Diff Stats

@@ -63,6 +63,9 @@ jobs:
         id: trigger
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           EVENT="${{ github.event_name }}"
 
@@ -70,23 +73,21 @@ jobs:
             echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
 
             # Get PR info from the workflow run
-            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
             if [[ "$CONCLUSION" != "failure" ]]; then
               echo "CI did not fail (conclusion: $CONCLUSION). Skipping."
               echo "should_continue=false" >> $GITHUB_OUTPUT
               exit 0
             fi
 
-            HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
-            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+            # HEAD_BRANCH and HEAD_SHA are passed via env to prevent shell injection
 
-            # Find the PR for this branch
+            # Find the PR for this branch using jq --arg to avoid injection
             PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
-              --jq ".[] | select(.head.ref == \"$HEAD_BRANCH\" and .state == \"open\") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft}" \
+              | jq --arg branch "$HEAD_BRANCH" '.[] | select(.head.ref == $branch and .state == "open") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft}' \
               | head -1)
 
             if [[ -z "$PR_DATA" ]]; then
-              echo "No open PR found for branch $HEAD_BRANCH. Skipping."
+              echo "No open PR found for branch. Skipping."
               echo "should_continue=false" >> $GITHUB_OUTPUT
               exit 0
             fi
@@ -293,12 +294,26 @@ jobs:
       pull-requests: write
       issues: write
     steps:
+      - name: Validate PR is not from a fork
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          IS_FORK=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.head.repo.fork // false')
+          SAME_REPO=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.head.repo.full_name == .base.repo.full_name')
+
+          if [[ "$IS_FORK" == "true" || "$SAME_REPO" != "true" ]]; then
+            echo "PR is from a fork or different repo. Refusing to run remediation."
+            exit 1
+          fi
+          echo "PR is from the same repository. Proceeding."
+
       - name: Checkout PR branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ needs.guard.outputs.pr_head_ref }}
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Mark attempt in progress
         env:
