@@ -26,7 +26,7 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
   }
 
   return (
-    <main className='space-y-4' aria-labelledby='about-title'>
+    <main id='main-content' className='space-y-4' aria-labelledby='about-title'>
       <h1 id='about-title' className='sr-only'>
         About {artist.name}
       </h1>

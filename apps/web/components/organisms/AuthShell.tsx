@@ -61,7 +61,10 @@ function AuthShellInner({
     <>
       <UnifiedSidebar section={section} />
 
-      <SidebarInset className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'>
+      <SidebarInset
+        id='main-content'
+        className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'
+      >
         {!isInSettings && (
           <DashboardHeader
             breadcrumbs={breadcrumbs}

@@ -2,6 +2,7 @@
 
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
@@ -44,7 +45,8 @@ export function SettingsBrandingSection({
     try {
       await updateBrandingAsync(enabled);
     } catch {
-      // Rollback on error - the hook already shows an error toast
+      // Rollback on error
+      toast.error('Failed to update setting. Please try again.');
       setHideBranding(previousValue);
       if (onArtistUpdate) {
         onArtistUpdate({

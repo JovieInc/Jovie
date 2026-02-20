@@ -50,7 +50,10 @@ export function SoundsLandingPage({
         <div className='absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-[120px]' />
       </div>
 
-      <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
+      <main
+        id='main-content'
+        className='relative z-10 flex h-full flex-col items-center px-6 pt-10'
+      >
         <div className='flex w-full max-w-[272px] min-h-0 flex-1 flex-col'>
           {/* Artwork */}
           <div className='shrink-0'>

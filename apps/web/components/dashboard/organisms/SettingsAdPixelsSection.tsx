@@ -2,10 +2,11 @@
 
 import { Button, Input, Switch } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { usePixelSettingsMutation } from '@/lib/queries';
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -148,7 +149,12 @@ export function SettingsAdPixelsSection({
     usePixelSettingsMutation();
 
   // Fetch existing pixel settings on mount
-  const { data: existingSettings } = useQuery<PixelSettingsResponse>({
+  const {
+    data: existingSettings,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<PixelSettingsResponse>({
     queryKey: queryKeys.pixels.settings(),
     queryFn: async ({ signal }) => {
       const res = await fetch('/api/dashboard/pixels', { signal });
@@ -262,6 +268,36 @@ export function SettingsAdPixelsSection({
     );
   }
 
+  if (isLoading) {
+    return (
+      <DashboardCard variant='settings'>
+        <PixelsSectionSkeleton />
+      </DashboardCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardCard variant='settings'>
+        <div className='flex flex-col items-center justify-center gap-2 py-8'>
+          <AlertCircle className='h-6 w-6 text-destructive' />
+          <p className='text-sm text-secondary-token'>
+            Failed to load pixel settings.
+          </p>
+          <Button variant='ghost' size='sm' onClick={() => refetch()}>
+            Try again
+          </Button>
+        </div>
+      </DashboardCard>
+    );
+  }
+
+  // Check if any pixels are configured
+  const hasAnyPixels =
+    existingSettings?.pixels?.facebookPixelId ||
+    existingSettings?.pixels?.googleMeasurementId ||
+    existingSettings?.pixels?.tiktokPixelId;
+
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>
       <DashboardCard
@@ -282,6 +318,15 @@ export function SettingsAdPixelsSection({
             />
           </div>
         </div>
+
+        {!hasAnyPixels && (
+          <div className='px-4 py-4 text-center'>
+            <p className='text-sm text-secondary-token'>
+              No tracking pixels configured. Add your first pixel to start
+              tracking conversions.
+            </p>
+          </div>
+        )}
 
         <div className='px-4 py-3 space-y-4'>
           <PlatformSection

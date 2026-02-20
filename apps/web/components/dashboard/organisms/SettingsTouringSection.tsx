@@ -2,7 +2,7 @@
 
 import { Button, Input, Label } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Loader2, Unplug } from 'lucide-react';
+import { CheckCircle2, Unplug } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -201,8 +201,8 @@ export function SettingsTouringSection({
             size='sm'
             onClick={handleSaveAndConnect}
             disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
+            loading={isSaving}
           >
-            {isSaving && <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />}
             {isConnected ? 'Update' : 'Connect'}
           </Button>
           {isConnected && (
@@ -211,13 +211,10 @@ export function SettingsTouringSection({
               size='sm'
               onClick={handleDisconnect}
               disabled={isDisconnecting}
+              loading={isDisconnecting}
               className='text-destructive hover:text-destructive'
             >
-              {isDisconnecting ? (
-                <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />
-              ) : (
-                <Unplug className='h-3.5 w-3.5 mr-1' />
-              )}
+              <Unplug className='h-3.5 w-3.5 mr-1' />
               Disconnect
             </Button>
           )}
