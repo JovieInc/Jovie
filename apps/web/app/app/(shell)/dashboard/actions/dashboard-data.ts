@@ -265,64 +265,69 @@ async function fetchDashboardCoreWithSession(
           });
           throw error;
         }),
-      // Optimized existence queries for link booleans.
+      // Existence queries for link booleans.
       // We only need true/false values, so limit(1) avoids full-table counting scans.
-      // Both queries share the same RLS session context set by executeWithSession.
-      executeWithSession(
-        clerkUserId,
-        () => ({
-          execute: async () => {
-            const [activeLinks, activeMusicLinks] = await Promise.all([
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active')
+      // Each query uses its own executeWithSession to ensure proper RLS session setup.
+      // Note: Previously these were wrapped in a custom { execute } object, but
+      // db.batch() requires real Drizzle query objects with _prepare() — custom
+      // wrappers cause TypeError: query._prepare is not a function (JOV-794/795).
+      Promise.all([
+        executeWithSession(
+          clerkUserId,
+          () =>
+            db
+              .select({ id: socialLinks.id })
+              .from(socialLinks)
+              .where(
+                and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active')
+                )
+              )
+              .limit(1),
+          'Social links existence query'
+        ),
+        executeWithSession(
+          clerkUserId,
+          () =>
+            db
+              .select({ id: socialLinks.id })
+              .from(socialLinks)
+              .where(
+                and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active'),
+                  or(
+                    eq(socialLinks.platformType, 'dsp'),
+                    eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
                   )
                 )
-                .limit(1),
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    or(
-                      eq(socialLinks.platformType, 'dsp'),
-                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                    )
-                  )
-                )
-                .limit(1),
-            ]);
+              )
+              .limit(1),
+          'Music links existence query'
+        ),
+      ])
+        .then(([activeLinks, activeMusicLinks]) => ({
+          hasLinks: activeLinks.length > 0,
+          hasMusicLinks: activeMusicLinks.length > 0,
+        }))
+        .catch((error: unknown) => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'social_links_count',
+          });
 
-            return {
-              hasLinks: activeLinks.length > 0,
-              hasMusicLinks: activeMusicLinks.length > 0,
-            };
-          },
+          if (!migrationResult.shouldRetry) {
+            return { hasLinks: false, hasMusicLinks: false };
+          }
+          Sentry.captureException(error, {
+            tags: {
+              query: 'social_links_existence',
+              context: 'dashboard_data',
+            },
+          });
+          throw error;
         }),
-        'Social links existence query'
-      ).catch((error: unknown) => {
-        const migrationResult = handleMigrationErrors(error, {
-          userId: userData.id,
-          operation: 'social_links_count',
-        });
-
-        if (!migrationResult.shouldRetry) {
-          return { hasLinks: false, hasMusicLinks: false };
-        }
-        Sentry.captureException(error, {
-          tags: {
-            query: 'social_links_existence',
-            context: 'dashboard_data',
-          },
-        });
-        throw error;
-      }),
       // Tipping stats now run in parallel with settings and link counts,
       // eliminating the previous waterfall where they waited for chrome data
       fetchTippingStatsWithSession(selected.id, clerkUserId),
