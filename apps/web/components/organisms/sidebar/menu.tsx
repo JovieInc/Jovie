@@ -39,8 +39,8 @@ const sidebarMenuButtonVariants = cva(
     'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-left text-app leading-tight tracking-tight outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
-    // Transitions — Linear: 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94)
-    'transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+    // Transitions — Linear: 0.16s var(--ease-interactive)
+    'transition-[background-color,color] duration-normal ease-interactive',
     // Default text color - muted sidebar tokens matching Linear
     'text-sidebar-item-foreground',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
@@ -56,12 +56,12 @@ const sidebarMenuButtonVariants = cva(
     // Collapsed icon mode
     'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center',
     // Text truncation in collapsed mode
-    '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150',
+    '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — 14px icons matching Linear
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-150',
-    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-150',
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-normal [&>svg]:ease-interactive',
+    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-normal [&_[data-sidebar-icon]_svg]:ease-interactive',
     'hover:[&>svg]:text-sidebar-item-icon',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
     'data-[active=true]:[&>svg]:text-sidebar-item-icon',
@@ -189,7 +189,7 @@ export const SidebarMenuAction = React.forwardRef<
       ref={ref}
       data-sidebar='menu-action'
       className={cn(
-        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+        'relative flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-item-icon outline-none transition-[background-color,color] duration-normal ease-interactive',
         'hover:text-sidebar-foreground hover:bg-sidebar-accent',
         'focus-visible:bg-sidebar-accent focus-visible:text-sidebar-foreground focus-visible:outline-none',
         '[&>svg]:size-3.5 [&>svg]:shrink-0',
@@ -241,7 +241,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
       ref={ref}
       data-sidebar='menu-skeleton'
       className={cn(
-        'rounded-md h-7 flex gap-2 px-2 items-center transition-all duration-200 ease-out',
+        'rounded-md h-7 flex gap-2 px-2 items-center transition-all duration-normal ease-interactive',
         'group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center',
         className
       )}
@@ -307,7 +307,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
+        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-normal ease-interactive',
         'hover:bg-sidebar-accent hover:text-sidebar-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-foreground',

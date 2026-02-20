@@ -36,6 +36,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const maxDuration = 30;
 
@@ -413,31 +414,33 @@ function buildSystemPrompt(
 - **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
 
-## Your Guidelines
+## Voice & Style (CRITICAL — follow strictly)
+- Be direct and concise. Most answers should be 1-3 sentences.
+- Never exceed 150 words unless the artist explicitly asks for detail or you are generating a bio.
+- Answer ONLY what was asked. Do not volunteer unrelated suggestions or observations.
+- No emoji. No exclamation marks unless genuinely warranted.
+- No marketing language, no cheerleading, no "Great question!" or "I'd love to help!" openers.
+- If the user asks to do something and you have a tool for it, call the tool immediately with minimal preamble.
+- Use bullet points only when listing 3+ items.
+- Use simple language, no jargon.
 
-1. **Be specific and data-driven.** Reference the actual numbers above when giving advice. Don't be vague.
+### DO NOT
+- Suggest bio/links/genres/profile improvements unless specifically asked.
+- Greet the user with a profile review or stats summary they didn't ask for.
+- Pad responses with encouragement, motivational filler, or "let me know if you need anything else."
+- Repeat back what the user just said.
 
-2. **Be concise.** Artists are busy. Give clear, actionable advice without fluff.
-
-3. **Be honest about limitations.** If you don't have enough data to answer something, say so. Don't make things up.
-
-4. **Focus on actionable advice.** Every response should give the artist something they can DO.
-
-5. **Understand context.** If they have 0 profile views, they're just starting. If they have 10K Spotify followers, they have momentum.
-
-6. **Don't be sycophantic.** Be a helpful advisor, not a cheerleader. Give real talk.
+### Guidelines
+- Be specific and data-driven when giving advice. Reference actual numbers, don't be vague.
+- Be honest about limitations. If you don't have enough data, say so.
+- Focus on actionable advice — give the artist something they can do.
+- Understand context: 0 profile views = just starting; 10K followers = has momentum.
 
 ## What You Cannot Do
 - You cannot send emails, post content, or take actions on behalf of the artist
 - You cannot access external data or APIs
 - You cannot see their actual music or listen to tracks
 - You cannot guarantee results or make promises about outcomes
-
-## Response Style
-- Use bullet points for lists
-- Keep responses under 300 words unless asked for detail
-- Use simple language, avoid jargon
-- Be encouraging but realistic
 
 ## Profile Editing
 You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
@@ -453,8 +456,13 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - username: Requires settings page
 - Connected accounts: Requires settings page
 
-**Client-Handled Fields:**
-- avatar/profile image: Users can upload a new profile photo directly from the chat input using the camera button. If they tell you they updated their profile photo, acknowledge it warmly. You do NOT have a tool for this — the upload is handled by the client UI.
+**Profile Photo:**
+- Use the proposeAvatarUpload tool when the artist wants to change or update their profile photo. This renders an upload widget directly in the chat. Do not describe how to upload — just call the tool.
+- If they tell you they already updated their photo, acknowledge it briefly.
+
+**Social Links:**
+- Use the proposeSocialLink tool when the artist wants to add a social link or URL to their profile. Pass the full URL. If they only provide a handle (e.g. "@myhandle" for Instagram), construct the full URL (e.g. "https://instagram.com/myhandle") before calling the tool.
+- Do not add links without showing the confirmation preview first.
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
@@ -512,7 +520,7 @@ After creating the release, let the artist know they can add streaming links fro
       ? `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions and give advice, but you do NOT have access to tools (profile editing, canvas planning, promo strategy, release creation, or related artist suggestions). If the artist asks for something that requires a tool, let them know this feature is available on the Pro plan and briefly explain the value.`
+This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), and add social links (proposeSocialLink). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
       : ''
   }`;
 }
@@ -546,6 +554,62 @@ function createProfileEditTool(context: ArtistContext) {
           newValue,
           reason,
         },
+      };
+    },
+  });
+}
+
+/**
+ * Creates the proposeAvatarUpload tool that signals the client to render
+ * an inline photo upload widget in the chat conversation.
+ */
+function createAvatarUploadTool() {
+  return tool({
+    description:
+      'Show a profile photo upload widget in the chat. Use this when the artist wants to change, update, or set their profile photo. Do not describe how to upload — just call this tool.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      return { success: true, action: 'avatar_upload' as const };
+    },
+  });
+}
+
+/**
+ * Creates the proposeSocialLink tool that detects the platform from a URL
+ * and returns a confirmation preview for the artist to accept or dismiss.
+ */
+function createSocialLinkTool() {
+  return tool({
+    description:
+      'Propose adding a social link to the artist profile. Pass the full URL. The client will show a confirmation card with the detected platform. Use this when the artist asks to add a link or social profile URL.',
+    inputSchema: z.object({
+      url: z
+        .string()
+        .describe(
+          'The full URL to add (e.g. https://instagram.com/myhandle). Construct the full URL from handles if needed.'
+        ),
+    }),
+    execute: async ({ url }) => {
+      const detected = detectPlatform(url);
+
+      if (!detected.isValid) {
+        return {
+          success: false,
+          error: detected.error ?? 'Invalid URL. Please provide a valid link.',
+        };
+      }
+
+      return {
+        success: true,
+        platform: {
+          id: detected.platform.id,
+          name: detected.platform.name,
+          icon: detected.platform.icon,
+          color: detected.platform.color,
+        },
+        normalizedUrl: detected.normalizedUrl,
+        originalUrl: detected.originalUrl,
+        suggestedTitle: detected.suggestedTitle,
       };
     },
   });
@@ -1058,6 +1122,17 @@ export async function OPTIONS() {
 }
 
 /**
+ * Build tools available on ALL plans (including Free).
+ * These are basic profile management tools that don't require a paid plan.
+ */
+function buildFreeChatTools() {
+  return {
+    proposeAvatarUpload: createAvatarUploadTool(),
+    proposeSocialLink: createSocialLinkTool(),
+  };
+}
+
+/**
  * Build the tool set for paid-plan chat sessions.
  */
 function buildChatTools(
@@ -1235,10 +1310,12 @@ export async function POST(req: Request) {
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Gate AI tools behind paid plans — free users get chat-only
+    // Free tools (avatar upload, social links) available on ALL plans
+    const freeTools = buildFreeChatTools();
+    // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
-      ? buildChatTools(artistContext, resolvedProfileId)
-      : {};
+      ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }
+      : freeTools;
 
     const result = streamText({
       model: gateway(CHAT_MODEL),

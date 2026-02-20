@@ -78,7 +78,7 @@ export function SettingsProfileSection({
       )}
 
       {/* Profile picture row */}
-      <div className='flex items-center justify-between px-5 py-4'>
+      <div className='flex items-center justify-between px-4 py-3'>
         <span className='text-sm text-primary-token'>Profile picture</span>
         <AvatarUploadable
           src={artist.image_url}
@@ -96,7 +96,7 @@ export function SettingsProfileSection({
       </div>
 
       {/* Display Name row */}
-      <div className='flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
         <label
           htmlFor='displayName'
           className='text-sm text-primary-token shrink-0'
@@ -116,7 +116,7 @@ export function SettingsProfileSection({
       </div>
 
       {/* Username row */}
-      <div className='flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
         <div className='shrink-0'>
           <label htmlFor='username' className='text-sm text-primary-token'>
             Username

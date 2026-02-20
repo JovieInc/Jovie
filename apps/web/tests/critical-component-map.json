@@ -1,8 +1,5 @@
 {
   "$schema": "Critical component map: source file → test file(s) that should run when changed",
-  "components/organisms/contact-sidebar/DrawerNav.tsx": [
-    "tests/components/organisms/contact-sidebar/DrawerNav.interaction.test.tsx"
-  ],
   "components/organisms/contact-sidebar/ContactSidebar.tsx": [
     "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
   ],

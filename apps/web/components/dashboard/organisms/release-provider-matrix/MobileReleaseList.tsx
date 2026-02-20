@@ -1,8 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
@@ -188,25 +188,10 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         className='flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
       >
         {/* Artwork thumbnail */}
-        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm'>
-          {release.artworkUrl ? (
-            <Image
-              src={release.artworkUrl}
-              alt={`${release.title} artwork`}
-              fill
-              className='object-cover'
-              sizes='40px'
-            />
-          ) : (
-            <div className='flex h-full w-full items-center justify-center'>
-              <Icon
-                name='Disc3'
-                className='h-5 w-5 text-tertiary-token'
-                aria-hidden='true'
-              />
-            </div>
-          )}
-        </div>
+        <ReleaseArtworkThumb
+          src={release.artworkUrl}
+          alt={`${release.title} artwork`}
+        />
 
         {/* Title + metadata */}
         <div className='min-w-0 flex-1'>

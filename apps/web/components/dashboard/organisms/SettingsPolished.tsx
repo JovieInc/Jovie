@@ -38,7 +38,7 @@ export function SettingsPolished({
 
   const renderAccountSection = useCallback(
     () => (
-      <div className='space-y-3 sm:space-y-6'>
+      <div className='space-y-0'>
         {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
           <AccountSettingsSection />
         ) : (
@@ -178,10 +178,7 @@ export function SettingsPolished({
     if (!section) return null;
 
     return (
-      <div
-        className='space-y-4 sm:space-y-5 pb-4 sm:pb-6'
-        data-testid='settings-polished'
-      >
+      <div className='space-y-0 pb-4 sm:pb-6' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -195,19 +192,19 @@ export function SettingsPolished({
 
   // Full settings view with group headers
   return (
-    <div
-      className='space-y-6 sm:space-y-8 pb-4 sm:pb-6'
-      data-testid='settings-polished'
-    >
+    <div className='space-y-0 pb-4 sm:pb-6' data-testid='settings-polished'>
       {/* General settings */}
-      <div className='space-y-5 sm:space-y-6'>
-        <h3 className='text-[13px] font-medium text-tertiary-token'>General</h3>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3 first:pt-0'>
+          General
+        </h3>
         {userSections.map(section => (
           <SettingsSection
             key={section.id}
             id={section.id}
             title={section.title}
             description={section.description}
+            className='mt-6 first:mt-0'
           >
             {section.render()}
           </SettingsSection>
@@ -215,14 +212,17 @@ export function SettingsPolished({
       </div>
 
       {/* Artist settings */}
-      <div className='space-y-5 sm:space-y-6'>
-        <h3 className='text-[13px] font-medium text-tertiary-token'>Artist</h3>
+      <div>
+        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+          Artist
+        </h3>
         {artistSections.map(section => (
           <SettingsSection
             key={section.id}
             id={section.id}
             title={section.title}
             description={section.description}
+            className='mt-6 first:mt-0'
           >
             {section.render()}
           </SettingsSection>

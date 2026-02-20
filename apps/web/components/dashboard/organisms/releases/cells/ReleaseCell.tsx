@@ -1,9 +1,8 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import Image from 'next/image';
 import { memo } from 'react';
-import { Icon } from '@/components/atoms/Icon';
+import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -35,25 +34,11 @@ export const ReleaseCell = memo(function ReleaseCell({
   return (
     <div className='flex items-center gap-3'>
       {/* Artwork thumbnail - hidden on mobile to save space */}
-      <div className='relative hidden h-10 w-10 shrink-0 overflow-hidden rounded-sm bg-surface-2 shadow-sm sm:block'>
-        {release.artworkUrl ? (
-          <Image
-            src={release.artworkUrl}
-            alt={`${release.title} artwork`}
-            fill
-            className='object-cover'
-            sizes='40px'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center'>
-            <Icon
-              name='Disc3'
-              className='h-5 w-5 text-tertiary-token'
-              aria-hidden='true'
-            />
-          </div>
-        )}
-      </div>
+      <ReleaseArtworkThumb
+        src={release.artworkUrl}
+        alt={`${release.title} artwork`}
+        className='hidden sm:block'
+      />
 
       {/* Title and metadata */}
       <div className='min-w-0 flex-1'>

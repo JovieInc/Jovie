@@ -76,6 +76,10 @@ vi.mock(
   }
 );
 
+vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
+  useDashboardSocialLinksQuery: () => ({ data: [], isLoading: false }),
+}));
+
 vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: true }),
   StatsigContext: React.createContext({ client: {} }),
