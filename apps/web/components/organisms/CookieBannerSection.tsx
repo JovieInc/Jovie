@@ -24,7 +24,7 @@ export function CookieBannerSection({
   showBanner = true,
 }: CookieBannerSectionProps) {
   const pathname = usePathname();
-  const isDashboard = pathname?.startsWith('/app');
+  const isDashboard = Boolean(pathname?.startsWith('/app'));
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
