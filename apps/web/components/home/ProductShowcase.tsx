@@ -7,6 +7,46 @@ import { Container } from '@/components/site/Container';
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
 
+function CroppedPhone() {
+  return (
+    <div className='flex flex-col items-center'>
+      {/* Cropped phone — top 2/3 with fade */}
+      <div
+        className='relative overflow-hidden'
+        style={{ height: 400, width: 280 }}
+      >
+        <div style={{ height: 580 }}>
+          <PhoneFrame>
+            <MobileProfilePreview />
+          </PhoneFrame>
+        </div>
+        {/* Bottom fade */}
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-x-0 bottom-0'
+          style={{
+            height: 80,
+            background:
+              'linear-gradient(to bottom, transparent, var(--linear-bg-page))',
+          }}
+        />
+      </div>
+      {/* URL label */}
+      <p
+        className='mt-4'
+        style={{
+          fontSize: '14px',
+          fontWeight: 450,
+          letterSpacing: '-0.01em',
+          color: 'var(--linear-text-tertiary)',
+        }}
+      >
+        jov.ie/tim
+      </p>
+    </div>
+  );
+}
+
 export function ProductShowcase() {
   const prefersReducedMotion = useReducedMotion();
 
@@ -81,17 +121,13 @@ export function ProductShowcase() {
                   transformStyle: 'preserve-3d',
                 }}
               >
-                <PhoneFrame>
-                  <MobileProfilePreview />
-                </PhoneFrame>
+                <CroppedPhone />
               </div>
             </div>
 
             {/* Mobile: flat, no 3D */}
             <div className='lg:hidden'>
-              <PhoneFrame>
-                <MobileProfilePreview />
-              </PhoneFrame>
+              <CroppedPhone />
             </div>
           </motion.div>
         </div>
