@@ -365,6 +365,114 @@
   }
 }
 
+/* ============================================
+   MANUAL HIGH CONTRAST MODE
+   ============================================
+   Applied via .high-contrast class on <html>.
+   Independent of OS prefers-contrast media query.
+   Works in both light and dark modes.
+*/
+
+:root.high-contrast {
+  --theme-contrast: 90;
+
+  /* Text hierarchy — maximum separation */
+  --color-text-primary-token: oklch(5% 0 0);
+  --color-text-secondary-token: oklch(
+    25% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    35% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    45% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Borders — significantly stronger */
+  --color-border-subtle: oklch(0% 0 0 / 15%);
+  --color-border-default: oklch(0% 0 0 / 25%);
+  --color-border-strong: oklch(0% 0 0 / 40%);
+
+  /* Surfaces — increased separation between layers */
+  --color-bg-hover: lch(94% 0 282.863);
+  --color-bg-elevated: lch(90% 0 282.863);
+
+  /* Interactive states — more visible */
+  --color-interactive-hover: oklch(0% 0 0 / 10%);
+  --color-interactive-active: oklch(0% 0 0 / 18%);
+
+  /* Badges — stronger contrast */
+  --color-badge-bg: rgba(0, 0, 0, 0.1);
+  --color-badge-border: rgba(0, 0, 0, 0.15);
+  --color-badge-text: oklch(5% 0 0);
+
+  /* Secondary button — more contrast */
+  --color-btn-secondary-bg: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-btn-secondary-fg: oklch(10% 0 0);
+  --color-btn-secondary-hover: oklch(
+    82% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Shadows — stronger ring for depth perception */
+  --shadow-card:
+    oklch(70% 0 283) 0px 0px 0px 1px,
+    oklch(0% 0 0 / 4%) 0px 3px 6px -2px,
+    oklch(0% 0 0 / 8%) 0px 1px 1px 0px;
+}
+
+:root.dark.high-contrast {
+  --theme-contrast: 90;
+
+  /* Text hierarchy — brighter primaries, more steps */
+  --color-text-primary-token: oklch(100% 0 0);
+  --color-text-secondary-token: oklch(
+    85% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    72% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(40% 0.006 272);
+
+  /* Borders — much stronger */
+  --color-border-subtle: oklch(100% 0 0 / 15%);
+  --color-border-default: oklch(100% 0 0 / 25%);
+  --color-border-strong: oklch(100% 0 0 / 40%);
+
+  /* Surfaces — more separation between layers */
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-elevated: lch(8% 0.7 272);
+
+  /* Interactive states — more visible */
+  --color-interactive-hover: rgba(255, 255, 255, 0.08);
+  --color-interactive-active: rgba(255, 255, 255, 0.12);
+
+  /* Badges — stronger contrast */
+  --color-badge-bg: rgba(255, 255, 255, 0.1);
+  --color-badge-border: rgba(255, 255, 255, 0.15);
+  --color-badge-text: rgb(255, 255, 255);
+
+  /* Secondary button — more contrast */
+  --color-btn-secondary-bg: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-btn-secondary-fg: oklch(95% 0 0);
+  --color-btn-secondary-hover: oklch(
+    30% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+
+  /* Shadows — stronger rings */
+  --shadow-card:
+    rgba(0, 0, 0, 0.35) 0px 0px 0px 1px, rgba(0, 0, 0, 0.5) 0px 2px 4px 0px;
+}
+
 /* Reduced contrast mode (for eye comfort) */
 @media (prefers-contrast: less) {
   :root {
