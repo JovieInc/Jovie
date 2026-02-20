@@ -22,6 +22,62 @@ export function truncate(input: string, maxLength: number): string {
   return `${input.slice(0, maxLength - 1)}…`;
 }
 
+/**
+ * Returns a generic branded fallback OG image when data fetching fails
+ * or the profile is not found.
+ */
+function fallbackImage(username: string) {
+  return new ImageResponse(
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: 24,
+        background:
+          'radial-gradient(circle at 15% 10%, #363062 0%, #17122d 40%, #0a0715 100%)',
+        color: '#ffffff',
+        fontFamily: 'Inter',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          fontSize: 48,
+          fontWeight: 700,
+          letterSpacing: -1,
+          color: '#b6a8ff',
+        }}
+      >
+        Jovie
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          fontSize: 32,
+          fontWeight: 500,
+          color: '#d4cffb',
+        }}
+      >
+        jov.ie/{username}
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          fontSize: 22,
+          color: '#9f95d9',
+        }}
+      >
+        Artist growth, simplified
+      </div>
+    </div>,
+    { ...size }
+  );
+}
+
 export default async function Image({
   params,
 }: {
@@ -30,21 +86,44 @@ export default async function Image({
   const { username } = await params;
   const normalizedUsername = username.toLowerCase();
 
-  const [profileResult, releaseStats] = await Promise.all([
-    getProfileWithLinks(normalizedUsername),
-    getReleaseStatsByUsername(normalizedUsername),
-  ]);
+  let profileResult: Awaited<ReturnType<typeof getProfileWithLinks>> | null =
+    null;
+  let releaseStats: Awaited<
+    ReturnType<typeof getReleaseStatsByUsername>
+  > | null = null;
+
+  try {
+    [profileResult, releaseStats] = await Promise.all([
+      getProfileWithLinks(normalizedUsername),
+      getReleaseStatsByUsername(normalizedUsername),
+    ]);
+  } catch {
+    return fallbackImage(normalizedUsername);
+  }
+
+  if (!profileResult) {
+    return fallbackImage(normalizedUsername);
+  }
 
   const profileIsPublic = Boolean(profileResult?.isPublic);
   const artistName = profileResult?.displayName || username;
-  const genreTags = profileResult?.genres?.slice(0, 3) ?? [];
+  const genreTags = profileIsPublic
+    ? (profileResult?.genres?.slice(0, 3) ?? [])
+    : [];
 
-  const topReleases = releaseStats.topReleaseTitles
-    .slice(0, 3)
-    .map(title => truncate(title, 28));
+  const topReleases =
+    profileIsPublic && releaseStats
+      ? releaseStats.topReleaseTitles
+          .slice(0, 3)
+          .map(title => truncate(title, 28))
+      : [];
 
-  const releaseSubtitle =
-    releaseStats.releaseCount > 0
+  const releaseCount =
+    profileIsPublic && releaseStats ? releaseStats.releaseCount : 0;
+
+  const releaseSubtitle = !profileIsPublic
+    ? 'Artist profile on Jovie'
+    : releaseCount > 0
       ? topReleases.length > 0
         ? topReleases.join(' • ')
         : 'Latest releases on Spotify, Apple Music, and more'
@@ -198,7 +277,7 @@ export default async function Image({
                   letterSpacing: -0.8,
                 }}
               >
-                {formatReleaseCount(releaseStats.releaseCount)}
+                {formatReleaseCount(releaseCount)}
               </div>
               <div
                 style={{
