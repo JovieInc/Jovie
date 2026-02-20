@@ -48,17 +48,18 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit, isPendingSubmit } = useOnboardingSubmit({
-    userId,
-    userEmail,
-    fullName,
-    handle,
-    handleInput,
-    handleValidation,
-    goToNextStep,
-    setProfileReadyHandle,
-    shouldAutoSubmitHandle,
-  });
+  const { state, handleSubmit, isPendingSubmit, spotifyImportState } =
+    useOnboardingSubmit({
+      userId,
+      userEmail,
+      fullName,
+      handle,
+      handleInput,
+      handleValidation,
+      goToNextStep,
+      setProfileReadyHandle,
+      shouldAutoSubmitHandle,
+    });
 
   useEffect(() => {
     if (userId) {
@@ -153,6 +154,9 @@ export function AppleStyleOnboardingForm({
             copied={copied}
             onGoToDashboard={goToDashboard}
             onCopyLink={copyProfileLink}
+            spotifyImportStatus={spotifyImportState.status}
+            spotifyImportMessage={spotifyImportState.message}
+            spotifyImportStage={spotifyImportState.stage}
           />
         );
 
