@@ -217,12 +217,21 @@ function isAbortError(event: SentryEvent): boolean {
  * Downgrade to warning instead of dropping entirely for monitoring.
  */
 function isHydrationMismatch(event: SentryEvent): boolean {
-  const message = event.exception?.values?.[0]?.value?.toLowerCase() ?? '';
+  const message = [
+    event.message,
+    event.logentry?.message,
+    event.exception?.values?.[0]?.value,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+
   return (
     message.includes('hydration failed') ||
     message.includes("server rendered html didn't match") ||
     message.includes("server rendered text didn't match") ||
-    message.includes('switched to client rendering')
+    message.includes('switched to client rendering') ||
+    message.includes('server rendering errored')
   );
 }
 
@@ -317,9 +326,9 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
-  // Downgrade hydration mismatches to warning (transient SSR/client differences)
+  // Drop hydration mismatch noise (React/Next can recover client-side)
   if (isHydrationMismatch(event)) {
-    event.level = 'warning';
+    return null;
   }
 
   // Anonymize IP addresses if present

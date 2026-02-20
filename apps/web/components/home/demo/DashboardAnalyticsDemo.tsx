@@ -104,7 +104,7 @@ export function DashboardAnalyticsDemo() {
           style={{ color: 'var(--linear-text-tertiary)' }}
         >
           <span>{DAILY_CLICKS[0].date}</span>
-          <span>{DAILY_CLICKS[DAILY_CLICKS.length - 1].date}</span>
+          <span>{DAILY_CLICKS.at(-1)?.date}</span>
         </div>
       </div>
 

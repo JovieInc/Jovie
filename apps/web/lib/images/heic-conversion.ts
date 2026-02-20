@@ -24,7 +24,7 @@ export async function convertHeicToJpeg(file: File): Promise<File> {
 
   const blob = Array.isArray(result) ? result[0] : result;
   if (!(blob instanceof Blob)) {
-    throw new Error(
+    throw new TypeError(
       'Failed to convert HEIC image. Please try a different file.'
     );
   }

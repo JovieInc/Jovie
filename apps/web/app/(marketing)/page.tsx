@@ -49,7 +49,7 @@ import {
   homepageProductPreview,
   homepageSeeItInAction,
   homepageWhatYouGet,
-} from '@/lib/flags';
+} from '@/lib/flags/homepage';
 
 // Flags read cookies for toolbar overrides, making this page dynamic.
 // Revert to `revalidate = false` once homepage design is finalized.

@@ -155,6 +155,30 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should filter hydration mismatch errors from exception text', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value:
+              'Switched to client rendering because the server rendering errored: hydration failed',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter hydration mismatch errors from top-level message', () => {
+    const event = {
+      message:
+        'Error: Switched to client rendering because the server rendering errored',
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
   it('should filter framework internal errors', () => {
     const event = {
       exception: {
