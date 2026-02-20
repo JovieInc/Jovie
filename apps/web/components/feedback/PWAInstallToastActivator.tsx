@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 
 const TOAST_ID = 'pwa-install';
 
@@ -27,10 +28,10 @@ export function PWAInstallToastActivator() {
     shownThisSession = true;
 
     const description = isIOS
-      ? 'Tap the Share button, then "Add to Home Screen" to install.'
-      : 'Add Jovie to your dock for quick access.';
+      ? TOAST_MESSAGES.PWA_INSTALL_IOS
+      : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION;
 
-    toast.info('Install Jovie', {
+    toast.info(TOAST_MESSAGES.PWA_INSTALL, {
       id: TOAST_ID,
       duration: Infinity,
       description,
