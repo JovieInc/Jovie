@@ -65,10 +65,9 @@ jobs:
         id: find-pr
         env:
           GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-
           echo "Looking for PR on branch: $HEAD_BRANCH"
 
           # Check agent branch pattern
