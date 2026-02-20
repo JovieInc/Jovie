@@ -1,13 +1,20 @@
 'use client';
 
-import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
 export function SettingsNotificationsSection() {
-  const [marketingEmails, setMarketingEmails] = useState(true);
-  const { updateNotifications, isPending } = useNotificationSettingsMutation();
+  const { updateNotificationsAsync, isPending } =
+    useNotificationSettingsMutation();
+
+  const { checked, handleToggle } = useOptimisticToggle({
+    initialValue: true,
+    mutateAsync: enabled =>
+      updateNotificationsAsync({ marketing_emails: enabled }),
+    errorMessage: 'Failed to update notification settings. Please try again.',
+  });
 
   return (
     <DashboardCard variant='settings' padding='none'>
@@ -15,11 +22,8 @@ export function SettingsNotificationsSection() {
         <SettingsToggleRow
           title='Marketing Emails'
           description='Receive updates about new features, tips, and promotional offers.'
-          checked={marketingEmails}
-          onCheckedChange={(enabled: boolean) => {
-            setMarketingEmails(enabled);
-            updateNotifications({ marketing_emails: enabled });
-          }}
+          checked={checked}
+          onCheckedChange={handleToggle}
           disabled={isPending}
           ariaLabel='Toggle marketing emails'
         />
