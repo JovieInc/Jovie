@@ -47,7 +47,6 @@ import {
   homepageProblem,
   homepageProductPreview,
   homepageSeeItInAction,
-  homepageWhatYouGet,
 } from '@/lib/flags/homepage';
 
 // Flags read cookies for toolbar overrides, making this page dynamic.
