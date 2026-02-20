@@ -364,21 +364,40 @@ export const LINKS: DemoLink[] = [
 
 // ── Automatic release smartlinks ────────────────────────────────────────────
 
-export const RELEASE_AUTOMATION_RELEASE = {
+export interface ReleaseAutomationRelease {
+  title: string;
+  artist: string;
+  date: string;
+  gradient: string;
+}
+
+export interface ReleaseAutomationPlatformHealth {
+  name: string;
+  status: 'Live' | 'Syncing';
+}
+
+export interface ReleaseAutomationActivity {
+  id: string;
+  title: string;
+  detail: string;
+}
+
+export const RELEASE_AUTOMATION_RELEASE: ReleaseAutomationRelease = {
   title: 'Afterglow (Deluxe)',
   artist: 'NOVA / LANE',
   date: 'Feb 23, 2026',
   gradient: 'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
-} as const;
+};
 
-export const RELEASE_AUTOMATION_PLATFORM_HEALTH = [
-  { name: 'Spotify', status: 'Live' },
-  { name: 'Apple Music', status: 'Live' },
-  { name: 'YouTube Music', status: 'Syncing' },
-  { name: 'Amazon Music', status: 'Live' },
-] as const;
+export const RELEASE_AUTOMATION_PLATFORM_HEALTH: ReleaseAutomationPlatformHealth[] =
+  [
+    { name: 'Spotify', status: 'Live' },
+    { name: 'Apple Music', status: 'Live' },
+    { name: 'YouTube Music', status: 'Syncing' },
+    { name: 'Amazon Music', status: 'Live' },
+  ];
 
-export const RELEASE_AUTOMATION_ACTIVITY = [
+export const RELEASE_AUTOMATION_ACTIVITY: ReleaseAutomationActivity[] = [
   {
     id: 'distribution',
     title: 'Distribution webhook received',
@@ -389,4 +408,4 @@ export const RELEASE_AUTOMATION_ACTIVITY = [
     title: 'Smartlink published automatically',
     detail: 'Short URL generated and queued for social posting',
   },
-] as const;
+];
