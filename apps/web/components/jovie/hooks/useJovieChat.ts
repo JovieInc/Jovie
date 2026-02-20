@@ -153,7 +153,7 @@ export function useJovieChat({
       setChatError({
         type: errorType,
         message:
-          metadata.message?.trim() ||
+          metadata.message ||
           getUserFriendlyMessage(errorType, metadata.retryAfter),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
