@@ -18,6 +18,7 @@ import {
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   ProfileData,
@@ -69,6 +70,7 @@ export async function getProfileById(
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
@@ -115,6 +117,7 @@ export async function getProfileByUsername(
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
@@ -163,6 +166,7 @@ export async function getProfileWithUser(
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
@@ -453,6 +457,7 @@ async function fetchProfileFromDatabase(
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
@@ -578,6 +583,7 @@ export async function getProfileSummary(
       avatarUrl: creatorProfiles.avatarUrl,
       isPublic: creatorProfiles.isPublic,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isVerified: creatorProfiles.isVerified,
     })
     .from(creatorProfiles)
@@ -598,13 +604,15 @@ export async function isClaimTokenValid(
   username: string,
   claimToken: string
 ): Promise<boolean> {
+  const claimTokenHash = hashClaimToken(claimToken);
+
   const [row] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
-        eq(creatorProfiles.claimToken, claimToken),
+        eq(creatorProfiles.claimToken, claimTokenHash),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )
@@ -624,12 +632,14 @@ export async function isClaimTokenValid(
 export async function lookupUsernameByClaimToken(
   claimToken: string
 ): Promise<string | null> {
+  const claimTokenHash = hashClaimToken(claimToken);
+
   const [row] = await db
     .select({ username: creatorProfiles.username })
     .from(creatorProfiles)
     .where(
       and(
-        eq(creatorProfiles.claimToken, claimToken),
+        eq(creatorProfiles.claimToken, claimTokenHash),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )

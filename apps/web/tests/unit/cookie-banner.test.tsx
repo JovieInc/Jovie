@@ -14,4 +14,9 @@ describe('CookieBannerSection', () => {
       screen.getByRole('button', { name: /accept all/i })
     ).toBeInTheDocument();
   });
+
+  it('hides the banner when showBanner is false', () => {
+    render(<CookieBannerSection showBanner={false} />);
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+  });
 });

@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   Sidebar,
@@ -11,9 +13,35 @@ import {
   SidebarProvider,
 } from '@/components/organisms/Sidebar';
 
+const mockDashboardData: DashboardData = {
+  user: { id: 'user-1' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: true,
+  hasMusicLinks: true,
+  isAdmin: false,
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+};
+
 const meta: Meta<typeof Sidebar> = {
   title: 'Dashboard/Sidebar-08',
   component: Sidebar,
+  decorators: [
+    Story => (
+      <DashboardDataProvider value={mockDashboardData}>
+        <Story />
+      </DashboardDataProvider>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
     docs: {

@@ -17,6 +17,7 @@ interface OnboardingHandleStepProps {
   readonly title: string;
   readonly prompt?: string;
   readonly handleInput: string;
+  readonly isReservedHandle?: boolean;
   readonly handleValidation: HandleValidationState;
   readonly stateError: string | null;
   readonly isSubmitting: boolean;
@@ -25,6 +26,7 @@ interface OnboardingHandleStepProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
   readonly onHandleChange: (value: string) => void;
   readonly onSubmit: (e?: React.FormEvent) => void;
+  readonly onSuggestionClick?: (value: string) => void;
   readonly isPendingSubmit?: boolean;
 }
 
@@ -133,6 +135,7 @@ export function OnboardingHandleStep({
   title,
   prompt,
   handleInput,
+  isReservedHandle = false,
   handleValidation,
   stateError,
   isSubmitting,
@@ -141,6 +144,7 @@ export function OnboardingHandleStep({
   inputRef,
   onHandleChange,
   onSubmit,
+  onSuggestionClick,
   isPendingSubmit = false,
 }: OnboardingHandleStepProps) {
   function renderValidationStatus(): React.ReactNode {
@@ -164,6 +168,12 @@ export function OnboardingHandleStep({
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
+          {isReservedHandle && handleInput ? (
+            <p className='text-sm text-secondary-token text-center'>
+              We reserved @{handleInput} for you. Prefer something else? Edit
+              it.
+            </p>
+          ) : null}
         </div>
 
         <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>
@@ -219,6 +229,25 @@ export function OnboardingHandleStep({
             <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
               {renderValidationStatus()}
             </output>
+
+            {handleValidation.suggestions.length > 0 && (
+              <div className='mt-2 flex flex-wrap justify-center gap-2'>
+                {handleValidation.suggestions.map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type='button'
+                    onClick={() =>
+                      onSuggestionClick
+                        ? onSuggestionClick(suggestion)
+                        : onHandleChange(suggestion)
+                    }
+                    className='rounded-full border border-subtle px-3 py-1 text-xs text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
+                  >
+                    @{suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <AuthButton
