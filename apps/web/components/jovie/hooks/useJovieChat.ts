@@ -6,7 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useThrottledCallback } from '@/lib/pacer';
+import { useAsyncRateLimiter } from '@/lib/pacer';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
 import {
@@ -15,7 +16,7 @@ import {
 } from '@/lib/queries/useChatMutations';
 
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
-import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
+import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   extractErrorMetadata,
   getErrorType,
@@ -434,26 +435,39 @@ export function useJovieChat({
     }
   }, [chatError, doSubmit]);
 
-  // Throttled submit to prevent rapid submissions
-  const throttledSubmit = useThrottledCallback(doSubmit, {
-    wait: SUBMIT_THROTTLE_MS,
-    leading: true,
-    trailing: false,
-  });
+  const rateLimitedSubmitter = useAsyncRateLimiter(
+    async ({ text, files }: { text: string; files?: FileUIPart[] }) => {
+      await doSubmit(text, files);
+    },
+    {
+      limit: 1,
+      window: PACER_TIMING.CHAT_RATE_LIMIT_MS,
+      onReject: () => {
+        setChatError({
+          type: 'rate_limit',
+          message:
+            'You’re sending messages too quickly. Please wait a moment and try again.',
+          failedMessage: input,
+        });
+      },
+    }
+  );
+
+  const isRateLimited = rateLimitedSubmitter.getRemainingInWindow() === 0;
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      throttledSubmit(input, files);
+      rateLimitedSubmitter.maybeExecute({ text: input, files });
     },
-    [input, throttledSubmit]
+    [input, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
     (prompt: string) => {
-      doSubmit(prompt);
+      rateLimitedSubmitter.maybeExecute({ text: prompt });
     },
-    [doSubmit]
+    [rateLimitedSubmitter]
   );
 
   return {
@@ -479,5 +493,6 @@ export function useJovieChat({
     /** Programmatic message submission (for imperative use without input state) */
     submitMessage: doSubmit,
     setChatError,
+    isRateLimited,
   };
 }
