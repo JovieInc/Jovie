@@ -16,7 +16,7 @@ export function RedesignedHero() {
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative grid w-full grid-cols-1 items-center gap-12 py-16 lg:grid-cols-[1fr,auto] lg:gap-20 lg:py-20'>
+      <div className='relative grid w-full grid-cols-1 items-center gap-12 py-16 md:grid-cols-[1fr,auto] md:gap-16 lg:gap-20 lg:py-20'>
         {/* ---- Left column: Copy + CTA ---- */}
         <div>
           <h1
@@ -81,7 +81,7 @@ export function RedesignedHero() {
         </div>
 
         {/* ---- Right column: Profile mockup ---- */}
-        <div className='relative hidden lg:flex lg:flex-col lg:items-center'>
+        <div className='relative hidden md:flex md:flex-col md:items-center'>
           <HeroProfileMockup />
         </div>
       </div>
