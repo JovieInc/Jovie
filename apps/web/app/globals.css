@@ -542,17 +542,17 @@ body {
 
   /* Linear Spacing System - generous vertical rhythm */
   .section-spacing-linear {
-    padding-top: var(--linear-section-py-sm); /* 80px mobile */
-    padding-bottom: var(--linear-section-py-sm);
+    padding-top: var(--linear-section-pt-sm); /* 64px mobile */
+    padding-bottom: var(--linear-section-pb-sm); /* 80px */
 
     @media (min-width: 768px) {
-      padding-top: var(--linear-section-py-md); /* 120px tablet */
-      padding-bottom: var(--linear-section-py-md);
+      padding-top: var(--linear-section-pt-md); /* 80px tablet */
+      padding-bottom: var(--linear-section-pb-md); /* 96px */
     }
 
     @media (min-width: 1024px) {
-      padding-top: var(--linear-section-py-lg); /* 160px desktop */
-      padding-bottom: var(--linear-section-py-lg);
+      padding-top: var(--linear-section-pt-lg); /* 96px desktop */
+      padding-bottom: var(--linear-section-pb-lg); /* 128px */
     }
   }
 
