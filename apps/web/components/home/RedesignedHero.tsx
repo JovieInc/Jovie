@@ -301,85 +301,9 @@ function HeroProfileMockup() {
             Music Artist
           </span>
 
-          {/* Latest release card */}
-          <div
-            className='mt-7 flex w-full items-center gap-3.5'
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.025)',
-              border: '1px solid rgba(255,255,255,0.05)',
-              borderRadius: '14px',
-              padding: '14px',
-            }}
-          >
-            {/* Album art */}
-            <div
-              className='shrink-0 overflow-hidden rounded-[10px]'
-              style={{
-                width: 56,
-                height: 56,
-                background:
-                  'linear-gradient(145deg, #1a1f3d 0%, #2a1a2e 50%, #1f2d2a 100%)',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-              }}
-            >
-              <div
-                className='flex h-full w-full items-center justify-center'
-                style={{
-                  fontSize: '8px',
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.2)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase' as const,
-                }}
-              >
-                NSAW
-              </div>
-            </div>
-            <div className='flex min-w-0 flex-1 flex-col gap-0.5'>
-              <span
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: 'rgba(247,248,248,0.9)',
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                Never Say A Word
-              </span>
-              <span
-                style={{
-                  fontSize: '12px',
-                  color: 'rgba(255,255,255,0.28)',
-                }}
-              >
-                Single · 2024
-              </span>
-            </div>
-            {/* Play icon */}
-            <div
-              className='flex shrink-0 items-center justify-center rounded-full'
-              style={{
-                width: 36,
-                height: 36,
-                backgroundColor: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
-              <svg
-                aria-hidden='true'
-                width='12'
-                height='12'
-                viewBox='0 0 12 12'
-                fill='rgba(255,255,255,0.65)'
-              >
-                <path d='M3 1.5v9l7.5-4.5L3 1.5z' />
-              </svg>
-            </div>
-          </div>
-
           {/* CTA button */}
           <div
-            className='mt-3.5 flex w-full items-center justify-center rounded-full'
+            className='mt-7 flex w-full items-center justify-center rounded-full'
             style={{
               height: 44,
               fontSize: '13px',

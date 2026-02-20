@@ -1,9 +1,3 @@
-const releases = [
-  { title: 'Midnight Drive', type: 'Single', color: '#6366f1' },
-  { title: 'Echoes', type: 'EP', color: '#f59e0b' },
-  { title: 'Into the Blue', type: 'Single', color: '#10b981' },
-];
-
 export function MobileProfilePreview() {
   return (
     <div className='flex h-full flex-col px-5 pb-6 pt-10'>
@@ -30,36 +24,6 @@ export function MobileProfilePreview() {
         >
           Indie / Alternative
         </p>
-      </div>
-
-      {/* Release rows */}
-      <div className='flex flex-col gap-2'>
-        {releases.map(release => (
-          <div
-            key={release.title}
-            className='flex items-center gap-3 rounded-lg px-3 py-2'
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}
-          >
-            <div
-              className='h-9 w-9 shrink-0 rounded'
-              style={{ backgroundColor: release.color }}
-            />
-            <div className='min-w-0'>
-              <p
-                className='truncate text-xs font-medium'
-                style={{ color: 'rgb(247, 248, 248)' }}
-              >
-                {release.title}
-              </p>
-              <p
-                className='text-[10px]'
-                style={{ color: 'rgba(255, 255, 255, 0.4)' }}
-              >
-                {release.type}
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* CTA */}
