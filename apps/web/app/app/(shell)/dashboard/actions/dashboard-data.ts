@@ -40,22 +40,37 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 
 const { logger } = Sentry;
 
+type BatchQuery<T> = BatchItem<'pg'> & { execute: () => Promise<T> };
+type BatchQueryList<T extends readonly unknown[]> = {
+  [K in keyof T]: BatchQuery<T[K]>;
+};
+
 /**
- * Executes a query with RLS session setup using Drizzle's batch API.
- * This ensures session variables are set on the same connection as the query execution.
+ * Executes query/queries with RLS session setup using Drizzle's batch API.
+ * This ensures session variables are set on the same connection as execution.
  *
  * With the Neon HTTP driver, each db.execute() can hit a different connection.
- * By using db.batch(), we guarantee that the session setup and the actual query
+ * By using db.batch(), we guarantee that the session setup and the actual queries
  * execute on the same connection, ensuring RLS policies work correctly.
  *
  * @param clerkUserId - The Clerk user ID for session setup
- * @param queryFn - Function that returns the Drizzle query builder (not executed yet)
+ * @param queryFn - Function that returns the Drizzle query builder(s) (not executed yet)
  * @param context - Description for error messages (used for timeout wrapper)
  * @returns The query result with timeout wrapper
  */
 async function executeWithSession<T>(
   clerkUserId: string,
-  queryFn: () => { execute: () => Promise<T> },
+  queryFn: () => BatchQuery<T>,
+  context?: string
+): Promise<T>;
+async function executeWithSession<T extends readonly unknown[]>(
+  clerkUserId: string,
+  queryFn: () => BatchQueryList<T>,
+  context?: string
+): Promise<T>;
+async function executeWithSession<T>(
+  clerkUserId: string,
+  queryFn: () => BatchQuery<T> | BatchQueryList<readonly unknown[]>,
   context?: string
 ): Promise<T> {
   validateClerkUserId(clerkUserId);
@@ -66,11 +81,15 @@ async function executeWithSession<T>(
   // Batch the session setup with the query to ensure they run on the same connection.
   // The batch API executes all statements as an implicit transaction.
   return dashboardQuery(async () => {
-    const [_sessionResult, queryResult] = await db.batch([
+    const queries = Array.isArray(query) ? query : [query];
+    const [_sessionResult, ...queryResults] = await db.batch([
       db.execute(sessionSql),
-      query as unknown as BatchItem<'pg'>,
+      ...queries,
     ]);
-    return queryResult as T;
+    if (Array.isArray(query)) {
+      return queryResults as T;
+    }
+    return queryResults[0] as T;
   }, context ?? 'Query with session');
 }
 
@@ -270,59 +289,55 @@ async function fetchDashboardCoreWithSession(
       // Both queries share the same RLS session context set by executeWithSession.
       executeWithSession(
         clerkUserId,
-        () => ({
-          execute: async () => {
-            const [activeLinks, activeMusicLinks] = await Promise.all([
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active')
-                  )
+        () => [
+          db
+            .select({ id: socialLinks.id })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.state, 'active')
+              )
+            )
+            .limit(1),
+          db
+            .select({ id: socialLinks.id })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.state, 'active'),
+                or(
+                  eq(socialLinks.platformType, 'dsp'),
+                  eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
                 )
-                .limit(1),
-              db
-                .select({ id: socialLinks.id })
-                .from(socialLinks)
-                .where(
-                  and(
-                    eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    or(
-                      eq(socialLinks.platformType, 'dsp'),
-                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                    )
-                  )
-                )
-                .limit(1),
-            ]);
-
-            return {
-              hasLinks: activeLinks.length > 0,
-              hasMusicLinks: activeMusicLinks.length > 0,
-            };
-          },
-        }),
+              )
+            )
+            .limit(1),
+        ],
         'Social links existence query'
-      ).catch((error: unknown) => {
-        const migrationResult = handleMigrationErrors(error, {
-          userId: userData.id,
-          operation: 'social_links_count',
-        });
+      )
+        .then(([activeLinks, activeMusicLinks]) => ({
+          hasLinks: activeLinks.length > 0,
+          hasMusicLinks: activeMusicLinks.length > 0,
+        }))
+        .catch((error: unknown) => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'social_links_count',
+          });
 
-        if (!migrationResult.shouldRetry) {
-          return { hasLinks: false, hasMusicLinks: false };
-        }
-        Sentry.captureException(error, {
-          tags: {
-            query: 'social_links_existence',
-            context: 'dashboard_data',
-          },
-        });
-        throw error;
-      }),
+          if (!migrationResult.shouldRetry) {
+            return { hasLinks: false, hasMusicLinks: false };
+          }
+          Sentry.captureException(error, {
+            tags: {
+              query: 'social_links_existence',
+              context: 'dashboard_data',
+            },
+          });
+          throw error;
+        }),
       // Tipping stats now run in parallel with settings and link counts,
       // eliminating the previous waterfall where they waited for chrome data
       fetchTippingStatsWithSession(selected.id, clerkUserId),
