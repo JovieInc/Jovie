@@ -65,6 +65,9 @@ jobs:
   playwright-visual:
     name: Playwright Visual Regression
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip on forks — secrets (DATABASE_URL) are not available
+    if: ${{ github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - name: Checkout
