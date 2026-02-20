@@ -8,6 +8,11 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   useUserSafe: () => mockUseUser(),
 }));
 
+// Mock analytics
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 // Mock next/link
 vi.mock('next/link', () => ({
   default: ({
@@ -55,17 +60,17 @@ describe('ClaimBanner', () => {
       expect(screen.getByText('Claim Profile')).toBeInTheDocument();
     });
 
-    it('displays profile handle when no display name provided', () => {
+    it('displays banner text regardless of display name', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       expect(
-        screen.getByText('Your profile? Claim testartist')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
 
-    it('displays display name when provided', () => {
+    it('displays banner text when display name is provided', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(
@@ -73,7 +78,7 @@ describe('ClaimBanner', () => {
       );
 
       expect(
-        screen.getByText('Your profile? Claim Test Artist Display')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
 
@@ -82,10 +87,8 @@ describe('ClaimBanner', () => {
 
       render(<ClaimBanner {...defaultProps} displayName='Test Artist' />);
 
-      const banner = screen.getByRole('banner', {
-        name: 'Claim profile banner',
-      });
-      expect(banner).toHaveAttribute('aria-label', 'Claim profile banner');
+      const banner = screen.getByRole('banner');
+      expect(banner).toBeInTheDocument();
 
       const cta = screen.getByTestId('claim-banner-cta');
       expect(cta).toHaveAttribute(
@@ -150,18 +153,13 @@ describe('ClaimBanner', () => {
   });
 
   describe('responsive behavior', () => {
-    it('renders mobile-friendly text', () => {
+    it('renders a single copy text visible at all breakpoints', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
-      // Mobile text
       expect(
-        screen.getByText('Your profile? Claim testartist')
-      ).toBeInTheDocument();
-      // Desktop text
-      expect(
-        screen.getByText('Is this your profile? Claim testartist')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
   });

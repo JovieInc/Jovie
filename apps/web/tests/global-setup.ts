@@ -1,6 +1,7 @@
 import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
+import { APP_ROUTES } from '../constants/routes';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables in priority order (first-loaded wins with override: false)
@@ -132,7 +133,12 @@ async function globalSetup() {
   // This pre-compiles /signin and /app so auth.setup.ts doesn't timeout waiting
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
   console.log('🔥 Warming up Turbopack routes...');
-  const warmupRoutes = ['/signin', '/app/dashboard/profile'];
+  const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+  const warmupRoutes = [
+    '/signin',
+    APP_ROUTES.DASHBOARD_PROFILE,
+    `/${testProfile}`,
+  ];
   await Promise.all(
     warmupRoutes.map(async route => {
       try {

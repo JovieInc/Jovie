@@ -29,11 +29,9 @@ import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
 import { LabelLogosBar } from '@/components/home/LabelLogosBar';
-import { ProblemSection } from '@/components/home/ProblemSection';
-import { ProfileMockup } from '@/components/home/ProfileMockup';
+import { ProductShowcase } from '@/components/home/ProductShowcase';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
-import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
@@ -45,10 +43,8 @@ import {
   homepageHero,
   homepageHowItWorks,
   homepageLabelLogos,
-  homepageProblem,
   homepageProductPreview,
   homepageSeeItInAction,
-  homepageWhatYouGet,
 } from '@/lib/flags/homepage';
 
 // Flags read cookies for toolbar overrides, making this page dynamic.
@@ -264,9 +260,7 @@ export default async function HomePage() {
     showProductPreview,
     showExampleProfiles,
     showDeeplinksGrid,
-    showProblem,
     showComparison,
-    showWhatYouGet,
     showSeeItInAction,
     showFinalCta,
   ] = await Promise.all([
@@ -277,9 +271,7 @@ export default async function HomePage() {
     homepageProductPreview(),
     homepageExampleProfiles(),
     homepageDeeplinksGrid(),
-    homepageProblem(),
     homepageComparison(),
-    homepageWhatYouGet(),
     homepageSeeItInAction(),
     homepageFinalCta(),
   ]);
@@ -331,7 +323,7 @@ export default async function HomePage() {
 
       {showProductPreview && (
         <DeferredSection placeholderHeight={640}>
-          <ProfileMockup />
+          <ProductShowcase />
         </DeferredSection>
       )}
 
@@ -347,17 +339,9 @@ export default async function HomePage() {
         </DeferredSection>
       )}
 
-      {showProblem && <ProblemSection />}
-
       {showComparison && (
         <DeferredSection placeholderHeight={480}>
           <ComparisonSection />
-        </DeferredSection>
-      )}
-
-      {showWhatYouGet && (
-        <DeferredSection placeholderHeight={560}>
-          <WhatYouGetSection />
         </DeferredSection>
       )}
 
