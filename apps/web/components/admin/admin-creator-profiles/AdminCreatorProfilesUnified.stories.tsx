@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { TablePanelProvider } from '@/contexts/TablePanelContext';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 
@@ -164,9 +165,11 @@ const meta: Meta<typeof AdminCreatorProfilesUnified> = {
   tags: ['autodocs', 'creators-a11y'],
   decorators: [
     Story => (
-      <div className='h-[800px] bg-base text-primary-token'>
-        <Story />
-      </div>
+      <TablePanelProvider>
+        <div className='h-[800px] bg-base text-primary-token'>
+          <Story />
+        </div>
+      </TablePanelProvider>
     ),
   ],
 };

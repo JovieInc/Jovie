@@ -82,13 +82,13 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     creatorProfileId: 'creator_profile_id',
     sentAt: 'sent_at',
     status: 'status',
+    meta: 'meta',
   },
   creatorProfiles: {
     id: 'id',
     username: 'username',
     displayName: 'display_name',
     avatarUrl: 'avatar_url',
-    claimToken: 'claim_token',
     isClaimed: 'is_claimed',
   },
 }));
@@ -191,7 +191,7 @@ function _createMockClaimInviteData(overrides: Record<string, unknown> = {}) {
       username: 'artist',
       displayName: 'The Artist',
       avatarUrl: null,
-      claimToken: 'token-abc',
+      meta: { claimToken: 'token-abc' },
     },
     ...overrides,
   };
@@ -225,7 +225,7 @@ function setupProcessingMocks(options: {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
-    claimToken: string | null;
+    meta: { claimToken?: string } | null;
   }>;
   emailSuppressionRows?: Array<{ emailHash: string; reason: string }>;
 }) {
@@ -243,7 +243,7 @@ function setupProcessingMocks(options: {
       username: 'artist',
       displayName: 'The Artist',
       avatarUrl: null,
-      claimToken: 'token-abc',
+      meta: { claimToken: 'token-abc' },
     },
   ];
   const emailSuppressionRows = options.emailSuppressionRows ?? [];
@@ -389,7 +389,7 @@ describe('email/campaigns/processor.ts', () => {
           username: 'a',
           displayName: 'A',
           avatarUrl: null,
-          claimToken: 'tok-1',
+          meta: { claimToken: 'tok-1' },
         },
         {
           inviteId: 'inv-2',
@@ -400,7 +400,7 @@ describe('email/campaigns/processor.ts', () => {
           username: 'b',
           displayName: 'B',
           avatarUrl: null,
-          claimToken: 'tok-2',
+          meta: { claimToken: 'tok-2' },
         },
       ];
 

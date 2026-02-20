@@ -7,9 +7,7 @@ import { Container } from '@/components/site/Container';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
-// Root layout handles dynamic rendering
 export const revalidate = 3600; // Revalidate every hour
-export const dynamic = 'force-dynamic';
 
 export default async function ArtistsPage() {
   let profiles: Array<{

@@ -346,7 +346,10 @@ export const creatorClaimInvites = pgTable(
     body: text('body'),
     aiVariantId: text('ai_variant_id'),
     meta: jsonb('meta')
-      .$type<{ source?: 'admin_click' | 'bulk' | 'auto' }>()
+      .$type<{
+        source?: 'admin_click' | 'bulk' | 'auto';
+        claimToken?: string;
+      }>()
       .default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

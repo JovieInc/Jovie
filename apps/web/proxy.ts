@@ -13,6 +13,10 @@ import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
@@ -487,6 +491,23 @@ function buildFinalResponse(
         );
       }
     }
+  }
+
+  const countryCode = req.headers.get('x-vercel-ip-country');
+  const requiresCookieConsent = isCookieBannerRequired(countryCode);
+  const currentCookieRequirement = req.cookies.get(
+    COOKIE_BANNER_REQUIRED_COOKIE
+  )?.value;
+  const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
+
+  if (currentCookieRequirement !== nextCookieRequirement) {
+    res.cookies.set(COOKIE_BANNER_REQUIRED_COOKIE, nextCookieRequirement, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    });
   }
 
   // Set audience tracking cookies
