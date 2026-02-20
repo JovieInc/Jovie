@@ -1,3 +1,4 @@
+import { getFeaturedCreators } from '@/lib/featured-creators';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
@@ -6,7 +7,14 @@ import { PhoneFrame } from './PhoneFrame';
  * RedesignedHero — F-layout hero: copy left, profile mockup right.
  * Linear.app-inspired: floating card with browser chrome, deep shadows, slight 3D tilt.
  */
-export function RedesignedHero() {
+export async function RedesignedHero() {
+  const creators = await getFeaturedCreators();
+  const featuredCreator = creators[0];
+
+  if (!featuredCreator) {
+    return null;
+  }
+
   return (
     <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 sm:px-6 lg:px-[77px]'>
       {/* Ambient glow */}
@@ -17,7 +25,6 @@ export function RedesignedHero() {
       />
 
       <div className='relative grid w-full grid-cols-1 items-center gap-12 py-16 md:grid-cols-[1fr_auto] md:gap-16 lg:gap-20 lg:py-20'>
-        {/* ---- Left column: Copy + CTA ---- */}
         <div>
           <h1
             style={{
@@ -80,23 +87,21 @@ export function RedesignedHero() {
           </p>
         </div>
 
-        {/* ---- Right column: Profile mockup ---- */}
         <div className='relative hidden md:flex md:flex-col md:items-center'>
-          <HeroProfileMockup />
+          <HeroProfileMockup creator={featuredCreator} />
         </div>
       </div>
     </section>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Linear.app-style floating profile card                             */
-/* ------------------------------------------------------------------ */
-
-function HeroProfileMockup() {
+function HeroProfileMockup({
+  creator,
+}: {
+  readonly creator: Awaited<ReturnType<typeof getFeaturedCreators>>[number];
+}) {
   return (
     <div className='flex flex-col items-center'>
-      {/* Ambient glow behind card */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute -inset-20'
@@ -106,7 +111,6 @@ function HeroProfileMockup() {
         }}
       />
 
-      {/* Cropped viewport — top 2/3 with bottom fade */}
       <div
         className='relative overflow-hidden'
         style={{
@@ -116,7 +120,6 @@ function HeroProfileMockup() {
           perspectiveOrigin: '50% 40%',
         }}
       >
-        {/* The phone, slightly tilted like Linear's product shots */}
         <div
           style={{
             transform: 'rotateY(-3deg) rotateX(1deg)',
@@ -124,11 +127,10 @@ function HeroProfileMockup() {
           }}
         >
           <PhoneFrame>
-            <MobileProfilePreview />
+            <MobileProfilePreview creator={creator} />
           </PhoneFrame>
         </div>
 
-        {/* Bottom fade — crops into page background */}
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 bottom-0'
@@ -140,18 +142,25 @@ function HeroProfileMockup() {
         />
       </div>
 
-      {/* URL label */}
-      <p
-        className='mt-3'
+      <div
+        className='mt-3 rounded-full border px-3 py-1.5'
         style={{
-          fontSize: '13px',
-          fontWeight: 450,
-          letterSpacing: '-0.005em',
-          color: 'var(--linear-text-tertiary)',
+          borderColor: 'var(--linear-border-subtle)',
+          background: 'rgba(255, 255, 255, 0.02)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
         }}
       >
-        jov.ie
-      </p>
+        <p
+          style={{
+            fontSize: '12px',
+            fontWeight: 500,
+            letterSpacing: '-0.005em',
+            color: 'var(--linear-text-secondary)',
+          }}
+        >
+          jov.ie/{creator.handle}
+        </p>
+      </div>
     </div>
   );
 }

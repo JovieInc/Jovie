@@ -10,6 +10,9 @@ export type FeaturedCreator = {
   handle: string;
   name: string;
   src: string;
+  genres: string[];
+  latestReleaseTitle: string | null;
+  latestReleaseType: string | null;
 };
 
 /**
@@ -74,6 +77,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
           creatorType: creatorProfiles.creatorType,
+          genres: creatorProfiles.genres,
         })
         .from(creatorProfiles)
         .where(
@@ -93,21 +97,61 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
       ),
     ]);
 
+    const creatorIds = data.map(creator => creator.id);
+    const releaseByCreatorId = new Map<
+      string,
+      { title: string; type: string | null }
+    >();
+
+    if (creatorIds.length > 0 && (await doesTableExist('discog_releases'))) {
+      const latestReleases = await db.query.discogReleases.findMany({
+        where: (releases, { inArray }) =>
+          inArray(releases.creatorProfileId, creatorIds),
+        columns: {
+          creatorProfileId: true,
+          title: true,
+          releaseType: true,
+          releaseDate: true,
+          createdAt: true,
+        },
+        orderBy: (releases, { desc }) => [
+          desc(releases.releaseDate),
+          desc(releases.createdAt),
+        ],
+      });
+
+      for (const release of latestReleases) {
+        if (!releaseByCreatorId.has(release.creatorProfileId)) {
+          releaseByCreatorId.set(release.creatorProfileId, {
+            title: release.title,
+            type: release.releaseType,
+          });
+        }
+      }
+    }
+
     const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
     return shuffle(
-      data.map(a => ({
-        id: a.id,
-        handle: a.username,
-        name: a.displayName || a.username,
-        src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
-          width: 256,
-          height: 256,
-          quality: 70,
-          format: 'webp',
-          crop: 'fill',
-          gravity: 'face',
-        }),
-      })),
+      data.map(a => {
+        const latestRelease = releaseByCreatorId.get(a.id);
+
+        return {
+          id: a.id,
+          handle: a.username,
+          name: a.displayName || a.username,
+          src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
+            width: 256,
+            height: 256,
+            quality: 70,
+            format: 'webp',
+            crop: 'fill',
+            gravity: 'face',
+          }),
+          genres: a.genres?.slice(0, 2) ?? [],
+          latestReleaseTitle: latestRelease?.title ?? null,
+          latestReleaseType: latestRelease?.type ?? null,
+        };
+      }),
       seed
     );
   } catch (error) {
