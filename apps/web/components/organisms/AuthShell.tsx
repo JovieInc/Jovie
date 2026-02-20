@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
@@ -81,6 +82,11 @@ function AuthShellInner({
             )}
           >
             <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
+              {!isInSettings && section !== 'admin' && (
+                <div className='px-4 pt-4 sm:px-6 sm:pt-6'>
+                  <ProfileCompletionCard />
+                </div>
+              )}
               {children}
             </div>
             {tablePanel}
@@ -93,6 +99,9 @@ function AuthShellInner({
                 showMobileTabs && 'pb-20 lg:pb-6'
               )}
             >
+              {!isInSettings && section !== 'admin' && (
+                <ProfileCompletionCard />
+              )}
               {children}
             </div>
             {previewPanel}
