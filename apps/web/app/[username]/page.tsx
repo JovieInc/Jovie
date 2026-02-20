@@ -622,10 +622,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       locale: 'en_US',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          width: profile.avatar_url ? 400 : 1200,
-          height: profile.avatar_url ? 400 : 630,
-          alt: `${artistName} profile picture`,
+          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          width: 1200,
+          height: 630,
+          alt: `${artistName} profile card`,
         },
       ],
     },
@@ -637,8 +637,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       site: '@jovieapp',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          alt: `${artistName} profile picture`,
+          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          alt: `${artistName} profile card`,
         },
       ],
     },
