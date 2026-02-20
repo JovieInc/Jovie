@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { getSessionErrorResponse } from '../session-error-response';
 
 export const runtime = 'nodejs';
 
@@ -60,19 +61,18 @@ export async function GET(req: Request) {
   } catch (error) {
     logger.error('Error listing conversations:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to list conversations', error, {
-        route: '/api/chat/conversations',
-        method: 'GET',
-      });
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_STORE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+    await captureError('Failed to list conversations', error, {
+      route: '/api/chat/conversations',
+      method: 'GET',
+    });
 
     return NextResponse.json(
       { error: 'Failed to list conversations' },
@@ -159,19 +159,18 @@ export async function POST(req: Request) {
   } catch (error) {
     logger.error('Error creating conversation:', error);
 
-    if (!(error instanceof TypeError && error.message === 'User not found')) {
-      await captureError('Failed to create conversation', error, {
-        route: '/api/chat/conversations',
-        method: 'POST',
-      });
+    const sessionErrorResponse = getSessionErrorResponse(
+      error,
+      NO_STORE_HEADERS
+    );
+    if (sessionErrorResponse) {
+      return sessionErrorResponse;
     }
 
-    if (error instanceof TypeError && error.message === 'User not found') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+    await captureError('Failed to create conversation', error, {
+      route: '/api/chat/conversations',
+      method: 'POST',
+    });
 
     return NextResponse.json(
       { error: 'Failed to create conversation' },
