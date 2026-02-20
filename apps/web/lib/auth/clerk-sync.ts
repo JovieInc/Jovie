@@ -213,9 +213,13 @@ export async function handleClerkUserDeleted(
       .limit(1);
 
     if (!dbUser) {
-      captureWarning('User not found in DB for Clerk deletion', {
-        clerkUserId,
-      });
+      await captureWarning(
+        'User not found in DB for Clerk deletion',
+        undefined,
+        {
+          clerkUserId,
+        }
+      );
       return { success: true }; // Already doesn't exist
     }
 
