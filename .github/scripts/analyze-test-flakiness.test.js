@@ -38,6 +38,22 @@ test('extractTestExecutions falls back to job-level outcome when no test steps e
   ]);
 });
 
+test('extractTestExecutions returns empty when test steps exist but are skipped/cancelled', () => {
+  const job = {
+    name: 'Unit Tests',
+    conclusion: 'failure',
+    steps: [
+      { name: 'Checkout', conclusion: 'success' },
+      { name: 'Install deps', conclusion: 'failure' },
+      { name: 'Run unit tests', conclusion: 'skipped' },
+      { name: 'Run quarantined unit tests (retries)', conclusion: 'cancelled' },
+    ],
+  };
+
+  // Test steps exist but were skipped — should NOT fall back to job-level failure
+  assert.deepEqual(extractTestExecutions(job), []);
+});
+
 test('calculateMetrics flags only tests above thresholds', () => {
   const testStats = new Map([
     [

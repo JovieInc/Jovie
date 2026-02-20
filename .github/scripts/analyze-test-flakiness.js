@@ -190,19 +190,26 @@ async function analyzeFlakiness(token, owner, repo) {
 function extractTestExecutions(job) {
   const runStepRegex = /^run .*tests?/i;
 
-  const runSteps = (job.steps || []).filter(
-    step =>
-      runStepRegex.test(step.name || '') &&
-      ['success', 'failure'].includes(step.conclusion)
+  // First, check if any test steps exist at all (regardless of conclusion)
+  const allTestSteps = (job.steps || []).filter(step =>
+    runStepRegex.test(step.name || '')
   );
 
-  if (runSteps.length > 0) {
-    return runSteps.map(step => ({
+  // If test steps exist, only report those that actually completed (success/failure).
+  // Skipped/cancelled test steps mean the job failed before tests ran (e.g. setup failure)
+  // — do NOT fall back to job-level conclusion in that case.
+  if (allTestSteps.length > 0) {
+    const completedSteps = allTestSteps.filter(step =>
+      ['success', 'failure'].includes(step.conclusion)
+    );
+
+    return completedSteps.map(step => ({
       name: `${job.name} › ${step.name}`,
       conclusion: step.conclusion,
     }));
   }
 
+  // Only fall back to job-level conclusion when there are genuinely no test steps
   if (['success', 'failure'].includes(job.conclusion)) {
     return [{ name: job.name, conclusion: job.conclusion }];
   }
