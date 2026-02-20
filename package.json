@@ -17,6 +17,7 @@
       "parse5": "7.1.2",
       "jws": "4.0.1",
       "path-to-regexp": ">=8.0.0",
+      "express>path-to-regexp": "0.1.12",
       "esbuild": ">=0.25.0",
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.3",
