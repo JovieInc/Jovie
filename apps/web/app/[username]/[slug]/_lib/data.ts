@@ -100,7 +100,7 @@ export const getCreatorByUsername = cache(
         tags: [
           'smartlink-creator',
           `smartlink-creator:${usernameNormalized}`,
-          `public-profile:${usernameNormalized}`,
+          `profile:${usernameNormalized}`,
         ],
         revalidate: 3600,
       }

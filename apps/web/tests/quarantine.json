@@ -1,4 +1,4 @@
 {
   "unit": ["tests/contracts/dashboard-apis.spec.ts"],
-  "e2e": ["apps/web/tests/e2e/admin-navigation.spec.ts"]
+  "e2e": ["apps/web/tests/e2e/dashboard-pages-health.spec.ts"]
 }

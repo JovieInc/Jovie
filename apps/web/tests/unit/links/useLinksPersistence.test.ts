@@ -458,8 +458,8 @@ describe('useLinksPersistence', () => {
       // Fetch not called yet (debounced)
       expect(mockFetch).not.toHaveBeenCalled();
 
-      act(() => {
-        result.current.debouncedSave.flush();
+      await act(async () => {
+        await result.current.debouncedSave.flush();
       });
 
       await waitFor(() => {

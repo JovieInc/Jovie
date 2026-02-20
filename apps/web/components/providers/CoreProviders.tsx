@@ -138,6 +138,17 @@ function CoreProvidersInner({
           leading: true,
           trailing: true,
         },
+        rateLimiter: {
+          limit: PACER_TIMING.DEFAULT_RATE_LIMIT,
+          window: PACER_TIMING.RATE_LIMIT_WINDOW_MS,
+          windowType: 'sliding',
+        },
+        queuer: {
+          wait: PACER_TIMING.QUEUE_WAIT_MS,
+        },
+        batcher: {
+          wait: PACER_TIMING.BATCH_WAIT_MS,
+        },
       }}
     >
       <ThemeProvider

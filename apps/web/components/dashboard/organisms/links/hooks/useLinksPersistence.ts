@@ -14,7 +14,7 @@ import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/soci
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
-import { useAsyncDebouncer } from '@/lib/pacer';
+import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
@@ -271,39 +271,6 @@ async function runSaveLoop(
 }
 
 /**
- * Create a debounced save function with cancel and flush methods
- */
-function createDebouncedSave(
-  asyncDebouncer: {
-    maybeExecute: (input: LinkItem[]) => void;
-    cancel: () => void;
-  },
-  lastInputRef: React.MutableRefObject<LinkItem[] | null>,
-  enqueueSave: (input: LinkItem[]) => void
-): { (input: LinkItem[]): void; flush: () => void; cancel: () => void } {
-  const fn = (input: LinkItem[]) => {
-    lastInputRef.current = input;
-    asyncDebouncer.maybeExecute(input);
-  };
-
-  fn.cancel = () => {
-    asyncDebouncer.cancel();
-    lastInputRef.current = null;
-  };
-
-  fn.flush = () => {
-    const pending = lastInputRef.current;
-    if (pending) {
-      asyncDebouncer.cancel();
-      lastInputRef.current = null;
-      enqueueSave(pending);
-    }
-  };
-
-  return fn;
-}
-
-/**
  * Options for the useLinksPersistence hook
  */
 export interface UseLinksPersistenceOptions {
@@ -342,7 +309,7 @@ export interface UseLinksPersistenceReturn {
   /** Debounced save function */
   debouncedSave: {
     (input: LinkItem[]): void;
-    flush: () => void;
+    flush: () => Promise<void>;
     cancel: () => void;
   };
   /** Immediately persist links */
@@ -518,30 +485,49 @@ export function useLinksPersistence({
     [persistLinks]
   );
 
-  // Ref to track the last input for flush functionality
   const lastInputRef = useRef<LinkItem[] | null>(null);
 
-  // TanStack Pacer async debouncer for save operations
-  const asyncDebouncer = useAsyncDebouncer(
-    async (input: LinkItem[]) => {
+  const { save: scheduleSave, cancel: cancelPendingSave } = useAutoSave<
+    LinkItem[]
+  >({
+    saveFn: async input => {
       lastInputRef.current = null;
       enqueueSave(input);
     },
-    { wait: debounceMs }
-  );
+    wait: debounceMs,
+    maxRetries: 1,
+  });
 
   // Debounced save function with cancel and flush methods
   const debouncedSave = useMemo(
-    () => createDebouncedSave(asyncDebouncer, lastInputRef, enqueueSave),
-    [asyncDebouncer, enqueueSave]
+    () =>
+      Object.assign(
+        (input: LinkItem[]) => {
+          lastInputRef.current = input;
+          scheduleSave(input);
+        },
+        {
+          flush: async () => {
+            const pending = lastInputRef.current;
+            if (!pending) return;
+            cancelPendingSave();
+            lastInputRef.current = null;
+            enqueueSave(pending);
+          },
+          cancel: () => {
+            cancelPendingSave();
+          },
+        }
+      ),
+    [scheduleSave, cancelPendingSave, enqueueSave]
   );
 
   // Cancel pending saves when profileId changes
   useEffect(() => {
     return () => {
-      asyncDebouncer.cancel();
+      cancelPendingSave();
     };
-  }, [asyncDebouncer]);
+  }, [cancelPendingSave, profileId]);
 
   // Flush pending saves on unmount
   useEffect(() => {

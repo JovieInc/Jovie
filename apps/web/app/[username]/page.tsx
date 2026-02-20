@@ -309,7 +309,7 @@ const getCachedProfileAndLinks = async (username: string) => {
       },
       [`public-profile-${username}`],
       {
-        tags: ['public-profile', `public-profile:${username}`],
+        tags: ['profiles-all', `profile:${username}`],
         revalidate: 3600, // 1 hour
       }
     )();
