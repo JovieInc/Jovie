@@ -18,6 +18,7 @@ import {
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   ProfileData,
@@ -603,13 +604,15 @@ export async function isClaimTokenValid(
   username: string,
   claimToken: string
 ): Promise<boolean> {
+  const claimTokenHash = hashClaimToken(claimToken);
+
   const [row] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
-        eq(creatorProfiles.claimToken, claimToken),
+        eq(creatorProfiles.claimToken, claimTokenHash),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )
@@ -629,12 +632,14 @@ export async function isClaimTokenValid(
 export async function lookupUsernameByClaimToken(
   claimToken: string
 ): Promise<string | null> {
+  const claimTokenHash = hashClaimToken(claimToken);
+
   const [row] = await db
     .select({ username: creatorProfiles.username })
     .from(creatorProfiles)
     .where(
       and(
-        eq(creatorProfiles.claimToken, claimToken),
+        eq(creatorProfiles.claimToken, claimTokenHash),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )

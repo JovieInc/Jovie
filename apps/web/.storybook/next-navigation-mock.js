@@ -25,3 +25,8 @@ export const useRouter = () => ({
 export const usePathname = () => '/test';
 export const useSearchParams = () => new URLSearchParams();
 export const useParams = () => ({});
+export function redirect() {}
+export function permanentRedirect() {}
+export function notFound() {
+  throw new Error('NEXT_NOT_FOUND');
+}
