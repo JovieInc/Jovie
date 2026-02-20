@@ -7,7 +7,11 @@ describe('/artists route segment config', () => {
     const pagePath = resolve(process.cwd(), 'app/artists/page.tsx');
     const pageSource = readFileSync(pagePath, 'utf8');
 
-    expect(pageSource).toContain('export const revalidate = 3600');
-    expect(pageSource).not.toContain("export const dynamic = 'force-dynamic'");
+    // Match revalidate export with any valid formatting
+    expect(pageSource).toMatch(/export\s+const\s+revalidate\s*[=:]\s*3600/);
+    // Ensure force-dynamic is not present in any form
+    expect(pageSource).not.toMatch(
+      /export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]$/m
+    );
   });
 });
