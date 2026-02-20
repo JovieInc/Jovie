@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useId } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -13,6 +13,7 @@ import { APP_ROUTES } from '@/constants/routes';
 export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
   const { selectedProfile, profileCompletion } = useDashboardData();
   const router = useRouter();
+  const gradientId = useId();
 
   const handleClick = useCallback(() => {
     const prompt = encodeURIComponent(
@@ -65,7 +66,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           cy='16'
           r={r}
           fill='none'
-          stroke='url(#progress-gradient)'
+          stroke={`url(#${gradientId})`}
           strokeWidth='3'
           strokeLinecap='round'
           strokeDasharray={circumference}
@@ -73,13 +74,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           className='transition-[stroke-dashoffset] duration-500'
         />
         <defs>
-          <linearGradient
-            id='progress-gradient'
-            x1='0%'
-            y1='0%'
-            x2='100%'
-            y2='100%'
-          >
+          <linearGradient id={gradientId} x1='0%' y1='0%' x2='100%' y2='100%'>
             <stop offset='0%' stopColor='var(--color-brand-400)' />
             <stop offset='100%' stopColor='var(--color-brand-500)' />
           </linearGradient>
