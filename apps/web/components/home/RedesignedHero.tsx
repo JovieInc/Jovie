@@ -1,7 +1,9 @@
+import { HeroProfileMockup } from './HeroProfileMockup';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 
 /**
- * RedesignedHero - Clean, left-aligned hero section
+ * RedesignedHero - Clean, left-aligned hero section with profile mockup.
+ * Two-column on desktop (text left, mockup right), stacked on mobile.
  * Supports both light and dark mode via --linear-* CSS custom properties.
  */
 export function RedesignedHero() {
@@ -16,72 +18,80 @@ export function RedesignedHero() {
         }}
       />
 
-      <div className='relative w-full'>
-        {/* H1 - Left-aligned headline */}
-        <h1
-          className='text-balance'
-          style={{
-            maxWidth: '640px',
-            fontSize: 'clamp(32px, calc(16px + 3.5vw), 56px)',
-            fontWeight: 500,
-            lineHeight: 1.1,
-            letterSpacing: '-0.025em',
-            color: 'var(--linear-text-primary)',
-            fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-            fontVariationSettings: '"opsz" 56',
-          }}
-        >
-          Your entire music career.
-          <br />
-          <span
+      <div className='relative w-full flex flex-col lg:flex-row lg:items-center lg:justify-between lg:gap-16'>
+        {/* Left column — text + CTA */}
+        <div className='flex-1 min-w-0'>
+          {/* H1 - Left-aligned headline */}
+          <h1
+            className='text-balance'
             style={{
-              background:
-                'linear-gradient(to right, var(--linear-hero-gradient-from), var(--linear-hero-gradient-to))',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              maxWidth: '640px',
+              fontSize: 'clamp(32px, calc(16px + 3.5vw), 56px)',
+              fontWeight: 500,
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              color: 'var(--linear-text-primary)',
+              fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
+              fontVariationSettings: '"opsz" 56',
             }}
           >
-            One intelligent link.
-          </span>
-        </h1>
+            Your entire music career.
+            <br />
+            <span
+              style={{
+                background:
+                  'linear-gradient(to right, var(--linear-hero-gradient-from), var(--linear-hero-gradient-to))',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              One intelligent link.
+            </span>
+          </h1>
 
-        {/* Subheading */}
-        <p
-          className='max-w-[460px] mt-6'
-          style={{
-            fontSize: '15px',
-            fontWeight: 400,
-            lineHeight: 1.65,
-            letterSpacing: '0.005em',
-            color: 'var(--linear-text-secondary)',
-          }}
-        >
-          Jovie builds your link-in-bio from Spotify in 30 seconds — with smart
-          links for every release, automatic email capture, and fan retargeting
-          built in.
-        </p>
+          {/* Subheading */}
+          <p
+            className='max-w-[460px] mt-6'
+            style={{
+              fontSize: '15px',
+              fontWeight: 400,
+              lineHeight: 1.65,
+              letterSpacing: '0.005em',
+              color: 'var(--linear-text-secondary)',
+            }}
+          >
+            Jovie builds your link-in-bio from Spotify in 30 seconds — with
+            smart links for every release, automatic email capture, and fan
+            retargeting built in.
+          </p>
 
-        {/* Spotify Search CTA */}
-        <div className='mt-10 max-w-[440px]'>
-          <HeroSpotifySearch />
+          {/* Spotify Search CTA */}
+          <div className='mt-10 max-w-[440px]'>
+            <HeroSpotifySearch />
+          </div>
+
+          {/* Trust line */}
+          <p
+            className='mt-5 flex items-center gap-2'
+            style={{
+              fontSize: '13px',
+              letterSpacing: '0.01em',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
+            <span
+              aria-hidden='true'
+              className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
+            />{' '}
+            Free forever. No credit card.
+          </p>
         </div>
 
-        {/* Trust line */}
-        <p
-          className='mt-5 flex items-center gap-2'
-          style={{
-            fontSize: '13px',
-            letterSpacing: '0.01em',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
-          <span
-            aria-hidden='true'
-            className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-          />{' '}
-          Free forever. No credit card.
-        </p>
+        {/* Right column — Profile mockup (hidden on small screens, visible lg+) */}
+        <div className='hidden lg:flex shrink-0' aria-hidden='true'>
+          <HeroProfileMockup />
+        </div>
       </div>
     </section>
   );
