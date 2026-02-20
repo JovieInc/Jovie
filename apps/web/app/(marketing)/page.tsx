@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
+import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
 
 const ComparisonSection = dynamic(
   () =>
@@ -35,6 +36,7 @@ import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
+  homepageAutomaticReleaseSmartlinks,
   homepageComparison,
   homepageDashboardShowcase,
   homepageDeeplinksGrid,
@@ -263,6 +265,7 @@ export default async function HomePage() {
     showComparison,
     showSeeItInAction,
     showFinalCta,
+    showAutomaticReleaseSmartlinks,
   ] = await Promise.all([
     homepageHero(),
     homepageLabelLogos(),
@@ -274,6 +277,7 @@ export default async function HomePage() {
     homepageComparison(),
     homepageSeeItInAction(),
     homepageFinalCta(),
+    homepageAutomaticReleaseSmartlinks(),
   ]);
 
   return (
@@ -348,6 +352,12 @@ export default async function HomePage() {
       {showSeeItInAction && (
         <DeferredSection placeholderHeight={520}>
           <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+        </DeferredSection>
+      )}
+
+      {showAutomaticReleaseSmartlinks && (
+        <DeferredSection placeholderHeight={560}>
+          <AutomaticReleaseSmartlinksSection />
         </DeferredSection>
       )}
 
