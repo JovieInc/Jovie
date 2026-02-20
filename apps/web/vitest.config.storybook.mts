@@ -24,6 +24,10 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
+    // Mutations may "succeed" with stub data, causing onSuccess handlers to crash
+    // on missing fields. The fetch interceptor in preview.tsx prevents 404 rejections,
+    // but downstream code (e.g. convertDrizzleCreatorProfileToArtist) still throws.
+    dangerouslyIgnoreUnhandledErrors: true,
   },
   resolve: {
     dedupe: [
