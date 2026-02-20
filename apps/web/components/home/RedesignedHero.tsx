@@ -81,7 +81,7 @@ export function RedesignedHero() {
         </div>
 
         {/* ---- Right column: Profile mockup ---- */}
-        <div className='relative hidden lg:block'>
+        <div className='relative hidden lg:flex lg:justify-end'>
           <HeroProfileMockup />
         </div>
       </div>
