@@ -451,7 +451,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
     # This is the only required status check in the branch ruleset.
-    needs: [ci-fast, ci-unit-tests, ci-a11y]
+    needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -461,6 +461,7 @@ jobs:
           echo "ci-fast: ${{ needs.ci-fast.result }}"
           echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
           echo "ci-a11y: ${{ needs.ci-a11y.result }}"
+          echo "ci-layout-guard: ${{ needs.ci-layout-guard.result }}"
 
           # ci-fast must succeed
           if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
@@ -480,7 +481,71 @@ jobs:
             exit 1
           fi
 
-          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, and a11y"
+          # ci-layout-guard must succeed (no overlapping/touching layout regressions)
+          if [[ "${{ needs.ci-layout-guard.result }}" != "success" ]]; then
+            echo "❌ ci-layout-guard failed — layout overlap/touching regressions detected"
+            exit 1
+          fi
+
+          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, a11y, and layout integrity"
+
+  ci-layout-guard:
+    name: Layout Guard (blocking)
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Build app (public routes only — no secrets needed)
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run layout overlap/touching guard
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          PORT=3100 pnpm --filter=@jovie/web exec next start &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          pnpm exec playwright test tests/e2e/layout-overlap-guard.spec.ts --project=chromium --reporter=line
+          EXIT_CODE=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT_CODE
+        env:
+          BASE_URL: http://localhost:3100
+          SMOKE_ONLY: '1'
+          CI: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/playwright-report/
+          retention-days: 3
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
