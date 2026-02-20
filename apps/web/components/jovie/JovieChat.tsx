@@ -82,6 +82,7 @@ export function JovieChat({
     handleSuggestedPrompt,
     submitMessage,
     setChatError,
+    isRateLimited,
   } = useJovieChat({
     profileId,
     artistContext,
@@ -329,7 +330,13 @@ export function JovieChat({
 
           {/* Input at bottom */}
           <div className='border-t border-subtle px-4 py-4'>
-            <div className='mx-auto max-w-2xl'>
+            <div className='mx-auto max-w-2xl space-y-2'>
+              {isRateLimited && (
+                <p className='text-xs text-tertiary-token' aria-live='polite'>
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
+              )}
               <ChatInput
                 {...chatInputProps}
                 placeholder='Ask a follow-up...'
@@ -365,6 +372,12 @@ export function JovieChat({
           {/* Input pinned at bottom */}
           <div className='px-4 pb-8'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
+              {isRateLimited && (
+                <p className='text-xs text-tertiary-token' aria-live='polite'>
+                  Sending too fast. Please wait a second before your next
+                  message.
+                </p>
+              )}
               <ChatInput {...chatInputProps} />
 
               {/* Error display */}

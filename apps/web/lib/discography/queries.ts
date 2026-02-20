@@ -192,6 +192,46 @@ export async function getLatestReleaseByUsername(
 }
 
 /**
+ * Get release stats for a creator by username.
+ * Returns total release count and up to 3 recent release titles.
+ */
+export async function getReleaseStatsByUsername(
+  usernameNormalized: string
+): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
+  if (!(await hasDiscogReleasesTable())) {
+    return { releaseCount: 0, topReleaseTitles: [] };
+  }
+
+  const [countResult, topReleases] = await Promise.all([
+    db
+      .select({
+        count: drizzleSql<number>`count(*)::int`,
+      })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized)),
+    db
+      .select({ title: discogReleases.title })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+      .limit(3),
+  ]);
+
+  return {
+    releaseCount: countResult[0]?.count ?? 0,
+    topReleaseTitles: topReleases.map(release => release.title),
+  };
+}
+
+/**
  * Get all releases for a creator profile with their provider links
  */
 export async function getReleasesForProfile(

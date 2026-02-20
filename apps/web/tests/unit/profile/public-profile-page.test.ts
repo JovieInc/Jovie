@@ -453,26 +453,18 @@ describe('Public Profile Page Logic', () => {
       expect(profileUrl).toBe('https://jov.ie/testartist');
     });
 
-    it('includes og:image with avatar or fallback default', () => {
-      const avatarUrl = mockProfile.avatar_url;
+    it('includes dynamic og:image route for profile cards', () => {
       const ogImage = {
-        url: avatarUrl || `${BASE_URL}/og/default.png`,
-        width: avatarUrl ? 400 : 1200,
-        height: avatarUrl ? 400 : 630,
-        alt: `Test Artist profile picture`,
+        url: `${BASE_URL}/${mockProfile.username}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        alt: `Test Artist profile card`,
       };
-      expect(ogImage.url).toBe('https://example.com/avatar.jpg');
-      expect(ogImage.width).toBe(400);
 
-      const nullAvatar: string | null = null;
-      const fallbackImage = {
-        url: nullAvatar || `${BASE_URL}/og/default.png`,
-        width: nullAvatar ? 400 : 1200,
-        height: nullAvatar ? 400 : 630,
-        alt: `Test Artist profile picture`,
-      };
-      expect(fallbackImage.url).toBe(`${BASE_URL}/og/default.png`);
-      expect(fallbackImage.width).toBe(1200);
+      expect(ogImage.url).toBe('https://jov.ie/testartist/opengraph-image');
+      expect(ogImage.width).toBe(1200);
+      expect(ogImage.height).toBe(630);
+      expect(ogImage.alt).toBe('Test Artist profile card');
     });
 
     it('sets robots to index and follow for public profiles', () => {
@@ -511,6 +503,28 @@ describe('Public Profile Page Logic', () => {
       const genreContext = ` | ${genres.slice(0, 2).join(', ')} Artist`;
       expect(genreContext).toBe(' | rock, indie Artist');
       expect(genreContext).not.toContain('alternative');
+    });
+  });
+
+  describe('cache strategy', () => {
+    function shouldStoreInNegativeCache(status: 'ok' | 'not_found' | 'error') {
+      return status === 'not_found';
+    }
+
+    function shouldStoreInLongLivedCache(status: 'ok' | 'not_found' | 'error') {
+      return status === 'ok';
+    }
+
+    it('stores only not_found responses in short-lived negative cache', () => {
+      expect(shouldStoreInNegativeCache('not_found')).toBe(true);
+      expect(shouldStoreInNegativeCache('ok')).toBe(false);
+      expect(shouldStoreInNegativeCache('error')).toBe(false);
+    });
+
+    it('stores only successful payloads in long-lived cache', () => {
+      expect(shouldStoreInLongLivedCache('ok')).toBe(true);
+      expect(shouldStoreInLongLivedCache('not_found')).toBe(false);
+      expect(shouldStoreInLongLivedCache('error')).toBe(false);
     });
   });
 });

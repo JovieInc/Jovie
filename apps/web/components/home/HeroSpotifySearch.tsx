@@ -52,9 +52,11 @@ export function HeroSpotifySearch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { results, state, search, clear } = useArtistSearchQuery({
     debounceMs: 300,
@@ -81,6 +83,8 @@ export function HeroSpotifySearch() {
 
   const handleNavigateToSignup = useCallback(
     (spotifyUrl: string, artistName?: string) => {
+      if (isNavigating) return;
+      setIsNavigating(true);
       const params = new URLSearchParams();
       params.set('spotify_url', spotifyUrl);
       if (artistName) {
@@ -88,7 +92,7 @@ export function HeroSpotifySearch() {
       }
       router.push(`${APP_ROUTES.SIGNUP}?${params.toString()}`);
     },
-    [router]
+    [router, isNavigating]
   );
 
   const handleSearchInputChange = useCallback(
@@ -97,16 +101,17 @@ export function HeroSpotifySearch() {
       setSearchQuery(value);
       setActiveIndex(-1);
 
-      // If user pastes a Spotify URL, go directly to signup
+      // If user pastes a Spotify URL, show it in the input but don't
+      // auto-navigate — let them click "Claim Artist" to proceed.
       if (isSpotifyUrl(value)) {
-        handleNavigateToSignup(value.trim());
+        setShowResults(false);
         return;
       }
 
       search(value);
       setShowResults(true);
     },
-    [search, handleNavigateToSignup]
+    [search]
   );
 
   const handleArtistSelect = useCallback(
@@ -116,7 +121,8 @@ export function HeroSpotifySearch() {
     [handleNavigateToSignup]
   );
 
-  const handleContinue = useCallback(() => {
+  const handleClaimArtist = useCallback(() => {
+    if (isNavigating) return;
     const query = searchQuery.trim();
     if (!query) return;
 
@@ -143,12 +149,12 @@ export function HeroSpotifySearch() {
     searchQuery,
     activeIndex,
     results,
+    isNavigating,
     handleNavigateToSignup,
     handleArtistSelect,
   ]);
 
   const handlePasteUrlClick = useCallback(() => {
-    // Focus input and hint user to paste their URL
     setSearchQuery('');
     setShowResults(false);
     setActiveIndex(-1);
@@ -161,6 +167,13 @@ export function HeroSpotifySearch() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
+      // Enter on empty results with a query → trigger claim
+      if (e.key === 'Enter' && !showResults && searchQuery.trim()) {
+        e.preventDefault();
+        handleClaimArtist();
+        return;
+      }
+
       if (!showResults) {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -185,6 +198,9 @@ export function HeroSpotifySearch() {
             if (artist) handleArtistSelect(artist);
           } else if (activeIndex === pasteUrlIndex) {
             handlePasteUrlClick();
+          } else {
+            // No active selection → claim first result or URL
+            handleClaimArtist();
           }
           break;
         case 'Escape':
@@ -204,8 +220,10 @@ export function HeroSpotifySearch() {
       results,
       activeIndex,
       pasteUrlIndex,
+      searchQuery,
       handleArtistSelect,
       handlePasteUrlClick,
+      handleClaimArtist,
     ]
   );
 
@@ -217,12 +235,18 @@ export function HeroSpotifySearch() {
     if (results.length > 0) return true;
     return searchQuery.length >= 1;
   }, [showResults, state, results.length, searchQuery.length]);
+
   const trimmedQuery = searchQuery.trim();
-  const showContinueAction =
-    Boolean(trimmedQuery) && (isSpotifyUrl(trimmedQuery) || results.length > 0);
+  const isLoading = state === 'loading';
+  // Show button when user has typed something; disable while loading
+  const showClaimButton = Boolean(trimmedQuery);
+  const claimButtonDisabled =
+    isNavigating ||
+    (isLoading && !isSpotifyUrl(trimmedQuery)) ||
+    (!isSpotifyUrl(trimmedQuery) && results.length === 0);
 
   return (
-    <div className='relative mx-auto w-full max-w-[480px]'>
+    <div ref={containerRef} className='relative mx-auto w-full max-w-[480px]'>
       <label htmlFor='hero-spotify-search' className='sr-only'>
         Search Spotify artists or paste a link
       </label>
@@ -248,8 +272,17 @@ export function HeroSpotifySearch() {
           value={searchQuery}
           onChange={handleSearchInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => searchQuery.length >= 1 && setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 150)}
+          onFocus={() => {
+            if (searchQuery.trim().length >= 1 && !isSpotifyUrl(searchQuery)) {
+              setShowResults(true);
+            }
+          }}
+          onBlur={e => {
+            // Keep dropdown open if focus moves to another element inside the container
+            if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+            setShowResults(false);
+            setActiveIndex(-1);
+          }}
           placeholder='Search your artist name or paste a Spotify link'
           autoCapitalize='none'
           autoCorrect='off'
@@ -262,19 +295,24 @@ export function HeroSpotifySearch() {
             activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
           }
         />
-        {state === 'loading' && (
-          <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none shrink-0' />
-        )}
-        {state !== 'loading' && showContinueAction && (
+        {showClaimButton ? (
           <button
             type='button'
-            onClick={handleContinue}
-            className='shrink-0 inline-flex items-center justify-center h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed bg-btn-primary text-btn-primary-foreground'
+            disabled={claimButtonDisabled}
+            onClick={handleClaimArtist}
+            className={cn(
+              'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
+              claimButtonDisabled
+                ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
+                : 'bg-btn-primary text-btn-primary-foreground'
+            )}
           >
-            Continue
+            {isLoading && (
+              <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+            )}
+            Claim Artist
           </button>
-        )}
-        {state !== 'loading' && !showContinueAction && (
+        ) : (
           <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
         )}
       </div>
