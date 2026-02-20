@@ -106,7 +106,7 @@ export async function handleNewProfileIngest({
       token: claimToken,
       tokenHash: claimTokenHash,
       expiresAt: claimTokenExpiresAt,
-    } = generateClaimTokenPair();
+    } = await generateClaimTokenPair();
 
     const [created] = await tx
       .insert(creatorProfiles)

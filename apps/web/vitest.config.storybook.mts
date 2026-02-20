@@ -24,9 +24,9 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
-    // Stories may trigger background fetches (TanStack Query) that 404 in test env.
-    // These are unhandled rejections, not test failures.
-    dangerouslyIgnoreUnhandledErrors: true,
+    // Retry once in CI to handle transient Vite browser-mode module serving failures
+    // (Storybook's internal React 18 compat chunk occasionally fails to load)
+    retry: process.env.CI ? 1 : 0,
   },
   resolve: {
     dedupe: [

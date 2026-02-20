@@ -604,7 +604,7 @@ export async function isClaimTokenValid(
   username: string,
   claimToken: string
 ): Promise<boolean> {
-  const claimTokenHash = hashClaimToken(claimToken);
+  const claimTokenHash = await hashClaimToken(claimToken);
 
   const [row] = await db
     .select({ id: creatorProfiles.id })
@@ -632,7 +632,7 @@ export async function isClaimTokenValid(
 export async function lookupUsernameByClaimToken(
   claimToken: string
 ): Promise<string | null> {
-  const claimTokenHash = hashClaimToken(claimToken);
+  const claimTokenHash = await hashClaimToken(claimToken);
 
   const [row] = await db
     .select({ username: creatorProfiles.username })

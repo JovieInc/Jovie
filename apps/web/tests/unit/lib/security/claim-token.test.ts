@@ -6,20 +6,20 @@ import {
 } from '@/lib/security/claim-token';
 
 describe('security/claim-token', () => {
-  it('hashClaimToken returns deterministic sha256 hex output', () => {
+  it('hashClaimToken returns deterministic sha256 hex output', async () => {
     const token = '550e8400-e29b-41d4-a716-446655440000';
 
-    expect(hashClaimToken(token)).toBe(
+    await expect(hashClaimToken(token)).resolves.toBe(
       'a3a9e1ed9732cab28868127be00f1ce921acaefdd5c3b23a6e9e0072bd9c1a34'
     );
   });
 
-  it('generateClaimTokenPair returns token, hash, and 30 day expiry', () => {
+  it('generateClaimTokenPair returns token, hash, and 30 day expiry', async () => {
     const now = Date.now();
-    const pair = generateClaimTokenPair();
+    const pair = await generateClaimTokenPair();
 
     expect(pair.token).toHaveLength(36);
-    expect(pair.tokenHash).toBe(hashClaimToken(pair.token));
+    expect(pair.tokenHash).toBe(await hashClaimToken(pair.token));
 
     const expiryMs = pair.expiresAt.getTime() - now;
     const min = 29 * 24 * 60 * 60 * 1000;
