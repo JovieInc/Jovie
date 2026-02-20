@@ -48,6 +48,7 @@ interface UseOnboardingSubmitOptions {
   handleValidation: HandleValidationState;
   goToNextStep: () => void;
   setProfileReadyHandle: (handle: string) => void;
+  shouldAutoSubmitHandle: boolean;
 }
 
 interface UseOnboardingSubmitReturn {
@@ -69,6 +70,7 @@ export function useOnboardingSubmit({
   handleValidation,
   goToNextStep,
   setProfileReadyHandle,
+  shouldAutoSubmitHandle,
 }: UseOnboardingSubmitOptions): UseOnboardingSubmitReturn {
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>({
@@ -247,6 +249,35 @@ export function useOnboardingSubmit({
       userId,
     ]
   );
+
+  // Auto-submit for OAuth-derived handles once availability check settles.
+  useEffect(() => {
+    if (
+      !shouldAutoSubmitHandle ||
+      state.isSubmitting ||
+      isPendingSubmit ||
+      Boolean(state.error)
+    ) {
+      return;
+    }
+
+    if (!handleInput || handleValidation.checking) {
+      return;
+    }
+
+    if (handleValidation.clientValid && handleValidation.available) {
+      setIsPendingSubmit(true);
+    }
+  }, [
+    handleInput,
+    handleValidation.available,
+    handleValidation.checking,
+    handleValidation.clientValid,
+    isPendingSubmit,
+    shouldAutoSubmitHandle,
+    state.error,
+    state.isSubmitting,
+  ]);
 
   // Auto-submit when validation completes if user had pending submit intent
   useEffect(() => {
