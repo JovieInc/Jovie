@@ -267,6 +267,7 @@ async function fetchDashboardCoreWithSession(
         }),
       // Optimized existence queries for link booleans.
       // We only need true/false values, so limit(1) avoids full-table counting scans.
+      // Both queries share the same RLS session context set by executeWithSession.
       executeWithSession(
         clerkUserId,
         () => ({
@@ -278,8 +279,7 @@ async function fetchDashboardCoreWithSession(
                 .where(
                   and(
                     eq(socialLinks.creatorProfileId, selected.id),
-                    eq(socialLinks.state, 'active'),
-                    eq(socialLinks.isActive, true)
+                    eq(socialLinks.state, 'active')
                   )
                 )
                 .limit(1),
@@ -290,7 +290,6 @@ async function fetchDashboardCoreWithSession(
                   and(
                     eq(socialLinks.creatorProfileId, selected.id),
                     eq(socialLinks.state, 'active'),
-                    eq(socialLinks.isActive, true),
                     or(
                       eq(socialLinks.platformType, 'dsp'),
                       eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
@@ -306,7 +305,7 @@ async function fetchDashboardCoreWithSession(
             };
           },
         }),
-        'Social links count query'
+        'Social links existence query'
       ).catch((error: unknown) => {
         const migrationResult = handleMigrationErrors(error, {
           userId: userData.id,
@@ -318,7 +317,7 @@ async function fetchDashboardCoreWithSession(
         }
         Sentry.captureException(error, {
           tags: {
-            query: 'social_links_count',
+            query: 'social_links_existence',
             context: 'dashboard_data',
           },
         });
