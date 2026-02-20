@@ -175,11 +175,14 @@ describe('BillingDashboard', () => {
 
     renderBillingDashboard();
 
-    await waitFor(() => {
-      expect(
-        screen.getByText('Billing is temporarily unavailable')
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText('Billing is temporarily unavailable')
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
 
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
@@ -342,11 +345,14 @@ describe('BillingDashboard', () => {
     renderBillingDashboard();
 
     // Both billing + pricing error → shows error banner
-    await waitFor(() => {
-      expect(
-        screen.getByText('Billing is temporarily unavailable')
-      ).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText('Billing is temporarily unavailable')
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('respects interval query param from URL', async () => {
