@@ -19,7 +19,7 @@ export function FooterBranding({
   className = '',
   showCTA = true,
   size = 'md',
-  mark = 'wordmark',
+  mark = 'icon',
 }: FooterBrandingProps) {
   const signUpLink = artistHandle
     ? `/waitlist?utm_source=profile&utm_artist=${artistHandle}`
