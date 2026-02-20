@@ -39,6 +39,12 @@ const baseDashboardData: DashboardData = {
     totalReceivedCents: 0,
     monthReceivedCents: 0,
   },
+  profileCompletion: {
+    percentage: 40,
+    completedCount: 2,
+    totalCount: 5,
+    steps: [],
+  },
 };
 
 function renderGuard(value: DashboardData) {
