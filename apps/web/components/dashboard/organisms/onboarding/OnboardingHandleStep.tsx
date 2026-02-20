@@ -25,6 +25,7 @@ interface OnboardingHandleStepProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
   readonly onHandleChange: (value: string) => void;
   readonly onSubmit: (e?: React.FormEvent) => void;
+  readonly onSuggestionClick?: (value: string) => void;
   readonly isPendingSubmit?: boolean;
 }
 
@@ -141,6 +142,7 @@ export function OnboardingHandleStep({
   inputRef,
   onHandleChange,
   onSubmit,
+  onSuggestionClick,
   isPendingSubmit = false,
 }: OnboardingHandleStepProps) {
   function renderValidationStatus(): React.ReactNode {
@@ -219,6 +221,25 @@ export function OnboardingHandleStep({
             <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
               {renderValidationStatus()}
             </output>
+
+            {handleValidation.suggestions.length > 0 && (
+              <div className='mt-2 flex flex-wrap justify-center gap-2'>
+                {handleValidation.suggestions.map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type='button'
+                    onClick={() =>
+                      onSuggestionClick
+                        ? onSuggestionClick(suggestion)
+                        : onHandleChange(suggestion)
+                    }
+                    className='rounded-full border border-subtle px-3 py-1 text-xs text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
+                  >
+                    @{suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <AuthButton

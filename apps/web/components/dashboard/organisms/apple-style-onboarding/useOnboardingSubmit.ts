@@ -1,7 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type Dispatch,
+  type FormEvent,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
@@ -15,7 +23,15 @@ import {
 import type { HandleValidationState, OnboardingState } from './types';
 import { getResolvedHandle, validateDisplayName } from './validation';
 
-function tryAutoConnectSpotify(): void {
+type SpotifyImportState = {
+  status: 'idle' | 'importing' | 'success' | 'error';
+  stage: 0 | 1 | 2;
+  message: string;
+};
+
+async function tryAutoConnectSpotify(
+  setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>
+): Promise<void> {
   try {
     const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
     if (!spotifyUrl) return;
@@ -25,12 +41,62 @@ function tryAutoConnectSpotify(): void {
       /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
 
     if (artistMatch?.[1]) {
-      const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
-      connectSpotifyArtist({
-        spotifyArtistId: artistMatch[1],
-        spotifyArtistUrl: normalizedUrl,
-        artistName,
-      }).catch(() => {});
+      setSpotifyImportState({
+        status: 'importing',
+        stage: 0,
+        message: 'Connecting your Spotify artist…',
+      });
+      const stageTimer = setInterval(() => {
+        setSpotifyImportState(prev => {
+          if (prev.status !== 'importing') return prev;
+
+          const nextStage = Math.min(prev.stage + 1, 2) as 0 | 1 | 2;
+          const messages = [
+            'Connecting your Spotify artist…',
+            'Importing your latest releases…',
+            'Finalizing your profile setup…',
+          ] as const;
+
+          return {
+            ...prev,
+            stage: nextStage,
+            message: messages[nextStage],
+          };
+        });
+      }, 1200);
+
+      try {
+        const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
+        const importResult = await connectSpotifyArtist({
+          spotifyArtistId: artistMatch[1],
+          spotifyArtistUrl: normalizedUrl,
+          artistName,
+        });
+
+        if (importResult.success) {
+          setSpotifyImportState({
+            status: 'success',
+            stage: 2,
+            message: `Spotify connected — imported ${importResult.imported} release${importResult.imported === 1 ? '' : 's'}.`,
+          });
+        } else {
+          setSpotifyImportState({
+            status: 'error',
+            stage: 2,
+            message:
+              'Spotify connected, but release import is still catching up.',
+          });
+        }
+      } catch {
+        setSpotifyImportState({
+          status: 'error',
+          stage: 2,
+          message:
+            'Spotify import is taking longer than expected. You can continue editing in Dashboard.',
+        });
+      } finally {
+        clearInterval(stageTimer);
+      }
     }
     sessionStorage.removeItem('jovie_signup_spotify_url');
     sessionStorage.removeItem('jovie_signup_artist_name');
@@ -52,9 +118,10 @@ interface UseOnboardingSubmitOptions {
 
 interface UseOnboardingSubmitReturn {
   state: OnboardingState;
-  setState: React.Dispatch<React.SetStateAction<OnboardingState>>;
-  handleSubmit: (e?: React.FormEvent) => Promise<void>;
+  setState: Dispatch<SetStateAction<OnboardingState>>;
+  handleSubmit: (e?: FormEvent) => Promise<void>;
   isPendingSubmit: boolean;
+  spotifyImportState: SpotifyImportState;
 }
 
 /**
@@ -79,6 +146,12 @@ export function useOnboardingSubmit({
     isSubmitting: false,
   });
   const [isPendingSubmit, setIsPendingSubmit] = useState(false);
+  const [spotifyImportState, setSpotifyImportState] =
+    useState<SpotifyImportState>({
+      status: 'idle',
+      stage: 0,
+      message: '',
+    });
 
   // Refs to track current state values without causing callback recreation
   const isSubmittingRef = useRef(state.isSubmitting);
@@ -161,7 +234,7 @@ export function useOnboardingSubmit({
   );
 
   const handleSubmit = useCallback(
-    async (e?: React.FormEvent) => {
+    async (e?: FormEvent) => {
       if (e) e.preventDefault();
 
       const resolvedHandle = getResolvedHandle(handle, handleInput);
@@ -227,10 +300,10 @@ export function useOnboardingSubmit({
           completion_time: new Date().toISOString(),
         });
 
-        // Auto-connect Spotify artist from homepage search (fire-and-forget)
-        tryAutoConnectSpotify();
-
         goToNextStep();
+
+        // Auto-connect Spotify artist from homepage search and report staged progress
+        void tryAutoConnectSpotify(setSpotifyImportState);
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
       }
@@ -275,5 +348,6 @@ export function useOnboardingSubmit({
     setState,
     handleSubmit,
     isPendingSubmit,
+    spotifyImportState,
   };
 }

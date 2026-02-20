@@ -30,9 +30,13 @@ export const ONBOARDING_STEPS = [
   {
     id: 'handle',
     title: 'Claim your handle',
-    prompt: '',
+    prompt: 'Pick a handle your fans can remember in one glance.',
   },
-  { id: 'done', title: "You're live.", prompt: '' },
+  {
+    id: 'done',
+    title: "You're live.",
+    prompt: 'Your profile is published and ready to share.',
+  },
 ] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
