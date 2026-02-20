@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import type { DbOrTransaction } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureWarning } from '@/lib/error-tracking';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
@@ -168,6 +169,10 @@ export async function handleExistingUnclaimedProfile(
       profileId: existing.id,
       error: linkError,
     });
+    await captureWarning('Failed to add link to existing profile', linkError, {
+      profileId: existing.id,
+      platform: platformId,
+    });
 
     return NextResponse.json(
       {
@@ -263,6 +268,10 @@ export async function createNewSocialProfile(
     logger.warn('Failed to add link to new profile', {
       profileId: created.id,
       error: linkError,
+    });
+    await captureWarning('Failed to add link to new profile', linkError, {
+      profileId: created.id,
+      platform: platformId,
     });
   }
 
