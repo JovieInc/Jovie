@@ -18,9 +18,7 @@ export function RedesignedHero() {
         {/* ---- Left column: Copy + CTA ---- */}
         <div>
           <h1
-            className='text-balance'
             style={{
-              maxWidth: '560px',
               fontSize: 'clamp(40px, calc(20px + 3.5vw), 64px)',
               fontWeight: 510,
               lineHeight: 1,
@@ -30,7 +28,7 @@ export function RedesignedHero() {
               fontVariationSettings: '"opsz" 64',
             }}
           >
-            Your entire music career.
+            <span className='whitespace-nowrap'>Your entire music career.</span>
             <br />
             <span
               style={{
@@ -305,31 +303,14 @@ function HeroProfileMockup() {
               Music Artist
             </span>
 
-            {/* CTA button */}
+            {/* Email capture — subscribe mode */}
             <div
-              className='mt-6 flex w-full items-center justify-center rounded-full'
-              style={{
-                height: 42,
-                fontSize: '13px',
-                fontWeight: 500,
-                color: 'rgb(8,9,10)',
-                backgroundColor: 'rgb(232,232,232)',
-                letterSpacing: '-0.005em',
-                boxShadow:
-                  '0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
-              }}
-            >
-              Listen Now
-            </div>
-
-            {/* Email capture hint */}
-            <div
-              className='mt-2.5 flex w-full items-center gap-2.5'
+              className='mt-6 flex w-full items-center gap-2'
               style={{
                 backgroundColor: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
                 borderRadius: '12px',
-                padding: '10px 14px',
+                padding: '5px 5px 5px 14px',
               }}
             >
               <svg
@@ -340,18 +321,34 @@ function HeroProfileMockup() {
                 fill='none'
                 stroke='rgba(255,255,255,0.22)'
                 strokeWidth='1.5'
+                className='shrink-0'
               >
                 <path d='M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75' />
               </svg>
               <span
+                className='flex-1'
                 style={{
                   fontSize: '12px',
-                  color: 'rgba(255,255,255,0.26)',
+                  color: 'rgba(255,255,255,0.22)',
                   fontWeight: 400,
                 }}
               >
-                Get notified on new releases
+                your@email.com
               </span>
+              <div
+                className='flex shrink-0 items-center justify-center rounded-[8px]'
+                style={{
+                  height: 32,
+                  padding: '0 14px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: 'rgb(8,9,10)',
+                  backgroundColor: 'rgb(232,232,232)',
+                  letterSpacing: '-0.005em',
+                }}
+              >
+                Subscribe
+              </div>
             </div>
 
             {/* Social links row */}
