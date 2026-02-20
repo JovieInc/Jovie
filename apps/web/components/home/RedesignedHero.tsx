@@ -14,7 +14,7 @@ export function RedesignedHero() {
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative mx-auto w-full max-w-[1200px] py-16 lg:py-20'>
+      <div className='relative w-full py-16 lg:py-20'>
         <h1
           style={{
             fontSize: 'clamp(40px, calc(20px + 3.5vw), 64px)',

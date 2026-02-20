@@ -29,7 +29,6 @@ import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
 import { LabelLogosBar } from '@/components/home/LabelLogosBar';
-import { ProblemSection } from '@/components/home/ProblemSection';
 import { ProductShowcase } from '@/components/home/ProductShowcase';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
@@ -44,7 +43,6 @@ import {
   homepageHero,
   homepageHowItWorks,
   homepageLabelLogos,
-  homepageProblem,
   homepageProductPreview,
   homepageSeeItInAction,
 } from '@/lib/flags/homepage';
@@ -262,7 +260,6 @@ export default async function HomePage() {
     showProductPreview,
     showExampleProfiles,
     showDeeplinksGrid,
-    showProblem,
     showComparison,
     showSeeItInAction,
     showFinalCta,
@@ -274,7 +271,6 @@ export default async function HomePage() {
     homepageProductPreview(),
     homepageExampleProfiles(),
     homepageDeeplinksGrid(),
-    homepageProblem(),
     homepageComparison(),
     homepageSeeItInAction(),
     homepageFinalCta(),
@@ -342,8 +338,6 @@ export default async function HomePage() {
           <DeeplinksGrid />
         </DeferredSection>
       )}
-
-      {showProblem && <ProblemSection />}
 
       {showComparison && (
         <DeferredSection placeholderHeight={480}>
