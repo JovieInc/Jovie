@@ -260,7 +260,7 @@ export const queryKeys = {
       [...queryKeys.chat.all, 'conversation', id] as const,
   },
 
-  // Audience queries
+  // Audience infinite scroll
   audience: {
     all: ['audience'] as const,
     members: (profileId: string, filters?: Record<string, unknown>) =>
