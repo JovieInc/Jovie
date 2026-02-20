@@ -30,6 +30,16 @@ import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 
+interface RowActionHandlers {
+  onMenuOpenChange: (open: boolean) => void;
+  onRefreshIngest: () => void;
+  onToggleVerification: () => Promise<void>;
+  onToggleFeatured: () => Promise<void>;
+  onToggleMarketing: () => Promise<void>;
+  onSendInvite?: () => void;
+  onDelete: () => void;
+}
+
 const DeleteCreatorDialog = dynamic(
   () =>
     import('@/components/admin/DeleteCreatorDialog').then(mod => ({
@@ -298,18 +308,7 @@ export function AdminCreatorProfilesWithSidebar({
   }, [notifications]);
 
   const rowActionHandlers = useMemo(() => {
-    const handlers = new Map<
-      string,
-      {
-        onMenuOpenChange: (open: boolean) => void;
-        onRefreshIngest: () => void;
-        onToggleVerification: () => Promise<void>;
-        onToggleFeatured: () => Promise<void>;
-        onToggleMarketing: () => Promise<void>;
-        onSendInvite?: () => void;
-        onDelete: () => void;
-      }
-    >();
+    const handlers = new Map<string, RowActionHandlers>();
 
     for (const profile of profilesWithActions) {
       handlers.set(profile.id, {
@@ -417,7 +416,14 @@ export function AdminCreatorProfilesWithSidebar({
                   ) : (
                     profilesWithActions.map((profile, index) => {
                       const handlers = rowActionHandlers.get(profile.id);
-                      if (!handlers) return null;
+                      if (!handlers) {
+                        if (process.env.NODE_ENV === 'development') {
+                          console.warn(
+                            `Missing row action handlers for profile ${profile.id}`
+                          );
+                        }
+                        return null;
+                      }
 
                       return (
                         <CreatorProfileTableRow
