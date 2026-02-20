@@ -15,6 +15,7 @@ import {
   unstable_cache as unstableCache,
 } from 'next/cache';
 import { cache } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { setupDbSession, validateClerkUserId } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
@@ -136,6 +137,111 @@ export interface DashboardData {
   isAdmin: boolean;
   /** Tipping statistics for the selected profile */
   tippingStats: TippingStats;
+  /** Profile setup completion percentage and recommended next steps */
+  profileCompletion: ProfileCompletion;
+}
+
+export interface ProfileCompletionStep {
+  id: 'avatar' | 'bio' | 'social-links' | 'music-links' | 'tip-jar';
+  label: string;
+  description: string;
+  href: string;
+}
+
+export interface ProfileCompletion {
+  percentage: number;
+  completedCount: number;
+  totalCount: number;
+  steps: ProfileCompletionStep[];
+}
+
+function hasText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function buildProfileCompletion(
+  selectedProfile: CreatorProfile | null,
+  hasSocialLinks: boolean,
+  hasMusicLinks: boolean
+): ProfileCompletion {
+  const totalCount = 7;
+
+  if (!selectedProfile) {
+    return {
+      percentage: 0,
+      completedCount: 0,
+      totalCount,
+      steps: [],
+    };
+  }
+
+  const checks = {
+    handle: hasText(selectedProfile.username),
+    name: hasText(selectedProfile.displayName),
+    avatar: hasText(selectedProfile.avatarUrl),
+    bio: hasText(selectedProfile.bio),
+    socialLinks: hasSocialLinks,
+    musicLinks: hasMusicLinks,
+    tipJar: hasText(selectedProfile.venmoHandle),
+  };
+
+  const completedCount = Object.values(checks).filter(Boolean).length;
+  const percentage = Math.round((completedCount / totalCount) * 100);
+
+  const steps: ProfileCompletionStep[] = [];
+
+  if (!checks.avatar) {
+    steps.push({
+      id: 'avatar',
+      label: 'Add a profile photo',
+      description: 'A recognizable photo makes your page feel personal.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!checks.bio) {
+    steps.push({
+      id: 'bio',
+      label: 'Write a short bio',
+      description: 'Tell new fans who you are in one or two lines.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!checks.socialLinks) {
+    steps.push({
+      id: 'social-links',
+      label: 'Connect your social links',
+      description: 'Give fans one-tap access to your social presence.',
+      href: APP_ROUTES.DASHBOARD_LINKS,
+    });
+  }
+
+  if (!checks.musicLinks) {
+    steps.push({
+      id: 'music-links',
+      label: 'Add your music platforms',
+      description:
+        'Help listeners stream you on Spotify, Apple Music, and more.',
+      href: APP_ROUTES.DASHBOARD_LINKS,
+    });
+  }
+
+  if (!checks.tipJar) {
+    steps.push({
+      id: 'tip-jar',
+      label: 'Set up your tip jar',
+      description: 'Turn attention into support with a fast tipping link.',
+      href: APP_ROUTES.DASHBOARD_EARNINGS,
+    });
+  }
+
+  return {
+    percentage,
+    completedCount,
+    totalCount,
+    steps,
+  };
 }
 
 /**
@@ -179,6 +285,7 @@ async function fetchDashboardCoreWithSession(
         hasSocialLinks: false,
         hasMusicLinks: false,
         tippingStats: createEmptyTippingStats(),
+        profileCompletion: buildProfileCompletion(null, false, false),
       };
     }
 
@@ -220,6 +327,7 @@ async function fetchDashboardCoreWithSession(
         hasSocialLinks: false,
         hasMusicLinks: false,
         tippingStats: createEmptyTippingStats(),
+        profileCompletion: buildProfileCompletion(null, false, false),
       };
     }
 
@@ -327,6 +435,11 @@ async function fetchDashboardCoreWithSession(
       hasSocialLinks: hasLinks,
       hasMusicLinks,
       tippingStats,
+      profileCompletion: buildProfileCompletion(
+        selected,
+        hasLinks,
+        hasMusicLinks
+      ),
     };
   } catch (error) {
     // Handle both standard and non-standard error objects
@@ -369,6 +482,7 @@ async function fetchDashboardCoreWithSession(
       hasSocialLinks: false,
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, false, false),
     };
   }
 }
@@ -518,6 +632,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, false, false),
     };
   }
 
@@ -549,6 +664,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, false, false),
     };
   }
 }
