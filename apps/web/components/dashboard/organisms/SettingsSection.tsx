@@ -48,7 +48,7 @@ export function SettingsSection({
           <p
             id={descriptionId}
             className={cn(
-              'mt-1 text-[13px] text-tertiary-token',
+              'mt-2 text-[13px] text-tertiary-token',
               descriptionClassName
             )}
           >

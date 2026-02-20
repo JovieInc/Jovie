@@ -94,7 +94,7 @@ function ListSection({
 }) {
   return (
     <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
-      <div className='flex items-center gap-2 mb-4'>
+      <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
         <h3 className='text-[13px] font-medium text-secondary-token'>
           {title}
@@ -112,7 +112,7 @@ function ListSection({
         </ul>
       )}
       {!loading && items.length > 0 && (
-        <ul className='space-y-2.5'>
+        <ul className='space-y-3'>
           {items.map((item, index) => (
             <li
               key={item.key}
@@ -169,7 +169,7 @@ export function DashboardAnalytics() {
   const fmt = Intl.NumberFormat();
 
   return (
-    <div className='max-w-5xl space-y-6 lg:space-y-8'>
+    <div className='max-w-5xl space-y-8'>
       <h1 className='sr-only'>Analytics</h1>
 
       {/* Header */}
@@ -199,10 +199,10 @@ export function DashboardAnalytics() {
         id={rangePanelId}
         role='tabpanel'
         aria-labelledby={activeRangeTabId}
-        className='space-y-4 lg:space-y-6'
+        className='space-y-6'
       >
         {/* Primary metrics — conversion funnel as stat cards */}
-        <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5'>
+        <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
           <StatCard
             label='Profile Views'
             value={fmt.format(data?.profile_views ?? 0)}
@@ -235,7 +235,7 @@ export function DashboardAnalytics() {
         {!loading &&
           typeof data?.listen_clicks === 'number' &&
           typeof data?.identified_users === 'number' && (
-            <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 lg:gap-5'>
+            <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
               <StatCard
                 label='Capture Rate'
                 value={`${data.capture_rate ?? 0}%`}
@@ -262,7 +262,7 @@ export function DashboardAnalytics() {
         )}
 
         {/* Lists */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5'>
+        <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
           <ListSection
             title='Top Cities'
             icon={MapPin}

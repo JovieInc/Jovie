@@ -18,7 +18,7 @@ export async function AdminKpiSection() {
         mercuryAvailability={metrics.mercuryAvailability}
       />
 
-      <section id='users' className='space-y-4' data-testid='admin-kpi-section'>
+      <section id='users' className='space-y-6' data-testid='admin-kpi-section'>
         <KpiCards
           mrrUsd={metrics.mrrUsd}
           balanceUsd={metrics.balanceUsd}
@@ -38,8 +38,8 @@ export function AdminKpiSectionSkeleton() {
   return (
     <>
       <div className='h-16 rounded-xl skeleton' />
-      <section id='users' className='space-y-4'>
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
+      <section id='users' className='space-y-6'>
+        <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
           {KPI_SKELETON_KEYS.map(key => (
             <div key={key} className='h-24 rounded-xl skeleton' />
           ))}

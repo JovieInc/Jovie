@@ -191,7 +191,7 @@ export function DashboardOverview({
           className='flex min-h-[60vh] items-center justify-center'
           data-testid='dashboard-overview'
         >
-          <div className='w-full max-w-sm space-y-5'>
+          <div className='w-full max-w-sm space-y-6'>
             <div className='space-y-0.5 text-center'>
               <h1 className='text-lg font-normal text-primary-token'>
                 Complete your setup
@@ -201,7 +201,7 @@ export function DashboardOverview({
               </p>
             </div>
 
-            <ul className='space-y-1'>
+            <ul className='space-y-3'>
               <SetupTaskItem
                 isComplete={isHandleClaimed}
                 stepNumber={1}
@@ -232,7 +232,7 @@ export function DashboardOverview({
 
   return (
     <DashboardOverviewControlsProvider>
-      <div className='space-y-2' data-testid='dashboard-overview'>
+      <div className='space-y-6' data-testid='dashboard-overview'>
         {header}
 
         <DashboardOverviewMetricsClient
