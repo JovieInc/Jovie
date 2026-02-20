@@ -111,7 +111,9 @@ function categorizePath(pathname: string): PathCategory {
   const isAuthCallbackPath =
     pathname === '/sso-callback' ||
     pathname === '/signup/sso-callback' ||
-    pathname === '/signin/sso-callback';
+    pathname === '/signin/sso-callback' ||
+    pathname === '/sign-up/sso-callback' ||
+    pathname === '/sign-in/sso-callback';
 
   // Dashboard paths (used for app subdomain rewrites)
   const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
@@ -332,6 +334,19 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       );
     }
 
+    // Auth callback routes must pass through untouched so Clerk can
+    // complete the handshake and exchange tokens successfully.
+    if (pathInfo.isAuthCallbackPath) {
+      return buildFinalResponse(
+        req,
+        NextResponse.next({ request: { headers: requestHeaders } }),
+        pathInfo,
+        startTime,
+        userId,
+        nonce
+      );
+    }
+
     // ========================================================================
     // Authenticated user handling - SINGLE getUserState call
     // ========================================================================
@@ -343,7 +358,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     let userState: ProxyUserState | null = null;
 
     // Only page routes need user state — API routes don't make routing decisions
-    const needsUserState = !pathname.startsWith('/api/');
+    const needsUserState =
+      !pathname.startsWith('/api/') && !pathInfo.isAuthCallbackPath;
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
