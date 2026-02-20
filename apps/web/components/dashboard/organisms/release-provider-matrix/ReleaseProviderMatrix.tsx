@@ -582,7 +582,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               (releasedCount > (smartLinksLimit ?? Infinity) ||
                 unreleasedCount > 0) && (
                 <SmartLinkGateBanner
-                  totalReleases={rows.length}
                   smartLinksLimit={smartLinksLimit ?? 25}
                   releasedCount={releasedCount}
                   unreleasedCount={unreleasedCount}

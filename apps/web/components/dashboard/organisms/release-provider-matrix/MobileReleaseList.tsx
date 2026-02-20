@@ -316,6 +316,7 @@ export const MobileReleaseList = memo(function MobileReleaseList({
             onEdit={onEdit}
             onCopy={onCopy}
             isSmartLinkLocked={isSmartLinkLocked}
+            getSmartLinkLockReason={getSmartLinkLockReason}
           />
         ))}
       </div>

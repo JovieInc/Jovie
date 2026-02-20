@@ -5,8 +5,6 @@ import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkGateBannerProps {
-  /** Total number of releases the user has */
-  readonly totalReleases: number;
   /** Number of smart links available on the free plan */
   readonly smartLinksLimit: number;
   /** Number of released releases */
@@ -22,7 +20,6 @@ interface SmartLinkGateBannerProps {
  * Encourages upgrading to Pro.
  */
 export function SmartLinkGateBanner({
-  totalReleases,
   smartLinksLimit,
   releasedCount,
   unreleasedCount,
