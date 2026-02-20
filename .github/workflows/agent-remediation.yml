@@ -66,8 +66,15 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          PR_REVIEW_USER: ${{ github.event.review.user.login }}
+          PR_REVIEW_STATE: ${{ github.event.review.state }}
+          PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF_EVENT: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_SHA_EVENT: ${{ github.event.pull_request.head.sha }}
+          PR_IS_DRAFT_EVENT: ${{ github.event.pull_request.draft }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          EVENT="${{ github.event_name }}"
+          EVENT="$EVENT_NAME"
 
           if [[ "$EVENT" == "workflow_run" ]]; then
             echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
@@ -104,8 +111,9 @@ jobs:
             echo "should_continue=true" >> $GITHUB_OUTPUT
 
           elif [[ "$EVENT" == "pull_request_review" ]]; then
-            REVIEWER="${{ github.event.review.user.login }}"
-            STATE="${{ github.event.review.state }}"
+            # PR event properties passed via env to prevent shell injection
+            REVIEWER="$PR_REVIEW_USER"
+            STATE="$PR_REVIEW_STATE"
 
             if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
               echo "Reviewer is not CodeRabbit (got: $REVIEWER). Skipping."
@@ -120,10 +128,10 @@ jobs:
             fi
 
             echo "trigger_type=coderabbit_review" >> $GITHUB_OUTPUT
-            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-            echo "pr_head_ref=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
-            echo "pr_head_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-            echo "is_draft=${{ github.event.pull_request.draft }}" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER_EVENT" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> $GITHUB_OUTPUT
+            echo "is_draft=$PR_IS_DRAFT_EVENT" >> $GITHUB_OUTPUT
             echo "should_continue=true" >> $GITHUB_OUTPUT
           fi
 
