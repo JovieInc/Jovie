@@ -26,10 +26,13 @@ export function useHighContrast() {
     const root = document.documentElement;
     if (isHighContrast) {
       root.classList.add('high-contrast');
-      localStorage.setItem(STORAGE_KEY, 'true');
     } else {
       root.classList.remove('high-contrast');
-      localStorage.setItem(STORAGE_KEY, 'false');
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, String(isHighContrast));
+    } catch {
+      // localStorage may be unavailable (e.g. private browsing, storage quota exceeded)
     }
   }, [isHighContrast]);
 
