@@ -96,8 +96,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "storybook:build": "storybook build",
-    "storybook:test": "vitest --workspace=vitest.workspace.mts --project=storybook",
-    "test:a11y": "vitest run --workspace=vitest.workspace.mts --project=storybook",
+    "storybook:test": "vitest --config=vitest.workspace.mts --project=storybook",
+    "test:a11y": "vitest run --config=vitest.workspace.mts --project=storybook",
     "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
   },
   "dependencies": {
