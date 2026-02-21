@@ -7,6 +7,13 @@ import type { EncryptionResult } from './url-encryption';
 
 const ALGORITHM = 'aes-256-gcm';
 
+const SCRYPT_WORK_FACTOR = Object.freeze({
+  N: 2 ** 17,
+  r: 8,
+  p: 1,
+  maxmem: 256 * 1024 * 1024,
+});
+
 const isTestTime = isTestEnv();
 
 // Build-time detection - these are injected by Next.js build process
@@ -54,7 +61,7 @@ export function encryptUrl(url: string): EncryptionResult {
   try {
     const iv = crypto.randomBytes(16);
     const salt = crypto.randomBytes(16);
-    const key = crypto.scryptSync(keyMaterial, salt, 32);
+    const key = crypto.scryptSync(keyMaterial, salt, 32, SCRYPT_WORK_FACTOR);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
     const encryptedBuffer = Buffer.concat([
@@ -103,7 +110,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
     }
 
     const salt = Buffer.from(encryptionResult.salt, 'hex');
-    const key = crypto.scryptSync(keyMaterial, salt, 32);
+    const key = crypto.scryptSync(keyMaterial, salt, 32, SCRYPT_WORK_FACTOR);
     const iv = Buffer.from(encryptionResult.iv, 'hex');
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 

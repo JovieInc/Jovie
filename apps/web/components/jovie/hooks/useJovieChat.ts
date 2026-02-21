@@ -64,6 +64,7 @@ export function useJovieChat({
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRateLimitHint, setShowRateLimitHint] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
@@ -443,6 +444,7 @@ export function useJovieChat({
       limit: 1,
       window: PACER_TIMING.CHAT_RATE_LIMIT_MS,
       onReject: () => {
+        setShowRateLimitHint(true);
         setChatError({
           type: 'rate_limit',
           message:
@@ -453,7 +455,17 @@ export function useJovieChat({
     }
   );
 
-  const isRateLimited = rateLimitedSubmitter.getRemainingInWindow() === 0;
+  useEffect(() => {
+    if (!showRateLimitHint) return;
+
+    const timer = setTimeout(() => {
+      setShowRateLimitHint(false);
+    }, PACER_TIMING.CHAT_RATE_LIMIT_MS);
+
+    return () => clearTimeout(timer);
+  }, [showRateLimitHint]);
+
+  const isRateLimited = showRateLimitHint;
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent, files?: FileUIPart[]) => {
