@@ -240,7 +240,7 @@ describe('dashboard data prefetch', () => {
 
   it('maps postgres bool-like existence values correctly', async () => {
     const { mapSocialLinkExistence } = await import(
-      '@/app/app/(shell)/dashboard/actions/dashboard-data'
+      '@/app/app/(shell)/dashboard/actions/social-link-utils'
     );
 
     expect(
