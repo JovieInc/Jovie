@@ -25,8 +25,10 @@ const USER_STATE_CACHE_KEY_PREFIX = 'proxy:user-state:';
 const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (invalidation is explicit)
 const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
 
-// Timeout for DB query to prevent proxy hanging on Neon cold starts
-const DB_QUERY_TIMEOUT_MS = 5000; // 5 seconds
+// Timeout for DB query to prevent proxy hanging on Neon cold starts.
+// Neon cold starts can regularly exceed 5s, so we use a slightly higher
+// timeout to reduce false-positive failures while keeping proxy latency bounded.
+const DB_QUERY_TIMEOUT_MS = 8000; // 8 seconds
 
 // ---------------------------------------------------------------------------
 // In-memory cache layer
