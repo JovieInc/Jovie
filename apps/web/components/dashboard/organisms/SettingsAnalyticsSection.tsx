@@ -1,6 +1,7 @@
 'use client';
 
 import { BarChart3 } from 'lucide-react';
+import { useCallback } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
@@ -20,6 +21,19 @@ export function SettingsAnalyticsSection({
 }: SettingsAnalyticsSectionProps) {
   const { updateAnalyticsFilterAsync } = useAnalyticsFilterMutation();
 
+  const handleOptimisticUpdate = useCallback(
+    (enabled: boolean) => {
+      onArtistUpdate?.({
+        ...artist,
+        settings: {
+          ...artist.settings,
+          exclude_self_from_analytics: enabled,
+        },
+      });
+    },
+    [artist, onArtistUpdate]
+  );
+
   const {
     checked: excludeSelf,
     handleToggle,
@@ -27,17 +41,8 @@ export function SettingsAnalyticsSection({
   } = useOptimisticToggle({
     initialValue: artist.settings?.exclude_self_from_analytics ?? false,
     mutateAsync: updateAnalyticsFilterAsync,
-    onOptimisticUpdate: onArtistUpdate
-      ? enabled => {
-          onArtistUpdate({
-            ...artist,
-            settings: {
-              ...artist.settings,
-              exclude_self_from_analytics: enabled,
-            },
-          });
-        }
-      : undefined,
+    onOptimisticUpdate: handleOptimisticUpdate,
+    errorMessage: 'Failed to update analytics filter.',
   });
 
   return (

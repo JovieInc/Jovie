@@ -44,9 +44,9 @@ export function useOptimisticToggle({
       await mutateAsync(enabled);
     } catch {
       // Rollback on error
-      toast.error(errorMessage);
       setChecked(previousValue);
       onOptimisticUpdate?.(previousValue);
+      toast.error(errorMessage);
     } finally {
       setIsPending(false);
     }

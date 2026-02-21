@@ -14,9 +14,9 @@ export function SettingsAudienceSection() {
     isPending,
   } = useOptimisticToggle({
     initialValue: true,
-    mutateAsync: enabled =>
+    mutateAsync: (enabled: boolean) =>
       updateNotificationsAsync({ require_double_opt_in: enabled }),
-    errorMessage: 'Failed to update audience setting. Please try again.',
+    errorMessage: 'Failed to update email verification setting.',
   });
 
   return (

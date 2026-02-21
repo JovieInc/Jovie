@@ -219,6 +219,7 @@ export function useNotificationSettingsMutation() {
 
   return {
     updateNotifications,
+    /** Async variant for use with try/catch rollback patterns */
     updateNotificationsAsync,
     isPending: mutation.isPending,
     isError: mutation.isError,
