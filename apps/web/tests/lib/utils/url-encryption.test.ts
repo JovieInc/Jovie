@@ -65,6 +65,25 @@ describe('URL Encryption', () => {
       expect(decrypted).toBe(url);
     });
 
+    it('should use strong scrypt work factor parameters', () => {
+      const scryptSpy = vi.spyOn(crypto, 'scryptSync');
+
+      const result = encryptUrl('https://example.com/scrypt');
+      decryptUrl(result);
+
+      expect(scryptSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        32,
+        expect.objectContaining({
+          N: 2 ** 17,
+          r: 8,
+          p: 1,
+          maxmem: 256 * 1024 * 1024,
+        })
+      );
+    });
+
     it('should throw error when cipher creation fails', () => {
       const url = 'https://example.com/fallback';
       const cipherSpy = vi

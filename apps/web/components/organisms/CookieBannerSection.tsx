@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
@@ -22,12 +23,15 @@ export interface CookieBannerSectionProps {
 export function CookieBannerSection({
   showBanner = true,
 }: CookieBannerSectionProps) {
+  const pathname = usePathname();
+  const isDashboard = Boolean(pathname?.startsWith('/app'));
+
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
 
   useEffect(() => {
-    if (!showBanner) {
+    if (!showBanner || isDashboard) {
       setVisible(false);
       return;
     }
@@ -38,7 +42,7 @@ export function CookieBannerSection({
     } catch {
       setVisible(true);
     }
-  }, [showBanner]);
+  }, [showBanner, isDashboard]);
 
   useEffect(() => {
     if (globalThis.window && !globalThis.JVConsent) {
@@ -98,7 +102,7 @@ export function CookieBannerSection({
 
   return (
     <>
-      {showBanner && visible ? (
+      {showBanner && visible && !isDashboard ? (
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'

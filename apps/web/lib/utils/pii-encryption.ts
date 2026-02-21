@@ -13,6 +13,12 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const KEY_LENGTH = 32;
+const SCRYPT_WORK_FACTOR = Object.freeze({
+  N: 2 ** 17,
+  r: 8,
+  p: 1,
+  maxmem: 256 * 1024 * 1024,
+});
 
 /**
  * Get the PII encryption key from environment (read at runtime, not cached)
@@ -33,7 +39,12 @@ function getEncryptionKey(): Buffer {
   }
 
   // Use scrypt to derive a 256-bit key from the provided key
-  return crypto.scryptSync(key, 'jovie-pii-salt', KEY_LENGTH);
+  return crypto.scryptSync(
+    key,
+    'jovie-pii-salt',
+    KEY_LENGTH,
+    SCRYPT_WORK_FACTOR
+  );
 }
 
 export interface EncryptedPII {

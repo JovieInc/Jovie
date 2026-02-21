@@ -8,7 +8,9 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import { useThemeMutation } from '@/lib/queries';
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { useHighContrast } from '@/lib/hooks/useHighContrast';
+import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light' },
@@ -18,44 +20,66 @@ const THEME_OPTIONS = [
 
 export function SettingsAppearanceSection() {
   const { theme, setTheme } = useTheme();
-  const { updateTheme, isPending } = useThemeMutation();
+  const { updateTheme, isPending: isThemePending } = useThemeMutation();
+  const { isHighContrast, setHighContrast } = useHighContrast();
+  const { setHighContrast: saveHighContrast, isPending: isContrastPending } =
+    useHighContrastMutation();
 
   const handleThemeChange = (newTheme: string) => {
     const validTheme = newTheme as 'light' | 'dark' | 'system';
     setTheme(validTheme);
-    updateTheme(validTheme);
+    updateTheme(validTheme, isHighContrast);
+  };
+
+  const handleHighContrastChange = (enabled: boolean) => {
+    setHighContrast(enabled);
+    const currentTheme = (theme ?? 'system') as 'light' | 'dark' | 'system';
+    saveHighContrast(enabled, currentTheme);
   };
 
   const currentLabel =
     THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
 
   return (
-    <div className='flex items-center justify-between py-3 border-b border-subtle'>
-      <div className='flex-1 min-w-0'>
-        <h3 className='text-sm font-medium text-primary-token'>
-          Interface theme
-        </h3>
-        <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-          Select or customize your interface color scheme
-        </p>
+    <div className='divide-y divide-subtle'>
+      <div className='flex items-center justify-between py-3'>
+        <div className='flex-1 min-w-0'>
+          <h3 className='text-sm font-medium text-primary-token'>
+            Interface theme
+          </h3>
+          <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
+            Select or customize your interface color scheme
+          </p>
+        </div>
+        <div className='shrink-0'>
+          <Select
+            value={theme ?? 'system'}
+            onValueChange={handleThemeChange}
+            disabled={isThemePending}
+          >
+            <SelectTrigger className='w-[120px] h-8 text-[13px]'>
+              <SelectValue>{currentLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent position='item-aligned'>
+              {THEME_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <div className='shrink-0'>
-        <Select
-          value={theme ?? 'system'}
-          onValueChange={handleThemeChange}
-          disabled={isPending}
-        >
-          <SelectTrigger className='w-[120px] h-8 text-[13px]'>
-            <SelectValue>{currentLabel}</SelectValue>
-          </SelectTrigger>
-          <SelectContent position='item-aligned'>
-            {THEME_OPTIONS.map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+      <div className='py-3'>
+        <SettingsToggleRow
+          title='High contrast'
+          description='Increase contrast for text, borders, and surfaces'
+          checked={isHighContrast}
+          onCheckedChange={handleHighContrastChange}
+          disabled={isContrastPending}
+          ariaLabel='Toggle high contrast mode'
+        />
       </div>
     </div>
   );

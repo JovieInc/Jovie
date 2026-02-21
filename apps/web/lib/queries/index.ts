@@ -283,6 +283,7 @@ export { useReleasesQuery } from './useReleasesQuery';
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
+  useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,
