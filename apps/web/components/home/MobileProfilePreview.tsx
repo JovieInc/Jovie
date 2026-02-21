@@ -10,7 +10,8 @@ function formatReleaseType(type: string | null): string {
 }
 
 export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
-  const initial = creator.name.slice(0, 1).toUpperCase();
+  const displayName = creator.name.trim() || creator.handle;
+  const initial = displayName.slice(0, 1).toUpperCase();
   const primaryGenre = creator.genres[0] ?? 'Independent artist';
   const secondaryGenre = creator.genres[1];
 
@@ -30,7 +31,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
           className='text-sm font-medium'
           style={{ color: 'rgb(247, 248, 248)' }}
         >
-          {creator.name}
+          {displayName}
         </p>
         <p
           className='mt-0.5 text-xs'
@@ -68,7 +69,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
             color: 'rgb(8, 9, 10)',
           }}
         >
-          Get updates from {creator.name.split(' ')[0]}
+          Get updates from {displayName.split(' ')[0]}
         </div>
       </div>
     </div>

@@ -1,19 +1,31 @@
+import type { FeaturedCreator } from '@/lib/featured-creators';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
+
+const FALLBACK_CREATOR: FeaturedCreator = {
+  id: 'fallback',
+  handle: 'artist',
+  name: 'Your Name Here',
+  src: '/android-chrome-192x192.png',
+  genres: ['Independent artist'],
+  latestReleaseTitle: 'New release coming soon',
+  latestReleaseType: null,
+};
 
 /**
  * RedesignedHero — F-layout hero: copy left, profile mockup right.
  * Linear.app-inspired: floating card with browser chrome, deep shadows, slight 3D tilt.
  */
 export async function RedesignedHero() {
-  const creators = await getFeaturedCreators();
-  const featuredCreator = creators[0];
-
-  if (!featuredCreator) {
-    return null;
+  let creators: FeaturedCreator[] = [];
+  try {
+    creators = await getFeaturedCreators();
+  } catch {
+    // Fall through to fallback
   }
+  const featuredCreator = creators[0] ?? FALLBACK_CREATOR;
 
   return (
     <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 sm:px-6 lg:px-[77px]'>
@@ -95,11 +107,7 @@ export async function RedesignedHero() {
   );
 }
 
-function HeroProfileMockup({
-  creator,
-}: {
-  readonly creator: Awaited<ReturnType<typeof getFeaturedCreators>>[number];
-}) {
+function HeroProfileMockup({ creator }: { readonly creator: FeaturedCreator }) {
   return (
     <div className='flex flex-col items-center'>
       <div

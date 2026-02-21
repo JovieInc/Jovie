@@ -104,21 +104,29 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     >();
 
     if (creatorIds.length > 0 && (await doesTableExist('discog_releases'))) {
-      const latestReleases = await db.query.discogReleases.findMany({
-        where: (releases, { inArray }) =>
-          inArray(releases.creatorProfileId, creatorIds),
-        columns: {
-          creatorProfileId: true,
-          title: true,
-          releaseType: true,
-          releaseDate: true,
-          createdAt: true,
-        },
-        orderBy: (releases, { desc }) => [
-          desc(releases.releaseDate),
-          desc(releases.createdAt),
-        ],
-      });
+      const latestReleases = await Promise.race([
+        db.query.discogReleases.findMany({
+          where: (releases, { inArray }) =>
+            inArray(releases.creatorProfileId, creatorIds),
+          columns: {
+            creatorProfileId: true,
+            title: true,
+            releaseType: true,
+            releaseDate: true,
+            createdAt: true,
+          },
+          orderBy: (releases, { desc }) => [
+            desc(releases.releaseDate),
+            desc(releases.createdAt),
+          ],
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Discog releases query timeout after 10s')),
+            10000
+          )
+        ),
+      ]);
 
       for (const release of latestReleases) {
         if (!releaseByCreatorId.has(release.creatorProfileId)) {
