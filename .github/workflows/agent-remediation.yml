@@ -305,6 +305,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      id-token: write
     steps:
       - name: Validate PR is not from a fork
         env:
@@ -496,6 +497,7 @@ jobs:
       - name: Commit and push fixes
         if: steps.final-status.outputs.final_passed == 'true'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_HEAD_REF: ${{ needs.guard.outputs.pr_head_ref }}
         run: |
           if git diff --quiet && git diff --staged --quiet; then
@@ -505,6 +507,9 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure credentials for push (checkout used persist-credentials: false)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
           git add -A
 
