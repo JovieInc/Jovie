@@ -72,4 +72,27 @@ describe('ProfileShell notification trigger', () => {
 
     expect(routerPushMock).toHaveBeenCalledWith('/testartist?mode=subscribe');
   });
+
+  it('propagates the source search param when clicking the notification bell', () => {
+    useSearchParamsMock.mockReturnValue(
+      new URLSearchParams('mode=tip&source=someSource')
+    );
+
+    renderWithQueryClient(
+      <ProfileShell
+        artist={makeArtist()}
+        socialLinks={[] as LegacySocialLink[]}
+        contacts={[] as PublicContact[]}
+        showNotificationButton
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /subscribe to notifications/i })
+    );
+
+    expect(routerPushMock).toHaveBeenCalledWith(
+      '/testartist?mode=subscribe&source=someSource'
+    );
+  });
 });
