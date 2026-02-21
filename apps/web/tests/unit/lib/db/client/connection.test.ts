@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { db, setInternalDb } from '@/lib/db/client/connection';
 import type { DbType } from '@/lib/db/client/types';
 
+const originalDb = db;
+
 describe('db proxy', () => {
+  afterEach(() => {
+    setInternalDb(originalDb as any);
+  });
   it('binds function properties to underlying db instance', () => {
     const mockDb = {
       marker: 'expected-context',
