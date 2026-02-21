@@ -214,10 +214,10 @@ describe('Analytics Tracking Integration', () => {
   });
 
   describe('Query Timeouts', () => {
-    it('should apply dashboard timeout (10s)', async () => {
+    it('should apply dashboard timeout (20s)', async () => {
       const { QUERY_TIMEOUTS } = await import('@/lib/db/query-timeout');
 
-      expect(QUERY_TIMEOUTS.dashboard).toBe(10000);
+      expect(QUERY_TIMEOUTS.dashboard).toBe(20000);
     });
 
     it('should apply API timeout (5s)', async () => {
