@@ -214,18 +214,98 @@ export function extractEmailsFromHtml(html: string): string[] {
   }
 
   // Extract from text content (bio, descriptions)
-  // Remove HTML tags first
-  const textContent = html
-    .replaceAll(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replaceAll(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replaceAll(/<[^>]+>/g, ' ')
-    .replaceAll(/\s+/g, ' ');
+  // Use a lightweight parser instead of tag-stripping regexes.
+  const textContent = extractTextContentFromHtml(html);
 
   for (const email of extractEmailsFromText(textContent)) {
     emails.add(email);
   }
 
   return Array.from(emails);
+}
+
+/**
+ * Extract plain text from HTML without regex-based tag filtering.
+ */
+function extractTextContentFromHtml(html: string): string {
+  let output = '';
+  let i = 0;
+
+  let inTag = false;
+  let inScript = false;
+  let inStyle = false;
+  let inComment = false;
+  let isClosingTag = false;
+  let currentTag = '';
+
+  while (i < html.length) {
+    const char = html[i];
+
+    if (inComment) {
+      if (html.slice(i, i + 3) === '-->') {
+        inComment = false;
+        i += 3;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (!inTag && char === '<') {
+      if (html.slice(i, i + 4) === '<!--') {
+        inComment = true;
+        i += 4;
+        continue;
+      }
+
+      inTag = true;
+      isClosingTag = false;
+      currentTag = '';
+      i += 1;
+
+      while (i < html.length && /\s/.test(html[i])) {
+        i += 1;
+      }
+
+      if (html[i] === '/') {
+        isClosingTag = true;
+        i += 1;
+      }
+
+      while (i < html.length) {
+        const nextChar = html[i];
+        const isTagNameChar = /[A-Za-z0-9]/.test(nextChar);
+        if (!isTagNameChar) break;
+        currentTag += nextChar.toLowerCase();
+        i += 1;
+      }
+
+      continue;
+    }
+
+    if (inTag) {
+      if (char === '>') {
+        if (currentTag === 'script') {
+          inScript = !isClosingTag;
+        } else if (currentTag === 'style') {
+          inStyle = !isClosingTag;
+        }
+        inTag = false;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (inScript || inStyle) {
+      i += 1;
+      continue;
+    }
+
+    output += char;
+    i += 1;
+  }
+
+  return output.replaceAll(/\s+/g, ' ').trim();
 }
 
 /**
