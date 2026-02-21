@@ -5,10 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  COUNTRY_CODE_COOKIE,
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import {
+  AvailableDSP,
+  getAvailableDSPs,
+  sortDSPsByGeoPopularity,
+} from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { Artist } from '@/types/db';
 
@@ -25,9 +30,20 @@ export function useAnimatedListenInterface(
   handle: string,
   enableDynamicEngagement: boolean
 ): UseAnimatedListenInterfaceReturn {
-  const [availableDSPs] = useState<AvailableDSP[]>(() =>
-    getAvailableDSPs(artist)
-  );
+  const [availableDSPs] = useState<AvailableDSP[]>(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    return sortDSPsByGeoPopularity(
+      getAvailableDSPs(artist),
+      countryCode ?? null
+    );
+  });
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
