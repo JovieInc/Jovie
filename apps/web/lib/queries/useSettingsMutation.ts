@@ -201,8 +201,17 @@ export function useNotificationSettingsMutation() {
     [mutation]
   );
 
+  const updateNotificationsAsync = useCallback(
+    (settings: SettingsUpdateInput['updates']['settings']) => {
+      return mutation.mutateAsync({ updates: { settings } });
+    },
+    [mutation]
+  );
+
   return {
     updateNotifications,
+    /** Async variant for use with try/catch rollback patterns */
+    updateNotificationsAsync,
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

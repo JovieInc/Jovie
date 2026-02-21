@@ -12,6 +12,7 @@ import {
   saveBandsintownApiKey,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
@@ -124,22 +125,24 @@ export function SettingsTouringSection({
     }
   }, [queryClient, profileId]);
 
+  if (isLoading) {
+    return (
+      <DashboardCard variant='settings'>
+        <TouringSectionSkeleton />
+      </DashboardCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SettingsErrorState
+        message='Failed to load connection status.'
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
   const renderContent = () => {
-    if (isLoading) {
-      return <TouringSectionSkeleton />;
-    }
-    if (isError) {
-      return (
-        <div className='flex flex-col items-center gap-2 py-6'>
-          <p className='text-sm text-secondary-token'>
-            Failed to load connection status.
-          </p>
-          <Button size='sm' variant='ghost' onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      );
-    }
     return (
       <div className='space-y-4'>
         <p className='text-sm text-secondary-token'>
