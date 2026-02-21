@@ -120,15 +120,19 @@ function safeSerializeError(error: unknown): string {
   return trySerialize({ value: String(error) }) ?? String(error);
 }
 
+interface SocialLinkExistenceCounts {
+  hasLinks?: boolean | number | string | null;
+  hasMusicLinks?: boolean | number | string | null;
+}
+
+interface SocialLinkExistenceFlags {
+  hasLinks: boolean;
+  hasMusicLinks: boolean;
+}
+
 export function mapSocialLinkExistence(
-  counts:
-    | {
-        hasLinks?: boolean | number | string | null;
-        hasMusicLinks?: boolean | number | string | null;
-      }
-    | null
-    | undefined
-): { hasLinks: boolean; hasMusicLinks: boolean } {
+  counts: SocialLinkExistenceCounts | null | undefined
+): SocialLinkExistenceFlags {
   const parseBoolLike = (value: boolean | number | string | null | undefined) =>
     value === true || value === 1 || value === '1' || value === 't';
 
@@ -297,7 +301,8 @@ async function fetchDashboardCoreWithSession(
                 from ${socialLinks}
                 where ${and(
                   eq(socialLinks.creatorProfileId, selected.id),
-                  eq(socialLinks.state, 'active')
+                  eq(socialLinks.state, 'active'),
+                  eq(socialLinks.isActive, true)
                 )}
               )
             `,
@@ -308,6 +313,7 @@ async function fetchDashboardCoreWithSession(
                 where ${and(
                   eq(socialLinks.creatorProfileId, selected.id),
                   eq(socialLinks.state, 'active'),
+                  eq(socialLinks.isActive, true),
                   or(
                     eq(socialLinks.platformType, 'dsp'),
                     eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
