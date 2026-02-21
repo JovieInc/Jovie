@@ -104,9 +104,16 @@ describe('URL Encryption', () => {
     it('should throw error when encrypted payload is tampered', () => {
       const url = 'https://example.com/protected';
       const encrypted = encryptUrl(url);
+
+      // Tamper the auth tag to guarantee GCM authentication failure.
+      // Flipping a hex character in the auth tag is more reliable than
+      // modifying the ciphertext, which could coincidentally be a no-op
+      // if the last characters happen to match the replacement value.
+      const originalTag = encrypted.authTag;
+      const flippedChar = originalTag[0] === 'a' ? 'b' : 'a';
       const tampered: EncryptionResult = {
         ...encrypted,
-        encrypted: encrypted.encrypted.slice(0, -2) + 'aa',
+        authTag: flippedChar + originalTag.slice(1),
       };
 
       expect(() => decryptUrl(tampered)).toThrow();

@@ -68,12 +68,15 @@ export function MethodSelector({
 }: MethodSelectorProps) {
   // Order methods with last used first
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] = ['google', 'email', 'spotify'];
+    const base: AuthMethod[] =
+      mode === 'signup'
+        ? ['spotify', 'google', 'email']
+        : ['google', 'email', 'spotify'];
 
     if (!lastMethod) return base;
     if (!base.includes(lastMethod)) return base;
     return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod]);
+  }, [lastMethod, mode]);
 
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';
@@ -167,8 +170,8 @@ export function MethodSelector({
         </h1>
         {mode === 'signup' && (
           <p className={FORM_LAYOUT.hint}>
-            Your link-in-bio built for music. Smart links, fan capture, and
-            audience growth — all in one page.
+            Start with Spotify to import your profile in seconds, then make it
+            unmistakably yours.
           </p>
         )}
       </div>

@@ -108,6 +108,15 @@ export const homepageDashboardShowcase = flag({
   },
 });
 
+export const homepageAutomaticReleaseSmartlinks = flag({
+  key: 'homepage_automatic_release_smartlinks',
+  description: 'Show the automatic release smartlinks section on the homepage',
+  defaultValue: false,
+  decide() {
+    return this.defaultValue as boolean;
+  },
+});
+
 /** All homepage flags for bulk operations (discovery endpoint, layout encryption) */
 export const homepageFlags = [
   homepageHero,
@@ -122,4 +131,5 @@ export const homepageFlags = [
   homepageSeeItInAction,
   homepageFinalCta,
   homepageDashboardShowcase,
+  homepageAutomaticReleaseSmartlinks,
 ] as const;

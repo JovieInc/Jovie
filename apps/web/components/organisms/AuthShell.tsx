@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';

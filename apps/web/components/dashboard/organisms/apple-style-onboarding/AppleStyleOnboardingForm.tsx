@@ -20,8 +20,10 @@ import { useStepNavigation } from './useStepNavigation';
 export function AppleStyleOnboardingForm({
   initialDisplayName = '',
   initialHandle = '',
+  isReservedHandle = false,
   userEmail = null,
   userId,
+  shouldAutoSubmitHandle = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
   const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
@@ -47,16 +49,18 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit, isPendingSubmit } = useOnboardingSubmit({
-    userId,
-    userEmail,
-    fullName,
-    handle,
-    handleInput,
-    handleValidation,
-    goToNextStep,
-    setProfileReadyHandle,
-  });
+  const { state, handleSubmit, isPendingSubmit, spotifyImportState } =
+    useOnboardingSubmit({
+      userId,
+      userEmail,
+      fullName,
+      handle,
+      handleInput,
+      handleValidation,
+      goToNextStep,
+      setProfileReadyHandle,
+      shouldAutoSubmitHandle,
+    });
 
   useEffect(() => {
     if (userId) {
@@ -129,6 +133,7 @@ export function AppleStyleOnboardingForm({
             title={ONBOARDING_STEPS[0].title}
             prompt={ONBOARDING_STEPS[0].prompt}
             handleInput={handleInput}
+            isReservedHandle={isReservedHandle}
             handleValidation={handleValidation}
             stateError={state.error}
             isSubmitting={state.isSubmitting}
@@ -151,6 +156,9 @@ export function AppleStyleOnboardingForm({
             copied={copied}
             onGoToDashboard={goToDashboard}
             onCopyLink={copyProfileLink}
+            spotifyImportStatus={spotifyImportState.status}
+            spotifyImportMessage={spotifyImportState.message}
+            spotifyImportStage={spotifyImportState.stage}
           />
         );
 

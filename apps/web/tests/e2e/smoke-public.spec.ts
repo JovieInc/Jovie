@@ -13,6 +13,7 @@ import {
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
   smokeNavigate,
+  smokeNavigateWithRetry,
   TEST_PROFILES,
   waitForHydration,
 } from './utils/smoke-test-utils';
@@ -287,7 +288,10 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           const { getContext, cleanup } = setupPageMonitoring(page);
 
           try {
-            const response = await smokeNavigate(page, `/${profile}${path}`);
+            const response = await smokeNavigateWithRetry(
+              page,
+              `/${profile}${path}`
+            );
             const status = response?.status() ?? 0;
 
             // Redirects (3xx) and 200 are both acceptable — subpages redirect

@@ -245,7 +245,8 @@ export function FilterSubmenu<T extends string = string>({
       <DropdownMenuSubContent
         sideOffset={4}
         alignOffset={-4}
-        className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+        collisionPadding={8}
+        className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
       >
         <SearchInput
           value={search}

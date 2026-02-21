@@ -77,9 +77,14 @@ describe('usePlanGate – edge cases', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     // Should fall back to free entitlements
     expect(result.current.isError).toBe(true);
@@ -101,9 +106,14 @@ describe('usePlanGate – edge cases', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     expect(result.current.isError).toBe(true);
     expect(result.current.isPro).toBe(false);
@@ -236,9 +246,14 @@ describe('usePlanGate – feature consistency', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     expect(result.current.isError).toBe(true);
     expect(result.current.canRemoveBranding).toBe(false);

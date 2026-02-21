@@ -20,4 +20,9 @@ rules:
         - context: 'CI / Lint'
         - context: 'CI / Migration Guard'
         - context: 'CI / ci-fast'
+        - context: 'CI / Unit Tests (1/2)'
+        - context: 'CI / Unit Tests (2/2)'
+        - context: 'CI / A11y (axe)'
+        - context: 'CI / Layout Guard (blocking)'
+        - context: 'CI / PR Ready'
 bypass_actors: []

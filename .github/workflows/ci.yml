@@ -770,13 +770,17 @@ jobs:
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
   ci-unit-tests:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.shard }})
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
     # Unit tests run on all PRs, merge queue, and push to main
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/2', '2/2']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -836,22 +840,24 @@ jobs:
         run: |
           # Enable coverage on main branch and PRs for Codecov integration
           COVERAGE_FLAG="--coverage"
-          # Mitigate low-frequency flakes by retrying failed tests once in CI.
+          # Use forked pool with limited workers to reduce CI flakiness from memory pressure
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
+          # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite with coverage"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG $RETRY_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -860,7 +866,7 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}

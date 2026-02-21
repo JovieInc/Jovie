@@ -112,6 +112,12 @@ const baseDashboardData: DashboardData = {
     totalReceivedCents: 0,
     monthReceivedCents: 0,
   },
+  profileCompletion: {
+    percentage: 57,
+    completedCount: 4,
+    totalCount: 7,
+    steps: [],
+  },
 };
 
 function renderChatPage(conversationId?: string) {

@@ -60,7 +60,7 @@ export function LatestReleaseCard({
   return (
     <div className='flex items-center gap-3 rounded-xl border border-subtle bg-surface-0/60 p-2.5 backdrop-blur-sm'>
       {/* Album Art */}
-      <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-surface-1'>
+      <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded bg-surface-1'>
         {release.artworkUrl ? (
           <Image
             src={release.artworkUrl}
