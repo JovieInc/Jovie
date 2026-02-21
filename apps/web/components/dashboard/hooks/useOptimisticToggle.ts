@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface UseOptimisticToggleOptions {
@@ -24,6 +24,11 @@ export function useOptimisticToggle({
 }: UseOptimisticToggleOptions): UseOptimisticToggleReturn {
   const [checked, setChecked] = useState(initialValue);
   const [isPending, setIsPending] = useState(false);
+
+  // Sync local state when the source of truth changes (e.g. after a refetch)
+  useEffect(() => {
+    setChecked(initialValue);
+  }, [initialValue]);
 
   const handleToggle = async (enabled: boolean) => {
     const previousValue = checked;
