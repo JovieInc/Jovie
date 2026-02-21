@@ -45,6 +45,11 @@ interface SettingsUpdateResponse {
   error?: string;
 }
 
+interface SettingsMutationOptions {
+  /** Suppress success toasts for obvious visual changes (e.g. theme toggles). */
+  silentSuccess?: boolean;
+}
+
 const updateSettings = createMutationFn<
   SettingsUpdateInput,
   SettingsUpdateResponse
@@ -81,26 +86,30 @@ const updateSettings = createMutationFn<
  * }
  * ```
  */
-export function useUpdateSettingsMutation() {
+export function useUpdateSettingsMutation(
+  options: SettingsMutationOptions = {}
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: updateSettings,
 
     onSuccess: (_data, variables) => {
-      // Show appropriate success message based on what was updated
-      if (variables.updates.theme) {
-        handleMutationSuccess('Theme preference saved');
-      } else if (variables.updates.settings?.hide_branding !== undefined) {
-        handleMutationSuccess('Branding settings saved');
-      } else if (
-        variables.updates.settings?.exclude_self_from_analytics !== undefined
-      ) {
-        handleMutationSuccess('Analytics filter saved');
-      } else if (variables.updates.settings) {
-        handleMutationSuccess('Settings saved');
-      } else {
-        handleMutationSuccess('Changes saved');
+      if (!options.silentSuccess) {
+        // Show appropriate success message based on what was updated
+        if (variables.updates.theme) {
+          handleMutationSuccess('Theme preference saved');
+        } else if (variables.updates.settings?.hide_branding !== undefined) {
+          handleMutationSuccess('Branding settings saved');
+        } else if (
+          variables.updates.settings?.exclude_self_from_analytics !== undefined
+        ) {
+          handleMutationSuccess('Analytics filter saved');
+        } else if (variables.updates.settings) {
+          handleMutationSuccess('Settings saved');
+        } else {
+          handleMutationSuccess('Changes saved');
+        }
       }
 
       // Invalidate user settings queries to reflect changes
@@ -138,7 +147,7 @@ export function useUpdateSettingsMutation() {
  * ```
  */
 export function useThemeMutation() {
-  const mutation = useUpdateSettingsMutation();
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
 
   return {
     updateTheme: (
@@ -165,7 +174,7 @@ export function useThemeMutation() {
  * ```
  */
 export function useHighContrastMutation() {
-  const mutation = useUpdateSettingsMutation();
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
 
   return {
     setHighContrast: (
