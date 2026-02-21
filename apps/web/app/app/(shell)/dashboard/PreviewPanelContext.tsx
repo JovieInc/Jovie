@@ -15,6 +15,7 @@ export interface PreviewPanelLink {
   url: string;
   platform: string;
   isVisible: boolean;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
 }
 
 export interface PreviewPanelData {

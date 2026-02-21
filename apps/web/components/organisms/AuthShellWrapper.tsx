@@ -118,16 +118,13 @@ function AuthShellWrapperInner({
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
-    () =>
-      config.section === 'dashboard' ? (
-        <>
-          <HeaderProfileProgress />
-          {config.isTableRoute && <DrawerToggleButton />}
-        </>
-      ) : config.isTableRoute ? (
-        <DrawerToggleButton />
-      ) : null,
-    [config.isTableRoute, config.section]
+    () => (
+      <>
+        <HeaderProfileProgress />
+        {config.isTableRoute && <DrawerToggleButton />}
+      </>
+    ),
+    [config.isTableRoute]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.

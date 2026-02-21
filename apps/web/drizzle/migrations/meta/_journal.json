@@ -285,6 +285,13 @@
     {
       "idx": 40,
       "version": "7",
+      "when": 1771642685744,
+      "tag": "0040_add_social_link_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
       "when": 1771642408553,
       "tag": "0040_waitlist_gate_settings",
       "breakpoints": true

@@ -46,6 +46,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
     return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
   },
+  get NEXT_PUBLIC_FEATURE_VOICE_INPUT() {
+    return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT || undefined;
+  },
   // SEO verification
   get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {
     return process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined;

@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useProfileNotificationsController } from '@/components/organisms/hooks/useProfileNotificationsController';
 import {
@@ -21,6 +21,7 @@ export interface UseProfileShellReturn {
   setIsTipNavigating: (value: boolean) => void;
   notificationsEnabled: boolean;
   notificationsController: ReturnType<typeof useProfileNotificationsController>;
+  handleNotificationsTrigger: () => void;
   notificationsContextValue: ProfileNotificationsContextValue;
   socialNetworkLinks: LegacySocialLink[];
   hasSocialLinks: boolean;
@@ -39,6 +40,7 @@ export function useProfileShell({
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
 
   // Memoize extracted search params to avoid downstream re-renders
   // when unrelated URL parameters change
@@ -76,6 +78,7 @@ export function useProfileShell({
 
   const {
     channel,
+    handleNotificationsClick,
     hasStoredContacts,
     hydrationStatus,
     openSubscription,
@@ -88,6 +91,33 @@ export function useProfileShell({
     subscribedChannels,
     subscriptionDetails,
   } = notificationsController;
+
+  const handleNotificationsTrigger = useMemo(
+    () => () => {
+      const isPrimaryProfileMode = mode === 'profile';
+
+      if (
+        !isPrimaryProfileMode &&
+        !notificationsController.hasActiveSubscriptions
+      ) {
+        const sourceParam = source
+          ? `&source=${encodeURIComponent(source)}`
+          : '';
+        router.push(`/${artist.handle}?mode=subscribe${sourceParam}`);
+        return;
+      }
+
+      handleNotificationsClick();
+    },
+    [
+      artist.handle,
+      handleNotificationsClick,
+      mode,
+      notificationsController.hasActiveSubscriptions,
+      router,
+      source,
+    ]
+  );
 
   const notificationsContextValue = useMemo(
     () => ({
@@ -139,6 +169,7 @@ export function useProfileShell({
     setIsTipNavigating,
     notificationsEnabled,
     notificationsController,
+    handleNotificationsTrigger,
     notificationsContextValue,
     socialNetworkLinks,
     hasSocialLinks,

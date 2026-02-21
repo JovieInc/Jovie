@@ -1,11 +1,13 @@
 'use client';
 
+import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
@@ -148,6 +150,16 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
           <div className='min-w-0 flex-1'>
             <div className='truncate text-sm text-primary-token'>
               {handle ? `@${handle}` : formatDisplayHost(link.url)}
+              {link.platform === 'website' &&
+                link.verificationStatus === 'verified' && (
+                  <span className='ml-1.5 inline-flex align-middle'>
+                    <SimpleTooltip content='Official website'>
+                      <span>
+                        <VerifiedBadge size='sm' className='text-accent' />
+                      </span>
+                    </SimpleTooltip>
+                  </span>
+                )}
             </div>
           </div>
         </div>

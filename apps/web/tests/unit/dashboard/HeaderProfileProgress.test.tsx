@@ -1,22 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
+import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
 import { fastRender } from '@/tests/utils/fast-render';
 
-vi.mock('@/lib/error-tracking', () => ({
-  captureWarning: vi.fn(),
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 const baseDashboardData: DashboardData = {
   user: { id: 'user_123' },
-  creatorProfiles: [
-    {
-      id: 'profile-1',
-      displayName: 'Test Artist',
-      username: 'testartist',
-    } as DashboardData['creatorProfiles'][0],
-  ],
+  creatorProfiles: [],
   selectedProfile: {
     id: 'profile-1',
     displayName: 'Test Artist',
@@ -46,52 +40,32 @@ const baseDashboardData: DashboardData = {
         description: 'A recognizable photo makes your page feel personal.',
         href: '/app/settings/artist-profile',
       },
-      {
-        id: 'tip-jar',
-        label: 'Set up your tip jar',
-        description: 'Turn attention into support with a fast tipping link.',
-        href: '/app/dashboard/earnings',
-      },
     ],
   },
 };
 
-function renderCard(overrides: Partial<DashboardData> = {}) {
+function renderProgress(overrides: Partial<DashboardData> = {}) {
   return fastRender(
     <DashboardDataProvider value={{ ...baseDashboardData, ...overrides }}>
-      <ProfileCompletionCard />
+      <HeaderProfileProgress />
     </DashboardDataProvider>
   );
 }
 
-describe('ProfileCompletionCard', () => {
-  it('renders progress and next steps when profile is incomplete', () => {
-    const { getByText } = renderCard();
+describe('HeaderProfileProgress', () => {
+  it('renders progress when profile setup is incomplete', () => {
+    const { getByLabelText, getByText } = renderProgress();
 
-    expect(getByText('Your profile is 57% complete')).toBeDefined();
-    expect(getByText('Add a profile photo')).toBeDefined();
-    expect(getByText('Set up your tip jar')).toBeDefined();
+    expect(getByLabelText(/Profile 57% complete/)).toBeDefined();
+    expect(getByText('57%')).toBeDefined();
   });
 
   it('does not crash when profileCompletion is missing', () => {
-    const { queryByText } = renderCard({
+    const { queryByRole } = renderProgress({
       profileCompletion:
         undefined as unknown as DashboardData['profileCompletion'],
     });
 
-    expect(queryByText(/Your profile is/)).toBeNull();
-  });
-
-  it('does not render when profile is fully complete', () => {
-    const { queryByText } = renderCard({
-      profileCompletion: {
-        percentage: 100,
-        completedCount: 7,
-        totalCount: 7,
-        steps: [],
-      },
-    });
-
-    expect(queryByText(/Your profile is/)).toBeNull();
+    expect(queryByRole('button')).toBeNull();
   });
 });

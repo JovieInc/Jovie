@@ -54,6 +54,7 @@ vi.mock('@/lib/queries/keys', () => ({
 import {
   useAnalyticsFilterMutation,
   useBrandingSettingsMutation,
+  useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,
@@ -334,6 +335,38 @@ describe('useThemeMutation', () => {
     });
   });
 
+  it('suppresses success toasts for theme changes', async () => {
+    const { result } = renderHook(() => useThemeMutation(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      result.current.updateTheme('light');
+      await Promise.resolve();
+    });
+
+    expect(mockHandleMutationSuccess).not.toHaveBeenCalled();
+  });
+
+  it('still shows error toasts when theme updates fail', async () => {
+    const error = new Error('Network error');
+    mockMutationFn.mockRejectedValueOnce(error);
+
+    const { result } = renderHook(() => useThemeMutation(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      result.current.updateTheme('dark');
+      await Promise.resolve();
+    });
+
+    expect(mockHandleMutationError).toHaveBeenCalledWith(
+      error,
+      'Failed to save theme preference'
+    );
+  });
+
   it('exposes isPending, isError, and error from the underlying mutation', () => {
     const { result } = renderHook(() => useThemeMutation(), {
       wrapper: TestWrapper,
@@ -345,6 +378,39 @@ describe('useThemeMutation', () => {
     expect(result.current.isPending).toBe(false);
     expect(result.current.isError).toBe(false);
     expect(result.current.error).toBeNull();
+  });
+});
+
+/* ================================================================== */
+/*  useHighContrastMutation                                            */
+/* ================================================================== */
+
+describe('useHighContrastMutation', () => {
+  it('sends the current preference and high-contrast value', async () => {
+    const { result } = renderHook(() => useHighContrastMutation(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      result.current.setHighContrast(true, 'dark');
+    });
+
+    expect(mockMutationFn.mock.calls[0][0]).toEqual({
+      updates: { theme: { preference: 'dark', highContrast: true } },
+    });
+  });
+
+  it('suppresses success toasts for high-contrast toggles', async () => {
+    const { result } = renderHook(() => useHighContrastMutation(), {
+      wrapper: TestWrapper,
+    });
+
+    await act(async () => {
+      result.current.setHighContrast(false, 'system');
+      await Promise.resolve();
+    });
+
+    expect(mockHandleMutationSuccess).not.toHaveBeenCalled();
   });
 });
 

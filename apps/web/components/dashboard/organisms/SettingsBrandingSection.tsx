@@ -1,6 +1,7 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
+import { useCallback } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
@@ -20,6 +21,19 @@ export function SettingsBrandingSection({
 }: SettingsBrandingSectionProps) {
   const { updateBrandingAsync } = useBrandingSettingsMutation();
 
+  const handleOptimisticUpdate = useCallback(
+    (enabled: boolean) => {
+      onArtistUpdate?.({
+        ...artist,
+        settings: {
+          ...artist.settings,
+          hide_branding: enabled,
+        },
+      });
+    },
+    [artist, onArtistUpdate]
+  );
+
   const {
     checked: hideBranding,
     handleToggle,
@@ -27,17 +41,8 @@ export function SettingsBrandingSection({
   } = useOptimisticToggle({
     initialValue: artist.settings?.hide_branding ?? false,
     mutateAsync: updateBrandingAsync,
-    onOptimisticUpdate: onArtistUpdate
-      ? enabled => {
-          onArtistUpdate({
-            ...artist,
-            settings: {
-              ...artist.settings,
-              hide_branding: enabled,
-            },
-          });
-        }
-      : undefined,
+    onOptimisticUpdate: handleOptimisticUpdate,
+    errorMessage: 'Failed to update branding settings.',
   });
 
   return (

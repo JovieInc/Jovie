@@ -22,15 +22,18 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
     router.push(`${APP_ROUTES.CHAT}?q=${prompt}`);
   }, [router]);
 
+  const completionPercentage = profileCompletion?.percentage ?? 0;
+  const completionSteps = profileCompletion?.steps ?? [];
+
   if (
     !selectedProfile ||
-    profileCompletion.percentage >= 100 ||
-    profileCompletion.steps.length === 0
+    completionPercentage >= 100 ||
+    completionSteps.length === 0
   ) {
     return null;
   }
 
-  const pct = profileCompletion.percentage;
+  const pct = completionPercentage;
   // SVG circular progress: radius 14, circumference ~88
   const r = 14;
   const circumference = 2 * Math.PI * r;
@@ -40,7 +43,7 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
     <button
       type='button'
       onClick={handleClick}
-      aria-label={`Profile ${pct}% complete — click to finish setup`}
+      aria-label={`Profile ${pct}% complete. Open chat for a guided completion plan.`}
       className='group relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-secondary-token transition-colors hover:bg-surface-2/60 hover:text-primary-token'
     >
       <svg
@@ -80,7 +83,10 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           </linearGradient>
         </defs>
       </svg>
-      <span className='tabular-nums hidden sm:inline'>{pct}%</span>
+      <span className='hidden sm:inline text-[11px] text-tertiary-token'>
+        Profile
+      </span>
+      <span className='tabular-nums'>{pct}%</span>
     </button>
   );
 });
