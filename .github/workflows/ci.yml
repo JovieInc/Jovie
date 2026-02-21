@@ -517,7 +517,7 @@ jobs:
 
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -763,7 +763,7 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -892,17 +892,17 @@ jobs:
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            pnpm turbo test --filter=@jovie/web -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -911,7 +911,7 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: pnpm turbo test:fast --filter=@jovie/web -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
