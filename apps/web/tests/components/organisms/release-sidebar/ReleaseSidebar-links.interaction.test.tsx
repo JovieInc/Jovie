@@ -17,6 +17,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
+  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
+    <section data-testid='drawer-section'>{children}</section>
+  ),
   DrawerLinkSection: ({
     title,
     children,

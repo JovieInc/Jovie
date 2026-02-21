@@ -271,10 +271,12 @@ export {
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
 export {
+  useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
+  useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations

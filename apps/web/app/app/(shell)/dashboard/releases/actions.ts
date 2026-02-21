@@ -47,6 +47,7 @@ import {
   enqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
   checkIsrcRescanRateLimit,
   formatTimeRemaining,
@@ -177,6 +178,10 @@ function mapReleaseToViewModel(
     hasVideoLinks: release.providerLinks.some(link =>
       (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
     ),
+    lyrics:
+      (
+        release.metadata as Record<string, unknown> | null
+      )?.lyrics?.toString() || undefined,
   };
 }
 
@@ -355,6 +360,76 @@ export async function resetProviderOverride(params: {
       error instanceof Error ? error.message : 'Failed to reset provider link';
     throw new Error(message);
   }
+}
+
+export async function saveReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  if (profile.id !== params.profileId) {
+    throw new TypeError('Profile mismatch');
+  }
+
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
+
+  await db
+    .update(discogReleases)
+    .set({
+      metadata: { ...metadata, lyrics: params.lyrics },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(discogReleases.id, params.releaseId),
+        eq(discogReleases.creatorProfileId, profile.id)
+      )
+    );
+
+  const updated = await getReleaseById(params.releaseId);
+  if (!updated) {
+    throw new TypeError('Release not found');
+  }
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return mapReleaseToViewModel(
+    updated,
+    buildProviderLabels(),
+    profile.id,
+    profile.handle
+  );
+}
+
+export async function formatReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+}): Promise<{ release: ReleaseViewModel; changesSummary: string[] }> {
+  const { formatted, changesSummary } = formatLyricsForAppleMusic(
+    params.lyrics
+  );
+  const release = await saveReleaseLyrics({
+    profileId: params.profileId,
+    releaseId: params.releaseId,
+    lyrics: formatted,
+  });
+
+  return { release, changesSummary };
 }
 
 /**
