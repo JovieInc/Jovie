@@ -20,7 +20,9 @@ import type { PlatformCategory, PlatformMetadata } from './types';
  * @returns `true` if the value is a valid SocialPlatform, `false` otherwise
  */
 export function isValidPlatform(value: unknown): value is SocialPlatform {
-  return typeof value === 'string' && value in PLATFORM_METADATA_MAP;
+  return (
+    typeof value === 'string' && Object.hasOwn(PLATFORM_METADATA_MAP, value)
+  );
 }
 
 /**
