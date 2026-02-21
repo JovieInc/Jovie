@@ -3,10 +3,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   deleteRelease,
+  formatReleaseLyrics,
   refreshRelease,
   rescanIsrcLinks,
   resetProviderOverride,
   saveProviderOverride,
+  saveReleaseLyrics,
   syncFromSpotify,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -284,6 +286,44 @@ export function useDeleteReleaseMutation(profileId: string) {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.releases.matrix(profileId),
       });
+    },
+  });
+}
+
+export function useSaveReleaseLyricsMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveReleaseLyrics,
+    onSuccess: async updated => {
+      const current = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+      if (current) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          current.map(r => (r.id === updated.id ? updated : r))
+        );
+      }
+    },
+  });
+}
+
+export function useFormatReleaseLyricsMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: formatReleaseLyrics,
+    onSuccess: async ({ release }) => {
+      const current = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+      if (current) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          current.map(r => (r.id === release.id ? release : r))
+        );
+      }
     },
   });
 }
