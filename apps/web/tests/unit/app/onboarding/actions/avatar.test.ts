@@ -1,27 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@sentry/nextjs', () => ({
-  captureMessage: vi.fn(),
-  captureException: vi.fn(),
-}));
-
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
-}));
-
-vi.mock('@/lib/auth/session', () => ({
-  withDbSessionTx: vi.fn(),
-}));
-
-vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: {},
-  profilePhotos: {},
-}));
-
-vi.mock('@/lib/ingestion/profile', () => ({
-  applyProfileEnrichment: vi.fn(),
-}));
-
 describe('getSafeUploadUrl', () => {
   it('builds upload URL from NEXT_PUBLIC_APP_URL', async () => {
     vi.resetModules();
@@ -33,7 +11,7 @@ describe('getSafeUploadUrl', () => {
     }));
 
     const { getSafeUploadUrl } = await import(
-      '../../../../../app/onboarding/actions/avatar'
+      '../../../../../app/onboarding/actions/avatar-url-utils'
     );
 
     expect(getSafeUploadUrl()).toBe('https://jov.ie/api/images/upload');
@@ -49,7 +27,7 @@ describe('getSafeUploadUrl', () => {
     }));
 
     const { getSafeUploadUrl } = await import(
-      '../../../../../app/onboarding/actions/avatar'
+      '../../../../../app/onboarding/actions/avatar-url-utils'
     );
 
     expect(() => getSafeUploadUrl()).toThrow(
