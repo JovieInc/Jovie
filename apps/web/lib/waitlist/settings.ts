@@ -1,4 +1,4 @@
-import { and, eq, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { waitlistSettings } from '@/lib/db/schema/waitlist';
 

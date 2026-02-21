@@ -1,6 +1,6 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
-import type { DbOrTransaction } from '@/lib/db';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
