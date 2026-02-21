@@ -489,11 +489,57 @@ jobs:
 
           echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, a11y, and layout integrity"
 
+  ci-build-public:
+    name: Build (public routes)
+    # Shared Next.js build for a11y + layout-guard — build once, test twice
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: echo "Skipping build — no UI-relevant paths changed."
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Build app (public routes only — no secrets needed)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm --filter=@jovie/web run build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Upload build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
+          retention-days: 1
+
   ci-layout-guard:
     name: Layout Guard (blocking)
+    needs: [ci-build-public]
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -503,20 +549,18 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Download build artifact
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
 
       - name: Run layout overlap/touching guard
         run: |
@@ -649,7 +693,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -780,7 +824,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/2', '2/2']
+        shard: ['1/3', '2/3', '3/3']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -838,8 +882,11 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          # Enable coverage on main branch and PRs for Codecov integration
-          COVERAGE_FLAG="--coverage"
+          # Only collect coverage on main branch pushes — PRs diff against main baseline
+          COVERAGE_FLAG=""
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            COVERAGE_FLAG="--coverage"
+          fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
@@ -849,15 +896,15 @@ jobs:
             echo "🚀 Main branch: Running full test suite with coverage"
             cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
-            echo "🔍 PR/merge queue: Running full test suite with coverage"
+            echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -876,7 +923,7 @@ jobs:
         run: pnpm --filter=@jovie/ui run test
 
       - name: Upload coverage to Codecov
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           directory: apps/web/coverage
@@ -895,10 +942,11 @@ jobs:
 
   ci-a11y:
     name: A11y (axe)
-    # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
+    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
+    needs: [ci-build-public]
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -928,7 +976,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -936,14 +984,12 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
+      - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
 
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1038,7 +1084,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1134,7 +1180,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1339,7 +1385,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key - chromium only for CI (Firefox runs weekly)
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1461,7 +1507,7 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    needs: [ci-typecheck]
+    # No dependencies — test profiling is independent and can run fully parallel
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -1845,7 +1891,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
