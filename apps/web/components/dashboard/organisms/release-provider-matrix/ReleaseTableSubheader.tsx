@@ -262,11 +262,10 @@ function LinearStyleDisplayMenu({
 }
 
 /**
- * ReleaseTableSubheader - Subheader with Filter, Display, and Export controls
+ * ReleaseTableSubheader - Subheader with right-aligned Filter, Display, and Export controls
  *
  * Follows Linear's UI pattern with:
- * - Filter button on the left
- * - Display settings + Export button on the right
+ * - Filter, Display, and Export actions grouped on the right
  */
 export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   releases,
@@ -290,18 +289,17 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: Filter */}
-      <div className='flex items-center gap-2'>
+      {/* Left: reserved for view-specific controls */}
+      <div className='flex items-center gap-2' />
+
+      {/* Right: Filter + Display + Export (hidden on mobile where list view is used) */}
+      <div className='hidden md:flex items-center gap-2'>
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
           buttonClassName={pillButtonClass}
         />
-      </div>
-
-      {/* Right: Display + Export (hidden on mobile where list view is used) */}
-      <div className='hidden md:flex items-center gap-2'>
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}
