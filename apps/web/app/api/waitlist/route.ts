@@ -19,12 +19,12 @@ import {
   extractHandleFromUrl,
 } from '@/lib/utils/social-platform';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
+import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
 import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
-import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
 

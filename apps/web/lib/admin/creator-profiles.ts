@@ -304,10 +304,7 @@ export async function getAdminCreatorProfiles(
         .limit(pageSize)
         .offset(offset),
       // Total count query
-      db
-        .select({ value: count() })
-        .from(creatorProfiles)
-        .where(whereClause),
+      db.select({ value: count() }).from(creatorProfiles).where(whereClause),
     ]);
 
     const pageRows = rows;
