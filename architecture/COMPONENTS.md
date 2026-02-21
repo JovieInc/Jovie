@@ -254,7 +254,7 @@ export function Button({ children, ...props }: ButtonProps) {
 
 ## data-testid Strategy
 
-> **Canonical reference:** See `agents.md` section 8.1.1 for the full policy.
+> **Canonical reference:** See `AGENTS.md` section 8.1.1 for the full policy.
 
 ### Philosophy
 Selective and purposeful, not exhaustive. Prefer accessibility-based selectors (`getByRole`, `getByLabelText`) in tests. Add `data-testid` only when those selectors cannot reliably target an element.

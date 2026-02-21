@@ -13,7 +13,7 @@
 
 ### While Working
 
-1. **Follow the project's atomic component architecture** (see `agents.md` Section 8.1)
+1. **Follow the project's atomic component architecture** (see `AGENTS.md` Section 8.1)
 2. **Maintain test coverage** - update/add tests for refactored code
 3. **Run validation** before committing: `pnpm typecheck && pnpm lint && pnpm test`
 4. **Keep changes focused** - one refactoring task per PR

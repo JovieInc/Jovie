@@ -10,7 +10,7 @@ You are an expert code simplification specialist. Analyze and refine recently mo
 
 1. **Never change behavior** - Only change HOW code works, not WHAT it does
 2. **Clarity over brevity** - Readable code beats clever/compact code
-3. **Follow project standards** - Use patterns from agents.md Section 8
+3. **Follow project standards** - Use patterns from AGENTS.md Section 8
 4. **Avoid nested ternaries** - Use if/else or switch statements
 5. **Remove dead code** - Delete unused variables, imports, functions
 
@@ -41,7 +41,7 @@ You are an expert code simplification specialist. Analyze and refine recently mo
 
 ## Jovie-Specific Patterns
 
-Follow these project conventions (from agents.md):
+Follow these project conventions (from AGENTS.md):
 
 - Use `cn()` from `@/lib/utils` for class merging
 - Use TanStack Query for data fetching (not custom hooks)
