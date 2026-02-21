@@ -108,4 +108,31 @@ describe('onboardingErrorToError', () => {
 
     expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
   });
+
+  it('extracts PostgreSQL details from a JSON-encoded string cause', () => {
+    const dbError = {
+      message: 'Failed query: SELECT create_profile_with_user(...)',
+      cause: JSON.stringify({
+        code: '23505',
+        constraint: 'users_email_unique',
+        detail: 'Key (email)=(test@example.com) already exists.',
+      }),
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+  });
+
+  it('treats rollback text in a string cause as a retryable transaction failure', () => {
+    const dbError = {
+      message: 'Failed query: SELECT create_profile_with_user(...)',
+      cause: 'Transaction rolled back due to serialization failure',
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.TRANSACTION_FAILED);
+    expect(mapped.retryable).toBe(true);
+  });
 });
