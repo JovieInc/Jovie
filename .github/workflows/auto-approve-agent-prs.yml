@@ -63,7 +63,7 @@ jobs:
           echo "Looking for PR on branch: $HEAD_BRANCH"
 
           # Check agent branch pattern
-          if [[ ! "$HEAD_BRANCH" =~ ^(linear/|claude/|codegen-bot/) ]]; then
+          if [[ ! "$HEAD_BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) ]]; then
             echo "Not an agent branch ($HEAD_BRANCH). Skipping."
             echo "should_continue=false" >> $GITHUB_OUTPUT
             exit 0

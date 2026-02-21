@@ -143,7 +143,7 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/) ]]; then
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) ]]; then
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> $GITHUB_OUTPUT
           else

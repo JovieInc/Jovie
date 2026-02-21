@@ -5,7 +5,7 @@ on:
     branches: [main]
   merge_group:
   push:
-    branches: [main, 'codegen-bot/**', 'claude/**']
+    branches: [main, 'codegen-bot/**', 'claude/**', 'codex/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'

@@ -40,7 +40,8 @@ jobs:
       (
         startsWith(github.event.pull_request.head.ref, 'linear/') ||
         startsWith(github.event.pull_request.head.ref, 'claude/') ||
-        startsWith(github.event.pull_request.head.ref, 'codegen-bot/')
+        startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
+        startsWith(github.event.pull_request.head.ref, 'codex/')
       )
     steps:
       - name: Checkout
