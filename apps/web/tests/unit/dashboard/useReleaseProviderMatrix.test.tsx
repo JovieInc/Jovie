@@ -16,6 +16,8 @@ const stableReset = vi.fn();
 const stableSync = vi.fn();
 const stableRefresh = vi.fn();
 const stableRescan = vi.fn();
+const stableSaveLyricsAsync = vi.fn();
+const stableFormatLyricsAsync = vi.fn();
 
 function makeMockMutation(mutateFn: ReturnType<typeof vi.fn>) {
   return {
@@ -43,6 +45,14 @@ vi.mock('@/lib/queries', () => ({
   useSyncReleasesFromSpotifyMutation: () => makeMockMutation(stableSync),
   useRefreshReleaseMutation: () => makeMockMutation(stableRefresh),
   useRescanIsrcLinksMutation: () => makeMockMutation(stableRescan),
+  useSaveReleaseLyricsMutation: () => ({
+    ...makeMockMutation(vi.fn()),
+    mutateAsync: stableSaveLyricsAsync,
+  }),
+  useFormatReleaseLyricsMutation: () => ({
+    ...makeMockMutation(vi.fn()),
+    mutateAsync: stableFormatLyricsAsync,
+  }),
 }));
 
 vi.mock('sonner', () => ({

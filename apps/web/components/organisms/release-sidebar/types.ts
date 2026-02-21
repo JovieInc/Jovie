@@ -69,6 +69,15 @@ export interface ReleaseSidebarProps {
    * Whether an ISRC rescan is currently in progress
    */
   readonly isRescanningIsrc?: boolean;
+  /** Persist release lyrics in metadata */
+  readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  /** Format lyrics with Apple Music deterministic rules */
+  readonly onFormatLyrics?: (
+    releaseId: string,
+    lyrics: string
+  ) => Promise<string[]>;
+  /** Whether lyrics operations are currently pending */
+  readonly isLyricsSaving?: boolean;
   /**
    * Whether album art downloads are allowed on public pages.
    * Controls the visibility of the "Allow album art downloads" setting.

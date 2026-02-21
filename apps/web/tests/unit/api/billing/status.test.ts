@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
+const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
+const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
+const mockGetPlanFromPriceId = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -9,6 +12,25 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
+  updateUserBillingStatus: mockUpdateUserBillingStatus,
+}));
+
+vi.mock('@/lib/stripe/client', () => ({
+  stripe: {
+    subscriptions: {
+      list: mockStripeSubscriptionsList,
+    },
+  },
+}));
+
+vi.mock('@/lib/stripe/webhooks/utils', () => ({
+  isActiveSubscription: vi.fn(
+    (status: string) => status === 'active' || status === 'trialing'
+  ),
+}));
+
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: mockGetPlanFromPriceId,
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -23,6 +45,9 @@ describe('GET /api/billing/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockGetPlanFromPriceId.mockReturnValue('pro');
+    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -197,6 +222,96 @@ describe('GET /api/billing/status', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('recovers billing status from Stripe when DB says free but active subscription exists', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_recover' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_recover',
+        email: 'recover@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: 'cus_recover',
+        stripeSubscriptionId: null,
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: 'sub_recover',
+          status: 'active',
+          items: { data: [{ price: { id: 'price_growth' } }] },
+        },
+      ],
+    });
+    mockGetPlanFromPriceId.mockReturnValue('growth');
+
+    const { GET } = await import('@/app/api/billing/status/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.isPro).toBe(true);
+    expect(data.plan).toBe('growth');
+    expect(data.stripeCustomerId).toBe('cus_recover');
+    expect(data.stripeSubscriptionId).toBe('sub_recover');
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_recover',
+        isPro: true,
+        plan: 'growth',
+        stripeCustomerId: 'cus_recover',
+        stripeSubscriptionId: 'sub_recover',
+        eventType: 'reconciliation_fix',
+        source: 'manual',
+      })
+    );
+  });
+
+  it('keeps original free response when Stripe recovery cannot update status', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_recover_fail' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_recover_fail',
+        email: 'recover-fail@example.com',
+        isAdmin: false,
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: 'cus_recover_fail',
+        stripeSubscriptionId: null,
+        billingVersion: 1,
+        lastBillingEventAt: null,
+      },
+    });
+    mockStripeSubscriptionsList.mockResolvedValue({
+      data: [
+        {
+          id: 'sub_recover_fail',
+          status: 'active',
+          items: { data: [{ price: { id: 'price_pro' } }] },
+        },
+      ],
+    });
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: false,
+      error: 'write failed',
+    });
+
+    const { GET } = await import('@/app/api/billing/status/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.isPro).toBe(false);
+    expect(data.plan).toBe('free');
+    expect(data.stripeCustomerId).toBe('cus_recover_fail');
+    expect(data.stripeSubscriptionId).toBeNull();
   });
 
   it('does not expose internal fields in the response', async () => {

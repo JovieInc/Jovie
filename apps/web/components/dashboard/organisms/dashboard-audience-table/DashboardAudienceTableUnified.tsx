@@ -460,6 +460,7 @@ export const DashboardAudienceTableUnified = memo(
           {/* Subheader with filter dropdown and export */}
           <AudienceTableSubheader
             view={view}
+            onViewChange={onViewChange}
             filters={filters}
             onFiltersChange={onFiltersChange}
             rows={rows}
