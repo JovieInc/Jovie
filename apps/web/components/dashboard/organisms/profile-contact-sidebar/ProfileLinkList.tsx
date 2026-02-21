@@ -1,9 +1,9 @@
 'use client';
 
+import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { SimpleTooltip } from '@jovie/ui';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';

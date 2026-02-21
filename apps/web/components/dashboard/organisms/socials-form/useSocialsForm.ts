@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
 import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
@@ -10,7 +11,6 @@ import {
   normalizeUrl,
   validateUrl,
 } from '@/lib/utils/platform-detection';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
 import type { SocialLink, UseSocialsFormReturn } from './types';
 
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube'] as const;
