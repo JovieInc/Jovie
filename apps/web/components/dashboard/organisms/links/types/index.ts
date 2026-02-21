@@ -47,6 +47,8 @@ export interface LinkItem {
   sourcePlatform?: string | null;
   sourceType?: 'manual' | 'admin' | 'ingested' | null;
   evidence?: { sources?: string[]; signals?: string[] } | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
   version?: number;
 }
 

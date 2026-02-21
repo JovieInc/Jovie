@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
 import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
@@ -43,6 +44,7 @@ export function useSocialsForm({
     reset: resetMutation,
   } = useSaveSocialLinksMutation(artistId);
   const [submitError, setSubmitError] = useState<string | undefined>(undefined);
+  const [verifyingLinkId, setVerifyingLinkId] = useState<string | null>(null);
 
   // Sync fetched data to local state when it changes.
   // Sync fetched links into local state only when the local state hasn't been
@@ -58,7 +60,13 @@ export function useSocialsForm({
       );
     } else {
       setSocialLinks(
-        fetchedLinks.filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+        fetchedLinks
+          .filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+          .map(link => ({
+            ...link,
+            verificationStatus: link.verificationStatus ?? 'unverified',
+            verificationToken: link.verificationToken ?? null,
+          }))
       );
     }
   }, [artistId, fetchedLinks]);
@@ -89,8 +97,18 @@ export function useSocialsForm({
             url: normalizedUrl,
             sortOrder: index,
             isActive: true,
+            verificationStatus: link.verificationStatus,
+            verificationToken: link.verificationToken,
           };
         });
+
+      const websiteCount = linksToInsert.filter(
+        link => link.platform === 'website'
+      ).length;
+      if (websiteCount > 1) {
+        setSubmitError('You can only add one official website link.');
+        return;
+      }
 
       for (const link of linksToInsert) {
         const platform = getPlatform(link.platform);
@@ -160,6 +178,39 @@ export function useSocialsForm({
     ]);
   }, []);
 
+  const verifyWebsite = useCallback(
+    async (linkId: string) => {
+      if (!linkId) return;
+      setVerifyingLinkId(linkId);
+      setSubmitError(undefined);
+      try {
+        const response = await fetchWithTimeout<{
+          ok: boolean;
+          status: 'pending' | 'verified';
+        }>('/api/dashboard/social-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId: artistId, linkId }),
+        });
+
+        setSocialLinks(prev =>
+          prev.map(link =>
+            link.id === linkId
+              ? { ...link, verificationStatus: response.status }
+              : link
+          )
+        );
+      } catch {
+        setSubmitError(
+          'We could not verify your website yet. Confirm the TXT record and try again.'
+        );
+      } finally {
+        setVerifyingLinkId(null);
+      }
+    },
+    [artistId]
+  );
+
   return {
     loading: isFetching || isSaving,
     error:
@@ -172,5 +223,7 @@ export function useSocialsForm({
     scheduleNormalize,
     handleUrlBlur,
     addSocialLink,
+    verifyWebsite,
+    verifyingLinkId,
   };
 }

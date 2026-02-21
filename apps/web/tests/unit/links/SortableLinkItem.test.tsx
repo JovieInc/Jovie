@@ -200,6 +200,26 @@ describe('SortableLinkItem', () => {
       expect(screen.getByText('Needs fix')).toBeInTheDocument();
       expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
+
+    it('shows Verified badge for verified website links', () => {
+      const websiteLink = createMockLink('website', {
+        platform: {
+          id: 'website',
+          name: 'Website',
+          category: 'custom',
+          icon: 'website',
+          color: '#000000',
+          placeholder: 'https://example.com',
+        },
+      }) as DetectedLink & { verificationStatus: 'verified' };
+      websiteLink.verificationStatus = 'verified';
+
+      renderWithProviders(
+        <SortableLinkItem {...defaultProps} link={websiteLink} />
+      );
+
+      expect(screen.getByText('Verified')).toBeInTheDocument();
+    });
   });
 
   describe('menu items', () => {
