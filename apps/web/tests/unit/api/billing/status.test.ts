@@ -23,7 +23,7 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
-vi.mock('@/lib/stripe/webhooks', () => ({
+vi.mock('@/lib/stripe/webhooks/utils', () => ({
   isActiveSubscription: vi.fn(
     (status: string) => status === 'active' || status === 'trialing'
   ),

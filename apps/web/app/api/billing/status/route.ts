@@ -27,14 +27,19 @@ const CACHE_HEADERS = {
 // No caching for error responses
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-async function healStripeBillingMismatch(params: {
+interface HealStripeBillingMismatchParams {
   userId: string;
   stripeCustomerId: string;
-  currentPlan: string;
-}) {
-  const { userId, stripeCustomerId, currentPlan } = params;
+}
+
+async function healStripeBillingMismatch(
+  params: HealStripeBillingMismatchParams
+) {
+  const { userId, stripeCustomerId } = params;
 
   try {
+    // Limit to 5 subscriptions to control Stripe API cost — a customer with
+    // more than 5 would be exceptional and can be investigated manually.
     const subscriptions = await stripe.subscriptions.list({
       customer: stripeCustomerId,
       status: 'all',
@@ -50,8 +55,19 @@ async function healStripeBillingMismatch(params: {
     }
 
     const activePriceId = activeSubscription.items.data[0]?.price?.id;
-    const recoveredPlan =
-      (activePriceId && getPlanFromPriceId(activePriceId)) || currentPlan;
+    const recoveredPlan = activePriceId
+      ? getPlanFromPriceId(activePriceId)
+      : null;
+
+    // If we can't determine the plan from the price ID, skip recovery to avoid
+    // an inconsistent state (isPro: true with plan: 'free').
+    if (!recoveredPlan) {
+      logger.warn('Skipping billing recovery: unmapped or missing price ID', {
+        userId,
+        activePriceId: activePriceId ?? null,
+      });
+      return null;
+    }
 
     const updateResult = await updateUserBillingStatus({
       clerkUserId: userId,
@@ -151,7 +167,6 @@ export async function GET() {
       const recoveredBilling = await healStripeBillingMismatch({
         userId,
         stripeCustomerId,
-        currentPlan: plan ?? 'free',
       });
 
       if (recoveredBilling) {
