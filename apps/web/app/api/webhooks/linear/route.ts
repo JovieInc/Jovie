@@ -120,14 +120,15 @@ function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
   const body = commentData?.body ?? '';
 
   const isCodeRabbitAuthor = author.includes('coderabbit');
-  const hasPlanMarker = /coderabbit-plan-ready|##\s+Implementation\s+Plan/i.test(
-    body
-  );
+  const hasPlanMarker =
+    /coderabbit-plan-ready|##\s+Implementation\s+Plan/i.test(body);
 
   return isCodeRabbitAuthor && hasPlanMarker;
 }
 
-function getIssueData(payload: LinearWebhookPayload): LinearIssueData | undefined {
+function getIssueData(
+  payload: LinearWebhookPayload
+): LinearIssueData | undefined {
   if (payload.type === 'Comment') {
     return (payload.data as LinearCommentData | undefined)?.issue;
   }
@@ -209,7 +210,9 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: isPlanReadyEvent ? 'linear_plan_ready' : 'linear_todo_ready',
+          event_type: isPlanReadyEvent
+            ? 'linear_plan_ready'
+            : 'linear_todo_ready',
           client_payload: {
             issue_id: issueId,
             issue_identifier: issueData?.identifier ?? null,
