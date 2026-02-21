@@ -120,6 +120,8 @@
       "Skill(ideate-quality:*)",
       "Skill(ideate-perf)",
       "Skill(ideate-perf:*)",
+      "Skill(work)",
+      "Skill(work:*)",
       "Skill(consolidate-ui)",
       "Skill(consolidate-ui:*)",
       "Skill(turborepo)",
@@ -128,7 +130,8 @@
       "SlashCommand(/verify)",
       "SlashCommand(/ship)",
       "SlashCommand(/simplify)",
-      "SlashCommand(/turbo-docs)"
+      "SlashCommand(/turbo-docs)",
+      "SlashCommand(/work)"
     ],
     "deny": [],
     "ask": [],
