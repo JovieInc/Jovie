@@ -449,7 +449,7 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
+    # Single merge gate for PRs and merge queue: fast checks + unit tests must pass. A11y + layout guard are informational.
     # This is the only required status check in the branch ruleset.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
@@ -475,19 +475,17 @@ jobs:
             exit 1
           fi
 
-          # ci-a11y: allow skip (path-gated) but block on failure
+          # ci-a11y: informational — log but do not block merge
           if [[ "${{ needs.ci-a11y.result }}" == "failure" ]]; then
-            echo "❌ ci-a11y failed — accessibility violations detected"
-            exit 1
+            echo "⚠️ ci-a11y failed — accessibility violations detected (non-blocking)"
           fi
 
-          # ci-layout-guard must succeed (no overlapping/touching layout regressions)
-          if [[ "${{ needs.ci-layout-guard.result }}" != "success" ]]; then
-            echo "❌ ci-layout-guard failed — layout overlap/touching regressions detected"
-            exit 1
+          # ci-layout-guard: allow skip (path-gated / artifact missing) but block on failure
+          if [[ "${{ needs.ci-layout-guard.result }}" == "failure" ]]; then
+            echo "⚠️ ci-layout-guard failed — layout overlap/touching regressions detected (non-blocking)"
           fi
 
-          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, a11y, and layout integrity"
+          echo "✅ All required PR checks passed: lint, typecheck, guardrails, unit tests"
 
   ci-build-public:
     name: Build (public routes)

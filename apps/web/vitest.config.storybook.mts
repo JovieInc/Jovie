@@ -56,6 +56,7 @@ export default defineConfig({
       'motion/react',
       'vaul',
       'react-error-boundary',
+      'react-hook-form',
       // Radix UI primitives
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
@@ -70,13 +71,38 @@ export default defineConfig({
       '@radix-ui/react-switch',
       '@radix-ui/react-tabs',
       '@radix-ui/react-tooltip',
+      '@radix-ui/react-context-menu',
       // Data / state
       '@tanstack/react-query',
       '@tanstack/react-pacer',
+      '@tanstack/react-table',
+      '@tanstack/react-virtual',
       // Next.js internals
       'next/link',
       'next/dynamic',
+      'next/image',
+      'next/navigation',
+      'next/script',
       'next/dist/client/components/redirect-error',
+      // Drag-and-drop
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+      // UI extras
+      '@floating-ui/react',
+      '@headlessui/react',
+      'cmdk',
+      'nuqs',
+      'nuqs/adapters/next/app',
+      'recharts',
+      // Auth / analytics
+      '@clerk/nextjs',
+      '@vercel/analytics/react',
+      // AI SDK (used by chat components)
+      '@ai-sdk/react',
+      // Form + context menu (pulled in via @jovie/ui barrel exports)
+      'react-hook-form',
+      '@radix-ui/react-context-menu',
       // Server-side deps (referenced by stories indirectly)
       '@sentry/nextjs',
       'isomorphic-dompurify',

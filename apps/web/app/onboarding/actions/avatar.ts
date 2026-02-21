@@ -102,7 +102,7 @@ function isVercelPreviewHostname(hostname: string): boolean {
  * Returns a safe upload URL for the internal images API.
  * Uses NEXT_PUBLIC_APP_URL as a trusted origin instead of request headers.
  */
-export function getSafeUploadUrl(): string {
+export async function getSafeUploadUrl(): Promise<string> {
   const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL;
   let parsed: URL;
   try {
@@ -181,7 +181,7 @@ async function uploadAvatarFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const uploadUrl = getSafeUploadUrl();
+  const uploadUrl = await getSafeUploadUrl();
   const upload = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,

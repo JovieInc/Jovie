@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
 /**
@@ -88,8 +88,8 @@ vi.mock('@/components/organisms/EmptyState', () => ({
   ),
 }));
 
-vi.mock('@/hooks/useRegisterTablePanel', () => ({
-  useRegisterTablePanel: vi.fn(),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock(
@@ -139,7 +139,7 @@ function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <TooltipProvider>
-        <TablePanelProvider>{children}</TablePanelProvider>
+        <RightPanelProvider>{children}</RightPanelProvider>
       </TooltipProvider>
     ),
     ...options,

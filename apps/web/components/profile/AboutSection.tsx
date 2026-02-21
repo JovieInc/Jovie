@@ -17,16 +17,19 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
 
   if (!hasContent) {
     return (
-      <div className='rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-sm p-8 text-center'>
+      <main
+        id='main-content'
+        className='rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-sm p-8 text-center'
+      >
         <p className='text-sm text-tertiary-token'>
           No information available yet.
         </p>
-      </div>
+      </main>
     );
   }
 
   return (
-    <main className='space-y-4' aria-labelledby='about-title'>
+    <main id='main-content' className='space-y-4' aria-labelledby='about-title'>
       <h1 id='about-title' className='sr-only'>
         About {artist.name}
       </h1>
