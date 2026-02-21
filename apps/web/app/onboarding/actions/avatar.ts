@@ -99,10 +99,11 @@ function isVercelPreviewHostname(hostname: string): boolean {
 }
 
 /**
- * Returns a safe upload URL for the internal images API, based on a trusted origin.
- * Throws if the provided baseUrl is not in the allow-list of permitted hosts.
+ * Returns a safe upload URL for the internal images API.
+ * Uses NEXT_PUBLIC_APP_URL as a trusted origin instead of request headers.
  */
-function getSafeUploadUrl(baseUrl: string): string {
+export function getSafeUploadUrl(): string {
+  const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL;
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
@@ -172,7 +173,6 @@ async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
  * Uploads avatar file to the API endpoint.
  */
 async function uploadAvatarFile(
-  baseUrl: string,
   buffer: ArrayBuffer,
   contentType: string,
   cookieHeader: string | null
@@ -181,7 +181,7 @@ async function uploadAvatarFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const uploadUrl = getSafeUploadUrl(baseUrl);
+  const uploadUrl = getSafeUploadUrl();
   const upload = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
@@ -220,7 +220,6 @@ async function uploadAvatarFile(
  */
 async function uploadRemoteAvatar(params: {
   imageUrl: string;
-  baseUrl: string;
   cookieHeader: string | null;
   maxRetries?: number;
 }): Promise<AvatarUploadResult | null> {
@@ -237,7 +236,6 @@ async function uploadRemoteAvatar(params: {
 
       const { buffer, contentType } = await fetchAvatarImage(params.imageUrl);
       const { blobUrl, photoId } = await uploadAvatarFile(
-        params.baseUrl,
         buffer,
         contentType,
         params.cookieHeader
@@ -286,13 +284,11 @@ async function uploadRemoteAvatar(params: {
 export async function handleBackgroundAvatarUpload(
   profileId: string,
   oauthAvatarUrl: string,
-  baseUrl: string,
   cookieHeader: string | null
 ): Promise<void> {
   try {
     const uploaded = await uploadRemoteAvatar({
       imageUrl: oauthAvatarUrl,
-      baseUrl,
       cookieHeader,
       maxRetries: 3,
     });
