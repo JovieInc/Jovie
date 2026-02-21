@@ -3,7 +3,7 @@
  * Validates AES-256-GCM encryption for personally identifiable information
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   decryptEmail,
   decryptIP,
@@ -107,6 +107,25 @@ describe('PII Encryption', () => {
       // But both should decrypt to the same value
       expect(decryptPII(encrypted1)).toBe(value);
       expect(decryptPII(encrypted2)).toBe(value);
+    });
+
+    it('should use strong scrypt work factor parameters for key derivation', async () => {
+      const cryptoModule = await import('node:crypto');
+      const scryptSpy = vi.spyOn(cryptoModule.default, 'scryptSync');
+
+      encryptPII('harden@example.com');
+
+      expect(scryptSpy).toHaveBeenCalledWith(
+        TEST_ENCRYPTION_KEY,
+        'jovie-pii-salt',
+        32,
+        expect.objectContaining({
+          N: 2 ** 17,
+          r: 8,
+          p: 1,
+          maxmem: 256 * 1024 * 1024,
+        })
+      );
     });
   });
 
