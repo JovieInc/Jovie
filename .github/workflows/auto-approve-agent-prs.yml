@@ -1,14 +1,16 @@
 # Auto-Approve Agent PRs Workflow
 #
-# PURPOSE: Automatically approves low-risk agent-generated PRs that pass ALL
-# gates, removing the human bottleneck for routine changes. This is the
-# Spotify-inspired pattern: agents produce PRs, deterministic verifiers +
-# LLM judge gate quality, humans only intervene for high-risk changes.
+# PURPOSE: Enables auto-merge on low-risk agent-generated PRs that pass ALL
+# quality gates. Submits an informational approval review for audit trail.
 #
-# TRIGGER: When CI completes successfully on an agent branch PR
+# NOTE: Branch protection requires 0 approvals (to avoid the github-actions[bot]
+# self-review collision). This workflow's approval is informational — the actual
+# gates are CI checks + scope-judge + sensitive-file detection.
 #
-# CONDITIONS FOR AUTO-APPROVE (ALL must be true):
-# 1. PR is on an agent branch (linear/*, claude/*, codegen-bot/*)
+# TRIGGER: When CI or Scope Judge workflow completes on an agent branch PR
+#
+# CONDITIONS FOR AUTO-MERGE (ALL must be true):
+# 1. PR is on an agent branch (linear/*, claude/*, codegen-bot/*, codex/*)
 # 2. CI checks all pass (ci-pr-ready = success)
 # 3. Scope judge passes (scope-judge = success)
 # 4. CodeRabbit review is not blocking (no changes_requested)
@@ -16,12 +18,12 @@
 # 6. PR does not have 'needs-human' label
 #
 # WHAT IT DOES:
-# - Approves the PR via GitHub API
+# - Submits an informational APPROVE review (audit trail)
 # - Enables auto-merge (enters merge queue)
-# - Comments with evidence of all gates passed
+# - Adds 'auto-approved' label for tracking
 #
 # SAFETY:
-# - Sensitive path detection prevents auto-approve on high-risk changes
+# - Sensitive path detection prevents auto-merge on high-risk changes
 # - 'needs-human' label overrides all automation
 # - Auto-merge still goes through merge queue checks
 # - Production deploy has canary + Sentry gates as safety net

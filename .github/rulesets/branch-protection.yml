@@ -2,29 +2,42 @@
 #
 # This ruleset enables the autonomous agent pipeline:
 #
-# For AGENT PRs (linear/*, claude/*, codegen-bot/*):
-#   CI passes → scope-judge passes → auto-approve-agent-prs.yml submits review
-#   → 1 approval satisfied → auto-merge enters merge queue → merge
+# For AGENT PRs (linear/*, claude/*, codegen-bot/*, codex/*):
+#   CI passes → scope-judge passes → auto-approve enables auto-merge
+#   → enters merge queue → merge → deploy → canary/sentry gates
 #
 # For HUMAN PRs:
-#   CI passes → human reviews and approves → 1 approval satisfied → merge
+#   CI passes → enters merge queue → merge
+#   (optional: request review from teammates for visibility)
+#
+# WHY 0 REQUIRED REVIEWS:
+#   Agent PRs are created by github-actions[bot] (via auto-pr-on-push)
+#   and approvals also come from github-actions[bot] (via auto-approve).
+#   GitHub treats this as a self-review and doesn't count it. Rather than
+#   maintaining a separate GitHub App just for reviews, we rely on the
+#   automated quality gates that already provide stronger coverage:
+#
+#   Pre-merge:  CI (typecheck + lint + tests + a11y + layout guard)
+#               + scope-judge (LLM alignment check, agent PRs only)
+#               + sensitive-file detection (blocks auto-merge)
+#               + merge queue (re-runs CI against latest main)
+#
+#   Post-merge: canary health gate + Sentry error gate + auto-rollback
 #
 # KEY DESIGN DECISIONS:
 #
-# 1. required_approving_review_count: 1
-#    This is what makes auto-approve meaningful. The auto-approve workflow
-#    submits a review that counts as the required approval. Without this,
-#    any PR passing CI could merge with zero review.
+# 1. required_approving_review_count: 0
+#    No approval required. The CI + merge queue + post-deploy gates
+#    are the quality gates. Auto-approve still enables auto-merge and
+#    logs an audit trail, but the approval itself is not a gate.
 #
 # 2. require_code_owner_review: false
 #    CODEOWNERS auto-requests reviewers (so humans get notified) but
-#    doesn't hard-gate. This allows the github-actions[bot] review from
-#    auto-approve to satisfy the approval requirement.
+#    doesn't hard-gate.
 #
 # 3. dismiss_stale_reviews_on_push: true
-#    When agent-remediation pushes a fix, old approvals are dismissed.
-#    This forces auto-approve to re-evaluate after each fix attempt,
-#    ensuring the approval reflects the FINAL state of the code.
+#    When agent-remediation pushes a fix, old informational approvals
+#    are dismissed. This keeps the audit trail accurate.
 #
 # 4. Simplified status checks: only PR Ready + Migration Guard
 #    PR Ready already aggregates: ci-fast (typecheck + lint + knip +
@@ -34,13 +47,13 @@
 #
 # 5. scope-judge is NOT a required status check here
 #    It only runs on agent branches. If required here, non-agent PRs
-#    would be stuck forever. Instead, auto-approve-agent-prs.yml checks
-#    for scope-judge status internally before approving.
+#    would be stuck forever. Instead, auto-approve checks for
+#    scope-judge status internally before enabling auto-merge.
 #
 # 6. merge_queue enabled
-#    PRs enter the merge queue after approval. The queue runs CI again
-#    (merge_group trigger) to catch integration conflicts between
-#    concurrent PRs.
+#    PRs enter the merge queue after checks pass. The queue runs CI
+#    again (merge_group trigger) to catch integration conflicts
+#    between concurrent PRs.
 
 name: 'Main Branch Protection'
 enforcement: 'active'
@@ -54,22 +67,19 @@ rules:
   # ── Pull Request Reviews ──────────────────────────────────────────────
   - type: 'pull_request'
     parameters:
-      # Require exactly 1 approval. For agent PRs, auto-approve-agent-prs.yml
-      # provides this. For human PRs, a human reviewer provides this.
-      required_approving_review_count: 1
+      # No approval required. CI + scope-judge + merge queue + post-deploy
+      # canary/sentry gates are the quality gates. Auto-approve still logs
+      # an informational review for audit trail.
+      required_approving_review_count: 0
 
-      # Dismiss approvals when new commits are pushed. Critical for
-      # agent-remediation: when the agent pushes a fix, the old approval
-      # is dismissed, and auto-approve re-evaluates the new code.
+      # Dismiss stale reviews on push. Keeps audit trail accurate when
+      # agent-remediation pushes fixes.
       dismiss_stale_reviews_on_push: true
 
-      # CODEOWNERS auto-requests reviewers but does NOT hard-gate.
-      # This allows github-actions[bot] reviews to satisfy the approval.
+      # CODEOWNERS auto-requests reviewers for visibility but doesn't gate.
       require_code_owner_review: false
 
-      # Require the person who pushed the last commit to NOT be the approver.
-      # Disabled because agent-remediation pushes fixes and auto-approve
-      # reviews — both run as github-actions[bot].
+      # Not relevant with 0 required reviews, but kept false for consistency.
       require_last_push_approval: false
 
   # ── Required Status Checks ────────────────────────────────────────────
@@ -121,6 +131,5 @@ rules:
 
 # ── Bypass Actors ──────────────────────────────────────────────────────
 # No bypass actors. Every PR — human or agent — must pass through
-# the same gates. The auto-approve workflow provides the review,
-# not a bypass.
+# the same CI + merge queue gates.
 bypass_actors: []

@@ -40,8 +40,9 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
+          # Use jq --arg to prevent shell injection via branch name
           EXISTING=$(gh api repos/${{ github.repository }}/pulls \
-            --jq "[.[] | select(.head.ref == \"$BRANCH\" and .state == \"open\")] | length")
+            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
 
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
@@ -54,8 +55,9 @@ jobs:
       - name: Parse branch name
         id: parse
         if: steps.check.outputs.should_create == 'true'
+        env:
+          BRANCH: ${{ github.ref_name }}
         run: |
-          BRANCH="${{ github.ref_name }}"
 
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
           # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
@@ -130,23 +132,28 @@ jobs:
         if: steps.check.outputs.should_create == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          TICKET: ${{ steps.parse.outputs.ticket }}
+          HAS_LINEAR: ${{ steps.linear.outputs.has_details }}
+          LINEAR_TITLE: ${{ steps.linear.outputs.title }}
+          PARSED_TITLE: ${{ steps.parse.outputs.title }}
+          LINEAR_ISSUE_URL: ${{ steps.linear.outputs.issue_url }}
+          LINEAR_ISSUE_ID: ${{ steps.linear.outputs.issue_id }}
+          LINEAR_ISSUE_DESC_B64: ${{ steps.linear.outputs.issue_desc }}
         run: |
-          BRANCH="${{ github.ref_name }}"
-          TICKET="${{ steps.parse.outputs.ticket }}"
-          HAS_LINEAR="${{ steps.linear.outputs.has_details }}"
 
           # Use Linear title if available, otherwise parsed title
           if [[ "$HAS_LINEAR" == "true" ]]; then
-            TITLE="${{ steps.linear.outputs.title }}"
+            TITLE="$LINEAR_TITLE"
           else
-            TITLE="${{ steps.parse.outputs.title }}"
+            TITLE="$PARSED_TITLE"
           fi
+
+          RUN_URL="/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           # Build PR body
           if [[ "$HAS_LINEAR" == "true" ]]; then
-            ISSUE_URL="${{ steps.linear.outputs.issue_url }}"
-            ISSUE_ID="${{ steps.linear.outputs.issue_id }}"
-            ISSUE_DESC=$(echo "${{ steps.linear.outputs.issue_desc }}" | base64 -d)
+            ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d)
 
             BODY=$(cat <<EOF
           ## Goal
@@ -156,13 +163,13 @@ jobs:
           ## Linear
 
           - Issue: ${TICKET}
-          - URL: ${ISSUE_URL}
+          - URL: ${LINEAR_ISSUE_URL}
 
-          <!-- linear-issue-id:${ISSUE_ID} -->
+          <!-- linear-issue-id:${LINEAR_ISSUE_ID} -->
           <!-- linear-issue-identifier:${TICKET} -->
 
           ---
-          *PR auto-created by [Auto-PR on Agent Push](/${{ github.repository }}/actions/runs/${{ github.run_id }})*
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
           EOF
           )
           elif [[ -n "$TICKET" ]]; then
@@ -174,7 +181,7 @@ jobs:
           <!-- linear-issue-identifier:${TICKET} -->
 
           ---
-          *PR auto-created by [Auto-PR on Agent Push](/${{ github.repository }}/actions/runs/${{ github.run_id }})*
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
           EOF
           )
           else
@@ -184,7 +191,7 @@ jobs:
           Agent-generated changes on \`${BRANCH}\`.
 
           ---
-          *PR auto-created by [Auto-PR on Agent Push](/${{ github.repository }}/actions/runs/${{ github.run_id }})*
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
           EOF
           )
           fi
