@@ -37,6 +37,16 @@ function isMainHost(hostname: string): boolean {
 // Single domain: dashboard is always at /app
 const DASHBOARD_URL = '/app';
 
+function isAuthCallbackPath(pathname: string): boolean {
+  return (
+    pathname === '/sso-callback' ||
+    pathname === '/signup/sso-callback' ||
+    pathname === '/signin/sso-callback' ||
+    pathname === '/sign-up/sso-callback' ||
+    pathname === '/sign-in/sso-callback'
+  );
+}
+
 describe('Proxy URL Mapping', () => {
   describe('isDevOrPreview', () => {
     it('returns true for localhost', () => {
@@ -85,6 +95,25 @@ describe('Proxy URL Mapping', () => {
 
     it('returns false for meetjovie.com (legacy redirect domain)', () => {
       expect(isMainHost('meetjovie.com')).toBe(false);
+    });
+  });
+
+  describe('auth callback paths', () => {
+    it('includes canonical auth callback paths', () => {
+      expect(isAuthCallbackPath('/sso-callback')).toBe(true);
+      expect(isAuthCallbackPath('/signup/sso-callback')).toBe(true);
+      expect(isAuthCallbackPath('/signin/sso-callback')).toBe(true);
+    });
+
+    it('includes legacy sign-in/sign-up callback aliases', () => {
+      expect(isAuthCallbackPath('/sign-in/sso-callback')).toBe(true);
+      expect(isAuthCallbackPath('/sign-up/sso-callback')).toBe(true);
+    });
+
+    it('does not treat non-callback routes as auth callbacks', () => {
+      expect(isAuthCallbackPath('/signin')).toBe(false);
+      expect(isAuthCallbackPath('/signup')).toBe(false);
+      expect(isAuthCallbackPath('/app')).toBe(false);
     });
   });
 
