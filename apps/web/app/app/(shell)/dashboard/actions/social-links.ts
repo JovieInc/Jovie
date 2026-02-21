@@ -50,6 +50,9 @@ export interface ProfileSocialLink {
     signals?: string[];
     linkType?: string | null;
   } | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
+  verifiedAt?: string | null;
   /** Optimistic locking version for concurrent edit detection */
   version?: number;
 }
@@ -102,6 +105,9 @@ export async function getProfileSocialLinks(
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          verificationStatus: socialLinks.verificationStatus,
+          verificationToken: socialLinks.verificationToken,
+          verifiedAt: socialLinks.verifiedAt,
           version: socialLinks.version,
         })
         .from(creatorProfiles)
@@ -147,6 +153,14 @@ export async function getProfileSocialLinks(
               sources?: string[];
               signals?: string[];
             } | null,
+            verificationStatus:
+              (r.verificationStatus as
+                | 'unverified'
+                | 'pending'
+                | 'verified'
+                | null) ?? 'unverified',
+            verificationToken: r.verificationToken ?? null,
+            verifiedAt: r.verifiedAt?.toISOString() ?? null,
             version: r.version ?? 1,
           };
         })

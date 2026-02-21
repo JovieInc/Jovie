@@ -22,6 +22,9 @@ export interface DashboardSocialLink {
   id: string;
   platform: string;
   url: string;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
+  verificationToken?: string | null;
+  verifiedAt?: string | null;
 }
 
 /**
@@ -41,6 +44,8 @@ export interface SaveSocialLinksInput {
     sourcePlatform?: string;
     sourceType?: string;
     evidence?: string;
+    verificationStatus?: 'unverified' | 'pending' | 'verified';
+    verificationToken?: string | null;
   }>;
   /** Expected version for optimistic locking */
   expectedVersion?: number;

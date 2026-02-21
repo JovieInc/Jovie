@@ -43,6 +43,9 @@ export async function GET(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          verificationStatus: socialLinks.verificationStatus,
+          verificationToken: socialLinks.verificationToken,
+          verifiedAt: socialLinks.verifiedAt,
           version: socialLinks.version,
         })
         .from(creatorProfiles)
@@ -81,6 +84,9 @@ export async function GET(req: Request) {
             sourcePlatform: r.sourcePlatform,
             sourceType: r.sourceType ?? 'manual',
             evidence: r.evidence,
+            verificationStatus: r.verificationStatus ?? 'unverified',
+            verificationToken: r.verificationToken,
+            verifiedAt: r.verifiedAt?.toISOString() ?? null,
             version: r.version ?? 1,
           };
         })

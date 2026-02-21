@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import { randomUUID } from 'node:crypto';
 import { and, eq, gt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -42,6 +43,8 @@ type LinkInput = {
   sourcePlatform?: string | null;
   sourceType?: IngestionSourceType | null;
   evidence?: Partial<LinkEvidencePayload> | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
 };
 
 type UpdateSocialLinksData = z.infer<typeof updateSocialLinksSchema>;
@@ -234,6 +237,9 @@ const buildEvidencePayload = (link: LinkInput): LinkEvidencePayload => ({
   signals: link.evidence?.signals ?? [],
 });
 
+const buildVerificationToken = (): string =>
+  `jovie-verify=${randomUUID().replace(/-/g, '')}`;
+
 const scoreLinkConfidence = (
   link: LinkInput,
   normalizedUrl: string,
@@ -278,6 +284,8 @@ export const buildSocialLinksInsertPayload = (
       usernameNormalized
     );
 
+    const isWebsite = link.platform === 'website';
+
     return {
       creatorProfileId: profileId,
       platform: link.platform,
@@ -295,6 +303,12 @@ export const buildSocialLinksInsertPayload = (
         signals: Array.from(new Set(evidence.signals)),
       },
       displayText: link.displayText || null,
+      verificationToken: isWebsite
+        ? (link.verificationToken ?? buildVerificationToken())
+        : null,
+      verificationStatus: isWebsite
+        ? (link.verificationStatus ?? 'pending')
+        : 'unverified',
       version: nextVersion,
     };
   });

@@ -44,6 +44,10 @@ export const socialLinks = pgTable(
     evidence: jsonb('evidence')
       .$type<{ sources?: string[]; signals?: string[] }>()
       .default({}),
+    verificationToken: text('verification_token'),
+    verificationStatus: text('verification_status').default('unverified'),
+    verificationCheckedAt: timestamp('verification_checked_at'),
+    verifiedAt: timestamp('verified_at'),
     version: integer('version').default(1).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
