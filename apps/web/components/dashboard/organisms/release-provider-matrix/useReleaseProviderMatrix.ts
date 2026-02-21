@@ -45,6 +45,10 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
+  const [refreshingReleaseId, setRefreshingReleaseId] = useState<string | null>(
+    null
+  );
+  const [flashedReleaseId, setFlashedReleaseId] = useState<string | null>(null);
 
   // Get profileId from first release (all releases share same profileId)
   const profileId = releases[0]?.profileId ?? '';
@@ -249,11 +253,18 @@ export function useReleaseProviderMatrix({
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
+      setRefreshingReleaseId(releaseId);
       refreshReleaseMutation.mutate(
         { releaseId },
         {
           onSuccess: updated => {
             updateRow(updated);
+            setFlashedReleaseId(updated.id);
+            globalThis.setTimeout(() => {
+              setFlashedReleaseId(current =>
+                current === updated.id ? null : current
+              );
+            }, 1200);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -263,6 +274,11 @@ export function useReleaseProviderMatrix({
               action: 'refresh-release',
             });
             toast.error('Failed to refresh release');
+          },
+          onSettled: () => {
+            setRefreshingReleaseId(current =>
+              current === releaseId ? null : current
+            );
           },
         }
       );
@@ -368,6 +384,8 @@ export function useReleaseProviderMatrix({
     handleReset,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
     handleAddUrl,

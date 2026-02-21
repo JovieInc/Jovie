@@ -48,6 +48,7 @@ export function ReleaseSidebar({
   artistName,
   onClose,
   onRefresh,
+  isRefreshing = false,
   onReleaseChange,
   onSave,
   isSaving,
@@ -194,9 +195,10 @@ export function ReleaseSidebar({
       {
         type: 'action',
         id: 'refresh',
-        label: 'Refresh',
+        label: isRefreshing ? 'Refreshing…' : 'Refresh',
         icon: <RefreshCw className='h-4 w-4' />,
         onClick: () => {
+          if (isRefreshing) return;
           if (onRefresh) {
             onRefresh();
           } else {
@@ -221,7 +223,14 @@ export function ReleaseSidebar({
     }
 
     return items;
-  }, [release, handleCopySmartLink, onRefresh, artistName, readOnly]);
+  }, [
+    release,
+    handleCopySmartLink,
+    onRefresh,
+    isRefreshing,
+    artistName,
+    readOnly,
+  ]);
 
   return (
     <RightDrawer
@@ -237,6 +246,7 @@ export function ReleaseSidebar({
           hasRelease={hasRelease}
           onClose={onClose}
           onRefresh={onRefresh}
+          isRefreshing={isRefreshing}
           onCopySmartLink={handleCopySmartLink}
         />
 
