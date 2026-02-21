@@ -43,14 +43,20 @@ function verifyCronSecret(provided: string | undefined): boolean {
  * Avoids partial replacement patterns that can be bypassed with repeated prefixes.
  */
 function extractBearerToken(authHeader: string | null): string | undefined {
-  const BEARER_PREFIX = 'Bearer ';
+  if (!authHeader) return undefined;
 
-  if (!authHeader?.startsWith(BEARER_PREFIX)) {
-    return undefined;
-  }
+  // RFC 7235: auth-scheme is case-insensitive
+  const spaceIndex = authHeader.indexOf(' ');
+  if (spaceIndex === -1) return undefined;
 
-  const token = authHeader.slice(BEARER_PREFIX.length);
-  return token.length > 0 ? token : undefined;
+  const scheme = authHeader.slice(0, spaceIndex);
+  if (scheme.toLowerCase() !== 'bearer') return undefined;
+
+  const token = authHeader.slice(spaceIndex + 1);
+  // Reject empty or whitespace-containing tokens
+  if (token.length === 0 || /\s/.test(token)) return undefined;
+
+  return token;
 }
 
 /**
