@@ -73,10 +73,31 @@ export default defineConfig({
       // Data / state
       '@tanstack/react-query',
       '@tanstack/react-pacer',
+      '@tanstack/react-table',
+      '@tanstack/react-virtual',
       // Next.js internals
       'next/link',
       'next/dynamic',
+      'next/image',
+      'next/navigation',
+      'next/script',
       'next/dist/client/components/redirect-error',
+      // Drag-and-drop
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+      // UI extras
+      '@floating-ui/react',
+      '@headlessui/react',
+      'cmdk',
+      'nuqs',
+      'nuqs/adapters/next/app',
+      'recharts',
+      // Auth / analytics
+      '@clerk/nextjs',
+      '@vercel/analytics/react',
+      // AI SDK (used by chat components)
+      '@ai-sdk/react',
       // Server-side deps (referenced by stories indirectly)
       '@sentry/nextjs',
       'isomorphic-dompurify',
