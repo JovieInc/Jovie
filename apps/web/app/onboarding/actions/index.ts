@@ -26,7 +26,7 @@ import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
-import { getRequestBaseUrl, profileIsPublishable } from './helpers';
+import { profileIsPublishable } from './helpers';
 import {
   createUserAndProfile,
   fetchExistingProfile,
@@ -100,7 +100,6 @@ export async function completeOnboarding({
     const headersList = await headers();
     const clientIP = extractClientIP(headersList);
     const cookieHeader = headersList.get('cookie');
-    const baseUrl = getRequestBaseUrl(headersList);
 
     const clerkUser = await currentUser();
     const clerkIdentity = resolveClerkIdentity(clerkUser);
@@ -211,7 +210,6 @@ export async function completeOnboarding({
       void handleBackgroundAvatarUpload(
         profileId,
         oauthAvatarUrl,
-        baseUrl,
         cookieHeader
       );
     }

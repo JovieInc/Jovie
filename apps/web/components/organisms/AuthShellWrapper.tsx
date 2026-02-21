@@ -132,7 +132,6 @@ function AuthShellWrapperInner({
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
-  // This matches the previewPanel pattern on line 140.
   const rawHeaderAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
   const headerAction = rawHeaderAction ? (
@@ -144,6 +143,12 @@ function AuthShellWrapperInner({
   const headerBadge = rawHeaderBadge ? (
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
+
+  const previewPanel = previewEnabled ? (
+    <ErrorBoundary fallback={null}>
+      <ProfileContactSidebar />
+    </ErrorBoundary>
+  ) : undefined;
 
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
@@ -178,13 +183,7 @@ function AuthShellWrapperInner({
             headerAction={headerAction}
             showMobileTabs={config.showMobileTabs}
             isTableRoute={config.isTableRoute}
-            previewPanel={
-              previewEnabled ? (
-                <ErrorBoundary fallback={null}>
-                  <ProfileContactSidebar />
-                </ErrorBoundary>
-              ) : undefined
-            }
+            previewPanel={previewPanel}
             onSidebarOpenChange={
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined
             }
