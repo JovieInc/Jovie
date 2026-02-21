@@ -32,6 +32,8 @@ export interface ReleaseSidebarProps {
   readonly artistName?: string | null;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
+  /** Whether a release refresh operation is currently in progress */
+  readonly isRefreshing?: boolean;
   readonly onReleaseChange?: (release: Release) => void;
   readonly onSave?: (release: Release) => void | Promise<void>;
   readonly isSaving?: boolean;

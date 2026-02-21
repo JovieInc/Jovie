@@ -650,7 +650,7 @@ All durations → 0ms via `@media (prefers-reduced-motion: reduce)`.
 │       ├── lib/               # cn(), dropdown-styles, overlay-styles
 │       └── theme/             # Theme configuration
 ├── CLAUDE.md                  # AI agent instructions
-├── agents.md                  # Full engineering guidelines
+├── AGENTS.md                  # Full engineering guidelines
 ├── turbo.json                 # Turbo task config
 └── pnpm-workspace.yaml        # Workspace config
 ```

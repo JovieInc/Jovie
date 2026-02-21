@@ -51,6 +51,9 @@ jobs:
       issue_url: ${{ steps.gather.outputs.issue_url }}
       branch_name: ${{ steps.gather.outputs.branch_name }}
       plan_ready: ${{ steps.gather.outputs.plan_ready }}
+      verify_required: ${{ steps.gather.outputs.verify_required }}
+      simplify_bounded: ${{ steps.gather.outputs.simplify_bounded }}
+      model_tier: ${{ steps.gather.outputs.model_tier }}
     steps:
       - name: Gather payload
         id: gather
@@ -63,6 +66,9 @@ jobs:
           PAYLOAD_ISSUE_DESCRIPTION: ${{ github.event.client_payload.issue_description }}
           PAYLOAD_ISSUE_URL: ${{ github.event.client_payload.issue_url }}
           PAYLOAD_PLAN_READY: ${{ github.event.client_payload.plan_ready }}
+          PAYLOAD_VERIFY_REQUIRED: ${{ github.event.client_payload.verify_required }}
+          PAYLOAD_SIMPLIFY_BOUNDED: ${{ github.event.client_payload.simplify_bounded }}
+          PAYLOAD_MODEL_TIER: ${{ github.event.client_payload.model_tier }}
           INPUT_ISSUE_ID: ${{ inputs.issue_id }}
           INPUT_ISSUE_IDENTIFIER: ${{ inputs.issue_identifier }}
           INPUT_ISSUE_TITLE: ${{ inputs.issue_title }}
@@ -106,6 +112,21 @@ jobs:
             PLAN_READY="false"
           fi
 
+          VERIFY_REQUIRED="${PAYLOAD_VERIFY_REQUIRED,,}"
+          if [[ "$VERIFY_REQUIRED" != "false" ]]; then
+            VERIFY_REQUIRED="true"
+          fi
+
+          SIMPLIFY_BOUNDED="${PAYLOAD_SIMPLIFY_BOUNDED,,}"
+          if [[ "$SIMPLIFY_BOUNDED" != "false" ]]; then
+            SIMPLIFY_BOUNDED="true"
+          fi
+
+          MODEL_TIER="${PAYLOAD_MODEL_TIER,,}"
+          if [[ "$MODEL_TIER" != "economy" ]]; then
+            MODEL_TIER="premium"
+          fi
+
           EXISTING_PR=$(gh pr list --state open --json number,title,body --jq '
             map(
               select(
@@ -132,6 +153,9 @@ jobs:
           echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
           echo "plan_ready=$PLAN_READY" >> "$GITHUB_OUTPUT"
+          echo "verify_required=$VERIFY_REQUIRED" >> "$GITHUB_OUTPUT"
+          echo "simplify_bounded=$SIMPLIFY_BOUNDED" >> "$GITHUB_OUTPUT"
+          echo "model_tier=$MODEL_TIER" >> "$GITHUB_OUTPUT"
 
   wait_for_coderabbit_plan:
     name: Wait for CodeRabbit Plan
@@ -141,15 +165,38 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    outputs:
+      verify_required: ${{ steps.poll.outputs.verify_required }}
+      simplify_bounded: ${{ steps.poll.outputs.simplify_bounded }}
+      model_tier: ${{ steps.poll.outputs.model_tier }}
     steps:
       - name: Poll Linear comments for CodeRabbit plan marker
+        id: poll
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
           ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
           MAX_ATTEMPTS: ${{ env.MAX_PLAN_WAIT_ATTEMPTS }}
           SLEEP_SECONDS: ${{ env.PLAN_POLL_INTERVAL_SECONDS }}
+          DEFAULT_VERIFY_REQUIRED: ${{ needs.guard.outputs.verify_required }}
+          DEFAULT_SIMPLIFY_BOUNDED: ${{ needs.guard.outputs.simplify_bounded }}
+          DEFAULT_MODEL_TIER: ${{ needs.guard.outputs.model_tier }}
         run: |
+          VERIFY_REQUIRED="${DEFAULT_VERIFY_REQUIRED,,}"
+          if [[ "$VERIFY_REQUIRED" != "false" ]]; then
+            VERIFY_REQUIRED="true"
+          fi
+
+          SIMPLIFY_BOUNDED="${DEFAULT_SIMPLIFY_BOUNDED,,}"
+          if [[ "$SIMPLIFY_BOUNDED" != "false" ]]; then
+            SIMPLIFY_BOUNDED="true"
+          fi
+
+          MODEL_TIER="${DEFAULT_MODEL_TIER,,}"
+          if [[ "$MODEL_TIER" != "economy" ]]; then
+            MODEL_TIER="premium"
+          fi
+
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "Missing LINEAR_API_KEY secret"
             exit 1
@@ -157,6 +204,9 @@ jobs:
 
           if [[ "${{ needs.guard.outputs.plan_ready }}" == "true" ]]; then
             echo "Plan-ready dispatch received; skipping poll loop"
+            echo "verify_required=$VERIFY_REQUIRED" >> "$GITHUB_OUTPUT"
+            echo "simplify_bounded=$SIMPLIFY_BOUNDED" >> "$GITHUB_OUTPUT"
+            echo "model_tier=$MODEL_TIER" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -199,7 +249,39 @@ jobs:
             ')
 
             if [[ "$PLAN_READY" == "true" ]]; then
+              PLAN_COMMENT_BODY=$(echo "$RESPONSE" | jq -r '
+                .data.issue.comments.nodes
+                | map(
+                    select(
+                      ((.user.name // .user.displayName // "") | ascii_downcase | contains("coderabbit"))
+                      and (
+                        (.body // "")
+                        | test("coderabbit-plan-ready|##[[:space:]]+Implementation[[:space:]]+Plan"; "i")
+                      )
+                    )
+                  )
+                | .[-1].body // ""
+              ')
+
+              PARSED_VERIFY=$(printf '%s' "$PLAN_COMMENT_BODY" | grep -Eo 'verify_required=(true|false)' | head -1 | cut -d '=' -f2 || true)
+              if [[ "$PARSED_VERIFY" == "true" || "$PARSED_VERIFY" == "false" ]]; then
+                VERIFY_REQUIRED="$PARSED_VERIFY"
+              fi
+
+              PARSED_SIMPLIFY=$(printf '%s' "$PLAN_COMMENT_BODY" | grep -Eo 'simplify_bounded=(true|false)' | head -1 | cut -d '=' -f2 || true)
+              if [[ "$PARSED_SIMPLIFY" == "true" || "$PARSED_SIMPLIFY" == "false" ]]; then
+                SIMPLIFY_BOUNDED="$PARSED_SIMPLIFY"
+              fi
+
+              PARSED_MODEL=$(printf '%s' "$PLAN_COMMENT_BODY" | grep -Eo 'model_tier=(premium|economy)' | head -1 | cut -d '=' -f2 || true)
+              if [[ "$PARSED_MODEL" == "economy" || "$PARSED_MODEL" == "premium" ]]; then
+                MODEL_TIER="$PARSED_MODEL"
+              fi
+
               echo "CodeRabbit plan marker found. Continuing."
+              echo "verify_required=$VERIFY_REQUIRED" >> "$GITHUB_OUTPUT"
+              echo "simplify_bounded=$SIMPLIFY_BOUNDED" >> "$GITHUB_OUTPUT"
+              echo "model_tier=$MODEL_TIER" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
@@ -257,6 +339,11 @@ jobs:
             - Description:
               ${{ needs.guard.outputs.issue_description }}
 
+            Automation contract (from CodeRabbit planner, strict defaults if missing):
+            - verify_required: ${{ needs.wait_for_coderabbit_plan.outputs.verify_required }}
+            - simplify_bounded: ${{ needs.wait_for_coderabbit_plan.outputs.simplify_bounded }}
+            - model_tier: ${{ needs.wait_for_coderabbit_plan.outputs.model_tier }}
+
             Hard requirements:
             1) Node.js 24.x and pnpm 9.15.4 conventions only.
             2) Run from repo root. Use pnpm/turbo commands only.
@@ -264,6 +351,15 @@ jobs:
             4) Never add // biome-ignore.
             5) Find and fix sibling occurrences if this is a bug-pattern issue.
             6) Keep changes focused and minimal.
+            7) If simplify_bounded=true, run a small simplification pass on touched files only:
+               - remove dead imports/locals
+               - flatten obvious nested conditionals
+               - improve unclear local variable names
+               - do not change behavior/API contracts
+               - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
+            8) Use model_tier as guidance for depth/cost profile:
+               - premium: thorough and comprehensive
+               - economy: concise and targeted
 
             Validation requirements:
             - Run: pnpm turbo typecheck --affected
@@ -271,6 +367,11 @@ jobs:
             - Run targeted tests for touched areas.
 
             Do not create commits yourself. Leave changes in working tree for the workflow commit step.
+
+      - name: Run automation verify bundle
+        if: needs.wait_for_coderabbit_plan.outputs.verify_required == 'true'
+        run: |
+          bash scripts/automation-verify.sh affected
 
       - name: Commit and push branch
         env:

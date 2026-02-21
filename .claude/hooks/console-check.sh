@@ -1,5 +1,5 @@
 #!/bin/bash
-# Block console.* statements in production code (use Sentry per agents.md Section 15)
+# Block console.* statements in production code (use Sentry per AGENTS.md Section 15)
 
 # Parse from TOOL_INPUT (supports jq and fallback)
 if command -v jq &> /dev/null; then
@@ -27,7 +27,7 @@ if echo "$content" | grep -qE 'console\.(log|error|warn|info|debug)\('; then
   echo "BLOCKED: console.* statements not allowed in production code"
   echo "File: $file_path"
   echo ""
-  echo "Use Sentry logging instead (per agents.md Section 15):"
+  echo "Use Sentry logging instead (per AGENTS.md Section 15):"
   echo "  import * as Sentry from '@sentry/nextjs';"
   echo "  Sentry.captureException(error);"
   echo "  // or for logs:"

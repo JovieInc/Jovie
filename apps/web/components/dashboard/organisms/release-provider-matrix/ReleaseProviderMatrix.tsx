@@ -86,6 +86,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleCopy,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
     handleAddUrl,
@@ -476,6 +478,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 ? () => handleRefreshRelease(editingRelease.id)
                 : undefined
             }
+            isRefreshing={refreshingReleaseId === editingRelease?.id}
             onAddDspLink={handleAddUrl}
             onRescanIsrc={
               editingRelease
@@ -502,6 +505,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       artistName,
       closeEditor,
       handleRefreshRelease,
+      refreshingReleaseId,
       handleAddUrl,
       handleRescanIsrc,
       isRescanningIsrc,
@@ -610,6 +614,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  refreshingReleaseId={refreshingReleaseId}
+                  flashedReleaseId={flashedReleaseId}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
                 />

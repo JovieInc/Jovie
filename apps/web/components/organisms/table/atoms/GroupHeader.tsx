@@ -28,6 +28,16 @@ interface GroupHeaderProps {
    * Additional CSS classes
    */
   readonly className?: string;
+
+  /**
+   * Additional CSS classes for the label text
+   */
+  readonly labelClassName?: string;
+
+  /**
+   * Additional CSS classes for the count text
+   */
+  readonly countClassName?: string;
 }
 
 /**
@@ -42,7 +52,15 @@ export const GroupHeader = React.forwardRef<
   HTMLTableRowElement,
   GroupHeaderProps
 >(function GroupHeader(
-  { label, count, colSpan, isSticky = true, className },
+  {
+    label,
+    count,
+    colSpan,
+    isSticky = true,
+    className,
+    labelClassName,
+    countClassName,
+  },
   ref
 ) {
   return (
@@ -56,8 +74,11 @@ export const GroupHeader = React.forwardRef<
     >
       <td colSpan={colSpan}>
         <div className='flex items-center gap-2 pl-5 pr-4 py-2'>
-          <span className={typography.groupHeader}>
-            {label} <span className='text-secondary-token'>({count})</span>
+          <span className={cn(typography.groupHeader, labelClassName)}>
+            {label}{' '}
+            <span className={cn('text-secondary-token', countClassName)}>
+              ({count})
+            </span>
           </span>
         </div>
       </td>
