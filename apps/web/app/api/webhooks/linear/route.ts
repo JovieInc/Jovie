@@ -54,6 +54,12 @@ interface LinearWebhookPayload {
   };
 }
 
+interface AutomationContract {
+  verifyRequired: boolean;
+  simplifyBounded: boolean;
+  modelTier: 'premium' | 'economy';
+}
+
 function isDuplicate(dedupeKey: string): boolean {
   const now = Date.now();
   for (const [key, ts] of recentDispatches) {
@@ -136,6 +142,34 @@ function getIssueData(
   return payload.data as LinearIssueData | undefined;
 }
 
+function parseAutomationContract(body: string): AutomationContract {
+  const verifyMatch = body.match(/verify_required=(true|false)/i)?.[1];
+  const simplifyMatch = body.match(/simplify_bounded=(true|false)/i)?.[1];
+  const modelMatch = body.match(/model_tier=(premium|economy)/i)?.[1];
+
+  return {
+    verifyRequired: verifyMatch?.toLowerCase() === 'false' ? false : true,
+    simplifyBounded: simplifyMatch?.toLowerCase() === 'false' ? false : true,
+    modelTier: modelMatch?.toLowerCase() === 'economy' ? 'economy' : 'premium',
+  };
+}
+
+function getAutomationContract(
+  payload: LinearWebhookPayload,
+  isPlanReadyEvent: boolean
+): AutomationContract {
+  if (!isPlanReadyEvent) {
+    return {
+      verifyRequired: true,
+      simplifyBounded: true,
+      modelTier: 'premium',
+    };
+  }
+
+  const commentData = payload.data as LinearCommentData | undefined;
+  return parseAutomationContract(commentData?.body ?? '');
+}
+
 export async function POST(request: NextRequest) {
   const webhookSecret = env.LINEAR_WEBHOOK_SECRET;
   const dispatchToken = env.GH_DISPATCH_TOKEN;
@@ -199,6 +233,7 @@ export async function POST(request: NextRequest) {
 
     const owner = process.env.VERCEL_GIT_REPO_OWNER ?? 'TheBlackFuture';
     const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
+    const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
     const dispatchResponse = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -223,6 +258,9 @@ export async function POST(request: NextRequest) {
             team_key: issueData?.team?.key ?? null,
             state_name: issueData?.state?.name ?? null,
             plan_ready: isPlanReadyEvent,
+            verify_required: automationContract.verifyRequired,
+            simplify_bounded: automationContract.simplifyBounded,
+            model_tier: automationContract.modelTier,
           },
         }),
       }
