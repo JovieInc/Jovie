@@ -1,6 +1,6 @@
 #!/bin/bash
 # Warn before dangerous bash commands
-# Based on agents.md guardrails
+# Based on AGENTS.md guardrails
 # Synced with .claude/hooks/bash-safety-check.sh
 
 # Get the command from the tool input (same as Claude)
@@ -11,14 +11,14 @@ if [ -z "$command" ]; then
   exit 0
 fi
 
-# List of dangerous patterns from agents.md
+# List of dangerous patterns from AGENTS.md
 dangerous_patterns=(
   # System destruction
   "rm -rf /"
   "rm -rf ~"
   "rm -rf \."
 
-  # Protected branch force pushes (agents.md line 50)
+  # Protected branch force pushes (AGENTS.md line 50)
   "git push --force.*main"
   "git push --force.*master"
   "git push -f.*main"
@@ -26,7 +26,7 @@ dangerous_patterns=(
   "git push.*main.*--force"
   "git push.*master.*--force"
 
-  # Direct pushes to main (agents.md line 8)
+  # Direct pushes to main (AGENTS.md line 8)
   "^git push origin main"
   "^git push origin master"
 

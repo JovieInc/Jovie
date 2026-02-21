@@ -282,7 +282,7 @@ useEffect(() => {
 
 **ALWAYS** include a Cost Impact section in PRs with recurring external API calls.
 
-See `agents.md` at repo root for full infrastructure guardrails.
+See `AGENTS.md` at repo root for full infrastructure guardrails.
 
 ---
 

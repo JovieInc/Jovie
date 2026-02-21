@@ -12,7 +12,7 @@ Use this skill whenever you touch plan gating, feature flags, limits, billing-de
    - Handles auth state, admin role lookup, billing lookup, and fallback/error behavior.
 3. `apps/web/types/index.ts` (`UserPlan`, `UserEntitlements`)
    - Shared contract consumed by API routes, server actions, and UI.
-4. `agents.md` (root)
+4. `AGENTS.md` (root)
    - Agent-facing guardrails and required patterns.
 
 ## How Entitlements Work
@@ -67,4 +67,4 @@ When modifying entitlement behavior, include or update tests for:
 - [ ] Update registry/types/server consistently (no drift).
 - [ ] Add/adjust unit tests for boundaries, transitions, and concurrency.
 - [ ] Keep call-sites using `getCurrentUserEntitlements()` as the gateway.
-- [ ] Update `agents.md` if the global policy changes.
+- [ ] Update `AGENTS.md` if the global policy changes.

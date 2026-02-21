@@ -53,6 +53,6 @@ jobs:
           # prompt: 'Update the pull request description to include a summary of changes.'
 
           # Use Opus 4.5 for GitHub-triggered tasks (complex by nature)
-          # Per agents.md section 6.1: Use Opus for multi-file changes and architectural decisions
+          # Per AGENTS.md section 6.1: Use Opus for multi-file changes and architectural decisions
           claude_args: '--model claude-opus-4-5-20251101'
 
