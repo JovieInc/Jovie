@@ -86,6 +86,17 @@ export function getReleaseContextMenuItems({
         navigator.clipboard.writeText(release.id);
       },
     },
+    {
+      id: 'copy-lyrics',
+      label: 'Copy lyrics',
+      icon: menuIcon('Hash'),
+      disabled: !release.lyrics?.trim(),
+      onClick: () => {
+        if (release.lyrics?.trim()) {
+          navigator.clipboard.writeText(release.lyrics);
+        }
+      },
+    },
   ];
 
   if (release.upc) {
