@@ -188,6 +188,20 @@ export const waitlistApproveSchema = z.object({
  */
 export type WaitlistApprovePayload = z.infer<typeof waitlistApproveSchema>;
 
+/**
+ * Waitlist settings update schema.
+ * Used for PATCH /app/admin/waitlist/settings requests.
+ */
+export const waitlistSettingsUpdateSchema = z.object({
+  gateEnabled: z.boolean(),
+  autoAcceptEnabled: z.boolean(),
+  autoAcceptDailyLimit: z.number().int().min(0).max(10_000),
+});
+
+export type WaitlistSettingsUpdatePayload = z.infer<
+  typeof waitlistSettingsUpdateSchema
+>;
+
 // =============================================================================
 // Cron Job Schemas
 // =============================================================================

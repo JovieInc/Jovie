@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
+import { WaitlistSettingsPanel } from '@/components/admin/WaitlistSettingsPanel';
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
@@ -64,6 +65,7 @@ export default async function AdminWaitlistPage({
   return (
     <PageShell>
       <PageContent noPadding>
+        <WaitlistSettingsPanel />
         <WaitlistMetrics metrics={metrics} />
         <AdminWaitlistTableWithViews
           entries={entries}
