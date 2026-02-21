@@ -139,6 +139,7 @@ export {
   type WaitlistInviteSendWindowConfig,
   type WaitlistPlan,
   type WaitlistRequestPayload,
+  type WaitlistSettingsUpdatePayload,
   waitlistApproveSchema,
   waitlistGoalSchema,
   // Waitlist schemas
@@ -148,6 +149,7 @@ export {
   waitlistPlanSchema,
   waitlistPlanValues,
   waitlistRequestSchema,
+  waitlistSettingsUpdateSchema,
 } from './admin';
 
 // =============================================================================

@@ -1,16 +1,15 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
-import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { sendNotification } from '@/lib/notifications/service';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
+import {
+  approveWaitlistEntryInTx,
+  finalizeWaitlistApproval,
+} from '@/lib/waitlist/approval';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
 export const runtime = 'nodejs';
@@ -52,99 +51,7 @@ export async function POST(request: Request) {
     }
 
     const result = await withSystemIngestionSession(
-      async tx => {
-        const now = new Date();
-
-        // Lock waitlist entry for update
-        const [entry] = await tx
-          .select({
-            id: waitlistEntries.id,
-            email: waitlistEntries.email,
-            fullName: waitlistEntries.fullName,
-            primarySocialUrlNormalized:
-              waitlistEntries.primarySocialUrlNormalized,
-            status: waitlistEntries.status,
-          })
-          .from(waitlistEntries)
-          .where(eq(waitlistEntries.id, parsed.data.entryId))
-          .for('update')
-          .limit(1);
-
-        if (!entry) {
-          return { outcome: 'not_found' as const };
-        }
-
-        if (entry.status !== 'new') {
-          return {
-            outcome: 'already_processed' as const,
-            status: entry.status,
-          };
-        }
-
-        // Get profile created during signup (via waitlistEntryId)
-        const [profile] = await tx
-          .select({ id: creatorProfiles.id })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.waitlistEntryId, entry.id))
-          .limit(1);
-
-        if (!profile) {
-          throw new Error(
-            'Profile not found for waitlist entry. User must submit waitlist form to auto-create profile.'
-          );
-        }
-
-        // Get user by email (include clerkId for cache invalidation)
-        const [user] = await tx
-          .select({ id: users.id, clerkId: users.clerkId })
-          .from(users)
-          .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
-          .limit(1);
-
-        if (!user) {
-          throw new Error(
-            'User not found for email. User may need to sign in first to create auth record.'
-          );
-        }
-
-        // Link profile to user and mark as claimed + public
-        await tx
-          .update(creatorProfiles)
-          .set({
-            userId: user.id,
-            isClaimed: true,
-            isPublic: true,
-            onboardingCompletedAt: now, // Skip onboarding
-            updatedAt: now,
-          })
-          .where(eq(creatorProfiles.id, profile.id));
-
-        // Update waitlist entry status to 'claimed' (skip 'invited' state)
-        await tx
-          .update(waitlistEntries)
-          .set({
-            status: 'claimed',
-            updatedAt: now,
-          })
-          .where(eq(waitlistEntries.id, entry.id));
-
-        // Update user status to 'active'
-        await tx
-          .update(users)
-          .set({
-            userStatus: 'active',
-            updatedAt: now,
-          })
-          .where(eq(users.id, user.id));
-
-        return {
-          outcome: 'approved' as const,
-          profileId: profile.id,
-          email: entry.email,
-          fullName: entry.fullName,
-          clerkId: user.clerkId,
-        };
-      },
+      async tx => approveWaitlistEntryInTx(tx, parsed.data.entryId),
       { isolationLevel: 'serializable' }
     );
 
@@ -165,10 +72,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Invalidate user state cache so middleware sees fresh state immediately
-    if (result.clerkId) {
-      await invalidateProxyUserStateCache(result.clerkId);
-    }
+    await finalizeWaitlistApproval(result);
 
     // Send welcome email after successful approval
     const { message, target } = buildWaitlistInviteEmail({
