@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
 
@@ -53,9 +53,14 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 
 describe('useJovieChat rate limiting', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
     onRejectHandler = undefined;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('routes submissions through async rate limiter and surfaces rate-limit feedback', () => {
@@ -84,7 +89,14 @@ describe('useJovieChat rate limiting', () => {
       onRejectHandler?.();
     });
 
+    expect(result.current.isRateLimited).toBe(true);
     expect(result.current.chatError?.type).toBe('rate_limit');
     expect(result.current.chatError?.message).toContain('too quickly');
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(result.current.isRateLimited).toBe(false);
   });
 });
