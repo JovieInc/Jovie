@@ -131,7 +131,6 @@ function AuthShellWrapperInner({
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
-  // This matches the previewPanel pattern on line 140.
   const rawHeaderAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
   const headerAction = rawHeaderAction ? (

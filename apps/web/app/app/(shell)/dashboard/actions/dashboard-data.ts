@@ -37,6 +37,7 @@ import {
 } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
 
@@ -374,31 +375,40 @@ async function fetchDashboardCoreWithSession(
         () =>
           db
             .select({
-              hasLinks: drizzleSql<number>`count(*)`,
-              hasMusicLinks: drizzleSql<number>`
-                count(*) filter (
-                  where ${or(
+              hasLinks: drizzleSql<boolean>`
+              exists (
+                select 1
+                from ${socialLinks}
+                where ${and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active'),
+                  eq(socialLinks.isActive, true)
+                )}
+              )
+            `,
+              hasMusicLinks: drizzleSql<boolean>`
+              exists (
+                select 1
+                from ${socialLinks}
+                where ${and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.state, 'active'),
+                  eq(socialLinks.isActive, true),
+                  or(
                     eq(socialLinks.platformType, 'dsp'),
                     eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                  )}
-                )
-              `,
-            })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
+                  )
+                )}
               )
-            ),
+            `,
+            })
+            .from(users)
+            .where(eq(users.id, userData.id))
+            .limit(1),
         'Social links existence query'
       )
         .then(result => {
-          const counts = result?.[0];
-          return {
-            hasLinks: Number(counts?.hasLinks ?? 0) > 0,
-            hasMusicLinks: Number(counts?.hasMusicLinks ?? 0) > 0,
-          };
+          return mapSocialLinkExistence(result?.[0]);
         })
         .catch((error: unknown) => {
           const migrationResult = handleMigrationErrors(error, {

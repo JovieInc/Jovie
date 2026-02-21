@@ -1,3 +1,60 @@
+# Main Branch Protection Ruleset
+#
+# This ruleset enables the autonomous agent pipeline:
+#
+# For AGENT PRs (linear/*, claude/*, codegen-bot/*, codex/*):
+#   CI passes → scope-judge passes → auto-approve enables auto-merge
+#   → enters merge queue → merge → deploy → canary/sentry gates
+#
+# For HUMAN PRs:
+#   CI passes → enters merge queue → merge
+#   (optional: request review from teammates for visibility)
+#
+# WHY 0 REQUIRED REVIEWS:
+#   Agent PRs are created by github-actions[bot] (via auto-pr-on-push)
+#   and approvals also come from github-actions[bot] (via auto-approve).
+#   GitHub treats this as a self-review and doesn't count it. Rather than
+#   maintaining a separate GitHub App just for reviews, we rely on the
+#   automated quality gates that already provide stronger coverage:
+#
+#   Pre-merge:  CI (typecheck + lint + tests + a11y + layout guard)
+#               + scope-judge (LLM alignment check, agent PRs only)
+#               + sensitive-file detection (blocks auto-merge)
+#               + merge queue (re-runs CI against latest main)
+#
+#   Post-merge: canary health gate + Sentry error gate + auto-rollback
+#
+# KEY DESIGN DECISIONS:
+#
+# 1. required_approving_review_count: 0
+#    No approval required. The CI + merge queue + post-deploy gates
+#    are the quality gates. Auto-approve still enables auto-merge and
+#    logs an audit trail, but the approval itself is not a gate.
+#
+# 2. require_code_owner_review: false
+#    CODEOWNERS auto-requests reviewers (so humans get notified) but
+#    doesn't hard-gate.
+#
+# 3. dismiss_stale_reviews_on_push: true
+#    When agent-remediation pushes a fix, old informational approvals
+#    are dismissed. This keeps the audit trail accurate.
+#
+# 4. Simplified status checks: only PR Ready + Migration Guard
+#    PR Ready already aggregates: ci-fast (typecheck + lint + knip +
+#    guardrails) + unit tests + a11y + layout guard. Requiring individual
+#    checks AND the aggregate is redundant and causes "pending" stuck
+#    states when path-gated checks skip.
+#
+# 5. scope-judge is NOT a required status check here
+#    It only runs on agent branches. If required here, non-agent PRs
+#    would be stuck forever. Instead, auto-approve checks for
+#    scope-judge status internally before enabling auto-merge.
+#
+# 6. merge_queue enabled
+#    PRs enter the merge queue after checks pass. The queue runs CI
+#    again (merge_group trigger) to catch integration conflicts
+#    between concurrent PRs.
+
 name: 'Main Branch Protection'
 enforcement: 'active'
 target:
@@ -5,24 +62,74 @@ target:
     include:
       - 'refs/heads/main'
     exclude: []
+
 rules:
+  # ── Pull Request Reviews ──────────────────────────────────────────────
   - type: 'pull_request'
     parameters:
-      dismiss_stale_reviews_on_push: false
-      require_code_owner_review: false
+      # No approval required. CI + scope-judge + merge queue + post-deploy
+      # canary/sentry gates are the quality gates. Auto-approve still logs
+      # an informational review for audit trail.
       required_approving_review_count: 0
+
+      # Dismiss stale reviews on push. Keeps audit trail accurate when
+      # agent-remediation pushes fixes.
+      dismiss_stale_reviews_on_push: true
+
+      # CODEOWNERS auto-requests reviewers for visibility but doesn't gate.
+      require_code_owner_review: false
+
+      # Not relevant with 0 required reviews, but kept false for consistency.
       require_last_push_approval: false
+
+  # ── Required Status Checks ────────────────────────────────────────────
   - type: 'required_status_checks'
     parameters:
+      # Require branch to be up-to-date with main before merging.
+      # The merge queue handles this automatically.
       strict_required_status_checks_policy: true
       required_status_checks:
-        - context: 'CI / Typecheck'
-        - context: 'CI / Lint'
-        - context: 'CI / Migration Guard'
-        - context: 'CI / ci-fast'
-        - context: 'CI / Unit Tests (1/2)'
-        - context: 'CI / Unit Tests (2/2)'
-        - context: 'CI / A11y (axe)'
-        - context: 'CI / Layout Guard (blocking)'
+        # PR Ready: The single aggregate gate for all CI checks.
+        # Internally aggregates:
+        #   ci-fast (typecheck + biome lint + eslint boundaries + knip + guardrails)
+        #   + unit tests (sharded 2/2)
+        #   + a11y (axe audit)
+        #   + layout guard (overlap/touching detection)
         - context: 'CI / PR Ready'
+
+        # Migration Guard: Separate from PR Ready because it's independently
+        # path-gated (only runs when DB/schema files change). Prevents
+        # dangerous migration patterns from reaching production.
+        - context: 'CI / Migration Guard'
+
+  # ── Merge Queue ────────────────────────────────────────────────────────
+  - type: 'merge_queue'
+    parameters:
+      # Merge method: squash keeps history clean with one commit per PR
+      merge_method: 'squash'
+
+      # Min entries before queue starts processing. 1 = process immediately
+      # (don't wait for batching). This maximizes speed for autonomous PRs.
+      min_entries_to_merge: 1
+
+      # Max entries to batch together. Small batches reduce blast radius
+      # if something fails in the queue.
+      max_entries_to_merge: 5
+
+      # Minutes to wait for more PRs before processing a batch.
+      # 0 = process immediately when min_entries_to_merge is met.
+      min_entries_to_merge_wait_minutes: 0
+
+      # Status checks that must pass in the merge queue context.
+      # The CI workflow triggers on merge_group events and runs
+      # the same checks as on pull_request.
+      check_response_timeout_minutes: 30
+
+  # ── Branch Integrity ───────────────────────────────────────────────────
+  - type: 'non_fast_forward'
+    # Block force pushes to main. Always.
+
+# ── Bypass Actors ──────────────────────────────────────────────────────
+# No bypass actors. Every PR — human or agent — must pass through
+# the same CI + merge queue gates.
 bypass_actors: []

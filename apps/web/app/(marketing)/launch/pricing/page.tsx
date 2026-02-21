@@ -9,7 +9,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `Pricing — ${APP_NAME}`;
   const description =
-    'Simple pricing. No surprises. Free, Pro, and Team plans for every stage of your music career.';
+    'Simple pricing. No surprises. Free, Pro, and Growth plans for every stage of your music career.';
 
   return {
     title,
@@ -48,14 +48,14 @@ const PRO_FEATURES = [
   'Pre-save pages',
 ];
 
-const TEAM_FEATURES = [
-  'Up to 10 artist profiles',
-  'Team member accounts',
-  'Consolidated fan dashboard',
-  'API access',
+const GROWTH_FEATURES = [
+  'Priority support',
+  'Advanced fan segmentation',
   'Webhook integrations',
-  'Dedicated account manager',
+  'API access',
+  'White-label embeds',
   'Bulk import tools',
+  'Dedicated account manager',
 ];
 
 interface FeatureListProps {
@@ -148,10 +148,10 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* Team */}
+          {/* Growth */}
           <div className='py-12 md:pl-8'>
             <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-              Team
+              Growth
             </div>
             <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
               $99{' '}
@@ -160,16 +160,16 @@ export default function PricingPage() {
               </span>
             </div>
             <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-              For managers and labels running multiple artists.
+              For artists scaling their fanbase and revenue.
             </div>
             <div className='mt-6 pt-5 border-t border-subtle'>
               <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                 Everything in Pro, plus
               </div>
-              <FeatureList features={TEAM_FEATURES} />
+              <FeatureList features={GROWTH_FEATURES} />
             </div>
             <Link
-              href={`${APP_ROUTES.SIGNUP}?plan=team`}
+              href={`${APP_ROUTES.SIGNUP}?plan=growth`}
               className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
             >
               Get started
