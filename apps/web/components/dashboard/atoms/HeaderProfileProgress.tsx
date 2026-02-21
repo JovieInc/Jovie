@@ -22,15 +22,18 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
     router.push(`${APP_ROUTES.CHAT}?q=${prompt}`);
   }, [router]);
 
+  const completionPercentage = profileCompletion?.percentage ?? 0;
+  const completionSteps = profileCompletion?.steps ?? [];
+
   if (
     !selectedProfile ||
-    profileCompletion.percentage >= 100 ||
-    profileCompletion.steps.length === 0
+    completionPercentage >= 100 ||
+    completionSteps.length === 0
   ) {
     return null;
   }
 
-  const pct = profileCompletion.percentage;
+  const pct = completionPercentage;
   // SVG circular progress: radius 14, circumference ~88
   const r = 14;
   const circumference = 2 * Math.PI * r;
