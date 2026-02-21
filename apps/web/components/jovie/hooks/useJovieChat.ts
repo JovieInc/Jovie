@@ -73,6 +73,10 @@ export function useJovieChat({
     assistantMessage: string;
     toolCalls?: Record<string, unknown>[];
   } | null>(null);
+  const pendingInitialSendRef = useRef<{
+    text: string;
+    files?: FileUIPart[];
+  } | null>(null);
   const queryClient = useQueryClient();
 
   // Track whether we're waiting for title generation from the server.
@@ -221,6 +225,22 @@ export function useJovieChat({
     setActiveConversationId(conversationId ?? null);
   }, [conversationId]);
 
+  // Ensure the first message in a new chat is sent only after activeConversationId
+  // has been committed, so transport includes conversationId on the request.
+  useEffect(() => {
+    if (!activeConversationId || !pendingInitialSendRef.current) return;
+
+    const pendingPayload = pendingInitialSendRef.current;
+    pendingInitialSendRef.current = null;
+
+    sendMessage({
+      text: pendingPayload.text,
+      ...(pendingPayload.files && pendingPayload.files.length > 0
+        ? { files: pendingPayload.files }
+        : {}),
+    });
+  }, [activeConversationId, sendMessage]);
+
   // Save messages to database when streaming completes.
   // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
   // assistant message. If the assistant message is empty, leave the ref so
@@ -353,6 +373,10 @@ export function useJovieChat({
       }
 
       const trimmedText = text.trim();
+      const payload = {
+        text: trimmedText,
+        ...(hasFiles ? { files } : {}),
+      };
 
       // Store the message before sending (in case of error)
       lastAttemptedMessageRef.current = trimmedText;
@@ -381,6 +405,8 @@ export function useJovieChat({
             userMessage: '', // Empty - already persisted via initialMessage
             assistantMessage: '', // Will be filled when response completes
           };
+
+          pendingInitialSendRef.current = payload;
         } catch (err) {
           Sentry.captureException(err, {
             tags: {
@@ -404,12 +430,18 @@ export function useJovieChat({
           setIsSubmitting(false);
           return;
         }
+
+        setInput('');
+
+        // Reset textarea height
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+        }
+
+        return;
       }
 
-      sendMessage({
-        text: trimmedText,
-        ...(hasFiles ? { files } : {}),
-      });
+      sendMessage(payload);
       setInput('');
 
       // Reset textarea height
