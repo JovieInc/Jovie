@@ -105,6 +105,12 @@ describe('@critical session.ts', () => {
       expect(result.userId).toBe('user_provided_123');
       // Combined into single query for performance
       expect(mockDbExecute).toHaveBeenCalledTimes(1);
+
+      const executedSql = mockDbExecute.mock.calls[0]?.[0];
+      const queryText = JSON.stringify(executedSql);
+
+      expect(queryText).toContain('app.clerk_user_id');
+      expect(queryText).not.toContain('app.user_id');
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {
