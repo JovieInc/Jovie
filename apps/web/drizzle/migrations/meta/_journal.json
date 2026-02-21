@@ -281,6 +281,13 @@
       "when": 1772000000000,
       "tag": "0039_hash_claim_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1771642408553,
+      "tag": "0040_waitlist_gate_settings",
+      "breakpoints": true
     }
   ]
 }
