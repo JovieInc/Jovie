@@ -17,6 +17,8 @@ import { useCallback, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   type SendCampaignInvitesResponse,
+  useCampaignInvitesQuery,
+  useCampaignOverviewQuery,
   useCampaignPreviewQuery,
   useCampaignStatsQuery,
   useSendCampaignInvitesMutation,
@@ -59,6 +61,11 @@ export function InviteCampaignManager() {
 
   // TanStack Query for campaign stats
   const { data: stats, isLoading: isLoadingStats } = useCampaignStatsQuery();
+
+  const { data: inviteList, isLoading: isLoadingInvites } =
+    useCampaignInvitesQuery({ limit: 10, offset: 0 });
+
+  const { data: campaignOverview } = useCampaignOverviewQuery();
 
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
@@ -384,6 +391,116 @@ export function InviteCampaignManager() {
             under 50/hour to avoid spam filters.
           </p>
         </div>
+      </section>
+
+      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-lg font-semibold text-primary-token'>
+            Claim Funnel
+          </h2>
+        </div>
+
+        <div className='grid gap-4 md:grid-cols-4'>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-bold text-primary-token'>
+              {campaignOverview?.invites.sent ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>Invites sent</p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-bold text-blue-600'>
+              {campaignOverview?.engagement.uniqueClicks ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>
+              Unique click-throughs
+            </p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-bold text-emerald-600'>
+              {campaignOverview?.conversion.profilesClaimed ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>Profiles claimed</p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-bold text-violet-600'>
+              {(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%
+            </p>
+            <p className='text-xs text-secondary-token'>
+              Claim conversion rate
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+        <div className='mb-4 flex items-center justify-between'>
+          <h2 className='text-lg font-semibold text-primary-token'>
+            Recent Invite Activity
+          </h2>
+          {isLoadingInvites && (
+            <Icon
+              name='Loader2'
+              className='h-3.5 w-3.5 animate-spin text-secondary-token'
+            />
+          )}
+        </div>
+
+        {inviteList && inviteList.invites.length > 0 ? (
+          <div className='overflow-hidden rounded-lg border border-subtle'>
+            <table className='w-full text-sm'>
+              <thead className='bg-surface-2'>
+                <tr>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Creator
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Status
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Engagement
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Claimed
+                  </th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-subtle'>
+                {inviteList.invites.map(invite => (
+                  <tr key={invite.id}>
+                    <td className='px-4 py-2 text-primary-token'>
+                      @{invite.profile.username}
+                    </td>
+                    <td className='px-4 py-2 text-secondary-token capitalize'>
+                      {invite.status}
+                    </td>
+                    <td className='px-4 py-2 text-secondary-token'>
+                      {invite.engagement.clicked
+                        ? `Clicked (${invite.engagement.clickCount})`
+                        : invite.engagement.opened
+                          ? 'Opened'
+                          : 'No events'}
+                    </td>
+                    <td className='px-4 py-2'>
+                      <span
+                        className={
+                          invite.profile.isClaimed
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-secondary-token'
+                        }
+                      >
+                        {invite.profile.isClaimed ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className='text-sm text-secondary-token'>
+            No invite activity yet.
+          </p>
+        )}
       </section>
 
       {/* Preview Section */}
