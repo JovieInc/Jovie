@@ -20,15 +20,17 @@ export function useOptimisticToggle({
   initialValue,
   mutateAsync,
   onOptimisticUpdate,
-  errorMessage = 'Something went wrong. Please try again.',
+  errorMessage = 'Failed to update setting. Please try again.',
 }: UseOptimisticToggleOptions): UseOptimisticToggleReturn {
   const [checked, setChecked] = useState(initialValue);
   const [isPending, setIsPending] = useState(false);
 
-  // Sync local state when the source of truth changes (e.g. after a refetch)
+  // Sync with server value when initialValue changes (e.g., refetch or profile switch)
   useEffect(() => {
-    setChecked(initialValue);
-  }, [initialValue]);
+    if (!isPending) {
+      setChecked(initialValue);
+    }
+  }, [initialValue, isPending]);
 
   const handleToggle = async (enabled: boolean) => {
     const previousValue = checked;
@@ -36,8 +38,8 @@ export function useOptimisticToggle({
     // Optimistic update
     setChecked(enabled);
     onOptimisticUpdate?.(enabled);
-    setIsPending(true);
 
+    setIsPending(true);
     try {
       await mutateAsync(enabled);
     } catch {

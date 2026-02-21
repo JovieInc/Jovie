@@ -12,7 +12,6 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
-import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
@@ -22,7 +21,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -112,7 +111,7 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Preview panel is available on all dashboard routes and the artist-profile settings page
+  // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
 
@@ -144,12 +143,6 @@ function AuthShellWrapperInner({
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
 
-  const previewPanel = previewEnabled ? (
-    <ErrorBoundary fallback={null}>
-      <ProfileContactSidebar />
-    </ErrorBoundary>
-  ) : undefined;
-
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
   // Only create a callback when persistSidebarCollapsed is defined, otherwise
@@ -174,7 +167,7 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <TablePanelProvider>
+      <RightPanelProvider>
         <PreviewPanelProvider enabled={previewEnabled}>
           <AuthShell
             section={config.section}
@@ -183,7 +176,6 @@ function AuthShellWrapperInner({
             headerAction={headerAction}
             showMobileTabs={config.showMobileTabs}
             isTableRoute={config.isTableRoute}
-            previewPanel={previewPanel}
             onSidebarOpenChange={
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined
             }
@@ -192,7 +184,7 @@ function AuthShellWrapperInner({
             {children}
           </AuthShell>
         </PreviewPanelProvider>
-      </TablePanelProvider>
+      </RightPanelProvider>
     </TableMetaContext.Provider>
   );
 }

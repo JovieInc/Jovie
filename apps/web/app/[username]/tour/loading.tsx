@@ -9,7 +9,7 @@ export default function TourLoading() {
       </header>
 
       {/* Content skeleton */}
-      <main className='mx-auto max-w-2xl px-4 py-8'>
+      <main id='main-content' className='mx-auto max-w-2xl px-4 py-8'>
         <div className='mb-8'>
           <div className='h-8 w-64 skeleton motion-reduce:animate-none rounded' />
           <div className='mt-2 h-5 w-24 skeleton motion-reduce:animate-none rounded' />

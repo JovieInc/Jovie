@@ -30,29 +30,8 @@
         "lib/db/schema/**"
       ],
       "ignoreDependencies": [
-        "@tailwindcss/forms",
-        "@tailwindcss/line-clamp",
-        "@tailwindcss/typography",
-        "critters",
-        "import-in-the-middle",
-        "require-in-the-middle",
-        "ignore-loader",
-        "@fontsource-variable/inter",
-        "geist",
-        "drizzle-kit",
         "tw-animate-css",
         "@clerk/backend",
-        "@clerk/dev-cli",
-        "@eslint/eslintrc",
-        "@eslint/js",
-        "@typescript-eslint/eslint-plugin",
-        "axe-core",
-        "axe-playwright",
-        "eslint-plugin-storybook",
-        "shadcn",
-        "hono",
-        "@clerk/elements",
-        "@hookform/resolvers",
         "@radix-ui/react-alert-dialog",
         "@radix-ui/react-avatar",
         "@radix-ui/react-checkbox",
@@ -65,16 +44,7 @@
         "@radix-ui/react-tabs",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
-        "@radix-ui/react-tooltip",
-        "@statsig/react-bindings",
-        "@statsig/session-replay",
-        "@stripe/stripe-js",
-        "@vercel/edge-config",
-        "flags",
-        "react-hook-form",
-        "@types/dompurify",
-        "@types/uuid",
-        "uuid"
+        "@radix-ui/react-tooltip"
       ],
       "playwright": {
         "config": [
@@ -118,7 +88,7 @@
       }
     },
     "packages/ui": {
-      "entry": ["index.ts", "atoms/*.{ts,tsx}", "lib/*.ts", "theme/*.ts"],
+      "entry": ["atoms/*.{ts,tsx}", "lib/*.ts", "theme/*.ts"],
       "project": ["**/*.{ts,tsx}"],
       "vitest": {
         "config": ["vitest.config.ts"],

@@ -14,7 +14,7 @@ import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -56,7 +56,7 @@ const ContactSidebar = dynamic(
       default: mod.ContactSidebar,
     })),
   {
-    loading: () => <div className='h-full w-full animate-pulse bg-surface-1' />,
+    loading: () => <div className='h-full w-full animate-pulse bg-surface-2' />,
     ssr: false,
   }
 );
@@ -377,7 +377,7 @@ export function AdminCreatorProfilesUnified({
     ]
   );
 
-  useRegisterTablePanel(sidebarPanel);
+  useRegisterRightPanel(sidebarPanel);
 
   return (
     <>
