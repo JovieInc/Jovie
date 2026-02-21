@@ -83,6 +83,6 @@ describe('POST /api/unsubscribe/claim-invites', () => {
         metadata: { notes: 'Unsubscribed via claim invite email link' },
       })
     );
-    expect(html).toContain("You've been unsubscribed");
+    expect(html).toContain('You&#039;ve been unsubscribed');
   });
 });
