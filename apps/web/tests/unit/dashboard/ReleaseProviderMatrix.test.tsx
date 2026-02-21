@@ -97,6 +97,14 @@ vi.mock('@/lib/queries', () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useSaveReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useFormatReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 // Mock heavy children

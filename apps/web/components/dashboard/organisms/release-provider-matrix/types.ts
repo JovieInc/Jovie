@@ -56,5 +56,8 @@ export interface UseReleaseProviderMatrixReturn {
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
+  handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
+  handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
+  isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;
 }

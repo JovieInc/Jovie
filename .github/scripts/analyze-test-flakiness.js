@@ -189,6 +189,7 @@ async function analyzeFlakiness(token, owner, repo) {
  */
 function extractTestExecutions(job) {
   const runStepRegex = /^run .*tests?/i;
+  const normalizedJobName = normalizeJobName(job.name || '');
 
   // First, check if any test steps exist at all (regardless of conclusion)
   const allTestSteps = (job.steps || []).filter(step =>
@@ -204,17 +205,25 @@ function extractTestExecutions(job) {
     );
 
     return completedSteps.map(step => ({
-      name: `${job.name} › ${step.name}`,
+      name: `${normalizedJobName} › ${step.name}`,
       conclusion: step.conclusion,
     }));
   }
 
   // Only fall back to job-level conclusion when there are genuinely no test steps
   if (['success', 'failure'].includes(job.conclusion)) {
-    return [{ name: job.name, conclusion: job.conclusion }];
+    return [{ name: normalizedJobName, conclusion: job.conclusion }];
   }
 
   return [];
+}
+
+/**
+ * Normalize CI matrix job names so shard variants are grouped together.
+ * Example: "Unit Tests (1/3)" -> "Unit Tests"
+ */
+function normalizeJobName(name) {
+  return name.replace(/\s*\(\d+\/\d+\)$/, '');
 }
 
 /**
@@ -456,5 +465,6 @@ module.exports = {
   analyzeFlakiness,
   calculateMetrics,
   extractTestExecutions,
+  normalizeJobName,
   generateReport,
 };

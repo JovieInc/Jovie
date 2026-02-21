@@ -89,6 +89,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleRescanIsrc,
     isRescanningIsrc,
     handleAddUrl,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
   // Table display preferences (column visibility)
@@ -483,6 +486,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             onArtworkUpload={handleArtworkUpload}
             onArtworkRevert={handleArtworkRevert}
             onReleaseChange={handleReleaseChange}
+            onSaveLyrics={handleSaveLyrics}
+            onFormatLyrics={handleFormatLyrics}
+            isLyricsSaving={isLyricsSaving}
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
             readOnly={!canEditSmartLinks}
@@ -502,6 +508,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       handleArtworkUpload,
       handleArtworkRevert,
       handleReleaseChange,
+      handleSaveLyrics,
+      handleFormatLyrics,
+      isLyricsSaving,
       isSaving,
       allowArtworkDownloads,
       canEditSmartLinks,
