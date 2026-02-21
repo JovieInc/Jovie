@@ -17,7 +17,7 @@ import {
 describe('Query Timeout', () => {
   describe('QUERY_TIMEOUTS', () => {
     it('should have correct default timeout values', () => {
-      expect(QUERY_TIMEOUTS.dashboard).toBe(10000); // 10 seconds
+      expect(QUERY_TIMEOUTS.dashboard).toBe(20000); // 20 seconds
       expect(QUERY_TIMEOUTS.api).toBe(5000); // 5 seconds
       expect(QUERY_TIMEOUTS.default).toBe(5000); // 5 seconds
     });
@@ -69,7 +69,7 @@ describe('Query Timeout', () => {
   });
 
   describe('dashboardQuery', () => {
-    it('should use dashboard timeout (10s)', async () => {
+    it('should use dashboard timeout (20s)', async () => {
       const startTime = Date.now();
       const fastQuery = async () => 'result';
 
