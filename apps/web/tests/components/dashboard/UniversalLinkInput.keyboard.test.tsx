@@ -73,7 +73,9 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     render(<UniversalLinkInput onAdd={mockOnAdd} />);
 
     // Open dropdown
-    const trigger = screen.getByRole('button', { name: /select platform/i });
+    const trigger = screen.getByRole('button', {
+      name: /add link from platform/i,
+    });
     await user.click(trigger);
 
     // Select Spotify from dropdown
@@ -117,7 +119,9 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     render(<UniversalLinkInput onAdd={mockOnAdd} />);
 
     // Open dropdown
-    const trigger = screen.getByRole('button', { name: /select platform/i });
+    const trigger = screen.getByRole('button', {
+      name: /add link from platform/i,
+    });
     await user.click(trigger);
 
     // Select Spotify from dropdown
@@ -182,7 +186,9 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     const user = userEvent.setup();
     render(<UniversalLinkInput onAdd={mockOnAdd} />);
 
-    const trigger = screen.getByRole('button', { name: /select platform/i });
+    const trigger = screen.getByRole('button', {
+      name: /add link from platform/i,
+    });
 
     // Tab to focus the trigger
     await user.tab();
@@ -216,16 +222,18 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     await user.tab(); // to clear button in input
     expect(screen.getByRole('button', { name: /clear input/i })).toHaveFocus();
 
-    // Next tab should move focus out of the component since preview controls live in the list
+    // Next tab should move to the submit button on the right
     await user.tab();
-    expect(document.body).toHaveFocus();
+    expect(screen.getByRole('button', { name: /submit/i })).toHaveFocus();
   });
 
   it('dropdown opens with Enter/Space and navigates with arrow keys', async () => {
     const user = userEvent.setup();
     render(<UniversalLinkInput onAdd={mockOnAdd} />);
 
-    const trigger = screen.getByRole('button', { name: /select platform/i });
+    const trigger = screen.getByRole('button', {
+      name: /add link from platform/i,
+    });
     trigger.focus();
 
     // Open with Enter
