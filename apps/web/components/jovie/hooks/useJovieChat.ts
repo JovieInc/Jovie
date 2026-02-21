@@ -21,7 +21,7 @@ import {
   extractErrorMetadata,
   getErrorType,
   getMessageText,
-  getUserFriendlyMessage,
+  getPreferredErrorMessage,
 } from '../utils';
 
 interface UseJovieChatOptions {
@@ -158,9 +158,7 @@ export function useJovieChat({
 
       setChatError({
         type: errorType,
-        message:
-          metadata.message ||
-          getUserFriendlyMessage(errorType, metadata.retryAfter),
+        message: getPreferredErrorMessage(error, errorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
