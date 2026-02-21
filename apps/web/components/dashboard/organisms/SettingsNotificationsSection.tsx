@@ -5,7 +5,13 @@ import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticT
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
-export function SettingsNotificationsSection() {
+interface SettingsNotificationsSectionProps {
+  readonly isGrowth?: boolean;
+}
+
+export function SettingsNotificationsSection({
+  isGrowth = false,
+}: SettingsNotificationsSectionProps) {
   const { updateNotificationsAsync, isPending } =
     useNotificationSettingsMutation();
 
@@ -20,12 +26,14 @@ export function SettingsNotificationsSection() {
     <DashboardCard variant='settings' padding='none'>
       <div className='px-4 py-3'>
         <SettingsToggleRow
-          title='Marketing Emails'
-          description='Receive updates about new features, tips, and promotional offers.'
+          title='Double opt-in email confirmation'
+          description='Protect your audience from spam by requiring subscribers to confirm their email. This safeguard is available on Growth. Need access sooner? Contact support.'
           checked={checked}
           onCheckedChange={handleToggle}
-          disabled={isPending}
-          ariaLabel='Toggle marketing emails'
+          disabled={isPending || !isGrowth}
+          ariaLabel='Toggle double opt-in email confirmation'
+          gated={!isGrowth}
+          gatePlanName='Growth'
         />
       </div>
     </DashboardCard>

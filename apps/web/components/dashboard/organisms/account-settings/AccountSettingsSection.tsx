@@ -61,7 +61,13 @@ function ClerkAccountSections() {
   );
 }
 
-export function AccountSettingsSection() {
+interface AccountSettingsSectionProps {
+  readonly isGrowth?: boolean;
+}
+
+export function AccountSettingsSection({
+  isGrowth = false,
+}: AccountSettingsSectionProps) {
   return (
     <div className='space-y-0' data-testid='account-settings-section'>
       <ClerkAccountSections />
@@ -75,7 +81,7 @@ export function AccountSettingsSection() {
         <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
           Notifications
         </h3>
-        <SettingsNotificationsSection />
+        <SettingsNotificationsSection isGrowth={isGrowth} />
       </div>
     </div>
   );
