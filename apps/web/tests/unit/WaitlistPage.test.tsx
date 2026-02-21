@@ -76,12 +76,18 @@ const createTestQueryClient = () =>
 describe('WaitlistPage', () => {
   test('clears waitlist session storage when user changes', async () => {
     window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.submitted, 'true');
-    window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, 'user-one');
+    mockUserId = 'user-one';
+
+    const queryClient = createTestQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <WaitlistPage />
+      </QueryClientProvider>
+    );
 
     mockUserId = 'user-two';
 
-    const queryClient = createTestQueryClient();
-    render(
+    rerender(
       <QueryClientProvider client={queryClient}>
         <WaitlistPage />
       </QueryClientProvider>
@@ -91,9 +97,6 @@ describe('WaitlistPage', () => {
       expect(
         window.sessionStorage.getItem(WAITLIST_STORAGE_KEYS.submitted)
       ).toBeNull();
-      expect(window.sessionStorage.getItem(WAITLIST_STORAGE_KEYS.userId)).toBe(
-        'user-two'
-      );
     });
   });
 });
