@@ -165,6 +165,15 @@ function tryUnwrapCause(
   depth: number
 ): UnwrappedDbError {
   const cause = record?.cause;
+
+  if (typeof cause === 'string') {
+    const parsedCause = tryParseJsonError(cause);
+    if (parsedCause) {
+      return unwrapDatabaseError(parsedCause, depth + 1);
+    }
+    return { code: null, message: cause, constraint: null, detail: null };
+  }
+
   if (cause && typeof cause === 'object') {
     return unwrapDatabaseError(cause, depth + 1);
   }
