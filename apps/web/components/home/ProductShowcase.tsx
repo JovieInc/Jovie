@@ -3,9 +3,20 @@
 import { motion, useReducedMotion } from 'motion/react';
 
 import { Container } from '@/components/site/Container';
+import type { FeaturedCreator } from '@/lib/featured-creators';
 
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
+
+const SHOWCASE_CREATOR: FeaturedCreator = {
+  id: 'showcase-creator',
+  handle: 'tim',
+  name: 'Tim White',
+  src: '/images/avatars/placeholder.jpg',
+  genres: ['Indie', 'Alternative'],
+  latestReleaseTitle: 'Never Say A Word',
+  latestReleaseType: 'single',
+};
 
 function CroppedPhone() {
   return (
@@ -17,7 +28,7 @@ function CroppedPhone() {
       >
         <div style={{ height: 580 }}>
           <PhoneFrame>
-            <MobileProfilePreview />
+            <MobileProfilePreview creator={SHOWCASE_CREATOR} />
           </PhoneFrame>
         </div>
         {/* Bottom fade */}
@@ -41,7 +52,7 @@ function CroppedPhone() {
           color: 'var(--linear-text-tertiary)',
         }}
       >
-        jov.ie/tim
+        jov.ie/{SHOWCASE_CREATOR.handle}
       </p>
     </div>
   );

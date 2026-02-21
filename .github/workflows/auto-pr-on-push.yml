@@ -1,0 +1,211 @@
+# Auto-PR on Agent Push
+#
+# PURPOSE: Automatically creates a PR when an agent (Codex, Claude, etc.) pushes
+# code to an agent branch without an existing PR. This closes the gap where
+# agents complete work and push, but leave no PR for the CI pipeline to process.
+#
+# TRIGGER: Push to any agent branch pattern (codex/*, claude/*, codegen-bot/*, linear/*)
+#
+# SAFETY:
+# - Idempotent: skips if PR already exists for the branch
+# - Extracts Linear ticket ID from branch name for traceability
+# - Enables auto-merge so the PR flows through the full pipeline
+# - Does NOT bypass any quality gates (CI, scope judge, auto-approve all still apply)
+
+name: Auto-PR on Agent Push
+
+on:
+  push:
+    branches:
+      - 'codex/**'
+      - 'claude/**'
+      - 'codegen-bot/**'
+      - 'linear/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    name: Open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check for existing PR
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          echo "Branch: $BRANCH"
+
+          # Use jq --arg to prevent shell injection via branch name
+          EXISTING=$(gh api repos/${{ github.repository }}/pulls \
+            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
+
+          if [[ "$EXISTING" -gt 0 ]]; then
+            echo "PR already exists for $BRANCH. Skipping."
+            echo "should_create=false" >> $GITHUB_OUTPUT
+          else
+            echo "No PR found for $BRANCH. Will create one."
+            echo "should_create=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Parse branch name
+        id: parse
+        if: steps.check.outputs.should_create == 'true'
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+
+          # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
+          # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
+          TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
+          echo "ticket=$TICKET" >> $GITHUB_OUTPUT
+
+          # Build PR title from branch name
+          # Strip the agent prefix (codex/, claude/, etc.)
+          SLUG=$(echo "$BRANCH" | sed 's|^[^/]*/||')
+
+          if [[ -n "$TICKET" ]]; then
+            # Remove ticket from slug to avoid duplication in title
+            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr '-_' '  ')
+            TITLE="${TICKET}: ${DESC}"
+          else
+            DESC=$(echo "$SLUG" | tr '-_' '  ')
+            TITLE="$DESC"
+          fi
+
+          # Capitalize first letter of description
+          TITLE=$(echo "$TITLE" | sed 's/\(: \)\(.\)/\1\U\2/;s/^\(.\)/\U\1/')
+
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "PR title: $TITLE"
+
+      - name: Fetch Linear ticket details
+        id: linear
+        if: steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          TICKET="${{ steps.parse.outputs.ticket }}"
+
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "No LINEAR_API_KEY. Skipping ticket lookup."
+            echo "has_details=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Fetch issue details from Linear GraphQL API
+          RESPONSE=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg id "$TICKET" '{
+              query: "query($id: String!) { issueVcsBranchSearch(branchName: $id) { id identifier title url description state { name } } }",
+              variables: { id: $id }
+            }')")
+
+          ISSUE_ID=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.id // ""')
+          ISSUE_TITLE=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.title // ""')
+          ISSUE_URL=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.url // ""')
+          ISSUE_DESC=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.description // ""' | head -c 2000)
+
+          if [[ -n "$ISSUE_ID" ]]; then
+            echo "Found Linear issue: $ISSUE_TITLE"
+            echo "has_details=true" >> $GITHUB_OUTPUT
+            echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+            echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+            echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+
+            # Override PR title with actual ticket title
+            echo "title=${TICKET}: ${ISSUE_TITLE}" >> $GITHUB_OUTPUT
+
+            # Base64 encode description for safe multiline handling
+            echo "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)" >> $GITHUB_OUTPUT
+          else
+            echo "Linear issue not found for $TICKET"
+            echo "has_details=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create PR
+        if: steps.check.outputs.should_create == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          TICKET: ${{ steps.parse.outputs.ticket }}
+          HAS_LINEAR: ${{ steps.linear.outputs.has_details }}
+          LINEAR_TITLE: ${{ steps.linear.outputs.title }}
+          PARSED_TITLE: ${{ steps.parse.outputs.title }}
+          LINEAR_ISSUE_URL: ${{ steps.linear.outputs.issue_url }}
+          LINEAR_ISSUE_ID: ${{ steps.linear.outputs.issue_id }}
+          LINEAR_ISSUE_DESC_B64: ${{ steps.linear.outputs.issue_desc }}
+        run: |
+
+          # Use Linear title if available, otherwise parsed title
+          if [[ "$HAS_LINEAR" == "true" ]]; then
+            TITLE="$LINEAR_TITLE"
+          else
+            TITLE="$PARSED_TITLE"
+          fi
+
+          RUN_URL="/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Build PR body
+          if [[ "$HAS_LINEAR" == "true" ]]; then
+            ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d)
+
+            BODY=$(cat <<EOF
+          ## Goal
+
+          ${ISSUE_DESC}
+
+          ## Linear
+
+          - Issue: ${TICKET}
+          - URL: ${LINEAR_ISSUE_URL}
+
+          <!-- linear-issue-id:${LINEAR_ISSUE_ID} -->
+          <!-- linear-issue-identifier:${TICKET} -->
+
+          ---
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
+          EOF
+          )
+          elif [[ -n "$TICKET" ]]; then
+            BODY=$(cat <<EOF
+          ## Goal
+
+          Implements ${TICKET} from Linear.
+
+          <!-- linear-issue-identifier:${TICKET} -->
+
+          ---
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
+          EOF
+          )
+          else
+            BODY=$(cat <<EOF
+          ## Goal
+
+          Agent-generated changes on \`${BRANCH}\`.
+
+          ---
+          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
+          EOF
+          )
+          fi
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "$TITLE" \
+            --body "$BODY")
+
+          echo "Created PR: $PR_URL"
+
+          # Enable auto-merge so it flows through the pipeline
+          PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
+          gh pr merge "$PR_NUMBER" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
+
+          echo "Auto-merge enabled for PR #$PR_NUMBER"
