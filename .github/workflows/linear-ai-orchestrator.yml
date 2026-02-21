@@ -2,7 +2,7 @@ name: Linear AI Orchestrator
 
 on:
   repository_dispatch:
-    types: [linear_todo_ready]
+    types: [linear_todo_ready, linear_plan_ready]
   workflow_dispatch:
     inputs:
       issue_id:
@@ -50,6 +50,7 @@ jobs:
       issue_description: ${{ steps.gather.outputs.issue_description }}
       issue_url: ${{ steps.gather.outputs.issue_url }}
       branch_name: ${{ steps.gather.outputs.branch_name }}
+      plan_ready: ${{ steps.gather.outputs.plan_ready }}
     steps:
       - name: Gather payload
         id: gather
@@ -61,6 +62,7 @@ jobs:
           PAYLOAD_ISSUE_TITLE: ${{ github.event.client_payload.issue_title }}
           PAYLOAD_ISSUE_DESCRIPTION: ${{ github.event.client_payload.issue_description }}
           PAYLOAD_ISSUE_URL: ${{ github.event.client_payload.issue_url }}
+          PAYLOAD_PLAN_READY: ${{ github.event.client_payload.plan_ready }}
           INPUT_ISSUE_ID: ${{ inputs.issue_id }}
           INPUT_ISSUE_IDENTIFIER: ${{ inputs.issue_identifier }}
           INPUT_ISSUE_TITLE: ${{ inputs.issue_title }}
@@ -97,7 +99,12 @@ jobs:
           if [[ -z "$SAFE_ID" ]]; then
             SAFE_ID="issue-${ISSUE_ID:0:8}"
           fi
-          BRANCH_NAME="linear/${SAFE_ID}"
+          BRANCH_NAME="codex/${SAFE_ID}"
+
+          PLAN_READY="${PAYLOAD_PLAN_READY,,}"
+          if [[ "$PLAN_READY" != "true" ]]; then
+            PLAN_READY="false"
+          fi
 
           EXISTING_PR=$(gh pr list --state open --json number,title,body --jq '
             map(
@@ -124,6 +131,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           echo "issue_url=$ISSUE_URL" >> "$GITHUB_OUTPUT"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "plan_ready=$PLAN_READY" >> "$GITHUB_OUTPUT"
 
   wait_for_coderabbit_plan:
     name: Wait for CodeRabbit Plan
@@ -145,6 +153,11 @@ jobs:
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "Missing LINEAR_API_KEY secret"
             exit 1
+          fi
+
+          if [[ "${{ needs.guard.outputs.plan_ready }}" == "true" ]]; then
+            echo "Plan-ready dispatch received; skipping poll loop"
+            exit 0
           fi
 
           ATTEMPT=1
@@ -204,8 +217,8 @@ jobs:
           exit 1
 
   implement_and_open_pr:
-    name: Implement + PR
-    needs: [guard, wait_for_coderabbit_plan]
+    name: Implement + Push
+    needs: [guard, wait_for_coderabbit_plan, assign_to_codex]
     if: needs.guard.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -214,8 +227,6 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
-    outputs:
-      pr_url: ${{ steps.create_pr.outputs.pr_url }}
     steps:
       - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -261,10 +272,8 @@ jobs:
 
             Do not create commits yourself. Leave changes in working tree for the workflow commit step.
 
-      - name: Commit, push, and create PR
-        id: create_pr
+      - name: Commit and push branch
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
           ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
           ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
@@ -283,64 +292,72 @@ jobs:
           git commit -m "feat: implement ${ISSUE_IDENTIFIER} - ${ISSUE_TITLE}"
           git push origin "HEAD:${BRANCH_NAME}"
 
-          PR_URL=$(gh pr create \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --title "feat: ${ISSUE_IDENTIFIER} - ${ISSUE_TITLE}" \
-            --body "$(cat <<EOF
-          ## Goal
-
-          Implement ${ISSUE_IDENTIFIER} from Linear with no-human-intervention automation.
-
-          ## Changes
-
-          - Implements the issue requirements from Linear.
-          - Includes validation and guardrail-compliant updates.
-
-          ## Testing
-
-          - [x] pnpm turbo typecheck --affected
-          - [x] pnpm turbo lint --affected
-          - [x] Targeted tests for touched areas
-
-          ## Linear
-
-          - Issue: ${ISSUE_IDENTIFIER}
-          - URL: ${ISSUE_URL}
-          - ID: ${ISSUE_ID}
-
-          <!-- linear-issue-id:${ISSUE_ID} -->
-          <!-- linear-issue-identifier:${ISSUE_IDENTIFIER} -->
-
-          EOF
-          )")
-
-          gh pr comment "$PR_URL" --body "@claude review this PR"
-
-          echo "pr_url=${PR_URL}" >> "$GITHUB_OUTPUT"
-
-      - name: Enable auto-merge
+  assign_to_codex:
+    name: Assign issue to Codex in Linear
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Assign issue + leave handoff comment
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ steps.create_pr.outputs.pr_url }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_CODEX_ASSIGNEE_ID: ${{ secrets.LINEAR_CODEX_ASSIGNEE_ID }}
+          ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
+          ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
         run: |
-          gh pr merge "$PR_URL" --auto --squash || echo "Auto-merge unavailable for this PR"
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "Missing LINEAR_API_KEY; cannot assign issue"
+            exit 1
+          fi
+
+          if [[ -z "$LINEAR_CODEX_ASSIGNEE_ID" ]]; then
+            echo "Missing LINEAR_CODEX_ASSIGNEE_ID; skipping assignee update"
+          else
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$(cat <<JSON
+            {
+              \"query\": \"mutation AssignIssue($issueId: String!, $assigneeId: String!) { issueUpdate(id: $issueId, input: { assigneeId: $assigneeId }) { success } }\",
+              \"variables\": { \"issueId\": \"${ISSUE_ID}\", \"assigneeId\": \"${LINEAR_CODEX_ASSIGNEE_ID}\" }
+            }
+            JSON
+            )" > /dev/null
+          fi
+
+          curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d "$(cat <<JSON
+          {
+            \"query\": \"mutation AddComment($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }\",
+            \"variables\": {
+              \"issueId\": \"${ISSUE_ID}\",
+              \"body\": \"Codex automation picked up ${ISSUE_IDENTIFIER}. Working branch: ${BRANCH_NAME}. PR will be auto-opened after push.\"
+            }
+          }
+          JSON
+          )" > /dev/null
 
   sync_linear_in_review:
     name: Sync Linear to In Review
     needs: [guard, implement_and_open_pr]
-    if: needs.guard.outputs.should_run == 'true' && needs.implement_and_open_pr.outputs.pr_url != ''
+    if: needs.guard.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read
     steps:
       - name: Update Linear status/comment
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
           ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
-          PR_URL: ${{ needs.implement_and_open_pr.outputs.pr_url }}
+          BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "Missing LINEAR_API_KEY; skipping Linear sync"
@@ -375,6 +392,12 @@ jobs:
             }
             JSON
             )" > /dev/null
+          fi
+
+          PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open --json url --jq '.[0].url // empty')
+          if [[ -z "$PR_URL" ]]; then
+            echo "No open PR found for ${BRANCH_NAME}; skipping review sync"
+            exit 0
           fi
 
           curl -sS https://api.linear.app/graphql \
