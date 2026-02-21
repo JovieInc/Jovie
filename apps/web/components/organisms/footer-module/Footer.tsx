@@ -37,7 +37,7 @@ export function Footer({
   showThemeToggle = false,
   themeShortcutKey,
   className = '',
-  brandingMark = 'wordmark',
+  brandingMark = 'icon',
   containerSize = 'lg',
   links,
 }: FooterProps) {
@@ -60,7 +60,7 @@ export function Footer({
             variant={config.colorVariant}
             size='sm'
             showCTA={false}
-            mark='wordmark'
+            mark='icon'
           />
         </div>
 

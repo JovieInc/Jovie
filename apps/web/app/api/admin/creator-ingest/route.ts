@@ -1,7 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { getEntitlements } from '@/lib/entitlements/registry';
+import {
+  BillingUnavailableError,
+  getCurrentUserEntitlements,
+} from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
@@ -256,7 +260,35 @@ async function processSocialPlatformIngestion(
  */
 export async function POST(request: Request) {
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
+    try {
+      entitlements = await getCurrentUserEntitlements();
+    } catch (error) {
+      if (error instanceof BillingUnavailableError && error.isAdmin) {
+        // Billing is down but user is confirmed admin — proceed with free-tier defaults.
+        // Admin ingestion only needs auth + admin check, not billing data.
+        await captureError(
+          'Admin ingest proceeding despite billing unavailability',
+          error,
+          { route: '/api/admin/creator-ingest', userId: error.userId },
+          'warning'
+        );
+        const freeEnt = getEntitlements('free');
+        entitlements = {
+          userId: error.userId,
+          email: null,
+          isAuthenticated: true,
+          isAdmin: true,
+          plan: 'free',
+          isPro: false,
+          hasAdvancedFeatures: false,
+          ...freeEnt.booleans,
+          ...freeEnt.limits,
+        };
+      } else {
+        throw error;
+      }
+    }
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { error: 'Unauthorized' },

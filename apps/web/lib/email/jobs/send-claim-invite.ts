@@ -16,6 +16,7 @@ import {
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -73,6 +74,7 @@ export async function processSendClaimInviteJob(
       email: creatorClaimInvites.email,
       status: creatorClaimInvites.status,
       creatorProfileId: creatorClaimInvites.creatorProfileId,
+      meta: creatorClaimInvites.meta,
     })
     .from(creatorClaimInvites)
     .where(eq(creatorClaimInvites.id, payload.inviteId))
@@ -142,17 +144,36 @@ export async function processSendClaimInviteJob(
     };
   }
 
-  if (!profile.claimToken) {
+  const inviteMeta = (invite.meta ?? {}) as {
+    source?: 'admin_click' | 'bulk' | 'auto';
+    claimToken?: string;
+  };
+
+  let claimToken = inviteMeta.claimToken;
+
+  if (!claimToken) {
+    const { token, tokenHash, expiresAt } = await generateClaimTokenPair();
+    claimToken = token;
+
+    await tx
+      .update(creatorProfiles)
+      .set({
+        claimToken: tokenHash,
+        claimTokenExpiresAt: expiresAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
     await tx
       .update(creatorClaimInvites)
       .set({
-        status: 'failed',
-        error: 'Profile has no claim token',
+        meta: {
+          ...inviteMeta,
+          claimToken,
+        },
         updatedAt: new Date(),
       })
       .where(eq(creatorClaimInvites.id, invite.id));
-
-    throw new Error(`Profile has no claim token: ${profile.id}`);
   }
 
   // Check if the email is suppressed (user unsubscribed or bounced)
@@ -194,7 +215,7 @@ export async function processSendClaimInviteJob(
   const templateData: ClaimInviteTemplateData = {
     creatorName: profile.displayName || profile.username,
     username: profile.username,
-    claimToken: profile.claimToken,
+    claimToken,
     avatarUrl: profile.avatarUrl,
     fitScore: profile.fitScore,
     recipientEmail: invite.email,

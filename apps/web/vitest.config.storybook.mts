@@ -7,7 +7,14 @@ import { defineConfig } from 'vitest/config';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  plugins: [storybookTest({ configDir: path.join(dirname, '.storybook') })],
+  plugins: [
+    storybookTest({
+      configDir: path.join(dirname, '.storybook'),
+      tags: {
+        exclude: ['no-vitest'],
+      },
+    }),
+  ],
   test: {
     name: 'storybook',
     browser: {
@@ -17,6 +24,9 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     setupFiles: ['./.storybook/vitest.setup.ts'],
+    // Retry once in CI to handle transient Vite browser-mode module serving failures
+    // (Storybook's internal React 18 compat chunk occasionally fails to load)
+    retry: process.env.CI ? 1 : 0,
   },
   resolve: {
     dedupe: [

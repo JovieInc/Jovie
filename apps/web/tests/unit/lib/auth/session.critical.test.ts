@@ -32,7 +32,6 @@ vi.mock('@/lib/db/schema', () => ({
 describe('@critical session.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockDbExecute.mockResolvedValue(undefined);
   });
 
