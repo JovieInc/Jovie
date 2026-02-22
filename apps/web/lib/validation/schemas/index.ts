@@ -125,6 +125,8 @@ export {
   type AdminRole,
   // Role management schemas
   adminRoleLiteral,
+  type BatchCreatorIngestPayload,
+  batchCreatorIngestSchema,
   type CreatorIngestPayload,
   // Creator ingestion schemas
   creatorIngestSchema,

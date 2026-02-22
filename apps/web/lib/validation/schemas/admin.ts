@@ -85,6 +85,18 @@ export const creatorIngestSchema = z.object({
 });
 
 /**
+ * Batch creator ingest validation schema.
+ * Used for POST /api/admin/batch-ingest requests.
+ */
+export const batchCreatorIngestSchema = z.object({
+  spotifyUrls: z.array(z.string().trim().min(1).max(2048)).min(1).max(50),
+});
+
+export type BatchCreatorIngestPayload = z.infer<
+  typeof batchCreatorIngestSchema
+>;
+
+/**
  * Inferred TypeScript type for creator ingest payload.
  */
 export type CreatorIngestPayload = z.infer<typeof creatorIngestSchema>;
