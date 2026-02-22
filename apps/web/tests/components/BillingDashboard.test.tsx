@@ -188,7 +188,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free/Pro/Growth columns', async () => {
+  it('renders plan comparison grid with Free/Pro columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -208,6 +208,7 @@ describe('BillingDashboard', () => {
     if (growthPlanEnabled) {
       expect(screen.getByText('Growth')).toBeInTheDocument();
     } else {
+      // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
       expect(screen.queryByText('Growth')).not.toBeInTheDocument();
     }
   });
