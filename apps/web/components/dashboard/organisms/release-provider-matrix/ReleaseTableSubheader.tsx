@@ -309,8 +309,12 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: reserved for view-specific controls */}
-      <div className='flex items-center gap-2' />
+      {/* Left: release count */}
+      <div className='flex items-center gap-2'>
+        <span className='text-xs text-tertiary-token tabular-nums'>
+          {releases.length} {releases.length === 1 ? 'release' : 'releases'}
+        </span>
+      </div>
 
       {/* Right: Filter + Display + Export (hidden on mobile where list view is used) */}
       <div className='hidden md:flex items-center gap-2'>
