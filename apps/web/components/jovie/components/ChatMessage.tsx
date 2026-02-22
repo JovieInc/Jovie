@@ -17,6 +17,7 @@ import {
 import { getMessageText } from '../utils';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
+import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
@@ -145,6 +146,32 @@ export function ChatMessage({
                     platform={result.platform}
                     normalizedUrl={result.normalizedUrl}
                     originalUrl={result.originalUrl}
+                  />
+                </div>
+              );
+            }
+
+            if (
+              toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success &&
+              profileId
+            ) {
+              const result = toolInvocation.result as {
+                linkId: string;
+                platform: string;
+                url: string;
+              };
+              return (
+                <div
+                  key={toolInvocation.toolInvocationId}
+                  className={cn(messageText && 'mt-3')}
+                >
+                  <ChatLinkRemovalCard
+                    profileId={profileId}
+                    linkId={result.linkId}
+                    platform={result.platform}
+                    url={result.url}
                   />
                 </div>
               );

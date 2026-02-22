@@ -463,7 +463,9 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 
 **Social Links:**
 - Use the proposeSocialLink tool when the artist wants to add a social link or URL to their profile. Pass the full URL. If they only provide a handle (e.g. "@myhandle" for Instagram), construct the full URL (e.g. "https://instagram.com/myhandle") before calling the tool.
-- Do not add links without showing the confirmation preview first.
+- Use the proposeSocialLinkRemoval tool when the artist wants to remove or delete a social link from their profile. Specify the platform name (e.g. "instagram", "twitter").
+- Do not add or remove links without showing the confirmation preview first.
+- All link changes instantly update the sidebar profile preview.
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
@@ -521,7 +523,7 @@ After creating the release, let the artist know they can add streaming links fro
       ? `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), and add social links (proposeSocialLink). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
+This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
       : ''
   }`;
 }
@@ -611,6 +613,76 @@ function createSocialLinkTool() {
         normalizedUrl: detected.normalizedUrl,
         originalUrl: detected.originalUrl,
         suggestedTitle: detected.suggestedTitle,
+      };
+    },
+  });
+}
+
+/**
+ * Creates the proposeSocialLinkRemoval tool that fetches the artist's
+ * active social links and returns a confirmation card to remove one.
+ */
+function createSocialLinkRemovalTool(profileId: string | null) {
+  return tool({
+    description:
+      'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
+    inputSchema: z.object({
+      platform: z
+        .string()
+        .describe(
+          'The platform name of the link to remove (e.g. "instagram", "spotify", "twitter", "tiktok"). Case-insensitive.'
+        ),
+    }),
+    execute: async ({ platform }) => {
+      if (!profileId) {
+        return {
+          success: false,
+          error: 'Profile ID required to remove links',
+        };
+      }
+
+      // Fetch active links for this profile
+      const activeLinks = await db
+        .select({
+          id: socialLinks.id,
+          platform: socialLinks.platform,
+          url: socialLinks.url,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.state, 'active')
+          )
+        );
+
+      if (activeLinks.length === 0) {
+        return {
+          success: false,
+          error: 'No social links found on your profile.',
+        };
+      }
+
+      // Find a matching link by platform (case-insensitive)
+      const normalizedPlatform = platform.toLowerCase();
+      const matchingLink = activeLinks.find(
+        l => l.platform.toLowerCase() === normalizedPlatform
+      );
+
+      if (!matchingLink) {
+        const available = activeLinks.map(l => l.platform).join(', ');
+        return {
+          success: false,
+          error: `No ${platform} link found. Available links: ${available}`,
+        };
+      }
+
+      return {
+        success: true,
+        action: 'remove_link' as const,
+        linkId: matchingLink.id,
+        platform: matchingLink.platform,
+        url: matchingLink.url,
       };
     },
   });
@@ -1260,10 +1332,11 @@ export async function OPTIONS(req: Request) {
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
  */
-function buildFreeChatTools() {
+function buildFreeChatTools(resolvedProfileId: string | null) {
   return {
     proposeAvatarUpload: createAvatarUploadTool(),
     proposeSocialLink: createSocialLinkTool(),
+    proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
   };
 }
 
@@ -1452,8 +1525,8 @@ export async function POST(req: Request) {
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Free tools (avatar upload, social links) available on ALL plans
-    const freeTools = buildFreeChatTools();
+    // Free tools (avatar upload, social links, link removal) available on ALL plans
+    const freeTools = buildFreeChatTools(resolvedProfileId);
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }

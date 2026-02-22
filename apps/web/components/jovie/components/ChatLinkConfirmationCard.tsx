@@ -2,6 +2,7 @@
 
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { useConfirmChatLinkMutation } from '@/lib/queries/useConfirmChatLinkMutation';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,7 @@ export function ChatLinkConfirmationCard({
   const [state, setState] = useState<CardState>('pending');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmLink = useConfirmChatLinkMutation();
+  const previewPanel = usePreviewPanelContext();
 
   const handleAdd = useCallback(() => {
     setErrorMessage(null);
@@ -73,14 +75,40 @@ export function ChatLinkConfirmationCard({
         normalizedUrl,
       },
       {
-        onSuccess: () => setState('added'),
+        onSuccess: () => {
+          setState('added');
+
+          // Instantly update sidebar preview with the new link
+          if (previewPanel?.previewData) {
+            previewPanel.setPreviewData({
+              ...previewPanel.previewData,
+              links: [
+                ...previewPanel.previewData.links,
+                {
+                  id: `chat-link-${Date.now()}`,
+                  title: platform.name,
+                  url: normalizedUrl,
+                  platform: platform.id,
+                  isVisible: true,
+                },
+              ],
+            });
+          }
+        },
         onError: () => {
           setState('pending');
           setErrorMessage('Unable to add link. Please try again.');
         },
       }
     );
-  }, [profileId, platform.id, originalUrl, normalizedUrl, confirmLink]);
+  }, [
+    profileId,
+    platform,
+    originalUrl,
+    normalizedUrl,
+    confirmLink,
+    previewPanel,
+  ]);
 
   const handleDismiss = useCallback(() => {
     setState('dismissed');
