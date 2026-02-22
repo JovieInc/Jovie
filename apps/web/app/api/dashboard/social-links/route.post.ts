@@ -1,5 +1,5 @@
 import { resolveTxt } from 'node:dns/promises';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
@@ -33,7 +33,10 @@ export async function POST(req: Request) {
 
     if (!profileId || !linkId) {
       return NextResponse.json(
-        { error: 'Profile ID and link ID are required' },
+        {
+          error: 'Profile ID and link ID are required',
+          code: 'missing_params',
+        },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
     const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
     if (!profile) {
       return NextResponse.json(
-        { error: 'Profile not found' },
+        { error: 'Profile not found', code: 'profile_not_found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
@@ -65,14 +68,17 @@ export async function POST(req: Request) {
 
     if (!link) {
       return NextResponse.json(
-        { error: 'Website link not found' },
+        { error: 'Website link not found', code: 'link_not_found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
     if (!link.verificationToken) {
       return NextResponse.json(
-        { error: 'This website link is missing a verification token.' },
+        {
+          error: 'This website link is missing a verification token.',
+          code: 'missing_token',
+        },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
@@ -80,8 +86,41 @@ export async function POST(req: Request) {
     const hostname = extractHostname(link.url);
     if (!hostname) {
       return NextResponse.json(
-        { error: 'Invalid website URL' },
+        { error: 'Invalid website URL', code: 'invalid_url' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Check if another profile already has this domain verified
+    const claimCandidates = await tx
+      .select({
+        id: socialLinks.id,
+        url: socialLinks.url,
+      })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.platform, 'website'),
+          eq(socialLinks.verificationStatus, 'verified'),
+          ne(socialLinks.creatorProfileId, profileId)
+        )
+      )
+      .limit(100);
+
+    const claimedByOther = claimCandidates.some(candidate => {
+      const candidateHostname = extractHostname(candidate.url);
+      return candidateHostname === hostname;
+    });
+
+    if (claimedByOther) {
+      return NextResponse.json(
+        {
+          ok: false,
+          status: 'pending',
+          code: 'domain_already_claimed',
+          error: 'This domain has already been verified by another account.',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -107,10 +146,25 @@ export async function POST(req: Request) {
       })
       .where(eq(socialLinks.id, link.id));
 
+    if (verified) {
+      return NextResponse.json(
+        {
+          ok: true,
+          status: 'verified',
+          code: 'verified',
+          verificationToken: link.verificationToken,
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return NextResponse.json(
       {
-        ok: verified,
-        status: verified ? 'verified' : 'pending',
+        ok: false,
+        status: 'pending',
+        code: 'dns_not_found',
+        error:
+          'DNS TXT record not found yet. DNS changes can take up to 48 hours to propagate.',
         verificationToken: link.verificationToken,
       },
       { status: 200, headers: NO_STORE_HEADERS }
