@@ -75,6 +75,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
                 icon={<SocialIcon platform={platformId} className='h-4 w-4' />}
                 label={displayUsername || platformId}
                 url={link.url}
+                deepLinkPlatform={platformId}
                 isEditable
                 isRemoving={removingLinkIndex === index}
                 onRemove={() => onRemoveLink(index)}
