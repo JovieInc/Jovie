@@ -118,7 +118,7 @@ export function ProfileNavButton({
 
           {hideBranding ? null : (
             <DropdownMenuItem asChild>
-              <Link href='/signup'>Claim your profile</Link>
+              <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
             </DropdownMenuItem>
           )}
 
@@ -127,7 +127,7 @@ export function ProfileNavButton({
             <DropdownMenuSubContent sideOffset={8}>
               <DropdownMenuItem asChild>
                 <Link
-                  href='/legal/privacy'
+                  href={APP_ROUTES.LEGAL_PRIVACY}
                   target='_blank'
                   rel='noopener noreferrer'
                 >
@@ -136,7 +136,7 @@ export function ProfileNavButton({
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link
-                  href='/legal/terms'
+                  href={APP_ROUTES.LEGAL_TERMS}
                   target='_blank'
                   rel='noopener noreferrer'
                 >

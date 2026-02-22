@@ -56,6 +56,13 @@ export const APP_ROUTES = {
 
   // Marketing
   PRICING: '/pricing',
+  LAUNCH: '/launch',
+  LAUNCH_PRICING: '/launch/pricing',
+
+  // Legal
+  LEGAL_PRIVACY: '/legal/privacy',
+  LEGAL_TERMS: '/legal/terms',
+  LEGAL_COOKIES: '/legal/cookies',
 
   // Auth & Onboarding
   SIGNIN: '/signin',
@@ -65,6 +72,7 @@ export const APP_ROUTES = {
 
   // Billing
   BILLING: '/billing',
+  BILLING_REMOVE_BRANDING: '/billing/remove-branding',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
 
