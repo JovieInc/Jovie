@@ -187,7 +187,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free/Pro/Growth columns', async () => {
+  it('renders plan comparison grid with Free/Pro columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -202,7 +202,8 @@ describe('BillingDashboard', () => {
 
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
-    expect(screen.getByText('Growth')).toBeInTheDocument();
+    // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
+    expect(screen.queryByText('Growth')).not.toBeInTheDocument();
   });
 
   it('shows Current Plan badge on the active plan', async () => {
