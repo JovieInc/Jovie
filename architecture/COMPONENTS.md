@@ -171,6 +171,35 @@ export function ProductFlyout({ productId }: ProductFlyoutProps) {
 }
 ```
 
+## Nested Atomic Structure Rules
+
+Feature-level nesting is allowed, but each level has strict scope boundaries.
+
+### Allowed
+
+```text
+components/
+└── dashboard/
+    ├── atoms/
+    ├── molecules/
+    └── organisms/
+```
+
+- `dashboard/atoms/*` can only contain dashboard-specific presentational primitives.
+- If a feature atom is reused outside its feature, promote it to `components/atoms/*`.
+- Feature molecules and organisms can compose feature atoms, but global atoms should remain dependency-free.
+
+### Not Allowed
+
+- Adding business logic hooks (`useState`, `useEffect`, `useQuery`, custom `useX`) inside any `atoms/` directory.
+- Importing feature services, API clients, or route-specific state directly in atoms.
+- Keeping "temporary" atoms in a feature folder once they are reused globally.
+
+### Enforcement
+
+- ESLint blocks hook calls in `apps/web/components/atoms/**/*.tsx`.
+- Existing legacy exceptions are tracked and must be migrated using `docs/ATOMIC_MIGRATION_GUIDE.md`.
+
 ## Feature Organization
 
 When components are specific to a feature domain:
@@ -333,6 +362,15 @@ pnpm generate feature
 # → Prompts for feature, atomic level, name
 # → Creates in appropriate feature directory
 ```
+
+## Atomic Enforcement Workflow
+
+When adding or editing atoms:
+
+1. Keep atom files props-driven and side-effect free.
+2. Move hook-based behavior into a colocated molecule or organism.
+3. Pass derived state to atoms through explicit props.
+4. If ESLint fails with "Hooks are not allowed in atoms," follow `docs/ATOMIC_MIGRATION_GUIDE.md`.
 
 ## Migration and Refactoring
 

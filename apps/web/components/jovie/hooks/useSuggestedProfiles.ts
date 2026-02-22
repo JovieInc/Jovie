@@ -7,7 +7,7 @@ import type {
   SuggestionsStarterContext,
 } from '@/app/api/suggestions/route';
 
-interface UseSuggestedProfilesReturn {
+export interface UseSuggestedProfilesReturn {
   suggestions: ProfileSuggestion[];
   isLoading: boolean;
   /** Currently displayed suggestion index */

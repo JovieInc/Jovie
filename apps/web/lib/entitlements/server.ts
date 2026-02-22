@@ -4,6 +4,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
+  ENTITLEMENT_REGISTRY,
   getEntitlements,
   hasAdvancedFeatures,
   isProPlan,
@@ -20,21 +21,8 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   plan: 'free',
   isPro: false,
   hasAdvancedFeatures: false,
-  canRemoveBranding: false,
-  canExportContacts: false,
-  canAccessAdvancedAnalytics: false,
-  canFilterSelfFromAnalytics: false,
-  canAccessAdPixels: false,
-  canBeVerified: false,
-  aiCanUseTools: false,
-  canCreateManualReleases: false,
-  canAccessFutureReleases: false,
-  canSendNotifications: false,
-  canEditSmartLinks: false,
-  analyticsRetentionDays: 7,
-  contactsLimit: 100,
-  smartLinksLimit: 25,
-  aiDailyMessageLimit: 5,
+  ...ENTITLEMENT_REGISTRY.free.booleans,
+  ...ENTITLEMENT_REGISTRY.free.limits,
 };
 
 /**
