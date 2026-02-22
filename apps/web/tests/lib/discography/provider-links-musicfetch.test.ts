@@ -109,7 +109,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
     fetchMock.mockImplementation(async (url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
 
-      if (urlStr.includes('itunes.apple.com')) {
+      if (new URL(urlStr).hostname === 'itunes.apple.com') {
         return {
           ok: true,
           json: async () => ({
@@ -125,7 +125,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
         } as unknown as Response;
       }
 
-      if (urlStr.includes('api.deezer.com')) {
+      if (new URL(urlStr).hostname === 'api.deezer.com') {
         return {
           ok: true,
           json: async () => ({

@@ -206,7 +206,7 @@ describe('resolveProviderLinks with Deezer', () => {
     fetchMock.mockImplementation(async (url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
 
-      if (urlStr.includes('api.deezer.com')) {
+      if (new URL(urlStr).hostname === 'api.deezer.com') {
         return {
           ok: true,
           json: async () => ({
@@ -247,7 +247,7 @@ describe('resolveProviderLinks with Deezer', () => {
     fetchMock.mockImplementation(async (url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
 
-      if (urlStr.includes('api.deezer.com')) {
+      if (new URL(urlStr).hostname === 'api.deezer.com') {
         return {
           ok: true,
           json: async () => ({
@@ -295,7 +295,7 @@ describe('resolveProviderLinks with Deezer', () => {
     fetchMock.mockImplementation(async (url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
 
-      if (urlStr.includes('api.deezer.com')) {
+      if (new URL(urlStr).hostname === 'api.deezer.com') {
         return {
           ok: true,
           json: async () => ({
