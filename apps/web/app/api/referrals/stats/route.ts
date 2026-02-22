@@ -6,6 +6,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   DEFAULT_COMMISSION_DURATION_MONTHS,
   DEFAULT_COMMISSION_RATE_BPS,
@@ -51,6 +52,9 @@ export async function GET() {
     );
   } catch (error) {
     logger.error('Error getting referral stats:', error);
+    captureError('Failed to get referral stats', error, {
+      route: '/api/referrals/stats',
+    });
     return NextResponse.json(
       { error: 'Failed to get referral stats' },
       { status: 500, headers: NO_STORE_HEADERS }

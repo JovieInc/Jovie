@@ -13,10 +13,12 @@ import {
   getBestSpotifyImage,
   getSpotifyAlbums,
   getSpotifyArtistAlbums,
+  getSpotifyTracks,
   mapSpotifyAlbumType,
   parseSpotifyReleaseDate,
   type SpotifyAlbum,
   type SpotifyAlbumFull,
+  type SpotifyTrackFull,
 } from '@/lib/spotify';
 import {
   sanitizeImageUrl,
@@ -53,6 +55,8 @@ const MAX_RELEASES_PER_IMPORT = 200;
 
 /** Maximum number of tracks per release */
 const MAX_TRACKS_PER_RELEASE = 100;
+
+const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 export interface SpotifyImportResult {
   success: boolean;
@@ -131,6 +135,57 @@ async function importAlbumBatch(
         creatorProfileId,
       });
     }
+  }
+}
+
+function mergeFullTrackMetadata(
+  album: SpotifyAlbumFull,
+  fullTracksById: Map<string, SpotifyTrackFull>
+): SpotifyAlbumFull {
+  return {
+    ...album,
+    tracks: {
+      ...album.tracks,
+      items: album.tracks.items.map(track => {
+        const fullTrack = fullTracksById.get(track.id);
+        if (!fullTrack) return track;
+
+        return {
+          ...track,
+          external_ids: fullTrack.external_ids,
+        };
+      }),
+    },
+  };
+}
+
+function normalizeSpotifyIsrc(isrc: string | undefined): string | null {
+  if (!isrc) return null;
+
+  const normalized = isrc.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!ISRC_REGEX.test(normalized)) return null;
+
+  return normalized;
+}
+
+function logTrackIsrcCoverage(album: SpotifyAlbumFull): void {
+  const tracks = album.tracks.items;
+  if (tracks.length === 0) return;
+
+  const tracksWithIsrc = tracks.filter(
+    track => normalizeSpotifyIsrc(track.external_ids?.isrc) !== null
+  ).length;
+
+  if (tracksWithIsrc !== tracks.length) {
+    captureWarning('Spotify ISRC coverage is incomplete for album tracks', {
+      source: 'spotify_import',
+      albumId: album.id,
+      albumName: sanitizeName(album.name),
+      totalTracks: tracks.length,
+      tracksWithIsrc,
+      tracksMissingIsrc: tracks.length - tracksWithIsrc,
+      coverageRatio: Number((tracksWithIsrc / tracks.length).toFixed(3)),
+    });
   }
 }
 
@@ -218,10 +273,22 @@ export async function importReleasesFromSpotify(
           ? await getSpotifyAlbums(albumIds, market)
           : [];
 
+        const spotifyTrackIds = fullAlbums.flatMap(album =>
+          album.tracks.items.map(track => track.id)
+        );
+        const fullTracks = includeTracks
+          ? await getSpotifyTracks(spotifyTrackIds, market)
+          : [];
+        const fullTracksById = new Map<string, SpotifyTrackFull>(
+          fullTracks.map(track => [track.id, track])
+        );
+
         // Create a map for quick lookup
         const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
         for (const album of fullAlbums) {
-          fullAlbumMap.set(album.id, album);
+          const enrichedAlbum = mergeFullTrackMetadata(album, fullTracksById);
+          logTrackIsrcCoverage(enrichedAlbum);
+          fullAlbumMap.set(album.id, enrichedAlbum);
         }
 
         // 3. Import each album
@@ -413,12 +480,7 @@ async function processTracksForRelease(
         existingTrack?.id
       ));
 
-    const sanitizedIsrc = track.external_ids?.isrc
-      ? track.external_ids.isrc
-          .replaceAll(/[^a-zA-Z0-9]/g, '')
-          .slice(0, 12)
-          .toUpperCase()
-      : null;
+    const sanitizedIsrc = normalizeSpotifyIsrc(track.external_ids?.isrc);
 
     const sanitizedPreviewUrl = track.preview_url
       ? sanitizeSpotifyPreviewUrl(track.preview_url)

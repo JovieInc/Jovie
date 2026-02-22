@@ -10,10 +10,12 @@ import {
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
+  useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
@@ -59,6 +61,7 @@ export function useReleaseProviderMatrix({
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
+  const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
   const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
   const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
@@ -100,14 +103,14 @@ export function useReleaseProviderMatrix({
     setDrafts({});
   }, []);
 
-  const updateRow = (updated: ReleaseViewModel) => {
+  const updateRow = useCallback((updated: ReleaseViewModel) => {
     setRawRows(prev =>
       prev.map(row => (row.id === updated.id ? { ...updated } : row))
     );
     setEditingRelease(current =>
       current?.id === updated.id ? { ...updated } : current
     );
-  };
+  }, []);
 
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
@@ -328,6 +331,33 @@ export function useReleaseProviderMatrix({
   const isLyricsSaving =
     saveLyricsMutation.isPending || formatLyricsMutation.isPending;
 
+  const handleCanvasStatusUpdate = useCallback(
+    async (releaseId: string, status: CanvasStatus) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      updateRow({ ...release, canvasStatus: status });
+
+      try {
+        const updated = await saveCanvasStatusMutation.mutateAsync({
+          profileId: release.profileId,
+          releaseId,
+          status,
+        });
+        updateRow(updated);
+      } catch (error) {
+        updateRow(release);
+        captureError('Failed to update canvas status', error, {
+          context: 'release-mutation',
+          releaseId,
+          action: 'update-canvas-status',
+        });
+        toast.error('Unable to update canvas status');
+      }
+    },
+    [saveCanvasStatusMutation, updateRow]
+  );
+
   const handleSaveLyrics = useCallback(
     async (releaseId: string, lyrics: string) => {
       const release = rawRowsRef.current.find(r => r.id === releaseId);
@@ -388,6 +418,7 @@ export function useReleaseProviderMatrix({
     flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
+    handleCanvasStatusUpdate,
     handleAddUrl,
     handleSaveLyrics,
     handleFormatLyrics,

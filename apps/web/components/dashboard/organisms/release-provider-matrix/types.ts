@@ -1,4 +1,5 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseProviderMatrixProps {
   readonly releases: ReleaseViewModel[];
@@ -53,6 +54,10 @@ export interface UseReleaseProviderMatrixReturn {
   flashedReleaseId: string | null;
   handleRescanIsrc: (releaseId: string) => void;
   isRescanningIsrc: boolean;
+  handleCanvasStatusUpdate: (
+    releaseId: string,
+    status: CanvasStatus
+  ) => Promise<void>;
   handleAddUrl: (
     releaseId: string,
     provider: ProviderKey,

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getDbUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureWarning } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,9 @@ export async function GET() {
     const error = e instanceof Error ? e : new Error('Unknown error');
     // Log full error details server-side for debugging
     logger.error('[health/auth] Error:', error);
+    void captureWarning('Auth health check failed', e, {
+      route: '/api/health/auth',
+    });
     return NextResponse.json(
       { ok: false, error: error.message },
       { status: 500, headers: NO_STORE_HEADERS }

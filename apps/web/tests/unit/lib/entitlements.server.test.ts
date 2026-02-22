@@ -55,15 +55,15 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canBeVerified: false,
-      aiCanUseTools: false,
-      canCreateManualReleases: false,
+      aiCanUseTools: true,
+      canCreateManualReleases: true,
       canAccessFutureReleases: false,
-      canSendNotifications: false,
-      canEditSmartLinks: false,
-      analyticsRetentionDays: 7,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
+      analyticsRetentionDays: 30,
       contactsLimit: 100,
-      smartLinksLimit: 25,
-      aiDailyMessageLimit: 5,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
     });
   });
 
@@ -123,7 +123,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.plan).toBe('free');
     expect(entitlements.isPro).toBe(false);
     expect(entitlements.contactsLimit).toBe(100);
-    expect(entitlements.analyticsRetentionDays).toBe(7);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
   });
 
   it('maps billing data for a free user', async () => {
@@ -161,15 +161,15 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canBeVerified: false,
-      aiCanUseTools: false,
-      canCreateManualReleases: false,
+      aiCanUseTools: true,
+      canCreateManualReleases: true,
       canAccessFutureReleases: false,
-      canSendNotifications: false,
-      canEditSmartLinks: false,
-      analyticsRetentionDays: 7,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
+      analyticsRetentionDays: 30,
       contactsLimit: 100,
-      smartLinksLimit: 25,
-      aiDailyMessageLimit: 5,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
     });
   });
 
@@ -373,7 +373,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.canRemoveBranding).toBe(false);
     expect(entitlements.canExportContacts).toBe(false);
     expect(entitlements.contactsLimit).toBe(100);
-    expect(entitlements.analyticsRetentionDays).toBe(7);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
   });
 
   it('forces free entitlements when isPro=false even if dbPlan says growth', async () => {

@@ -27,13 +27,13 @@ function buildRelease(overrides: Partial<Release> = {}): Release {
 }
 
 describe('ReleaseMetadata canvas status', () => {
-  it('shows live status when canvas is uploaded', () => {
+  it('shows set status when canvas is uploaded', () => {
     render(
       <ReleaseMetadata release={buildRelease({ canvasStatus: 'uploaded' })} />
     );
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Set')).toBeInTheDocument();
   });
 
   it('shows ready to upload when canvas is generated', () => {
@@ -44,7 +44,7 @@ describe('ReleaseMetadata canvas status', () => {
     expect(screen.getByText('Ready to upload')).toBeInTheDocument();
   });
 
-  it('falls back to not set for unknown canvas status values', () => {
+  it('falls back to empty state for unknown canvas status values', () => {
     render(
       <ReleaseMetadata
         release={buildRelease({
@@ -53,14 +53,14 @@ describe('ReleaseMetadata canvas status', () => {
       />
     );
 
-    expect(screen.getByText('Not set')).toBeInTheDocument();
+    expect(screen.getByText('Set canvas status.')).toBeInTheDocument();
   });
 
-  it('defaults to not set when canvas status is missing', () => {
+  it('defaults to empty state when canvas status is missing', () => {
     render(
       <ReleaseMetadata release={buildRelease({ canvasStatus: undefined })} />
     );
 
-    expect(screen.getByText('Not set')).toBeInTheDocument();
+    expect(screen.getByText('Set canvas status.')).toBeInTheDocument();
   });
 });

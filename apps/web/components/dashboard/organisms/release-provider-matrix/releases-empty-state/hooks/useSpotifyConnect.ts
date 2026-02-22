@@ -44,6 +44,9 @@ export function useSpotifyConnect({
   const connectFromUrl = useCallback(
     (artistId: string) => {
       const artistUrl = `https://open.spotify.com/artist/${artistId}`;
+      dispatch({ type: 'SET_ERROR', payload: null });
+      dispatch({ type: 'CLEAR_SEARCH' });
+      searchClear();
       onImportStart?.('');
 
       startTransition(async () => {
@@ -69,7 +72,7 @@ export function useSpotifyConnect({
         }
       });
     },
-    [dispatch, onConnected, onImportStart]
+    [dispatch, searchClear, onConnected, onImportStart]
   );
 
   // Handle selection from search results
@@ -107,67 +110,10 @@ export function useSpotifyConnect({
     [searchClear, dispatch, onConnected, onImportStart]
   );
 
-  // Handle manual URL submission
-  const handleManualSubmit = useCallback(
-    (manualUrl: string): boolean => {
-      dispatch({ type: 'SET_ERROR', payload: null });
-
-      const trimmedUrl = manualUrl.trim();
-      if (!trimmedUrl) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a Spotify artist URL',
-        });
-        return false;
-      }
-
-      const artistId = extractSpotifyArtistId(trimmedUrl);
-      if (!artistId) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a valid Spotify artist URL',
-        });
-        return false;
-      }
-
-      const artistUrl = `https://open.spotify.com/artist/${artistId}`;
-
-      // Clear the form and show importing state
-      dispatch({ type: 'RESET_MANUAL_MODE' });
-      onImportStart?.('');
-
-      startTransition(async () => {
-        try {
-          const result = await connectSpotifyArtist({
-            spotifyArtistId: artistId,
-            spotifyArtistUrl: artistUrl,
-            artistName: '',
-          });
-
-          if (result.success) {
-            onConnected?.(result.releases, result.artistName);
-          } else {
-            dispatch({ type: 'SET_ERROR', payload: result.message });
-          }
-        } catch (err) {
-          dispatch({
-            type: 'SET_ERROR',
-            payload:
-              err instanceof Error ? err.message : 'Failed to connect artist',
-          });
-        }
-      });
-
-      return true;
-    },
-    [dispatch, extractSpotifyArtistId, onConnected, onImportStart]
-  );
-
   return {
     isPending,
     extractSpotifyArtistId,
     connectFromUrl,
     handleArtistSelect,
-    handleManualSubmit,
   };
 }

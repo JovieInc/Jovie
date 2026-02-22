@@ -48,7 +48,7 @@ export const homepageExampleProfiles = flag({
 export const homepageDeeplinksGrid = flag({
   key: 'homepage_deeplinks_grid',
   description: 'Show the deeplinks grid on the homepage',
-  defaultValue: false,
+  defaultValue: true,
   decide() {
     return this.defaultValue as boolean;
   },
@@ -111,7 +111,7 @@ export const homepageDashboardShowcase = flag({
 export const homepageAutomaticReleaseSmartlinks = flag({
   key: 'homepage_automatic_release_smartlinks',
   description: 'Show the automatic release smartlinks section on the homepage',
-  defaultValue: false,
+  defaultValue: true,
   decide() {
     return this.defaultValue as boolean;
   },

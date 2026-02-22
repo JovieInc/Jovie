@@ -63,30 +63,36 @@ function AuthShellInner({
         tabIndex={-1}
         className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'
       >
-        {!isInSettings && (
-          <DashboardHeader
-            breadcrumbs={breadcrumbs}
-            sidebarTrigger={sidebarTrigger}
-            breadcrumbSuffix={headerBadge}
-            action={headerAction}
-            mobileProfileSlot={
-              <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-            }
-            showDivider={isTableRoute}
-          />
-        )}
-        <div className={cn('flex-1 min-h-0 overflow-hidden flex')}>
+        <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div
             className={cn(
-              'flex-1 min-h-0 min-w-0',
-              isTableRoute
-                ? 'overflow-hidden overflow-x-auto'
-                : 'overflow-y-auto overflow-x-hidden p-4 sm:p-6',
-              showMobileTabs &&
-                (isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6')
+              'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'
             )}
           >
-            {children}
+            {!isInSettings && (
+              <DashboardHeader
+                breadcrumbs={breadcrumbs}
+                sidebarTrigger={sidebarTrigger}
+                breadcrumbSuffix={headerBadge}
+                action={headerAction}
+                mobileProfileSlot={
+                  <MobileProfileDrawer onOpen={previewPanelState.toggle} />
+                }
+                showDivider={isTableRoute}
+              />
+            )}
+            <div
+              className={cn(
+                'flex-1 min-h-0 min-w-0',
+                isTableRoute
+                  ? 'overflow-hidden overflow-x-auto'
+                  : 'overflow-y-auto overflow-x-hidden p-4 sm:p-6',
+                showMobileTabs &&
+                  (isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6')
+              )}
+            >
+              {children}
+            </div>
           </div>
           {rightPanel}
         </div>

@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
+import {
+  buildSocialLinksVerificationSelect,
+  getSocialLinksVerificationColumnSupport,
+} from '@/lib/db/queries/social-links-verification';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -28,6 +32,9 @@ export async function GET(req: Request) {
         );
       }
 
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(db);
+
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -43,9 +50,7 @@ export async function GET(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
-          verificationStatus: socialLinks.verificationStatus,
-          verificationToken: socialLinks.verificationToken,
-          verifiedAt: socialLinks.verifiedAt,
+          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
           version: socialLinks.version,
         })
         .from(creatorProfiles)

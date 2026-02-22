@@ -5,6 +5,8 @@ import * as React from 'react';
 import { useMemo } from 'react';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AuthMethod, LoadingState } from '@/lib/auth/types';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import {
   AuthButton,
   AuthGoogleIcon,
@@ -66,17 +68,21 @@ export function MethodSelector({
   mode,
   error,
 }: MethodSelectorProps) {
+  const spotifyOauthEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.SPOTIFY_OAUTH,
+    false
+  );
+
   // Order methods with last used first
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] =
-      mode === 'signup'
-        ? ['spotify', 'google', 'email']
-        : ['google', 'email', 'spotify'];
+    const base: AuthMethod[] = spotifyOauthEnabled
+      ? ['google', 'email', 'spotify']
+      : ['google', 'email'];
 
     if (!lastMethod) return base;
     if (!base.includes(lastMethod)) return base;
     return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod, mode]);
+  }, [lastMethod, spotifyOauthEnabled]);
 
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';
@@ -170,8 +176,8 @@ export function MethodSelector({
         </h1>
         {mode === 'signup' && (
           <p className={FORM_LAYOUT.hint}>
-            Start with Spotify to import your profile in seconds, then make it
-            unmistakably yours.
+            Sign up with Google or email in seconds, then make it unmistakably
+            yours.
           </p>
         )}
       </div>

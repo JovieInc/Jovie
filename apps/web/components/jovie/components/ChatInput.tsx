@@ -90,6 +90,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       [variant]
     );
 
+    const handleMouseDown = useCallback(
+      (event: React.MouseEvent<HTMLButtonElement>) => {
+        // Keep focus in the textarea when clicking action buttons.
+        event.preventDefault();
+      },
+      []
+    );
+
     const isCompact = variant === 'compact';
     let paddingRight = 'pr-14';
     if (hasAttachButton) {
@@ -142,6 +150,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 <button
                   type='button'
                   onClick={onImageAttach}
+                  onMouseDown={handleMouseDown}
                   disabled={isImageProcessing || isLoading || isSubmitting}
                   className={cn(
                     'absolute flex items-center justify-center rounded-lg',
@@ -165,6 +174,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             <button
               type='submit'
+              onMouseDown={handleMouseDown}
               disabled={!canSend}
               className={cn(
                 'absolute rounded-md flex items-center justify-center',

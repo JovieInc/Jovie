@@ -233,7 +233,7 @@ export function DeeplinksGrid() {
           >
             One link.{' '}
             <span style={{ color: 'var(--linear-text-tertiary)' }}>
-              Five destinations.
+              Infinite outcomes.
             </span>
           </h2>
           <p
@@ -246,8 +246,8 @@ export function DeeplinksGrid() {
               maxWidth: '460px',
             }}
           >
-            Every Jovie profile auto-generates smart links for tips, tours,
-            contacts, and every release.
+            Jovie automatically routes fans to the right action — or override
+            with a direct link to tips, tours, contacts, and every release.
           </p>
         </div>
 

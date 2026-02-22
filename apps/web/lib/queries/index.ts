@@ -275,6 +275,7 @@ export {
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
+  useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
   useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,

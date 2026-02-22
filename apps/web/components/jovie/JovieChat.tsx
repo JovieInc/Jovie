@@ -16,7 +16,12 @@ import {
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
-import { useChatImageAttachments, useJovieChat } from './hooks';
+import { ChatUsageAlert } from './components/ChatUsageAlert';
+import {
+  useChatImageAttachments,
+  useJovieChat,
+  useSuggestedProfiles,
+} from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
@@ -64,6 +69,12 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Suggested profiles carousel data — lifted here so we can hide
+  // the help text and suggested prompts while the carousel has items.
+  const suggestedProfiles = useSuggestedProfiles(profileId);
+  const hasCarouselItems =
+    !suggestedProfiles.isLoading && suggestedProfiles.total > 0;
 
   const {
     input,
@@ -314,6 +325,12 @@ export function JovieChat({
             />
           </div>
 
+          <div className='px-4 pt-3'>
+            <div className='mx-auto max-w-2xl'>
+              <ChatUsageAlert />
+            </div>
+          </div>
+
           {/* Error display in chat view */}
           {chatError && (
             <div className='px-4 pb-3'>
@@ -354,23 +371,36 @@ export function JovieChat({
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
               {profileId && (
                 <SuggestedProfilesCarousel
-                  profileId={profileId}
+                  suggestions={suggestedProfiles.suggestions}
+                  isLoading={suggestedProfiles.isLoading}
+                  currentIndex={suggestedProfiles.currentIndex}
+                  total={suggestedProfiles.total}
+                  next={suggestedProfiles.next}
+                  prev={suggestedProfiles.prev}
+                  confirm={suggestedProfiles.confirm}
+                  reject={suggestedProfiles.reject}
+                  isActioning={suggestedProfiles.isActioning}
                   username={username}
                   displayName={displayName}
                   avatarUrl={avatarUrl}
                 />
               )}
 
-              <p className='text-center text-[15px] text-secondary-token'>
-                What can I help you with?
-              </p>
+              {/* Hide help text and prompts while the carousel has items */}
+              {!hasCarouselItems && (
+                <>
+                  <p className='text-center text-[15px] text-secondary-token'>
+                    What can I help you with?
+                  </p>
 
-              <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                  <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                </>
+              )}
             </div>
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='px-4 pb-8'>
+          <div className='px-4 pb-4 sm:pb-8'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
@@ -378,6 +408,7 @@ export function JovieChat({
                   message.
                 </p>
               )}
+              <ChatUsageAlert />
               <ChatInput {...chatInputProps} />
 
               {/* Error display */}

@@ -24,7 +24,7 @@ describe('entitlement registry boundary helpers', () => {
   });
 
   it('returns expected limits for known plans and free defaults for unknown plans', () => {
-    expect(getLimit('free', 'analyticsRetentionDays')).toBe(7);
+    expect(getLimit('free', 'analyticsRetentionDays')).toBe(30);
     expect(getLimit('pro', 'analyticsRetentionDays')).toBe(90);
     expect(getLimit('growth', 'analyticsRetentionDays')).toBe(365);
 
@@ -32,7 +32,9 @@ describe('entitlement registry boundary helpers', () => {
     expect(getLimit('pro', 'contactsLimit')).toBeNull();
     expect(getLimit('growth', 'contactsLimit')).toBeNull();
 
-    expect(getLimit('mystery', 'analyticsRetentionDays')).toBe(7);
+    expect(getLimit('free', 'smartLinksLimit')).toBeNull();
+
+    expect(getLimit('mystery', 'analyticsRetentionDays')).toBe(30);
     expect(getLimit('mystery', 'contactsLimit')).toBe(100);
   });
 
