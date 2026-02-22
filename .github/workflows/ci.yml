@@ -19,6 +19,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
 jobs:
 
   ci-env-example-guard:
@@ -236,9 +240,6 @@ jobs:
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         run: pnpm turbo typecheck --affected
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
   neon-db:
     name: Neon DB
