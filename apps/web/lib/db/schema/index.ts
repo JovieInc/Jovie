@@ -40,6 +40,8 @@ export * from './insights';
 export * from './links';
 // Pixel Tracking (Events, Creator Configs)
 export * from './pixels';
+// Pre-save campaigns (Spotify, Apple Music)
+export * from './pre-save';
 // Creator Profiles
 export * from './profiles';
 // Referral Program (Codes, Referrals, Commissions)
@@ -50,6 +52,5 @@ export * from './sender';
 export * from './suppression';
 // Tour (Tour Dates)
 export * from './tour';
-
 // Waitlist
 export * from './waitlist';

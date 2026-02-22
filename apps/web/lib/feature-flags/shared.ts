@@ -8,6 +8,7 @@ export const FEATURE_FLAG_KEYS = {
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
   SUBSCRIBE_TWO_STEP: 'feature_subscribe_two_step',
   LATEST_RELEASE_CARD: 'feature_latest_release_card',
+  SMARTLINK_PRE_SAVE: 'smartlink_pre_save_campaigns',
 } as const;
 
 export type FeatureFlagKey =
