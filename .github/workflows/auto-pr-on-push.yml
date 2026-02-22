@@ -196,6 +196,7 @@ jobs:
           fi
 
           PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
             --base main \
             --head "$BRANCH" \
             --title "$TITLE" \
@@ -205,6 +206,6 @@ jobs:
 
           # Enable auto-merge so it flows through the pipeline
           PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
-          gh pr merge "$PR_NUMBER" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
+          gh pr merge "$PR_NUMBER" --repo "${{ github.repository }}" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
 
           echo "Auto-merge enabled for PR #$PR_NUMBER"
