@@ -9,6 +9,7 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import {
   ScheduledReleasePage,
@@ -247,6 +248,8 @@ export default async function ContentSmartLinkPage({
   const allSearchParams = await searchParams;
   const dspParam = allSearchParams.dsp;
   const dsp = typeof dspParam === 'string' ? dspParam : undefined;
+  const noredirectParam = allSearchParams.noredirect;
+  const noredirect = typeof noredirectParam === 'string' ? noredirectParam : undefined;
   const requestSearchParams = new URLSearchParams(
     Object.entries(allSearchParams).flatMap(([key, value]) => {
       if (Array.isArray(value)) {
@@ -357,6 +360,14 @@ export default async function ContentSmartLinkPage({
           __html: safeJsonLdStringify(breadcrumbSchema),
         }}
       />
+
+      {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
+      {!isUnreleased && noredirect !== '1' && (
+        <PreferredDspRedirect
+          providerLinks={content.providerLinks}
+          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
+        />
+      )}
 
       {isUnreleased && showUnreleasedHero ? (
         <UnreleasedReleaseHero

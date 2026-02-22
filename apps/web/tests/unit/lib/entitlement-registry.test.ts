@@ -25,6 +25,10 @@ describe('Entitlement Registry Consistency', () => {
       'canAccessAdPixels',
       'canBeVerified',
       'aiCanUseTools',
+      'canCreateManualReleases',
+      'canAccessFutureReleases',
+      'canSendNotifications',
+      'canEditSmartLinks',
     ];
 
     for (const planId of planIds) {

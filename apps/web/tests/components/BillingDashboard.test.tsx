@@ -200,10 +200,18 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
+    const growthEnabled =
+      process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
+
     // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
-    expect(screen.queryByText('Growth')).not.toBeInTheDocument();
+    if (growthEnabled) {
+      expect(screen.getByText('Growth')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Growth')).not.toBeInTheDocument();
+    }
   });
 
   it('shows Current Plan badge on the active plan', async () => {
