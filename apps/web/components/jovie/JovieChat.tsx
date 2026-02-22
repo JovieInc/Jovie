@@ -17,7 +17,11 @@ import {
   SuggestedPrompts,
 } from './components';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
-import { useChatImageAttachments, useJovieChat } from './hooks';
+import {
+  useChatImageAttachments,
+  useJovieChat,
+  useSuggestedProfiles,
+} from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
@@ -65,6 +69,12 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Suggested profiles carousel data — lifted here so we can hide
+  // the help text and suggested prompts while the carousel has items.
+  const suggestedProfiles = useSuggestedProfiles(profileId);
+  const hasCarouselItems =
+    !suggestedProfiles.isLoading && suggestedProfiles.total > 0;
 
   const {
     input,
@@ -361,18 +371,31 @@ export function JovieChat({
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
               {profileId && (
                 <SuggestedProfilesCarousel
-                  profileId={profileId}
+                  suggestions={suggestedProfiles.suggestions}
+                  isLoading={suggestedProfiles.isLoading}
+                  currentIndex={suggestedProfiles.currentIndex}
+                  total={suggestedProfiles.total}
+                  next={suggestedProfiles.next}
+                  prev={suggestedProfiles.prev}
+                  confirm={suggestedProfiles.confirm}
+                  reject={suggestedProfiles.reject}
+                  isActioning={suggestedProfiles.isActioning}
                   username={username}
                   displayName={displayName}
                   avatarUrl={avatarUrl}
                 />
               )}
 
-              <p className='text-center text-[15px] text-secondary-token'>
-                What can I help you with?
-              </p>
+              {/* Hide help text and prompts while the carousel has items */}
+              {!hasCarouselItems && (
+                <>
+                  <p className='text-center text-[15px] text-secondary-token'>
+                    What can I help you with?
+                  </p>
 
-              <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                  <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                </>
+              )}
             </div>
           </div>
 
