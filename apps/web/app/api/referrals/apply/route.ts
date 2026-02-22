@@ -7,6 +7,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import { createReferral, getInternalUserId } from '@/lib/referrals/service';
 import { logger } from '@/lib/utils/logger';
 
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     logger.error('Error applying referral code:', error);
+    captureError('Failed to apply referral code', error, {
+      route: '/api/referrals/apply',
+    });
     return NextResponse.json(
       { error: 'Failed to apply referral code' },
       { status: 500, headers: NO_STORE_HEADERS }

@@ -198,6 +198,9 @@ export async function GET() {
     });
   } catch (error) {
     logger.error('Billing health check failed:', error);
+    void captureWarning('Billing health check failed', error, {
+      route: '/api/billing/health',
+    });
 
     return NextResponse.json(
       {
