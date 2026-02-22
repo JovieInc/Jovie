@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       target,
       linkId,
       source: resolvedSource,
+      context,
       utmParams,
     } = validationResult.data;
 
@@ -230,6 +231,12 @@ export async function POST(request: NextRequest) {
       const metadata: Record<string, unknown> = {
         target,
         ...(resolvedSource ? { source: resolvedSource } : {}),
+        ...(context?.contentType ? { contentType: context.contentType } : {}),
+        ...(context?.contentId ? { contentId: context.contentId } : {}),
+        ...(context?.provider ? { provider: context.provider } : {}),
+        ...(context?.smartLinkSlug
+          ? { smartLinkSlug: context.smartLinkSlug }
+          : {}),
       };
 
       if (utmParams) {

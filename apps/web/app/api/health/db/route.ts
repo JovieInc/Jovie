@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkDbHealth, getDbConfig } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   createRateLimitHeadersFromStatus,
   getClientIP,
@@ -139,6 +140,11 @@ export async function GET(request: Request) {
       },
       'health/db'
     );
+    void captureWarning('DB health check unhealthy', undefined, {
+      route: '/api/health/db',
+      error: healthResult.error,
+      latency: healthResult.latency,
+    });
   }
 
   return NextResponse.json(body, {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   COUNTRY_CODE_COOKIE,
@@ -8,10 +8,13 @@ import {
 } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import {
-  AvailableDSP,
+  type AvailableDSP,
   getAvailableDSPs,
-  sortDSPsByGeoPopularity,
+  sortDSPsForDevice,
 } from '@/lib/dsp';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
@@ -35,7 +38,12 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
-  const [dsps] = useState<AvailableDSP[]>(() => {
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
+  );
+
+  const dsps = useMemo(() => {
     const countryCode =
       typeof document === 'undefined'
         ? null
@@ -45,8 +53,20 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             ?.split('=')[1];
 
     const baseDSPs = dspsOverride ?? getAvailableDSPs(artist);
-    return sortDSPsByGeoPopularity(baseDSPs, countryCode ?? null);
-  });
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice(baseDSPs, {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority,
+    });
+  }, [artist, dspsOverride, enableDevicePriority]);
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

@@ -19,6 +19,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
 jobs:
 
   ci-env-example-guard:
@@ -236,9 +240,6 @@ jobs:
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         run: pnpm turbo typecheck --affected
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
   neon-db:
     name: Neon DB
@@ -1595,7 +1596,7 @@ jobs:
           COREPACK_ENABLE_STRICT: 0
           # Share Turbo remote cache with ci-build to avoid redundant rebuilds
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -2056,7 +2057,7 @@ jobs:
           COREPACK_ENABLE_STRICT: 0
           # Share Turbo remote cache with ci-build to avoid redundant rebuilds
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
