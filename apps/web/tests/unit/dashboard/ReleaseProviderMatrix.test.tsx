@@ -97,6 +97,10 @@ vi.mock('@/lib/queries', () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useSaveCanvasStatusMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useSaveReleaseLyricsMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,

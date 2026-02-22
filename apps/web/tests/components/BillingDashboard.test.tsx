@@ -187,7 +187,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free/Pro/Growth columns', async () => {
+  it('renders plan comparison grid with Free/Pro columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -200,9 +200,16 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
+    const growthPlanEnabled =
+      process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
-    expect(screen.getByText('Growth')).toBeInTheDocument();
+    if (growthPlanEnabled) {
+      expect(screen.getByText('Growth')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Growth')).not.toBeInTheDocument();
+    }
   });
 
   it('shows Current Plan badge on the active plan', async () => {
