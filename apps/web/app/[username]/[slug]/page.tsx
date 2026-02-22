@@ -249,7 +249,8 @@ export default async function ContentSmartLinkPage({
   const dspParam = allSearchParams.dsp;
   const dsp = typeof dspParam === 'string' ? dspParam : undefined;
   const noredirectParam = allSearchParams.noredirect;
-  const noredirect = typeof noredirectParam === 'string' ? noredirectParam : undefined;
+  const noredirect =
+    typeof noredirectParam === 'string' ? noredirectParam : undefined;
   const requestSearchParams = new URLSearchParams(
     Object.entries(allSearchParams).flatMap(([key, value]) => {
       if (Array.isArray(value)) {
