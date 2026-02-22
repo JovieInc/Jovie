@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
+import { captureError } from '@/lib/error-tracking';
 
 /**
  * Generate ICS calendar file for a tour date
@@ -11,105 +12,124 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
-  const { eventId } = await params;
+  try {
+    const { eventId } = await params;
 
-  // Fetch tour date with profile info
-  const [result] = await db
-    .select({
-      tourDate: tourDates,
-      profile: {
-        displayName: creatorProfiles.displayName,
-        username: creatorProfiles.username,
-      },
-    })
-    .from(tourDates)
-    .innerJoin(creatorProfiles, eq(tourDates.profileId, creatorProfiles.id))
-    .where(eq(tourDates.id, eventId))
-    .limit(1);
+    // Fetch tour date with profile info
+    const [result] = await db
+      .select({
+        tourDate: tourDates,
+        profile: {
+          displayName: creatorProfiles.displayName,
+          username: creatorProfiles.username,
+        },
+      })
+      .from(tourDates)
+      .innerJoin(creatorProfiles, eq(tourDates.profileId, creatorProfiles.id))
+      .where(eq(tourDates.id, eventId))
+      .limit(1);
 
-  if (!result) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  }
+    if (!result) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
 
-  const { tourDate, profile } = result;
-  const artistName = profile.displayName || profile.username;
+    const { tourDate, profile } = result;
+    const artistName = profile.displayName || profile.username;
 
-  // Format date for ICS (YYYYMMDD format)
-  const startDate = new Date(tourDate.startDate);
-  const formatIcsDate = (date: Date) => {
-    return (
-      date.toISOString().replaceAll('-', '').replaceAll(':', '').split('.')[0] +
-      'Z'
+    // Format date for ICS (YYYYMMDD format)
+    const startDate = new Date(tourDate.startDate);
+    const formatIcsDate = (date: Date) => {
+      return (
+        date
+          .toISOString()
+          .replaceAll('-', '')
+          .replaceAll(':', '')
+          .split('.')[0] + 'Z'
+      );
+    };
+
+    // Create end date (assume 3 hours if no end time specified)
+    const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+
+    // Build location string
+    const location = [
+      tourDate.venueName,
+      tourDate.city,
+      tourDate.region,
+      tourDate.country,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    // Build description
+    const descriptionParts = [`${artistName} live at ${tourDate.venueName}`];
+    if (tourDate.startTime) {
+      descriptionParts.push(`Doors: ${tourDate.startTime}`);
+    }
+    if (tourDate.ticketUrl) {
+      descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
+    }
+    const description = descriptionParts.join(String.raw`\n`);
+
+    // Build event summary
+    const summary = tourDate.title
+      ? `${artistName}: ${tourDate.title}`
+      : `${artistName} at ${tourDate.venueName}`;
+
+    // Generate unique ID for the event
+    const uid = `${tourDate.id}@jov.ie`;
+
+    // Build ICS content
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Jovie//Tour Dates//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${formatIcsDate(new Date())}`,
+      `DTSTART:${formatIcsDate(startDate)}`,
+      `DTEND:${formatIcsDate(endDate)}`,
+      `SUMMARY:${escapeIcsText(summary)}`,
+      `DESCRIPTION:${escapeIcsText(description)}`,
+      `LOCATION:${escapeIcsText(location)}`,
+      tourDate.ticketUrl ? `URL:${tourDate.ticketUrl}` : null,
+      'STATUS:CONFIRMED',
+      'TRANSP:OPAQUE',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ]
+      .filter(Boolean)
+      .join('\r\n');
+
+    // Generate filename with null-safe handling
+    const citySlug = (tourDate.city || 'event').replaceAll(
+      /[^a-zA-Z0-9]/g,
+      '_'
     );
-  };
+    const artistSlug = (artistName ?? 'artist').replaceAll(
+      /[^a-zA-Z0-9]/g,
+      '_'
+    );
+    const filename = `${artistSlug}_${citySlug}.ics`;
 
-  // Create end date (assume 3 hours if no end time specified)
-  const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
-
-  // Build location string
-  const location = [
-    tourDate.venueName,
-    tourDate.city,
-    tourDate.region,
-    tourDate.country,
-  ]
-    .filter(Boolean)
-    .join(', ');
-
-  // Build description
-  const descriptionParts = [`${artistName} live at ${tourDate.venueName}`];
-  if (tourDate.startTime) {
-    descriptionParts.push(`Doors: ${tourDate.startTime}`);
+    return new NextResponse(icsContent, {
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+  } catch (error) {
+    void captureError('Calendar ICS generation failed', error, {
+      route: '/api/calendar/[eventId]',
+    });
+    return NextResponse.json(
+      { error: 'Failed to generate calendar file' },
+      { status: 500 }
+    );
   }
-  if (tourDate.ticketUrl) {
-    descriptionParts.push(`Tickets: ${tourDate.ticketUrl}`);
-  }
-  const description = descriptionParts.join(String.raw`\n`);
-
-  // Build event summary
-  const summary = tourDate.title
-    ? `${artistName}: ${tourDate.title}`
-    : `${artistName} at ${tourDate.venueName}`;
-
-  // Generate unique ID for the event
-  const uid = `${tourDate.id}@jov.ie`;
-
-  // Build ICS content
-  const icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Jovie//Tour Dates//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${formatIcsDate(new Date())}`,
-    `DTSTART:${formatIcsDate(startDate)}`,
-    `DTEND:${formatIcsDate(endDate)}`,
-    `SUMMARY:${escapeIcsText(summary)}`,
-    `DESCRIPTION:${escapeIcsText(description)}`,
-    `LOCATION:${escapeIcsText(location)}`,
-    tourDate.ticketUrl ? `URL:${tourDate.ticketUrl}` : null,
-    'STATUS:CONFIRMED',
-    'TRANSP:OPAQUE',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ]
-    .filter(Boolean)
-    .join('\r\n');
-
-  // Generate filename with null-safe handling
-  const citySlug = (tourDate.city || 'event').replaceAll(/[^a-zA-Z0-9]/g, '_');
-  const artistSlug = (artistName ?? 'artist').replaceAll(/[^a-zA-Z0-9]/g, '_');
-  const filename = `${artistSlug}_${citySlug}.ics`;
-
-  return new NextResponse(icsContent, {
-    headers: {
-      'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'public, max-age=3600',
-    },
-  });
 }
 
 /**

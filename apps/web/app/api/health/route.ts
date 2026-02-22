@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import {
   createRateLimitHeadersFromStatus,
@@ -76,7 +77,10 @@ export async function GET(request: Request) {
       status: 200,
       headers: NO_STORE_HEADERS,
     });
-  } catch {
+  } catch (error) {
+    void captureWarning('Health check degraded', error, {
+      route: '/api/health',
+    });
     summary.status = 'degraded';
     summary.database = 'error';
     return NextResponse.json(summary, {

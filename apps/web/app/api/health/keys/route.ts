@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -85,6 +86,13 @@ export async function GET() {
       missing: missingRecommended.map(r => r.label),
     },
   };
+
+  if (!allRequiredPresent) {
+    void captureWarning('Required keys health check failed', undefined, {
+      route: '/api/health/keys',
+      missingRequired: missingRequired.map(r => r.label),
+    });
+  }
 
   return NextResponse.json(response, {
     status: allRequiredPresent ? 200 : 503,

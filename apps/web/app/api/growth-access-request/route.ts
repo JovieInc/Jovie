@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackGrowthRequest } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
@@ -100,6 +101,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     logger.error('[growth-access] Request failed', err);
+    captureError('Growth access request failed', err, {
+      route: '/api/growth-access-request',
+    });
     return NextResponse.json(
       { error: 'Failed to submit request' },
       { status: 500, headers: NO_STORE_HEADERS }

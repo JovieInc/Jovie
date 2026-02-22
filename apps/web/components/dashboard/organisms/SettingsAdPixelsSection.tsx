@@ -164,6 +164,7 @@ export function SettingsAdPixelsSection({
     },
     enabled: isPro,
     staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache after unmount
   });
 
   const [pixelData, setPixelData] = useState({

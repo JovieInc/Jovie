@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkDbHealth, validateDbConnection } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   createRateLimitHeadersFromStatus,
   getClientIP,
@@ -360,6 +361,9 @@ export async function GET(request: Request) {
       },
       'health/comprehensive'
     );
+    void captureWarning('Comprehensive health check failed', error, {
+      route: '/api/health/comprehensive',
+    });
 
     return buildErrorResponse(now, errorMessage, totalLatency, rateLimitStatus);
   }

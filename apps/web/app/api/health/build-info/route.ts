@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NextResponse } from 'next/server';
+import { captureWarning } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,10 @@ export function GET() {
       commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
       environment,
     });
-  } catch {
+  } catch (error) {
+    void captureWarning('Build info health check failed', error, {
+      route: '/api/health/build-info',
+    });
     return NextResponse.json({
       buildId: 'unknown',
       version,
