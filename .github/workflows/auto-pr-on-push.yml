@@ -70,10 +70,10 @@ jobs:
 
           if [[ -n "$TICKET" ]]; then
             # Remove ticket from slug to avoid duplication in title
-            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr '-_' '  ')
+            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr -- '-_' '  ')
             TITLE="${TICKET}: ${DESC}"
           else
-            DESC=$(echo "$SLUG" | tr '-_' '  ')
+            DESC=$(echo "$SLUG" | tr -- '-_' '  ')
             TITLE="$DESC"
           fi
 
