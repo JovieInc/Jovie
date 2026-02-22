@@ -27,6 +27,7 @@ import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -157,7 +158,7 @@ function generateMusicStructuredData(
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<{ dsp?: string; noredirect?: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -190,21 +191,17 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string,
-  dsp: string | undefined,
-  noredirect: string | undefined
+  searchParams: URLSearchParams
 ): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    const queryParts: string[] = [];
-    if (dsp) queryParts.push(`dsp=${encodeURIComponent(dsp)}`);
-    if (noredirect)
-      queryParts.push(`noredirect=${encodeURIComponent(noredirect)}`);
-    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    const queryString = searchParams.toString();
+    const suffix = queryString ? `?${queryString}` : '';
     permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${queryString}`
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${suffix}`
     );
   }
   notFound();
@@ -217,7 +214,8 @@ async function resolveContentOrRedirect(
 function handleDspRedirect(
   dsp: string,
   content: Content,
-  creator: Creator
+  creator: Creator,
+  utmParams: ReturnType<typeof extractUTMParams>
 ): never {
   const providerKey = dsp as ProviderKey;
 
@@ -236,9 +234,10 @@ function handleDspRedirect(
     profileId: creator.id,
     provider: providerKey,
     contentTitle: content.title,
+    utmParams,
   });
 
-  redirect(targetUrl);
+  redirect(appendUTMParamsToUrl(targetUrl, utmParams));
 }
 
 export default async function ContentSmartLinkPage({
@@ -246,7 +245,21 @@ export default async function ContentSmartLinkPage({
   searchParams,
 }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const { dsp, noredirect } = await searchParams;
+  const allSearchParams = await searchParams;
+  const dspParam = allSearchParams.dsp;
+  const dsp = typeof dspParam === 'string' ? dspParam : undefined;
+  const noredirectParam = allSearchParams.noredirect;
+  const noredirect =
+    typeof noredirectParam === 'string' ? noredirectParam : undefined;
+  const requestSearchParams = new URLSearchParams(
+    Object.entries(allSearchParams).flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map(v => [key, v]);
+      }
+      return typeof value === 'string' ? [[key, value]] : [];
+    })
+  );
+  const utmParams = extractUTMParams(requestSearchParams);
 
   if (!username || !slug) {
     notFound();
@@ -262,13 +275,12 @@ export default async function ContentSmartLinkPage({
   const content = await resolveContentOrRedirect(
     creator,
     slug,
-    dsp,
-    noredirect
+    requestSearchParams
   );
 
   // If DSP is specified, redirect immediately
   if (dsp) {
-    handleDspRedirect(dsp, content, creator);
+    handleDspRedirect(dsp, content, creator, utmParams);
   }
 
   // Build provider data for the landing page
@@ -396,6 +408,7 @@ export default async function ContentSmartLinkPage({
             avatarUrl: creator.avatarUrl,
           }}
           providers={allProviders}
+          utmParams={utmParams}
           artworkSizes={content.artworkSizes}
           allowDownloads={
             (creator.settings as Record<string, unknown> | null)

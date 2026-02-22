@@ -13,6 +13,26 @@ import type {
   UTMPlaceholder,
 } from './types';
 
+const UTM_PARAM_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+] as const;
+
+export type PartialUTMParams = Partial<
+  Record<(typeof UTM_PARAM_KEYS)[number], string>
+>;
+
+function normalizeUTMParamValue(
+  value: string | null | undefined
+): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 /**
  * Pattern to match UTM placeholders like {{release_slug}}
  */
@@ -198,6 +218,52 @@ export function parseUTMParams(url: string): Partial<UTMParams> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Extract UTM parameters from URLSearchParams.
+ */
+export function extractUTMParams(
+  searchParams: URLSearchParams
+): PartialUTMParams {
+  return UTM_PARAM_KEYS.reduce<PartialUTMParams>((acc, key) => {
+    const value = normalizeUTMParamValue(searchParams.get(key));
+    if (value) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
+/**
+ * Append UTM parameters to a URL while preserving existing query params.
+ */
+export function appendUTMParamsToUrl(
+  url: string,
+  utmParams: PartialUTMParams
+): string {
+  const normalizedEntries = UTM_PARAM_KEYS.map(
+    key => [key, normalizeUTMParamValue(utmParams[key])] as const
+  ).filter(([, value]) => Boolean(value));
+
+  if (normalizedEntries.length === 0) {
+    return url;
+  }
+
+  const isAbsoluteUrl = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
+  const baseUrl = 'https://jovie.local';
+  const urlObj = new URL(url, isAbsoluteUrl ? undefined : baseUrl);
+  for (const [key, value] of normalizedEntries) {
+    if (value) {
+      urlObj.searchParams.set(key, value);
+    }
+  }
+
+  if (isAbsoluteUrl) {
+    return urlObj.toString();
+  }
+
+  return `${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
 }
 
 /**
