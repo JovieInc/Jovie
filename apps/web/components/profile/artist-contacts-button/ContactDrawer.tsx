@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
 import { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
@@ -96,12 +97,17 @@ export function ContactDrawer({
                   >
                     <button
                       type='button'
-                      className='flex flex-1 flex-col items-start rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                      className='flex flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                       onClick={() => performAction(primary, contact)}
                     >
-                      <span className='text-sm font-semibold text-primary-token'>
-                        {buildTerritoryLabel(contact)}
-                      </span>
+                      <div className='flex items-center gap-2'>
+                        <span className='text-sm font-semibold text-primary-token'>
+                          {contact.roleLabel}
+                        </span>
+                        {contact.territorySummary ? (
+                          <Badge size='sm'>{contact.territorySummary}</Badge>
+                        ) : null}
+                      </div>
                       {contact.secondaryLabel ? (
                         <span className='text-xs text-secondary-token'>
                           {contact.secondaryLabel}
