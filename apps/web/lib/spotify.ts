@@ -73,6 +73,14 @@ export interface SpotifyTrack {
   }>;
 }
 
+export interface SpotifyTrackFull extends SpotifyTrack {
+  external_ids?: {
+    isrc?: string;
+    ean?: string;
+    upc?: string;
+  };
+}
+
 export interface SpotifyAlbumFull extends SpotifyAlbum {
   tracks: {
     items: SpotifyTrack[];
@@ -387,6 +395,68 @@ export async function getSpotifyAlbums(
     await captureError('Failed to fetch Spotify albums batch', error, {
       albumIdsCount: albumIds.length,
       operation: 'getSpotifyAlbums',
+    });
+    return [];
+  }
+}
+
+/**
+ * Get multiple tracks in a single request (max 50)
+ */
+export async function getSpotifyTracks(
+  trackIds: string[],
+  market: string = 'US'
+): Promise<SpotifyTrackFull[]> {
+  const token = await getSpotifyToken();
+  if (!token || trackIds.length === 0) {
+    return [];
+  }
+
+  // Spotify API allows max 50 tracks per request
+  const chunks: string[][] = [];
+  for (let i = 0; i < trackIds.length; i += 50) {
+    chunks.push(trackIds.slice(i, i + 50));
+  }
+
+  console.info(
+    `[spotify] getSpotifyTracks: fetching ${trackIds.length} track(s) in ${chunks.length} chunk(s)`
+  );
+
+  const tracks: SpotifyTrackFull[] = [];
+
+  try {
+    for (const chunk of chunks) {
+      const response = await fetch(
+        `https://api.spotify.com/v1/tracks?ids=${chunk.join(',')}&market=${market}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        await captureError(
+          'Spotify tracks batch API error',
+          new Error(`Status ${response.status}`),
+          {
+            trackIds: chunk,
+            status: response.status,
+            operation: 'getSpotifyTracks',
+          }
+        );
+        continue;
+      }
+
+      const data: { tracks: SpotifyTrackFull[] } = await response.json();
+      tracks.push(...data.tracks.filter(Boolean));
+    }
+
+    return tracks;
+  } catch (error) {
+    await captureError('Failed to fetch Spotify tracks batch', error, {
+      trackIdsCount: trackIds.length,
+      operation: 'getSpotifyTracks',
     });
     return [];
   }

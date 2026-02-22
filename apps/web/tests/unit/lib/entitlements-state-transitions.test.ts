@@ -83,7 +83,7 @@ describe('entitlement state transitions', () => {
 
     expect(free.plan).toBe('free');
     expect(free.isPro).toBe(false);
-    expect(free.aiDailyMessageLimit).toBe(5);
+    expect(free.aiDailyMessageLimit).toBe(25);
 
     expect(pro.plan).toBe('pro');
     expect(pro.isPro).toBe(true);

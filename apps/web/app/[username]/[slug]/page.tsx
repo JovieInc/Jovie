@@ -9,6 +9,7 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import {
   ScheduledReleasePage,
@@ -156,7 +157,7 @@ function generateMusicStructuredData(
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<{ dsp?: string }>;
+  readonly searchParams: Promise<{ dsp?: string; noredirect?: string }>;
 }
 
 /**
@@ -189,16 +190,21 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string,
-  dsp: string | undefined
+  dsp: string | undefined,
+  noredirect: string | undefined
 ): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
+    const queryParts: string[] = [];
+    if (dsp) queryParts.push(`dsp=${encodeURIComponent(dsp)}`);
+    if (noredirect)
+      queryParts.push(`noredirect=${encodeURIComponent(noredirect)}`);
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
     permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${queryString}`
     );
   }
   notFound();
@@ -240,7 +246,7 @@ export default async function ContentSmartLinkPage({
   searchParams,
 }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const { dsp } = await searchParams;
+  const { dsp, noredirect } = await searchParams;
 
   if (!username || !slug) {
     notFound();
@@ -253,7 +259,12 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(creator, slug, dsp);
+  const content = await resolveContentOrRedirect(
+    creator,
+    slug,
+    dsp,
+    noredirect
+  );
 
   // If DSP is specified, redirect immediately
   if (dsp) {
@@ -338,6 +349,14 @@ export default async function ContentSmartLinkPage({
           __html: safeJsonLdStringify(breadcrumbSchema),
         }}
       />
+
+      {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
+      {!isUnreleased && noredirect !== '1' && (
+        <PreferredDspRedirect
+          providerLinks={content.providerLinks}
+          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
+        />
+      )}
 
       {isUnreleased && showUnreleasedHero ? (
         <UnreleasedReleaseHero

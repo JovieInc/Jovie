@@ -5,11 +5,6 @@
  */
 
 export {
-  type SearchResult,
-  type UseSearchKeyboardParams,
-  useSearchKeyboard,
-} from './hooks/useSearchKeyboard';
-export {
   type SpotifyArtist,
   type UseSpotifyConnectParams,
   useSpotifyConnect,

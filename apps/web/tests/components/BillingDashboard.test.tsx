@@ -3,10 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingDashboard } from '@/components/organisms/BillingDashboard';
-import {
-  PLAN_FEATURES,
-  PLAN_KEYS,
-} from '@/components/organisms/billing/billing-constants';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -191,7 +187,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with configured plan columns', async () => {
+  it('renders plan comparison grid with Free/Pro columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -204,8 +200,17 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    for (const planKey of PLAN_KEYS) {
-      expect(screen.getByText(PLAN_FEATURES[planKey].name)).toBeInTheDocument();
+    const growthEnabled =
+      process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
+    expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.getByText('Pro')).toBeInTheDocument();
+
+    // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
+    if (growthEnabled) {
+      expect(screen.getByText('Growth')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Growth')).not.toBeInTheDocument();
     }
   });
 

@@ -19,16 +19,23 @@ vi.mock('@sentry/nextjs', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    innerJoin: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([]),
+    select: vi.fn().mockImplementation(() => {
+      const queryBuilder = {
+        from: vi.fn().mockReturnThis(),
+        innerJoin: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+        then: (resolve: (value: unknown[]) => unknown) => resolve([]),
+      };
+
+      return queryBuilder;
+    }),
   },
 }));
 
 const mockGetSpotifyArtistAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyAlbums = vi.fn().mockResolvedValue([]);
+const mockGetSpotifyTracks = vi.fn().mockResolvedValue([]);
 const mockMapSpotifyAlbumType = vi.fn().mockReturnValue('album');
 const mockSafeParse = vi.fn((id: unknown) => ({
   success: typeof id === 'string' && id.length > 0,
@@ -37,10 +44,12 @@ const mockGetBestSpotifyImage = vi
   .fn()
   .mockReturnValue('https://example.com/image.jpg');
 const mockUpsertRelease = vi.fn().mockResolvedValue({ id: 'release-1' });
+const mockUpsertTrack = vi.fn().mockResolvedValue({ id: 'track-1' });
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
   getSpotifyAlbums: mockGetSpotifyAlbums,
+  getSpotifyTracks: mockGetSpotifyTracks,
   buildSpotifyAlbumUrl: vi.fn(
     (id: string) => `https://open.spotify.com/album/${id}`
   ),
@@ -68,7 +77,7 @@ vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: vi.fn().mockResolvedValue([]),
   upsertProviderLink: vi.fn().mockResolvedValue({ id: 'link-1' }),
   upsertRelease: mockUpsertRelease,
-  upsertTrack: vi.fn().mockResolvedValue({ id: 'track-1' }),
+  upsertTrack: mockUpsertTrack,
 }));
 
 vi.mock('@/lib/discography/slug', () => ({
@@ -95,9 +104,11 @@ describe('spotify-import', () => {
     // Reset default mock implementations
     mockGetSpotifyArtistAlbums.mockResolvedValue([]);
     mockGetSpotifyAlbums.mockResolvedValue([]);
+    mockGetSpotifyTracks.mockResolvedValue([]);
     mockMapSpotifyAlbumType.mockReturnValue('album');
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
     mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
+    mockUpsertTrack.mockResolvedValue({ id: 'track-1' });
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));
@@ -300,6 +311,195 @@ describe('spotify-import', () => {
   });
 
   describe('release metadata precedence', () => {
+    it('fetches full track metadata and persists valid ISRC from track endpoint', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-isrc',
+          name: 'ISRC Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [],
+          uri: 'spotify:album:album-isrc',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-isrc',
+          },
+        },
+      ]);
+
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-isrc',
+          name: 'ISRC Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [],
+          uri: 'spotify:album:album-isrc',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-isrc',
+          },
+          tracks: {
+            items: [
+              {
+                id: 'track-1',
+                name: 'Track 1',
+                track_number: 1,
+                disc_number: 1,
+                duration_ms: 180000,
+                explicit: false,
+                external_urls: {
+                  spotify: 'https://open.spotify.com/track/track-1',
+                },
+                uri: 'spotify:track:track-1',
+                preview_url: null,
+                artists: [{ id: 'artist-1', name: 'Artist Name' }],
+              },
+            ],
+            total: 1,
+            next: null,
+          },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      mockGetSpotifyTracks.mockResolvedValueOnce([
+        {
+          id: 'track-1',
+          name: 'Track 1',
+          track_number: 1,
+          disc_number: 1,
+          duration_ms: 180000,
+          explicit: false,
+          external_urls: { spotify: 'https://open.spotify.com/track/track-1' },
+          uri: 'spotify:track:track-1',
+          preview_url: null,
+          external_ids: { isrc: 'us-abc-24-12345' },
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockGetSpotifyTracks).toHaveBeenCalledWith(['track-1'], 'US');
+      expect(mockUpsertTrack).toHaveBeenCalledWith(
+        expect.objectContaining({ isrc: 'USABC2412345' })
+      );
+    });
+
+    it('drops malformed ISRC values from full track metadata', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-invalid-isrc',
+          name: 'Bad ISRC Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [],
+          uri: 'spotify:album:album-invalid-isrc',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-invalid-isrc',
+          },
+        },
+      ]);
+
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-invalid-isrc',
+          name: 'Bad ISRC Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [],
+          uri: 'spotify:album:album-invalid-isrc',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-invalid-isrc',
+          },
+          tracks: {
+            items: [
+              {
+                id: 'track-1',
+                name: 'Track 1',
+                track_number: 1,
+                disc_number: 1,
+                duration_ms: 180000,
+                explicit: false,
+                external_urls: {
+                  spotify: 'https://open.spotify.com/track/track-1',
+                },
+                uri: 'spotify:track:track-1',
+                preview_url: null,
+                artists: [{ id: 'artist-1', name: 'Artist Name' }],
+              },
+            ],
+            total: 1,
+            next: null,
+          },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      mockGetSpotifyTracks.mockResolvedValueOnce([
+        {
+          id: 'track-1',
+          name: 'Track 1',
+          track_number: 1,
+          disc_number: 1,
+          duration_ms: 180000,
+          explicit: false,
+          external_urls: { spotify: 'https://open.spotify.com/track/track-1' },
+          uri: 'spotify:track:track-1',
+          preview_url: null,
+          external_ids: { isrc: 'BAD' },
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockUpsertTrack).toHaveBeenCalledWith(
+        expect.objectContaining({ isrc: null })
+      );
+    });
+
     it('classifies EPs based on full album track count when summary album says single', async () => {
       mockMapSpotifyAlbumType.mockReturnValue('single');
 
