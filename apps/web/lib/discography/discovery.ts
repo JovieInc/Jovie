@@ -6,6 +6,7 @@
  * - Apple Music (via MusicKit API, with iTunes fallback)
  * - Deezer (via public API)
  * - All other DSPs via Musicfetch API (supplementary)
+ * - Search URL fallbacks for any DSPs not resolved by the above
  */
 
 import {
@@ -18,8 +19,17 @@ import {
   isMusicfetchAvailable,
   lookupByIsrc as musicfetchLookupByIsrc,
 } from './musicfetch';
-import { lookupAppleMusicByIsrc, lookupDeezerByIsrc } from './provider-links';
-import { getTracksForRelease, upsertProviderLink } from './queries';
+import {
+  buildSearchUrl,
+  lookupAppleMusicByIsrc,
+  lookupDeezerByIsrc,
+} from './provider-links';
+import {
+  getReleaseById,
+  getTracksForRelease,
+  upsertProviderLink,
+} from './queries';
+import type { ProviderKey } from './types';
 
 export interface DiscoveryResult {
   releaseId: string;
@@ -36,6 +46,46 @@ export interface DiscoverLinksOptions {
   skipExisting?: boolean;
   /** Apple Music storefront code (default: 'us') */
   storefront?: string;
+}
+
+/**
+ * All DSPs that should receive search URL fallbacks when canonical links
+ * cannot be resolved. Spotify is excluded because it's always set during
+ * the initial import. bandcamp and beatport are excluded because search
+ * URLs are not meaningful for those platforms.
+ */
+const SEARCH_FALLBACK_PROVIDERS: ProviderKey[] = [
+  'apple_music',
+  'youtube',
+  'soundcloud',
+  'deezer',
+  'amazon_music',
+  'tidal',
+  'pandora',
+  'napster',
+  'audiomack',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iheartradio',
+  'tiktok',
+];
+
+/**
+ * Extract the primary artist name from release metadata.
+ * Spotify import stores artist info at metadata.spotifyArtists[0].name.
+ */
+function extractArtistNameFromMetadata(
+  metadata: Record<string, unknown> | undefined | null
+): string | null {
+  if (!metadata) return null;
+  const artists = metadata.spotifyArtists;
+  if (!Array.isArray(artists) || artists.length === 0) return null;
+  const first = artists[0];
+  if (typeof first === 'object' && first !== null && 'name' in first) {
+    return typeof first.name === 'string' ? first.name : null;
+  }
+  return null;
 }
 
 /**
@@ -291,6 +341,52 @@ export async function discoverLinksForRelease(
   }
 
   await Promise.all(lookupPromises);
+
+  // Generate search URL fallbacks for any DSPs not resolved above.
+  // This ensures every release gets at least a search link for all supported
+  // platforms, even when MusicFetch is unavailable or returns partial results.
+  const discoveredProviders = new Set([
+    ...existingProviders,
+    ...result.discovered.map(d => d.provider),
+  ]);
+
+  const undiscovered = SEARCH_FALLBACK_PROVIDERS.filter(
+    p => !discoveredProviders.has(p) && (!skipExisting || !existingSet.has(p))
+  );
+
+  if (undiscovered.length > 0) {
+    const release = await getReleaseById(releaseId);
+    const artistName =
+      extractArtistNameFromMetadata(release?.metadata ?? null) ?? '';
+    const trackTitle = trackWithIsrc.title;
+
+    for (const provider of undiscovered) {
+      const searchUrl = buildSearchUrl(
+        provider,
+        { title: trackTitle, artistName, isrc },
+        { storefront }
+      );
+
+      await upsertProviderLink({
+        releaseId,
+        providerId: provider,
+        url: searchUrl,
+        externalId: null,
+        sourceType: 'ingested',
+        metadata: {
+          discoveredFrom: 'search_fallback',
+          discoveredAt: new Date().toISOString(),
+          isrc,
+        },
+      });
+
+      result.discovered.push({
+        provider,
+        url: searchUrl,
+        quality: 'search_fallback',
+      });
+    }
+  }
 
   return result;
 }
