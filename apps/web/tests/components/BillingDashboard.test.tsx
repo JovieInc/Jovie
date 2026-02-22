@@ -188,21 +188,31 @@ describe('BillingDashboard', () => {
   });
 
   it('renders plan comparison grid with Free/Pro/Growth columns', async () => {
+    const originalGrowthFlag = process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN;
+    process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN = 'true';
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
       '/api/billing/history': EMPTY_HISTORY,
     });
 
-    renderBillingDashboard();
+    try {
+      renderBillingDashboard();
 
-    await waitFor(() => {
-      expect(screen.getByText('Compare Plans')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByText('Compare Plans')).toBeInTheDocument();
+      });
 
-    expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('Pro')).toBeInTheDocument();
-    expect(screen.getByText('Growth')).toBeInTheDocument();
+      expect(screen.getByText('Free')).toBeInTheDocument();
+      expect(screen.getByText('Pro')).toBeInTheDocument();
+      expect(screen.getByText('Growth')).toBeInTheDocument();
+    } finally {
+      if (originalGrowthFlag === undefined) {
+        delete process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN;
+      } else {
+        process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN = originalGrowthFlag;
+      }
+    }
   });
 
   it('shows Current Plan badge on the active plan', async () => {
