@@ -67,8 +67,6 @@ export { TableRow } from './atoms/TableRow';
 // Molecules
 // =============================================================================
 
-export type { AdminPageSizeSelectProps } from './AdminPageSizeSelect';
-export { AdminPageSizeSelect } from './AdminPageSizeSelect';
 export { ContextMenuSubmenu } from './molecules/ContextMenuSubmenu';
 export type { ViewMode } from './molecules/DisplayMenuDropdown';
 export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
@@ -93,12 +91,8 @@ export {
 } from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
-export type { TablePaginationFooterProps } from './molecules/TablePaginationFooter';
-export { TablePaginationFooter } from './molecules/TablePaginationFooter';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
-export type { TableStandardFooterProps } from './molecules/TableStandardFooter';
-export { TableStandardFooter } from './molecules/TableStandardFooter';
 export type {
   BulkAction as TableStandardToolbarBulkAction,
   TableStandardToolbarProps,
