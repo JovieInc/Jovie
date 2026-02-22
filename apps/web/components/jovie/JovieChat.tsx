@@ -16,6 +16,7 @@ import {
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
+import { ChatUsageAlert } from './components/ChatUsageAlert';
 import { useChatImageAttachments, useJovieChat } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
@@ -314,6 +315,12 @@ export function JovieChat({
             />
           </div>
 
+          <div className='px-4 pt-3'>
+            <div className='mx-auto max-w-2xl'>
+              <ChatUsageAlert />
+            </div>
+          </div>
+
           {/* Error display in chat view */}
           {chatError && (
             <div className='px-4 pb-3'>
@@ -378,6 +385,7 @@ export function JovieChat({
                   message.
                 </p>
               )}
+              <ChatUsageAlert />
               <ChatInput {...chatInputProps} />
 
               {/* Error display */}

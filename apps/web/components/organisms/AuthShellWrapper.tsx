@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { HeaderChatUsageIndicator } from '@/components/dashboard/atoms/HeaderChatUsageIndicator';
 import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
@@ -120,6 +121,7 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
+        <HeaderChatUsageIndicator />
         <HeaderProfileProgress />
         {config.isTableRoute && <DrawerToggleButton />}
       </>
