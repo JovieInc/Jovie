@@ -565,6 +565,8 @@ export async function upsertTrack(input: {
   isExplicit?: boolean;
   isrc?: string | null;
   previewUrl?: string | null;
+  audioUrl?: string | null;
+  audioFormat?: string | null;
   sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
@@ -581,6 +583,8 @@ export async function upsertTrack(input: {
     isExplicit: input.isExplicit ?? false,
     isrc: input.isrc ?? null,
     previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -603,6 +607,8 @@ export async function upsertTrack(input: {
         isExplicit: input.isExplicit ?? false,
         isrc: input.isrc ?? null,
         previewUrl: input.previewUrl ?? null,
+        audioUrl: input.audioUrl ?? null,
+        audioFormat: input.audioFormat ?? null,
         sourceType: input.sourceType ?? 'ingested',
         metadata: input.metadata ?? {},
         updatedAt: now,
@@ -643,6 +649,8 @@ export interface TrackWithProviders {
   isExplicit: boolean;
   isrc: string | null;
   previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
   providerLinks: ProviderLink[];
 }
 
@@ -734,6 +742,8 @@ export async function getTracksForReleaseWithProviders(
     isExplicit: track.isExplicit,
     isrc: track.isrc,
     previewUrl: track.previewUrl,
+    audioUrl: track.audioUrl,
+    audioFormat: track.audioFormat,
     providerLinks: linksByTrack.get(track.id) ?? [],
   }));
 
