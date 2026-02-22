@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingDashboard } from '@/components/organisms/BillingDashboard';
-import { PLAN_KEYS } from '@/components/organisms/billing/billing-constants';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -201,14 +200,16 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    const growthPlanEnabled = PLAN_KEYS.includes('growth');
+    const growthEnabled =
+      process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
-    if (growthPlanEnabled) {
+
+    // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
+    if (growthEnabled) {
       expect(screen.getByText('Growth')).toBeInTheDocument();
     } else {
-      // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
       expect(screen.queryByText('Growth')).not.toBeInTheDocument();
     }
   });

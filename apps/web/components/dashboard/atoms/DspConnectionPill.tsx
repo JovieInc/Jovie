@@ -79,13 +79,12 @@ export function DspConnectionPill({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium',
+          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium text-primary-token',
           className
         )}
         style={{
           borderColor: `${style.accent}30`,
           backgroundColor: `${style.accent}10`,
-          color: style.accent,
         }}
       >
         <SocialIcon platform={style.platform} className='h-4 w-4' />
@@ -107,7 +106,7 @@ export function DspConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
+              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium text-primary-token transition-colors cursor-pointer',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
@@ -116,7 +115,6 @@ export function DspConnectionPill({
               {
                 borderColor: `${style.accent}30`,
                 backgroundColor: `${style.accent}10`,
-                color: style.accent,
                 '--tw-ring-color': `${style.accent}50`,
               } as React.CSSProperties
             }
@@ -135,7 +133,7 @@ export function DspConnectionPill({
         <DropdownMenuContent align='start' sideOffset={4}>
           {onSyncNow && (
             <DropdownMenuItem onClick={onSyncNow}>
-              <RefreshCw className='h-4 w-4' />
+              <RefreshCw className='h-3.5 w-3.5' />
               Sync Now
             </DropdownMenuItem>
           )}
