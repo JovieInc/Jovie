@@ -1,3 +1,5 @@
+import { Bolt, Check, Disc, Link } from 'lucide-react';
+
 import { Container } from '@/components/site/Container';
 import type { SmartlinkThreadItem } from './demo/mock-data';
 import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
@@ -349,33 +351,13 @@ function ThreadIcon({
   readonly type: SmartlinkThreadItem['iconType'];
   readonly color: string;
 }) {
-  const paths: Record<SmartlinkThreadItem['iconType'], React.ReactNode> = {
-    link: (
-      <path
-        d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'
-        strokeLinecap='round'
-      />
-    ),
-    disc: <circle cx='12' cy='12' r='7' />,
-    zap: (
-      <path d='M13 2 3 14h9l-1 8 10-12h-9l1-8z' fill={color} stroke='none' />
-    ),
-    check: (
-      <path d='M20 6 9 17l-5-5' strokeLinecap='round' strokeLinejoin='round' />
-    ),
-  };
+  const icons = {
+    link: Link,
+    disc: Disc,
+    zap: Bolt,
+    check: Check,
+  } as const;
 
-  return (
-    <svg
-      aria-hidden='true'
-      width='11'
-      height='11'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke={color}
-      strokeWidth='2.5'
-    >
-      {paths[type]}
-    </svg>
-  );
+  const Icon = icons[type];
+  return <Icon aria-hidden='true' className='h-3 w-3' style={{ color }} />;
 }

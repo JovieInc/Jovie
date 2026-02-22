@@ -1,3 +1,5 @@
+import { Bell, CheckCircle2 } from 'lucide-react';
+
 import type { FeaturedCreator } from '@/lib/featured-creators';
 
 interface MobileProfilePreviewProps {
@@ -44,25 +46,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
           {displayName}
         </p>
         <span className='inline-flex rounded-full bg-white/10 p-0.5 text-sky-400'>
-          <svg
-            aria-hidden='true'
-            width='14'
-            height='14'
-            viewBox='0 0 24 24'
-            fill='currentColor'
-            stroke='rgb(8, 9, 10)'
-            strokeWidth='2'
-          >
-            <path
-              d='M9 12l2 2 4-4'
-              stroke='rgb(8, 9, 10)'
-              fill='none'
-              strokeWidth='2.5'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-            />
-            <path d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z' />
-          </svg>
+          <CheckCircle2 className='h-3.5 w-3.5' aria-hidden='true' />
         </span>
       </div>
 
@@ -76,9 +60,9 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
 
       {/* Social icons — just icons, no labels */}
       <div className='mt-4 flex items-center gap-3'>
-        <SocialIcon icon='ig' label='Instagram' />
-        <SocialIcon icon='tt' label='TikTok' />
-        <SocialIcon icon='tip' label='Tip' />
+        <PreviewIconButton icon='ig' label='Instagram' />
+        <PreviewIconButton icon='tt' label='TikTok' />
+        <PreviewIconButton icon='tip' label='Tip' />
       </div>
 
       {/* Big CTA — matches TwoStepNotificationsCTA */}
@@ -90,20 +74,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
             color: 'rgb(8, 9, 10)',
           }}
         >
-          <svg
-            aria-hidden='true'
-            width='18'
-            height='18'
-            viewBox='0 0 24 24'
-            fill='none'
-            stroke='currentColor'
-            strokeWidth='2'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-          >
-            <path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' />
-            <path d='M10.3 21a1.94 1.94 0 0 0 3.4 0' />
-          </svg>
+          <Bell className='h-[18px] w-[18px]' aria-hidden='true' />
           Turn on Notifications
         </div>
       </div>
@@ -111,7 +82,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
   );
 }
 
-function SocialIcon({
+function PreviewIconButton({
   icon,
   label,
 }: {
