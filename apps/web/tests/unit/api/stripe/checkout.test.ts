@@ -7,6 +7,8 @@ const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
 const mockEnsureStripeCustomer = vi.hoisted(() => vi.fn());
 const mockGetActivePriceIds = vi.hoisted(() => vi.fn());
 const mockGetPriceMappingDetails = vi.hoisted(() => vi.fn());
+const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsGrowthPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -30,6 +32,8 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 vi.mock('@/lib/stripe/config', () => ({
   getActivePriceIds: mockGetActivePriceIds,
   getPriceMappingDetails: mockGetPriceMappingDetails,
+  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
+  isGrowthPriceId: mockIsGrowthPriceId,
   PRICE_MAPPINGS: {
     price_123: {
       priceId: 'price_123',
@@ -46,6 +50,8 @@ describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockIsGrowthPlanEnabled.mockReturnValue(true);
+    mockIsGrowthPriceId.mockReturnValue(false);
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -63,6 +69,26 @@ describe('POST /api/stripe/checkout', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
+  });
+
+  it('returns 403 when growth plan is disabled', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetActivePriceIds.mockReturnValue(['price_growth']);
+    mockIsGrowthPlanEnabled.mockReturnValue(false);
+    mockIsGrowthPriceId.mockReturnValue(true);
+
+    const { POST } = await import('@/app/api/stripe/checkout/route');
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId: 'price_growth' }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Growth plan is not currently available',
+    });
   });
 
   it('creates checkout session for authenticated user', async () => {
