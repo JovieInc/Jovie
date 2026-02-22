@@ -30,10 +30,7 @@ export function DashboardHeader({
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
 
   return (
-    <header
-      data-testid='dashboard-header'
-      className={cn('z-20 border-b border-subtle', className)}
-    >
+    <header data-testid='dashboard-header' className={cn('z-20', className)}>
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
         <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>

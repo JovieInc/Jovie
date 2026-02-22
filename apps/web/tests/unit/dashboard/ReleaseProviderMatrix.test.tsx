@@ -97,6 +97,10 @@ vi.mock('@/lib/queries', () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useSaveCanvasStatusMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useSaveReleaseLyricsMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
@@ -131,6 +135,13 @@ vi.mock(
     ReleasesEmptyState: () => (
       <div data-testid='releases-empty-state'>empty</div>
     ),
+  })
+);
+
+vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
+  () => ({
+    SpotifyConnectDialog: () => null,
   })
 );
 
