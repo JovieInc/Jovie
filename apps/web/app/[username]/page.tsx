@@ -16,7 +16,11 @@ import type {
   DiscogRelease,
 } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import {
+  checkGate,
+  FEATURE_FLAG_KEYS,
+  getSubscribeCTAVariant,
+} from '@/lib/feature-flags/server';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -463,12 +467,9 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  // Evaluate two-step subscribe experiment per-artist (deterministic bucketing)
-  const subscribeTwoStep = await checkGate(
-    profile.id,
-    FEATURE_FLAG_KEYS.SUBSCRIBE_TWO_STEP,
-    false
-  );
+  // Evaluate subscribe CTA experiment per-artist (deterministic bucketing)
+  const subscribeCTAVariant = await getSubscribeCTAVariant(profile.id);
+  const subscribeTwoStep = subscribeCTAVariant === 'two_step';
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
