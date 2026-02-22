@@ -1,9 +1,14 @@
+import { publicEnv } from '@/lib/env-public';
+
 /**
  * Pricing page loading skeleton
  * Matches the three-tier pricing grid layout
  */
 
-const TIER_SKELETON_KEYS = ['free-tier', 'pro-tier', 'growth-tier'] as const;
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+const TIER_SKELETON_KEYS = growthPlanEnabled
+  ? (['free-tier', 'pro-tier', 'growth-tier'] as const)
+  : (['free-tier', 'pro-tier'] as const);
 const FEATURE_SKELETON_KEYS = Array.from(
   { length: 5 },
   (_, i) => `feature-skeleton-${i + 1}`

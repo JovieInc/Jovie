@@ -74,8 +74,15 @@ export function GroupedTableBody<T>({
   return (
     <tbody>
       {groupedData.map((group, groupIndex) => {
-        const _isVisible = groupIndex === visibleGroupIndex;
-        const nextGroupIsVisible = groupIndex === visibleGroupIndex + 1;
+        const isUpcomingGroup = groupIndex === visibleGroupIndex + 1;
+        const labelClassName = cn(
+          'transition-colors duration-150 ease-out',
+          isUpcomingGroup && 'text-secondary-token'
+        );
+        const countClassName = cn(
+          'transition-colors duration-150 ease-out',
+          isUpcomingGroup && 'text-tertiary-token'
+        );
 
         return (
           <React.Fragment key={group.key}>
@@ -85,11 +92,8 @@ export function GroupedTableBody<T>({
               count={group.count}
               colSpan={columns}
               isSticky
-              className={cn(
-                'transition-opacity duration-150',
-                // Fade out current header when next header approaches
-                nextGroupIsVisible && 'opacity-50'
-              )}
+              labelClassName={labelClassName}
+              countClassName={countClassName}
               ref={(el: HTMLTableRowElement | null) =>
                 observeGroupHeader(group.key, el)
               }

@@ -49,6 +49,8 @@ export interface UseReleaseProviderMatrixReturn {
   handleReset: (provider: ProviderKey) => void;
   handleSync: () => void;
   handleRefreshRelease: (releaseId: string) => void;
+  refreshingReleaseId: string | null;
+  flashedReleaseId: string | null;
   handleRescanIsrc: (releaseId: string) => void;
   isRescanningIsrc: boolean;
   handleAddUrl: (
@@ -56,5 +58,8 @@ export interface UseReleaseProviderMatrixReturn {
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
+  handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
+  handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
+  isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;
 }

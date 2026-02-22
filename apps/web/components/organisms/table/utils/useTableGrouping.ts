@@ -35,6 +35,12 @@ interface UseTableGroupingOptions<T> {
    * Whether grouping is enabled. If false, returns empty grouped data.
    */
   enabled: boolean;
+
+  /**
+   * Optional scroll container to scope sticky header observation.
+   * Defaults to viewport when not provided.
+   */
+  scrollRoot?: Element | null;
 }
 
 /**
@@ -107,6 +113,7 @@ export function useTableGrouping<T>({
   getGroupKey,
   getGroupLabel,
   enabled,
+  scrollRoot = null,
 }: UseTableGroupingOptions<T>) {
   const [visibleGroupIndex, setVisibleGroupIndex] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -177,6 +184,7 @@ export function useTableGrouping<T>({
       {
         threshold: [0, 1],
         rootMargin: '-1px 0px 0px 0px',
+        root: scrollRoot,
       }
     );
 
@@ -192,7 +200,7 @@ export function useTableGrouping<T>({
         observerRef.current.disconnect();
       }
     };
-  }, [enabled, groupedData, handleIntersectionEntry]);
+  }, [enabled, groupedData, handleIntersectionEntry, scrollRoot]);
 
   // Function to register a group header for observation
   const observeGroupHeader = (key: string, element: HTMLElement | null) => {
@@ -201,6 +209,7 @@ export function useTableGrouping<T>({
       return;
     }
 
+    element.dataset.groupKey = key;
     headerRefs.current.set(key, element);
 
     if (observerRef.current) {

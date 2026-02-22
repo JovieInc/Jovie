@@ -52,15 +52,15 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
  * This allows the session setup to be batched with other queries.
  *
  * @param userId - The Clerk user ID (already validated)
- * @returns SQL statement that sets RLS session variables
+ * @returns SQL statement that sets RLS session variable(s)
  */
 export function getSessionSetupSql(userId: string) {
   validateClerkUserId(userId);
 
-  // Set the session variables for RLS in a single query.
+  // Set the Clerk session variable for RLS in a single query.
   // is_local=false (session-scoped) because the Neon HTTP driver has no
   // transaction context — is_local=true would be silently discarded.
-  return drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`;
+  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`;
 }
 
 /**
@@ -112,7 +112,7 @@ export type IsolationLevel =
 
 /**
  * Run DB operations with RLS session variables set.
- * Sets app.user_id and app.clerk_user_id via session-scoped set_config
+ * Sets app.clerk_user_id via session-scoped set_config
  * before executing the operation.
  *
  * Note: The Neon HTTP driver does not support transactions. The operation

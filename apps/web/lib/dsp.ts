@@ -1,3 +1,4 @@
+import { geoAwarePopularityIndex } from '@/constants/app';
 import { Artist, Release } from '@/types/db';
 
 export interface DSPConfig {
@@ -77,9 +78,24 @@ function addDSP(
   });
 }
 
+export function sortDSPsByGeoPopularity(
+  dsps: AvailableDSP[],
+  countryCode?: string | null
+): AvailableDSP[] {
+  return dsps.sort((a, b) => {
+    const rankDelta =
+      geoAwarePopularityIndex(a.key, countryCode) -
+      geoAwarePopularityIndex(b.key, countryCode);
+
+    if (rankDelta !== 0) return rankDelta;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export function getAvailableDSPs(
   artist: Artist,
-  releases?: Release[]
+  releases?: Release[],
+  countryCode?: string | null
 ): AvailableDSP[] {
   const dsps: AvailableDSP[] = [];
 
@@ -107,7 +123,7 @@ export function getAvailableDSPs(
     addDSP(dsps, 'youtube', youtubeRelease?.url);
   }
 
-  return dsps;
+  return sortDSPsByGeoPopularity(dsps, countryCode);
 }
 
 export function generateDSPButtonHTML(dsp: AvailableDSP): string {

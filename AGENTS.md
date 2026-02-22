@@ -223,6 +223,22 @@ For deeper implementation guidance, use `.claude/skills/entitlements.md`.
    gh pr merge --auto --squash
    ```
 
+## Ship Validation (CodeRabbit Issue Planner Instruction)
+
+When generating implementation plans for GitHub issues, the plan MUST include a final **"Ship Validation"** phase as the last step. This phase ensures all changes pass quality gates before a PR is opened.
+
+The validation phase must instruct the coding agent to run:
+
+```bash
+pnpm run typecheck && pnpm run biome:check && pnpm run test
+```
+
+**Requirements for the Ship Validation phase:**
+- All TypeScript type checks pass (zero errors)
+- All Biome lint and formatting checks pass (zero errors)
+- All unit tests pass
+- If any check fails, fix before proceeding to PR creation
+
 ---
 
 ## Architecture Overview

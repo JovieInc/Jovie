@@ -1,15 +1,54 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
-import { detectPlatform } from '@/lib/utils/platform-detection';
+import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
+import {
+  getNetworkFromPlatform,
+  INGEST_NETWORKS,
+  type IngestNetworkId,
+} from './ingest-network-options';
 import type { UseIngestProfileReturn } from './types';
 
 interface UseIngestProfileOptions {
   onIngestPending?: (profile: { id: string; username: string }) => void;
+}
+
+export function getNormalizedInputUrl(
+  network: IngestNetworkId,
+  inputValue: string
+): string {
+  const trimmed = inputValue.trim();
+  if (!trimmed) return '';
+
+  if (network === 'spotify') {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return normalizeUrl(trimmed);
+    }
+
+    if (/^[a-zA-Z0-9]{22}$/.test(trimmed)) {
+      return `https://open.spotify.com/artist/${trimmed}`;
+    }
+
+    return normalizeUrl(trimmed);
+  }
+
+  const hasProtocol =
+    trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  if (hasProtocol || trimmed.includes('.')) {
+    return normalizeUrl(trimmed);
+  }
+
+  const networkConfig = INGEST_NETWORKS.find(option => option.id === network);
+  if (!networkConfig) {
+    return normalizeUrl(trimmed);
+  }
+
+  return normalizeUrl(`${networkConfig.preset}${trimmed}`);
 }
 
 export function useIngestProfile({
@@ -19,48 +58,78 @@ export function useIngestProfile({
   const notifications = useNotifications();
 
   const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState('');
+  const [network, setNetwork] = useState<IngestNetworkId>('instagram');
+  const [inputValue, setInputValue] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // TanStack Query mutation for cache invalidation
-  const ingestProfileMutation = useIngestProfileMutation();
+  const inputPlaceholder =
+    INGEST_NETWORKS.find(option => option.id === network)?.placeholder ??
+    'Paste profile URL';
 
-  // Detect platform from URL in real-time
+  const normalizedInputUrl = useMemo(
+    () => getNormalizedInputUrl(network, inputValue),
+    [network, inputValue]
+  );
+
   const detectedPlatform: PlatformInfo | null = useMemo(() => {
-    const trimmed = url.trim();
-    if (!trimmed) return null;
-
-    // Only detect if it looks like a URL
-    if (
-      !trimmed.startsWith('http://') &&
-      !trimmed.startsWith('https://') &&
-      !trimmed.includes('.')
-    ) {
-      return null;
-    }
+    if (!normalizedInputUrl) return null;
 
     try {
-      const detected = detectPlatform(trimmed);
-      // Don't show "website" as detected - that's the fallback
+      const detected = detectPlatform(normalizedInputUrl);
       if (detected.platform.id === 'website') return null;
       return detected.platform;
     } catch {
       return null;
     }
-  }, [url]);
+  }, [normalizedInputUrl]);
+
+  const artistSearch = useArtistSearchQuery({
+    minQueryLength: 2,
+    limit: 6,
+  });
+
+  useEffect(() => {
+    const detectedNetwork = getNetworkFromPlatform(detectedPlatform);
+    if (!detectedNetwork || detectedNetwork === network) return;
+
+    // Auto-switch when a URL clearly maps to another network.
+    if (inputValue.includes('.') || inputValue.startsWith('http')) {
+      setNetwork(detectedNetwork);
+    }
+  }, [detectedPlatform, inputValue, network]);
+
+  useEffect(() => {
+    if (network !== 'spotify') {
+      artistSearch.clear();
+      return;
+    }
+
+    if (inputValue.trim().startsWith('http')) {
+      artistSearch.clear();
+      return;
+    }
+
+    artistSearch.search(inputValue);
+  }, [artistSearch, inputValue, network]);
+
+  const ingestProfileMutation = useIngestProfileMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const trimmedUrl = url.trim();
-    if (!trimmedUrl) {
-      notifications.error('Please enter a URL');
+    const normalizedUrl = getNormalizedInputUrl(network, inputValue);
+    if (!normalizedUrl) {
+      notifications.error(
+        network === 'spotify'
+          ? 'Select a Spotify artist or paste a Spotify artist URL'
+          : 'Enter a profile URL or handle'
+      );
       return;
     }
 
     try {
       const result = await ingestProfileMutation.mutateAsync({
-        url: trimmedUrl,
+        url: normalizedUrl,
       });
 
       const profileId = result.profile?.id;
@@ -83,7 +152,8 @@ export function useIngestProfile({
       }
 
       setIsSuccess(true);
-      setUrl('');
+      setInputValue('');
+      artistSearch.clear();
 
       router.refresh();
 
@@ -103,11 +173,21 @@ export function useIngestProfile({
   return {
     open,
     setOpen,
-    url,
-    setUrl,
+    network,
+    setNetwork,
+    inputValue,
+    setInputValue,
+    inputPlaceholder,
     isLoading: ingestProfileMutation.isPending,
     isSuccess,
     detectedPlatform,
+    spotifyResults: artistSearch.results,
+    spotifyState: artistSearch.state,
+    spotifyError: artistSearch.error,
+    selectSpotifyArtist: artist => {
+      setInputValue(artist.url);
+      setNetwork('spotify');
+    },
     handleSubmit,
   };
 }

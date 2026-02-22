@@ -32,14 +32,32 @@ interface LinearIssueData {
   stateId?: string;
 }
 
+interface LinearCommentUser {
+  name?: string;
+  displayName?: string;
+}
+
+interface LinearCommentData {
+  id?: string;
+  body?: string;
+  issue?: LinearIssueData;
+  user?: LinearCommentUser;
+}
+
 interface LinearWebhookPayload {
   action?: string;
   type?: string;
   createdAt?: string;
-  data?: LinearIssueData;
+  data?: LinearIssueData | LinearCommentData;
   updatedFrom?: {
     stateId?: string;
   };
+}
+
+interface AutomationContract {
+  verifyRequired: boolean;
+  simplifyBounded: boolean;
+  modelTier: 'premium' | 'economy';
 }
 
 function isDuplicate(dedupeKey: string): boolean {
@@ -79,10 +97,11 @@ function isTodoTransition(payload: LinearWebhookPayload): boolean {
     return false;
   }
 
-  const stateName = payload.data?.state?.name?.trim().toLowerCase();
-  const stateType = payload.data?.state?.type?.trim().toLowerCase();
+  const issueData = payload.data as LinearIssueData | undefined;
+  const stateName = issueData?.state?.name?.trim().toLowerCase();
+  const stateType = issueData?.state?.type?.trim().toLowerCase();
   const previousStateId = payload.updatedFrom?.stateId;
-  const currentStateId = payload.data?.stateId;
+  const currentStateId = issueData?.stateId;
 
   const isTodoName = stateName === 'todo';
   const isUnstartedType = stateType === 'unstarted';
@@ -92,6 +111,63 @@ function isTodoTransition(payload: LinearWebhookPayload): boolean {
     previousStateId !== currentStateId;
 
   return changedState && (isTodoName || isUnstartedType);
+}
+
+function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
+  if (payload.type !== 'Comment' || payload.action !== 'create') {
+    return false;
+  }
+
+  const commentData = payload.data as LinearCommentData | undefined;
+  const author =
+    commentData?.user?.name?.trim().toLowerCase() ??
+    commentData?.user?.displayName?.trim().toLowerCase() ??
+    '';
+  const body = commentData?.body ?? '';
+
+  const isCodeRabbitAuthor = author.includes('coderabbit');
+  const hasPlanMarker =
+    /coderabbit-plan-ready|##\s+Implementation\s+Plan/i.test(body);
+
+  return isCodeRabbitAuthor && hasPlanMarker;
+}
+
+function getIssueData(
+  payload: LinearWebhookPayload
+): LinearIssueData | undefined {
+  if (payload.type === 'Comment') {
+    return (payload.data as LinearCommentData | undefined)?.issue;
+  }
+
+  return payload.data as LinearIssueData | undefined;
+}
+
+function parseAutomationContract(body: string): AutomationContract {
+  const verifyMatch = body.match(/verify_required=(true|false)/i)?.[1];
+  const simplifyMatch = body.match(/simplify_bounded=(true|false)/i)?.[1];
+  const modelMatch = body.match(/model_tier=(premium|economy)/i)?.[1];
+
+  return {
+    verifyRequired: verifyMatch?.toLowerCase() === 'false' ? false : true,
+    simplifyBounded: simplifyMatch?.toLowerCase() === 'false' ? false : true,
+    modelTier: modelMatch?.toLowerCase() === 'economy' ? 'economy' : 'premium',
+  };
+}
+
+function getAutomationContract(
+  payload: LinearWebhookPayload,
+  isPlanReadyEvent: boolean
+): AutomationContract {
+  if (!isPlanReadyEvent) {
+    return {
+      verifyRequired: true,
+      simplifyBounded: true,
+      modelTier: 'premium',
+    };
+  }
+
+  const commentData = payload.data as LinearCommentData | undefined;
+  return parseAutomationContract(commentData?.body ?? '');
 }
 
 export async function POST(request: NextRequest) {
@@ -128,14 +204,18 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
-    if (!isTodoTransition(payload)) {
+    const isTodoReadyEvent = isTodoTransition(payload);
+    const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
+
+    if (!isTodoReadyEvent && !isPlanReadyEvent) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
       );
     }
 
-    const issueId = payload.data?.id;
+    const issueData = getIssueData(payload);
+    const issueId = issueData?.id;
     if (!issueId) {
       return NextResponse.json(
         { error: 'Missing issue id in payload' },
@@ -143,7 +223,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dedupeKey = `${issueId}:${payload.data?.updatedAt ?? payload.createdAt ?? ''}`;
+    const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'todo'}`;
     if (isDuplicate(dedupeKey)) {
       return NextResponse.json(
         { received: true, deduplicated: true },
@@ -153,6 +233,7 @@ export async function POST(request: NextRequest) {
 
     const owner = process.env.VERCEL_GIT_REPO_OWNER ?? 'TheBlackFuture';
     const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
+    const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
     const dispatchResponse = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -164,16 +245,22 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: 'linear_todo_ready',
+          event_type: isPlanReadyEvent
+            ? 'linear_plan_ready'
+            : 'linear_todo_ready',
           client_payload: {
             issue_id: issueId,
-            issue_identifier: payload.data?.identifier ?? null,
-            issue_title: payload.data?.title ?? 'Untitled Linear Issue',
-            issue_description: payload.data?.description ?? '',
-            issue_url: payload.data?.url ?? null,
-            issue_updated_at: payload.data?.updatedAt ?? null,
-            team_key: payload.data?.team?.key ?? null,
-            state_name: payload.data?.state?.name ?? null,
+            issue_identifier: issueData?.identifier ?? null,
+            issue_title: issueData?.title ?? 'Untitled Linear Issue',
+            issue_description: issueData?.description ?? '',
+            issue_url: issueData?.url ?? null,
+            issue_updated_at: issueData?.updatedAt ?? null,
+            team_key: issueData?.team?.key ?? null,
+            state_name: issueData?.state?.name ?? null,
+            plan_ready: isPlanReadyEvent,
+            verify_required: automationContract.verifyRequired,
+            simplify_bounded: automationContract.simplifyBounded,
+            model_tier: automationContract.modelTier,
           },
         }),
       }

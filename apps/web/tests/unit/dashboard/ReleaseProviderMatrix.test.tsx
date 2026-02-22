@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 
 /**
  * ReleaseProviderMatrix Component Tests
@@ -42,8 +42,8 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useRegisterTablePanel', () => ({
-  useRegisterTablePanel: vi.fn(),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/usePlanGate', () => ({
@@ -95,6 +95,14 @@ vi.mock('@/lib/queries', () => ({
   }),
   useRescanIsrcLinksMutation: () => ({
     mutate: vi.fn(),
+    isPending: false,
+  }),
+  useSaveReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useFormatReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
     isPending: false,
   }),
 }));
@@ -204,7 +212,7 @@ function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <TooltipProvider>
-        <TablePanelProvider>{children}</TablePanelProvider>
+        <RightPanelProvider>{children}</RightPanelProvider>
       </TooltipProvider>
     ),
     ...options,

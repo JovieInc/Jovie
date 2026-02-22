@@ -2,7 +2,7 @@
 
 import { Button, Input, Label } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Loader2, Unplug } from 'lucide-react';
+import { CheckCircle2, Unplug } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -12,6 +12,7 @@ import {
   saveBandsintownApiKey,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
@@ -124,23 +125,25 @@ export function SettingsTouringSection({
     }
   }, [queryClient, profileId]);
 
-  const renderContent = () => {
-    if (isLoading) {
-      return <TouringSectionSkeleton />;
-    }
-    if (isError) {
-      return (
-        <div className='flex flex-col items-center gap-2 py-6'>
-          <p className='text-sm text-secondary-token'>
-            Failed to load connection status.
-          </p>
-          <Button size='sm' variant='ghost' onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      );
-    }
+  if (isLoading) {
     return (
+      <DashboardCard variant='settings'>
+        <TouringSectionSkeleton />
+      </DashboardCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SettingsErrorState
+        message='Failed to load connection status.'
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  return (
+    <DashboardCard variant='settings'>
       <div className='space-y-4'>
         <p className='text-sm text-secondary-token'>
           Tour dates will appear on your public profile when connected.
@@ -201,8 +204,8 @@ export function SettingsTouringSection({
             size='sm'
             onClick={handleSaveAndConnect}
             disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
+            loading={isSaving}
           >
-            {isSaving && <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />}
             {isConnected ? 'Update' : 'Connect'}
           </Button>
           {isConnected && (
@@ -211,20 +214,15 @@ export function SettingsTouringSection({
               size='sm'
               onClick={handleDisconnect}
               disabled={isDisconnecting}
+              loading={isDisconnecting}
               className='text-destructive hover:text-destructive'
             >
-              {isDisconnecting ? (
-                <Loader2 className='h-3.5 w-3.5 animate-spin mr-1' />
-              ) : (
-                <Unplug className='h-3.5 w-3.5 mr-1' />
-              )}
+              <Unplug className='h-4 w-4 mr-1' />
               Disconnect
             </Button>
           )}
         </div>
       </div>
-    );
-  };
-
-  return <DashboardCard variant='settings'>{renderContent()}</DashboardCard>;
+    </DashboardCard>
+  );
 }

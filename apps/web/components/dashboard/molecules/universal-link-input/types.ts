@@ -27,6 +27,8 @@ export interface UniversalLinkInputProps {
   readonly chatEnabled?: boolean;
   /** Callback when user submits a chat message */
   readonly onChatSubmit?: (message: string) => void;
+  /** Feature-flagged voice input (defaults to false/off) */
+  readonly voiceInputEnabled?: boolean;
 }
 
 export interface UniversalLinkInputRef {

@@ -25,7 +25,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
@@ -444,7 +444,7 @@ export const DashboardAudienceTableUnified = memo(
       [selectedMember, getContextMenuItems, setSelectedMember]
     );
 
-    useRegisterTablePanel(sidebarPanel);
+    useRegisterRightPanel(sidebarPanel);
 
     return (
       <AudienceTableProvider value={contextValue}>
@@ -460,6 +460,7 @@ export const DashboardAudienceTableUnified = memo(
           {/* Subheader with filter dropdown and export */}
           <AudienceTableSubheader
             view={view}
+            onViewChange={onViewChange}
             filters={filters}
             onFiltersChange={onFiltersChange}
             rows={rows}

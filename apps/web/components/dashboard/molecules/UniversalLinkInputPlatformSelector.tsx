@@ -5,7 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { ChevronDown, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 import {
   getPlatformIconMetadata,
@@ -21,7 +21,6 @@ import {
 import { type CursorPosition } from './useInputFocusController';
 
 interface PlatformSelectorProps {
-  readonly currentPlatformIcon: string;
   readonly onPlatformSelect: (
     platform: (typeof PLATFORM_OPTIONS)[number]
   ) => void;
@@ -31,44 +30,21 @@ interface PlatformSelectorProps {
 }
 
 export function UniversalLinkInputPlatformSelector({
-  currentPlatformIcon,
   onPlatformSelect,
   onArtistSearchSelect,
   onRestoreFocus,
   disabled = false,
 }: PlatformSelectorProps) {
-  const currentIconMeta = getPlatformIconMetadata(currentPlatformIcon);
-  const currentIconHex = currentIconMeta?.hex
-    ? `#${currentIconMeta.hex}`
-    : '#6b7280';
-  const selectorIconBg = currentIconHex;
-  const selectorIconColor = getContrastTextOnBrand(currentIconHex);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type='button'
           disabled={disabled}
-          className='relative flex h-11 w-11 items-center justify-center rounded-xl hover:bg-surface-2 transition-colors shrink-0 p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95 sm:h-10 sm:w-10 sm:rounded-full'
-          aria-label='Select platform'
+          className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-secondary-token transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95'
+          aria-label='Add link from platform'
         >
-          <div
-            className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
-            style={{
-              backgroundColor: selectorIconBg,
-              color: selectorIconColor,
-            }}
-          >
-            <SocialIcon
-              platform={currentPlatformIcon}
-              className='h-4 w-4 sm:h-3.5 sm:w-3.5'
-            />
-          </div>
-          <ChevronDown
-            className='absolute right-0.5 top-0.5 h-3 w-3 text-tertiary-token sm:right-1 sm:top-1'
-            aria-hidden='true'
-          />
+          <Plus className='h-4 w-4' aria-hidden='true' />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

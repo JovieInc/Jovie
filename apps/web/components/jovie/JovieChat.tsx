@@ -265,7 +265,7 @@ export function JovieChat({
             className='relative flex-1 overflow-y-auto px-4 py-6'
             onScroll={handleScroll}
           >
-            <div className='mx-auto max-w-2xl space-y-6'>
+            <div className='mx-auto max-w-[44rem] space-y-7'>
               {messages.map((message, index) => (
                 <ChatMessage
                   key={message.id}
@@ -279,10 +279,10 @@ export function JovieChat({
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-2xl bg-surface-2 px-4 py-3'>
+                  <div className='rounded-2xl border border-subtle bg-surface-1 px-5 py-3.5'>
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'
@@ -293,7 +293,7 @@ export function JovieChat({
                         <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
                       </span>
                       {activeToolLabel && (
-                        <span className='ml-1.5 text-xs text-tertiary-token'>
+                        <span className='ml-2 text-xs font-medium tracking-wide text-tertiary-token'>
                           {activeToolLabel}
                         </span>
                       )}

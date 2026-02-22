@@ -1,26 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
-export function SettingsNotificationsSection() {
-  const [marketingEmails, setMarketingEmails] = useState(true);
-  const { updateNotifications, isPending } = useNotificationSettingsMutation();
+interface SettingsNotificationsSectionProps {
+  readonly isGrowth?: boolean;
+}
+
+export function SettingsNotificationsSection({
+  isGrowth = false,
+}: SettingsNotificationsSectionProps) {
+  const { updateNotificationsAsync, isPending } =
+    useNotificationSettingsMutation();
+
+  const { checked, handleToggle } = useOptimisticToggle({
+    initialValue: true,
+    mutateAsync: enabled =>
+      updateNotificationsAsync({ marketing_emails: enabled }),
+    errorMessage: 'Failed to update notification settings. Please try again.',
+  });
 
   return (
-    <div className='py-3 border-b border-subtle'>
-      <SettingsToggleRow
-        title='Marketing Emails'
-        description='Receive updates about new features, tips, and promotional offers.'
-        checked={marketingEmails}
-        onCheckedChange={(enabled: boolean) => {
-          setMarketingEmails(enabled);
-          updateNotifications({ marketing_emails: enabled });
-        }}
-        disabled={isPending}
-        ariaLabel='Toggle marketing emails'
-      />
-    </div>
+    <DashboardCard variant='settings' padding='none'>
+      <div className='px-4 py-3'>
+        <SettingsToggleRow
+          title='Double opt-in email confirmation'
+          description='Protect your audience from spam by requiring subscribers to confirm their email. This safeguard is available on Growth. Need access sooner? Contact support.'
+          checked={checked}
+          onCheckedChange={handleToggle}
+          disabled={isPending || !isGrowth}
+          ariaLabel='Toggle double opt-in email confirmation'
+          gated={!isGrowth}
+          gatePlanName='Growth'
+        />
+      </div>
+    </DashboardCard>
   );
 }

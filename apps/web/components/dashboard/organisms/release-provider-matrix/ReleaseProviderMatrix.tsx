@@ -25,7 +25,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -86,9 +86,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleCopy,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
     handleAddUrl,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
 
   // Table display preferences (column visibility)
@@ -473,6 +478,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 ? () => handleRefreshRelease(editingRelease.id)
                 : undefined
             }
+            isRefreshing={refreshingReleaseId === editingRelease?.id}
             onAddDspLink={handleAddUrl}
             onRescanIsrc={
               editingRelease
@@ -483,6 +489,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             onArtworkUpload={handleArtworkUpload}
             onArtworkRevert={handleArtworkRevert}
             onReleaseChange={handleReleaseChange}
+            onSaveLyrics={handleSaveLyrics}
+            onFormatLyrics={handleFormatLyrics}
+            isLyricsSaving={isLyricsSaving}
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
             readOnly={!canEditSmartLinks}
@@ -496,19 +505,23 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       artistName,
       closeEditor,
       handleRefreshRelease,
+      refreshingReleaseId,
       handleAddUrl,
       handleRescanIsrc,
       isRescanningIsrc,
       handleArtworkUpload,
       handleArtworkRevert,
       handleReleaseChange,
+      handleSaveLyrics,
+      handleFormatLyrics,
+      isLyricsSaving,
       isSaving,
       allowArtworkDownloads,
       canEditSmartLinks,
     ]
   );
 
-  useRegisterTablePanel(sidebarPanel);
+  useRegisterRightPanel(sidebarPanel);
 
   return (
     <>
@@ -601,6 +614,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  refreshingReleaseId={refreshingReleaseId}
+                  flashedReleaseId={flashedReleaseId}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
                 />

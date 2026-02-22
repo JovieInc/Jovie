@@ -6,10 +6,12 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import {
+  useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
   useSaveProviderOverrideMutation,
+  useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -43,6 +45,10 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
+  const [refreshingReleaseId, setRefreshingReleaseId] = useState<string | null>(
+    null
+  );
+  const [flashedReleaseId, setFlashedReleaseId] = useState<string | null>(null);
 
   // Get profileId from first release (all releases share same profileId)
   const profileId = releases[0]?.profileId ?? '';
@@ -53,6 +59,8 @@ export function useReleaseProviderMatrix({
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
+  const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
+  const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
@@ -245,11 +253,18 @@ export function useReleaseProviderMatrix({
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
+      setRefreshingReleaseId(releaseId);
       refreshReleaseMutation.mutate(
         { releaseId },
         {
           onSuccess: updated => {
             updateRow(updated);
+            setFlashedReleaseId(updated.id);
+            globalThis.setTimeout(() => {
+              setFlashedReleaseId(current =>
+                current === updated.id ? null : current
+              );
+            }, 1200);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -259,6 +274,11 @@ export function useReleaseProviderMatrix({
               action: 'refresh-release',
             });
             toast.error('Failed to refresh release');
+          },
+          onSettled: () => {
+            setRefreshingReleaseId(current =>
+              current === releaseId ? null : current
+            );
           },
         }
       );
@@ -305,6 +325,40 @@ export function useReleaseProviderMatrix({
   );
 
   const isRescanningIsrc = rescanIsrcMutation.isPending;
+  const isLyricsSaving =
+    saveLyricsMutation.isPending || formatLyricsMutation.isPending;
+
+  const handleSaveLyrics = useCallback(
+    async (releaseId: string, lyrics: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      await saveLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+      });
+      toast.success('Lyrics saved');
+    },
+    [saveLyricsMutation]
+  );
+
+  const handleFormatLyrics = useCallback(
+    async (releaseId: string, lyrics: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return [];
+
+      const result = await formatLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+      });
+
+      toast.success('Lyrics formatted for Apple Music');
+      return result.changesSummary;
+    },
+    [formatLyricsMutation]
+  );
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
@@ -330,9 +384,14 @@ export function useReleaseProviderMatrix({
     handleReset,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
     handleAddUrl,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
     setDrafts,
   };
 }

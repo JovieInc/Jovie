@@ -21,6 +21,7 @@ import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
+import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
@@ -47,6 +48,7 @@ export function ReleaseSidebar({
   artistName,
   onClose,
   onRefresh,
+  isRefreshing = false,
   onReleaseChange,
   onSave,
   isSaving,
@@ -56,6 +58,9 @@ export function ReleaseSidebar({
   onRemoveDspLink,
   onRescanIsrc,
   isRescanningIsrc = false,
+  onSaveLyrics,
+  onFormatLyrics,
+  isLyricsSaving = false,
   allowDownloads = false,
   readOnly = false,
 }: ReleaseSidebarProps) {
@@ -190,9 +195,10 @@ export function ReleaseSidebar({
       {
         type: 'action',
         id: 'refresh',
-        label: 'Refresh',
+        label: isRefreshing ? 'Refreshing…' : 'Refresh',
         icon: <RefreshCw className='h-4 w-4' />,
         onClick: () => {
+          if (isRefreshing) return;
           if (onRefresh) {
             onRefresh();
           } else {
@@ -217,7 +223,14 @@ export function ReleaseSidebar({
     }
 
     return items;
-  }, [release, handleCopySmartLink, onRefresh, artistName, readOnly]);
+  }, [
+    release,
+    handleCopySmartLink,
+    onRefresh,
+    isRefreshing,
+    artistName,
+    readOnly,
+  ]);
 
   return (
     <RightDrawer
@@ -233,6 +246,7 @@ export function ReleaseSidebar({
           hasRelease={hasRelease}
           onClose={onClose}
           onRefresh={onRefresh}
+          isRefreshing={isRefreshing}
           onCopySmartLink={handleCopySmartLink}
         />
 
@@ -331,6 +345,17 @@ export function ReleaseSidebar({
                       onCanvasStatusChange={
                         isEditable ? handleCanvasStatusChange : undefined
                       }
+                    />
+                  </div>
+
+                  <div className='pt-5'>
+                    <ReleaseLyricsSection
+                      releaseId={release.id}
+                      lyrics={release.lyrics}
+                      isEditable={isEditable}
+                      isSaving={isLyricsSaving}
+                      onSaveLyrics={onSaveLyrics}
+                      onFormatLyrics={onFormatLyrics}
                     />
                   </div>
 

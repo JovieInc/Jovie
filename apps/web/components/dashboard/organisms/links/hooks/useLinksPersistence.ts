@@ -94,6 +94,8 @@ function buildSavePayload(normalized: LinkItem[]) {
     sourcePlatform: l.sourcePlatform ?? undefined,
     sourceType: l.sourceType ?? undefined,
     evidence: l.evidence ?? undefined,
+    verificationStatus: l.verificationStatus ?? undefined,
+    verificationToken: l.verificationToken ?? undefined,
   }));
 }
 

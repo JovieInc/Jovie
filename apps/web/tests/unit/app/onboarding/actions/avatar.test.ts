@@ -36,7 +36,7 @@ describe('getSafeUploadUrl', () => {
       '../../../../../app/onboarding/actions/avatar'
     );
 
-    expect(getSafeUploadUrl()).toBe('https://jov.ie/api/images/upload');
+    expect(await getSafeUploadUrl()).toBe('https://jov.ie/api/images/upload');
   });
 
   it('throws for invalid NEXT_PUBLIC_APP_URL', async () => {
@@ -52,7 +52,7 @@ describe('getSafeUploadUrl', () => {
       '../../../../../app/onboarding/actions/avatar'
     );
 
-    expect(() => getSafeUploadUrl()).toThrow(
+    await expect(getSafeUploadUrl()).rejects.toThrow(
       'Invalid base URL for avatar upload'
     );
   });

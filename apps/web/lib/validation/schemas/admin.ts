@@ -79,7 +79,7 @@ export type RevokeRolePayload = z.infer<typeof revokeRoleSchema>;
  */
 export const creatorIngestSchema = z.object({
   /** Profile URL to ingest (Linktree or Laylo) */
-  url: z.string().url(),
+  url: z.string().trim().min(1).max(2048),
   /** Optional idempotency key to prevent duplicate ingestion on double-click */
   idempotencyKey: z.string().uuid().optional(),
 });
@@ -187,6 +187,20 @@ export const waitlistApproveSchema = z.object({
  * Inferred TypeScript type for waitlist approval payload.
  */
 export type WaitlistApprovePayload = z.infer<typeof waitlistApproveSchema>;
+
+/**
+ * Waitlist settings update schema.
+ * Used for PATCH /app/admin/waitlist/settings requests.
+ */
+export const waitlistSettingsUpdateSchema = z.object({
+  gateEnabled: z.boolean(),
+  autoAcceptEnabled: z.boolean(),
+  autoAcceptDailyLimit: z.number().int().min(0).max(10_000),
+});
+
+export type WaitlistSettingsUpdatePayload = z.infer<
+  typeof waitlistSettingsUpdateSchema
+>;
 
 // =============================================================================
 // Cron Job Schemas

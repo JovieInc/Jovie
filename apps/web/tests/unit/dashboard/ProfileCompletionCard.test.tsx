@@ -73,6 +73,15 @@ describe('ProfileCompletionCard', () => {
     expect(getByText('Set up your tip jar')).toBeDefined();
   });
 
+  it('does not crash when profileCompletion is missing', () => {
+    const { queryByText } = renderCard({
+      profileCompletion:
+        undefined as unknown as DashboardData['profileCompletion'],
+    });
+
+    expect(queryByText(/Your profile is/)).toBeNull();
+  });
+
   it('does not render when profile is fully complete', () => {
     const { queryByText } = renderCard({
       profileCompletion: {

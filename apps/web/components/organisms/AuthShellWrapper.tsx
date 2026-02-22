@@ -12,7 +12,6 @@ import {
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
-import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
@@ -22,7 +21,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -112,23 +111,20 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Preview panel is available on all dashboard routes and the artist-profile settings page
+  // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
-    () =>
-      config.section === 'dashboard' ? (
-        <>
-          <HeaderProfileProgress />
-          {config.isTableRoute && <DrawerToggleButton />}
-        </>
-      ) : config.isTableRoute ? (
-        <DrawerToggleButton />
-      ) : null,
-    [config.isTableRoute, config.section]
+    () => (
+      <>
+        <HeaderProfileProgress />
+        {config.isTableRoute && <DrawerToggleButton />}
+      </>
+    ),
+    [config.isTableRoute]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -143,12 +139,6 @@ function AuthShellWrapperInner({
   const headerBadge = rawHeaderBadge ? (
     <ErrorBoundary fallback={null}>{rawHeaderBadge}</ErrorBoundary>
   ) : null;
-
-  const previewPanel = previewEnabled ? (
-    <ErrorBoundary fallback={null}>
-      <ProfileContactSidebar />
-    </ErrorBoundary>
-  ) : undefined;
 
   // Memoize the sidebar open change handler to prevent context value changes
   // that would cause infinite re-render loops in sidebar consumers.
@@ -174,7 +164,7 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <TablePanelProvider>
+      <RightPanelProvider>
         <PreviewPanelProvider enabled={previewEnabled}>
           <AuthShell
             section={config.section}
@@ -183,7 +173,6 @@ function AuthShellWrapperInner({
             headerAction={headerAction}
             showMobileTabs={config.showMobileTabs}
             isTableRoute={config.isTableRoute}
-            previewPanel={previewPanel}
             onSidebarOpenChange={
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined
             }
@@ -192,7 +181,7 @@ function AuthShellWrapperInner({
             {children}
           </AuthShell>
         </PreviewPanelProvider>
-      </TablePanelProvider>
+      </RightPanelProvider>
     </TableMetaContext.Provider>
   );
 }

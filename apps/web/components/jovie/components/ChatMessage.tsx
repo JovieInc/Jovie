@@ -63,18 +63,18 @@ export function ChatMessage({
   return (
     <motion.div
       data-message-id={id}
-      className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-3.5', isUser ? 'justify-end' : 'justify-start')}
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {!isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
           <BrandLogo size={16} tone='auto' />
         </div>
       )}
       {isUser ? (
-        <div className='max-w-[80%] rounded-2xl px-4 py-3 bg-accent text-accent-foreground'>
+        <div className='max-w-[78%] rounded-2xl border border-accent/20 bg-accent/95 px-4 py-3.5 text-accent-foreground shadow-sm'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {fileParts.map((file, index) => (
@@ -94,15 +94,15 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+            <div className='whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em]'>
               {messageText}
             </div>
           )}
         </div>
       ) : (
-        <div className='flex max-w-[80%] flex-col'>
+        <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
+            <div className='rounded-2xl border border-subtle bg-surface-1 px-5 py-4 text-primary-token shadow-[0_1px_0_rgba(0,0,0,0.02)]'>
               <ChatMarkdown
                 content={messageText}
                 isStreaming={Boolean(isStreaming)}
@@ -154,12 +154,12 @@ export function ChatMessage({
           })}
 
           {!isStreaming && messageText && (
-            <div className='mt-1 flex items-center gap-0.5 pl-1'>
+            <div className='mt-1.5 flex items-center gap-0.5 pl-1.5'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+                  className='rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
@@ -176,7 +176,7 @@ export function ChatMessage({
         </div>
       )}
       {isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 overflow-hidden'>
+        <div className='flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-1'>
           {avatarUrl ? (
             <Image
               src={avatarUrl}

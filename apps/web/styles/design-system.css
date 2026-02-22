@@ -237,8 +237,8 @@
   ); /* #E3E4E6 — Linear exact */
   --color-text-tertiary-token: lch(62.6% 1.35 272); /* #969799 — Linear exact */
   --color-text-quaternary-token: lch(
-    38.29% 1.35 272
-  ); /* #5A5B5D — Linear exact */
+    51% 1.35 272
+  ); /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
   --color-text-disabled-token: oklch(28% 0.006 272);
 
   /* Logo muted tokens for label logos bar */

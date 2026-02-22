@@ -305,6 +305,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      id-token: write
     steps:
       - name: Validate PR is not from a fork
         env:
@@ -377,13 +378,21 @@ jobs:
           echo "" >> /tmp/fix-instructions.md
           echo "## VALIDATION (run after fixing)" >> /tmp/fix-instructions.md
           echo "" >> /tmp/fix-instructions.md
-          echo "1. \`pnpm biome check . --write\` (auto-fix formatting)" >> /tmp/fix-instructions.md
-          echo "2. \`pnpm biome check .\` (verify no remaining issues)" >> /tmp/fix-instructions.md
-          echo "3. \`pnpm turbo typecheck\` (verify types)" >> /tmp/fix-instructions.md
+          echo "1. \`pnpm turbo typecheck --affected\` (verify types)" >> /tmp/fix-instructions.md
+          echo "2. \`pnpm turbo lint --affected\` (verify lint)" >> /tmp/fix-instructions.md
+          echo "3. \`pnpm turbo test --affected\` (verify tests)" >> /tmp/fix-instructions.md
+          echo "4. \`pnpm biome check . --write\` (auto-fix formatting)" >> /tmp/fix-instructions.md
+          echo "5. \`pnpm biome check .\` (verify no remaining issues)" >> /tmp/fix-instructions.md
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "## BOUNDED SIMPLIFICATION PASS" >> /tmp/fix-instructions.md
+          echo "- touched files only" >> /tmp/fix-instructions.md
+          echo "- no behavior/API contract changes" >> /tmp/fix-instructions.md
+          echo "- skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)" >> /tmp/fix-instructions.md
 
           if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
-            echo "4. \`pnpm --filter=@jovie/web vitest run --config=vitest.config.mts\` (run unit tests)" >> /tmp/fix-instructions.md
-            echo "5. \`pnpm knip\` (check for dead code)" >> /tmp/fix-instructions.md
+            echo "6. \`pnpm --filter=@jovie/web vitest run --config=vitest.config.mts\` (run unit tests)" >> /tmp/fix-instructions.md
+            echo "7. \`pnpm knip\` (check for dead code)" >> /tmp/fix-instructions.md
           fi
 
           echo "" >> /tmp/fix-instructions.md
@@ -398,9 +407,14 @@ jobs:
             Read the file at /tmp/fix-instructions.md and apply the fixes described.
 
             After making changes, run these validation commands:
-            1. pnpm biome check . --write (auto-fix formatting)
-            2. pnpm biome check . (verify no remaining issues)
-            3. pnpm turbo typecheck (verify types)
+            1. bash scripts/automation-verify.sh affected (verify typecheck/lint/tests)
+            2. pnpm biome check . --write (auto-fix formatting)
+            3. pnpm biome check . (verify no remaining issues)
+
+            Also run a bounded simplification pass:
+            - touched files only
+            - no behavior/API contract changes
+            - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
 
             If validation fails, analyze the errors and fix them.
             Do NOT commit the changes - just make the fixes.
@@ -410,6 +424,10 @@ jobs:
         run: |
           set +e
 
+          echo "=== Running automation verify bundle (affected) ==="
+          bash scripts/automation-verify.sh affected 2>&1 | tee /tmp/verify-bundle.log
+          VERIFY_BUNDLE_EXIT=$?
+
           echo "=== Running Biome auto-fix ==="
           pnpm biome check . --write 2>&1 | tail -20
 
@@ -417,24 +435,20 @@ jobs:
           pnpm biome check . 2>&1 | tee /tmp/biome-check.log
           BIOME_EXIT=$?
 
-          echo "=== Running TypeScript typecheck ==="
-          pnpm turbo typecheck 2>&1 | tee /tmp/typecheck.log
-          TYPECHECK_EXIT=$?
-
-          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+          if [[ $VERIFY_BUNDLE_EXIT -eq 0 && $BIOME_EXIT -eq 0 ]]; then
             echo "Validation passed"
             echo "validation_passed=true" >> $GITHUB_OUTPUT
           else
-            echo "Validation failed (biome=$BIOME_EXIT, typecheck=$TYPECHECK_EXIT)"
+            echo "Validation failed (verify_bundle=$VERIFY_BUNDLE_EXIT, biome=$BIOME_EXIT)"
             echo "validation_passed=false" >> $GITHUB_OUTPUT
 
             # Capture structured error summary (last 50 lines of each, not full logs)
             {
+              echo "## Verify Bundle Errors"
+              tail -50 /tmp/verify-bundle.log
+              echo ""
               echo "## Biome Errors"
               tail -50 /tmp/biome-check.log
-              echo ""
-              echo "## TypeScript Errors"
-              tail -50 /tmp/typecheck.log
             } > /tmp/validation-errors.log
 
             echo "validation_errors=$(cat /tmp/validation-errors.log | base64 -w0)" >> $GITHUB_OUTPUT
@@ -457,8 +471,8 @@ jobs:
             Fix these validation errors. Remember:
             - Make minimal changes
             - Do not silence errors with comments
+            - Run `bash scripts/automation-verify.sh affected`
             - Run `pnpm biome check . --write` followed by `pnpm biome check .`
-            - Run `pnpm turbo typecheck`
 
       - name: Re-validate after retry
         id: revalidate
@@ -466,14 +480,14 @@ jobs:
         run: |
           set +e
 
+          bash scripts/automation-verify.sh affected 2>&1 | tee /tmp/verify-bundle-2.log
+          VERIFY_BUNDLE_EXIT=$?
+
           pnpm biome check . --write 2>&1 | tail -20
           pnpm biome check . 2>&1 | tee /tmp/biome-check-2.log
           BIOME_EXIT=$?
 
-          pnpm turbo typecheck 2>&1 | tee /tmp/typecheck-2.log
-          TYPECHECK_EXIT=$?
-
-          if [[ $BIOME_EXIT -eq 0 && $TYPECHECK_EXIT -eq 0 ]]; then
+          if [[ $VERIFY_BUNDLE_EXIT -eq 0 && $BIOME_EXIT -eq 0 ]]; then
             echo "Retry validation passed"
             echo "validation_passed=true" >> $GITHUB_OUTPUT
           else
@@ -496,6 +510,7 @@ jobs:
       - name: Commit and push fixes
         if: steps.final-status.outputs.final_passed == 'true'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_HEAD_REF: ${{ needs.guard.outputs.pr_head_ref }}
         run: |
           if git diff --quiet && git diff --staged --quiet; then
@@ -505,6 +520,9 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure credentials for push (checkout used persist-credentials: false)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
           git add -A
 

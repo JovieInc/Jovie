@@ -54,6 +54,7 @@ export function ProfileShell({
   allowPhotoDownloads = false,
 }: ProfileShellProps) {
   const {
+    handleNotificationsTrigger,
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
@@ -83,7 +84,6 @@ export function ProfileShell({
     channelBusy,
     contentPreferences,
     handleMenuOpenChange,
-    handleNotificationsClick,
     handleUnsubscribe,
     hasActiveSubscriptions,
     isNotificationMenuOpen,
@@ -124,7 +124,7 @@ export function ProfileShell({
         buttonRef={menuTriggerRef}
         hasActiveSubscriptions={false}
         notificationsState={notificationsState}
-        onClick={handleNotificationsClick}
+        onClick={handleNotificationsTrigger}
       />
     );
   };
