@@ -21,6 +21,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { mobileReleaseTokens } from '@/components/dashboard/tokens';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
@@ -682,7 +683,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Footer - simplified count + reset */}
           {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
+            <div className={mobileReleaseTokens.footer.container}>
               <span>
                 {filteredRows.length === rows.length
                   ? `${totalReleases}`
@@ -698,7 +699,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <button
                 type='button'
                 onClick={resetToDefaults}
-                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover'
+                className={mobileReleaseTokens.footer.resetButton}
               >
                 Reset display
               </button>
