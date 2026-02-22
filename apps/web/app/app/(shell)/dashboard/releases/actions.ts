@@ -883,6 +883,8 @@ function mapTrackToViewModel(
     isrc: track.isrc,
     isExplicit: track.isExplicit,
     previewUrl: track.previewUrl,
+    audioUrl: track.audioUrl,
+    audioFormat: track.audioFormat,
     providers: Object.entries(providerLabels)
       .map(([key, label]) => {
         const providerKey = key as ProviderKey;

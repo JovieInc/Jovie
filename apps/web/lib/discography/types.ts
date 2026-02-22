@@ -112,6 +112,8 @@ export interface TrackViewModel {
   isrc: string | null;
   isExplicit: boolean;
   previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
   providers: Array<
     ProviderLink & {
       label: string;
