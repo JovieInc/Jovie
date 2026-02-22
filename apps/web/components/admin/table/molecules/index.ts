@@ -18,8 +18,6 @@ export {
   TableContextMenu,
   TableHeaderRow,
   type TableHeaderRowProps,
-  TablePaginationFooter,
-  type TablePaginationFooterProps,
 } from '@/components/organisms/table';
 
 // Admin-specific components (kept for now)
