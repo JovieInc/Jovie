@@ -65,6 +65,7 @@ export function useBuildInfoQuery(options?: { enabled?: boolean }) {
     queryFn: fetchBuildInfo,
     enabled,
     staleTime: POLLING_INTERVAL,
+    gcTime: POLLING_INTERVAL * 2, // Keep in cache for 10 minutes
     refetchInterval: POLLING_INTERVAL,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,

@@ -1,6 +1,7 @@
 import { gateway } from '@ai-sdk/gateway';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { INSIGHT_MODEL } from '@/lib/constants/ai-models';
 import type { GeneratedInsight, MetricSnapshot } from '@/types/insights';
 import { buildSystemPrompt, buildUserPrompt } from './prompts';
 import { MAX_INSIGHTS_PER_RUN, MIN_CONFIDENCE } from './thresholds';
@@ -66,20 +67,22 @@ export async function generateInsights(
   metrics: MetricSnapshot,
   existingInsightTypes: string[]
 ): Promise<InsightGenerationResult> {
-  const modelId = 'anthropic:claude-sonnet-4-20250514';
-
   const { object, usage } = await generateObject({
-    model: gateway.languageModel(modelId),
+    model: gateway(INSIGHT_MODEL),
     schema: insightsResponseSchema,
     system: buildSystemPrompt(),
     prompt: buildUserPrompt(metrics, existingInsightTypes),
     temperature: 0.3,
     maxOutputTokens: 4096,
+    providerOptions: {
+      anthropic: { cacheControl: true },
+    },
     experimental_telemetry: {
       isEnabled: true,
       recordInputs: true,
       recordOutputs: true,
       functionId: 'jovie-insight-generator',
+      metadata: { model: INSIGHT_MODEL },
     },
   });
 
@@ -92,6 +95,6 @@ export async function generateInsights(
     insights: validInsights,
     promptTokens: usage.inputTokens ?? 0,
     completionTokens: usage.outputTokens ?? 0,
-    modelUsed: modelId,
+    modelUsed: INSIGHT_MODEL,
   };
 }

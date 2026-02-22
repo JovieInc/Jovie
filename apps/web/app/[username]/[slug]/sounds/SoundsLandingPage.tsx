@@ -14,6 +14,7 @@ import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface VideoProvider {
   key: VideoProviderKey;
@@ -35,6 +36,8 @@ interface SoundsLandingPageProps {
   readonly videoProviders: VideoProvider[];
   /** Smart link path back to the main release page */
   readonly smartLinkPath: string;
+  /** UTM params captured from incoming request and passed to outbound links */
+  readonly utmParams?: PartialUTMParams;
 }
 
 export function SoundsLandingPage({
@@ -42,6 +45,7 @@ export function SoundsLandingPage({
   artist,
   videoProviders,
   smartLinkPath,
+  utmParams = {},
 }: Readonly<SoundsLandingPageProps>) {
   return (
     <div className='h-dvh bg-black text-white'>
@@ -111,7 +115,7 @@ export function SoundsLandingPage({
                 return (
                   <a
                     key={provider.key}
-                    href={provider.url}
+                    href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
                     className='group flex w-full items-center gap-3.5 rounded-xl bg-gradient-to-r from-pink-500/[0.08] to-violet-500/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.14] hover:to-violet-500/[0.14] hover:ring-white/[0.16]'
@@ -145,7 +149,7 @@ export function SoundsLandingPage({
             {/* Back to streaming links */}
             <div className='mt-3 text-center'>
               <Link
-                href={smartLinkPath}
+                href={appendUTMParamsToUrl(smartLinkPath, utmParams)}
                 className='inline-flex items-center gap-1.5 text-[12px] text-white/35 transition-colors hover:text-white/55'
               >
                 <Icon
