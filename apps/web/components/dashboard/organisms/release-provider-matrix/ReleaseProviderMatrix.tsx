@@ -580,8 +580,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               />
             )}
 
-            {/* Apple Music sync status banner */}
-            {showReleasesTable && rows[0]?.profileId && (
+            {/* Apple Music sync status banner — only when not already connected */}
+            {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
               <AppleMusicSyncBanner
                 profileId={rows[0].profileId}
                 spotifyConnected={isConnected}

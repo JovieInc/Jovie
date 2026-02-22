@@ -4,12 +4,12 @@
  * AppleMusicSyncBanner - Shows Apple Music match suggestions requiring action.
  *
  * Only renders for actionable states:
- * - Discovery in progress (scanning ISRCs)
  * - Suggested match awaiting confirmation
  * - No match found
  *
- * Confirmed/auto-confirmed matches are NOT shown here — the header pill
- * (DspConnectionPill) already communicates the connected state.
+ * Loading/confirmed/auto-confirmed matches are NOT shown here — the header pill
+ * (DspConnectionPill) already communicates the connected state, and we avoid
+ * flashing a loading banner on every page visit.
  */
 
 import { Button } from '@jovie/ui';
@@ -39,7 +39,7 @@ interface AppleMusicSyncBannerProps {
   ) => void;
 }
 
-type SyncState = 'hidden' | 'loading' | 'suggested' | 'no_match';
+type SyncState = 'hidden' | 'suggested' | 'no_match';
 
 function determineSyncState(
   spotifyConnected: boolean,
@@ -48,8 +48,7 @@ function determineSyncState(
   appleMusicMatch: DspMatch | null,
   withAppleMusic: number
 ): SyncState {
-  if (!spotifyConnected || releasesCount === 0) return 'hidden';
-  if (isLoading) return 'loading';
+  if (!spotifyConnected || releasesCount === 0 || isLoading) return 'hidden';
   if (!appleMusicMatch) {
     return withAppleMusic > 0 ? 'hidden' : 'no_match';
   }
@@ -120,26 +119,6 @@ export function AppleMusicSyncBanner({
   );
 
   if (syncState === 'hidden') return null;
-
-  if (syncState === 'loading') {
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-3 rounded-lg border border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
-          className
-        )}
-      >
-        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#FA243C]/10'>
-          <Icon
-            name='Loader2'
-            className='h-4 w-4 text-[#FA243C] animate-spin'
-            aria-hidden='true'
-          />
-        </div>
-        <p className='text-sm text-secondary-token'>Checking Apple Music...</p>
-      </div>
-    );
-  }
 
   if (syncState === 'no_match') {
     return (
