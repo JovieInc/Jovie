@@ -6,6 +6,10 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_TRANSIENT } from '@/lib/http/headers';
+import {
+  cacheHandleAvailability,
+  getCachedHandleAvailability,
+} from '@/lib/onboarding/handle-availability-cache';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
@@ -121,6 +125,11 @@ export async function GET(request: Request) {
 
     const handleLower = handle.toLowerCase();
 
+    const cachedAvailability = await getCachedHandleAvailability(handleLower);
+    if (cachedAvailability !== null) {
+      return respondWithConstantTime({ available: cachedAvailability });
+    }
+
     // Add timeout to prevent hanging on database issues
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Database timeout')), 3000); // 3 second timeout
@@ -135,9 +144,12 @@ export async function GET(request: Request) {
       timeoutPromise,
     ]);
 
+    const isAvailable = !data || data.length === 0;
+    await cacheHandleAvailability(handleLower, isAvailable);
+
     // SECURITY: Return with constant timing to prevent timing attacks
     // An attacker cannot determine if a handle exists based on response time
-    return respondWithConstantTime({ available: !data || data.length === 0 });
+    return respondWithConstantTime({ available: isAvailable });
   } catch (error: unknown) {
     await captureError('Error checking handle availability', error, {
       handle,

@@ -6,6 +6,7 @@ import { memo, type ReactNode, useMemo } from 'react';
 import { HeroSection } from '@/components/organisms/HeroSection';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
+import { HeroSpotifySearch } from './HeroSpotifySearch';
 
 function LoadingSkeleton() {
   return (
@@ -31,8 +32,17 @@ function GetStartedContent() {
   );
 }
 
-function getHeroContent(loading: boolean, showClaimHandle: boolean): ReactNode {
+function getHeroContent({
+  loading,
+  showClaimHandle,
+  showSpotifyClaimFlow,
+}: {
+  loading: boolean;
+  showClaimHandle: boolean;
+  showSpotifyClaimFlow: boolean;
+}): ReactNode {
   if (loading) return <LoadingSkeleton />;
+  if (showSpotifyClaimFlow) return <HeroSpotifySearch />;
   if (showClaimHandle) return <ClaimHandleForm />;
   return <GetStartedContent />;
 }
@@ -42,13 +52,20 @@ export const HomeHero = memo(function HomeHero({
 }: Readonly<{ subtitle?: ReactNode }>) {
   const { enabled: showClaimHandle, loading } = useFeatureFlagWithLoading(
     FEATURE_FLAGS.CLAIM_HANDLE,
-    false
+    true
   );
+  const { enabled: showSpotifyClaimFlow, loading: spotifyFlowLoading } =
+    useFeatureFlagWithLoading(FEATURE_FLAGS.HERO_SPOTIFY_CLAIM_FLOW, false);
 
   const defaultSubtitle = subtitle ?? 'Your Jovie profile, ready in seconds.';
   const content = useMemo(
-    () => getHeroContent(loading, showClaimHandle),
-    [loading, showClaimHandle]
+    () =>
+      getHeroContent({
+        loading: loading || spotifyFlowLoading,
+        showClaimHandle,
+        showSpotifyClaimFlow,
+      }),
+    [loading, showClaimHandle, showSpotifyClaimFlow, spotifyFlowLoading]
   );
   const trustIndicators = useMemo(
     () => (
