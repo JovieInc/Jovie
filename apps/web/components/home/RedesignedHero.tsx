@@ -9,6 +9,7 @@ const FALLBACK_CREATOR: FeaturedCreator = {
   handle: 'artist',
   name: 'Your Name Here',
   src: '/android-chrome-192x192.png',
+  tagline: 'Independent artist',
   genres: ['Independent artist'],
   latestReleaseTitle: 'New release coming soon',
   latestReleaseType: null,
