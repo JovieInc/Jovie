@@ -8,6 +8,9 @@ on:
       - 'apps/web/.storybook/**'
       - 'packages/ui/**'
 
+permissions:
+  contents: read
+
 # Cancel in-progress runs for the same PR
 concurrency:
   group: visual-a11y-${{ github.head_ref || github.ref }}

@@ -7,6 +7,9 @@ import {
   type PreviewPanelLink,
   usePreviewPanelData,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
@@ -34,6 +37,13 @@ export function PreviewDataHydrator({
 }) {
   const { setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+
+  // Register ProfileContactSidebar in the unified right panel system
+  useRegisterRightPanel(
+    <ErrorBoundary fallback={null}>
+      <ProfileContactSidebar />
+    </ErrorBoundary>
+  );
 
   const previewLinks = useMemo(
     () => convertSocialLinksToPreviewLinks(initialLinks),

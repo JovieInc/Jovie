@@ -50,6 +50,8 @@ export function convertDbLinkToDetected(
   sourcePlatform?: string | null;
   sourceType?: 'manual' | 'admin' | 'ingested' | null;
   evidence?: { sources?: string[]; signals?: string[] } | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
 } {
   const platform = buildPlatformMeta(link);
   const title = link.displayText || platform.name;
@@ -70,6 +72,8 @@ export function convertDbLinkToDetected(
     sourcePlatform: link.sourcePlatform ?? null,
     sourceType: link.sourceType ?? null,
     evidence: link.evidence ?? null,
+    verificationStatus: link.verificationStatus ?? 'unverified',
+    verificationToken: link.verificationToken ?? null,
   };
 }
 
@@ -106,6 +110,8 @@ export function convertDbLinksToLinkItems(
       sourcePlatform: detected.sourcePlatform ?? null,
       sourceType: detected.sourceType ?? null,
       evidence: detected.evidence ?? null,
+      verificationStatus: detected.verificationStatus ?? 'unverified',
+      verificationToken: detected.verificationToken ?? null,
       version: link.version ?? 1,
     };
 
@@ -235,6 +241,7 @@ export function convertLinksToDashboardFormat(links: LinkItem[]) {
       | 'applemusic'
       | 'custom',
     isVisible: link.isVisible,
+    verificationStatus: link.verificationStatus ?? 'unverified',
     category: mapCategoryForPreview(link.category),
   }));
 }
@@ -251,6 +258,8 @@ function extractLinkMetadata(link: DetectedLink) {
     sourcePlatform?: string | null;
     sourceType?: 'manual' | 'admin' | 'ingested' | null;
     evidence?: { sources?: string[]; signals?: string[] } | null;
+    verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+    verificationToken?: string | null;
   };
   return meta;
 }
@@ -335,6 +344,8 @@ export function convertDetectedLinksToLinkItems(
       sourcePlatform: meta.sourcePlatform ?? null,
       sourceType: meta.sourceType ?? null,
       evidence: meta.evidence ?? null,
+      verificationStatus: meta.verificationStatus ?? 'unverified',
+      verificationToken: meta.verificationToken ?? null,
     };
   });
 }

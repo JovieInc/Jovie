@@ -409,3 +409,108 @@ export const RELEASE_AUTOMATION_ACTIVITY: ReleaseAutomationActivity[] = [
     detail: 'Short URL generated and queued for social posting',
   },
 ];
+
+// ── Smartlink thread + kanban ───────────────────────────────────────────────
+
+export interface SmartlinkThreadItem {
+  id: string;
+  iconType: 'link' | 'disc' | 'zap' | 'check';
+  iconColor: string;
+  label: string;
+  detail?: string;
+  time: string;
+}
+
+export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
+  {
+    id: 'connect',
+    iconType: 'link',
+    iconColor: '#1DB954',
+    label: 'Spotify connected',
+    detail: 'Artist profile linked · 4 releases synced',
+    time: '2m ago',
+  },
+  {
+    id: 'detect',
+    iconType: 'disc',
+    iconColor: '#6C7AFF',
+    label: 'New release detected: Afterglow (Deluxe)',
+    detail: 'ISRC matched · artwork downloaded · 14 tracks',
+    time: '1m ago',
+  },
+  {
+    id: 'generate',
+    iconType: 'zap',
+    iconColor: '#F5A623',
+    label: 'Smartlink generated — 4 platforms verified',
+    detail: 'Spotify · Apple Music · YouTube Music · Amazon Music',
+    time: '45s ago',
+  },
+  {
+    id: 'publish',
+    iconType: 'check',
+    iconColor: '#4EC98C',
+    label: 'Links published to jovie.fm/novalane/afterglow',
+    time: '32s ago',
+  },
+];
+
+export interface SmartlinkKanbanCard {
+  id: string;
+  title: string;
+  artist: string;
+  gradient: string;
+  platformCount: number;
+  status: 'Syncing' | 'Live' | 'Archived';
+}
+
+export const SMARTLINK_KANBAN_COLUMNS = [
+  {
+    title: 'Upcoming',
+    cards: [
+      {
+        id: 'k1',
+        title: 'Afterglow (Deluxe)',
+        artist: 'NOVA / LANE',
+        gradient:
+          'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
+        platformCount: 4,
+        status: 'Syncing' as const,
+      },
+    ],
+  },
+  {
+    title: 'Live',
+    cards: [
+      {
+        id: 'k2',
+        title: 'Signals',
+        artist: 'NOVA / LANE',
+        gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
+        platformCount: 4,
+        status: 'Live' as const,
+      },
+      {
+        id: 'k3',
+        title: 'Neon Nights',
+        artist: 'NOVA / LANE',
+        gradient: 'linear-gradient(135deg, #1a2a3a, #2d4a5a)',
+        platformCount: 3,
+        status: 'Live' as const,
+      },
+    ],
+  },
+  {
+    title: 'Archived',
+    cards: [
+      {
+        id: 'k4',
+        title: 'The Sound',
+        artist: 'NOVA / LANE',
+        gradient: 'linear-gradient(135deg, #3a1a1a, #6b2d2d)',
+        platformCount: 2,
+        status: 'Archived' as const,
+      },
+    ],
+  },
+] as const;

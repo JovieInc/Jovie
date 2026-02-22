@@ -11,6 +11,7 @@ import { Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
@@ -82,7 +83,11 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
   }
 
   return (
-    <div className='divide-y divide-subtle'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
       {accounts.map(account => {
         const label = getProviderLabel(account.provider);
         const identifier = getProviderIdentifier(account);
@@ -91,7 +96,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
         return (
           <div
             key={account.id}
-            className='flex items-center justify-between py-3'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div className='flex items-center gap-3'>
               <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10'>
@@ -139,6 +144,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </div>
+    </DashboardCard>
   );
 }

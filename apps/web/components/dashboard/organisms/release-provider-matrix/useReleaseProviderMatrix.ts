@@ -6,12 +6,16 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import {
+  useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
+  useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
+  useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
@@ -43,6 +47,10 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
+  const [refreshingReleaseId, setRefreshingReleaseId] = useState<string | null>(
+    null
+  );
+  const [flashedReleaseId, setFlashedReleaseId] = useState<string | null>(null);
 
   // Get profileId from first release (all releases share same profileId)
   const profileId = releases[0]?.profileId ?? '';
@@ -53,6 +61,9 @@ export function useReleaseProviderMatrix({
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
+  const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
+  const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
+  const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
@@ -92,14 +103,14 @@ export function useReleaseProviderMatrix({
     setDrafts({});
   }, []);
 
-  const updateRow = (updated: ReleaseViewModel) => {
+  const updateRow = useCallback((updated: ReleaseViewModel) => {
     setRawRows(prev =>
       prev.map(row => (row.id === updated.id ? { ...updated } : row))
     );
     setEditingRelease(current =>
       current?.id === updated.id ? { ...updated } : current
     );
-  };
+  }, []);
 
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
@@ -245,11 +256,18 @@ export function useReleaseProviderMatrix({
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
+      setRefreshingReleaseId(releaseId);
       refreshReleaseMutation.mutate(
         { releaseId },
         {
           onSuccess: updated => {
             updateRow(updated);
+            setFlashedReleaseId(updated.id);
+            globalThis.setTimeout(() => {
+              setFlashedReleaseId(current =>
+                current === updated.id ? null : current
+              );
+            }, 1200);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -259,6 +277,11 @@ export function useReleaseProviderMatrix({
               action: 'refresh-release',
             });
             toast.error('Failed to refresh release');
+          },
+          onSettled: () => {
+            setRefreshingReleaseId(current =>
+              current === releaseId ? null : current
+            );
           },
         }
       );
@@ -305,6 +328,67 @@ export function useReleaseProviderMatrix({
   );
 
   const isRescanningIsrc = rescanIsrcMutation.isPending;
+  const isLyricsSaving =
+    saveLyricsMutation.isPending || formatLyricsMutation.isPending;
+
+  const handleCanvasStatusUpdate = useCallback(
+    async (releaseId: string, status: CanvasStatus) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      updateRow({ ...release, canvasStatus: status });
+
+      try {
+        const updated = await saveCanvasStatusMutation.mutateAsync({
+          profileId: release.profileId,
+          releaseId,
+          status,
+        });
+        updateRow(updated);
+      } catch (error) {
+        updateRow(release);
+        captureError('Failed to update canvas status', error, {
+          context: 'release-mutation',
+          releaseId,
+          action: 'update-canvas-status',
+        });
+        toast.error('Unable to update canvas status');
+      }
+    },
+    [saveCanvasStatusMutation, updateRow]
+  );
+
+  const handleSaveLyrics = useCallback(
+    async (releaseId: string, lyrics: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      await saveLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+      });
+      toast.success('Lyrics saved');
+    },
+    [saveLyricsMutation]
+  );
+
+  const handleFormatLyrics = useCallback(
+    async (releaseId: string, lyrics: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return [];
+
+      const result = await formatLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+      });
+
+      toast.success('Lyrics formatted for Apple Music');
+      return result.changesSummary;
+    },
+    [formatLyricsMutation]
+  );
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
@@ -330,9 +414,15 @@ export function useReleaseProviderMatrix({
     handleReset,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
+    handleCanvasStatusUpdate,
     handleAddUrl,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
     setDrafts,
   };
 }

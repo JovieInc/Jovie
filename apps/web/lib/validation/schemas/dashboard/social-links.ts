@@ -81,6 +81,8 @@ export const socialLinkInputSchema = z.object({
   sourceType: sourceTypeSchema.optional(),
   /** Provenance evidence */
   evidence: linkEvidenceSchema,
+  verificationStatus: z.enum(['unverified', 'pending', 'verified']).optional(),
+  verificationToken: z.string().max(256).optional(),
 });
 
 /**

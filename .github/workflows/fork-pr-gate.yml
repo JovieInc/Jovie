@@ -1,0 +1,208 @@
+# Fork PR Gate
+#
+# PURPOSE: Prevents external/fork PRs from being merged without human approval.
+# Internal (non-fork) PRs — including agent PRs and team member PRs — pass
+# immediately. Fork PRs are blocked until a repo collaborator submits an
+# APPROVE review.
+#
+# WHY THIS EXISTS:
+# Branch protection requires 0 approvals (to enable agent auto-merge).
+# This means fork PRs from external contributors could also merge with
+# zero reviews if CI passes. This workflow closes that gap by adding a
+# required status check that only blocks fork PRs.
+#
+# TRIGGER: PR opened/synchronized/reopened + review submitted (to re-evaluate)
+#
+# HOW IT WORKS:
+# 1. Detects if PR is from a fork
+# 2. Non-fork PRs: sets commit status to success immediately
+# 3. Fork PRs: checks for at least one APPROVE review from a human collaborator
+#    - Also checks for sensitive file changes and warns via PR comment
+#    - Sets commit status to pending/success based on approval state
+#
+# SAFETY:
+# - Read-only for non-fork PRs (just sets a status)
+# - Fork PRs cannot bypass: the status check is required in branch protection
+# - Re-triggers on review submission so approval unblocks the PR
+
+name: Fork PR Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  fork-gate:
+    name: Fork PR Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Resolve PR metadata
+        id: pr-meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # For pull_request events, metadata is directly available.
+          # For pull_request_review events, we need to fetch it.
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            IS_FORK="${{ github.event.pull_request.head.repo.fork }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            # pull_request_review event
+            IS_FORK="${{ github.event.pull_request.head.repo.fork }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          fi
+
+          echo "is_fork=$IS_FORK" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
+          echo "PR #$PR_NUMBER | fork=$IS_FORK | sha=$HEAD_SHA"
+
+      - name: Auto-pass for non-fork PRs
+        if: steps.pr-meta.outputs.is_fork != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Non-fork PR — auto-passing gate."
+          gh api repos/${{ github.repository }}/statuses/${{ steps.pr-meta.outputs.head_sha }} \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Internal PR — no approval required" \
+            -f context="Fork PR Gate"
+
+      - name: Check sensitive files (fork PRs only)
+        id: sensitive-check
+        if: steps.pr-meta.outputs.is_fork == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
+
+          CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "${{ github.repository }}" --name-only 2>/dev/null || echo "")
+
+          # Same sensitive patterns as auto-approve-agent-prs.yml
+          SENSITIVE_PATTERNS=(
+            "^\.github/"                         # CI/CD and workflow changes
+            "^drizzle/migrations/"               # Database migrations
+            "^apps/web/lib/auth/"                 # Authentication
+            "^apps/web/lib/db/"                   # Database layer
+            "^apps/web/app/api/.*/billing"        # Billing API routes
+            "^apps/web/lib/stripe/"               # Stripe/payment code
+            "^apps/web/middleware"                 # Middleware (security surface)
+            "^\.env"                              # Environment files
+            "^CODEOWNERS"                         # Code ownership
+            "^agents\.md"                         # Agent guidelines
+            "^CLAUDE\.md"                         # Agent guidelines
+            "package\.json$"                      # Dependency changes
+            "pnpm-lock\.yaml$"                    # Lock file changes
+          )
+
+          SENSITIVE_FOUND=""
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
+            if [[ -n "$MATCHES" ]]; then
+              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
+            fi
+          done
+
+          if [[ -n "$SENSITIVE_FOUND" ]]; then
+            echo "Sensitive files changed in fork PR:"
+            echo -e "$SENSITIVE_FOUND"
+            echo "has_sensitive=true" >> $GITHUB_OUTPUT
+            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -10 | tr '\n' ', ')" >> $GITHUB_OUTPUT
+          else
+            echo "No sensitive files changed"
+            echo "has_sensitive=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on sensitive file changes
+        if: steps.pr-meta.outputs.is_fork == 'true' && steps.sensitive-check.outputs.has_sensitive == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Only comment once — check for existing comment marker first
+        run: |
+          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
+          SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+          MARKER="<!-- fork-pr-gate-sensitive -->"
+
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments \
+            --jq "[.[] | select(.body | contains(\"$MARKER\"))] | length" 2>/dev/null || echo "0")
+
+          if [[ "$EXISTING" -gt 0 ]]; then
+            echo "Sensitive file comment already exists. Skipping."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$MARKER
+          ## Fork PR: Sensitive Files Detected
+
+          This PR from a fork modifies files in sensitive areas that require careful human review:
+
+          \`\`\`
+          $SENSITIVE_FILES
+          \`\`\`
+
+          A repository collaborator must review and approve this PR before it can be merged.
+
+          **Sensitive areas include:** authentication, billing, database migrations, CI/CD workflows, middleware, dependencies, and agent configuration."
+
+      - name: Check for human approval (fork PRs only)
+        id: approval-check
+        if: steps.pr-meta.outputs.is_fork == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
+
+          # Get all reviews, find the latest review per user
+          # Look for at least one APPROVED review from a non-bot user
+          REVIEWS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+            --jq '[.[] | select(.state == "APPROVED" and (.user.type != "Bot"))] | length' \
+            2>/dev/null || echo "0")
+
+          echo "Human APPROVE reviews: $REVIEWS"
+
+          if [[ "$REVIEWS" -gt 0 ]]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            echo "approved=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set gate status (fork PRs)
+        if: steps.pr-meta.outputs.is_fork == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HEAD_SHA="${{ steps.pr-meta.outputs.head_sha }}"
+          APPROVED="${{ steps.approval-check.outputs.approved }}"
+          HAS_SENSITIVE="${{ steps.sensitive-check.outputs.has_sensitive }}"
+
+          if [[ "$APPROVED" == "true" ]]; then
+            STATE="success"
+            DESCRIPTION="Fork PR approved by human reviewer"
+          else
+            STATE="pending"
+            if [[ "$HAS_SENSITIVE" == "true" ]]; then
+              DESCRIPTION="Fork PR with sensitive files — awaiting human approval"
+            else
+              DESCRIPTION="Fork PR — awaiting human approval"
+            fi
+          fi
+
+          gh api repos/${{ github.repository }}/statuses/$HEAD_SHA \
+            -f state="$STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="$DESCRIPTION" \
+            -f context="Fork PR Gate"
+
+          echo "Fork PR Gate: $STATE — $DESCRIPTION"

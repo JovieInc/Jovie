@@ -93,7 +93,7 @@ describe('Entitlements – Privilege Escalation Prevention', () => {
     expect(e.isPro).toBe(false);
     expect(e.plan).toBe('free');
     expect(e.hasAdvancedFeatures).toBe(false);
-    expect(e.analyticsRetentionDays).toBe(7);
+    expect(e.analyticsRetentionDays).toBe(30);
     expect(e.contactsLimit).toBe(100);
   });
 
@@ -123,7 +123,7 @@ describe('Entitlements – Privilege Escalation Prevention', () => {
     expect(e.hasAdvancedFeatures).toBe(false);
     // getPlanLimits('superadmin') falls back to free
     expect(e.contactsLimit).toBe(100);
-    expect(e.analyticsRetentionDays).toBe(7);
+    expect(e.analyticsRetentionDays).toBe(30);
   });
 });
 
@@ -136,11 +136,11 @@ describe('Entitlements – Free Tier Boundary Enforcement', () => {
     expect(typeof e.contactsLimit).toBe('number');
   });
 
-  it('free user analytics retention is exactly 7 days', async () => {
+  it('free user analytics retention is exactly 30 days', async () => {
     setupAuthenticatedUser({ isPro: false, plan: 'free' });
     const e = await getCurrentUserEntitlements();
 
-    expect(e.analyticsRetentionDays).toBe(7);
+    expect(e.analyticsRetentionDays).toBe(30);
   });
 
   it('free user has all boolean features disabled', async () => {
@@ -197,7 +197,7 @@ describe('Entitlements – Unauthenticated User Safety', () => {
     expect(e.plan).toBe('free');
     expect(e.isPro).toBe(false);
     expect(e.contactsLimit).toBe(100);
-    expect(e.analyticsRetentionDays).toBe(7);
+    expect(e.analyticsRetentionDays).toBe(30);
     for (const feature of FREE_FEATURES) {
       expect(e[feature]).toBe(false);
     }

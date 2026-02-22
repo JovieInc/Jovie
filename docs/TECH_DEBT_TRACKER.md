@@ -110,7 +110,7 @@ _No critical issues currently open._
 | `components/home/ArtistSearch.tsx` | 25 | Search error logging |
 | `components/home/HeroExampleProfiles.tsx` | 70 | Hero profile error logging |
 
-**Recommended Fix:** Replace with Sentry logging per agents.md Section 15.
+**Recommended Fix:** Replace with Sentry logging per AGENTS.md Section 15.
 
 ### P2 - Medium (Deprecated Files)
 
@@ -189,4 +189,4 @@ Consider splitting for maintainability:
 
 ---
 
-_This document is maintained by AI agents per instructions in `agents.md` Section 17._
+_This document is maintained by AI agents per instructions in `AGENTS.md` Section 17._

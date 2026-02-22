@@ -16,7 +16,12 @@ import {
   SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
-import { useChatImageAttachments, useJovieChat } from './hooks';
+import { ChatUsageAlert } from './components/ChatUsageAlert';
+import {
+  useChatImageAttachments,
+  useJovieChat,
+  useSuggestedProfiles,
+} from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
@@ -64,6 +69,12 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Suggested profiles carousel data — lifted here so we can hide
+  // the help text and suggested prompts while the carousel has items.
+  const suggestedProfiles = useSuggestedProfiles(profileId);
+  const hasCarouselItems =
+    !suggestedProfiles.isLoading && suggestedProfiles.total > 0;
 
   const {
     input,
@@ -265,7 +276,7 @@ export function JovieChat({
             className='relative flex-1 overflow-y-auto px-4 py-6'
             onScroll={handleScroll}
           >
-            <div className='mx-auto max-w-2xl space-y-6'>
+            <div className='mx-auto max-w-[44rem] space-y-7'>
               {messages.map((message, index) => (
                 <ChatMessage
                   key={message.id}
@@ -279,10 +290,10 @@ export function JovieChat({
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-2xl bg-surface-2 px-4 py-3'>
+                  <div className='rounded-2xl border border-subtle bg-surface-1 px-5 py-3.5'>
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'
@@ -293,7 +304,7 @@ export function JovieChat({
                         <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
                       </span>
                       {activeToolLabel && (
-                        <span className='ml-1.5 text-xs text-tertiary-token'>
+                        <span className='ml-2 text-xs font-medium tracking-wide text-tertiary-token'>
                           {activeToolLabel}
                         </span>
                       )}
@@ -312,6 +323,12 @@ export function JovieChat({
               visible={showScrollToBottom}
               onClick={scrollToBottom}
             />
+          </div>
+
+          <div className='px-4 pt-3'>
+            <div className='mx-auto max-w-2xl'>
+              <ChatUsageAlert />
+            </div>
           </div>
 
           {/* Error display in chat view */}
@@ -354,23 +371,36 @@ export function JovieChat({
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
               {profileId && (
                 <SuggestedProfilesCarousel
-                  profileId={profileId}
+                  suggestions={suggestedProfiles.suggestions}
+                  isLoading={suggestedProfiles.isLoading}
+                  currentIndex={suggestedProfiles.currentIndex}
+                  total={suggestedProfiles.total}
+                  next={suggestedProfiles.next}
+                  prev={suggestedProfiles.prev}
+                  confirm={suggestedProfiles.confirm}
+                  reject={suggestedProfiles.reject}
+                  isActioning={suggestedProfiles.isActioning}
                   username={username}
                   displayName={displayName}
                   avatarUrl={avatarUrl}
                 />
               )}
 
-              <p className='text-center text-[15px] text-secondary-token'>
-                What can I help you with?
-              </p>
+              {/* Hide help text and prompts while the carousel has items */}
+              {!hasCarouselItems && (
+                <>
+                  <p className='text-center text-[15px] text-secondary-token'>
+                    What can I help you with?
+                  </p>
 
-              <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                  <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                </>
+              )}
             </div>
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='px-4 pb-8'>
+          <div className='px-4 pb-4 sm:pb-8'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
@@ -378,6 +408,7 @@ export function JovieChat({
                   message.
                 </p>
               )}
+              <ChatUsageAlert />
               <ChatInput {...chatInputProps} />
 
               {/* Error display */}

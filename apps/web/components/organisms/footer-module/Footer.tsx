@@ -236,7 +236,7 @@ export function Footer({
               <Copyright
                 variant='light'
                 className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] order-2 sm:order-1'
-                style={{ color: 'rgb(98, 102, 109)' }}
+                style={{ color: 'var(--linear-text-tertiary)' }}
               />
               {showThemeToggle && (
                 <div className='flex items-center gap-3 order-1 sm:order-2'>
@@ -294,7 +294,7 @@ export function Footer({
               <Copyright
                 variant={config.colorVariant}
                 className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]'
-                style={{ color: 'rgb(98, 102, 109)' }}
+                style={{ color: 'var(--linear-text-tertiary)' }}
               />
               {variant === 'minimal' && (
                 <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
@@ -313,7 +313,7 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)]'
-                      style={{ color: 'rgb(98, 102, 109)' }}
+                      style={{ color: 'var(--linear-text-tertiary)' }}
                     >
                       {link.label}
                     </Link>

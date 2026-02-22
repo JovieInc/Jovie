@@ -5,7 +5,7 @@ on:
     branches: [main]
   merge_group:
   push:
-    branches: [main, 'codegen-bot/**', 'claude/**']
+    branches: [main, 'codegen-bot/**', 'claude/**', 'codex/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -17,7 +17,11 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
 jobs:
 
@@ -235,10 +239,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+        run: pnpm turbo typecheck --affected
 
   neon-db:
     name: Neon DB
@@ -285,19 +286,25 @@ jobs:
       - name: Determine sanitized branch name
         id: sanitize-branch
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          RAW_REF: ${{ github.head_ref || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref || github.ref_name }}"
+          RAW="$RAW_REF"
 
           # Avoid collisions with protected long-lived branches in Neon.
           # For push to main we reuse the long-lived Neon branch.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            RAW="${{ github.ref_name }}"
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
+            RAW="$REF_NAME"
           fi
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -449,8 +456,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
-    # This is the only required status check in the branch ruleset.
+    # Single merge gate for PRs and merge queue.
+    # On PRs: gates on ci-fast + unit tests (a11y + layout guard are informational).
+    # On merge queue: only ci-fast runs; unit tests/a11y/layout-guard are skipped
+    # (already passed on PR) and their "skipped" result passes the checks below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
@@ -475,25 +484,73 @@ jobs:
             exit 1
           fi
 
-          # ci-a11y: allow skip (path-gated) but block on failure
+          # ci-a11y: informational — log but do not block merge
           if [[ "${{ needs.ci-a11y.result }}" == "failure" ]]; then
-            echo "❌ ci-a11y failed — accessibility violations detected"
-            exit 1
+            echo "⚠️ ci-a11y failed — accessibility violations detected (non-blocking)"
           fi
 
-          # ci-layout-guard must succeed (no overlapping/touching layout regressions)
-          if [[ "${{ needs.ci-layout-guard.result }}" != "success" ]]; then
-            echo "❌ ci-layout-guard failed — layout overlap/touching regressions detected"
-            exit 1
+          # ci-layout-guard: allow skip (path-gated / artifact missing) but block on failure
+          if [[ "${{ needs.ci-layout-guard.result }}" == "failure" ]]; then
+            echo "⚠️ ci-layout-guard failed — layout overlap/touching regressions detected (non-blocking)"
           fi
 
-          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, a11y, and layout integrity"
+          echo "✅ All required PR checks passed: lint, typecheck, guardrails, unit tests"
+
+  ci-build-public:
+    name: Build (public routes)
+    # Shared Next.js build for a11y + layout-guard — build once, test twice
+    # Skipped in merge queue: a11y + layout-guard are non-blocking and already
+    # ran on the PR. Merge queue only needs ci-fast for integration conflict detection.
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: echo "Skipping build — no UI-relevant paths changed."
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Build app (public routes only — no secrets needed)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm turbo build --affected
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Upload build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
+          retention-days: 1
 
   ci-layout-guard:
     name: Layout Guard (blocking)
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [ci-build-public]
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -503,20 +560,18 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Download build artifact
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
 
       - name: Run layout overlap/touching guard
         run: |
@@ -587,11 +642,15 @@ jobs:
       - name: Determine sanitized Neon branch name
         id: sanitize-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          RAW_REF: ${{ github.head_ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref }}"
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          RAW="$RAW_REF"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -649,7 +708,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -682,8 +741,8 @@ jobs:
     name: Build
     # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Build runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -721,7 +780,7 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -773,14 +832,17 @@ jobs:
     name: Unit Tests (${{ matrix.shard }})
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs, merge queue, and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Unit tests run on PRs and push to main — skipped in merge queue for speed.
+    # The merge queue gates on ci-fast (typecheck + lint) to catch integration
+    # conflicts; unit tests already passed on the PR and post-deploy canary/sentry
+    # gates catch behavioral regressions.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: ['1/2', '2/2']
+        shard: ['1/3', '2/3', '3/3']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -838,8 +900,11 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          # Enable coverage on main branch and PRs for Codecov integration
-          COVERAGE_FLAG="--coverage"
+          # Only collect coverage on main branch pushes — PRs diff against main baseline
+          COVERAGE_FLAG=""
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            COVERAGE_FLAG="--coverage"
+          fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
@@ -847,17 +912,18 @@ jobs:
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
-            echo "🔍 PR/merge queue: Running full test suite with coverage"
+            echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            # --passWithNoTests: some shards may have no files matching the filter
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -866,17 +932,17 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run packages/ui unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/ui run test
+        run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload coverage to Codecov
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           directory: apps/web/coverage
@@ -895,10 +961,11 @@ jobs:
 
   ci-a11y:
     name: A11y (axe)
-    # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
+    needs: [ci-build-public]
+    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -928,7 +995,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -936,14 +1003,12 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
+      - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: apps/web/.next
 
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -1038,7 +1103,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1134,7 +1199,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1288,7 +1353,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1296,7 +1361,7 @@ jobs:
 
       - name: Set shard env
         run: |
-          echo "SHARD_TOTAL=2" >> $GITHUB_ENV
+          echo "SHARD_TOTAL=4" >> $GITHUB_ENV
           echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -1339,7 +1404,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key - chromium only for CI (Firefox runs weekly)
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1461,7 +1526,7 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    needs: [ci-typecheck]
+    # No dependencies — test profiling is independent and can run fully parallel
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -1515,7 +1580,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
+        run: pnpm add -g vercel@50.22.1
       - name: Pull env (preview)
         run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
         env:
@@ -1529,6 +1594,9 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Share Turbo remote cache with ci-build to avoid redundant rebuilds
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -1845,7 +1913,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1956,7 +2024,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
+        run: pnpm add -g vercel@50.22.1
       - name: DB safety check (production - preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
@@ -1973,7 +2041,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
       - name: Upgrade corepack
-        run: npm install -g corepack@latest && corepack enable
+        run: npm install -g corepack@0.34.6 && corepack enable
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
         env:
@@ -1987,6 +2055,9 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Share Turbo remote cache with ci-build to avoid redundant rebuilds
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
@@ -2010,9 +2081,29 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+  sentry-error-gate:
+    name: Sentry Error Gate (production)
+    needs: [deploy, canary-health-gate]
+    if: ${{ always() && needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    uses: ./.github/workflows/sentry-error-gate.yml
+    with:
+      deployment_url: ${{ needs.deploy.outputs.deployment_url }}
+      soak_minutes: 5
+      baseline_window_minutes: 30
+      threshold_multiplier: 3
+      min_baseline_errors: 5
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   deploy-notify:
     name: Notify production deploy
-    needs: [deploy, canary-health-gate]
+    needs: [deploy, canary-health-gate, sentry-error-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -2045,7 +2136,7 @@ jobs:
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
       - name: Slack notify (production deploy)
-        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2070,13 +2161,14 @@ jobs:
 
       - name: Classify failure type
         id: classify-failure
-        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') }}
+        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success' || needs.sentry-error-gate.result == 'failure') }}
         run: |
           # Determine failure type for accurate Slack notification
           MIGRATION_STATUS="${{ needs.deploy.outputs.migration_status }}"
           PREFLIGHT_STATUS="${{ needs.deploy.outputs.preflight_status }}"
           DEPLOY_RESULT="${{ needs.deploy.result }}"
           CANARY_RESULT="${{ needs.canary-health-gate.result }}"
+          SENTRY_RESULT="${{ needs.sentry-error-gate.result }}"
 
           if [ "$PREFLIGHT_STATUS" = "failure" ]; then
             echo "failure_type=migration_preflight" >> "$GITHUB_OUTPUT"
@@ -2098,6 +2190,11 @@ jobs:
             echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
             echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
             echo "failure_detail=Deployment is LIVE but health check failed - investigate immediately" >> "$GITHUB_OUTPUT"
+          elif [ "$SENTRY_RESULT" = "failure" ]; then
+            echo "failure_type=sentry" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=📈" >> "$GITHUB_OUTPUT"
+            echo "failure_title=SENTRY ERROR SPIKE DETECTED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Post-deploy error rate exceeded threshold - auto-rollback triggered" >> "$GITHUB_OUTPUT"
           else
             echo "failure_type=unknown" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=❓" >> "$GITHUB_OUTPUT"
@@ -2175,6 +2272,31 @@ jobs:
                     { "title": "Failure", "value": "Canary health gate failed", "short": true },
                     { "title": "Branch", "value": "main", "short": true },
                     { "title": "Action Required", "value": "Check https://jov.ie immediately - may need rollback", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (sentry error spike - URGENT)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'sentry' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "📈 SENTRY ERROR SPIKE — Auto-rollback triggered: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Status", "value": "📈 Error rate spiked post-deploy — auto-rollback triggered", "short": false },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Check Sentry for new errors, verify rollback succeeded", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
                 }

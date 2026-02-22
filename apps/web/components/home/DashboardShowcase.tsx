@@ -81,21 +81,36 @@ export function DashboardShowcase() {
       `}</style>
 
       <Container size='homepage'>
-        {/* Section header */}
-        <div className='mb-8 text-center'>
-          <h2
-            className='text-2xl font-semibold sm:text-3xl'
-            style={{ color: 'var(--linear-text-primary)' }}
-          >
-            One dashboard, all your data.
-          </h2>
-          <p
-            className='mx-auto mt-3 max-w-xl text-base'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
-            Track every click, grow your audience, and earn from your fans — all
-            in one place.
-          </p>
+        {/* Section header — 2-col layout matching smartlinks section */}
+        <div className='mx-auto mb-8 max-w-6xl'>
+          <div className='grid gap-6 md:grid-cols-2 md:items-start'>
+            <h2
+              className='max-w-md'
+              style={{
+                color: 'var(--linear-text-primary)',
+                fontSize: 'clamp(28px, 4vw, 48px)',
+                fontWeight: 510,
+                letterSpacing: '-0.022em',
+                lineHeight: 1,
+              }}
+            >
+              One dashboard,
+              <br />
+              all your data.
+            </h2>
+            <p
+              className='max-w-lg'
+              style={{
+                color: 'var(--linear-text-secondary)',
+                fontSize: '15px',
+                lineHeight: '24px',
+                letterSpacing: '-0.011em',
+              }}
+            >
+              Track every click, grow your audience, and earn from your fans —
+              all in one place.
+            </p>
+          </div>
         </div>
 
         {/* Tabs */}

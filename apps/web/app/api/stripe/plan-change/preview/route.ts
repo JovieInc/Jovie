@@ -12,6 +12,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { isGrowthPlanEnabled, isGrowthPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { previewPlanChange } from '@/lib/stripe/plan-change';
 import { logger } from '@/lib/utils/logger';
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid price ID' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
+      return NextResponse.json(
+        { error: 'Growth plan is not currently available' },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 

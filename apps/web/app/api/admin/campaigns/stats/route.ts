@@ -237,7 +237,12 @@ async function buildConversionStats(
           creatorProfiles,
           eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
         )
-        .where(gte(creatorClaimInvites.createdAt, dateFilter))
+        .where(
+          and(
+            gte(creatorClaimInvites.createdAt, dateFilter),
+            eq(creatorProfiles.isClaimed, true)
+          )
+        )
     : db
         .select({
           count: drizzleSql<number>`count(distinct ${creatorClaimInvites.creatorProfileId})`,

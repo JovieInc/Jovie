@@ -16,8 +16,11 @@ export const ProfileCompletionCard = memo(
     const { selectedProfile, profileCompletion } = useDashboardData();
     const [dismissed, setDismissed] = useState(false);
 
+    const completionPercentage = profileCompletion?.percentage ?? 0;
+    const completionSteps = profileCompletion?.steps ?? [];
+
     const storageKey = selectedProfile?.id
-      ? getStorageKey(selectedProfile.id, profileCompletion.percentage)
+      ? getStorageKey(selectedProfile.id, completionPercentage)
       : null;
 
     useEffect(() => {
@@ -48,14 +51,14 @@ export const ProfileCompletionCard = memo(
 
     if (
       !selectedProfile ||
-      profileCompletion.percentage >= 100 ||
-      profileCompletion.steps.length === 0 ||
+      completionPercentage >= 100 ||
+      completionSteps.length === 0 ||
       dismissed
     ) {
       return null;
     }
 
-    const primarySteps = profileCompletion.steps.slice(0, 3);
+    const primarySteps = completionSteps.slice(0, 3);
 
     return (
       <DashboardCard variant='analytics' hover={false} className='mb-4 sm:mb-6'>
@@ -67,7 +70,7 @@ export const ProfileCompletionCard = memo(
             </div>
             <div className='space-y-1'>
               <p className='text-base font-semibold text-primary-token sm:text-lg'>
-                Your profile is {profileCompletion.percentage}% complete
+                Your profile is {completionPercentage}% complete
               </p>
               <p className='text-sm text-secondary-token'>
                 You&apos;re close. Finish these next steps to increase trust and
@@ -80,12 +83,12 @@ export const ProfileCompletionCard = memo(
               role='progressbar'
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={profileCompletion.percentage}
+              aria-valuenow={completionPercentage}
               aria-label='Profile completion'
             >
               <div
                 className='h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-500 transition-all duration-500'
-                style={{ width: `${profileCompletion.percentage}%` }}
+                style={{ width: `${completionPercentage}%` }}
               />
             </div>
 

@@ -52,6 +52,15 @@ function isSocialLinksColumnMissing(message: string): boolean {
   );
 }
 
+function isUserSettingsSchemaIssue(message: string): boolean {
+  return (
+    message.includes('relation "user_settings" does not exist') ||
+    (message.includes('column') && message.includes('user_settings')) ||
+    (message.includes('Failed query:') &&
+      message.includes('from "user_settings"'))
+  );
+}
+
 function logMigrationWarning(message: string, context: MigrationErrorContext) {
   const { logger } = Sentry;
 
@@ -81,7 +90,7 @@ export function handleMigrationErrors(
       break;
     }
     case 'user_settings': {
-      if (hasMigrationErrorCode) {
+      if (hasMigrationErrorCode || isUserSettingsSchemaIssue(message)) {
         logMigrationWarning(
           '[Dashboard] user_settings migration in progress',
           context

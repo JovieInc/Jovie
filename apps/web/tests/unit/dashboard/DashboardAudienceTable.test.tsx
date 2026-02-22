@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
 /**
@@ -88,8 +88,8 @@ vi.mock('@/components/organisms/EmptyState', () => ({
   ),
 }));
 
-vi.mock('@/hooks/useRegisterTablePanel', () => ({
-  useRegisterTablePanel: vi.fn(),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock(
@@ -105,7 +105,6 @@ vi.mock('@/components/organisms/table', () => ({
     capturedTableData = data ?? [];
     return <table data-testid='unified-table' />;
   },
-  TablePaginationFooter: () => null,
   convertToCommonDropdownItems: vi.fn(() => []),
   ExportCSVButton: () => null,
   useRowSelection: () => ({
@@ -139,7 +138,7 @@ function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <TooltipProvider>
-        <TablePanelProvider>{children}</TablePanelProvider>
+        <RightPanelProvider>{children}</RightPanelProvider>
       </TooltipProvider>
     ),
     ...options,
@@ -176,12 +175,8 @@ const defaultProps = {
   mode: 'members' as const,
   view: 'all' as const,
   total: 0,
-  page: 1,
-  pageSize: 50,
   sort: 'lastSeen',
   direction: 'desc' as const,
-  onPageChange: vi.fn(),
-  onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
   onViewChange: vi.fn(),
   onFiltersChange: vi.fn(),

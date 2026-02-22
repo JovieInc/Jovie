@@ -49,7 +49,7 @@ describe('SkipToContent', () => {
     expect(link).toHaveClass('focus:fixed');
     expect(link).toHaveClass('focus:left-4');
     expect(link).toHaveClass('focus:top-4');
-    expect(link).toHaveClass('focus:z-[9999]');
+    expect(link).toHaveClass('focus:z-50');
   });
 
   it('applies custom className', () => {

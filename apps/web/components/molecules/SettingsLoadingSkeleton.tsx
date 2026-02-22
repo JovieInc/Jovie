@@ -169,6 +169,45 @@ export function TouringSectionSkeleton() {
   );
 }
 
+/** Inline skeleton for Pixels section — matches toggle + platform cards shape */
+export function PixelsSectionSkeleton() {
+  return (
+    <div className='space-y-4' aria-hidden='true'>
+      {/* Toggle row: label + switch */}
+      <div className='flex items-center justify-between'>
+        <div className='h-4 w-28 rounded skeleton' />
+        <div className='flex items-center gap-2'>
+          <div className='h-3 w-14 rounded skeleton' />
+          <div className='h-6 w-10 rounded skeleton' />
+        </div>
+      </div>
+
+      {/* Platform cards */}
+      {[1, 2, 3].map(i => (
+        <div key={i} className='space-y-3 p-4 rounded-lg border border-subtle'>
+          <div className='flex items-center justify-between'>
+            <div className='h-4 w-44 rounded skeleton' />
+            <div className='h-3 w-24 rounded skeleton' />
+          </div>
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <div className='space-y-1.5'>
+              <div className='h-3 w-20 rounded skeleton' />
+              <div className='h-10 w-full rounded skeleton' />
+            </div>
+            <div className='space-y-1.5'>
+              <div className='h-3 w-24 rounded skeleton' />
+              <div className='h-10 w-full rounded skeleton' />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Footer text */}
+      <div className='h-3 w-3/4 rounded skeleton' />
+    </div>
+  );
+}
+
 /** Inline skeleton for Contacts section — matches contact list shape */
 export function ContactsSectionSkeleton() {
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { QueryClientContext } from '@tanstack/react-query';
+import { QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
@@ -27,6 +27,16 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   // This prevents "No QueryClient set" errors when the component renders
   // outside a QueryClientProvider (e.g. during SSR edge cases).
   const queryClient = useContext(QueryClientContext);
+  const standaloneQueryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      }),
+    []
+  );
   const hasQueryClient = !!queryClient;
 
   // Wait for client-side mount (avoids SSR/hydration issues)
@@ -53,6 +63,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   // Use TanStack Query for fetching environment health
   const { data: envHealth } = useEnvHealthQuery({
     enabled: showBanner && !isDismissed,
+    queryClient: queryClient ?? standaloneQueryClient,
   });
 
   // Extract issues from the response

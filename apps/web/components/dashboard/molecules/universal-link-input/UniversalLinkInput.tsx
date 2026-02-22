@@ -17,7 +17,13 @@ import {
   shift,
   useFloating,
 } from '@floating-ui/react';
-import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from 'react';
 
 import {
   getPlatformIconMetadata,
@@ -159,6 +165,7 @@ export const UniversalLinkInput = forwardRef<
       clearSignal = 0,
       chatEnabled = true,
       onChatSubmit,
+      voiceInputEnabled = false,
     },
     forwardedRef
   ) => {
@@ -172,9 +179,11 @@ export const UniversalLinkInput = forwardRef<
       platformSuggestions,
       shouldShowAutosuggest,
       isShortQuery,
+      inputMode,
       focusInput,
       handleUrlChange,
       handleKeyDown,
+      handleAdd,
       handleClear,
       handleArtistSearchSelect,
       handleExitSearchMode,
@@ -221,6 +230,68 @@ export const UniversalLinkInput = forwardRef<
     useImperativeHandle(forwardedRef, () => ({
       getInputElement: () => urlInputRef.current,
     }));
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
+    const handleVoiceInput = useCallback(async () => {
+      if (!voiceInputEnabled) return;
+      if (typeof window === 'undefined') return;
+      if (!navigator.mediaDevices?.getUserMedia) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        streamRef.current = stream;
+
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.addEventListener('stop', () => {
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          streamRef.current = null;
+          mediaRecorderRef.current = null;
+        });
+
+        recorder.start();
+        window.setTimeout(() => {
+          recorder.stop();
+        }, 250);
+      } catch {
+        // Ignore permission errors until voice feature is enabled.
+      }
+    }, [voiceInputEnabled]);
+
+    const canSubmit = useMemo(() => {
+      const trimmed = url.trim();
+      if (!trimmed) return false;
+      if (inputMode === 'chat') return true;
+      return !!detectedLink?.isValid;
+    }, [detectedLink?.isValid, inputMode, url]);
+
+    const handleSubmit = useCallback(() => {
+      const trimmed = url.trim();
+      if (!trimmed) return;
+
+      if (inputMode === 'chat' && onChatSubmit) {
+        onChatSubmit(trimmed);
+        handleClear();
+        return;
+      }
+
+      if (detectedLink?.isValid) {
+        handleAdd();
+      }
+    }, [
+      detectedLink?.isValid,
+      handleAdd,
+      handleClear,
+      inputMode,
+      onChatSubmit,
+      url,
+    ]);
 
     // Group platforms by category when showing popular platforms (short query)
     const groupedSuggestions = useMemo(() => {
@@ -275,6 +346,10 @@ export const UniversalLinkInput = forwardRef<
           onPlatformSelect={commitPlatformSelection}
           onArtistSearchSelect={handleArtistSearchSelect}
           onRestoreFocus={focusInput}
+          onSubmit={handleSubmit}
+          canSubmit={canSubmit}
+          voiceInputEnabled={voiceInputEnabled}
+          onVoiceInput={handleVoiceInput}
           isDropdownOpen={shouldShowAutosuggest}
           onFocus={() => {
             const trimmed = url.trim();

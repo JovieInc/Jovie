@@ -10,6 +10,7 @@
 import { Button } from '@jovie/ui';
 
 import { useEffect, useState } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -82,15 +83,21 @@ export function SessionManagementCard({
 
   if (sessionsLoading) {
     return (
-      <div className='py-3 space-y-3'>
-        <LoadingSkeleton height='h-10' />
-        <LoadingSkeleton height='h-10' />
-      </div>
+      <DashboardCard variant='settings'>
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-10' />
+          <LoadingSkeleton height='h-10' />
+        </div>
+      </DashboardCard>
     );
   }
 
   if (sessionsError) {
-    return <div className='py-3 text-sm text-destructive'>{sessionsError}</div>;
+    return (
+      <DashboardCard variant='settings'>
+        <p className='text-sm text-destructive'>{sessionsError}</p>
+      </DashboardCard>
+    );
   }
 
   if (sessions.length === 0) {
@@ -98,7 +105,11 @@ export function SessionManagementCard({
   }
 
   return (
-    <div className='divide-y divide-subtle'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
       {sessions.map(session => {
         const isCurrent = session.id === activeSessionId;
         const activity = session.latestActivity;
@@ -106,7 +117,7 @@ export function SessionManagementCard({
         return (
           <div
             key={session.id}
-            className='flex items-center justify-between py-3'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div>
               <p className='text-sm text-primary-token flex items-center gap-2'>
@@ -155,6 +166,6 @@ export function SessionManagementCard({
           if (sessionToEnd) await handleEndSession(sessionToEnd);
         }}
       />
-    </div>
+    </DashboardCard>
   );
 }

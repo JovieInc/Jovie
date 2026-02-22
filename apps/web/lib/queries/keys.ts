@@ -232,6 +232,9 @@ export const queryKeys = {
     preview: (threshold: number, limit: number) =>
       [...queryKeys.campaign.all, 'preview', { threshold, limit }] as const,
     stats: () => [...queryKeys.campaign.all, 'stats'] as const,
+    overview: () => [...queryKeys.campaign.all, 'overview'] as const,
+    invites: (params: { limit: number; offset: number }) =>
+      [...queryKeys.campaign.all, 'invites', params] as const,
   },
 
   // AI Insights
@@ -258,6 +261,7 @@ export const queryKeys = {
       ] as const,
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
+    usage: () => [...queryKeys.chat.all, 'usage'] as const,
   },
 
   // Audience infinite scroll

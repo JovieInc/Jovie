@@ -16,7 +16,7 @@ Orchestrate multiple agents working on separate Linear issues in parallel, using
 
 ## Constraints
 
-- **Max 5 concurrent agents** (memory/CPU — see agents.md OOM guidance)
+- **Max 5 concurrent agents** (memory/CPU — see AGENTS.md OOM guidance)
 - **Node 24.x** and **pnpm 9.15.4** required in each worktree
 - Never edit/delete files in `drizzle/migrations/` without coordination
 - Each agent creates its own PR — no shared branches

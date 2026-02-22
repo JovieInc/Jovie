@@ -37,6 +37,25 @@ describe('GET /api/cron/data-retention', () => {
     expect(data.error).toBe('Unauthorized');
   });
 
+  it('returns 401 for malformed bearer authorization', async () => {
+    const { GET } = await import('@/app/api/cron/data-retention/route');
+    const request = new NextRequest(
+      'http://localhost/api/cron/data-retention',
+      {
+        headers: {
+          Authorization: 'Bearer Bearer test-secret',
+          'x-vercel-cron': '1',
+        },
+      }
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+  });
+
   it('runs data retention cleanup', async () => {
     mockRunDataRetentionCleanup.mockResolvedValue({
       clickEventsDeleted: 10,

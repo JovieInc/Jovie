@@ -51,7 +51,7 @@ async function maskDynamicContent(page: import('@playwright/test').Page) {
 
 // Snapshot options with reasonable threshold for CI stability
 const snapshotOptions = {
-  maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
+  maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (accounts for cross-platform font rendering)
   threshold: 0.2, // Per-pixel color threshold
   animations: 'disabled' as const,
 };

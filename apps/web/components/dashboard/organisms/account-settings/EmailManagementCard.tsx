@@ -11,6 +11,7 @@ import { Button, Input } from '@jovie/ui';
 import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 
 import type { ClerkEmailAddressResource, ClerkUserResource } from './types';
@@ -51,7 +52,11 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
   }
 
   return (
-    <div className='divide-y divide-subtle'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
       {/* Existing email rows */}
       {sortedEmails.map(email => {
         const isPrimary = email.id === primaryEmailId;
@@ -60,7 +65,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
         return (
           <div
             key={email.id}
-            className='flex items-center justify-between py-3'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div className='flex items-center gap-3'>
               <div>
@@ -116,7 +121,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
       })}
 
       {/* Add email row */}
-      <div className='py-3'>
+      <div className='px-4 py-3'>
         <form
           onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
           className='flex flex-col gap-3 sm:flex-row sm:items-end'
@@ -200,6 +205,6 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           if (emailToRemove) await handleRemoveEmail(emailToRemove);
         }}
       />
-    </div>
+    </DashboardCard>
   );
 }

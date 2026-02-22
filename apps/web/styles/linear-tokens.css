@@ -296,7 +296,7 @@
   /* Text */
   --linear-text-primary: oklch(97% 0.005 260);
   --linear-text-secondary: oklch(62% 0.015 255);
-  --linear-text-tertiary: oklch(58% 0.01 260);
+  --linear-text-tertiary: oklch(60% 0.01 260);
   --linear-text-inverse: oklch(5% 0.005 260);
 
   /* Backgrounds — extracted from linear.app via Playwright (2026-02-16) */

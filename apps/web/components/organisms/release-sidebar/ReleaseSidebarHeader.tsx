@@ -20,6 +20,7 @@ interface ReleaseSidebarHeaderProps {
   readonly hasRelease: boolean;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
+  readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
 }
 
@@ -28,6 +29,7 @@ export function ReleaseSidebarHeader({
   hasRelease,
   onClose,
   onRefresh,
+  isRefreshing = false,
   onCopySmartLink,
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
@@ -67,9 +69,10 @@ export function ReleaseSidebarHeader({
     overflowActions.push(
       {
         id: 'refresh',
-        label: 'Refresh release',
+        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
         icon: RefreshCw,
         onClick: () => {
+          if (isRefreshing) return;
           if (onRefresh) {
             onRefresh();
             return;

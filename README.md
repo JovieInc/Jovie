@@ -418,6 +418,12 @@ This project has evolved through several migrations:
 - **Doppler Setup** - [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md)
 - **CI/CD** - [.github/workflows/README.md](.github/workflows/README.md)
 
+## Security
+
+- **Security Policy** - [SECURITY.md](SECURITY.md)
+- **Security Reviews** - [docs/security/](docs/security)
+- **OpenSSF Best Practices Plan** - [docs/security/OPENSSF_BEST_PRACTICES.md](docs/security/OPENSSF_BEST_PRACTICES.md)
+
 ## License
 
 This project is proprietary and confidential. All rights reserved by Jovie Technology Inc.

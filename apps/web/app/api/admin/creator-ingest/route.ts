@@ -40,7 +40,7 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { detectPlatform } from '@/lib/utils/platform-detection';
+import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -351,7 +351,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const inputUrl = parsed.data.url;
+    const inputUrl = normalizeUrl(parsed.data.url);
 
     // Detect platform from URL
     const detected = detectPlatform(inputUrl);

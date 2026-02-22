@@ -21,11 +21,10 @@ import { EmptyState } from '@/components/organisms/EmptyState';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
-  TablePaginationFooter,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
@@ -177,11 +176,7 @@ const MobileCardList = memo(function MobileCardList({
   });
 
   return (
-    <div
-      ref={parentRef}
-      className='md:hidden overflow-auto'
-      style={{ maxHeight: '100%' }}
-    >
+    <div ref={parentRef} className='md:hidden h-full overflow-auto'>
       <div
         className='relative w-full'
         style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -217,12 +212,8 @@ export const DashboardAudienceTableUnified = memo(
     view,
     rows,
     total,
-    page,
-    pageSize,
     sort,
     direction,
-    onPageChange,
-    onPageSizeChange,
     onSortChange,
     onViewChange,
     onFiltersChange,
@@ -230,6 +221,9 @@ export const DashboardAudienceTableUnified = memo(
     profileId,
     subscriberCount,
     filters,
+    hasNextPage,
+    isFetchingNextPage,
+    onLoadMore,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -241,14 +235,11 @@ export const DashboardAudienceTableUnified = memo(
       selectedIds,
       selectedCount,
       toggleSelect,
-      totalPages,
       handleCopyProfileLink,
     } = useDashboardAudienceTable({
       mode,
       rows,
       total,
-      page,
-      pageSize,
       sort,
       direction,
       profileUrl,
@@ -362,8 +353,6 @@ export const DashboardAudienceTableUnified = memo(
       () => ({
         selectedIds,
         toggleSelect,
-        page,
-        pageSize,
         openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
@@ -373,8 +362,6 @@ export const DashboardAudienceTableUnified = memo(
       [
         selectedIds,
         toggleSelect,
-        page,
-        pageSize,
         openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
@@ -444,7 +431,7 @@ export const DashboardAudienceTableUnified = memo(
       [selectedMember, getContextMenuItems, setSelectedMember]
     );
 
-    useRegisterTablePanel(sidebarPanel);
+    useRegisterRightPanel(sidebarPanel);
 
     return (
       <AudienceTableProvider value={contextValue}>
@@ -460,6 +447,7 @@ export const DashboardAudienceTableUnified = memo(
           {/* Subheader with filter dropdown and export */}
           <AudienceTableSubheader
             view={view}
+            onViewChange={onViewChange}
             filters={filters}
             onFiltersChange={onFiltersChange}
             rows={rows}
@@ -512,28 +500,18 @@ export const DashboardAudienceTableUnified = memo(
                       getRowClassName={getRowClassName}
                       onRowClick={row => setSelectedMember(row)}
                       getContextMenuItems={getContextMenuItems}
+                      hasNextPage={hasNextPage}
+                      isFetchingNextPage={isFetchingNextPage}
+                      onLoadMore={onLoadMore}
                     />
                   </div>
                 </>
               )}
             </div>
-
-            {/* Pagination footer — uses the shared component for consistency */}
-            <div className='shrink-0'>
-              <TablePaginationFooter
-                currentPage={page}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                totalItems={total}
-                onPageChange={onPageChange}
-                onPageSizeChange={onPageSizeChange}
-              />
-            </div>
           </div>
 
           <div className='sr-only' aria-live='polite' aria-atomic='true'>
-            {total > 0 &&
-              `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
+            {total > 0 && `Showing ${rows.length} of ${total}`}
             {selectedCount > 0 &&
               `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
           </div>

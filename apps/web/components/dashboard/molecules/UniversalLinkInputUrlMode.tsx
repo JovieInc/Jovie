@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { X } from 'lucide-react';
+import { ArrowUp, Mic, X } from 'lucide-react';
 import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -55,6 +55,10 @@ interface UniversalLinkInputUrlModeProps {
     readonly ariaActivedescendant?: string;
     readonly ariaAutocomplete?: 'list';
   };
+  readonly onSubmit?: () => void;
+  readonly canSubmit?: boolean;
+  readonly voiceInputEnabled?: boolean;
+  readonly onVoiceInput?: () => void;
 }
 
 export function UniversalLinkInputUrlMode({
@@ -74,8 +78,11 @@ export function UniversalLinkInputUrlMode({
   onBlur,
   isDropdownOpen = false,
   comboboxAria,
+  onSubmit,
+  canSubmit = false,
+  voiceInputEnabled = false,
+  onVoiceInput,
 }: UniversalLinkInputUrlModeProps) {
-  const currentPlatformIcon = detectedLink?.platform.icon || 'globe';
   const brandColor = detectedLink?.platform.color
     ? `#${detectedLink.platform.color}`
     : '#6b7280';
@@ -98,7 +105,6 @@ export function UniversalLinkInputUrlMode({
         )}
       >
         <UniversalLinkInputPlatformSelector
-          currentPlatformIcon={currentPlatformIcon}
           onPlatformSelect={onPlatformSelect}
           onArtistSearchSelect={onArtistSearchSelect}
           onRestoreFocus={onRestoreFocus}
@@ -125,7 +131,7 @@ export function UniversalLinkInputUrlMode({
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
-          className='border-0 bg-transparent px-0 pr-24 focus-visible:ring-0 focus-visible:ring-offset-0'
+          className='border-0 bg-transparent px-0 pr-2 focus-visible:ring-0 focus-visible:ring-offset-0'
           aria-describedby={detectedLink ? 'link-detection-status' : undefined}
           role={comboboxAria?.role}
           aria-expanded={comboboxAria?.ariaExpanded}
@@ -134,33 +140,55 @@ export function UniversalLinkInputUrlMode({
           aria-autocomplete={comboboxAria?.ariaAutocomplete}
         />
 
-        {url && (
-          <div className='absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1'>
-            {detectedLink && (
-              <div
-                className='flex items-center justify-center h-8 w-8 rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
-                style={{
-                  backgroundColor: iconBg,
-                  color: iconColor,
-                }}
-                aria-hidden='true'
-              >
-                <SocialIcon
-                  platform={detectedLink.platform.icon}
-                  className='h-4 w-4 sm:h-3 sm:w-3'
-                />
-              </div>
-            )}
+        <div className='flex items-center gap-1 pr-1'>
+          {voiceInputEnabled && (
+            <button
+              type='button'
+              onClick={onVoiceInput}
+              className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+              aria-label='Start voice input'
+            >
+              <Mic className='h-4 w-4' />
+            </button>
+          )}
+
+          {url && detectedLink && (
+            <div
+              className='flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
+              style={{
+                backgroundColor: iconBg,
+                color: iconColor,
+              }}
+              aria-hidden='true'
+            >
+              <SocialIcon
+                platform={detectedLink.platform.icon}
+                className='h-4 w-4 sm:h-3 sm:w-3'
+              />
+            </div>
+          )}
+
+          {url && (
             <button
               type='button'
               onClick={onClear}
-              className='flex items-center justify-center h-11 w-11 rounded-xl text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95 sm:h-8 sm:w-8 sm:rounded-full'
+              className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
               aria-label='Clear input'
             >
-              <X className='h-5 w-5 sm:h-4 sm:w-4' />
+              <X className='h-4 w-4' />
             </button>
-          </div>
-        )}
+          )}
+
+          <button
+            type='button'
+            onClick={onSubmit}
+            disabled={disabled || !canSubmit}
+            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95'
+            aria-label='Submit'
+          >
+            <ArrowUp className='h-4 w-4' />
+          </button>
+        </div>
       </div>
 
       <div id='link-detection-status' className='sr-only' aria-live='polite'>

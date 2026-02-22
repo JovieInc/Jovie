@@ -8,6 +8,7 @@ import {
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,
 } from '@/lib/entitlements/registry';
+import { publicEnv } from '@/lib/env-public';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -40,6 +41,8 @@ export const metadata: Metadata = {
   },
 };
 
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
 // Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
 const PRICING_SCHEMA = JSON.stringify({
   '@context': 'https://schema.org',
@@ -50,29 +53,31 @@ const PRICING_SCHEMA = JSON.stringify({
   url: `${APP_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: getAllPlanIds().map((planId, index) => {
-      const plan = ENTITLEMENT_REGISTRY[planId];
-      const price = plan.marketing.price?.monthly ?? 0;
-      return {
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'Product',
-          name: `${APP_NAME} ${plan.marketing.displayName}`,
-          description: plan.marketing.tagline,
-          offers: {
-            '@type': 'Offer',
-            price: String(price),
-            priceCurrency: 'USD',
-            ...(price > 0 && {
-              priceValidUntil: '2026-12-31',
-              billingIncrement: 'P1M',
-            }),
-            availability: 'https://schema.org/InStock',
+    itemListElement: getAllPlanIds()
+      .filter(planId => growthPlanEnabled || planId !== 'growth')
+      .map((planId, index) => {
+        const plan = ENTITLEMENT_REGISTRY[planId];
+        const price = plan.marketing.price?.monthly ?? 0;
+        return {
+          '@type': 'ListItem',
+          position: index + 1,
+          item: {
+            '@type': 'Product',
+            name: `${APP_NAME} ${plan.marketing.displayName}`,
+            description: plan.marketing.tagline,
+            offers: {
+              '@type': 'Offer',
+              price: String(price),
+              priceCurrency: 'USD',
+              ...(price > 0 && {
+                priceValidUntil: '2026-12-31',
+                billingIncrement: 'P1M',
+              }),
+              availability: 'https://schema.org/InStock',
+            },
           },
-        },
-      };
-    }),
+        };
+      }),
   },
 });
 
@@ -282,9 +287,9 @@ export default function PricingPage() {
 
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
-            {/* Desktop: 3 columns, Mobile: stacked cards */}
+            {/* Desktop: 2-3 columns, Mobile: stacked cards */}
             <div
-              className='grid grid-cols-1 md:grid-cols-3 rounded-xl md:rounded-lg overflow-hidden'
+              className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-default)',
@@ -317,21 +322,22 @@ export default function PricingPage() {
                 isHighlighted
               />
 
-              {/* Growth Tier */}
-              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
-                <PricingTier
-                  name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
-                  badge='Early Access'
-                  billingLabel='Billed monthly'
-                  price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
-                  priceSuffix='/month'
-                  yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly})`}
-                  buttonLabel='Request Early Access'
-                  buttonHref='/signup?plan=growth'
-                  buttonVariant='secondary'
-                  features={ENTITLEMENT_REGISTRY.growth.marketing.features}
-                />
-              </div>
+              {growthPlanEnabled && (
+                <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
+                  <PricingTier
+                    name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
+                    badge='Early Access'
+                    billingLabel='Billed monthly'
+                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
+                    priceSuffix='/month'
+                    yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly})`}
+                    buttonLabel='Request Early Access'
+                    buttonHref='/signup?plan=growth'
+                    buttonVariant='secondary'
+                    features={ENTITLEMENT_REGISTRY.growth.marketing.features}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

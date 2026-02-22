@@ -8,6 +8,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
 import { captureError, sanitizeErrorResponse } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -19,6 +20,11 @@ import {
 } from '@/lib/utils/social-platform';
 import { waitlistRequestSchema } from '@/lib/validation/schemas';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import {
+  approveWaitlistEntryInTx,
+  finalizeWaitlistApproval,
+} from '@/lib/waitlist/approval';
+import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
 
 export const runtime = 'nodejs';
 
@@ -316,7 +322,7 @@ async function createNewWaitlistEntry(params: {
   spotifyArtistName: string | null;
   sanitizedHeardAbout: string | null;
   selectedPlan: string | null | undefined;
-}): Promise<void> {
+}): Promise<{ entryId: string }> {
   const {
     userId,
     emailRaw,
@@ -402,6 +408,8 @@ async function createNewWaitlistEntry(params: {
         updatedAt: new Date(),
       },
     });
+
+  return { entryId: entry.id };
 }
 
 /**
@@ -466,7 +474,7 @@ async function processValidatedRequest(params: {
   }
 
   // Create new waitlist entry with profile
-  await createNewWaitlistEntry({
+  const { entryId } = await createNewWaitlistEntry({
     userId,
     emailRaw,
     email,
@@ -486,6 +494,21 @@ async function processValidatedRequest(params: {
   notifySlackWaitlist(fullName, email).catch(err => {
     logger.warn('[waitlist] Slack notification failed', err);
   });
+
+  const { shouldAutoAccept } = await tryReserveAutoAcceptSlot();
+  if (!shouldAutoAccept) {
+    return successResponse({ status: 'new' });
+  }
+
+  const approvalResult = await withSystemIngestionSession(
+    async tx => approveWaitlistEntryInTx(tx, entryId),
+    { isolationLevel: 'serializable' }
+  );
+
+  if (approvalResult.outcome === 'approved') {
+    await finalizeWaitlistApproval(approvalResult);
+    return successResponse({ status: 'claimed' });
+  }
 
   return successResponse({ status: 'new' });
 }

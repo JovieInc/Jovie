@@ -30,6 +30,16 @@ import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 
+interface RowActionHandlers {
+  onMenuOpenChange: (open: boolean) => void;
+  onRefreshIngest: () => void;
+  onToggleVerification: () => Promise<void>;
+  onToggleFeatured: () => Promise<void>;
+  onToggleMarketing: () => Promise<void>;
+  onSendInvite?: () => void;
+  onDelete: () => void;
+}
+
 const DeleteCreatorDialog = dynamic(
   () =>
     import('@/components/admin/DeleteCreatorDialog').then(mod => ({
@@ -248,19 +258,87 @@ export function AdminCreatorProfilesWithSidebar({
   // Social links are fetched automatically via TanStack Query
   // in useContactHydration when enabled && selectedId are truthy
 
+  const handleSidebarToggle = useCallback(() => {
+    setSidebarOpen(open => !open);
+  }, []);
+
+  const handleSidebarClose = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
+
+  const getProfileId = useCallback(
+    (profile: (typeof filteredProfiles)[number]) => profile.id,
+    []
+  );
+
   const { handleKeyDown } = useAdminTableKeyboardNavigation({
     items: filteredProfiles,
     selectedId,
     onSelect: setSelectedId,
-    onToggleSidebar: () => setSidebarOpen(open => !open),
-    onCloseSidebar: () => setSidebarOpen(false),
+    onToggleSidebar: handleSidebarToggle,
+    onCloseSidebar: handleSidebarClose,
     isSidebarOpen: sidebarOpen,
-    getId: profile => profile.id,
+    getId: getProfileId,
   });
 
-  const handleSidebarClose = () => {
-    setSidebarOpen(false);
-  };
+  const handlePageSizeChange = useCallback(
+    (nextPageSize: number) => {
+      router.push(buildHref({ page: 1, pageSize: nextPageSize }));
+    },
+    [buildHref, router]
+  );
+
+  const handleSidebarRefresh = useCallback(() => {
+    router.refresh();
+    refetchSocialLinks();
+  }, [refetchSocialLinks, router]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!profileToDelete) return { success: false };
+    const result = await deleteCreatorOrUser(profileToDelete.id);
+    if (result.success) {
+      setProfileToDelete(null);
+    }
+    return result;
+  }, [deleteCreatorOrUser, profileToDelete]);
+
+  const handleInviteSuccess = useCallback(() => {
+    setProfileToInvite(null);
+    notifications.success('Invite created successfully');
+  }, [notifications]);
+
+  const rowActionHandlers = useMemo(() => {
+    const handlers = new Map<string, RowActionHandlers>();
+
+    for (const profile of profilesWithActions) {
+      handlers.set(profile.id, {
+        onMenuOpenChange: open => handleMenuOpenChange(profile.id, open),
+        onRefreshIngest: () => handleRefreshIngest(profile.id),
+        onToggleVerification: () =>
+          handleToggleVerification(profile.id, profile.isVerified),
+        onToggleFeatured: () =>
+          handleToggleFeatured(profile.id, profile.isFeatured),
+        onToggleMarketing: () =>
+          handleToggleMarketing(profile.id, profile.marketingOptOut),
+        onSendInvite:
+          !profile.isClaimed && profile.claimToken
+            ? () => handleSendInvite(profile)
+            : undefined,
+        onDelete: () => handleDelete(profile),
+      });
+    }
+
+    return handlers;
+  }, [
+    handleDelete,
+    handleMenuOpenChange,
+    handleRefreshIngest,
+    handleSendInvite,
+    handleToggleFeatured,
+    handleToggleMarketing,
+    handleToggleVerification,
+    profilesWithActions,
+  ]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
@@ -303,9 +381,7 @@ export function AdminCreatorProfilesWithSidebar({
                 prevHref={prevHref}
                 nextHref={nextHref}
                 pageSize={pageSize}
-                onPageSizeChange={nextPageSize => {
-                  router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-                }}
+                onPageSizeChange={handlePageSizeChange}
                 entityLabel='profiles'
               />
             }
@@ -338,51 +414,45 @@ export function AdminCreatorProfilesWithSidebar({
                       </td>
                     </tr>
                   ) : (
-                    profilesWithActions.map((profile, index) => (
-                      <CreatorProfileTableRow
-                        key={profile.id}
-                        profile={profile}
-                        rowNumber={(page - 1) * pageSize + index + 1}
-                        isSelected={profile.id === selectedId}
-                        isChecked={selectedIds.has(profile.id)}
-                        isMobile={isMobile}
-                        verificationStatus={
-                          verificationStatuses[profile.id] ?? 'idle'
+                    profilesWithActions.map((profile, index) => {
+                      const handlers = rowActionHandlers.get(profile.id);
+                      if (!handlers) {
+                        if (process.env.NODE_ENV === 'development') {
+                          console.warn(
+                            `Missing row action handlers for profile ${profile.id}`
+                          );
                         }
-                        refreshIngestStatus={
-                          ingestRefreshStatuses[profile.id] ?? 'idle'
-                        }
-                        isMenuOpen={openMenuProfileId === profile.id}
-                        onRowClick={handleRowClick}
-                        onContextMenu={setOpenMenuProfileId}
-                        onToggleSelect={toggleSelect}
-                        onMenuOpenChange={open =>
-                          handleMenuOpenChange(profile.id, open)
-                        }
-                        onRefreshIngest={() => handleRefreshIngest(profile.id)}
-                        onToggleVerification={() =>
-                          handleToggleVerification(
-                            profile.id,
-                            profile.isVerified
-                          )
-                        }
-                        onToggleFeatured={() =>
-                          handleToggleFeatured(profile.id, profile.isFeatured)
-                        }
-                        onToggleMarketing={() =>
-                          handleToggleMarketing(
-                            profile.id,
-                            profile.marketingOptOut
-                          )
-                        }
-                        onSendInvite={
-                          !profile.isClaimed && profile.claimToken
-                            ? () => handleSendInvite(profile)
-                            : undefined
-                        }
-                        onDelete={() => handleDelete(profile)}
-                      />
-                    ))
+                        return null;
+                      }
+
+                      return (
+                        <CreatorProfileTableRow
+                          key={profile.id}
+                          profile={profile}
+                          rowNumber={(page - 1) * pageSize + index + 1}
+                          isSelected={profile.id === selectedId}
+                          isChecked={selectedIds.has(profile.id)}
+                          isMobile={isMobile}
+                          verificationStatus={
+                            verificationStatuses[profile.id] ?? 'idle'
+                          }
+                          refreshIngestStatus={
+                            ingestRefreshStatuses[profile.id] ?? 'idle'
+                          }
+                          isMenuOpen={openMenuProfileId === profile.id}
+                          onRowClick={handleRowClick}
+                          onContextMenu={setOpenMenuProfileId}
+                          onToggleSelect={toggleSelect}
+                          onMenuOpenChange={handlers.onMenuOpenChange}
+                          onRefreshIngest={handlers.onRefreshIngest}
+                          onToggleVerification={handlers.onToggleVerification}
+                          onToggleFeatured={handlers.onToggleFeatured}
+                          onToggleMarketing={handlers.onToggleMarketing}
+                          onSendInvite={handlers.onSendInvite}
+                          onDelete={handlers.onDelete}
+                        />
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -411,10 +481,7 @@ export function AdminCreatorProfilesWithSidebar({
               mode={mode}
               isOpen={sidebarOpen && Boolean(effectiveContact)}
               onClose={handleSidebarClose}
-              onRefresh={() => {
-                router.refresh();
-                refetchSocialLinks();
-              }}
+              onRefresh={handleSidebarRefresh}
               onContactChange={handleContactChange}
               onSave={saveContact}
               isSaving={isSaving}
@@ -427,23 +494,13 @@ export function AdminCreatorProfilesWithSidebar({
         profile={profileToDelete}
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        onConfirm={async () => {
-          if (!profileToDelete) return { success: false };
-          const result = await deleteCreatorOrUser(profileToDelete.id);
-          if (result.success) {
-            setProfileToDelete(null);
-          }
-          return result;
-        }}
+        onConfirm={handleDeleteConfirm}
       />
       <SendInviteDialog
         profile={profileToInvite}
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
-        onSuccess={() => {
-          setProfileToInvite(null);
-          notifications.success('Invite created successfully');
-        }}
+        onSuccess={handleInviteSuccess}
       />
     </div>
   );

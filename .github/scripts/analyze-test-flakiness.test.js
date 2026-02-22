@@ -4,7 +4,26 @@ const assert = require('node:assert/strict');
 const {
   calculateMetrics,
   extractTestExecutions,
+  normalizeJobName,
 } = require('./analyze-test-flakiness');
+
+test('normalizeJobName strips matrix shard suffixes', () => {
+  assert.equal(normalizeJobName('Unit Tests (1/3)'), 'Unit Tests');
+  assert.equal(normalizeJobName('Unit Tests (2/3)'), 'Unit Tests');
+  assert.equal(normalizeJobName('E2E Tests'), 'E2E Tests');
+});
+
+test('extractTestExecutions normalizes matrix job names in step-level output', () => {
+  const job = {
+    name: 'Unit Tests (3/3)',
+    conclusion: 'failure',
+    steps: [{ name: 'Run unit tests', conclusion: 'failure' }],
+  };
+
+  assert.deepEqual(extractTestExecutions(job), [
+    { name: 'Unit Tests › Run unit tests', conclusion: 'failure' },
+  ]);
+});
 
 test('extractTestExecutions prefers explicit test run steps', () => {
   const job = {

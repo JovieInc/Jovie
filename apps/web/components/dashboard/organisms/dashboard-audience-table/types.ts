@@ -29,12 +29,8 @@ export interface DashboardAudienceTableProps {
   readonly view: AudienceView;
   readonly rows: AudienceRow[];
   readonly total: number;
-  readonly page: number;
-  readonly pageSize: number;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
-  readonly onPageChange: (page: number) => void;
-  readonly onPageSizeChange: (pageSize: number) => void;
   readonly onSortChange: (sort: string) => void;
   readonly onViewChange: (view: AudienceView) => void;
   readonly onFiltersChange: (filters: AudienceFilters) => void;
@@ -42,6 +38,9 @@ export interface DashboardAudienceTableProps {
   readonly profileId?: string;
   readonly subscriberCount: number;
   readonly filters: AudienceFilters;
+  readonly hasNextPage?: boolean;
+  readonly isFetchingNextPage?: boolean;
+  readonly onLoadMore?: () => void;
 }
 
 export interface BulkAction {

@@ -44,11 +44,19 @@
       "env": [
         "NODE_ENV",
         "NEXT_PUBLIC_*",
+        "SENTRY_*",
+        "STATSIG_*",
+        "FLAGS_*",
+        "EXPERIMENTATION_*"
+      ],
+      // Runtime-only secrets and deployment-specific vars are passed through
+      // without affecting the cache key. This allows ci-build and vercel build
+      // to share Turbo remote cache hits (VERCEL_* would otherwise bust the
+      // cache since ci-build runs outside Vercel's environment).
+      "passThroughEnv": [
         "VERCEL_*",
         "CLERK_*",
         "STRIPE_*",
-        "SENTRY_*",
-        "STATSIG_*",
         "NEON_*",
         "DATABASE_URL",
         "DATABASE_URL_MAIN",
@@ -57,8 +65,6 @@
         "RESEND_*",
         "MERCURY_*",
         "REVENUECAT_*",
-        "FLAGS_*",
-        "EXPERIMENTATION_*",
         "BLOB_*",
         "CRON_*",
         "GITLEAKS_LICENSE"

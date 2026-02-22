@@ -43,6 +43,10 @@ interface ReleaseTableProps {
   readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
   readonly groupByYear?: boolean;
+  /** Release currently being refreshed for loading shimmer feedback */
+  readonly refreshingReleaseId?: string | null;
+  /** Release that should briefly flash after refresh success */
+  readonly flashedReleaseId?: string | null;
   /** Check if a release's smart link is locked behind the pro gate */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
@@ -78,6 +82,8 @@ export function ReleaseTable({
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  refreshingReleaseId,
+  flashedReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
 }: ReleaseTableProps) {
@@ -115,13 +121,25 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
       const isRowExpanded = showTracks && isExpanded(row.id);
+      const isRefreshing = refreshingReleaseId === row.id;
+      const isFlashed = flashedReleaseId === row.id;
 
-      if (isRowExpanded) {
-        return 'bg-surface-2/30 hover:bg-surface-2/50';
-      }
-      return 'hover:bg-surface-2/50';
+      const baseClassName = isRowExpanded
+        ? 'bg-surface-2/30 hover:bg-surface-2/50'
+        : 'hover:bg-surface-2/50';
+
+      const refreshClassName = isRefreshing
+        ? 'relative overflow-hidden skeleton'
+        : '';
+      const flashClassName = isFlashed
+        ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5 transition-colors duration-700'
+        : '';
+
+      return [baseClassName, refreshClassName, flashClassName]
+        .filter(Boolean)
+        .join(' ');
     },
-    [showTracks, isExpanded]
+    [showTracks, isExpanded, refreshingReleaseId, flashedReleaseId]
   );
 
   // Keyboard navigation callback - open sidebar for focused row

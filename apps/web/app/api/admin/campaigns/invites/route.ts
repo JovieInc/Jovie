@@ -5,15 +5,7 @@
  */
 
 import type { SQLWrapper } from 'drizzle-orm';
-import {
-  and,
-  count,
-  desc,
-  sql as drizzleSql,
-  eq,
-  gte,
-  ilike,
-} from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
@@ -149,11 +141,7 @@ async function fetchEngagementData(inviteIds: string[]) {
       createdAt: emailEngagement.createdAt,
     })
     .from(emailEngagement)
-    .where(
-      drizzleSql`${emailEngagement.referenceId} = ANY(ARRAY[${drizzleSql.raw(
-        inviteIds.map(id => `'${id}'::uuid`).join(',')
-      )}])`
-    )
+    .where(inArray(emailEngagement.referenceId, inviteIds))
     .orderBy(emailEngagement.createdAt);
 }
 

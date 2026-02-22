@@ -25,34 +25,13 @@ export function DashboardReleasesDemo() {
 
   return (
     <div ref={containerRef}>
-      <div
-        className='overflow-hidden rounded-lg'
-        style={{
-          border: '1px solid var(--linear-border-subtle)',
-          backgroundColor: 'var(--linear-bg-surface-0)',
-        }}
-      >
+      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-0'>
         {/* Header */}
-        <div
-          className='flex items-center justify-between px-4 py-3'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            borderBottom: '1px solid var(--linear-border-subtle)',
-          }}
-        >
-          <p
-            className='text-xs font-medium'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
+        <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-3'>
+          <p className='text-xs font-medium text-secondary-token'>
             {RELEASES.length} releases
           </p>
-          <div
-            className='rounded-md px-2.5 py-1 text-[11px] font-medium'
-            style={{
-              backgroundColor: 'var(--linear-btn-primary-bg)',
-              color: 'var(--linear-btn-primary-fg)',
-            }}
-          >
+          <div className='rounded-md bg-btn-primary px-2.5 py-1 text-[11px] font-medium text-btn-primary-foreground'>
             + Add release
           </div>
         </div>
@@ -82,19 +61,10 @@ export function DashboardReleasesDemo() {
               {/* Info */}
               <div className='min-w-0 flex-1'>
                 <div className='flex items-center gap-2'>
-                  <p
-                    className='truncate text-sm font-medium'
-                    style={{ color: 'var(--linear-text-primary)' }}
-                  >
+                  <p className='truncate text-sm font-medium text-primary-token'>
                     {release.title}
                   </p>
-                  <span
-                    className='shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium'
-                    style={{
-                      backgroundColor: 'var(--linear-bg-surface-2)',
-                      color: 'var(--linear-text-secondary)',
-                    }}
-                  >
+                  <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token'>
                     {release.type}
                   </span>
                   {release.hasSmartLink && (
@@ -110,10 +80,7 @@ export function DashboardReleasesDemo() {
                     </span>
                   )}
                 </div>
-                <p
-                  className='mt-0.5 text-[11px]'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <p className='mt-0.5 text-[11px] text-tertiary-token'>
                   {release.date} · {release.trackCount}{' '}
                   {release.trackCount === 1 ? 'track' : 'tracks'} ·{' '}
                   {release.platforms.length} platforms

@@ -21,7 +21,7 @@ import {
   extractErrorMetadata,
   getErrorType,
   getMessageText,
-  getUserFriendlyMessage,
+  getPreferredErrorMessage,
 } from '../utils';
 
 interface UseJovieChatOptions {
@@ -72,6 +72,10 @@ export function useJovieChat({
     userMessage: string;
     assistantMessage: string;
     toolCalls?: Record<string, unknown>[];
+  } | null>(null);
+  const pendingInitialSendRef = useRef<{
+    text: string;
+    files?: FileUIPart[];
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -154,9 +158,7 @@ export function useJovieChat({
 
       setChatError({
         type: errorType,
-        message:
-          metadata.message ||
-          getUserFriendlyMessage(errorType, metadata.retryAfter),
+        message: getPreferredErrorMessage(error, errorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
@@ -167,6 +169,10 @@ export function useJovieChat({
       if (lastAttemptedMessageRef.current) {
         setInput(lastAttemptedMessageRef.current);
       }
+
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.usage(),
+      });
 
       setIsSubmitting(false);
     },
@@ -181,6 +187,13 @@ export function useJovieChat({
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.chat.usage(),
+    });
+  }, [status, queryClient]);
 
   // Derive the conversation title from the query data
   const conversationTitle = existingConversation?.conversation?.title ?? null;
@@ -220,6 +233,22 @@ export function useJovieChat({
   useEffect(() => {
     setActiveConversationId(conversationId ?? null);
   }, [conversationId]);
+
+  // Ensure the first message in a new chat is sent only after activeConversationId
+  // has been committed, so transport includes conversationId on the request.
+  useEffect(() => {
+    if (!activeConversationId || !pendingInitialSendRef.current) return;
+
+    const pendingPayload = pendingInitialSendRef.current;
+    pendingInitialSendRef.current = null;
+
+    sendMessage({
+      text: pendingPayload.text,
+      ...(pendingPayload.files && pendingPayload.files.length > 0
+        ? { files: pendingPayload.files }
+        : {}),
+    });
+  }, [activeConversationId, sendMessage]);
 
   // Save messages to database when streaming completes.
   // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
@@ -353,6 +382,10 @@ export function useJovieChat({
       }
 
       const trimmedText = text.trim();
+      const payload = {
+        text: trimmedText,
+        ...(hasFiles ? { files } : {}),
+      };
 
       // Store the message before sending (in case of error)
       lastAttemptedMessageRef.current = trimmedText;
@@ -381,6 +414,8 @@ export function useJovieChat({
             userMessage: '', // Empty - already persisted via initialMessage
             assistantMessage: '', // Will be filled when response completes
           };
+
+          pendingInitialSendRef.current = payload;
         } catch (err) {
           Sentry.captureException(err, {
             tags: {
@@ -404,12 +439,18 @@ export function useJovieChat({
           setIsSubmitting(false);
           return;
         }
+
+        setInput('');
+
+        // Reset textarea height
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+        }
+
+        return;
       }
 
-      sendMessage({
-        text: trimmedText,
-        ...(hasFiles ? { files } : {}),
-      });
+      sendMessage(payload);
       setInput('');
 
       // Reset textarea height

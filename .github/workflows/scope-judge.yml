@@ -1,0 +1,264 @@
+# Scope-Creep Judge Workflow
+#
+# PURPOSE: LLM-based judge that compares the actual PR diff against the
+# original Linear ticket intent. Prevents agent-generated PRs from drifting
+# beyond the requested scope — the failure mode that tests alone can't catch.
+#
+# TRIGGER: PR opened/synchronized on agent branches (linear/*, claude/*, codegen-bot/*)
+#
+# HOW IT WORKS:
+# 1. Extracts Linear ticket intent from PR body (populated by linear-ai-orchestrator)
+# 2. Gets the full diff of the PR
+# 3. Sends diff + intent to OpenAI GPT-4o for scope alignment judgment
+# 4. Reports pass/fail as a commit status (used as required check for auto-approve)
+#
+# SAFETY:
+# - Read-only: does not modify code, only reports status
+# - Only runs on agent branches
+# - Fails open: if the judge can't determine, it flags for human review
+
+name: Scope Judge
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  judge:
+    name: Scope Alignment Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run on agent branches
+    if: >-
+      !github.event.pull_request.draft &&
+      (
+        startsWith(github.event.pull_request.head.ref, 'linear/') ||
+        startsWith(github.event.pull_request.head.ref, 'claude/') ||
+        startsWith(github.event.pull_request.head.ref, 'codegen-bot/') ||
+        startsWith(github.event.pull_request.head.ref, 'codex/')
+      )
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Extract ticket intent from PR body
+        id: intent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body // ""')
+          PR_TITLE=$(gh pr view $PR_NUMBER --json title --jq '.title // ""')
+
+          # Extract Linear issue details from PR body markers
+          LINEAR_ID=$(echo "$PR_BODY" | grep -oP '(?<=linear-issue-identifier:)[^\s<]+' | head -1 || echo "")
+          LINEAR_ISSUE_ID=$(echo "$PR_BODY" | grep -oP '(?<=linear-issue-id:)[^\s<]+' | head -1 || echo "")
+
+          if [[ -z "$LINEAR_ID" && -z "$LINEAR_ISSUE_ID" ]]; then
+            echo "No Linear issue markers found in PR body. Skipping scope judge."
+            echo "has_intent=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "has_intent=true" >> $GITHUB_OUTPUT
+
+          # Store PR context for the judge
+          INTENT=$(cat <<INTENTEOF
+          ## PR Title
+          $PR_TITLE
+
+          ## PR Body (contains ticket description)
+          $PR_BODY
+
+          ## Linear Issue
+          ID: $LINEAR_ID
+          INTENTEOF
+          )
+
+          echo "intent=$(echo "$INTENT" | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Get PR diff
+        id: diff
+        if: steps.intent.outputs.has_intent == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          # Get diff, limit to 8000 chars to fit in API context
+          DIFF=$(gh pr diff $PR_NUMBER --patch 2>/dev/null | head -c 8000 || echo "")
+
+          if [[ -z "$DIFF" ]]; then
+            echo "Could not get PR diff. Skipping."
+            echo "has_diff=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "has_diff=true" >> $GITHUB_OUTPUT
+
+          # Get diff stats for context
+          DIFF_STATS=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null | wc -l | xargs -I{} echo "{} files changed" || echo "")
+
+          FULL_DIFF=$(cat <<DIFFEOF
+          ## Diff Stats
+          $DIFF_STATS
+
+          ## Diff (first 8000 chars)
+          $DIFF
+          DIFFEOF
+          )
+
+          echo "diff=$(echo "$FULL_DIFF" | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Run scope alignment judge (OpenAI)
+        id: judge
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          INTENT=$(echo "${{ steps.intent.outputs.intent }}" | base64 -d)
+          DIFF=$(echo "${{ steps.diff.outputs.diff }}" | base64 -d)
+
+          # Build the judge prompt
+          JUDGE_PROMPT=$(cat <<'PROMPTEOF'
+          You are a scope-creep judge for AI-generated pull requests. Your job is to determine
+          whether the code changes in this PR align with the original ticket intent.
+
+          SCORING CRITERIA:
+          - PASS: Changes are focused on the ticket requirements. Minor supporting changes
+            (imports, type updates, test updates for changed code) are acceptable.
+          - FAIL: Changes include significant work unrelated to the ticket, such as:
+            - Refactoring code not mentioned in the ticket
+            - Adding features not requested
+            - Changing configuration or tooling unrelated to the fix
+            - Modifying files with no clear connection to the ticket
+            - "Improving" code quality beyond what the ticket requires
+
+          IMPORTANT GUIDELINES:
+          - Test files that test the changed functionality are IN SCOPE (not scope creep)
+          - Type/import changes needed to support the fix are IN SCOPE
+          - Formatting changes from automated tools (biome/prettier) are IN SCOPE
+          - Be lenient with small PRs (< 100 lines changed)
+          - Be stricter with large PRs (> 300 lines changed)
+
+          Respond with EXACTLY one of these two formats:
+          VERDICT: PASS
+          REASON: <one sentence explanation>
+
+          or
+
+          VERDICT: FAIL
+          REASON: <one sentence explaining what's out of scope>
+          PROMPTEOF
+          )
+
+          # Call OpenAI API
+          RESPONSE=$(curl -sS --max-time 30 https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg system "$JUDGE_PROMPT" \
+              --arg user "## TICKET INTENT\n$INTENT\n\n## CODE CHANGES\n$DIFF" \
+              '{
+                model: "gpt-4o-mini",
+                messages: [
+                  {role: "system", content: $system},
+                  {role: "user", content: $user}
+                ],
+                max_tokens: 200,
+                temperature: 0.1
+              }'
+            )")
+
+          # Extract verdict
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "ERROR: No response"')
+          echo "Judge response: $CONTENT"
+
+          VERDICT=$(echo "$CONTENT" | grep -oP '(?<=VERDICT:\s)(PASS|FAIL)' | head -1 || echo "")
+          REASON=$(echo "$CONTENT" | grep -oP '(?<=REASON:\s).*' | head -1 || echo "Unable to determine")
+
+          if [[ "$VERDICT" == "PASS" ]]; then
+            echo "Scope judge: PASS"
+            echo "verdict=pass" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
+          elif [[ "$VERDICT" == "FAIL" ]]; then
+            echo "Scope judge: FAIL - $REASON"
+            echo "verdict=fail" >> $GITHUB_OUTPUT
+            echo "reason=$REASON" >> $GITHUB_OUTPUT
+          else
+            # Fail open: treat unclear responses as needing human review
+            echo "Scope judge: INCONCLUSIVE - flagging for human review"
+            echo "verdict=inconclusive" >> $GITHUB_OUTPUT
+            echo "reason=Judge response was inconclusive. Flagging for human review." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Report scope judge status
+        if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERDICT="${{ steps.judge.outputs.verdict }}"
+          REASON="${{ steps.judge.outputs.reason }}"
+          SHA="${{ github.event.pull_request.head.sha }}"
+
+          if [[ "$VERDICT" == "pass" ]]; then
+            STATE="success"
+            DESCRIPTION="Scope aligned with ticket intent"
+          elif [[ "$VERDICT" == "fail" ]]; then
+            STATE="failure"
+            DESCRIPTION="Scope creep detected: $REASON"
+          else
+            STATE="failure"
+            DESCRIPTION="Inconclusive — needs human review"
+          fi
+
+          # Truncate description to 140 chars (GitHub API limit)
+          DESCRIPTION="${DESCRIPTION:0:140}"
+
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="$STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="$DESCRIPTION" \
+            -f context="scope-judge"
+
+      - name: Skip status (no Linear intent found)
+        if: steps.intent.outputs.has_intent != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+
+          # Non-Linear PRs pass by default (scope judge only applies to agent PRs with tickets)
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="No Linear ticket found — skipping scope judge" \
+            -f context="scope-judge"
+
+      - name: Comment on PR if scope creep detected
+        if: steps.judge.outputs.verdict == 'fail'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REASON="${{ steps.judge.outputs.reason }}"
+
+          gh pr comment $PR_NUMBER --body "## Scope Judge: Changes Exceed Ticket Intent
+
+          **Verdict:** The changes in this PR extend beyond what the Linear ticket requested.
+
+          **Reason:** $REASON
+
+          **What to do:**
+          - Review the diff and remove out-of-scope changes
+          - If the additional changes are intentional, a human reviewer should approve
+
+          The \`scope-judge\` status check will block auto-approval until resolved."

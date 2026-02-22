@@ -140,7 +140,14 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - Fix the underlying issue instead
 - If truly necessary, discuss with maintainers first
 
-### 4. Conventional Commits Required
+### 4. No Emoji in UI — Use Icons
+
+- **NEVER** use emoji characters in component markup, mock data, or UI strings
+- Emoji looks cheap and undesigned — always use proper SVG icons instead
+- For decorative indicators, use small SVG icon components (e.g., Lucide icons or inline SVGs)
+- This applies to marketing pages, dashboards, mockups, and all user-facing surfaces
+
+### 5. Conventional Commits Required
 
 ```bash
 # Format: type(scope): description
@@ -150,7 +157,7 @@ refactor(api): simplify user endpoint logic
 docs(readme): update setup instructions
 ```
 
-### 5. Scan for Similar Bugs
+### 6. Scan for Similar Bugs
 
 When you discover and fix a bug:
 
@@ -222,6 +229,22 @@ For deeper implementation guidance, use `.claude/skills/entitlements.md`.
    ```bash
    gh pr merge --auto --squash
    ```
+
+## Ship Validation (CodeRabbit Issue Planner Instruction)
+
+When generating implementation plans for GitHub issues, the plan MUST include a final **"Ship Validation"** phase as the last step. This phase ensures all changes pass quality gates before a PR is opened.
+
+The validation phase must instruct the coding agent to run:
+
+```bash
+pnpm run typecheck && pnpm run biome:check && pnpm run test
+```
+
+**Requirements for the Ship Validation phase:**
+- All TypeScript type checks pass (zero errors)
+- All Biome lint and formatting checks pass (zero errors)
+- All unit tests pass
+- If any check fails, fix before proceeding to PR creation
 
 ---
 

@@ -35,12 +35,13 @@ export function SettingsPolished({
   const router = useRouter();
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
+  const isGrowth = billingData?.plan === 'growth';
 
   const renderAccountSection = useCallback(
     () => (
       <div className='space-y-0'>
         {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <AccountSettingsSection />
+          <AccountSettingsSection isGrowth={isGrowth} />
         ) : (
           <DashboardCard variant='settings'>
             <div className='text-center py-4'>
@@ -56,7 +57,7 @@ export function SettingsPolished({
         )}
       </div>
     ),
-    []
+    [isGrowth]
   );
 
   // -- General (user-level) settings --

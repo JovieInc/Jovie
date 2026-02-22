@@ -415,7 +415,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 - Always calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If >1,000/month, justify it.
 - PRs with recurring external API calls MUST include a **Cost Impact** section
 
-**Full details**: See `agents.md` → "Infrastructure & Scheduling Guardrails" at the repo root.
+**Full details**: See `AGENTS.md` → "Infrastructure & Scheduling Guardrails" at the repo root.
 
 ---
 

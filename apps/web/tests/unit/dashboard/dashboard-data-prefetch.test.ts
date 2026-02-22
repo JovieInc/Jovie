@@ -237,4 +237,18 @@ describe('dashboard data prefetch', () => {
     expect(first).toEqual(second);
     expect(setupDbSessionMock).toHaveBeenCalled();
   });
+
+  it('maps postgres bool-like existence values correctly', async () => {
+    const { mapSocialLinkExistence } = await import(
+      '@/app/app/(shell)/dashboard/actions/social-link-utils'
+    );
+
+    expect(
+      mapSocialLinkExistence({ hasLinks: 't', hasMusicLinks: '1' })
+    ).toEqual({ hasLinks: true, hasMusicLinks: true });
+
+    expect(mapSocialLinkExistence({ hasLinks: 'f', hasMusicLinks: 0 })).toEqual(
+      { hasLinks: false, hasMusicLinks: false }
+    );
+  });
 });

@@ -50,6 +50,33 @@ jobs:
         if: steps.dedup.outputs.skip != 'true'
         uses: ./.github/actions/setup-node-pnpm
 
+      - name: Resolve automation contract
+        if: steps.dedup.outputs.skip != 'true'
+        id: contract
+        env:
+          PAYLOAD_VERIFY_REQUIRED: ${{ github.event.client_payload.verify_required }}
+          PAYLOAD_SIMPLIFY_BOUNDED: ${{ github.event.client_payload.simplify_bounded }}
+          PAYLOAD_MODEL_TIER: ${{ github.event.client_payload.model_tier }}
+        run: |
+          VERIFY_REQUIRED="${PAYLOAD_VERIFY_REQUIRED,,}"
+          if [[ "$VERIFY_REQUIRED" != "false" ]]; then
+            VERIFY_REQUIRED="true"
+          fi
+
+          SIMPLIFY_BOUNDED="${PAYLOAD_SIMPLIFY_BOUNDED,,}"
+          if [[ "$SIMPLIFY_BOUNDED" != "false" ]]; then
+            SIMPLIFY_BOUNDED="true"
+          fi
+
+          MODEL_TIER="${PAYLOAD_MODEL_TIER,,}"
+          if [[ "$MODEL_TIER" != "economy" ]]; then
+            MODEL_TIER="premium"
+          fi
+
+          echo "verify_required=$VERIFY_REQUIRED" >> "$GITHUB_OUTPUT"
+          echo "simplify_bounded=$SIMPLIFY_BOUNDED" >> "$GITHUB_OUTPUT"
+          echo "model_tier=$MODEL_TIER" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code to fix the bug
         if: steps.dedup.outputs.skip != 'true'
         id: claude
@@ -64,6 +91,11 @@ jobs:
             **Message:** ${{ github.event.client_payload.message }}
             **Sentry URL:** ${{ github.event.client_payload.url }}
 
+            **Automation Contract:**
+            - verify_required: ${{ steps.contract.outputs.verify_required }}
+            - simplify_bounded: ${{ steps.contract.outputs.simplify_bounded }}
+            - model_tier: ${{ steps.contract.outputs.model_tier }}
+
             **Stack Trace:**
             ```
             ${{ github.event.client_payload.stacktrace }}
@@ -75,8 +107,22 @@ jobs:
             3. Run `pnpm biome check . --write` to auto-fix formatting
             4. Run `pnpm turbo typecheck --filter=@jovie/web` to verify types pass
             5. If validation fails, fix the issues and re-run
+            6. If simplify_bounded=true, run a small simplification pass on touched files only:
+               - remove dead imports/locals
+               - flatten obvious nested conditionals
+               - improve unclear local variable names
+               - do not change behavior/API contracts
+               - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
+            7. Use model_tier as guidance for depth/cost profile:
+               - premium: thorough and comprehensive
+               - economy: concise and targeted
 
             Keep changes minimal — fix only the bug, do not refactor surrounding code.
+
+      - name: Run automation verify bundle
+        if: steps.dedup.outputs.skip != 'true' && steps.contract.outputs.verify_required == 'true'
+        run: |
+          bash scripts/automation-verify.sh affected
 
       - name: Push branch and create PR
         if: steps.dedup.outputs.skip != 'true'

@@ -30,10 +30,10 @@ const RELEASE_TYPE_LABELS: Record<string, string> = {
 
 const CANVAS_STATUS_CONFIG: Record<
   CanvasStatus,
-  { label: string; className: string }
+  { label: string; className: string; displayLabel?: string }
 > = {
   uploaded: {
-    label: 'Live',
+    label: 'Set',
     className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
   },
   generated: {
@@ -42,15 +42,12 @@ const CANVAS_STATUS_CONFIG: Record<
   },
   not_set: {
     label: 'Not set',
+    displayLabel: 'Set canvas status.',
     className: 'bg-surface-2 text-secondary-token',
   },
 };
 
-const CANVAS_STATUS_OPTIONS: CanvasStatus[] = [
-  'not_set',
-  'generated',
-  'uploaded',
-];
+const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 
 function PopularityBar({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -79,8 +76,12 @@ export function ReleaseMetadata({
   onCanvasStatusChange,
 }: ReleaseMetadataProps) {
   const canvasStatus: CanvasStatus = release.canvasStatus ?? 'not_set';
+  const selectionStatus: CanvasStatus =
+    canvasStatus === 'generated' ? 'not_set' : canvasStatus;
   const canvasStatusConfig =
     CANVAS_STATUS_CONFIG[canvasStatus] ?? CANVAS_STATUS_CONFIG.not_set;
+  const canvasStatusDisplayLabel =
+    canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
 
   return (
     <DrawerSection title='Metadata'>
@@ -154,7 +155,7 @@ export function ReleaseMetadata({
                       variant='secondary'
                       className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
                     >
-                      {canvasStatusConfig.label}
+                      {canvasStatusDisplayLabel}
                     </Badge>
                     <ChevronDown
                       size={12}
@@ -166,7 +167,7 @@ export function ReleaseMetadata({
                 <DropdownMenuContent align='start' className='w-44'>
                   {CANVAS_STATUS_OPTIONS.map(status => {
                     const config = CANVAS_STATUS_CONFIG[status];
-                    const isActive = status === canvasStatus;
+                    const isActive = status === selectionStatus;
                     return (
                       <DropdownMenuItem
                         key={status}
@@ -198,7 +199,7 @@ export function ReleaseMetadata({
                 variant='secondary'
                 className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
               >
-                {canvasStatusConfig.label}
+                {canvasStatusDisplayLabel}
               </Badge>
             )
           }

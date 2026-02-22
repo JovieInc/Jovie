@@ -7,7 +7,8 @@ import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
-import { CHAT_MODEL } from '@/lib/constants/ai-models';
+import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -19,6 +20,7 @@ import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
+import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
   checkAiChatRateLimitForPlan,
   createRateLimitHeaders,
@@ -28,10 +30,6 @@ import {
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
-import {
-  SPOTIFY_CANVAS_SPEC,
-  TIKTOK_PREVIEW_SPEC,
-} from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
@@ -45,25 +43,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
-
-/**
- * Editable profile fields by tier:
- * - Tier 1 (Safe): Non-destructive fields that can be freely edited
- * - Tier 2 (Careful): Fields that need confirmation before applying
- * - Tier 3 (Blocked): Cannot be edited via chat - requires settings page
- */
-const EDITABLE_FIELDS = {
-  tier1: ['displayName', 'bio'] as const,
-  tier2: [] as const,
-  blocked: ['username', 'spotifyId', 'genres'] as const,
-};
-
-type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
-
-const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
-  displayName: 'Display name shown on your profile',
-  bio: 'Artist bio/description',
-};
 
 /**
  * Zod schema for validating client-provided artist context.
@@ -415,33 +394,12 @@ function buildSystemPrompt(
 - **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
 
-## Voice & Style (CRITICAL — follow strictly)
-- Be direct and concise. Most answers should be 1-3 sentences.
-- Never exceed 150 words unless the artist explicitly asks for detail or you are generating a bio.
-- Answer ONLY what was asked. Do not volunteer unrelated suggestions or observations.
-- No emoji. No exclamation marks unless genuinely warranted.
-- No marketing language, no cheerleading, no "Great question!" or "I'd love to help!" openers.
-- If the user asks to do something and you have a tool for it, call the tool immediately with minimal preamble.
-- Use bullet points only when listing 3+ items.
-- Use simple language, no jargon.
-
-### DO NOT
-- Suggest bio/links/genres/profile improvements unless specifically asked.
-- Greet the user with a profile review or stats summary they didn't ask for.
-- Pad responses with encouragement, motivational filler, or "let me know if you need anything else."
-- Repeat back what the user just said.
-
-### Guidelines
-- Be specific and data-driven when giving advice. Reference actual numbers, don't be vague.
-- Be honest about limitations. If you don't have enough data, say so.
-- Focus on actionable advice — give the artist something they can do.
-- Understand context: 0 profile views = just starting; 10K followers = has momentum.
-
-## What You Cannot Do
-- You cannot send emails, post content, or take actions on behalf of the artist
-- You cannot access external data or APIs
-- You cannot see their actual music or listen to tracks
-- You cannot guarantee results or make promises about outcomes
+## Voice (CRITICAL)
+- Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
+- No emoji, no exclamation marks, no cheerleading, no filler, no repeating the user.
+- If a tool exists for the request, call it immediately with minimal preamble.
+- Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
+- You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
 
 ## Profile Editing
 You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
@@ -467,58 +425,7 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Do not add or remove links without showing the confirmation preview first.
 - All link changes instantly update the sidebar profile preview.
 
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
-
-## World-Class Bio Writing
-You have access to the writeWorldClassBio tool. Use it when the artist asks for a new biography, a rewrite for Spotify/Apple Music, or an AllMusic-quality narrative.
-- Pull in the artist's real platform signals and catalog context
-- Keep all claims factual and grounded in available data
-- Deliver a polished draft the artist can use directly or refine
-
-
-## Creative & Promotion Tools
-
-You also have tools to help with creative assets and promotion:
-
-**Spotify Canvas:**
-- Use the checkCanvasStatus tool to see which releases are missing canvas videos
-- All releases default to "not set" since Spotify has no public API for canvas detection
-- If the artist says they already have a canvas for a release, use markCanvasUploaded to update the status
-- Canvas is a 3-8 second looping video that plays behind tracks on Spotify mobile
-- You can help plan canvas generation from album artwork (AI removes text, upscales, and animates)
-- Specs: ${SPOTIFY_CANVAS_SPEC.minWidth}x${SPOTIFY_CANVAS_SPEC.minHeight}px minimum, 9:16 portrait, ${SPOTIFY_CANVAS_SPEC.minDurationSec}-${SPOTIFY_CANVAS_SPEC.maxDurationSec}s loop, H.264/MP4
-
-**Social Media Video Ads:**
-- Help artists plan video ads using their album art + song clips
-- Suggest promo text and strategy for different platforms
-- Consider QR codes linking to their Jovie page for tracking
-
-**TikTok Sound Previews:**
-- Help identify the best ${TIKTOK_PREVIEW_SPEC.durationSec}-second clip for TikTok previews
-- Consider hooks, drops, choruses, and viral moments
-- You can't listen to the audio, but you can advise based on song structure knowledge
-
-**Related Artists for Pitching:**
-- Use the suggestRelatedArtists tool to find similar artists
-- Useful for playlist pitching, ad targeting (Meta, TikTok), and collaboration
-- Base suggestions on genre, popularity tier, and audience overlap
-
-## Release Creation
-You can create new releases using the createRelease tool. This is useful for artists who:
-- Are not on Spotify and need to manually add their discography
-- Want to set up smart links for an upcoming release before it's live on streaming platforms
-- Have releases on platforms that aren't synced automatically
-
-When an artist asks to create a release, gather at minimum:
-- **Title** (required)
-- **Release type** (single, ep, album, compilation, live, mixtape, or other)
-
-Optional fields you can ask about:
-- **Release date** (when it was or will be released)
-- **Label** (record label name)
-- **UPC** (barcode, most artists won't know this)
-
-After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.${
+When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${
     options && !options.aiCanUseTools
       ? `
 
@@ -526,40 +433,6 @@ After creating the release, let the artist know they can add streaming links fro
 This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
       : ''
   }`;
-}
-
-/**
- * Creates the proposeProfileEdit tool for the AI to suggest profile changes.
- * This tool only returns a preview - actual changes require user confirmation.
- */
-function createProfileEditTool(context: ArtistContext) {
-  const profileEditSchema = z.object({
-    field: z.enum(['displayName', 'bio']).describe('The profile field to edit'),
-    newValue: z.string().describe('The new value for the field.'),
-    reason: z
-      .string()
-      .optional()
-      .describe('Brief explanation of why this change was suggested'),
-  });
-
-  return tool({
-    description:
-      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio.',
-    inputSchema: profileEditSchema,
-    execute: async ({ field, newValue, reason }) => {
-      // Return preview data for the UI to render
-      return {
-        success: true,
-        preview: {
-          field,
-          fieldLabel: FIELD_DESCRIPTIONS[field],
-          currentValue: context[field],
-          newValue,
-          reason,
-        },
-      };
-    },
-  });
 }
 
 /**
@@ -1182,104 +1055,6 @@ function createWorldClassBioTool(
 }
 
 /**
- * Deterministic formatting rules for Apple Music lyrics guidelines.
- * Returns the formatted text and a summary of changes applied.
- */
-function formatLyricsForAppleMusic(raw: string): {
-  formatted: string;
-  changesSummary: string[];
-} {
-  const changes: string[] = [];
-  let text = raw;
-
-  // 1. Remove section labels like [Verse], [Chorus 2], [Bridge], [Pre-Chorus], etc.
-  const sectionLabelPattern =
-    /^\[(?:Verse|Chorus|Bridge|Intro|Outro|Hook|Pre-Chorus|Interlude|Refrain|Coda|Break|Tag|Adlib|Post-Chorus)(?:\s*\d*)?\]\s*$/gim;
-  const sectionMatches = text.match(sectionLabelPattern);
-  if (sectionMatches) {
-    text = text.replace(sectionLabelPattern, '');
-    changes.push(`Removed ${sectionMatches.length} section label(s)`);
-  }
-
-  // 2. Remove timestamp markers like [0:00], [1:23], [12:34]
-  const timestampPattern = /\[\d{1,2}:\d{2}\]/g;
-  const timestampMatches = text.match(timestampPattern);
-  if (timestampMatches) {
-    text = text.replace(timestampPattern, '');
-    changes.push(`Removed ${timestampMatches.length} timestamp marker(s)`);
-  }
-
-  // 3. Straighten curly quotes
-  const hadCurlyQuotes = /[\u2018\u2019\u201C\u201D]/.test(text);
-  text = text.replace(/[\u2018\u2019]/g, "'");
-  text = text.replace(/[\u201C\u201D]/g, '"');
-  if (hadCurlyQuotes) {
-    changes.push('Straightened curly quotes');
-  }
-
-  // 4. Normalize ellipsis (... → …)
-  const hadEllipsis = /\.{3,}/.test(text);
-  text = text.replace(/\.{3,}/g, '\u2026');
-  if (hadEllipsis) {
-    changes.push('Normalized ellipsis');
-  }
-
-  // 5. Normalize em-dashes (-- → —)
-  const hadDashes = /--+/.test(text);
-  text = text.replace(/--+/g, '\u2014');
-  if (hadDashes) {
-    changes.push('Normalized em-dashes');
-  }
-
-  // 6. Normalize repeated exclamation/question marks (max 1)
-  const hadRepeatedPunctuation = /[!]{2,}|[?]{2,}/.test(text);
-  text = text.replace(/!{2,}/g, '!');
-  text = text.replace(/\?{2,}/g, '?');
-  if (hadRepeatedPunctuation) {
-    changes.push('Normalized repeated punctuation');
-  }
-
-  // 7. Collapse multiple spaces to single space (per line)
-  const hadMultipleSpaces = / {2,}/.test(text);
-  text = text.replace(/ {2,}/g, ' ');
-  if (hadMultipleSpaces) {
-    changes.push('Collapsed multiple spaces');
-  }
-
-  // 8. Trim trailing whitespace per line
-  const hadTrailingWhitespace = / +$/m.test(text);
-  text = text.replace(/ +$/gm, '');
-  if (hadTrailingWhitespace) {
-    changes.push('Trimmed trailing whitespace');
-  }
-
-  // 9. Collapse 3+ consecutive blank lines to 1 blank line
-  const hadExcessiveBlanks = /\n{4,}/.test(text);
-  text = text.replace(/\n{4,}/g, '\n\n');
-  if (hadExcessiveBlanks) {
-    changes.push('Collapsed excessive blank lines');
-  }
-
-  // 10. Remove leading/trailing blank lines
-  const trimmed = text.replace(/^\n+/, '').replace(/\n+$/, '');
-  if (trimmed.length !== text.length) {
-    changes.push('Removed leading/trailing blank lines');
-  }
-  text = trimmed;
-
-  // 11. Ensure final newline
-  if (text.length > 0 && !text.endsWith('\n')) {
-    text += '\n';
-  }
-
-  if (changes.length === 0) {
-    changes.push('No changes needed — lyrics already formatted');
-  }
-
-  return { formatted: text, changesSummary: changes };
-}
-
-/**
  * Creates the formatLyrics tool.
  * Applies deterministic Apple Music formatting rules to raw lyrics text.
  */
@@ -1370,6 +1145,53 @@ function buildChatTools(
 
 function toNullableString(value: unknown): string | null {
   return value && typeof value === 'string' ? value : null;
+}
+
+/**
+ * Regex patterns for messages that can be handled by the lightweight model.
+ * These are simple, tool-invocation-oriented requests that don't need
+ * frontier-model reasoning.
+ */
+const SIMPLE_INTENT_PATTERNS = [
+  /^(?:change|update|set|edit|make)\s+(?:my\s+)?(?:display\s*name|name|bio)\s+(?:to|:)/i,
+  /^(?:add|connect|link)\s+(?:my\s+)?(?:instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|link|url|website)/i,
+  /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic|pfp)/i,
+  /^(?:format|clean\s*up|fix)\s+(?:my\s+)?lyrics/i,
+  /^check\s+(?:my\s+)?canvas/i,
+  /^mark\s+.+\s+as\s+(?:uploaded|done|set)/i,
+] as const;
+
+/**
+ * Determines whether a request can be handled by the lightweight (Haiku) model.
+ *
+ * Returns true for:
+ * - Free-tier users (limited tools, simple Q&A)
+ * - Short conversations with clearly simple intents (profile edits, link adds)
+ */
+function canUseLightModel(
+  messages: UIMessage[],
+  aiCanUseTools: boolean
+): boolean {
+  // Free-plan users don't have advanced tools — always use the light model
+  if (!aiCanUseTools) return true;
+
+  // Only consider light model for short conversations
+  if (messages.length > 6) return false;
+
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return false;
+
+  const text = lastUserMsg.parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('')
+    .trim();
+
+  // Short, clearly tool-oriented requests
+  return text.length < 200 && SIMPLE_INTENT_PATTERNS.some(p => p.test(text));
 }
 
 function isClientDisconnect(
@@ -1532,17 +1354,28 @@ export async function POST(req: Request) {
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }
       : freeTools;
 
+    const selectedModel = canUseLightModel(
+      uiMessages,
+      planLimits.booleans.aiCanUseTools
+    )
+      ? CHAT_MODEL_LIGHT
+      : CHAT_MODEL;
+
     const result = streamText({
-      model: gateway(CHAT_MODEL),
+      model: gateway(selectedModel),
       system: systemPrompt,
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
+      providerOptions: {
+        anthropic: { cacheControl: true },
+      },
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: true,
         recordOutputs: true,
         functionId: 'jovie-chat',
+        metadata: { model: selectedModel },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;

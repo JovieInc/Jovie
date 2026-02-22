@@ -12,6 +12,10 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import {
+  buildSocialLinksVerificationSelect,
+  getSocialLinksVerificationColumnSupport,
+} from '@/lib/db/queries/social-links-verification';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -50,6 +54,9 @@ export interface ProfileSocialLink {
     signals?: string[];
     linkType?: string | null;
   } | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
+  verifiedAt?: string | null;
   /** Optimistic locking version for concurrent edit detection */
   version?: number;
 }
@@ -87,6 +94,9 @@ export async function getProfileSocialLinks(
 
     return await withDbSession(async clerkUserId => {
       // Query against creatorProfiles with ownership check and left-join links
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(db);
+
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -102,6 +112,7 @@ export async function getProfileSocialLinks(
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
           version: socialLinks.version,
         })
         .from(creatorProfiles)
@@ -147,6 +158,14 @@ export async function getProfileSocialLinks(
               sources?: string[];
               signals?: string[];
             } | null,
+            verificationStatus:
+              (r.verificationStatus as
+                | 'unverified'
+                | 'pending'
+                | 'verified'
+                | null) ?? 'unverified',
+            verificationToken: r.verificationToken ?? null,
+            verifiedAt: r.verifiedAt?.toISOString() ?? null,
             version: r.version ?? 1,
           };
         })

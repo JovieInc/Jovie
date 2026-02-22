@@ -60,7 +60,7 @@ The Linear automation path uses two workflows:
 
 - **`linear-ai-orchestrator.yml`**
   - Trigger: `repository_dispatch` (`linear_todo_ready`) from `/api/webhooks/linear`
-  - Behavior: waits for a CodeRabbit plan marker, runs Claude Code, opens PR, enables auto-merge, updates Linear to review
+  - Behavior: waits for a CodeRabbit plan marker, assigns the issue to Codex in Linear, runs implementation, pushes a codex/* branch for auto-PR creation, then updates Linear to review
   - Includes bounded polling with configurable loop counts (`MAX_PLAN_WAIT_ATTEMPTS`, `PLAN_POLL_INTERVAL_SECONDS`)
 
 - **`linear-sync-on-merge.yml`**
@@ -76,3 +76,7 @@ The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on
 - **Ephemeral branches** - Created per PR for isolated testing
 - **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close
 - **Protected branch** - `main` is the production database branch
+
+## Agent Push-to-PR Bridge
+
+The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches (`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a PR immediately after a push and enabling auto-merge.

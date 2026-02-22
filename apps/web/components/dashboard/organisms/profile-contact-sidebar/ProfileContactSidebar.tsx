@@ -38,7 +38,7 @@ const PROFILE_TAB_OPTIONS = [
 ];
 
 export function ProfileContactSidebar() {
-  const { isOpen, close } = usePreviewPanelState();
+  const { isOpen } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
   const [selectedCategory, setSelectedCategory] =
@@ -345,7 +345,6 @@ export function ProfileContactSidebar() {
           username={username}
           displayName={displayName}
           profilePath={profilePath}
-          onClose={close}
         />
 
         {/* Contact Header with Avatar, Name — all editable */}

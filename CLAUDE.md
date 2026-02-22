@@ -17,6 +17,6 @@ pnpm --version   # MUST be 9.15.4
 
 ---
 
-> **Full Guidelines:** See `agents.md` at repo root for complete AI agent rules, engineering guardrails, and architecture guidance.
+> **Full Guidelines:** See `AGENTS.md` at repo root for complete AI agent rules, engineering guardrails, and architecture guidance.
 
-This file is intentionally kept minimal. The canonical source is `agents.md`.
+This file is intentionally kept minimal. The canonical source is `AGENTS.md`.

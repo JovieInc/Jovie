@@ -5,9 +5,13 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
-        "timeout": 120
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "PreToolUse": [

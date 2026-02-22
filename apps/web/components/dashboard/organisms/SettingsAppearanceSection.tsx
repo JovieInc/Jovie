@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { useTheme } from 'next-themes';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
@@ -41,8 +42,12 @@ export function SettingsAppearanceSection() {
     THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
 
   return (
-    <div className='divide-y divide-subtle'>
-      <div className='flex items-center justify-between py-3'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      <div className='px-4 py-3 flex items-center justify-between'>
         <div className='flex-1 min-w-0'>
           <h3 className='text-sm font-medium text-primary-token'>
             Interface theme
@@ -71,7 +76,7 @@ export function SettingsAppearanceSection() {
         </div>
       </div>
 
-      <div className='py-3'>
+      <div className='px-4 py-3'>
         <SettingsToggleRow
           title='High contrast'
           description='Increase contrast for text, borders, and surfaces'
@@ -81,6 +86,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </div>
+    </DashboardCard>
   );
 }

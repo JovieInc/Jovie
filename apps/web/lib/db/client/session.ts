@@ -48,11 +48,11 @@ export async function setSessionUser(userId: string): Promise<void> {
         db = initializeDb();
         setInternalDb(db);
       }
-      // Set both RLS session variables in a single round-trip.
+      // Set the RLS session variable in a single round-trip.
       // is_local=false so the setting takes effect for the current connection
       // rather than requiring a transaction block that doesn't exist.
       await db.execute(
-        drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`
+        drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
       );
     }, 'setSessionUser');
 

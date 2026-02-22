@@ -38,9 +38,9 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex w-fit items-center gap-2 rounded-lg border border-white/[0.06]',
-        'bg-white/[0.02] px-3.5 py-2.5 text-left',
-        'hover:border-white/[0.1] hover:bg-white/[0.04]',
+        'chat-pill flex w-fit items-center gap-2 rounded-lg border border-subtle',
+        'bg-surface-1 px-3.5 py-2.5 text-left',
+        'hover:border-default hover:bg-surface-2',
         'active:scale-[0.98]',
         'focus:outline-none',
         'cursor-pointer transition-colors duration-fast'

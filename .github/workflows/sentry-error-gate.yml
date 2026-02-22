@@ -1,0 +1,280 @@
+# Sentry Error Rate Gate
+#
+# PURPOSE: Post-deploy safety net that compares Sentry error rates before and
+# after a production deployment. If error rate spikes beyond threshold,
+# automatically triggers a Vercel rollback.
+#
+# This catches regressions that the canary health gate misses — the canary
+# checks "does the app respond?", while this checks "is the app throwing
+# more errors than before?"
+#
+# TRIGGER: Called as a reusable workflow from ci.yml after canary passes
+#
+# HOW IT WORKS:
+# 1. Query Sentry API for baseline error count (30 min window before deploy)
+# 2. Wait for errors to accumulate post-deploy (configurable soak period)
+# 3. Query Sentry API for post-deploy error count (same window duration)
+# 4. Compare: if post-deploy errors > baseline * threshold_multiplier → FAIL
+# 5. On failure: auto-rollback via Vercel CLI + Slack alert
+#
+# SAFETY:
+# - Uses statistical comparison, not absolute counts (handles normal error noise)
+# - Configurable threshold multiplier (default 3x = 300% increase)
+# - Minimum baseline threshold prevents false positives on low-traffic periods
+# - Auto-rollback is best-effort (won't crash if Vercel rollback fails)
+
+name: Sentry Error Gate
+
+on:
+  workflow_call:
+    inputs:
+      deployment_url:
+        description: 'The deployment URL that was just deployed'
+        required: true
+        type: string
+      soak_minutes:
+        description: 'Minutes to wait after deploy before checking error rates'
+        required: false
+        default: 5
+        type: number
+      baseline_window_minutes:
+        description: 'Minutes of pre-deploy history to use as baseline'
+        required: false
+        default: 30
+        type: number
+      threshold_multiplier:
+        description: 'Error rate multiplier that triggers rollback (e.g., 3 = 300% increase)'
+        required: false
+        default: 3
+        type: number
+      min_baseline_errors:
+        description: 'Minimum baseline errors required to trigger comparison (prevents false positives in low-traffic)'
+        required: false
+        default: 5
+        type: number
+    outputs:
+      gate_status:
+        description: 'Gate result: passed, failed, rolled_back, skipped'
+        value: ${{ jobs.sentry-gate.outputs.gate_status }}
+      baseline_errors:
+        description: 'Number of errors in baseline window'
+        value: ${{ jobs.sentry-gate.outputs.baseline_errors }}
+      post_deploy_errors:
+        description: 'Number of errors in post-deploy window'
+        value: ${{ jobs.sentry-gate.outputs.post_deploy_errors }}
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        required: true
+      SENTRY_ORG:
+        required: true
+      SENTRY_PROJECT:
+        required: true
+      VERCEL_TOKEN:
+        required: true
+      VERCEL_ORG_ID:
+        required: true
+      VERCEL_PROJECT_ID:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  sentry-gate:
+    name: Sentry Error Rate Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      gate_status: ${{ steps.evaluate.outputs.gate_status }}
+      baseline_errors: ${{ steps.baseline.outputs.error_count }}
+      post_deploy_errors: ${{ steps.post-deploy.outputs.error_count }}
+    steps:
+      - name: Query baseline error rate (pre-deploy)
+        id: baseline
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          WINDOW_MINUTES="${{ inputs.baseline_window_minutes }}"
+
+          # Calculate time range: from (now - soak - baseline_window) to (now - soak)
+          # The "now - soak" represents approximately when deploy happened
+          SOAK="${{ inputs.soak_minutes }}"
+          END_EPOCH=$(($(date +%s) - SOAK * 60))
+          START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))
+
+          START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+          END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+
+          echo "Baseline window: $START_ISO to $END_ISO ($WINDOW_MINUTES min)"
+
+          # Query Sentry issues endpoint for error count in window
+          RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            "https://sentry.io/api/0/projects/$SENTRY_ORG/$SENTRY_PROJECT/issues/?query=is:unresolved&statsPeriod=${WINDOW_MINUTES}m&sort=freq" \
+            2>/dev/null || echo "[]")
+
+          # Count total events across all issues in the window
+          # Use the stats endpoint for more accurate event counts
+          STATS_RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT&field=count()&start=$START_ISO&end=$END_ISO&interval=1m" \
+            2>/dev/null || echo '{"data":[]}')
+
+          # Sum all event counts from the stats response
+          ERROR_COUNT=$(echo "$STATS_RESPONSE" | jq '[.data[]?[1][]?.count // 0] | add // 0' 2>/dev/null || echo "0")
+
+          echo "Baseline error count: $ERROR_COUNT"
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Wait for post-deploy soak period
+        run: |
+          SOAK="${{ inputs.soak_minutes }}"
+          echo "Waiting ${SOAK} minutes for errors to accumulate post-deploy..."
+          sleep $((SOAK * 60))
+
+      - name: Query post-deploy error rate
+        id: post-deploy
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          WINDOW_MINUTES="${{ inputs.baseline_window_minutes }}"
+
+          END_EPOCH=$(date +%s)
+          START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))
+
+          START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+          END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+
+          echo "Post-deploy window: $START_ISO to $END_ISO ($WINDOW_MINUTES min)"
+
+          STATS_RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+            "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/?project=$SENTRY_PROJECT&field=count()&start=$START_ISO&end=$END_ISO&interval=1m" \
+            2>/dev/null || echo '{"data":[]}')
+
+          ERROR_COUNT=$(echo "$STATS_RESPONSE" | jq '[.data[]?[1][]?.count // 0] | add // 0' 2>/dev/null || echo "0")
+
+          echo "Post-deploy error count: $ERROR_COUNT"
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Evaluate error rate comparison
+        id: evaluate
+        run: |
+          BASELINE="${{ steps.baseline.outputs.error_count }}"
+          POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
+          THRESHOLD="${{ inputs.threshold_multiplier }}"
+          MIN_BASELINE="${{ inputs.min_baseline_errors }}"
+
+          echo "=== Sentry Error Rate Comparison ==="
+          echo "Baseline errors: $BASELINE"
+          echo "Post-deploy errors: $POST_DEPLOY"
+          echo "Threshold multiplier: ${THRESHOLD}x"
+          echo "Minimum baseline: $MIN_BASELINE"
+
+          # Skip comparison if baseline is too low (not enough signal)
+          if [[ "$BASELINE" -lt "$MIN_BASELINE" ]]; then
+            echo "Baseline too low ($BASELINE < $MIN_BASELINE). Checking absolute count instead."
+
+            # Even with low baseline, flag if post-deploy errors are abnormally high
+            if [[ "$POST_DEPLOY" -gt 50 ]]; then
+              echo "High absolute error count post-deploy ($POST_DEPLOY > 50)"
+              echo "gate_status=failed" >> $GITHUB_OUTPUT
+              echo "reason=High absolute error count: $POST_DEPLOY errors in post-deploy window" >> $GITHUB_OUTPUT
+            else
+              echo "Post-deploy errors within acceptable range"
+              echo "gate_status=passed" >> $GITHUB_OUTPUT
+              echo "reason=Low baseline ($BASELINE), post-deploy errors ($POST_DEPLOY) within acceptable range" >> $GITHUB_OUTPUT
+            fi
+            exit 0
+          fi
+
+          # Calculate if post-deploy exceeds threshold
+          LIMIT=$((BASELINE * THRESHOLD))
+
+          if [[ "$POST_DEPLOY" -gt "$LIMIT" ]]; then
+            RATIO=$((POST_DEPLOY * 100 / BASELINE))
+            echo "ERROR SPIKE DETECTED: ${RATIO}% of baseline (threshold: ${THRESHOLD}00%)"
+            echo "Post-deploy ($POST_DEPLOY) > baseline ($BASELINE) * ${THRESHOLD}x ($LIMIT)"
+            echo "gate_status=failed" >> $GITHUB_OUTPUT
+            echo "reason=Error rate spike: ${RATIO}% of baseline (${POST_DEPLOY} vs ${BASELINE}, threshold ${THRESHOLD}x)" >> $GITHUB_OUTPUT
+          else
+            echo "Error rate within acceptable range"
+            echo "gate_status=passed" >> $GITHUB_OUTPUT
+            echo "reason=Post-deploy errors ($POST_DEPLOY) within ${THRESHOLD}x of baseline ($BASELINE)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-rollback on error spike
+        if: steps.evaluate.outputs.gate_status == 'failed'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          echo "Sentry error gate FAILED. Triggering auto-rollback..."
+
+          # Install Vercel CLI
+          npm install -g vercel@latest 2>/dev/null
+
+          vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
+            echo "Auto-rollback failed or not supported. Manual intervention required."
+            exit 0
+          }
+
+          echo "Auto-rollback completed"
+
+      - name: Slack alert on error spike
+        if: steps.evaluate.outputs.gate_status == 'failed' && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          BASELINE="${{ steps.baseline.outputs.error_count }}"
+          POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
+          REASON="${{ steps.evaluate.outputs.reason }}"
+          DEPLOYMENT_URL="${{ inputs.deployment_url }}"
+
+          curl -sS -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n \
+              --arg reason "$REASON" \
+              --arg baseline "$BASELINE" \
+              --arg post_deploy "$POST_DEPLOY" \
+              --arg deploy_url "$DEPLOYMENT_URL" \
+              --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              '{
+                text: "🚨 Sentry Error Gate FAILED — Auto-Rollback Triggered",
+                attachments: [{
+                  color: "danger",
+                  fields: [
+                    {title: "Reason", value: $reason, short: false},
+                    {title: "Baseline Errors", value: $baseline, short: true},
+                    {title: "Post-Deploy Errors", value: $post_deploy, short: true},
+                    {title: "Deployment", value: $deploy_url, short: false},
+                    {title: "Action", value: ("<" + $run_url + "|View Details>"), short: false}
+                  ]
+                }]
+              }'
+            )" || true
+
+      - name: Summary
+        if: always()
+        run: |
+          STATUS="${{ steps.evaluate.outputs.gate_status }}"
+          REASON="${{ steps.evaluate.outputs.reason }}"
+          BASELINE="${{ steps.baseline.outputs.error_count }}"
+          POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
+
+          echo "### Sentry Error Gate Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | $STATUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Baseline errors | $BASELINE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Post-deploy errors | $POST_DEPLOY |" >> $GITHUB_STEP_SUMMARY
+          echo "| Threshold | ${{ inputs.threshold_multiplier }}x |" >> $GITHUB_STEP_SUMMARY
+          echo "| Reason | $REASON |" >> $GITHUB_STEP_SUMMARY

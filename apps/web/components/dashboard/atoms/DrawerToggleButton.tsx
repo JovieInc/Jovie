@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { PanelRight, PanelRightOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton() {
   const { tableMeta } = useTableMeta();
@@ -17,15 +17,12 @@ export function DrawerToggleButton() {
   const Icon = isOpen ? PanelRightOpen : PanelRight;
 
   return (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={() => tableMeta.toggle?.()}
-      aria-label='Toggle contact details'
-      className='h-10 w-10 border-none'
+    <DashboardHeaderActionButton
+      ariaLabel='Toggle contact details'
+      pressed={isOpen}
       disabled={!tableMeta.toggle}
-    >
-      <Icon className='h-4 w-4' />
-    </Button>
+      onClick={() => tableMeta.toggle?.()}
+      icon={<Icon />}
+    />
   );
 }

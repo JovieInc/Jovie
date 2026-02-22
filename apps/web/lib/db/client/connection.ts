@@ -118,7 +118,9 @@ export const db = new Proxy({} as DbType, {
         );
       };
     }
-    return Reflect.get(_db, prop);
+
+    const value = Reflect.get(_db, prop, _db);
+    return typeof value === 'function' ? value.bind(_db) : value;
   },
 });
 

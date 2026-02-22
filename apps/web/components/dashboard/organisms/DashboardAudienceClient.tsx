@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
-  parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
   useQueryState,
@@ -11,12 +10,11 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
+import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
 import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
-import { AudienceHeaderBadge } from './dashboard-audience-table/AudienceHeaderBadge';
 import type {
   AudienceFilters,
   AudienceView,
@@ -74,8 +72,6 @@ export interface DashboardAudienceClientProps {
  * Reuses audienceSortFields from the centralized lib/nuqs module to avoid drift.
  */
 const audienceUrlParsers = {
-  page: parseAsInteger.withDefault(1),
-  pageSize: parseAsInteger.withDefault(20),
   sort: parseAsStringLiteral(audienceSortFields).withDefault('lastSeen'),
   direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
 };
@@ -85,8 +81,6 @@ export function DashboardAudienceClient({
   view,
   initialRows,
   total,
-  page,
-  pageSize,
   sort,
   direction,
   profileUrl,
@@ -116,21 +110,24 @@ export function DashboardAudienceClient({
     })
   );
 
-  const handlePageChange = React.useCallback(
-    (nextPage: number) => {
-      const clampedPage = Math.max(1, Math.min(9999, Math.floor(nextPage)));
-      setUrlParams({ page: clampedPage });
-    },
-    [setUrlParams]
+  // Infinite query for audience data
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useAudienceInfiniteQuery({
+      profileId: profileId ?? '',
+      mode,
+      sort,
+      direction,
+      filters: initialFilters,
+      initialData: { rows: initialRows, total },
+    });
+
+  // Flatten pages into a single rows array
+  const rows = React.useMemo(
+    () => data?.pages.flatMap(p => p.rows) ?? initialRows,
+    [data?.pages, initialRows]
   );
 
-  const handlePageSizeChange = React.useCallback(
-    (nextPageSize: number) => {
-      const clampedSize = Math.max(1, Math.min(100, Math.floor(nextPageSize)));
-      setUrlParams({ pageSize: clampedSize, page: 1 });
-    },
-    [setUrlParams]
-  );
+  const totalCount = data?.pages[0]?.total ?? total;
 
   const handleSortChange = React.useCallback(
     (nextSort: string) => {
@@ -141,7 +138,6 @@ export function DashboardAudienceClient({
       setUrlParams({
         sort: nextSort as (typeof audienceUrlParsers.sort)['defaultValue'],
         direction: nextDirection,
-        page: 1,
       });
     },
     [sort, direction, setUrlParams]
@@ -149,10 +145,9 @@ export function DashboardAudienceClient({
 
   const handleViewChange = React.useCallback(
     (nextView: AudienceView) => {
-      // Reset to page 1, clear filters, and default sort when changing views
       setView(nextView);
       setSegments([]);
-      setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
+      setUrlParams({ sort: 'lastSeen', direction: 'desc' });
     },
     [setView, setSegments, setUrlParams]
   );
@@ -160,24 +155,15 @@ export function DashboardAudienceClient({
   const handleFiltersChange = React.useCallback(
     (nextFilters: AudienceFilters) => {
       setSegments(nextFilters.segments);
-      setUrlParams({ page: 1 });
     },
-    [setSegments, setUrlParams]
+    [setSegments]
   );
 
-  // Push audience segment control into the breadcrumb header bar
-  const { setHeaderBadge } = useSetHeaderActions();
-
-  const headerBadge = React.useMemo(
-    () => <AudienceHeaderBadge view={view} onViewChange={handleViewChange} />,
-    [view, handleViewChange]
-  );
-
-  React.useEffect(() => {
-    setHeaderBadge(headerBadge);
-    return () => setHeaderBadge(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge is a stable context setter
-  }, [headerBadge]);
+  const handleLoadMore = React.useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
@@ -192,14 +178,10 @@ export function DashboardAudienceClient({
           <DashboardAudienceTable
             mode={mode}
             view={view}
-            rows={initialRows}
-            total={total}
-            page={page}
-            pageSize={pageSize}
+            rows={rows}
+            total={totalCount}
             sort={sort}
             direction={direction}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
             onSortChange={handleSortChange}
             onViewChange={handleViewChange}
             onFiltersChange={handleFiltersChange}
@@ -207,6 +189,9 @@ export function DashboardAudienceClient({
             profileId={profileId}
             subscriberCount={subscriberCount}
             filters={initialFilters}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={handleLoadMore}
           />
         </div>
       </div>

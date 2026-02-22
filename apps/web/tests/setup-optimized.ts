@@ -36,6 +36,52 @@ vi.mock('react', async () => {
 // `server-only` throws when imported in non-Next runtimes; tests should noop it.
 vi.mock('server-only', () => ({}));
 
+// Mock @sentry/nextjs globally to prevent heavy SDK initialization (~50-70KB)
+// from causing test timeouts. Route handlers import @/lib/error-tracking which
+// transitively loads Sentry, taking >10s in jsdom. Individual test files that
+// need specific Sentry behavior can override this with their own vi.mock().
+vi.mock('@sentry/nextjs', () => {
+  const noop = vi.fn();
+  const noopLogger = {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+    disable: vi.fn(),
+    enable: vi.fn(),
+    isEnabled: vi.fn(() => false),
+  };
+  return {
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    captureRequestError: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    withScope: vi.fn((cb: (scope: unknown) => void) =>
+      cb({ setTag: noop, setExtra: noop, setLevel: noop })
+    ),
+    setTag: vi.fn(),
+    setExtra: vi.fn(),
+    setUser: vi.fn(),
+    setContext: vi.fn(),
+    init: vi.fn(),
+    startSpan: vi.fn((_options: unknown, cb: () => unknown) => cb()),
+    getClient: vi.fn(() => undefined),
+    getCurrentScope: vi.fn(() => ({
+      setTag: noop,
+      setExtra: noop,
+      setLevel: noop,
+    })),
+    logger: noopLogger,
+    breadcrumbsIntegration: vi.fn(() => ({})),
+    replayIntegration: vi.fn(() => ({})),
+    vercelAIIntegration: vi.fn(() => ({})),
+    diagnoseSdkConnectivity: vi.fn(),
+  };
+});
+
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();

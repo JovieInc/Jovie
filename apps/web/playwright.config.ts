@@ -59,12 +59,12 @@ export default defineConfig({
     timeout: 20_000,
     // Visual regression snapshot settings
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
+      maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
       threshold: 0.2, // Per-pixel color threshold
       animations: 'disabled',
     },
     toMatchSnapshot: {
-      maxDiffPixelRatio: 0.05,
+      maxDiffPixelRatio: 0.08,
       threshold: 0.2,
     },
   },

@@ -23,7 +23,7 @@ ALL_CHANGED="${CHANGED_FILES}${STAGED_FILES}"
 
 # If no code changes, allow stop
 if [ -z "$ALL_CHANGED" ]; then
-  echo '{"decision": "allow"}'
+  echo '{"continue": true}'
   exit 0
 fi
 
@@ -59,7 +59,7 @@ if [ ${#errors[@]} -gt 0 ]; then
   REASON+="\nFix these issues before completing."
   python3 -c "
 import json, sys
-print(json.dumps({'decision': 'block', 'reason': sys.argv[1]}))
+print(json.dumps({'continue': False, 'stopReason': sys.argv[1]}))
 " "$REASON"
   exit 0
 fi
@@ -70,13 +70,13 @@ if [ "$STOP_HOOK_ACTIVE" = "False" ]; then
   python3 -c "
 import json
 print(json.dumps({
-    'decision': 'block',
-    'reason': 'All automated checks passed (typecheck, lint, boundaries, tests). Before completing, please also:\n1. Run /simplify on your changes to clean up recently modified code\n2. Run /coderabbit:review to catch issues static analysis misses\n3. Fix any findings from above, then complete.'
+    'continue': False,
+    'stopReason': 'All automated checks passed (typecheck, lint, boundaries, tests). Before completing, please also:\n1. Run /simplify on your changes to clean up recently modified code\n2. Run /coderabbit:review to catch issues static analysis misses\n3. Fix any findings from above, then complete.'
 }))
 "
   exit 0
 fi
 
 # Second stop (stop_hook_active=True) — validation passed, allow completion
-echo '{"decision": "allow"}'
+echo '{"continue": true}'
 exit 0

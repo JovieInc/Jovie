@@ -7,8 +7,6 @@ import type { AudienceMember } from '@/types';
 interface AudienceTableContextValue {
   readonly selectedIds: Set<string>;
   readonly toggleSelect: (id: string) => void;
-  readonly page: number;
-  readonly pageSize: number;
   readonly openMenuRowId: string | null;
   readonly setOpenMenuRowId: (id: string | null) => void;
   readonly getContextMenuItems: (

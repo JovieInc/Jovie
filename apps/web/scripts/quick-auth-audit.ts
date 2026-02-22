@@ -93,16 +93,13 @@ async function auditSignIn(browser: any, screenshotsDir: string) {
   const emailBtn = await page
     .locator('button:has-text("Continue with email")')
     .count();
-  const spotifyBtn = await page
-    .locator('button:has-text("Continue with Spotify")')
-    .count();
 
-  if (googleBtn === 0 || emailBtn === 0 || spotifyBtn === 0) {
+  if (googleBtn === 0 || emailBtn === 0) {
     issues.push({
       screen: '/signin',
       severity: 'P0',
       title: 'Missing auth method buttons',
-      description: `Google: ${googleBtn}, Email: ${emailBtn}, Spotify: ${spotifyBtn}`,
+      description: `Google: ${googleBtn}, Email: ${emailBtn}`,
       screenshot: desktopScreenshot,
     });
     console.log(`  🚨 Critical issue: Missing auth buttons`);

@@ -5,7 +5,38 @@ interface ReliabilityCardProps {
   readonly summary: AdminReliabilitySummary;
 }
 
+type HealthTone = {
+  label: 'Healthy' | 'Needs attention' | 'Critical';
+  labelClassName: string;
+  iconClassName: string;
+};
+
+function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
+  if (summary.incidents24h >= 5 || summary.errorRatePercent >= 5) {
+    return {
+      label: 'Critical',
+      labelClassName: 'text-red-600 dark:text-red-400',
+      iconClassName: 'text-red-500',
+    };
+  }
+
+  if (summary.incidents24h >= 1 || summary.errorRatePercent >= 1) {
+    return {
+      label: 'Needs attention',
+      labelClassName: 'text-amber-600 dark:text-amber-400',
+      iconClassName: 'text-amber-500',
+    };
+  }
+
+  return {
+    label: 'Healthy',
+    labelClassName: 'text-emerald-600 dark:text-emerald-400',
+    iconClassName: 'text-emerald-500',
+  };
+}
+
 export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
+  const tone = getHealthTone(summary);
   const errorRateLabel = `${summary.errorRatePercent.toFixed(2)}%`;
   const latencyLabel =
     summary.p95LatencyMs === null
@@ -25,14 +56,14 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           </h3>
           <p className='text-xs text-tertiary-token'>System health metrics</p>
         </div>
-        <span className='text-xs font-medium text-emerald-600 dark:text-emerald-400'>
-          Healthy
+        <span className={`text-xs font-medium ${tone.labelClassName}`}>
+          {tone.label}
         </span>
       </div>
       <div className='space-y-3 text-sm text-secondary-token'>
         <div className='flex items-center justify-between py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <CheckCircle2 className='size-4 text-emerald-500' />
+            <CheckCircle2 className={`size-4 ${tone.iconClassName}`} />
             Error rate
           </div>
           <span className='text-primary-token tabular-nums'>

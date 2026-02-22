@@ -116,7 +116,7 @@ Detects CONCURRENTLY in migration files and **blocks the commit**.
 
 CI will **fail** if CONCURRENTLY is detected.
 
-### 3. agents.md Documentation ✅
+### 3. AGENTS.md Documentation ✅
 Section 5.2 now has the **correct** guidance (previously had wrong info).
 
 ### 4. This Reference Doc ✅
@@ -128,10 +128,10 @@ Permanent reminder of the rule and why it exists.
 1. **Dec 6, 2024**: Migration 0004 used CONCURRENTLY → E2E tests failed
 2. **Dec 7, 2024**: Attempted fix with migration 0008 → didn't work
 3. **Dec 7, 2024**: Fixed by removing CONCURRENTLY from migration 0004
-4. **Dec 7, 2024**: Updated agents.md to prevent future occurrences
+4. **Dec 7, 2024**: Updated AGENTS.md to prevent future occurrences
 
 ### Root Cause
-- Initial `agents.md` had **incorrect guidance** saying to use CONCURRENTLY
+- Initial `AGENTS.md` had **incorrect guidance** saying to use CONCURRENTLY
 - AI agents followed the documentation faithfully
 - Created a feedback loop of broken migrations
 
@@ -158,7 +158,7 @@ If you need CONCURRENTLY for a specific reason:
 ## Related Files
 
 - **Validation script**: `scripts/validate-migrations.sh`
-- **Agent guide**: `agents.md` (Section 5.2)
+- **Agent guide**: `AGENTS.md` (Section 5.2)
 - **Pre-commit config**: `package.json` (lint-staged)
 - **CI workflow**: `.github/workflows/ci.yml`
 

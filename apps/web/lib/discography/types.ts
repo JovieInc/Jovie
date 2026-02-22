@@ -95,6 +95,8 @@ export interface ReleaseViewModel {
   originalArtworkUrl?: string;
   /** Whether this release has short-form video provider links (TikTok, Reels, Shorts) */
   hasVideoLinks?: boolean;
+  /** Editable lyrics text stored in release metadata */
+  lyrics?: string;
 }
 
 /** Track view model for display in expandable release rows */

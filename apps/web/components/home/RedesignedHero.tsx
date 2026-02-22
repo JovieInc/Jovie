@@ -1,12 +1,33 @@
+import type { FeaturedCreator } from '@/lib/featured-creators';
+import { getFeaturedCreators } from '@/lib/featured-creators';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
+
+const FALLBACK_CREATOR: FeaturedCreator = {
+  id: 'fallback',
+  handle: 'tim',
+  name: 'Tim White',
+  src: '/images/hero/tim-profile.avif',
+  tagline: null,
+  genres: ['Artist'],
+  latestReleaseTitle: 'Afterglow (Deluxe)',
+  latestReleaseType: 'Album',
+};
 
 /**
  * RedesignedHero — F-layout hero: copy left, profile mockup right.
  * Linear.app-inspired: floating card with browser chrome, deep shadows, slight 3D tilt.
  */
-export function RedesignedHero() {
+export async function RedesignedHero() {
+  let creators: FeaturedCreator[] = [];
+  try {
+    creators = await getFeaturedCreators();
+  } catch {
+    // Fall through to fallback
+  }
+  const featuredCreator = creators[0] ?? FALLBACK_CREATOR;
+
   return (
     <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 sm:px-6 lg:px-[77px]'>
       {/* Ambient glow */}
@@ -16,21 +37,20 @@ export function RedesignedHero() {
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative grid w-full grid-cols-1 items-center gap-12 py-16 md:grid-cols-[1fr_auto] md:gap-16 lg:gap-20 lg:py-20'>
-        {/* ---- Left column: Copy + CTA ---- */}
+      <div className='relative grid w-full grid-cols-1 items-center gap-10 py-12 md:grid-cols-[1fr_auto] md:gap-12 lg:gap-16 lg:py-16'>
         <div>
           <h1
             style={{
-              fontSize: 'clamp(40px, calc(20px + 3.5vw), 64px)',
+              fontSize: 'clamp(36px, calc(18px + 3.2vw), 56px)',
               fontWeight: 510,
-              lineHeight: 1,
+              lineHeight: 1.05,
               letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
               fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-              fontVariationSettings: '"opsz" 64',
+              fontVariationSettings: '"opsz" 56',
             }}
           >
-            <span className='whitespace-nowrap'>Your entire music career.</span>
+            One-click artist profiles
             <br />
             <span
               style={{
@@ -41,12 +61,12 @@ export function RedesignedHero() {
                 backgroundClip: 'text',
               }}
             >
-              One intelligent link.
+              that actually convert.
             </span>
           </h1>
 
           <p
-            className='mt-5 max-w-[440px]'
+            className='mt-4 max-w-[400px]'
             style={{
               fontSize: '15px',
               fontWeight: 400,
@@ -55,17 +75,15 @@ export function RedesignedHero() {
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Jovie builds your link-in-bio from Spotify in 30 seconds — with
-            smart links for every release, automatic email capture, and fan
-            retargeting built in.
+            Your entire music career. One link. Ready in seconds.
           </p>
 
-          <div className='mt-10 max-w-[440px]'>
+          <div className='mt-8 max-w-[400px]'>
             <HeroSpotifySearch />
           </div>
 
           <p
-            className='mt-5 flex items-center gap-2'
+            className='mt-4 flex items-center gap-2'
             style={{
               fontSize: '13px',
               letterSpacing: '0.01em',
@@ -80,23 +98,17 @@ export function RedesignedHero() {
           </p>
         </div>
 
-        {/* ---- Right column: Profile mockup ---- */}
         <div className='relative hidden md:flex md:flex-col md:items-center'>
-          <HeroProfileMockup />
+          <HeroProfileMockup creator={featuredCreator} />
         </div>
       </div>
     </section>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Linear.app-style floating profile card                             */
-/* ------------------------------------------------------------------ */
-
-function HeroProfileMockup() {
+function HeroProfileMockup({ creator }: { readonly creator: FeaturedCreator }) {
   return (
     <div className='flex flex-col items-center'>
-      {/* Ambient glow behind card */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute -inset-20'
@@ -106,7 +118,6 @@ function HeroProfileMockup() {
         }}
       />
 
-      {/* Cropped viewport — top 2/3 with bottom fade */}
       <div
         className='relative overflow-hidden'
         style={{
@@ -116,7 +127,6 @@ function HeroProfileMockup() {
           perspectiveOrigin: '50% 40%',
         }}
       >
-        {/* The phone, slightly tilted like Linear's product shots */}
         <div
           style={{
             transform: 'rotateY(-3deg) rotateX(1deg)',
@@ -124,11 +134,10 @@ function HeroProfileMockup() {
           }}
         >
           <PhoneFrame>
-            <MobileProfilePreview />
+            <MobileProfilePreview creator={creator} />
           </PhoneFrame>
         </div>
 
-        {/* Bottom fade — crops into page background */}
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 bottom-0'
@@ -140,18 +149,25 @@ function HeroProfileMockup() {
         />
       </div>
 
-      {/* URL label */}
-      <p
-        className='mt-3'
+      <div
+        className='mt-3 rounded-full border px-3 py-1.5'
         style={{
-          fontSize: '13px',
-          fontWeight: 450,
-          letterSpacing: '-0.005em',
-          color: 'var(--linear-text-tertiary)',
+          borderColor: 'var(--linear-border-subtle)',
+          background: 'rgba(255, 255, 255, 0.02)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
         }}
       >
-        jov.ie
-      </p>
+        <p
+          style={{
+            fontSize: '12px',
+            fontWeight: 500,
+            letterSpacing: '-0.005em',
+            color: 'var(--linear-text-secondary)',
+          }}
+        >
+          jov.ie/{creator.handle}
+        </p>
+      </div>
     </div>
   );
 }

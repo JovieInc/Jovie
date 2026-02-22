@@ -26,13 +26,16 @@ import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
 import { AdminTablePagination } from '../table/AdminTablePagination';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
+import {
+  persistGroupingPreference,
+  persistViewModePreference,
+  readGroupingPreference,
+  readViewModePreference,
+} from './storage';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import { usePagination } from './usePagination';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
-
-const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
-const GROUPING_STORAGE_KEY = 'waitlist-grouping-enabled';
 
 /**
  * AdminWaitlistTableWithViews - Enhanced waitlist table with view mode switching
@@ -48,37 +51,21 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const { entries, page, pageSize, total } = props;
 
   // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-      if (stored === 'list' || stored === 'board') {
-        return stored;
-      }
-    }
-    return 'list';
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>(readViewModePreference);
 
   // Grouping state with localStorage persistence (only for list view)
-  const [groupingEnabled, setGroupingEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(GROUPING_STORAGE_KEY);
-      return stored === 'true';
-    }
-    return false;
-  });
+  const [groupingEnabled, setGroupingEnabled] = useState<boolean>(
+    readGroupingPreference
+  );
 
   // Persist view mode to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-    }
+    persistViewModePreference(viewMode);
   }, [viewMode]);
 
   // Persist grouping preference to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(GROUPING_STORAGE_KEY, String(groupingEnabled));
-    }
+    persistGroupingPreference(groupingEnabled);
   }, [groupingEnabled]);
 
   const { totalPages, canPrev, canNext, from, to, prevHref, nextHref } =

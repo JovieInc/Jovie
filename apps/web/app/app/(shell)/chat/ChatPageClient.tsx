@@ -11,9 +11,12 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
 
@@ -42,6 +45,13 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+
+  // Register ProfileContactSidebar in the unified right panel system
+  useRegisterRightPanel(
+    <ErrorBoundary fallback={null}>
+      <ProfileContactSidebar />
+    </ErrorBoundary>
+  );
 
   // Fetch social links for the selected profile
   const profileId = selectedProfile?.id ?? '';

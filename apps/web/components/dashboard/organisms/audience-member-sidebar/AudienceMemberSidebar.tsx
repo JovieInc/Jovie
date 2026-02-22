@@ -48,7 +48,7 @@ export function AudienceMemberSidebar({
     >
       <DrawerHeader title='Contact' onClose={onClose} />
 
-      <div className='flex-1 min-h-0 overflow-auto p-4 space-y-6'>
+      <div className='flex-1 min-h-0 overflow-auto px-4 py-4 space-y-4'>
         <AudienceMemberHeader
           title={title}
           subtitle={subtitle}
@@ -57,7 +57,7 @@ export function AudienceMemberSidebar({
         />
 
         {member ? (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <AudienceMemberDetails member={member} />
 
             <DrawerSection title='Recent actions'>

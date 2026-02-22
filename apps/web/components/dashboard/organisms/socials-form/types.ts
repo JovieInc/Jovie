@@ -4,6 +4,8 @@ export interface SocialLink {
   id: string;
   platform: string;
   url: string;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
+  verificationToken?: string | null;
 }
 
 export interface SocialsFormProps {
@@ -25,4 +27,6 @@ export interface UseSocialsFormReturn {
   scheduleNormalize: (index: number, raw: string) => void;
   handleUrlBlur: (index: number) => void;
   addSocialLink: () => void;
+  verifyWebsite: (linkId: string) => Promise<void>;
+  verifyingLinkId: string | null;
 }
