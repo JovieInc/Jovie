@@ -12,10 +12,10 @@
 export const CHAT_MODEL = 'anthropic/claude-sonnet-4-20250514';
 
 /** Lightweight chat model for simple tool-calling tasks (profile edits, link adds) */
-export const CHAT_MODEL_LIGHT = 'anthropic/claude-haiku-4-5-20251001';
+export const CHAT_MODEL_LIGHT = 'anthropic/claude-haiku-4.5';
 
 /** Model used for AI-generated analytics insights */
-export const INSIGHT_MODEL = 'anthropic/claude-haiku-4-5-20251001';
+export const INSIGHT_MODEL = 'anthropic/claude-haiku-4.5';
 
 /** Lightweight model used for generating conversation titles */
 export const TITLE_MODEL = 'google/gemini-2.0-flash';
