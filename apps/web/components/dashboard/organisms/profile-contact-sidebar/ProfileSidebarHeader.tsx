@@ -20,7 +20,6 @@ interface ProfileSidebarHeaderProps {
   readonly username: string;
   readonly displayName: string;
   readonly profilePath: string;
-  readonly onClose: () => void;
 }
 
 function generateVCard(
@@ -42,7 +41,6 @@ export function ProfileSidebarHeader({
   username,
   displayName,
   profilePath,
-  onClose,
 }: ProfileSidebarHeaderProps) {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,7 +91,7 @@ export function ProfileSidebarHeader({
     toast.success('QR code downloaded');
   };
 
-  // Primary actions: Copy (close is handled by DrawerHeader)
+  // Primary actions: Copy
   const primaryActions: DrawerHeaderAction[] = [
     {
       id: 'copy',
@@ -130,7 +128,6 @@ export function ProfileSidebarHeader({
   return (
     <DrawerHeader
       title='Profile details'
-      onClose={onClose}
       actions={
         <DrawerHeaderActions
           primaryActions={primaryActions}
