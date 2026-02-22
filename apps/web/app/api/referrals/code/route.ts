@@ -7,6 +7,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError } from '@/lib/error-tracking';
 import {
   getInternalUserId,
   getOrCreateReferralCode,
@@ -43,6 +44,10 @@ export async function GET() {
     );
   } catch (error) {
     logger.error('Error getting referral code:', error);
+    captureError('Failed to get referral code', error, {
+      route: '/api/referrals/code',
+      method: 'GET',
+    });
     return NextResponse.json(
       { error: 'Failed to get referral code' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -90,6 +95,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error creating referral code:', error);
+    captureError('Failed to create referral code', error, {
+      route: '/api/referrals/code',
+      method: 'POST',
+    });
 
     // Only expose validation error messages, not internal errors
     if (
