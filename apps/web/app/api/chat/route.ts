@@ -7,6 +7,7 @@ import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
+import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -42,25 +43,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
-
-/**
- * Editable profile fields by tier:
- * - Tier 1 (Safe): Non-destructive fields that can be freely edited
- * - Tier 2 (Careful): Fields that need confirmation before applying
- * - Tier 3 (Blocked): Cannot be edited via chat - requires settings page
- */
-const EDITABLE_FIELDS = {
-  tier1: ['displayName', 'bio'] as const,
-  tier2: [] as const,
-  blocked: ['username', 'spotifyId', 'genres'] as const,
-};
-
-type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
-
-const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
-  displayName: 'Display name shown on your profile',
-  bio: 'Artist bio/description',
-};
 
 /**
  * Zod schema for validating client-provided artist context.
@@ -449,40 +431,6 @@ When asked to edit genres, explain that genres are automatically synced from the
 This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), and add social links (proposeSocialLink). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
       : ''
   }`;
-}
-
-/**
- * Creates the proposeProfileEdit tool for the AI to suggest profile changes.
- * This tool only returns a preview - actual changes require user confirmation.
- */
-function createProfileEditTool(context: ArtistContext) {
-  const profileEditSchema = z.object({
-    field: z.enum(['displayName', 'bio']).describe('The profile field to edit'),
-    newValue: z.string().describe('The new value for the field.'),
-    reason: z
-      .string()
-      .optional()
-      .describe('Brief explanation of why this change was suggested'),
-  });
-
-  return tool({
-    description:
-      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio.',
-    inputSchema: profileEditSchema,
-    execute: async ({ field, newValue, reason }) => {
-      // Return preview data for the UI to render
-      return {
-        success: true,
-        preview: {
-          field,
-          fieldLabel: FIELD_DESCRIPTIONS[field],
-          currentValue: context[field],
-          newValue,
-          reason,
-        },
-      };
-    },
-  });
 }
 
 /**

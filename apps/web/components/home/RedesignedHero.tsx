@@ -6,13 +6,13 @@ import { PhoneFrame } from './PhoneFrame';
 
 const FALLBACK_CREATOR: FeaturedCreator = {
   id: 'fallback',
-  handle: 'artist',
-  name: 'Your Name Here',
-  src: '/android-chrome-192x192.png',
-  tagline: 'Independent artist',
-  genres: ['Independent artist'],
-  latestReleaseTitle: 'New release coming soon',
-  latestReleaseType: null,
+  handle: 'tim',
+  name: 'Tim White',
+  src: '/images/hero/tim-profile.avif',
+  tagline: null,
+  genres: ['Artist'],
+  latestReleaseTitle: 'Afterglow (Deluxe)',
+  latestReleaseType: 'Album',
 };
 
 /**
@@ -37,20 +37,20 @@ export async function RedesignedHero() {
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative grid w-full grid-cols-1 items-center gap-12 py-16 md:grid-cols-[1fr_auto] md:gap-16 lg:gap-20 lg:py-20'>
+      <div className='relative grid w-full grid-cols-1 items-center gap-10 py-12 md:grid-cols-[1fr_auto] md:gap-12 lg:gap-16 lg:py-16'>
         <div>
           <h1
             style={{
-              fontSize: 'clamp(40px, calc(20px + 3.5vw), 64px)',
+              fontSize: 'clamp(36px, calc(18px + 3.2vw), 56px)',
               fontWeight: 510,
-              lineHeight: 1,
+              lineHeight: 1.05,
               letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
               fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-              fontVariationSettings: '"opsz" 64',
+              fontVariationSettings: '"opsz" 56',
             }}
           >
-            <span className='whitespace-nowrap'>Your entire music career.</span>
+            One-click artist profiles
             <br />
             <span
               style={{
@@ -61,12 +61,12 @@ export async function RedesignedHero() {
                 backgroundClip: 'text',
               }}
             >
-              One intelligent link.
+              that actually convert.
             </span>
           </h1>
 
           <p
-            className='mt-5 max-w-[440px]'
+            className='mt-4 max-w-[400px]'
             style={{
               fontSize: '15px',
               fontWeight: 400,
@@ -75,17 +75,15 @@ export async function RedesignedHero() {
               color: 'var(--linear-text-secondary)',
             }}
           >
-            Jovie builds your link-in-bio from Spotify in 30 seconds — with
-            smart links for every release, automatic email capture, and fan
-            retargeting built in.
+            Your entire music career. One link. Ready in seconds.
           </p>
 
-          <div className='mt-10 max-w-[440px]'>
+          <div className='mt-8 max-w-[400px]'>
             <HeroSpotifySearch />
           </div>
 
           <p
-            className='mt-5 flex items-center gap-2'
+            className='mt-4 flex items-center gap-2'
             style={{
               fontSize: '13px',
               letterSpacing: '0.01em',
