@@ -21,7 +21,6 @@ import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
-import { mobileReleaseTokens } from '@/components/dashboard/tokens';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { APP_ROUTES } from '@/constants/routes';
@@ -80,8 +79,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
-    totalReleases,
-    totalOverrides,
     openEditor,
     closeEditor,
     handleCopy,
@@ -680,31 +677,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
           </div>
-
-          {/* Footer - simplified count + reset */}
-          {rows.length > 0 && (
-            <div className={mobileReleaseTokens.footer.container}>
-              <span>
-                {filteredRows.length === rows.length
-                  ? `${totalReleases}`
-                  : `${filteredRows.length} of ${totalReleases}`}{' '}
-                {totalReleases === 1 ? 'release' : 'releases'}
-                {totalOverrides > 0 && (
-                  <span className='ml-1.5 text-tertiary-token'>
-                    ({totalOverrides} manual{' '}
-                    {totalOverrides === 1 ? 'override' : 'overrides'})
-                  </span>
-                )}
-              </span>
-              <button
-                type='button'
-                onClick={resetToDefaults}
-                className={mobileReleaseTokens.footer.resetButton}
-              >
-                Reset display
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
