@@ -186,6 +186,13 @@ export function ProfileShell({
                       className='flex flex-wrap items-center justify-center gap-3'
                       data-testid='social-links'
                     >
+                      {/* Mail (contacts) — left */}
+                      <ArtistContactsButton
+                        contacts={contacts}
+                        artistHandle={artist.handle}
+                        artistName={artist.name}
+                      />
+                      {/* Social icons — middle */}
                       {(showSocialBar || hasActiveSubscriptions) &&
                         hasSocialLinks &&
                         socialNetworkLinks.map(link => (
@@ -196,11 +203,7 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
-                      <ArtistContactsButton
-                        contacts={contacts}
-                        artistHandle={artist.handle}
-                        artistName={artist.name}
-                      />
+                      {/* Tip — right */}
                       {hasTipSupport &&
                         venmoLink &&
                         (isMobile ? (

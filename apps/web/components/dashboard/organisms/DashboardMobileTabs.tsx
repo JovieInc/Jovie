@@ -1,5 +1,7 @@
 'use client';
 
+import { useClerk } from '@clerk/nextjs';
+import { useCallback } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   adminNavigation,
@@ -27,12 +29,18 @@ export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
+  const { signOut } = useClerk();
+
+  const handleSignOut = useCallback(() => {
+    void signOut({ redirectUrl: '/' });
+  }, [signOut]);
 
   return (
     <LiquidGlassMenu
       primaryItems={PRIMARY_ITEMS}
       expandedItems={EXPANDED_ITEMS}
       adminItems={isAdmin ? ADMIN_ITEMS : undefined}
+      onSignOut={handleSignOut}
       className={cn('lg:hidden', className)}
     />
   );

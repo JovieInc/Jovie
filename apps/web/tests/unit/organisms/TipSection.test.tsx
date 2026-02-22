@@ -89,7 +89,11 @@ describe('TipSection', () => {
     );
 
     expect(screen.getByText('Choose payment method')).toBeInTheDocument();
-    expect(screen.getByText('Apple Pay / Card')).toBeInTheDocument();
-    expect(screen.getByText('Venmo')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Pay with Apple Pay or Card' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Pay with Venmo' })
+    ).toBeInTheDocument();
   });
 });

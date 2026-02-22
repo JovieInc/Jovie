@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreHorizontal, Search } from 'lucide-react';
+import { LogOut, MoreHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,6 +31,7 @@ export interface LiquidGlassMenuProps {
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
   readonly onSearchClick?: () => void;
+  readonly onSignOut?: () => void;
   readonly className?: string;
 }
 
@@ -210,6 +211,7 @@ export function LiquidGlassMenu({
   expandedItems,
   adminItems,
   onSearchClick,
+  onSignOut,
   className,
 }: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
@@ -299,6 +301,24 @@ export function LiquidGlassMenu({
                       active={isActive(item.href)}
                     />
                   ))}
+                </>
+              )}
+
+              {/* Sign out */}
+              {onSignOut && (
+                <>
+                  <div className='my-2 mx-1 border-t border-default/30' />
+                  <button
+                    type='button'
+                    onClick={onSignOut}
+                    className='flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-secondary-token transition-all duration-150 hover:text-primary-token hover:bg-bg-surface-2/50 active:scale-[0.98]'
+                  >
+                    <LogOut
+                      className='size-5 shrink-0 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                    <span className='flex-1 text-left'>Sign out</span>
+                  </button>
                 </>
               )}
             </div>
