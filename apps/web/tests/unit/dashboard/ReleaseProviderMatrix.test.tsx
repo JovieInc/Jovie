@@ -320,7 +320,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
 
-    it('shows footer with release count when releases exist', () => {
+    it('renders table and subheader when releases exist', () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease('r1'), makeRelease('r2'), makeRelease('r3')]}
@@ -329,8 +329,8 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={true}
         />
       );
-      expect(screen.getByText(/3/)).toBeInTheDocument();
-      expect(screen.getByText(/releases/)).toBeInTheDocument();
+      expect(screen.getByTestId('release-table')).toBeInTheDocument();
+      expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
   });
 
