@@ -27,7 +27,7 @@ export function SettingsNotificationsSection({
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Double opt-in email confirmation'
-          description='Protect your audience from spam by requiring subscribers to confirm their email. This safeguard is available on Growth. Need access sooner? Contact support.'
+          description='Subscriber emails use double opt-in by default to prevent spam. On Growth, you can disable this if you use a separate provider (for example, Mailchimp or webhooks).'
           checked={checked}
           onCheckedChange={handleToggle}
           disabled={isPending || !isGrowth}

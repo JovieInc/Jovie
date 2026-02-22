@@ -18,6 +18,7 @@ import {
   Switch,
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
+import { LISTEN_COOKIE } from '@/constants/app';
 import { useUpdateContentPreferencesMutation } from '@/lib/queries';
 import {
   NOTIFICATION_CONTENT_TYPES,
@@ -41,6 +42,7 @@ const DEFAULT_CONTENT_PREFS: ContentPrefs = {
 
 export function ProfileNotificationsMenu({
   artistId,
+  availableDspPreferences,
   channelBusy,
   contentPreferences,
   hasActiveSubscriptions,
@@ -75,6 +77,60 @@ export function ProfileNotificationsMenu({
       setContentPrefs(prev => ({ ...prev, ...contentPreferences }));
     }
   }, [contentPreferences]);
+
+  const [selectedDspPreference, setSelectedDspPreference] =
+    useState<string>('');
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const cookieValue = document.cookie
+      .split(';')
+      .find(cookie => cookie.trim().startsWith(`${LISTEN_COOKIE}=`))
+      ?.split('=')[1];
+
+    if (!cookieValue) {
+      setSelectedDspPreference('');
+      return;
+    }
+
+    const hasMatch = availableDspPreferences.some(
+      preference => preference.key === cookieValue
+    );
+    setSelectedDspPreference(hasMatch ? cookieValue : '');
+  }, [availableDspPreferences]);
+
+  const handleDspPreferenceChange = useCallback(
+    (nextValue: string) => {
+      if (typeof document === 'undefined') return;
+
+      // Clear preference when empty option is selected
+      if (!nextValue) {
+        document.cookie = `${LISTEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+        try {
+          localStorage.removeItem(LISTEN_COOKIE);
+        } catch {
+          // Ignore storage errors (private mode, disabled storage)
+        }
+        setSelectedDspPreference('');
+        return;
+      }
+
+      const preference = availableDspPreferences.find(
+        item => item.key === nextValue
+      );
+      if (!preference) return;
+
+      document.cookie = `${LISTEN_COOKIE}=${preference.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+      try {
+        localStorage.setItem(LISTEN_COOKIE, preference.key);
+      } catch {
+        // Ignore storage errors (private mode, disabled storage)
+      }
+      setSelectedDspPreference(preference.key);
+    },
+    [availableDspPreferences]
+  );
 
   const handleContentToggle = useCallback(
     (key: NotificationContentType) => {
@@ -207,6 +263,33 @@ export function ProfileNotificationsMenu({
               …
             </span>
           </DropdownMenuItem>
+
+          {/* ── Listening preference ───────────────────── */}
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+            Listening preference
+          </DropdownMenuLabel>
+          <div className='px-2 pb-2'>
+            <label htmlFor='preferred-dsp-select' className='sr-only'>
+              Preferred streaming platform
+            </label>
+            <select
+              id='preferred-dsp-select'
+              value={selectedDspPreference}
+              onChange={event => handleDspPreferenceChange(event.target.value)}
+              className='h-9 w-full rounded-md border border-subtle bg-surface-0 px-2 text-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+            >
+              <option value=''>Choose your platform</option>
+              {availableDspPreferences.map(preference => (
+                <option key={preference.key} value={preference.key}>
+                  {preference.label}
+                </option>
+              ))}
+            </select>
+            <p className='pt-1 text-xs text-tertiary-token'>
+              We&apos;ll open this platform first on future smart links.
+            </p>
+          </div>
 
           {/* ── Content types ────────────────────────── */}
           <DropdownMenuSeparator />

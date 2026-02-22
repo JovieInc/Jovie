@@ -6,7 +6,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Share2 } from 'lucide-react';
+import { Instagram, Link2, Mail, Music2, Share2, Twitter } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ContextMenuItemType } from '@/components/organisms/table';
@@ -14,6 +14,19 @@ import type { ContextMenuAction } from '@/components/organisms/table/molecules/T
 import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
+
+const UTM_PRESET_ICONS = {
+  Instagram,
+  Music2,
+  Twitter,
+  Mail,
+} as const;
+
+function resolvePresetIcon(preset: UTMPreset) {
+  return (
+    UTM_PRESET_ICONS[preset.icon as keyof typeof UTM_PRESET_ICONS] ?? Link2
+  );
+}
 
 /**
  * Copy a UTM-tagged URL to the clipboard with toast feedback.
@@ -151,6 +164,7 @@ export function getUTMShareDropdownItems(params: {
     type: 'action' as const,
     id: `utm-share-${preset.id}`,
     label: preset.label,
+    icon: resolvePresetIcon(preset),
     onClick: () => {
       void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
         onCopied?.(preset.id);

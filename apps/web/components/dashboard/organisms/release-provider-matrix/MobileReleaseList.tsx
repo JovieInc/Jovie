@@ -8,6 +8,7 @@ import {
   SwipeToRevealGroup,
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { mobileReleaseTokens } from '@/components/dashboard/tokens';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -96,21 +97,24 @@ const SwipeActions = memo(function SwipeActions({
       <button
         type='button'
         onClick={() => onEdit(release)}
-        className='flex w-16 flex-col items-center justify-center gap-1 bg-indigo-500 text-white active:bg-indigo-600'
+        className={cn(
+          mobileReleaseTokens.swipeActions.button,
+          mobileReleaseTokens.swipeActions.edit
+        )}
         aria-label={`Edit ${release.title}`}
       >
         <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
-        <span className='text-[10px] font-medium'>Edit</span>
+        <span className={mobileReleaseTokens.swipeActions.label}>Edit</span>
       </button>
       <button
         type='button'
         onClick={handleCopy}
         disabled={isLocked || !onCopy}
         className={cn(
-          'flex w-16 flex-col items-center justify-center gap-1 text-white active:opacity-80',
+          mobileReleaseTokens.swipeActions.button,
           isLocked
-            ? 'bg-neutral-400 opacity-60'
-            : 'bg-sky-500 active:bg-sky-600'
+            ? mobileReleaseTokens.swipeActions.locked
+            : mobileReleaseTokens.swipeActions.link
         )}
         aria-label={
           isLocked ? lockedAriaLabel : `Copy smart link for ${release.title}`
@@ -123,7 +127,7 @@ const SwipeActions = memo(function SwipeActions({
           className='h-4 w-4'
           aria-hidden='true'
         />
-        <span className='text-[10px] font-medium'>
+        <span className={mobileReleaseTokens.swipeActions.label}>
           {isLocked ? lockedLabel : 'Link'}
         </span>
       </button>
@@ -185,7 +189,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
       <button
         type='button'
         onClick={() => onEdit(release)}
-        className='flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
+        className={mobileReleaseTokens.row.container}
       >
         {/* Artwork thumbnail */}
         <ReleaseArtworkThumb
@@ -196,25 +200,17 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         {/* Title + metadata */}
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-1.5'>
-            <TruncatedText
-              lines={1}
-              className='text-sm font-semibold text-primary-token'
-            >
+            <TruncatedText lines={1} className={mobileReleaseTokens.row.title}>
               {release.title}
             </TruncatedText>
-            <span
-              className={cn(
-                'shrink-0 text-[10px] font-medium uppercase tracking-wide',
-                typeStyle.text
-              )}
-            >
+            <span className={cn(mobileReleaseTokens.row.type, typeStyle.text)}>
               {typeStyle.label}
             </span>
           </div>
           {artistName && (
             <TruncatedText
               lines={1}
-              className='mt-0.5 text-xs text-secondary-token'
+              className={mobileReleaseTokens.row.subtitle}
             >
               {artistName}
             </TruncatedText>
@@ -222,16 +218,12 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         </div>
 
         {/* Year on the right */}
-        {year && (
-          <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
-            {year}
-          </span>
-        )}
+        {year && <span className={mobileReleaseTokens.row.year}>{year}</span>}
 
         {/* Chevron indicator */}
         <Icon
           name='ChevronRight'
-          className='h-4 w-4 shrink-0 text-tertiary-token'
+          className={mobileReleaseTokens.row.chevron}
           aria-hidden='true'
         />
       </button>
@@ -245,8 +237,8 @@ function YearGroupHeader({
   count,
 }: Readonly<{ year: string; count: number }>) {
   return (
-    <div className='sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2'>
-      <span className='text-sm font-semibold text-primary-token'>{year}</span>
+    <div className={mobileReleaseTokens.groupHeader}>
+      <span className={mobileReleaseTokens.row.title}>{year}</span>
       <span className='text-xs tabular-nums text-tertiary-token'>{count}</span>
     </div>
   );
