@@ -69,6 +69,7 @@ function useImpressionTracking(handle: string) {
       handle,
       placement: 'profile_inline',
       variant: 'two_step',
+      experiment_group: 'two_step',
     });
     setTracked(true);
   }, [tracked, handle]);
