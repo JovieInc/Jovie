@@ -159,7 +159,9 @@ describe('DSP Utils', () => {
       ]);
     });
 
-    it('prioritizes Apple Music on iOS when device weighting is enabled', () => {
+    it('preserves geo ordering as primary even when device weighting is enabled on iOS', () => {
+      // US geo ranks: spotify=0, apple_music=1, youtube=2
+      // Device priority is only a tiebreaker, so geo order is preserved
       const result = sortDSPsForDevice([...dspSet], {
         countryCode: 'US',
         platform: 'ios',
@@ -167,10 +169,26 @@ describe('DSP Utils', () => {
       });
 
       expect(result.map(d => d.key)).toEqual([
-        'apple_music',
         'spotify',
+        'apple_music',
         'youtube',
       ]);
+    });
+
+    it('uses device weighting as tiebreaker when geo ranks are equal', () => {
+      // With distinct global ranks, device priority does not change order
+      const withoutDevice = sortDSPsForDevice([...dspSet], {
+        countryCode: null,
+        platform: 'ios',
+        enableDevicePriority: false,
+      });
+      const withDevice = sortDSPsForDevice([...dspSet], {
+        countryCode: null,
+        platform: 'ios',
+        enableDevicePriority: true,
+      });
+
+      expect(withoutDevice.map(d => d.key)).toEqual(withDevice.map(d => d.key));
     });
 
     it('does not prioritize Apple Music on Android when device weighting is enabled', () => {

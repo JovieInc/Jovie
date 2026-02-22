@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   COUNTRY_CODE_COOKIE,
@@ -12,7 +12,8 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { publicEnv } from '@/lib/env-public';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
@@ -37,7 +38,12 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
-  const [dsps] = useState<AvailableDSP[]>(() => {
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
+  );
+
+  const dsps = useMemo(() => {
     const countryCode =
       typeof document === 'undefined'
         ? null
@@ -58,10 +64,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
     return sortDSPsForDevice(baseDSPs, {
       countryCode: countryCode ?? null,
       platform,
-      enableDevicePriority:
-        publicEnv.NEXT_PUBLIC_FEATURE_IOS_APPLE_MUSIC_PRIORITY === 'true',
+      enableDevicePriority,
     });
-  });
+  }, [artist, dspsOverride, enableDevicePriority]);
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

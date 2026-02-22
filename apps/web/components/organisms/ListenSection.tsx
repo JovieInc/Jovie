@@ -6,8 +6,9 @@ import { COUNTRY_CODE_COOKIE, LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { type AvailableDSP, sortDSPsForDevice } from '@/lib/dsp';
-import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { detectPlatformFromUA } from '@/lib/utils';
 
 export interface ListenSectionProps {
@@ -45,6 +46,11 @@ export function ListenSection({
   enableDeepLinks = true,
   enableTracking = true,
 }: Readonly<ListenSectionProps>) {
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
+  );
+
   useEffect(() => {
     // Auto open preferred URL if provided
     if (initialPreferredUrl) {
@@ -76,10 +82,9 @@ export function ListenSection({
     return sortDSPsForDevice([...dsps], {
       countryCode: countryCode ?? null,
       platform,
-      enableDevicePriority:
-        publicEnv.NEXT_PUBLIC_FEATURE_IOS_APPLE_MUSIC_PRIORITY === 'true',
+      enableDevicePriority,
     });
-  }, [dsps]);
+  }, [dsps, enableDevicePriority]);
 
   const handleDSPClick = async (dspKey: string, url: string) => {
     try {

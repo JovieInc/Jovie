@@ -14,7 +14,8 @@ import {
   getAvailableDSPs,
   sortDSPsForDevice,
 } from '@/lib/dsp';
-import { publicEnv } from '@/lib/env-public';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { detectPlatformFromUA } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -32,7 +33,12 @@ export function useAnimatedListenInterface(
   handle: string,
   enableDynamicEngagement: boolean
 ): UseAnimatedListenInterfaceReturn {
-  const [availableDSPs] = useState<AvailableDSP[]>(() => {
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
+  );
+
+  const availableDSPs = useMemo(() => {
     const countryCode =
       typeof document === 'undefined'
         ? null
@@ -52,10 +58,9 @@ export function useAnimatedListenInterface(
     return sortDSPsForDevice(getAvailableDSPs(artist), {
       countryCode: countryCode ?? null,
       platform,
-      enableDevicePriority:
-        publicEnv.NEXT_PUBLIC_FEATURE_IOS_APPLE_MUSIC_PRIORITY === 'true',
+      enableDevicePriority,
     });
-  });
+  }, [artist, enableDevicePriority]);
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();

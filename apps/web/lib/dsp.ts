@@ -134,10 +134,12 @@ export function sortDSPsForDevice(
       geoAwarePopularityIndex(a.key, countryCode) -
       geoAwarePopularityIndex(b.key, countryCode);
 
-    if (!enableDevicePriority && baseRankDelta !== 0) {
+    // Geo popularity is always the primary signal
+    if (baseRankDelta !== 0) {
       return baseRankDelta;
     }
 
+    // Device weighting is a secondary tiebreaker when geo ranks are equal
     if (enableDevicePriority) {
       const devicePriorityDelta =
         getDevicePriorityWeight(a.key, platform) -
@@ -146,10 +148,6 @@ export function sortDSPsForDevice(
       if (devicePriorityDelta !== 0) {
         return devicePriorityDelta;
       }
-    }
-
-    if (baseRankDelta !== 0) {
-      return baseRankDelta;
     }
 
     return a.name.localeCompare(b.name);
