@@ -74,7 +74,7 @@ export interface SpotifyTrack {
 }
 
 export interface SpotifyTrackFull extends SpotifyTrack {
-  external_ids: {
+  external_ids?: {
     isrc?: string;
     ean?: string;
     upc?: string;
@@ -417,6 +417,10 @@ export async function getSpotifyTracks(
   for (let i = 0; i < trackIds.length; i += 50) {
     chunks.push(trackIds.slice(i, i + 50));
   }
+
+  console.info(
+    `[spotify] getSpotifyTracks: fetching ${trackIds.length} track(s) in ${chunks.length} chunk(s)`
+  );
 
   const tracks: SpotifyTrackFull[] = [];
 
