@@ -9,6 +9,7 @@ import type {
   ProviderLink,
   ReleaseViewModel,
 } from '@/lib/discography/types';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type Release = ReleaseViewModel;
 
@@ -73,6 +74,11 @@ export interface ReleaseSidebarProps {
   readonly isRescanningIsrc?: boolean;
   /** Persist release lyrics in metadata */
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  /** Persist canvas status in metadata */
+  readonly onCanvasStatusUpdate?: (
+    releaseId: string,
+    status: CanvasStatus
+  ) => Promise<void>;
   /** Format lyrics with Apple Music deterministic rules */
   readonly onFormatLyrics?: (
     releaseId: string,
