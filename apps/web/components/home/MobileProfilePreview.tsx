@@ -12,8 +12,8 @@ function formatReleaseType(type: string | null): string {
 export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
   const displayName = creator.name.trim() || creator.handle;
   const initial = displayName.slice(0, 1).toUpperCase();
-  const primaryGenre = creator.genres[0] ?? 'Independent artist';
-  const secondaryGenre = creator.genres[1];
+  const primaryGenre =
+    creator.tagline?.trim() || creator.genres[0] || 'Independent artist';
 
   return (
     <div className='flex h-full flex-col px-5 pb-6 pt-10'>
@@ -37,9 +37,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
           className='mt-0.5 text-xs'
           style={{ color: 'rgba(255, 255, 255, 0.6)' }}
         >
-          {secondaryGenre
-            ? `${primaryGenre} · ${secondaryGenre}`
-            : primaryGenre}
+          {primaryGenre}
         </p>
       </div>
 

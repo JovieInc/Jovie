@@ -19,6 +19,7 @@ export const FALLBACK_AVATARS: FeaturedCreator[] = FALLBACK_HANDLES.map(
     handle,
     name: 'Artist',
     src: `/images/avatars/${handle}.jpg`,
+    tagline: null,
     genres: [],
     latestReleaseTitle: null,
     latestReleaseType: null,

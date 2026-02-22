@@ -206,6 +206,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
 
+    // Growth plan is gated behind NEXT_PUBLIC_FEATURE_GROWTH_PLAN flag
     if (growthEnabled) {
       expect(screen.getByText('Growth')).toBeInTheDocument();
     } else {
