@@ -9,6 +9,10 @@ import type { ProfileNotificationsState } from '../hooks/useProfileNotifications
 
 export interface ProfileNotificationsMenuProps {
   readonly artistId: string;
+  readonly availableDspPreferences: readonly {
+    key: string;
+    label: string;
+  }[];
   readonly channelBusy: Partial<Record<NotificationChannel, boolean>>;
   readonly contentPreferences?: NotificationContentPreferences;
   readonly hasActiveSubscriptions: boolean;

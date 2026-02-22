@@ -63,6 +63,7 @@ export function ReleaseSidebar({
   isLyricsSaving = false,
   allowDownloads = false,
   readOnly = false,
+  onCanvasStatusUpdate,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -124,11 +125,13 @@ export function ReleaseSidebar({
 
   const handleCanvasStatusChange = useCallback(
     (status: CanvasStatus) => {
-      if (!release || !onReleaseChange) return;
-      onReleaseChange({ ...release, canvasStatus: status });
+      if (!release || !onCanvasStatusUpdate) return;
+      void onCanvasStatusUpdate(release.id, status);
     },
-    [release, onReleaseChange]
+    [release, onCanvasStatusUpdate]
   );
+
+  const canEditCanvasStatus = Boolean(release && onCanvasStatusUpdate);
 
   const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!release) return [];
@@ -343,7 +346,9 @@ export function ReleaseSidebar({
                     <ReleaseMetadata
                       release={release}
                       onCanvasStatusChange={
-                        isEditable ? handleCanvasStatusChange : undefined
+                        canEditCanvasStatus
+                          ? handleCanvasStatusChange
+                          : undefined
                       }
                     />
                   </div>
