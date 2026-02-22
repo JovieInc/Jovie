@@ -18,6 +18,7 @@ const INPUT_CLASS =
 
 interface PlatformSectionProps {
   readonly platform: string;
+  readonly description: string;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
   readonly pixelIdName: string;
@@ -30,10 +31,12 @@ interface PlatformSectionProps {
   readonly helpText: string;
   readonly onPixelIdChange: (value: string) => void;
   readonly onTokenChange: (value: string) => void;
+  readonly isConfigured: boolean;
 }
 
 function PlatformSection({
   platform,
+  description,
   pixelIdLabel,
   pixelIdPlaceholder,
   pixelIdName,
@@ -46,13 +49,23 @@ function PlatformSection({
   helpText,
   onPixelIdChange,
   onTokenChange,
+  isConfigured,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
 
   return (
-    <div className='space-y-4 p-4 bg-surface-0 rounded-lg border border-subtle'>
+    <div className='space-y-4 rounded-xl border border-subtle bg-surface-0 p-4'>
       <div className='flex items-center justify-between'>
-        <h4 className='text-sm font-medium text-primary'>{platform}</h4>
+        <div>
+          <h4 className='text-sm font-medium text-primary'>{platform}</h4>
+          <p className='mt-1 text-xs text-secondary-token'>{description}</p>
+        </div>
+        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-secondary-token'>
+          {isConfigured ? 'Configured' : 'Not configured'}
+        </span>
+      </div>
+
+      <div className='flex items-center justify-between'>
         <a
           href={helpUrl}
           target='_blank'
@@ -322,9 +335,16 @@ export function SettingsAdPixelsSection({
           </div>
         )}
 
-        <div className='px-4 py-3 space-y-4'>
+        <div className='space-y-2 px-4 pt-3'>
+          <p className='text-xs text-secondary-token'>
+            Configure each retargeting destination independently.
+          </p>
+        </div>
+
+        <div className='space-y-4 px-4 pb-3'>
           <PlatformSection
             platform='Facebook Conversions API'
+            description='Track profile views and link clicks in Meta Ads Manager.'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
             pixelIdName='facebookPixelId'
@@ -335,6 +355,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.facebookAccessToken}
             helpUrl='https://www.facebook.com/business/help/952192354843755'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.facebookPixelId &&
+                existingSettings?.hasTokens.facebook
+              )
+            }
             onPixelIdChange={value =>
               handleInputChange('facebookPixelId', value)
             }
@@ -345,6 +371,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
+            description='Send conversion events directly to your GA4 property.'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
             pixelIdName='googleMeasurementId'
@@ -355,6 +382,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.googleApiSecret}
             helpUrl='https://developers.google.com/analytics/devguides/collection/protocol/ga4'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.googleMeasurementId &&
+                existingSettings?.hasTokens.google
+              )
+            }
             onPixelIdChange={value =>
               handleInputChange('googleMeasurementId', value)
             }
@@ -363,6 +396,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='TikTok Events API'
+            description='Measure profile engagement and optimize TikTok campaigns.'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
             pixelIdName='tiktokPixelId'
@@ -373,6 +407,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.tiktokAccessToken}
             helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.tiktokPixelId &&
+                existingSettings?.hasTokens.tiktok
+              )
+            }
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)
