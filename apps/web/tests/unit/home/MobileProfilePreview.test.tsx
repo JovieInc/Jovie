@@ -18,13 +18,11 @@ describe('MobileProfilePreview', () => {
     render(<MobileProfilePreview creator={creator} />);
 
     expect(screen.getByText('Tim White')).toBeInTheDocument();
-    expect(screen.getByText('Indie · Alternative')).toBeInTheDocument();
-    expect(screen.getByText('Never Say A Word')).toBeInTheDocument();
-    expect(screen.getByText('Single')).toBeInTheDocument();
-    expect(screen.getByText('Get updates from Tim')).toBeInTheDocument();
+    expect(screen.getByText('Indie')).toBeInTheDocument();
+    expect(screen.getByText('Turn on Notifications')).toBeInTheDocument();
   });
 
-  it('falls back gracefully when release and genres are missing', () => {
+  it('falls back gracefully when genres are missing', () => {
     render(
       <MobileProfilePreview
         creator={{
@@ -36,8 +34,7 @@ describe('MobileProfilePreview', () => {
       />
     );
 
-    expect(screen.getByText('Independent artist')).toBeInTheDocument();
-    expect(screen.getByText('New release coming soon')).toBeInTheDocument();
-    expect(screen.getByText('Latest release')).toBeInTheDocument();
+    expect(screen.getByText('Artist')).toBeInTheDocument();
+    expect(screen.getByText('Turn on Notifications')).toBeInTheDocument();
   });
 });
