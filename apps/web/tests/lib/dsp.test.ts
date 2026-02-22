@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { geoAwarePopularityIndex } from '@/constants/app';
-import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import { DSP_CONFIGS, getAvailableDSPs, sortDSPsForDevice } from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
 describe('DSP Utils', () => {
@@ -120,6 +120,71 @@ describe('DSP Utils', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe('https://open.spotify.com/track/track123');
+    });
+  });
+
+  describe('sortDSPsForDevice', () => {
+    const dspSet = [
+      {
+        key: 'spotify',
+        name: 'Spotify',
+        url: 'https://open.spotify.com/artist/spotify123',
+        config: DSP_CONFIGS.spotify,
+      },
+      {
+        key: 'apple_music',
+        name: 'Apple Music',
+        url: 'https://music.apple.com/artist/apple123',
+        config: DSP_CONFIGS.apple_music,
+      },
+      {
+        key: 'youtube',
+        name: 'YouTube',
+        url: 'https://youtube.com/channel/youtube123',
+        config: DSP_CONFIGS.youtube,
+      },
+    ];
+
+    it('keeps geo popularity as default ordering when device weighting is disabled', () => {
+      const result = sortDSPsForDevice([...dspSet], {
+        countryCode: 'US',
+        platform: 'ios',
+        enableDevicePriority: false,
+      });
+
+      expect(result.map(d => d.key)).toEqual([
+        'spotify',
+        'apple_music',
+        'youtube',
+      ]);
+    });
+
+    it('prioritizes Apple Music on iOS when device weighting is enabled', () => {
+      const result = sortDSPsForDevice([...dspSet], {
+        countryCode: 'US',
+        platform: 'ios',
+        enableDevicePriority: true,
+      });
+
+      expect(result.map(d => d.key)).toEqual([
+        'apple_music',
+        'spotify',
+        'youtube',
+      ]);
+    });
+
+    it('does not prioritize Apple Music on Android when device weighting is enabled', () => {
+      const result = sortDSPsForDevice([...dspSet], {
+        countryCode: 'US',
+        platform: 'android',
+        enableDevicePriority: true,
+      });
+
+      expect(result.map(d => d.key)).toEqual([
+        'spotify',
+        'apple_music',
+        'youtube',
+      ]);
     });
   });
 

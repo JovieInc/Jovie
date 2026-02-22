@@ -8,10 +8,12 @@ import {
 } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import {
-  AvailableDSP,
+  type AvailableDSP,
   getAvailableDSPs,
-  sortDSPsByGeoPopularity,
+  sortDSPsForDevice,
 } from '@/lib/dsp';
+import { publicEnv } from '@/lib/env-public';
+import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
@@ -45,7 +47,20 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             ?.split('=')[1];
 
     const baseDSPs = dspsOverride ?? getAvailableDSPs(artist);
-    return sortDSPsByGeoPopularity(baseDSPs, countryCode ?? null);
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice(baseDSPs, {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority:
+        publicEnv.NEXT_PUBLIC_FEATURE_IOS_APPLE_MUSIC_PRIORITY === 'true',
+    });
   });
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

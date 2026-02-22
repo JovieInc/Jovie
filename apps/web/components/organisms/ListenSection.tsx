@@ -5,8 +5,10 @@ import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
 import { COUNTRY_CODE_COOKIE, LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { type AvailableDSP, sortDSPsByGeoPopularity } from '@/lib/dsp';
+import { type AvailableDSP, sortDSPsForDevice } from '@/lib/dsp';
+import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
+import { detectPlatformFromUA } from '@/lib/utils';
 
 export interface ListenSectionProps {
   /** Artist handle for tracking */
@@ -63,7 +65,20 @@ export function ListenSection({
             .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
             ?.split('=')[1];
 
-    return sortDSPsByGeoPopularity([...dsps], countryCode ?? null);
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice([...dsps], {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority:
+        publicEnv.NEXT_PUBLIC_FEATURE_IOS_APPLE_MUSIC_PRIORITY === 'true',
+    });
   }, [dsps]);
 
   const handleDSPClick = async (dspKey: string, url: string) => {
