@@ -156,6 +156,7 @@ function useImpressionTracking(
       handle,
       placement: 'profile_inline',
       variant,
+      experiment_group: 'inline',
     });
     setHasTrackedImpression(true);
   }, [showsSubscribeForm, hasTrackedImpression, handle, variant]);
