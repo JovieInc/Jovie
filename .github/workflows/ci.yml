@@ -235,7 +235,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck
+        run: pnpm turbo typecheck --affected
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -499,6 +499,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -541,7 +543,7 @@ jobs:
   ci-layout-guard:
     name: Layout Guard (blocking)
     needs: [ci-build-public]
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -912,7 +914,8 @@ jobs:
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            # --passWithNoTests: some shards may have no files matching the filter
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -952,7 +955,7 @@ jobs:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
     needs: [ci-build-public]
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

@@ -107,6 +107,14 @@ export function getAvailablePricing() {
   return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
 }
 
+export function isGrowthPlanEnabled(): boolean {
+  return publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+}
+
+export function isGrowthPriceId(priceId: string): boolean {
+  return getPlanFromPriceId(priceId) === 'growth';
+}
+
 /**
  * Validate that all required environment variables are set
  */
