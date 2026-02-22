@@ -12,6 +12,10 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import {
+  buildSocialLinksVerificationSelect,
+  getSocialLinksVerificationColumnSupport,
+} from '@/lib/db/queries/social-links-verification';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -90,6 +94,9 @@ export async function getProfileSocialLinks(
 
     return await withDbSession(async clerkUserId => {
       // Query against creatorProfiles with ownership check and left-join links
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(db);
+
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -105,9 +112,7 @@ export async function getProfileSocialLinks(
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
-          verificationStatus: socialLinks.verificationStatus,
-          verificationToken: socialLinks.verificationToken,
-          verifiedAt: socialLinks.verifiedAt,
+          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
           version: socialLinks.version,
         })
         .from(creatorProfiles)
