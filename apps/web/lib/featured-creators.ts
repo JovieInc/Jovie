@@ -10,6 +10,7 @@ export type FeaturedCreator = {
   handle: string;
   name: string;
   src: string;
+  tagline: string | null;
   genres: string[];
   latestReleaseTitle: string | null;
   latestReleaseType: string | null;
@@ -75,6 +76,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
           id: creatorProfiles.id,
           username: creatorProfiles.username,
           displayName: creatorProfiles.displayName,
+          bio: creatorProfiles.bio,
           avatarUrl: creatorProfiles.avatarUrl,
           creatorType: creatorProfiles.creatorType,
           genres: creatorProfiles.genres,
@@ -155,6 +157,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
             crop: 'fill',
             gravity: 'face',
           }),
+          tagline: a.bio,
           genres: a.genres?.slice(0, 2) ?? [],
           latestReleaseTitle: latestRelease?.title ?? null,
           latestReleaseType: latestRelease?.type ?? null,
