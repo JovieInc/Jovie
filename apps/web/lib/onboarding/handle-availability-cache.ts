@@ -4,7 +4,8 @@ import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
 const HANDLE_CACHE_KEY_PREFIX = 'onboarding:handle-availability:';
-const HANDLE_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+const HANDLE_AVAILABLE_TTL_SECONDS = 300; // 5 minutes — available handles can be claimed quickly
+const HANDLE_UNAVAILABLE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days — claimed handles rarely become unclaimed
 
 function getHandleCacheKey(handle: string): string {
   return `${HANDLE_CACHE_KEY_PREFIX}${handle.toLowerCase()}`;
@@ -35,7 +36,9 @@ export async function cacheHandleAvailability(
 
   try {
     await redis.set(getHandleCacheKey(handle), available ? '1' : '0', {
-      ex: HANDLE_CACHE_TTL_SECONDS,
+      ex: available
+        ? HANDLE_AVAILABLE_TTL_SECONDS
+        : HANDLE_UNAVAILABLE_TTL_SECONDS,
     });
   } catch (error) {
     captureWarning('[handle-availability] Redis write failed', { error });
