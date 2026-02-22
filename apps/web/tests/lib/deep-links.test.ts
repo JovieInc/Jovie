@@ -195,6 +195,56 @@ describe('Deep Links', () => {
     });
   });
 
+  describe('Extended platform coverage', () => {
+    it('should extract SoundCloud username and create iOS deep link', () => {
+      const config = DSP_DEEP_LINKS.soundcloud;
+      const username = config.extractUsername?.(
+        'https://soundcloud.com/artistname'
+      );
+      expect(username).toBe('artistname');
+
+      const result = createDeepLink(
+        'https://soundcloud.com/artistname',
+        config,
+        {
+          platform: 'ios',
+        }
+      );
+      expect(result.nativeUrl).toBe('soundcloud://users:artistname');
+    });
+
+    it('should extract Tidal artist ID', () => {
+      const config = DSP_DEEP_LINKS.tidal;
+      const artistId = config.extractId?.(
+        'https://tidal.com/browse/artist/123456'
+      );
+      expect(artistId).toBe('123456');
+    });
+
+    it('should extract LinkedIn username and create Android deep link', () => {
+      const config = SOCIAL_DEEP_LINKS.linkedin;
+      const username = config.extractUsername?.(
+        'https://www.linkedin.com/in/test-artist/'
+      );
+      expect(username).toBe('test-artist');
+
+      const result = createDeepLink(
+        'https://www.linkedin.com/in/test-artist/',
+        config,
+        { platform: 'android' }
+      );
+      expect(result.nativeUrl).toContain(
+        'intent://www.linkedin.com/in/test-artist'
+      );
+    });
+
+    it('should extract WhatsApp number from wa.me URL', () => {
+      const config = SOCIAL_DEEP_LINKS.whatsapp;
+      const phone = config.extractId?.('https://wa.me/15551234567');
+      expect(phone).toBe('15551234567');
+    });
+  });
+
   describe('Configuration Getters', () => {
     it('should get social deep link config', () => {
       const config = getSocialDeepLinkConfig('instagram');

@@ -18,6 +18,7 @@ import {
 } from '@/components/release/AlbumArtworkContextMenu';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface Provider {
   key: ProviderKey;
@@ -45,6 +46,8 @@ interface ReleaseLandingPageProps
     readonly allowDownloads?: boolean;
     /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
+    /** UTM params captured from incoming request and passed to outbound links */
+    readonly utmParams?: PartialUTMParams;
   }> {}
 
 export function ReleaseLandingPage({
@@ -54,6 +57,7 @@ export function ReleaseLandingPage({
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
+  utmParams = {},
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -142,7 +146,7 @@ export function ReleaseLandingPage({
                 return (
                   <a
                     key={provider.key}
-                    href={provider.url}
+                    href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
                     className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white/[0.10] hover:ring-white/[0.12]'
@@ -177,7 +181,7 @@ export function ReleaseLandingPage({
             {soundsUrl && (
               <div className='pt-1'>
                 <Link
-                  href={soundsUrl}
+                  href={appendUTMParamsToUrl(soundsUrl, utmParams)}
                   className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
                 >
                   <Icon

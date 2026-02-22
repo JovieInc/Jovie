@@ -6,12 +6,14 @@ export {
   FEATURE_FLAG_KEYS,
   type FeatureFlagKey,
   type FeatureFlagsBootstrap,
+  type SubscribeCTAVariant,
 } from './shared';
 
 import {
   FEATURE_FLAG_KEYS,
   type FeatureFlagKey,
   type FeatureFlagsBootstrap,
+  type SubscribeCTAVariant,
 } from './shared';
 
 let statsigInitialized = false;
@@ -70,6 +72,47 @@ export async function checkGate(
     console.error(`[Statsig] Error checking gate ${gateKey}:`, error);
     return defaultValue;
   }
+}
+
+/**
+ * Evaluate a Statsig experiment and return its parameter values.
+ * Returns an empty object if Statsig is not initialized.
+ */
+export async function getExperiment(
+  userId: string | null,
+  experimentKey: string
+): Promise<Record<string, unknown>> {
+  await initializeStatsig();
+  if (!statsigInitialized) return {};
+  try {
+    const experiment = await Statsig.getExperiment(
+      { userID: userId ?? 'anonymous' },
+      experimentKey
+    );
+    return experiment.value;
+  } catch (error) {
+    console.error(
+      `[Statsig] Error getting experiment ${experimentKey}:`,
+      error
+    );
+    return {};
+  }
+}
+
+/**
+ * Get the subscribe CTA variant for a given artist.
+ * Defaults to 'two_step' when Statsig is not configured.
+ */
+export async function getSubscribeCTAVariant(
+  artistId: string
+): Promise<SubscribeCTAVariant> {
+  const config = await getExperiment(
+    artistId,
+    FEATURE_FLAG_KEYS.SUBSCRIBE_CTA_EXPERIMENT
+  );
+  const variant = config.variant;
+  if (variant === 'inline' || variant === 'two_step') return variant;
+  return 'two_step';
 }
 
 /**
