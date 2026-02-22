@@ -10,7 +10,7 @@ interface MobileProfilePreviewProps {
  */
 export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
   const displayName = creator.name.trim() || creator.handle;
-  const primaryGenre = creator.genres[0] ?? 'Artist';
+  const primaryGenre = creator.tagline?.trim() || creator.genres[0] || 'Artist';
 
   return (
     <div

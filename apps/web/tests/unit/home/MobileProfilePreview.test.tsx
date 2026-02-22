@@ -8,6 +8,7 @@ const creator: FeaturedCreator = {
   handle: 'timwhitemusic',
   name: 'Tim White',
   src: '/avatar.png',
+  tagline: 'Nashville-bred indie singer-songwriter',
   genres: ['Indie', 'Alternative'],
   latestReleaseTitle: 'Never Say A Word',
   latestReleaseType: 'single',
@@ -18,7 +19,10 @@ describe('MobileProfilePreview', () => {
     render(<MobileProfilePreview creator={creator} />);
 
     expect(screen.getByText('Tim White')).toBeInTheDocument();
-    expect(screen.getByText('Indie')).toBeInTheDocument();
+    // tagline takes priority over genres[0] for primaryGenre
+    expect(
+      screen.getByText('Nashville-bred indie singer-songwriter')
+    ).toBeInTheDocument();
     expect(screen.getByText('Turn on Notifications')).toBeInTheDocument();
   });
 
@@ -27,6 +31,7 @@ describe('MobileProfilePreview', () => {
       <MobileProfilePreview
         creator={{
           ...creator,
+          tagline: null,
           genres: [],
           latestReleaseTitle: null,
           latestReleaseType: null,

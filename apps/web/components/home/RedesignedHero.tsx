@@ -9,6 +9,7 @@ const FALLBACK_CREATOR: FeaturedCreator = {
   handle: 'tim',
   name: 'Tim White',
   src: '/images/hero/tim-profile.avif',
+  tagline: null,
   genres: ['Artist'],
   latestReleaseTitle: 'Afterglow (Deluxe)',
   latestReleaseType: 'Album',
