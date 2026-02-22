@@ -7,6 +7,7 @@ import {
   refreshRelease,
   rescanIsrcLinks,
   resetProviderOverride,
+  saveCanvasStatus,
   saveProviderOverride,
   saveReleaseLyrics,
   syncFromSpotify,
@@ -295,6 +296,25 @@ export function useSaveReleaseLyricsMutation(profileId: string) {
 
   return useMutation({
     mutationFn: saveReleaseLyrics,
+    onSuccess: async updated => {
+      const current = queryClient.getQueryData<ReleaseViewModel[]>(
+        queryKeys.releases.matrix(profileId)
+      );
+      if (current) {
+        queryClient.setQueryData(
+          queryKeys.releases.matrix(profileId),
+          current.map(r => (r.id === updated.id ? updated : r))
+        );
+      }
+    },
+  });
+}
+
+export function useSaveCanvasStatusMutation(profileId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveCanvasStatus,
     onSuccess: async updated => {
       const current = queryClient.getQueryData<ReleaseViewModel[]>(
         queryKeys.releases.matrix(profileId)
