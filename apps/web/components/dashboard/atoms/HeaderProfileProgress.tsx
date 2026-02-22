@@ -83,10 +83,12 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
           </linearGradient>
         </defs>
       </svg>
-      <span className='hidden sm:inline text-[11px] text-tertiary-token'>
+      <span className='hidden sm:inline text-[11px] text-secondary-token'>
         Profile
       </span>
-      <span className='tabular-nums'>{pct}%</span>
+      <span className='text-[11px] tabular-nums text-primary-token'>
+        {pct}%
+      </span>
     </button>
   );
 });
