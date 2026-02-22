@@ -1,6 +1,7 @@
 'use client';
 
-import { AlertTriangle, Home, RefreshCcw } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { FallbackProps } from 'react-error-boundary';
 import { ErrorDetails } from '@/components/feedback/ErrorDetails';
@@ -19,45 +20,35 @@ export function DashboardErrorFallback({
   const errorWithDigest = error as Error & { digest?: string };
 
   return (
-    <div className='flex flex-col items-center justify-center gap-6 p-8 text-center min-h-[500px]'>
-      <div className='w-full max-w-lg space-y-6'>
+    <div
+      className='flex flex-1 flex-col items-center justify-center px-4 py-12 text-center'
+      role='alert'
+      aria-live='polite'
+    >
+      <div className='w-full max-w-sm space-y-4'>
         <div className='flex justify-center'>
-          <div className='rounded-full bg-destructive/10 p-4'>
-            <AlertTriangle
-              className='h-12 w-12 text-destructive'
-              aria-hidden='true'
-            />
+          <div className='flex h-10 w-10 items-center justify-center text-destructive'>
+            <AlertTriangle className='h-6 w-6' aria-hidden='true' />
           </div>
         </div>
 
-        <div className='space-y-3'>
-          <h2 className='text-2xl font-semibold text-primary-token'>
+        <div className='space-y-1.5'>
+          <h2 className='text-sm font-medium text-secondary-token'>
             Unable to load dashboard
           </h2>
-          <p className='text-base text-secondary-token'>
+          <p className='text-[13px] text-tertiary-token'>
             {error?.message ||
               'An unexpected error occurred while loading your dashboard.'}
           </p>
         </div>
 
         <div className='flex justify-center gap-3'>
-          <button
-            type='button'
-            onClick={resetErrorBoundary}
-            className='inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors'
-          >
-            <RefreshCcw className='h-4 w-4' aria-hidden='true' />
+          <Button variant='primary' size='sm' onClick={resetErrorBoundary}>
             Reload dashboard
-          </button>
-
-          <button
-            type='button'
-            onClick={() => router.push('/')}
-            className='inline-flex items-center gap-2 rounded-md bg-secondary px-5 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 transition-colors'
-          >
-            <Home className='h-4 w-4' aria-hidden='true' />
+          </Button>
+          <Button variant='outline' size='sm' onClick={() => router.push('/')}>
             Go home
-          </button>
+          </Button>
         </div>
 
         <ErrorDetails
