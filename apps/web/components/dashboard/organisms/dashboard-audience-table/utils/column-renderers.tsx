@@ -145,9 +145,8 @@ export function renderEmailCell({
  * Avoids closing over selectedIds/page/pageSize which would destabilize column defs.
  */
 export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { selectedIds, toggleSelect, page, pageSize } =
-    useAudienceTableContext();
-  const rowNumber = (page - 1) * pageSize + row.index + 1;
+  const { selectedIds, toggleSelect } = useAudienceTableContext();
+  const rowNumber = row.index + 1;
   return (
     <AudienceRowSelectionCell
       rowNumber={rowNumber}

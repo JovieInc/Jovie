@@ -23,7 +23,7 @@ on:
       - 'linear/**'
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -70,10 +70,10 @@ jobs:
 
           if [[ -n "$TICKET" ]]; then
             # Remove ticket from slug to avoid duplication in title
-            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr '-_' '  ')
+            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr -- '-_' '  ')
             TITLE="${TICKET}: ${DESC}"
           else
-            DESC=$(echo "$SLUG" | tr '-_' '  ')
+            DESC=$(echo "$SLUG" | tr -- '-_' '  ')
             TITLE="$DESC"
           fi
 
@@ -151,61 +151,61 @@ jobs:
 
           RUN_URL="/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Build PR body
+          # Build PR body using a temp file to safely handle special characters
+          BODY_FILE=$(mktemp)
+          trap 'rm -f "$BODY_FILE"' EXIT
+
           if [[ "$HAS_LINEAR" == "true" ]]; then
-            ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d)
-
-            BODY=$(cat <<EOF
-          ## Goal
-
-          ${ISSUE_DESC}
-
-          ## Linear
-
-          - Issue: ${TICKET}
-          - URL: ${LINEAR_ISSUE_URL}
-
-          <!-- linear-issue-id:${LINEAR_ISSUE_ID} -->
-          <!-- linear-issue-identifier:${TICKET} -->
-
-          ---
-          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
-          EOF
-          )
+            ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d 2>/dev/null || echo "")
+            {
+              echo "## Goal"
+              echo ""
+              printf '%s\n' "$ISSUE_DESC"
+              echo ""
+              echo "## Linear"
+              echo ""
+              echo "- Issue: ${TICKET}"
+              echo "- URL: ${LINEAR_ISSUE_URL}"
+              echo ""
+              echo "<!-- linear-issue-id:${LINEAR_ISSUE_ID} -->"
+              echo "<!-- linear-issue-identifier:${TICKET} -->"
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
           elif [[ -n "$TICKET" ]]; then
-            BODY=$(cat <<EOF
-          ## Goal
-
-          Implements ${TICKET} from Linear.
-
-          <!-- linear-issue-identifier:${TICKET} -->
-
-          ---
-          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
-          EOF
-          )
+            {
+              echo "## Goal"
+              echo ""
+              echo "Implements ${TICKET} from Linear."
+              echo ""
+              echo "<!-- linear-issue-identifier:${TICKET} -->"
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
           else
-            BODY=$(cat <<EOF
-          ## Goal
-
-          Agent-generated changes on \`${BRANCH}\`.
-
-          ---
-          *PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*
-          EOF
-          )
+            {
+              echo "## Goal"
+              echo ""
+              echo "Agent-generated changes on \`${BRANCH}\`."
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
           fi
 
           PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
             --base main \
             --head "$BRANCH" \
             --title "$TITLE" \
-            --body "$BODY")
+            --body-file "$BODY_FILE")
 
           echo "Created PR: $PR_URL"
 
           # Enable auto-merge so it flows through the pipeline
           PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
-          gh pr merge "$PR_NUMBER" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
+          gh pr merge "$PR_NUMBER" --repo "${{ github.repository }}" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
 
           echo "Auto-merge enabled for PR #$PR_NUMBER"

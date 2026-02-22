@@ -105,7 +105,6 @@ vi.mock('@/components/organisms/table', () => ({
     capturedTableData = data ?? [];
     return <table data-testid='unified-table' />;
   },
-  TablePaginationFooter: () => null,
   convertToCommonDropdownItems: vi.fn(() => []),
   ExportCSVButton: () => null,
   useRowSelection: () => ({
@@ -176,12 +175,8 @@ const defaultProps = {
   mode: 'members' as const,
   view: 'all' as const,
   total: 0,
-  page: 1,
-  pageSize: 50,
   sort: 'lastSeen',
   direction: 'desc' as const,
-  onPageChange: vi.fn(),
-  onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
   onViewChange: vi.fn(),
   onFiltersChange: vi.fn(),
