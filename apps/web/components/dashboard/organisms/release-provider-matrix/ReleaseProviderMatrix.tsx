@@ -79,8 +79,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
-    totalReleases,
-    totalOverrides,
     openEditor,
     closeEditor,
     handleCopy,
@@ -679,31 +677,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
           </div>
-
-          {/* Footer - simplified count + reset */}
-          {rows.length > 0 && (
-            <div className='flex items-center justify-between border-t border-subtle bg-surface-0 px-4 py-3 text-xs text-secondary-token'>
-              <span>
-                {filteredRows.length === rows.length
-                  ? `${totalReleases}`
-                  : `${filteredRows.length} of ${totalReleases}`}{' '}
-                {totalReleases === 1 ? 'release' : 'releases'}
-                {totalOverrides > 0 && (
-                  <span className='ml-1.5 text-tertiary-token'>
-                    ({totalOverrides} manual{' '}
-                    {totalOverrides === 1 ? 'override' : 'overrides'})
-                  </span>
-                )}
-              </span>
-              <button
-                type='button'
-                onClick={resetToDefaults}
-                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors rounded focus-visible:outline-none focus-visible:bg-interactive-hover'
-              >
-                Reset display
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

@@ -13,6 +13,7 @@ const SHOWCASE_CREATOR: FeaturedCreator = {
   handle: 'tim',
   name: 'Tim White',
   src: '/images/avatars/placeholder.jpg',
+  tagline: 'Nashville-bred indie singer-songwriter',
   genres: ['Indie', 'Alternative'],
   latestReleaseTitle: 'Never Say A Word',
   latestReleaseType: 'single',
