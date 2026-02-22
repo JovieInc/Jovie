@@ -53,7 +53,11 @@ import {
   formatTimeRemaining,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
+import {
+  buildCanvasMetadata,
+  getCanvasStatusFromMetadata,
+} from '@/lib/services/canvas/service';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
@@ -390,6 +394,67 @@ export async function saveReleaseLyrics(params: {
     .update(discogReleases)
     .set({
       metadata: { ...metadata, lyrics: params.lyrics },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(discogReleases.id, params.releaseId),
+        eq(discogReleases.creatorProfileId, profile.id)
+      )
+    );
+
+  const updated = await getReleaseById(params.releaseId);
+  if (!updated) {
+    throw new TypeError('Release not found');
+  }
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  return mapReleaseToViewModel(
+    updated,
+    buildProviderLabels(),
+    profile.id,
+    profile.handle
+  );
+}
+
+export async function saveCanvasStatus(params: {
+  profileId: string;
+  releaseId: string;
+  status: CanvasStatus;
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  if (profile.id !== params.profileId) {
+    throw new TypeError('Profile mismatch');
+  }
+
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
+  const nextMetadata: Record<string, unknown> = {
+    ...metadata,
+    ...buildCanvasMetadata(params.status),
+  };
+
+  if (params.status === 'not_set') {
+    delete nextMetadata.canvasVideoUrl;
+  }
+
+  await db
+    .update(discogReleases)
+    .set({
+      metadata: nextMetadata,
       updatedAt: new Date(),
     })
     .where(
