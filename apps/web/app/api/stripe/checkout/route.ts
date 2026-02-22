@@ -18,7 +18,12 @@ import {
   getCheckoutErrorResponse,
 } from '@/lib/stripe/checkout-helpers';
 import { createCheckoutSession } from '@/lib/stripe/client';
-import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
+import {
+  getActivePriceIds,
+  getPriceMappingDetails,
+  isGrowthPlanEnabled,
+  isGrowthPriceId,
+} from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -90,6 +95,10 @@ export async function POST(request: NextRequest) {
 
     const priceError = await validatePriceId(priceId);
     if (priceError) return priceError;
+
+    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
+      return jsonError('Growth plan is not currently available', 403);
+    }
 
     const priceDetails = getPriceMappingDetails(priceId);
     logger.info('Creating checkout session for:', {

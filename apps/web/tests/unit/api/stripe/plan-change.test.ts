@@ -8,6 +8,8 @@ const mockGetAvailablePlanChanges = vi.hoisted(() => vi.fn());
 const mockExecutePlanChange = vi.hoisted(() => vi.fn());
 const mockCancelScheduledPlanChange = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockIsGrowthPlanEnabled = vi.hoisted(() => vi.fn());
+const mockIsGrowthPriceId = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: mockAuth }));
 
@@ -26,6 +28,11 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
 }));
 
+vi.mock('@/lib/stripe/config', () => ({
+  isGrowthPlanEnabled: mockIsGrowthPlanEnabled,
+  isGrowthPriceId: mockIsGrowthPriceId,
+}));
+
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -37,6 +44,8 @@ describe('/api/stripe/plan-change route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockIsGrowthPlanEnabled.mockReturnValue(true);
+    mockIsGrowthPriceId.mockReturnValue(false);
   });
 
   describe('POST', () => {
@@ -72,6 +81,27 @@ describe('/api/stripe/plan-change route', () => {
       const response = await POST(request);
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: 'Invalid price ID' });
+    });
+
+    it('returns 403 when growth plan is disabled', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockIsGrowthPlanEnabled.mockReturnValue(false);
+      mockIsGrowthPriceId.mockReturnValue(true);
+
+      const { POST } = await import('@/app/api/stripe/plan-change/route');
+      const request = new NextRequest(
+        'http://localhost/api/stripe/plan-change',
+        {
+          method: 'POST',
+          body: JSON.stringify({ priceId: 'price_growth_monthly' }),
+        }
+      );
+
+      const response = await POST(request);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'Growth plan is not currently available',
+      });
     });
 
     it('changes plan immediately when executePlanChange succeeds', async () => {
@@ -138,6 +168,32 @@ describe('/api/stripe/plan-change route', () => {
         availableChanges: [{ plan: 'pro' }],
         hasActiveSubscription: false,
       });
+    });
+
+    it('hides growth plan from available changes when growth is disabled', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_123' });
+      mockIsGrowthPlanEnabled.mockReturnValue(false);
+      mockEnsureStripeCustomer.mockResolvedValue({
+        success: true,
+        customerId: 'cus_123',
+      });
+      mockGetAvailablePlanChanges.mockResolvedValue({
+        currentPlan: 'pro',
+        currentPriceId: 'price_pro_monthly',
+        currentInterval: 'month',
+        availableChanges: [{ plan: 'growth' }, { plan: 'free' }],
+      });
+      mockGetActiveSubscription.mockResolvedValue({
+        id: 'sub_123',
+        schedule: null,
+      });
+
+      const { GET } = await import('@/app/api/stripe/plan-change/route');
+      const response = await GET();
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.availableChanges).toEqual([{ plan: 'free' }]);
     });
 
     it('returns plan options with scheduled change metadata', async () => {

@@ -3,13 +3,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { publicEnv } from '@/lib/env-public';
 
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `Pricing — ${APP_NAME}`;
   const description =
-    'Simple pricing. No surprises. Free, Pro, and Growth plans for every stage of your music career.';
+    'Simple pricing. No surprises. Free and Pro plans for every stage of your music career.';
 
   return {
     title,
@@ -27,6 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const WRAP = 'mx-auto max-w-[1100px] px-6';
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
 const FREE_FEATURES = [
   'One-click Spotify import',
@@ -91,7 +93,9 @@ export default function PricingPage() {
             <span className='text-secondary-token'>No surprises.</span>
           </h2>
         </div>
-        <div className='grid grid-cols-1 md:grid-cols-3 border-t border-subtle'>
+        <div
+          className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
+        >
           {/* Free */}
           <div className='py-12 md:pr-8 md:border-r md:border-subtle'>
             <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
@@ -148,33 +152,34 @@ export default function PricingPage() {
             </div>
           </div>
 
-          {/* Growth */}
-          <div className='py-12 md:pl-8'>
-            <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-              Growth
-            </div>
-            <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
-              $99{' '}
-              <span className='text-base font-normal text-tertiary-token'>
-                /mo
-              </span>
-            </div>
-            <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-              For artists scaling their fanbase and revenue.
-            </div>
-            <div className='mt-6 pt-5 border-t border-subtle'>
-              <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
-                Everything in Pro, plus
+          {growthPlanEnabled && (
+            <div className='py-12 md:pl-8'>
+              <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
+                Growth
               </div>
-              <FeatureList features={GROWTH_FEATURES} />
+              <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
+                $99{' '}
+                <span className='text-base font-normal text-tertiary-token'>
+                  /mo
+                </span>
+              </div>
+              <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
+                For artists scaling their fanbase and revenue.
+              </div>
+              <div className='mt-6 pt-5 border-t border-subtle'>
+                <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
+                  Everything in Pro, plus
+                </div>
+                <FeatureList features={GROWTH_FEATURES} />
+              </div>
+              <Link
+                href={`${APP_ROUTES.SIGNUP}?plan=growth`}
+                className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
+              >
+                Get started
+              </Link>
             </div>
-            <Link
-              href={`${APP_ROUTES.SIGNUP}?plan=growth`}
-              className='focus-ring inline-block mt-7 px-5 py-2.5 rounded-md font-medium text-sm transition-colors border border-subtle hover:bg-white/[0.04]'
-            >
-              Get started
-            </Link>
-          </div>
+          )}
         </div>
       </section>
     </div>
