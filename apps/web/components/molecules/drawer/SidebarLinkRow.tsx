@@ -3,6 +3,11 @@
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
+import {
+  getDSPDeepLinkConfig,
+  getSocialDeepLinkConfig,
+  openDeepLink,
+} from '@/lib/deep-links';
 import { cn } from '@/lib/utils';
 
 const ACTION_BUTTON_CLASS = [
@@ -18,6 +23,7 @@ const SWIPE_ACTION_BUTTON_CLASS = [
 ].join(' ');
 
 export interface SidebarLinkRowProps {
+  readonly deepLinkPlatform?: string;
   readonly icon: ReactNode;
   readonly label: string;
   readonly url: string;
@@ -34,6 +40,7 @@ export function SidebarLinkRow({
   label,
   url,
   badge,
+  deepLinkPlatform,
   isEditable = false,
   isRemoving = false,
   onRemove,
@@ -57,10 +64,24 @@ export function SidebarLinkRow({
       });
   }, [hasUrl, url]);
 
-  const handleOpen = useCallback(() => {
+  const handleOpen = useCallback(async () => {
     if (!hasUrl) return;
+
+    const deepLinkConfig =
+      (deepLinkPlatform ? getDSPDeepLinkConfig(deepLinkPlatform) : null) ??
+      (deepLinkPlatform ? getSocialDeepLinkConfig(deepLinkPlatform) : null);
+
+    if (deepLinkConfig) {
+      try {
+        await openDeepLink(url, deepLinkConfig);
+        return;
+      } catch {
+        // Fall through to standard web open
+      }
+    }
+
     globalThis.open(url, '_blank', 'noopener,noreferrer');
-  }, [hasUrl, url]);
+  }, [deepLinkPlatform, hasUrl, url]);
 
   const hasRemove = isEditable && onRemove;
   const swipeActionsWidth = hasRemove ? 132 : 88;
