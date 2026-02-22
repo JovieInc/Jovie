@@ -102,10 +102,24 @@ export function ProfileNotificationsMenu({
 
   const handleDspPreferenceChange = useCallback(
     (nextValue: string) => {
+      if (typeof document === 'undefined') return;
+
+      // Clear preference when empty option is selected
+      if (!nextValue) {
+        document.cookie = `${LISTEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+        try {
+          localStorage.removeItem(LISTEN_COOKIE);
+        } catch {
+          // Ignore storage errors (private mode, disabled storage)
+        }
+        setSelectedDspPreference('');
+        return;
+      }
+
       const preference = availableDspPreferences.find(
         item => item.key === nextValue
       );
-      if (!preference || typeof document === 'undefined') return;
+      if (!preference) return;
 
       document.cookie = `${LISTEN_COOKIE}=${preference.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
       try {

@@ -8,19 +8,18 @@
  */
 
 import { Metadata } from 'next';
-import { cookies } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
 } from '@/components/release';
-import { BASE_URL, LISTEN_COOKIE } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
-import { resolvePreferredProviderKey } from '@/lib/discography/preferred-dsp';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
@@ -191,16 +190,21 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string,
-  dsp: string | undefined
+  dsp: string | undefined,
+  noredirect: string | undefined
 ): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
+    const queryParts: string[] = [];
+    if (dsp) queryParts.push(`dsp=${encodeURIComponent(dsp)}`);
+    if (noredirect)
+      queryParts.push(`noredirect=${encodeURIComponent(noredirect)}`);
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
     permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${queryString}`
     );
   }
   notFound();
@@ -255,23 +259,16 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(creator, slug, dsp);
+  const content = await resolveContentOrRedirect(
+    creator,
+    slug,
+    dsp,
+    noredirect
+  );
 
   // If DSP is specified, redirect immediately
   if (dsp) {
     handleDspRedirect(dsp, content, creator);
-  }
-
-  // Auto-redirect to preferred DSP when available unless explicitly disabled.
-  if (noredirect !== '1') {
-    const cookieStore = await cookies();
-    const preferredProvider = resolvePreferredProviderKey(
-      cookieStore.get(LISTEN_COOKIE)?.value,
-      content.providerLinks
-    );
-    if (preferredProvider) {
-      handleDspRedirect(preferredProvider, content, creator);
-    }
   }
 
   // Build provider data for the landing page
@@ -352,6 +349,14 @@ export default async function ContentSmartLinkPage({
           __html: safeJsonLdStringify(breadcrumbSchema),
         }}
       />
+
+      {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
+      {!isUnreleased && noredirect !== '1' && (
+        <PreferredDspRedirect
+          providerLinks={content.providerLinks}
+          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
+        />
+      )}
 
       {isUnreleased && showUnreleasedHero ? (
         <UnreleasedReleaseHero
