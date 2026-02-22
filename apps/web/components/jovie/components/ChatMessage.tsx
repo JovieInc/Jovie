@@ -1,12 +1,11 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { Check, Copy, User } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useMemo } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
@@ -68,13 +67,8 @@ export function ChatMessage({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      {!isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
-          <BrandLogo size={16} tone='auto' />
-        </div>
-      )}
       {isUser ? (
-        <div className='max-w-[78%] rounded-2xl border border-accent/20 bg-accent/95 px-4 py-3.5 text-accent-foreground shadow-sm'>
+        <div className='max-w-[78%] rounded-2xl bg-accent/95 px-4 py-3.5 text-accent-foreground'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {fileParts.map((file, index) => (
@@ -102,7 +96,7 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-2xl border border-subtle bg-surface-1 px-5 py-4 text-primary-token shadow-[0_1px_0_rgba(0,0,0,0.02)]'>
+            <div className='px-5 py-4 text-primary-token'>
               <ChatMarkdown
                 content={messageText}
                 isStreaming={Boolean(isStreaming)}
@@ -172,22 +166,6 @@ export function ChatMessage({
                 </button>
               </SimpleTooltip>
             </div>
-          )}
-        </div>
-      )}
-      {isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-subtle bg-surface-1'>
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt=''
-              width={32}
-              height={32}
-              className='h-full w-full object-cover'
-              unoptimized
-            />
-          ) : (
-            <User className='h-4 w-4 text-secondary-token' />
           )}
         </div>
       )}
