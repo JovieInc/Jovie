@@ -5,16 +5,17 @@ import { Suspense, useEffect } from 'react';
 import { AuthLayout, SignUpForm } from '@/components/auth';
 
 /**
- * Persist Spotify data from homepage hero search into sessionStorage.
+ * Persist pre-signup claim data from the homepage hero into sessionStorage.
  * This data survives Clerk's auth redirects (OTP, SSO callbacks)
  * and is consumed by the onboarding flow after signup.
  */
-function SpotifyDataPersistence() {
+function SignUpClaimDataPersistence() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
+    const handle = searchParams.get('handle');
 
     try {
       // Clear stale values before persisting new ones
@@ -26,6 +27,13 @@ function SpotifyDataPersistence() {
       }
       if (artistName) {
         sessionStorage.setItem('jovie_signup_artist_name', artistName);
+      }
+
+      if (handle) {
+        sessionStorage.setItem(
+          'pendingClaim',
+          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+        );
       }
     } catch {
       // sessionStorage may be unavailable (incognito quota, etc.)
@@ -39,8 +47,8 @@ function SpotifyDataPersistence() {
  * Sign-up page using new Clerk Core API implementation.
  * No longer depends on Clerk Elements.
  *
- * When arriving from the homepage Spotify search, query params
- * (spotify_url, artist_name) are persisted to sessionStorage
+ * When arriving from the homepage claim flow, query params
+ * (handle, spotify_url, artist_name) are persisted to sessionStorage
  * for use during onboarding.
  */
 export default function SignUpPage() {
@@ -51,7 +59,7 @@ export default function SignUpPage() {
       showFooterPrompt={false}
     >
       <Suspense>
-        <SpotifyDataPersistence />
+        <SignUpClaimDataPersistence />
       </Suspense>
       <SignUpForm />
     </AuthLayout>
