@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingDashboard } from '@/components/organisms/BillingDashboard';
+import { PLAN_KEYS } from '@/components/organisms/billing/billing-constants';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -200,9 +201,15 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
+    const growthPlanEnabled = PLAN_KEYS.includes('growth');
+
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.getByText('Pro')).toBeInTheDocument();
-    expect(screen.getByText('Growth')).toBeInTheDocument();
+    if (growthPlanEnabled) {
+      expect(screen.getByText('Growth')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText('Growth')).not.toBeInTheDocument();
+    }
   });
 
   it('shows Current Plan badge on the active plan', async () => {
