@@ -130,13 +130,14 @@ describe('Admin Creator Social Links API', () => {
         canRemoveBranding: true,
       });
 
+      const profileId = '123e4567-e89b-12d3-a456-426614174000';
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             limit: vi
               .fn()
               .mockResolvedValue([
-                { id: 'profile_123', usernameNormalized: 'artist' },
+                { id: profileId, usernameNormalized: 'artist' },
               ]),
           }),
         }),
@@ -155,7 +156,7 @@ describe('Admin Creator Social Links API', () => {
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId: 'profile_123', links: [] }),
+          body: JSON.stringify({ profileId, links: [] }),
         }
       );
 
