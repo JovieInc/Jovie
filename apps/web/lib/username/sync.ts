@@ -3,6 +3,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
+import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -140,6 +141,10 @@ export async function syncCanonicalUsernameFromApp(
     // Note: We don't have the old username without a Clerk lookup,
     // but invalidateUsernameChange handles undefined oldUsername gracefully
     await invalidateUsernameChange(outcome.canonicalUsername, undefined);
+
+    // Invalidate handle availability cache so the old handle shows as available
+    // and the new handle shows as unavailable on next check
+    await invalidateHandleCache(outcome.canonicalUsername);
   }
 }
 

@@ -44,3 +44,21 @@ export async function cacheHandleAvailability(
     captureWarning('[handle-availability] Redis write failed', { error });
   }
 }
+
+/**
+ * Invalidate the cached availability for a specific handle.
+ * Call this when a username is changed or an account is deleted
+ * so stale "unavailable" entries don't persist for 30 days.
+ */
+export async function invalidateHandleCache(handle: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+
+  try {
+    await redis.del(getHandleCacheKey(handle));
+  } catch (error) {
+    captureWarning('[handle-availability] Redis invalidation failed', {
+      error,
+    });
+  }
+}
