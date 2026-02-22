@@ -7,6 +7,7 @@ import {
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
+  COUNTRY_CODE_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -509,12 +510,26 @@ function buildFinalResponse(
     }
   }
 
-  const countryCode = req.headers.get('x-vercel-ip-country');
-  const requiresCookieConsent = isCookieBannerRequired(countryCode);
+  const countryCode =
+    req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
+  const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
+  const requiresCookieConsent = isCookieBannerRequired(normalizedCountryCode);
   const currentCookieRequirement = req.cookies.get(
     COOKIE_BANNER_REQUIRED_COOKIE
   )?.value;
+  const currentCountryCode =
+    req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
   const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
+
+  if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
+    res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    });
+  }
 
   if (currentCookieRequirement !== nextCookieRequirement) {
     res.cookies.set(COOKIE_BANNER_REQUIRED_COOKIE, nextCookieRequirement, {
