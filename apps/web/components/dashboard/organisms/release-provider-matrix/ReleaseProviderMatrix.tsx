@@ -90,6 +90,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
+    handleCanvasStatusUpdate,
     handleAddUrl,
     handleSaveLyrics,
     handleFormatLyrics,
@@ -495,6 +496,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
             readOnly={!canEditSmartLinks}
+            onCanvasStatusUpdate={handleCanvasStatusUpdate}
           />
         </Suspense>
       ) : null,
@@ -518,6 +520,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       isSaving,
       allowArtworkDownloads,
       canEditSmartLinks,
+      handleCanvasStatusUpdate,
     ]
   );
 
