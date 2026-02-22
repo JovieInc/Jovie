@@ -3,6 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingDashboard } from '@/components/organisms/BillingDashboard';
+import {
+  PLAN_FEATURES,
+  PLAN_KEYS,
+} from '@/components/organisms/billing/billing-constants';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -187,7 +191,7 @@ describe('BillingDashboard', () => {
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
-  it('renders plan comparison grid with Free/Pro/Growth columns', async () => {
+  it('renders plan comparison grid with configured plan columns', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -200,9 +204,9 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('Pro')).toBeInTheDocument();
-    expect(screen.getByText('Growth')).toBeInTheDocument();
+    for (const planKey of PLAN_KEYS) {
+      expect(screen.getByText(PLAN_FEATURES[planKey].name)).toBeInTheDocument();
+    }
   });
 
   it('shows Current Plan badge on the active plan', async () => {
