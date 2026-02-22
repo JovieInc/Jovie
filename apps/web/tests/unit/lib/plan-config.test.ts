@@ -12,10 +12,10 @@ describe('Plan Configuration (Entitlement Registry)', () => {
     it('free plan has correct limits', () => {
       const free = ENTITLEMENT_REGISTRY.free;
       expect(free.limits).toEqual({
-        analyticsRetentionDays: 7,
+        analyticsRetentionDays: 30,
         contactsLimit: 100,
-        smartLinksLimit: 25,
-        aiDailyMessageLimit: 5,
+        smartLinksLimit: null,
+        aiDailyMessageLimit: 25,
       });
       expect(free.booleans).toEqual({
         canExportContacts: false,
@@ -24,11 +24,11 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         canFilterSelfFromAnalytics: false,
         canAccessAdPixels: false,
         canBeVerified: false,
-        aiCanUseTools: false,
-        canCreateManualReleases: false,
+        aiCanUseTools: true,
+        canCreateManualReleases: true,
         canAccessFutureReleases: false,
-        canSendNotifications: false,
-        canEditSmartLinks: false,
+        canSendNotifications: true,
+        canEditSmartLinks: true,
       });
     });
 
@@ -218,12 +218,21 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       }
     });
 
-    it('free plan disables all boolean features', () => {
-      for (const [, value] of Object.entries(
-        ENTITLEMENT_REGISTRY.free.booleans
-      )) {
-        expect(value).toBe(false);
-      }
+    it('free plan has expected boolean feature mix', () => {
+      const booleans = ENTITLEMENT_REGISTRY.free.booleans;
+      // Pro-only features stay false
+      expect(booleans.canRemoveBranding).toBe(false);
+      expect(booleans.canExportContacts).toBe(false);
+      expect(booleans.canAccessAdvancedAnalytics).toBe(false);
+      expect(booleans.canFilterSelfFromAnalytics).toBe(false);
+      expect(booleans.canAccessAdPixels).toBe(false);
+      expect(booleans.canBeVerified).toBe(false);
+      expect(booleans.canAccessFutureReleases).toBe(false);
+      // Unlocked for free
+      expect(booleans.aiCanUseTools).toBe(true);
+      expect(booleans.canCreateManualReleases).toBe(true);
+      expect(booleans.canSendNotifications).toBe(true);
+      expect(booleans.canEditSmartLinks).toBe(true);
     });
   });
 });

@@ -142,23 +142,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     });
   }, [rows, filters]);
 
-  // Smart link gating: free tier gets smartlinks for released music only (up to cap)
-  const { smartLinksLimit, isPro, canCreateManualReleases, canEditSmartLinks } =
-    usePlanGate();
+  // Smart link gating
+  const {
+    smartLinksLimit,
+    isPro,
+    canCreateManualReleases,
+    canEditSmartLinks,
+    canAccessFutureReleases,
+  } = usePlanGate();
+
+  /** Soft cap: show a "request higher limit" banner (not a hard lock) */
+  const SMART_LINK_SOFT_CAP = 100;
 
   // Partition releases into released vs unreleased, and compute lock state
   const { unlockedIds, lockReasons, releasedCount, unreleasedCount } =
     useMemo(() => {
-      if (!smartLinksLimit) {
-        // null = unlimited (pro/growth) — all unlocked
-        return {
-          unlockedIds: null,
-          lockReasons: new Map<string, 'scheduled' | 'cap'>(),
-          releasedCount: rows.length,
-          unreleasedCount: 0,
-        };
-      }
-
       const now = Date.now();
       const released: typeof rows = [];
       const unreleased: typeof rows = [];
@@ -170,13 +168,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           : 0;
         if (releaseTime > now) {
           unreleased.push(r);
-          reasons.set(r.id, 'scheduled');
+          // Mark as scheduled if the creator can't access future release pages
+          if (!canAccessFutureReleases) {
+            reasons.set(r.id, 'scheduled');
+          }
         } else {
           released.push(r);
         }
       }
 
-      // Released releases get smartlinks up to cap (oldest first when over cap)
+      if (!smartLinksLimit) {
+        // null = unlimited — no cap-based locks
+        return {
+          unlockedIds: canAccessFutureReleases
+            ? null
+            : new Set(released.map(r => r.id)),
+          lockReasons: reasons,
+          releasedCount: released.length,
+          unreleasedCount: unreleased.length,
+        };
+      }
+
+      // Apply cap-based locks (oldest first when over cap)
       const sorted = [...released].sort((a, b) => {
         const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
         const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
@@ -185,7 +198,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       const allowed = sorted.slice(0, smartLinksLimit);
       const ids = new Set(allowed.map(r => r.id));
 
-      // Mark released releases over cap as 'cap' locked
       for (const r of sorted.slice(smartLinksLimit)) {
         reasons.set(r.id, 'cap');
       }
@@ -196,7 +208,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         releasedCount: released.length,
         unreleasedCount: unreleased.length,
       };
-    }, [rows, smartLinksLimit]);
+    }, [rows, smartLinksLimit, canAccessFutureReleases]);
 
   const isSmartLinkLocked = useCallback(
     (releaseId: string) => {
@@ -587,14 +599,25 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
 
-            {/* Smart link gate banner for free users */}
+            {/* Soft-cap banner: request higher limit when over 100 smart links */}
             {showReleasesTable &&
               !isPro &&
-              (releasedCount > (smartLinksLimit ?? Infinity) ||
-                unreleasedCount > 0) && (
+              releasedCount > SMART_LINK_SOFT_CAP && (
                 <SmartLinkGateBanner
-                  smartLinksLimit={smartLinksLimit ?? 25}
+                  mode='soft-cap'
                   releasedCount={releasedCount}
+                  softCap={SMART_LINK_SOFT_CAP}
+                  className='mx-4 mt-2'
+                />
+              )}
+
+            {/* Pre-release upsell for free users with unreleased music */}
+            {showReleasesTable &&
+              !isPro &&
+              !canAccessFutureReleases &&
+              unreleasedCount > 0 && (
+                <SmartLinkGateBanner
+                  mode='unreleased'
                   unreleasedCount={unreleasedCount}
                   className='mx-4 mt-2'
                 />
