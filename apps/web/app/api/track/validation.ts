@@ -30,6 +30,43 @@ export interface ValidatedTrackRequest {
   target: string;
   linkId?: string;
   source?: 'qr' | 'link';
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    utm_content?: string;
+  };
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeUtmParams(
+  utmParams: unknown
+): ValidatedTrackRequest['utmParams'] | undefined {
+  if (typeof utmParams !== 'object' || utmParams === null) {
+    return undefined;
+  }
+
+  const params = utmParams as Record<string, unknown>;
+
+  const normalized = {
+    utm_source: normalizeOptionalString(params.utm_source),
+    utm_medium: normalizeOptionalString(params.utm_medium),
+    utm_campaign: normalizeOptionalString(params.utm_campaign),
+    utm_term: normalizeOptionalString(params.utm_term),
+    utm_content: normalizeOptionalString(params.utm_content),
+  };
+
+  if (!Object.values(normalized).some(Boolean)) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 /**
@@ -155,12 +192,13 @@ export function validateTrackRequest(
     };
   }
 
-  const { handle, linkType, target, linkId, source } = body as {
+  const { handle, linkType, target, linkId, source, utmParams } = body as {
     handle?: string;
     linkType?: LinkType;
     target?: string;
     linkId?: string;
     source?: unknown;
+    utmParams?: unknown;
   };
 
   // Run all validations
@@ -184,6 +222,7 @@ export function validateTrackRequest(
       target: target!,
       linkId,
       source: normalizeSource(source),
+      utmParams: normalizeUtmParams(utmParams),
     },
   };
 }

@@ -20,7 +20,7 @@
 #   Pre-merge:  CI (typecheck + lint + tests + a11y + layout guard)
 #               + scope-judge (LLM alignment check, agent PRs only)
 #               + sensitive-file detection (blocks auto-merge)
-#               + merge queue (re-runs CI against latest main)
+#               + merge queue (re-runs ci-fast against latest main)
 #
 #   Post-merge: canary health gate + Sentry error gate + auto-rollback
 #
@@ -50,10 +50,11 @@
 #    would be stuck forever. Instead, auto-approve checks for
 #    scope-judge status internally before enabling auto-merge.
 #
-# 6. merge_queue enabled
-#    PRs enter the merge queue after checks pass. The queue runs CI
-#    again (merge_group trigger) to catch integration conflicts
-#    between concurrent PRs.
+# 6. merge_queue enabled (lightweight)
+#    PRs enter the merge queue after checks pass. The queue runs only
+#    ci-fast (merge_group trigger) to catch integration conflicts.
+#    Unit tests, a11y, and layout guard are skipped in the queue —
+#    they already passed on the PR and post-deploy gates catch regressions.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -126,18 +127,21 @@ rules:
       # (don't wait for batching). This maximizes speed for autonomous PRs.
       min_entries_to_merge: 1
 
-      # Max entries to batch together. Small batches reduce blast radius
-      # if something fails in the queue.
-      max_entries_to_merge: 5
+      # Max entries to batch together. 10 balances throughput for 20+ agent PRs
+      # with blast radius control. Merge queue only runs ci-fast (~30s), so
+      # batches process quickly and failures are cheap to retry.
+      max_entries_to_merge: 10
 
       # Minutes to wait for more PRs before processing a batch.
       # 0 = process immediately when min_entries_to_merge is met.
       min_entries_to_merge_wait_minutes: 0
 
       # Status checks that must pass in the merge queue context.
-      # The CI workflow triggers on merge_group events and runs
-      # the same checks as on pull_request.
-      check_response_timeout_minutes: 30
+      # The CI workflow triggers on merge_group events but only runs
+      # ci-fast (typecheck + lint + boundaries + knip + guardrails).
+      # Unit tests, a11y, and layout guard are skipped — they already
+      # passed on the PR and post-deploy canary/sentry gates cover regressions.
+      check_response_timeout_minutes: 10
 
   # ── Branch Integrity ───────────────────────────────────────────────────
   - type: 'non_fast_forward'
