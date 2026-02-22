@@ -235,7 +235,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck
+        run: pnpm turbo typecheck --affected
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
