@@ -10,6 +10,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useCallback } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -46,6 +47,12 @@ interface ReleaseLandingPageProps
     readonly allowDownloads?: boolean;
     /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
+    /** Optional tracking context for smartlink click analytics */
+    readonly tracking?: {
+      readonly contentType: 'release' | 'track';
+      readonly contentId: string;
+      readonly smartLinkSlug?: string | null;
+    };
     /** UTM params captured from incoming request and passed to outbound links */
     readonly utmParams?: PartialUTMParams;
   }> {}
@@ -57,6 +64,7 @@ export function ReleaseLandingPage({
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
+  tracking,
   utmParams = {},
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
@@ -70,6 +78,43 @@ export function ReleaseLandingPage({
     (provider): provider is Provider & { url: string } => Boolean(provider.url)
   );
   const sizes = buildArtworkSizes(artworkSizes, release.artworkUrl);
+
+  const handleProviderClick = useCallback(
+    (providerKey: ProviderKey) => {
+      if (!artist.handle || !tracking?.contentId || !tracking?.contentType)
+        return;
+      const payload = {
+        handle: artist.handle,
+        linkType: 'listen',
+        target: providerKey,
+        source: 'link',
+        context: {
+          contentType: tracking.contentType,
+          contentId: tracking.contentId,
+          provider: providerKey,
+          smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+        },
+      };
+
+      const body = JSON.stringify(payload);
+
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' });
+        navigator.sendBeacon('/api/track', blob);
+        return;
+      }
+
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {
+        // Ignore tracking errors
+      });
+    },
+    [artist.handle, tracking]
+  );
 
   return (
     <div className='h-dvh bg-black text-white'>
@@ -149,6 +194,7 @@ export function ReleaseLandingPage({
                     href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
+                    onClick={() => handleProviderClick(provider.key)}
                     className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white/[0.10] hover:ring-white/[0.12]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties

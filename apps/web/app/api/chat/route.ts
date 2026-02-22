@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
-import { CHAT_MODEL } from '@/lib/constants/ai-models';
+import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -30,10 +30,6 @@ import {
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
-import {
-  SPOTIFY_CANVAS_SPEC,
-  TIKTOK_PREVIEW_SPEC,
-} from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
@@ -398,33 +394,12 @@ function buildSystemPrompt(
 - **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
 
-## Voice & Style (CRITICAL — follow strictly)
-- Be direct and concise. Most answers should be 1-3 sentences.
-- Never exceed 150 words unless the artist explicitly asks for detail or you are generating a bio.
-- Answer ONLY what was asked. Do not volunteer unrelated suggestions or observations.
-- No emoji. No exclamation marks unless genuinely warranted.
-- No marketing language, no cheerleading, no "Great question!" or "I'd love to help!" openers.
-- If the user asks to do something and you have a tool for it, call the tool immediately with minimal preamble.
-- Use bullet points only when listing 3+ items.
-- Use simple language, no jargon.
-
-### DO NOT
-- Suggest bio/links/genres/profile improvements unless specifically asked.
-- Greet the user with a profile review or stats summary they didn't ask for.
-- Pad responses with encouragement, motivational filler, or "let me know if you need anything else."
-- Repeat back what the user just said.
-
-### Guidelines
-- Be specific and data-driven when giving advice. Reference actual numbers, don't be vague.
-- Be honest about limitations. If you don't have enough data, say so.
-- Focus on actionable advice — give the artist something they can do.
-- Understand context: 0 profile views = just starting; 10K followers = has momentum.
-
-## What You Cannot Do
-- You cannot send emails, post content, or take actions on behalf of the artist
-- You cannot access external data or APIs
-- You cannot see their actual music or listen to tracks
-- You cannot guarantee results or make promises about outcomes
+## Voice (CRITICAL)
+- Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
+- No emoji, no exclamation marks, no cheerleading, no filler, no repeating the user.
+- If a tool exists for the request, call it immediately with minimal preamble.
+- Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
+- You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
 
 ## Profile Editing
 You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
@@ -448,58 +423,7 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Use the proposeSocialLink tool when the artist wants to add a social link or URL to their profile. Pass the full URL. If they only provide a handle (e.g. "@myhandle" for Instagram), construct the full URL (e.g. "https://instagram.com/myhandle") before calling the tool.
 - Do not add links without showing the confirmation preview first.
 
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
-
-## World-Class Bio Writing
-You have access to the writeWorldClassBio tool. Use it when the artist asks for a new biography, a rewrite for Spotify/Apple Music, or an AllMusic-quality narrative.
-- Pull in the artist's real platform signals and catalog context
-- Keep all claims factual and grounded in available data
-- Deliver a polished draft the artist can use directly or refine
-
-
-## Creative & Promotion Tools
-
-You also have tools to help with creative assets and promotion:
-
-**Spotify Canvas:**
-- Use the checkCanvasStatus tool to see which releases are missing canvas videos
-- All releases default to "not set" since Spotify has no public API for canvas detection
-- If the artist says they already have a canvas for a release, use markCanvasUploaded to update the status
-- Canvas is a 3-8 second looping video that plays behind tracks on Spotify mobile
-- You can help plan canvas generation from album artwork (AI removes text, upscales, and animates)
-- Specs: ${SPOTIFY_CANVAS_SPEC.minWidth}x${SPOTIFY_CANVAS_SPEC.minHeight}px minimum, 9:16 portrait, ${SPOTIFY_CANVAS_SPEC.minDurationSec}-${SPOTIFY_CANVAS_SPEC.maxDurationSec}s loop, H.264/MP4
-
-**Social Media Video Ads:**
-- Help artists plan video ads using their album art + song clips
-- Suggest promo text and strategy for different platforms
-- Consider QR codes linking to their Jovie page for tracking
-
-**TikTok Sound Previews:**
-- Help identify the best ${TIKTOK_PREVIEW_SPEC.durationSec}-second clip for TikTok previews
-- Consider hooks, drops, choruses, and viral moments
-- You can't listen to the audio, but you can advise based on song structure knowledge
-
-**Related Artists for Pitching:**
-- Use the suggestRelatedArtists tool to find similar artists
-- Useful for playlist pitching, ad targeting (Meta, TikTok), and collaboration
-- Base suggestions on genre, popularity tier, and audience overlap
-
-## Release Creation
-You can create new releases using the createRelease tool. This is useful for artists who:
-- Are not on Spotify and need to manually add their discography
-- Want to set up smart links for an upcoming release before it's live on streaming platforms
-- Have releases on platforms that aren't synced automatically
-
-When an artist asks to create a release, gather at minimum:
-- **Title** (required)
-- **Release type** (single, ep, album, compilation, live, mixtape, or other)
-
-Optional fields you can ask about:
-- **Release date** (when it was or will be released)
-- **Label** (record label name)
-- **UPC** (barcode, most artists won't know this)
-
-After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.${
+When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${
     options && !options.aiCanUseTools
       ? `
 
@@ -1150,6 +1074,53 @@ function toNullableString(value: unknown): string | null {
   return value && typeof value === 'string' ? value : null;
 }
 
+/**
+ * Regex patterns for messages that can be handled by the lightweight model.
+ * These are simple, tool-invocation-oriented requests that don't need
+ * frontier-model reasoning.
+ */
+const SIMPLE_INTENT_PATTERNS = [
+  /^(?:change|update|set|edit|make)\s+(?:my\s+)?(?:display\s*name|name|bio)\s+(?:to|:)/i,
+  /^(?:add|connect|link)\s+(?:my\s+)?(?:instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|link|url|website)/i,
+  /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic|pfp)/i,
+  /^(?:format|clean\s*up|fix)\s+(?:my\s+)?lyrics/i,
+  /^check\s+(?:my\s+)?canvas/i,
+  /^mark\s+.+\s+as\s+(?:uploaded|done|set)/i,
+] as const;
+
+/**
+ * Determines whether a request can be handled by the lightweight (Haiku) model.
+ *
+ * Returns true for:
+ * - Free-tier users (limited tools, simple Q&A)
+ * - Short conversations with clearly simple intents (profile edits, link adds)
+ */
+function canUseLightModel(
+  messages: UIMessage[],
+  aiCanUseTools: boolean
+): boolean {
+  // Free-plan users don't have advanced tools — always use the light model
+  if (!aiCanUseTools) return true;
+
+  // Only consider light model for short conversations
+  if (messages.length > 6) return false;
+
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return false;
+
+  const text = lastUserMsg.parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('')
+    .trim();
+
+  // Short, clearly tool-oriented requests
+  return text.length < 200 && SIMPLE_INTENT_PATTERNS.some(p => p.test(text));
+}
+
 function isClientDisconnect(
   error: unknown,
   signal: AbortSignal | undefined
@@ -1310,17 +1281,28 @@ export async function POST(req: Request) {
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }
       : freeTools;
 
+    const selectedModel = canUseLightModel(
+      uiMessages,
+      planLimits.booleans.aiCanUseTools
+    )
+      ? CHAT_MODEL_LIGHT
+      : CHAT_MODEL;
+
     const result = streamText({
-      model: gateway(CHAT_MODEL),
+      model: gateway(selectedModel),
       system: systemPrompt,
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
+      providerOptions: {
+        anthropic: { cacheControl: true },
+      },
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: true,
         recordOutputs: true,
         functionId: 'jovie-chat',
+        metadata: { model: selectedModel },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;

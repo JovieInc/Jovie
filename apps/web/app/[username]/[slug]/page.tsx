@@ -415,6 +415,11 @@ export default async function ContentSmartLinkPage({
               ?.allowArtworkDownloads === true
           }
           soundsUrl={soundsUrl}
+          tracking={{
+            contentType: content.type,
+            contentId: content.id,
+            smartLinkSlug: content.slug,
+          }}
         />
       )}
     </>

@@ -8,6 +8,7 @@ export const FEATURE_FLAG_KEYS = {
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
   SUBSCRIBE_TWO_STEP: 'feature_subscribe_two_step',
   LATEST_RELEASE_CARD: 'feature_latest_release_card',
+  IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
 } as const;
