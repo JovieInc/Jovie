@@ -24,8 +24,8 @@ async function ensureReleasesVisible(
 ): Promise<Locator | null> {
   await page.waitForLoadState('load').catch(() => {});
 
-  // Check for the "Connect your music" prompt which indicates no releases
-  const connectPrompt = page.getByText('Connect your music');
+  // Check for the "Connect Spotify" prompt which indicates no releases
+  const connectPrompt = page.getByText('Connect Spotify');
   if (
     await connectPrompt
       .isVisible({ timeout: TIMEOUTS.ELEMENT_CHECK })
