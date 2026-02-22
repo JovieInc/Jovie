@@ -455,8 +455,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue: fast checks + unit tests must pass. A11y + layout guard are informational.
-    # This is the only required status check in the branch ruleset.
+    # Single merge gate for PRs and merge queue.
+    # On PRs: gates on ci-fast + unit tests (a11y + layout guard are informational).
+    # On merge queue: only ci-fast runs; unit tests/a11y/layout-guard are skipped
+    # (already passed on PR) and their "skipped" result passes the checks below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
@@ -496,7 +498,9 @@ jobs:
   ci-build-public:
     name: Build (public routes)
     # Shared Next.js build for a11y + layout-guard — build once, test twice
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push' }}
+    # Skipped in merge queue: a11y + layout-guard are non-blocking and already
+    # ran on the PR. Merge queue only needs ci-fast for integration conflict detection.
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -736,7 +740,8 @@ jobs:
     name: Build
     # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -826,8 +831,11 @@ jobs:
     name: Unit Tests (${{ matrix.shard }})
     # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs, merge queue, and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Unit tests run on PRs and push to main — skipped in merge queue for speed.
+    # The merge queue gates on ci-fast (typecheck + lint) to catch integration
+    # conflicts; unit tests already passed on the PR and post-deploy canary/sentry
+    # gates catch behavioral regressions.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:

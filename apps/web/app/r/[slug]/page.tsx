@@ -24,6 +24,7 @@ import {
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import { ReleaseLandingPage } from './ReleaseLandingPage';
 
 // Use ISR with 5-minute revalidation for smart link pages
@@ -32,7 +33,7 @@ export const revalidate = 300;
 
 interface PageProps {
   readonly params: Promise<{ slug: string }>;
-  readonly searchParams: Promise<{ dsp?: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -151,7 +152,19 @@ export default async function ReleaseSmartLinkPage({
   searchParams,
 }: Readonly<PageProps>) {
   const { slug } = await params;
-  const { dsp } = await searchParams;
+  const allSearchParams = await searchParams;
+  const dspParam = allSearchParams.dsp;
+  const dsp = typeof dspParam === 'string' ? dspParam : undefined;
+  const utmParams = extractUTMParams(
+    new URLSearchParams(
+      Object.entries(allSearchParams).flatMap(([key, value]) => {
+        if (Array.isArray(value)) {
+          return value.map(v => [key, v]);
+        }
+        return typeof value === 'string' ? [[key, value]] : [];
+      })
+    )
+  );
 
   if (!slug) {
     notFound();
@@ -203,9 +216,10 @@ export default async function ReleaseSmartLinkPage({
       profileId,
       provider: providerKey,
       releaseTitle: release.title,
+      utmParams,
     });
 
-    redirect(targetUrl);
+    redirect(appendUTMParamsToUrl(targetUrl, utmParams));
   }
 
   // Build provider data for the landing page
@@ -248,11 +262,12 @@ export default async function ReleaseSmartLinkPage({
         avatarUrl: creator.avatarUrl ?? null,
       }}
       providers={allProviders}
-      tracking={{
+tracking={{
         contentType: 'release',
         contentId: release.id,
         smartLinkSlug: release.slug,
       }}
+      utmParams={utmParams}
     />
   );
 }

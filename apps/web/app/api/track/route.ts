@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
       target,
       linkId,
       source: resolvedSource,
-      context,
+context,
+      utmParams,
     } = validationResult.data;
 
     const userAgent = request.headers.get('user-agent');
@@ -227,7 +228,7 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
-      const metadata = {
+const metadata: Record<string, unknown> = {
         target,
         ...(resolvedSource ? { source: resolvedSource } : {}),
         ...(context?.contentType ? { contentType: context.contentType } : {}),
@@ -237,6 +238,11 @@ export async function POST(request: NextRequest) {
           ? { smartLinkSlug: context.smartLinkSlug }
           : {}),
       };
+
+      if (utmParams) {
+        metadata.utmParams = utmParams;
+      }
+
 
       const [insertedClickEvent] = await tx
         .insert(clickEvents)

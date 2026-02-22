@@ -2,12 +2,11 @@
  * Regression test: BillingDashboard requires QueryClientProvider.
  *
  * This test guards against the production bug where billing/layout.tsx
- * passed `skipCoreProviders` to ClientProviders, which stripped
- * QueryProvider from the tree. BillingDashboard uses TanStack Query
- * hooks that crash without QueryClientProvider.
+ * mounted BillingDashboard without a QueryClientProvider at the route
+ * boundary. BillingDashboard uses TanStack Query hooks that crash
+ * without QueryClientProvider.
  *
- * Introduced in commit 78fd6d6a9 (Jan 22).
- * Fixed by removing skipCoreProviders from billing layout.
+ * This test protects against regressions in route/layout provider wiring.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

@@ -31,6 +31,13 @@ export interface ValidatedTrackRequest {
   linkId?: string;
   source?: 'qr' | 'link';
   context?: TrackClickContext;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    utm_content?: string;
+  };
 }
 
 export interface TrackClickContext {
@@ -38,6 +45,36 @@ export interface TrackClickContext {
   contentId?: string;
   provider?: string;
   smartLinkSlug?: string;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeUtmParams(
+  utmParams: unknown
+): ValidatedTrackRequest['utmParams'] | undefined {
+  if (typeof utmParams !== 'object' || utmParams === null) {
+    return undefined;
+  }
+
+  const params = utmParams as Record<string, unknown>;
+
+  const normalized = {
+    utm_source: normalizeOptionalString(params.utm_source),
+    utm_medium: normalizeOptionalString(params.utm_medium),
+    utm_campaign: normalizeOptionalString(params.utm_campaign),
+    utm_term: normalizeOptionalString(params.utm_term),
+    utm_content: normalizeOptionalString(params.utm_content),
+  };
+
+  if (!Object.values(normalized).some(Boolean)) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 /**
@@ -190,14 +227,16 @@ export function validateTrackRequest(
     };
   }
 
-  const { handle, linkType, target, linkId, source, context } = body as {
-    handle?: string;
-    linkType?: LinkType;
-    target?: string;
-    linkId?: string;
-    source?: unknown;
-    context?: unknown;
-  };
+  const { handle, linkType, target, linkId, source, context, utmParams } =
+    body as {
+      handle?: string;
+      linkType?: LinkType;
+      target?: string;
+      linkId?: string;
+      source?: unknown;
+      context?: unknown;
+      utmParams?: unknown;
+    };
 
   // Run all validations
   const requiredError = validateRequiredFields({ handle, linkType, target });
@@ -221,6 +260,7 @@ export function validateTrackRequest(
       linkId,
       source: normalizeSource(source),
       context: normalizeContext(context),
+      utmParams: normalizeUtmParams(utmParams),
     },
   };
 }

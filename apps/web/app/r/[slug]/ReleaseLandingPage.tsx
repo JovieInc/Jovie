@@ -19,6 +19,7 @@ import {
 } from '@/components/release/AlbumArtworkContextMenu';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface Provider {
   key: ProviderKey;
@@ -46,12 +47,14 @@ interface ReleaseLandingPageProps
     readonly allowDownloads?: boolean;
     /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
-    /** Optional tracking context for smartlink click analytics */
+/** Optional tracking context for smartlink click analytics */
     readonly tracking?: {
       readonly contentType: 'release' | 'track';
       readonly contentId: string;
       readonly smartLinkSlug?: string | null;
     };
+    /** UTM params captured from incoming request and passed to outbound links */
+    readonly utmParams?: PartialUTMParams;
   }> {}
 
 export function ReleaseLandingPage({
@@ -61,7 +64,8 @@ export function ReleaseLandingPage({
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
-  tracking,
+tracking,
+  utmParams = {},
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -187,7 +191,7 @@ export function ReleaseLandingPage({
                 return (
                   <a
                     key={provider.key}
-                    href={provider.url}
+                    href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
                     onClick={() => handleProviderClick(provider.key)}
@@ -223,7 +227,7 @@ export function ReleaseLandingPage({
             {soundsUrl && (
               <div className='pt-1'>
                 <Link
-                  href={soundsUrl}
+                  href={appendUTMParamsToUrl(soundsUrl, utmParams)}
                   className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
                 >
                   <Icon
