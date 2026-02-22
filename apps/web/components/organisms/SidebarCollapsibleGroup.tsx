@@ -1,5 +1,6 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
 import { ChevronRight } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import {
@@ -16,6 +17,7 @@ export interface SidebarCollapsibleGroupProps {
   readonly children: React.ReactNode;
   readonly defaultOpen?: boolean;
   readonly className?: string;
+  readonly icon?: LucideIcon;
 }
 
 export function SidebarCollapsibleGroup({
@@ -23,6 +25,7 @@ export function SidebarCollapsibleGroup({
   children,
   defaultOpen = true,
   className,
+  icon: GroupIcon,
 }: SidebarCollapsibleGroupProps) {
   const [open, setOpen] = useState<boolean>(defaultOpen);
 
@@ -47,6 +50,12 @@ export function SidebarCollapsibleGroup({
             <span className='truncate group-data-[collapsible=icon]:hidden text-2xs tracking-wide'>
               {label}
             </span>
+            {GroupIcon ? (
+              <GroupIcon
+                className='size-3 shrink-0 opacity-50 group-data-[collapsible=icon]:inline hidden'
+                aria-hidden='true'
+              />
+            ) : null}
             <ChevronRight
               className={cn(
                 'size-3 shrink-0 opacity-50 transition-transform duration-[160ms] [transition-timing-function:cubic-bezier(0.25,0.46,0.45,0.94)]',
