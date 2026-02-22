@@ -319,6 +319,12 @@ export default async function HomePage() {
 
       {showHowItWorks && <HowItWorksRich />}
 
+      {showAutomaticReleaseSmartlinks && (
+        <DeferredSection placeholderHeight={560}>
+          <AutomaticReleaseSmartlinksSection />
+        </DeferredSection>
+      )}
+
       {showDashboardShowcase && (
         <DeferredSection placeholderHeight={640}>
           <DashboardShowcase />
@@ -352,12 +358,6 @@ export default async function HomePage() {
       {showSeeItInAction && (
         <DeferredSection placeholderHeight={520}>
           <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-        </DeferredSection>
-      )}
-
-      {showAutomaticReleaseSmartlinks && (
-        <DeferredSection placeholderHeight={560}>
-          <AutomaticReleaseSmartlinksSection />
         </DeferredSection>
       )}
 
