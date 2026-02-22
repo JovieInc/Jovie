@@ -8,6 +8,18 @@ export interface SocialLink {
   verificationToken?: string | null;
 }
 
+export type VerificationErrorCode =
+  | 'dns_not_found'
+  | 'domain_already_claimed'
+  | 'invalid_url'
+  | 'rate_limited'
+  | 'server_error';
+
+export interface VerificationError {
+  code: VerificationErrorCode;
+  message: string;
+}
+
 export interface SocialsFormProps {
   readonly artist: Artist;
 }
@@ -29,4 +41,6 @@ export interface UseSocialsFormReturn {
   addSocialLink: () => void;
   verifyWebsite: (linkId: string) => Promise<void>;
   verifyingLinkId: string | null;
+  verificationError: VerificationError | null;
+  clearVerificationError: () => void;
 }

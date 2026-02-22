@@ -15,6 +15,7 @@ import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
 import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
 import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
+import { VerificationModal } from './VerificationModal';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
 const CHIP_BG_ALPHA = 0x15 / 255;
@@ -192,7 +193,12 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     addSocialLink,
     verifyWebsite,
     verifyingLinkId,
+    verificationError,
+    clearVerificationError,
   } = useSocialsForm({ artistId: artist.id });
+  const [verifyModalLinkId, setVerifyModalLinkId] = useState<string | null>(
+    null
+  );
   const {
     suggestions,
     isLoading: suggestionsLoading,
@@ -370,7 +376,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 </Button>
 
                 {link.platform === 'website' && link.url.trim().length > 0 && (
-                  <div className='hidden lg:flex items-center gap-2'>
+                  <div className='flex items-center gap-2'>
                     <StatusBadge
                       variant={
                         link.verificationStatus === 'verified'
@@ -388,10 +394,10 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                         type='button'
                         size='sm'
                         variant='outline'
-                        onClick={() => verifyWebsite(link.id)}
-                        disabled={verifyingLinkId === link.id}
+                        onClick={() => setVerifyModalLinkId(link.id)}
+                        data-testid='open-verify-modal'
                       >
-                        {verifyingLinkId === link.id ? 'Checking…' : 'Verify'}
+                        Verify
                       </Button>
                     )}
                   </div>
@@ -399,17 +405,6 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
               </div>
             ))}
           </DashboardCard>
-
-          {socialLinks.some(link => link.platform === 'website') && (
-            <p className='pt-3 text-xs text-secondary-token'>
-              Add this TXT record to your domain:{' '}
-              <code>
-                {socialLinks.find(link => link.platform === 'website')
-                  ?.verificationToken ?? 'jovie-verify=...'}
-              </code>
-              . Then click Verify.
-            </p>
-          )}
 
           <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button
@@ -446,6 +441,32 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
           </p>
         </div>
       )}
+
+      {(() => {
+        const modalLink = socialLinks.find(l => l.id === verifyModalLinkId);
+        if (!modalLink) return null;
+        let hostname = '';
+        try {
+          hostname = new URL(modalLink.url).hostname;
+        } catch {
+          hostname = modalLink.url;
+        }
+        return (
+          <VerificationModal
+            open={!!verifyModalLinkId}
+            onClose={() => {
+              setVerifyModalLinkId(null);
+              clearVerificationError();
+            }}
+            hostname={hostname}
+            verificationToken={modalLink.verificationToken ?? ''}
+            onVerify={() => verifyWebsite(modalLink.id)}
+            verifying={verifyingLinkId === modalLink.id}
+            verificationStatus={modalLink.verificationStatus ?? 'unverified'}
+            verificationError={verificationError}
+          />
+        );
+      })()}
     </div>
   );
 }
