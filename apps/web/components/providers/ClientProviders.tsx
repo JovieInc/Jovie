@@ -9,6 +9,7 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
+import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
@@ -40,7 +41,7 @@ function wrapWithCoreProviders({
   skipCoreProviders,
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
-    children
+    <QueryProvider>{children}</QueryProvider>
   ) : (
     <CoreProviders initialThemeMode={initialThemeMode}>
       {children}
