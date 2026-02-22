@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       target,
       linkId,
       source: resolvedSource,
-context,
+      context,
       utmParams,
     } = validationResult.data;
 
@@ -228,7 +228,7 @@ context,
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
-const metadata: Record<string, unknown> = {
+      const metadata: Record<string, unknown> = {
         target,
         ...(resolvedSource ? { source: resolvedSource } : {}),
         ...(context?.contentType ? { contentType: context.contentType } : {}),
@@ -242,7 +242,6 @@ const metadata: Record<string, unknown> = {
       if (utmParams) {
         metadata.utmParams = utmParams;
       }
-
 
       const [insertedClickEvent] = await tx
         .insert(clickEvents)

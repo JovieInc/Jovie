@@ -47,7 +47,7 @@ interface ReleaseLandingPageProps
     readonly allowDownloads?: boolean;
     /** URL to the /sounds page, shown when video provider links exist */
     readonly soundsUrl?: string | null;
-/** Optional tracking context for smartlink click analytics */
+    /** Optional tracking context for smartlink click analytics */
     readonly tracking?: {
       readonly contentType: 'release' | 'track';
       readonly contentId: string;
@@ -64,7 +64,7 @@ export function ReleaseLandingPage({
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
-tracking,
+  tracking,
   utmParams = {},
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
