@@ -8,17 +8,19 @@
  */
 
 import { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
 } from '@/components/release';
-import { BASE_URL } from '@/constants/app';
+import { BASE_URL, LISTEN_COOKIE } from '@/constants/app';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
+import { resolvePreferredProviderKey } from '@/lib/discography/preferred-dsp';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
 import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
@@ -156,7 +158,7 @@ function generateMusicStructuredData(
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<{ dsp?: string }>;
+  readonly searchParams: Promise<{ dsp?: string; noredirect?: string }>;
 }
 
 /**
@@ -240,7 +242,7 @@ export default async function ContentSmartLinkPage({
   searchParams,
 }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const { dsp } = await searchParams;
+  const { dsp, noredirect } = await searchParams;
 
   if (!username || !slug) {
     notFound();
@@ -258,6 +260,18 @@ export default async function ContentSmartLinkPage({
   // If DSP is specified, redirect immediately
   if (dsp) {
     handleDspRedirect(dsp, content, creator);
+  }
+
+  // Auto-redirect to preferred DSP when available unless explicitly disabled.
+  if (noredirect !== '1') {
+    const cookieStore = await cookies();
+    const preferredProvider = resolvePreferredProviderKey(
+      cookieStore.get(LISTEN_COOKIE)?.value,
+      content.providerLinks
+    );
+    if (preferredProvider) {
+      handleDspRedirect(preferredProvider, content, creator);
+    }
   }
 
   // Build provider data for the landing page
