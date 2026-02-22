@@ -176,11 +176,7 @@ const MobileCardList = memo(function MobileCardList({
   });
 
   return (
-    <div
-      ref={parentRef}
-      className='md:hidden overflow-auto'
-      style={{ maxHeight: '100%' }}
-    >
+    <div ref={parentRef} className='md:hidden h-full overflow-auto'>
       <div
         className='relative w-full'
         style={{ height: `${virtualizer.getTotalSize()}px` }}

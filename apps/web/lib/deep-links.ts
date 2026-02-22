@@ -104,6 +104,73 @@ export const SOCIAL_DEEP_LINKS: Record<string, DeepLinkConfig> = {
     webFallback: 'https://www.facebook.com/{username}',
     extractUsername: createUrlExtractor(/facebook\.com\/([^/?#]+)/),
   },
+  linkedin: {
+    name: 'LinkedIn',
+    iosScheme: 'linkedin://in/{username}',
+    androidScheme:
+      'intent://www.linkedin.com/in/{username}#Intent;package=com.linkedin.android;scheme=https;end',
+    universalLink: 'https://www.linkedin.com/in/{username}',
+    webFallback: 'https://www.linkedin.com/in/{username}',
+    extractUsername: createUrlExtractor(/linkedin\.com\/in\/([^/?#]+)/),
+  },
+  snapchat: {
+    name: 'Snapchat',
+    iosScheme: 'snapchat://add/{username}',
+    androidScheme:
+      'intent://www.snapchat.com/add/{username}#Intent;package=com.snapchat.android;scheme=https;end',
+    universalLink: 'https://www.snapchat.com/add/{username}',
+    webFallback: 'https://www.snapchat.com/add/{username}',
+    extractUsername: createMultiPatternExtractor([
+      /snapchat\.com\/add\/([^/?#]+)/,
+      /snapchat\.com\/u\/([^/?#]+)/,
+      /snapchat\.com\/([^/?#]+)/,
+    ]),
+  },
+  reddit: {
+    name: 'Reddit',
+    iosScheme: 'reddit://user/{username}',
+    androidScheme:
+      'intent://www.reddit.com/user/{username}#Intent;package=com.reddit.frontpage;scheme=https;end',
+    universalLink: 'https://www.reddit.com/user/{username}',
+    webFallback: 'https://www.reddit.com/user/{username}',
+    extractUsername: createMultiPatternExtractor([
+      /reddit\.com\/user\/([^/?#]+)/,
+      /reddit\.com\/u\/([^/?#]+)/,
+    ]),
+  },
+  discord: {
+    name: 'Discord',
+    iosScheme: 'discord://invite/{id}',
+    androidScheme:
+      'intent://discord.gg/{id}#Intent;package=com.discord;scheme=https;end',
+    universalLink: 'https://discord.gg/{id}',
+    webFallback: 'https://discord.gg/{id}',
+    extractId: createMultiPatternExtractor([
+      /discord\.gg\/([^/?#]+)/,
+      /discord\.com\/invite\/([^/?#]+)/,
+    ]),
+  },
+  whatsapp: {
+    name: 'WhatsApp',
+    iosScheme: 'whatsapp://send?phone={userId}',
+    androidScheme:
+      'intent://send?phone={userId}#Intent;scheme=whatsapp;package=com.whatsapp;end',
+    universalLink: 'https://wa.me/{userId}',
+    webFallback: 'https://wa.me/{userId}',
+    extractId: createMultiPatternExtractor([
+      /wa\.me\/([^/?#]+)/,
+      /api\.whatsapp\.com\/send\?phone=([^&#]+)/,
+    ]),
+  },
+  twitch: {
+    name: 'Twitch',
+    iosScheme: 'twitch://stream/{username}',
+    androidScheme:
+      'intent://www.twitch.tv/{username}#Intent;package=tv.twitch.android.app;scheme=https;end',
+    universalLink: 'https://www.twitch.tv/{username}',
+    webFallback: 'https://www.twitch.tv/{username}',
+    extractUsername: createUrlExtractor(/twitch\.tv\/([^/?#]+)/),
+  },
 };
 
 // Music Streaming Platform Deep Link Configurations
@@ -140,6 +207,126 @@ export const DSP_DEEP_LINKS: Record<string, DeepLinkConfig> = {
       /youtube\.com\/user\/([^/?#]+)/,
     ]),
     extractId: createUrlExtractor(/youtube\.com\/channel\/([^/?#]+)/),
+  },
+  soundcloud: {
+    name: 'SoundCloud',
+    iosScheme: 'soundcloud://users:{username}',
+    androidScheme:
+      'intent://soundcloud.com/{username}#Intent;package=com.soundcloud.android;scheme=https;end',
+    universalLink: 'https://soundcloud.com/{username}',
+    webFallback: 'https://soundcloud.com/{username}',
+    extractUsername: createUrlExtractor(/soundcloud\.com\/([^/?#]+)/),
+  },
+  tidal: {
+    name: 'TIDAL',
+    iosScheme: 'tidal://artist/{artistId}',
+    androidScheme:
+      'intent://tidal.com/browse/artist/{artistId}#Intent;package=com.aspiro.tidal;scheme=https;end',
+    universalLink: 'https://tidal.com/browse/artist/{artistId}',
+    webFallback: 'https://tidal.com/browse/artist/{artistId}',
+    extractId: createUrlExtractor(/tidal\.com\/(?:browse\/)?artist\/([^/?#]+)/),
+  },
+  deezer: {
+    name: 'Deezer',
+    iosScheme: 'deezer://artist/{artistId}',
+    androidScheme:
+      'intent://www.deezer.com/artist/{artistId}#Intent;package=deezer.android.app;scheme=https;end',
+    universalLink: 'https://www.deezer.com/artist/{artistId}',
+    webFallback: 'https://www.deezer.com/artist/{artistId}',
+    extractId: createUrlExtractor(
+      /deezer\.com\/(?:[a-z]{2}\/)?artist\/([^/?#]+)/i
+    ),
+  },
+  amazon_music: {
+    name: 'Amazon Music',
+    iosScheme: 'amazonmusic://artists/{artistId}',
+    androidScheme:
+      'intent://music.amazon.com/artists/{artistId}#Intent;package=com.amazon.mp3;scheme=https;end',
+    universalLink: 'https://music.amazon.com/artists/{artistId}',
+    webFallback: 'https://music.amazon.com/artists/{artistId}',
+    extractId: createUrlExtractor(
+      /music\.amazon\.[a-z.]+\/artists\/([^/?#]+)/i
+    ),
+  },
+  bandcamp: {
+    name: 'Bandcamp',
+    webFallback: 'https://{username}.bandcamp.com',
+    extractUsername: createMultiPatternExtractor([
+      /https?:\/\/([^./]+)\.bandcamp\.com/i,
+      /bandcamp\.com\/([^/?#]+)/i,
+    ]),
+  },
+  beatport: {
+    name: 'Beatport',
+    webFallback: 'https://www.beatport.com/artist/{username}',
+    extractUsername: createUrlExtractor(
+      /beatport\.com\/artist\/[^/]+\/([^/?#]+)/
+    ),
+  },
+  pandora: {
+    name: 'Pandora',
+    webFallback: 'https://www.pandora.com/artist/{username}',
+    extractUsername: createUrlExtractor(/pandora\.com\/artist\/([^/?#]+)/),
+  },
+  napster: {
+    name: 'Napster',
+    iosScheme: 'napster://artist/{artistId}',
+    androidScheme:
+      'intent://us.napster.com/artist/{artistId}#Intent;package=com.rhapsody;scheme=https;end',
+    universalLink: 'https://us.napster.com/artist/{artistId}',
+    webFallback: 'https://us.napster.com/artist/{artistId}',
+    extractId: createUrlExtractor(/napster\.com\/artist\/([^/?#]+)/),
+  },
+  audiomack: {
+    name: 'Audiomack',
+    iosScheme: 'audiomack://profile/{username}',
+    androidScheme:
+      'intent://audiomack.com/{username}#Intent;package=com.audiomack;scheme=https;end',
+    universalLink: 'https://audiomack.com/{username}',
+    webFallback: 'https://audiomack.com/{username}',
+    extractUsername: createUrlExtractor(/audiomack\.com\/([^/?#]+)/),
+  },
+  qobuz: {
+    name: 'Qobuz',
+    webFallback: 'https://www.qobuz.com/artist/{artistId}',
+    extractId: createUrlExtractor(
+      /qobuz\.com\/[a-z]{2}-[a-z]{2}\/artist\/[^/]+\/([^/?#]+)/i
+    ),
+  },
+  anghami: {
+    name: 'Anghami',
+    iosScheme: 'anghami://artist/{artistId}',
+    androidScheme:
+      'intent://play.anghami.com/artist/{artistId}#Intent;package=com.anghami;scheme=https;end',
+    universalLink: 'https://play.anghami.com/artist/{artistId}',
+    webFallback: 'https://play.anghami.com/artist/{artistId}',
+    extractId: createUrlExtractor(/anghami\.com\/artist\/([^/?#]+)/),
+  },
+  boomplay: {
+    name: 'Boomplay',
+    androidScheme:
+      'intent://www.boomplay.com/artists/{artistId}#Intent;package=com.afmobi.boomplayer;scheme=https;end',
+    universalLink: 'https://www.boomplay.com/artists/{artistId}',
+    webFallback: 'https://www.boomplay.com/artists/{artistId}',
+    extractId: createUrlExtractor(/boomplay\.com\/artists\/([^/?#]+)/),
+  },
+  iheartradio: {
+    name: 'iHeartRadio',
+    iosScheme: 'iheartradio://artist/{username}',
+    androidScheme:
+      'intent://www.iheart.com/artist/{username}#Intent;package=com.clearchannel.iheartradio.controller;scheme=https;end',
+    universalLink: 'https://www.iheart.com/artist/{username}',
+    webFallback: 'https://www.iheart.com/artist/{username}',
+    extractUsername: createUrlExtractor(/iheart\.com\/artist\/([^/?#]+)/),
+  },
+  tiktok: {
+    name: 'TikTok Music',
+    iosScheme: 'tiktok://music/{artistId}',
+    androidScheme:
+      'intent://www.tiktok.com/music/{artistId}#Intent;package=com.zhiliaoapp.musically;scheme=https;end',
+    universalLink: 'https://www.tiktok.com/music/{artistId}',
+    webFallback: 'https://www.tiktok.com/music/{artistId}',
+    extractId: createUrlExtractor(/tiktok\.com\/music\/([^/?#]+)/),
   },
 };
 
