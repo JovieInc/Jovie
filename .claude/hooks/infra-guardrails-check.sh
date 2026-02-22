@@ -1,5 +1,5 @@
 #!/bin/bash
-# Infrastructure Guardrails (agents.md: Infrastructure & Scheduling Guardrails)
+# Infrastructure Guardrails (AGENTS.md: Infrastructure & Scheduling Guardrails)
 # - Block creation of new cron jobs without explicit justification
 # - Block vercel.json cron config changes
 # - Detect polling patterns (setInterval/setTimeout in server code)
@@ -30,7 +30,7 @@ if [[ "$file_path" =~ app/api/cron/ ]] && [[ "$file_path" =~ route\.ts$ ]]; then
     echo "File: $file_path"
     echo ""
     echo "Before creating a new cron job, you MUST justify why simpler alternatives won't work."
-    echo "Walk through the decision hierarchy (agents.md: Infrastructure & Scheduling Guardrails):"
+    echo "Walk through the decision hierarchy (AGENTS.md: Infrastructure & Scheduling Guardrails):"
     echo ""
     echo "  1. Can a webhook/event handler do this instead?"
     echo "  2. Can this happen inline after the triggering action?"
@@ -50,7 +50,7 @@ if [[ "$file_path" =~ vercel\.json$ ]] && [ -n "$content" ]; then
     echo "File: $file_path"
     echo ""
     echo "Changes to cron schedules or adding new cron entries have direct cost"
-    echo "and operational impact. See agents.md: Infrastructure & Scheduling Guardrails."
+    echo "and operational impact. See AGENTS.md: Infrastructure & Scheduling Guardrails."
     echo ""
     echo "Required in PR description:"
     echo "  - Why a webhook/event-driven approach won't work"

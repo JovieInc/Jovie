@@ -1,5 +1,5 @@
 #!/bin/bash
-# Protect critical files based on agents.md HARD GUARDRAILS
+# Protect critical files based on AGENTS.md HARD GUARDRAILS
 # Synced with .claude/hooks/file-protection-check.sh
 # - Prevent modification of Drizzle migrations (append-only, line 51)
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
@@ -14,9 +14,9 @@ if [ -z "$file_path" ]; then
   exit 0
 fi
 
-# HARD GUARDRAIL: Drizzle migrations are immutable (agents.md line 51)
+# HARD GUARDRAIL: Drizzle migrations are immutable (AGENTS.md line 51)
 if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizzle/migrations/meta/_journal\.json$ ]]; then
-  echo "BLOCKED: Drizzle migration files are IMMUTABLE (agents.md line 51)"
+  echo "BLOCKED: Drizzle migration files are IMMUTABLE (AGENTS.md line 51)"
   echo "File: $file_path"
   echo ""
   echo "Drizzle migrations are append-only once merged to main."
@@ -29,9 +29,9 @@ if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizz
   exit 2  # Exit 2 blocks in Windsurf
 fi
 
-# HARD GUARDRAIL: No middleware.ts allowed (agents.md line 11)
+# HARD GUARDRAIL: No middleware.ts allowed (AGENTS.md line 11)
 if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
-  echo "BLOCKED: Do not create middleware.ts (agents.md line 11)"
+  echo "BLOCKED: Do not create middleware.ts (AGENTS.md line 11)"
   echo "File: $file_path"
   echo ""
   echo "This repo uses apps/web/proxy.ts as the middleware entrypoint."
@@ -42,10 +42,10 @@ if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; th
   exit 2  # Exit 2 blocks in Windsurf
 fi
 
-# HARD GUARDRAIL: Never suppress Biome errors (agents.md line 52)
+# HARD GUARDRAIL: Never suppress Biome errors (AGENTS.md line 52)
 if [ -n "$content" ]; then
   if echo "$content" | grep -q "biome-ignore"; then
-    echo "BLOCKED: biome-ignore comments are not allowed (agents.md line 52)"
+    echo "BLOCKED: biome-ignore comments are not allowed (AGENTS.md line 52)"
     echo "File: $file_path"
     echo ""
     echo "Do NOT use biome-ignore to suppress lint or format errors."

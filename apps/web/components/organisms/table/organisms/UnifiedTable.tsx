@@ -303,6 +303,15 @@ export function UnifiedTable<TData>({
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const setTableContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (tableContainerRef.current === node) return;
+      tableContainerRef.current = node;
+      setScrollRoot(node);
+    },
+    [setScrollRoot]
+  );
 
   // Internal focused row state (uncontrolled mode)
   const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(-1);
@@ -392,6 +401,7 @@ export function UnifiedTable<TData>({
       getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
       getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
       enabled: groupingEnabled,
+      scrollRoot,
     });
 
   // Initialize virtualization
@@ -432,7 +442,7 @@ export function UnifiedTable<TData>({
   if (isLoading) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -452,7 +462,7 @@ export function UnifiedTable<TData>({
   if (rows.length === 0 && emptyState) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -481,7 +491,7 @@ export function UnifiedTable<TData>({
 
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -558,7 +568,7 @@ export function UnifiedTable<TData>({
   // Render table with data
   return (
     <div
-      ref={tableContainerRef}
+      ref={setTableContainerRef}
       className={cn('overflow-auto', containerClassName)}
     >
       <table className={tableClassName} style={{ minWidth }}>

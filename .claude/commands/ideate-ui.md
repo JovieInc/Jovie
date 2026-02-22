@@ -323,7 +323,7 @@ Ideas saved to: `.claude/ideation/ui-ux-ideas.json`
 
 ## Jovie-Specific Patterns
 
-Follow project conventions (from agents.md):
+Follow project conventions (from AGENTS.md):
 
 - Use `cn()` from `@/lib/utils` for class merging
 - Use components from `@jovie/ui` package

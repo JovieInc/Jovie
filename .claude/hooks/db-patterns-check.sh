@@ -57,7 +57,7 @@ if [[ ${#ERRORS[@]} -gt 0 ]]; then
     echo "  • $error"
   done
   echo ""
-  echo "See agents.md 'Database Access (Single Driver Policy)' for details."
+  echo "See AGENTS.md 'Database Access (Single Driver Policy)' for details."
   exit 1
 fi
 

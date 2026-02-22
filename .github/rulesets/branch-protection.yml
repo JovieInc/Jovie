@@ -54,6 +54,15 @@
 #    PRs enter the merge queue after checks pass. The queue runs CI
 #    again (merge_group trigger) to catch integration conflicts
 #    between concurrent PRs.
+#
+# 7. Fork PR Gate (required status check)
+#    Since required_approving_review_count is 0, fork PRs from external
+#    contributors could merge with zero reviews if CI passes. The Fork
+#    PR Gate workflow (.github/workflows/fork-pr-gate.yml) closes this
+#    gap: it auto-passes for non-fork PRs (agents + team) and blocks
+#    fork PRs until a human collaborator submits an APPROVE review.
+#    This keeps the agent auto-merge pipeline fast while preventing
+#    unreviewed external code from reaching production.
 
 name: 'Main Branch Protection'
 enforcement: 'active'
@@ -101,6 +110,11 @@ rules:
         # path-gated (only runs when DB/schema files change). Prevents
         # dangerous migration patterns from reaching production.
         - context: 'CI / Migration Guard'
+
+        # Fork PR Gate: Auto-passes for non-fork PRs (agents + team).
+        # Blocks fork PRs from external contributors until a human
+        # collaborator submits an APPROVE review. See design decision #7.
+        - context: 'Fork PR Gate'
 
   # ── Merge Queue ────────────────────────────────────────────────────────
   - type: 'merge_queue'

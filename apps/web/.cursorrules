@@ -15,7 +15,7 @@ pnpm --version   # MUST be 9.15.4 (not npm or yarn)
 | `pnpm --filter web dev` | `cd apps/web && pnpm dev` |
 | Run from repo root | Run from subdirectories |
 
-See `agents.md` at repo root for full AI agent guidelines.
+See `AGENTS.md` at repo root for full AI agent guidelines.
 
 ---
 
@@ -37,7 +37,7 @@ See `agents.md` at repo root for full AI agent guidelines.
 - Always calculate API call volume: `(calls/run) × (runs/day) × 30 = monthly calls`
 - Include a **Cost Impact** section in PR description for any recurring external API calls
 
-See `agents.md` → "Infrastructure & Scheduling Guardrails" for full details.
+See `AGENTS.md` → "Infrastructure & Scheduling Guardrails" for full details.
 
 ---
 

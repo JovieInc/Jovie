@@ -3,10 +3,15 @@
 import React, { useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  COUNTRY_CODE_COOKIE,
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { track } from '@/lib/analytics';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import {
+  AvailableDSP,
+  getAvailableDSPs,
+  sortDSPsByGeoPopularity,
+} from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
@@ -30,9 +35,18 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
-  const [dsps] = useState<AvailableDSP[]>(
-    () => dspsOverride ?? getAvailableDSPs(artist)
-  );
+  const [dsps] = useState<AvailableDSP[]>(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    const baseDSPs = dspsOverride ?? getAvailableDSPs(artist);
+    return sortDSPsByGeoPopularity(baseDSPs, countryCode ?? null);
+  });
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

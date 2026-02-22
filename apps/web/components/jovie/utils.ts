@@ -93,6 +93,15 @@ interface ErrorMetadata {
   message?: string;
 }
 
+function isJsonLikeErrorMessage(message: string): boolean {
+  const trimmed = message.trim();
+  return (
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('Error: {') ||
+    trimmed.includes('"errorCode"')
+  );
+}
+
 /**
  * Extracts metadata fields from a record-like source into the metadata object.
  * Overwrites existing fields if the source has valid values.
@@ -167,4 +176,25 @@ export function extractErrorMetadata(error: Error): ErrorMetadata {
   }
 
   return metadata;
+}
+
+export function getPreferredErrorMessage(
+  error: Error,
+  type: ChatErrorType,
+  metadata: ErrorMetadata
+): string {
+  if (metadata.message) {
+    return metadata.message;
+  }
+
+  const rawMessage = error.message?.trim();
+  if (!rawMessage) {
+    return getUserFriendlyMessage(type, metadata.retryAfter);
+  }
+
+  if (isJsonLikeErrorMessage(rawMessage)) {
+    return getUserFriendlyMessage(type, metadata.retryAfter);
+  }
+
+  return rawMessage;
 }

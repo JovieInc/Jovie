@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractErrorMetadata,
   getErrorType,
+  getPreferredErrorMessage,
   getUserFriendlyMessage,
 } from '@/components/jovie/utils';
 
@@ -72,6 +73,29 @@ describe('chat error classification', () => {
   it('builds polished rate limit copy with retry time', () => {
     expect(getUserFriendlyMessage('rate_limit', 19)).toBe(
       'Too many requests. Please wait 19 seconds.'
+    );
+  });
+});
+
+describe('getPreferredErrorMessage', () => {
+  it('returns polished fallback for JSON-like transport errors', () => {
+    const error = new Error(
+      'Error: {"error":"Rate limit exceeded","errorCode":"RATE_LIMITED","retryAfter":3600}'
+    );
+
+    expect(
+      getPreferredErrorMessage(error, 'rate_limit', {
+        retryAfter: 3600,
+        errorCode: 'RATE_LIMITED',
+      })
+    ).toBe('Too many requests. Please wait 3600 seconds.');
+  });
+
+  it('preserves plain-text server messages', () => {
+    const error = new Error('Service is temporarily unavailable.');
+
+    expect(getPreferredErrorMessage(error, 'server', {})).toBe(
+      'Service is temporarily unavailable.'
     );
   });
 });
