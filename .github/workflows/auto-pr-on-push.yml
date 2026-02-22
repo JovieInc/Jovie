@@ -8,6 +8,7 @@
 #
 # SAFETY:
 # - Idempotent: skips if PR already exists for the branch
+# - Skips audit-only pushes (branches with only docs/audits and no code changes)
 # - Extracts Linear ticket ID from branch name for traceability
 # - Enables auto-merge so the PR flows through the full pipeline
 # - Does NOT bypass any quality gates (CI, scope judge, auto-approve all still apply)
@@ -32,7 +33,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for code changes
+        id: diff
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Compare this branch against main to get all changed files
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "No files changed vs main. Skipping PR."
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Filter out audit-only files: audits/, docs/, and standalone markdown
+          # A push is "audit-only" if every changed file matches these patterns
+          CODE_CHANGES=$(echo "$CHANGED" | grep -vE '^(audits/|docs/|\.github/workflows/|[^/]+\.md$)' || true)
+
+          if [[ -z "$CODE_CHANGES" ]]; then
+            echo "All changes are audit/docs only. Skipping PR creation."
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Found code changes:"
+            echo "$CODE_CHANGES"
+            echo "has_code_changes=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check for existing PR
+        if: steps.diff.outputs.has_code_changes == 'true'
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,7 +91,7 @@ jobs:
 
       - name: Parse branch name
         id: parse
-        if: steps.check.outputs.should_create == 'true'
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
@@ -85,7 +122,7 @@ jobs:
 
       - name: Fetch Linear ticket details
         id: linear
-        if: steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != ''
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != ''
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: |
@@ -129,7 +166,7 @@ jobs:
           fi
 
       - name: Create PR
-        if: steps.check.outputs.should_create == 'true'
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
