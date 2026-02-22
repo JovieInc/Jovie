@@ -393,7 +393,7 @@ export function JovieChat({
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='px-4 pb-8'>
+          <div className='px-4 pb-4 sm:pb-8'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
