@@ -52,7 +52,7 @@ export function SidebarCollapsibleGroup({
             </span>
             {GroupIcon ? (
               <GroupIcon
-                className='size-3 shrink-0 opacity-50 group-data-[collapsible=icon]:inline hidden'
+                className='h-4 w-4 shrink-0 opacity-50 group-data-[collapsible=icon]:inline hidden'
                 aria-hidden='true'
               />
             ) : null}
