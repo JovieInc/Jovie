@@ -43,6 +43,7 @@ import {
   type ReleaseView,
 } from './ReleaseTableSubheader';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
+import { SpotifyConnectDialog } from './SpotifyConnectDialog';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -67,6 +68,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(false);
+  const [spotifySearchOpen, setSpotifySearchOpen] = useState(false);
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
@@ -390,9 +392,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [handleNewRelease, canCreateManualReleases]
   );
 
-  const spotifyBadge = useMemo(
-    () =>
-      isConnected ? (
+  const spotifyBadge = useMemo(() => {
+    if (isConnected) {
+      return (
         <button
           type='button'
           onClick={handleSync}
@@ -424,9 +426,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             aria-hidden='true'
           />
         </button>
-      ) : null,
-    [isConnected, artistName, handleSync, isSyncing]
-  );
+      );
+    }
+
+    return (
+      <DspConnectionPill
+        provider='spotify'
+        connected={false}
+        onClick={() => setSpotifySearchOpen(true)}
+      />
+    );
+  }, [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]);
 
   const appleMusicBadge = useMemo(
     () => (
@@ -563,8 +573,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           <div className='flex-1 min-h-0 overflow-auto pb-4'>
             {showEmptyState && (
               <ReleasesEmptyState
-                onConnected={handleArtistConnected}
-                onImportStart={handleImportStart}
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
               />
             )}
 
@@ -709,6 +718,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onOpenChange={setAmPaletteOpen}
         provider='apple_music'
         onArtistSelect={handleAppleMusicConnect}
+      />
+
+      <SpotifyConnectDialog
+        open={spotifySearchOpen}
+        onOpenChange={setSpotifySearchOpen}
+        onConnected={handleArtistConnected}
+        onImportStart={handleImportStart}
       />
     </>
   );

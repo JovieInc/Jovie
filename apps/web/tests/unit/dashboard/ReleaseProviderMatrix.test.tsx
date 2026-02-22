@@ -135,6 +135,13 @@ vi.mock(
 );
 
 vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
+  () => ({
+    SpotifyConnectDialog: () => null,
+  })
+);
+
+vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
   () => ({
     AppleMusicSyncBanner: () => null,
