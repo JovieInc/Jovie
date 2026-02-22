@@ -120,6 +120,14 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
+  it('every plan marketing list includes unlimited smart links', () => {
+    for (const planId of planIds) {
+      expect(ENTITLEMENT_REGISTRY[planId].marketing.features).toContain(
+        'Unlimited smart links'
+      );
+    }
+  });
+
   it('marketing displayName is non-empty for all plans', () => {
     for (const planId of planIds) {
       expect(ENTITLEMENT_REGISTRY[planId].marketing.displayName).toBeTruthy();

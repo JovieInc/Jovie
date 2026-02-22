@@ -339,6 +339,16 @@ export default function PricingPage() {
                 </div>
               )}
             </div>
+
+            <p
+              className='mt-4 text-center'
+              style={{
+                fontSize: 'var(--linear-label-size)',
+                color: 'var(--linear-text-tertiary)',
+              }}
+            >
+              Unlimited subject to abuse guardrails.
+            </p>
           </div>
         </div>
       </Container>
