@@ -43,6 +43,7 @@ import {
   type ReleaseView,
 } from './ReleaseTableSubheader';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
+import { SpotifyConnectDialog } from './SpotifyConnectDialog';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -67,6 +68,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(false);
+  const [spotifySearchOpen, setSpotifySearchOpen] = useState(false);
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
@@ -88,6 +90,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
+    handleCanvasStatusUpdate,
     handleAddUrl,
     handleSaveLyrics,
     handleFormatLyrics,
@@ -142,23 +145,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     });
   }, [rows, filters]);
 
-  // Smart link gating: free tier gets smartlinks for released music only (up to cap)
-  const { smartLinksLimit, isPro, canCreateManualReleases, canEditSmartLinks } =
-    usePlanGate();
+  // Smart link gating
+  const {
+    smartLinksLimit,
+    isPro,
+    canCreateManualReleases,
+    canEditSmartLinks,
+    canAccessFutureReleases,
+  } = usePlanGate();
+
+  /** Soft cap: show a "request higher limit" banner (not a hard lock) */
+  const SMART_LINK_SOFT_CAP = 100;
 
   // Partition releases into released vs unreleased, and compute lock state
   const { unlockedIds, lockReasons, releasedCount, unreleasedCount } =
     useMemo(() => {
-      if (!smartLinksLimit) {
-        // null = unlimited (pro/growth) — all unlocked
-        return {
-          unlockedIds: null,
-          lockReasons: new Map<string, 'scheduled' | 'cap'>(),
-          releasedCount: rows.length,
-          unreleasedCount: 0,
-        };
-      }
-
       const now = Date.now();
       const released: typeof rows = [];
       const unreleased: typeof rows = [];
@@ -170,13 +171,28 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           : 0;
         if (releaseTime > now) {
           unreleased.push(r);
-          reasons.set(r.id, 'scheduled');
+          // Mark as scheduled if the creator can't access future release pages
+          if (!canAccessFutureReleases) {
+            reasons.set(r.id, 'scheduled');
+          }
         } else {
           released.push(r);
         }
       }
 
-      // Released releases get smartlinks up to cap (oldest first when over cap)
+      if (!smartLinksLimit) {
+        // null = unlimited — no cap-based locks
+        return {
+          unlockedIds: canAccessFutureReleases
+            ? null
+            : new Set(released.map(r => r.id)),
+          lockReasons: reasons,
+          releasedCount: released.length,
+          unreleasedCount: unreleased.length,
+        };
+      }
+
+      // Apply cap-based locks (oldest first when over cap)
       const sorted = [...released].sort((a, b) => {
         const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
         const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
@@ -185,7 +201,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       const allowed = sorted.slice(0, smartLinksLimit);
       const ids = new Set(allowed.map(r => r.id));
 
-      // Mark released releases over cap as 'cap' locked
       for (const r of sorted.slice(smartLinksLimit)) {
         reasons.set(r.id, 'cap');
       }
@@ -196,7 +211,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         releasedCount: released.length,
         unreleasedCount: unreleased.length,
       };
-    }, [rows, smartLinksLimit]);
+    }, [rows, smartLinksLimit, canAccessFutureReleases]);
 
   const isSmartLinkLocked = useCallback(
     (releaseId: string) => {
@@ -378,9 +393,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [handleNewRelease, canCreateManualReleases]
   );
 
-  const spotifyBadge = useMemo(
-    () =>
-      isConnected ? (
+  const spotifyBadge = useMemo(() => {
+    if (isConnected) {
+      return (
         <button
           type='button'
           onClick={handleSync}
@@ -412,9 +427,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             aria-hidden='true'
           />
         </button>
-      ) : null,
-    [isConnected, artistName, handleSync, isSyncing]
-  );
+      );
+    }
+
+    return (
+      <DspConnectionPill
+        provider='spotify'
+        connected={false}
+        onClick={() => setSpotifySearchOpen(true)}
+      />
+    );
+  }, [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]);
 
   const appleMusicBadge = useMemo(
     () => (
@@ -493,6 +516,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
             readOnly={!canEditSmartLinks}
+            onCanvasStatusUpdate={handleCanvasStatusUpdate}
           />
         </Suspense>
       ) : null,
@@ -516,6 +540,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       isSaving,
       allowArtworkDownloads,
       canEditSmartLinks,
+      handleCanvasStatusUpdate,
     ]
   );
 
@@ -551,8 +576,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           <div className='flex-1 min-h-0 overflow-auto pb-4'>
             {showEmptyState && (
               <ReleasesEmptyState
-                onConnected={handleArtistConnected}
-                onImportStart={handleImportStart}
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
               />
             )}
 
@@ -587,14 +611,25 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               </div>
             )}
 
-            {/* Smart link gate banner for free users */}
+            {/* Soft-cap banner: request higher limit when over 100 smart links */}
             {showReleasesTable &&
               !isPro &&
-              (releasedCount > (smartLinksLimit ?? Infinity) ||
-                unreleasedCount > 0) && (
+              releasedCount > SMART_LINK_SOFT_CAP && (
                 <SmartLinkGateBanner
-                  smartLinksLimit={smartLinksLimit ?? 25}
+                  mode='soft-cap'
                   releasedCount={releasedCount}
+                  softCap={SMART_LINK_SOFT_CAP}
+                  className='mx-4 mt-2'
+                />
+              )}
+
+            {/* Pre-release upsell for free users with unreleased music */}
+            {showReleasesTable &&
+              !isPro &&
+              !canAccessFutureReleases &&
+              unreleasedCount > 0 && (
+                <SmartLinkGateBanner
+                  mode='unreleased'
                   unreleasedCount={unreleasedCount}
                   className='mx-4 mt-2'
                 />
@@ -686,6 +721,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onOpenChange={setAmPaletteOpen}
         provider='apple_music'
         onArtistSelect={handleAppleMusicConnect}
+      />
+
+      <SpotifyConnectDialog
+        open={spotifySearchOpen}
+        onOpenChange={setSpotifySearchOpen}
+        onConnected={handleArtistConnected}
+        onImportStart={handleImportStart}
       />
     </>
   );

@@ -1,12 +1,14 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import { PencilLine, Trash2 } from 'lucide-react';
+import { PencilLine, QrCode, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -97,6 +99,44 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
 
+  const handleCopyQrCode = useCallback(async () => {
+    try {
+      const qrUrl = getQrCodeUrl(smartLinkUrl, 512);
+      const response = await fetch(qrUrl);
+
+      if (!response.ok) {
+        throw new Error('Failed to generate QR code');
+      }
+
+      const qrBlob = await response.blob();
+
+      if (
+        typeof globalThis.ClipboardItem === 'function' &&
+        navigator.clipboard?.write
+      ) {
+        await navigator.clipboard.write([
+          new globalThis.ClipboardItem({
+            [qrBlob.type || 'image/png']: qrBlob,
+          }),
+        ]);
+        toast.success('QR code copied');
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(qrBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${release.slug}-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success('QR code downloaded (copy unsupported in this browser)');
+    } catch {
+      toast.error('Unable to copy QR code');
+    }
+  }, [release.slug, smartLinkUrl]);
+
   const utmShareItems = useMemo(
     () =>
       getUTMShareActionMenuItems({
@@ -126,6 +166,12 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
         onClick: handleCopySmartLink,
       },
+      {
+        id: 'copy-qr-code',
+        label: 'Copy QR code',
+        icon: QrCode,
+        onClick: () => void handleCopyQrCode(),
+      },
       ...utmShareItems,
       {
         id: 'separator',
@@ -141,7 +187,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         disabled: !onDelete,
       },
     ],
-    [handleEdit, handleCopySmartLink, utmShareItems, onDelete]
+    [handleEdit, handleCopySmartLink, handleCopyQrCode, utmShareItems, onDelete]
   );
 
   const manualOverrideCount = release.providers.filter(

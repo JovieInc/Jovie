@@ -68,7 +68,7 @@ describe('usePlanGate', () => {
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
     expect(result.current.isError).toBe(false);
   });
@@ -144,7 +144,7 @@ describe('usePlanGate', () => {
     expect(result.current.isError).toBe(true);
     // Should default to free limits when error occurs
     expect(result.current.isPro).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 });

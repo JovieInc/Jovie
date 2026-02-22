@@ -1,9 +1,8 @@
+import { Bolt, Check, Disc, Link } from 'lucide-react';
+
 import { Container } from '@/components/site/Container';
-import {
-  RELEASE_AUTOMATION_ACTIVITY,
-  RELEASE_AUTOMATION_PLATFORM_HEALTH,
-  RELEASE_AUTOMATION_RELEASE,
-} from './demo/mock-data';
+import type { SmartlinkThreadItem } from './demo/mock-data';
+import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
 
 export function AutomaticReleaseSmartlinksSection() {
   return (
@@ -13,39 +12,70 @@ export function AutomaticReleaseSmartlinksSection() {
     >
       <Container size='homepage'>
         <div className='mx-auto max-w-6xl'>
+          {/* Two-column header */}
           <div className='grid gap-6 md:grid-cols-2 md:items-start'>
             <h2
-              className='max-w-md text-3xl font-semibold tracking-tight sm:text-4xl'
-              style={{ color: 'var(--linear-text-primary)' }}
-            >
-              Automatic smartlinks for every release.
-            </h2>
-            <p
-              className='max-w-lg text-base sm:text-lg'
-              style={{ color: 'var(--linear-text-secondary)' }}
-            >
-              Publish once, and Jovie creates a polished release smartlink
-              instantly — populated with platform destinations, artwork, and
-              metadata your fans can trust.
-            </p>
-          </div>
-
-          <div className='relative mt-12'>
-            <div
-              className='relative overflow-hidden rounded-[28px] p-5 sm:p-8'
+              className='max-w-md'
               style={{
-                border: '1px solid var(--linear-border-subtle)',
-                background:
-                  'radial-gradient(120% 160% at 50% 0%, rgba(91,112,255,0.12), rgba(7,11,19,0.92) 62%)',
+                color: 'var(--linear-text-primary)',
+                fontSize: 'clamp(28px, 4vw, 48px)',
+                fontWeight: 510,
+                letterSpacing: '-0.022em',
+                lineHeight: 1,
               }}
             >
-              <DesktopReleaseBackground />
+              Automatic smartlinks
+              <br />
+              for every release.
+            </h2>
+            <div className='max-w-lg'>
+              <p
+                style={{
+                  color: 'var(--linear-text-secondary)',
+                  fontSize: '15px',
+                  lineHeight: '24px',
+                  letterSpacing: '-0.011em',
+                }}
+              >
+                Connect your Spotify and Jovie instantly creates a polished
+                release smartlink — populated with platform destinations,
+                artwork, and metadata your fans can trust.
+              </p>
+              <span
+                className='mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1'
+                style={{
+                  fontSize: '13px',
+                  fontWeight: 510,
+                  color: 'var(--linear-text-secondary)',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
+                Smartlinks · Auto-generated
+                <span style={{ color: 'var(--linear-text-tertiary)' }}>→</span>
+              </span>
+            </div>
+          </div>
 
-              <div className='pointer-events-none absolute inset-0 bg-gradient-to-t from-[rgba(4,7,13,0.92)] to-transparent' />
+          {/* Two-panel product mockup */}
+          <div className='relative mt-12'>
+            <div
+              className='relative overflow-hidden rounded-2xl'
+              style={{
+                border: '1px solid var(--linear-border-subtle)',
+                backgroundColor: 'rgba(10, 14, 24, 0.9)',
+              }}
+            >
+              <div className='grid md:grid-cols-[1fr_1.1fr]'>
+                {/* Left panel — Activity thread */}
+                <ActivityThread />
 
-              <div className='relative z-10 flex justify-center sm:justify-start sm:pl-8 lg:pl-16'>
-                <MobileSmartlinkForeground />
+                {/* Right panel — Release kanban */}
+                <ReleaseKanban />
               </div>
+
+              {/* Bottom gradient fade */}
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[rgba(4,7,13,0.95)] to-transparent' />
             </div>
           </div>
         </div>
@@ -54,163 +84,280 @@ export function AutomaticReleaseSmartlinksSection() {
   );
 }
 
-function DesktopReleaseBackground() {
+function ActivityThread() {
   return (
     <div
-      aria-hidden='true'
-      className='pointer-events-none mx-auto hidden w-full max-w-5xl overflow-hidden rounded-2xl border p-4 opacity-45 blur-[1.5px] sm:block'
+      className='flex flex-col border-r'
       style={{
         borderColor: 'var(--linear-border-subtle)',
-        backgroundColor: 'rgba(10, 14, 24, 0.9)',
+        backgroundColor: 'rgba(13, 18, 28, 0.88)',
       }}
     >
+      {/* Title bar */}
       <div
-        className='flex items-center justify-between rounded-xl px-4 py-3'
-        style={{
-          border: '1px solid var(--linear-border-subtle)',
-          backgroundColor: 'rgba(19, 24, 36, 0.88)',
-        }}
+        className='flex items-center gap-2 border-b px-5 py-3'
+        style={{ borderColor: 'var(--linear-border-subtle)' }}
       >
-        <div>
-          <p className='text-sm font-medium text-white'>Releases</p>
-          <p className='text-xs text-[var(--linear-text-tertiary)]'>
-            {RELEASE_AUTOMATION_PLATFORM_HEALTH.length} destinations verified
-          </p>
-        </div>
         <span
-          className='rounded-full px-3 py-1 text-[11px] font-medium text-white'
-          style={{ backgroundColor: 'rgba(112, 126, 255, 0.8)' }}
+          style={{
+            fontSize: '13px',
+            fontWeight: 510,
+            color: 'var(--linear-text-primary)',
+          }}
         >
-          Auto-linking active
+          Activity
+        </span>
+        <span
+          style={{
+            fontSize: '13px',
+            color: 'var(--linear-text-tertiary)',
+          }}
+        >
+          · Release automation
         </span>
       </div>
 
-      <div className='mt-4 grid gap-4 lg:grid-cols-[1.35fr_0.85fr]'>
-        <div
-          className='overflow-hidden rounded-xl border'
-          style={{ borderColor: 'var(--linear-border-subtle)' }}
-        >
+      {/* Thread items */}
+      <div className='flex-1 space-y-1 px-3 py-3'>
+        {SMARTLINK_THREAD.map(item => (
           <div
-            className='grid grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr] px-4 py-2 text-[11px] uppercase tracking-[0.08em]'
-            style={{
-              color: 'var(--linear-text-tertiary)',
-              backgroundColor: 'rgba(13, 18, 28, 0.88)',
-            }}
+            key={item.id}
+            className='flex items-start gap-3 rounded-lg px-3 py-2.5'
+            style={{ backgroundColor: 'transparent' }}
           >
-            <span>Release</span>
-            <span>Status</span>
-            <span>Smartlink</span>
-            <span className='text-right'>Updated</span>
-          </div>
-
-          <div
-            className='grid grid-cols-[1.4fr_0.9fr_0.9fr_0.8fr] items-center px-4 py-3 text-sm'
-            style={{
-              color: 'var(--linear-text-primary)',
-              borderTop: '1px solid var(--linear-border-subtle)',
-            }}
-          >
-            <span className='truncate'>{RELEASE_AUTOMATION_RELEASE.title}</span>
-            <span className='text-[var(--linear-text-secondary)]'>Shipped</span>
-            <span className='text-[var(--linear-accent)]'>Generated</span>
-            <span className='text-right text-[var(--linear-text-tertiary)]'>
-              32s ago
+            {/* Icon */}
+            <span
+              className='mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full'
+              style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <ThreadIcon type={item.iconType} color={item.iconColor} />
             </span>
-          </div>
-        </div>
 
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-baseline justify-between gap-2'>
+                <p
+                  className='truncate'
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 450,
+                    color: 'var(--linear-text-primary)',
+                  }}
+                >
+                  {item.label}
+                </p>
+                <span
+                  className='flex-shrink-0'
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--linear-text-tertiary)',
+                  }}
+                >
+                  {item.time}
+                </span>
+              </div>
+              {item.detail && (
+                <p
+                  className='mt-0.5'
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--linear-text-tertiary)',
+                    lineHeight: '18px',
+                  }}
+                >
+                  {item.detail}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Command bar */}
+      <div
+        className='border-t px-4 py-3'
+        style={{ borderColor: 'var(--linear-border-subtle)' }}
+      >
         <div
-          className='overflow-hidden rounded-xl border'
-          style={{ borderColor: 'var(--linear-border-subtle)' }}
+          className='flex items-center gap-2 rounded-lg px-3 py-2'
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
         >
-          <div
-            className='px-4 py-2 text-[11px] uppercase tracking-[0.08em]'
+          <span
+            className='rounded px-1.5 py-0.5'
             style={{
-              color: 'var(--linear-text-tertiary)',
-              backgroundColor: 'rgba(13, 18, 28, 0.88)',
+              fontSize: '11px',
+              fontWeight: 510,
+              color: 'var(--linear-accent, #6C7AFF)',
+              backgroundColor: 'rgba(108, 122, 255, 0.1)',
             }}
           >
-            Release drawer
-          </div>
-
-          <div className='space-y-2 px-4 py-3'>
-            {RELEASE_AUTOMATION_ACTIVITY.map(activity => (
-              <div
-                key={activity.id}
-                className='rounded-lg border px-3 py-2'
-                style={{
-                  borderColor: 'rgba(108, 122, 255, 0.28)',
-                  backgroundColor: 'rgba(95, 109, 255, 0.08)',
-                }}
-              >
-                <p className='text-xs font-medium text-white'>
-                  {activity.title}
-                </p>
-                <p className='mt-1 text-[11px] text-[var(--linear-text-tertiary)]'>
-                  {activity.detail}
-                </p>
-              </div>
-            ))}
-          </div>
+            @jovie
+          </span>
+          <span
+            style={{
+              fontSize: '13px',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
+            create smartlink for upcoming release
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-function MobileSmartlinkForeground() {
+function ReleaseKanban() {
   return (
-    <div
-      className='relative w-full max-w-[320px] overflow-hidden rounded-[26px] border p-4 shadow-2xl'
-      style={{
-        borderColor: 'rgba(151, 162, 255, 0.45)',
-        background:
-          'linear-gradient(180deg, rgba(15,19,31,0.98) 0%, rgba(9,12,20,0.98) 100%)',
-        boxShadow: '0 30px 70px rgba(6, 8, 15, 0.55)',
-      }}
-    >
+    <div style={{ backgroundColor: 'rgba(13, 18, 28, 0.88)' }}>
+      {/* Title bar */}
       <div
-        className='h-24 rounded-xl'
-        style={{ background: RELEASE_AUTOMATION_RELEASE.gradient }}
-      />
-
-      <div className='mt-4'>
-        <p className='text-base font-semibold text-white'>
-          {RELEASE_AUTOMATION_RELEASE.title}
-        </p>
-        <p className='text-xs text-[var(--linear-text-tertiary)]'>
-          {RELEASE_AUTOMATION_RELEASE.artist} ·{' '}
-          {RELEASE_AUTOMATION_RELEASE.date}
-        </p>
+        className='flex items-center gap-2 border-b px-5 py-3'
+        style={{ borderColor: 'var(--linear-border-subtle)' }}
+      >
+        <span
+          style={{
+            fontSize: '13px',
+            fontWeight: 510,
+            color: 'var(--linear-text-primary)',
+          }}
+        >
+          Releases
+        </span>
+        <span
+          className='rounded-full px-2 py-0.5'
+          style={{
+            fontSize: '10px',
+            fontWeight: 510,
+            color: 'var(--linear-text-secondary)',
+            backgroundColor: 'rgba(255,255,255,0.05)',
+          }}
+        >
+          4
+        </span>
       </div>
 
-      <div className='mt-4 space-y-2'>
-        {RELEASE_AUTOMATION_PLATFORM_HEALTH.map(platform => (
-          <div
-            key={platform.name}
-            className='flex items-center justify-between rounded-lg border px-3 py-2.5'
-            style={{
-              borderColor: 'var(--linear-border-subtle)',
-              backgroundColor: 'rgba(20, 26, 38, 0.85)',
-            }}
-          >
-            <span className='text-sm text-[var(--linear-text-primary)]'>
-              {platform.name}
-            </span>
-            <span
-              className='rounded-full px-2 py-0.5 text-[10px] font-medium text-white'
-              style={{
-                backgroundColor:
-                  platform.status === 'Live'
-                    ? 'rgba(78, 201, 140, 0.75)'
-                    : 'rgba(112, 126, 255, 0.72)',
-              }}
-            >
-              {platform.status}
-            </span>
+      {/* Columns */}
+      <div className='grid grid-cols-3 gap-px p-3'>
+        {SMARTLINK_KANBAN_COLUMNS.map(column => (
+          <div key={column.title} className='flex flex-col gap-2 px-1.5'>
+            {/* Column header */}
+            <div className='flex items-center justify-between px-1 py-1.5'>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 510,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  color: 'var(--linear-text-tertiary)',
+                }}
+              >
+                {column.title}
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--linear-text-tertiary)',
+                }}
+              >
+                {column.cards.length}
+              </span>
+            </div>
+
+            {/* Cards */}
+            {column.cards.map(card => (
+              <div
+                key={card.id}
+                className='overflow-hidden rounded-lg'
+                style={{
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  backgroundColor: 'rgba(255,255,255,0.02)',
+                }}
+              >
+                {/* Artwork */}
+                <div
+                  className='h-16 w-full'
+                  style={{ background: card.gradient }}
+                />
+
+                <div className='space-y-1.5 px-2.5 py-2'>
+                  <p
+                    className='truncate'
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      color: 'var(--linear-text-primary)',
+                    }}
+                  >
+                    {card.title}
+                  </p>
+                  <p
+                    className='truncate'
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--linear-text-tertiary)',
+                    }}
+                  >
+                    {card.artist}
+                  </p>
+
+                  <div className='flex items-center justify-between'>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        color: 'var(--linear-text-tertiary)',
+                      }}
+                    >
+                      {card.platformCount} platforms
+                    </span>
+                    <span
+                      className='rounded-full px-1.5 py-0.5'
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: 510,
+                        color:
+                          card.status === 'Live'
+                            ? '#4EC98C'
+                            : card.status === 'Syncing'
+                              ? '#6C7AFF'
+                              : 'var(--linear-text-tertiary)',
+                        backgroundColor:
+                          card.status === 'Live'
+                            ? 'rgba(78, 201, 140, 0.12)'
+                            : card.status === 'Syncing'
+                              ? 'rgba(108, 122, 255, 0.12)'
+                              : 'rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      {card.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function ThreadIcon({
+  type,
+  color,
+}: {
+  readonly type: SmartlinkThreadItem['iconType'];
+  readonly color: string;
+}) {
+  const icons = {
+    link: Link,
+    disc: Disc,
+    zap: Bolt,
+    check: Check,
+  } as const;
+
+  const Icon = icons[type];
+  return <Icon aria-hidden='true' className='h-3 w-3' style={{ color }} />;
 }
