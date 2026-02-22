@@ -1,6 +1,8 @@
 import { geoAwarePopularityIndex } from '@/constants/app';
 import { Artist, Release } from '@/types/db';
 
+export type DevicePlatform = 'ios' | 'android' | 'desktop';
+
 export interface DSPConfig {
   name: string;
   color: string;
@@ -88,6 +90,66 @@ export function sortDSPsByGeoPopularity(
       geoAwarePopularityIndex(b.key, countryCode);
 
     if (rankDelta !== 0) return rankDelta;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+const IOS_APPLE_MUSIC_PRIORITY_WEIGHT = -2;
+
+function getDevicePriorityWeight(
+  dspKey: string,
+  platform: DevicePlatform
+): number {
+  if (platform === 'ios' && dspKey === 'apple_music') {
+    return IOS_APPLE_MUSIC_PRIORITY_WEIGHT;
+  }
+
+  return 0;
+}
+
+interface SortDSPsForDeviceOptions {
+  countryCode?: string | null;
+  platform?: DevicePlatform;
+  enableDevicePriority?: boolean;
+}
+
+/**
+ * Sort DSPs by geo popularity with optional device-aware weighting.
+ *
+ * Device weighting is intentionally small so geo ordering remains the primary
+ * signal while letting us gently favor native-first UX on iOS.
+ */
+export function sortDSPsForDevice(
+  dsps: AvailableDSP[],
+  options: SortDSPsForDeviceOptions = {}
+): AvailableDSP[] {
+  const {
+    countryCode,
+    platform = 'desktop',
+    enableDevicePriority = false,
+  } = options;
+
+  return dsps.sort((a, b) => {
+    const baseRankDelta =
+      geoAwarePopularityIndex(a.key, countryCode) -
+      geoAwarePopularityIndex(b.key, countryCode);
+
+    // Geo popularity is always the primary signal
+    if (baseRankDelta !== 0) {
+      return baseRankDelta;
+    }
+
+    // Device weighting is a secondary tiebreaker when geo ranks are equal
+    if (enableDevicePriority) {
+      const devicePriorityDelta =
+        getDevicePriorityWeight(a.key, platform) -
+        getDevicePriorityWeight(b.key, platform);
+
+      if (devicePriorityDelta !== 0) {
+        return devicePriorityDelta;
+      }
+    }
+
     return a.name.localeCompare(b.name);
   });
 }

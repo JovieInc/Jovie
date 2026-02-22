@@ -170,6 +170,10 @@ export function useJovieChat({
         setInput(lastAttemptedMessageRef.current);
       }
 
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.usage(),
+      });
+
       setIsSubmitting(false);
     },
   });
@@ -183,6 +187,13 @@ export function useJovieChat({
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.chat.usage(),
+    });
+  }, [status, queryClient]);
 
   // Derive the conversation title from the query data
   const conversationTitle = existingConversation?.conversation?.title ?? null;
