@@ -21,6 +21,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { isGrowthPlanEnabled, isGrowthPriceId } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 import {
   cancelScheduledPlanChange,
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid price ID' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
+      return NextResponse.json(
+        { error: 'Growth plan is not currently available' },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -168,10 +176,14 @@ export async function GET() {
     }
 
     const hasScheduledChange = !!subscription?.schedule;
+    const availableChanges = isGrowthPlanEnabled()
+      ? planOptions.availableChanges
+      : planOptions.availableChanges.filter(change => change.plan !== 'growth');
 
     return NextResponse.json(
       {
         ...planOptions,
+        availableChanges,
         hasActiveSubscription: !!subscription,
         hasScheduledChange,
       },
