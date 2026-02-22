@@ -25,6 +25,7 @@ import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
+import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
@@ -339,6 +340,12 @@ export function ReleaseSidebar({
               {/* Details tab: Metadata + Settings */}
               {activeTab === 'details' && (
                 <>
+                  <div className='pb-5'>
+                    <ReleaseSmartLinkAnalytics
+                      release={release}
+                      providerConfig={providerConfig}
+                    />
+                  </div>
                   <div className='pb-5'>
                     <ReleaseMetadata
                       release={release}

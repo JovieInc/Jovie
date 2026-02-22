@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       target,
       linkId,
       source: resolvedSource,
+      context,
     } = validationResult.data;
 
     const userAgent = request.headers.get('user-agent');
@@ -226,6 +227,17 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
+      const metadata = {
+        target,
+        ...(resolvedSource ? { source: resolvedSource } : {}),
+        ...(context?.contentType ? { contentType: context.contentType } : {}),
+        ...(context?.contentId ? { contentId: context.contentId } : {}),
+        ...(context?.provider ? { provider: context.provider } : {}),
+        ...(context?.smartLinkSlug
+          ? { smartLinkSlug: context.smartLinkSlug }
+          : {}),
+      };
+
       const [insertedClickEvent] = await tx
         .insert(clickEvents)
         .values({
@@ -238,9 +250,7 @@ export async function POST(request: NextRequest) {
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
-          metadata: resolvedSource
-            ? { target, source: resolvedSource }
-            : { target },
+          metadata,
           audienceMemberId: resolvedMember.id,
         })
         .returning({ id: clickEvents.id });
