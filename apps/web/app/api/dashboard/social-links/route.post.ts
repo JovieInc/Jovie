@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
+import { getSocialLinksVerificationColumnSupport } from '@/lib/db/queries/social-links-verification';
 import { socialLinks } from '@/lib/db/schema/links';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -43,6 +44,15 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const hasVerificationColumns =
+      await getSocialLinksVerificationColumnSupport(tx);
+    if (!hasVerificationColumns) {
+      return NextResponse.json(
+        { error: 'Website verification is temporarily unavailable.' },
+        { status: 503, headers: NO_STORE_HEADERS }
       );
     }
 

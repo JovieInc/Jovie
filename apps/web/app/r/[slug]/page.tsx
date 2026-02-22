@@ -262,6 +262,11 @@ export default async function ReleaseSmartLinkPage({
         avatarUrl: creator.avatarUrl ?? null,
       }}
       providers={allProviders}
+      tracking={{
+        contentType: 'release',
+        contentId: release.id,
+        smartLinkSlug: release.slug,
+      }}
       utmParams={utmParams}
     />
   );
