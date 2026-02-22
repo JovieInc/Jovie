@@ -49,6 +49,8 @@ export interface UseReleaseProviderMatrixReturn {
   handleReset: (provider: ProviderKey) => void;
   handleSync: () => void;
   handleRefreshRelease: (releaseId: string) => void;
+  refreshingReleaseId: string | null;
+  flashedReleaseId: string | null;
   handleRescanIsrc: (releaseId: string) => void;
   isRescanningIsrc: boolean;
   handleAddUrl: (

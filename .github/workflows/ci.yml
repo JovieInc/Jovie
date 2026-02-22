@@ -235,7 +235,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck
+        run: pnpm turbo typecheck --affected
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -285,19 +285,25 @@ jobs:
       - name: Determine sanitized branch name
         id: sanitize-branch
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          RAW_REF: ${{ github.head_ref || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref || github.ref_name }}"
+          RAW="$RAW_REF"
 
           # Avoid collisions with protected long-lived branches in Neon.
           # For push to main we reuse the long-lived Neon branch.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            RAW="${{ github.ref_name }}"
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
+            RAW="$REF_NAME"
           fi
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -493,6 +499,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -517,7 +525,7 @@ jobs:
 
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -535,7 +543,7 @@ jobs:
   ci-layout-guard:
     name: Layout Guard (blocking)
     needs: [ci-build-public]
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -629,11 +637,15 @@ jobs:
       - name: Determine sanitized Neon branch name
         id: sanitize-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          RAW_REF: ${{ github.head_ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref }}"
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          RAW="$RAW_REF"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -724,8 +736,7 @@ jobs:
     name: Build
     # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Build runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -763,7 +774,7 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --filter=@jovie/web
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -892,17 +903,18 @@ jobs:
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            pnpm turbo test --filter=@jovie/web -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
             echo "🔍 PR/merge queue: Running full test suite"
             # Run all tests on PRs and merge queue to catch regressions before merge
-            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            # --passWithNoTests: some shards may have no files matching the filter
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -911,7 +923,7 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: pnpm turbo test:fast --filter=@jovie/web -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -942,7 +954,7 @@ jobs:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
     needs: [ci-build-public]
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

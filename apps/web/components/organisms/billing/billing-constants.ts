@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
+import { publicEnv } from '@/lib/env-public';
 
 export const LINEAR_EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -51,7 +52,11 @@ export const PLAN_FEATURES = {
 
 export type PlanKey = keyof typeof PLAN_FEATURES;
 
-export const PLAN_KEYS: PlanKey[] = ['free', 'pro', 'growth'];
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
+export const PLAN_KEYS: PlanKey[] = growthPlanEnabled
+  ? ['free', 'pro', 'growth']
+  : ['free', 'pro'];
 
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   'subscription.created': 'Subscription started',

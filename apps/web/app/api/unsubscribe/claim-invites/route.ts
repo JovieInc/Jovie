@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
       message: `Click the button below to unsubscribe from claim invite emails.`,
       success: true,
       showForm: true,
-      token,
     }),
     {
       status: 200,
@@ -67,9 +66,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const token = formData.get('token');
+    const tokenFromQuery = request.nextUrl.searchParams.get('token');
+    const tokenFromBody = formData.get('token');
+    const token =
+      tokenFromQuery ??
+      (typeof tokenFromBody === 'string' ? tokenFromBody : null);
 
-    if (typeof token !== 'string') {
+    if (!token) {
       return new NextResponse(
         renderHtmlPage({
           title: 'Error',
@@ -175,9 +178,8 @@ function renderHtmlPage(options: {
   message: string;
   success: boolean;
   showForm?: boolean;
-  token?: string;
 }): string {
-  const { title, message, success, showForm, token } = options;
+  const { title, message, success, showForm } = options;
 
   const iconColor = success ? '#22c55e' : '#ef4444';
   const icon = success
@@ -187,12 +189,9 @@ function renderHtmlPage(options: {
   // Escape user-provided values to prevent XSS
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
-  const safeToken = token ? escapeHtml(token) : '';
-
   const formHtml = showForm
     ? `
     <form method="POST" style="margin-top: 24px;">
-      <input type="hidden" name="token" value="${safeToken}" />
       <button type="submit" style="padding: 12px 24px; background-color: #000; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">
         Unsubscribe
       </button>

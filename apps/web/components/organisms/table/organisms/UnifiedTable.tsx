@@ -12,7 +12,13 @@ import {
   useReactTable,
   type VisibilityState,
 } from '@tanstack/react-table';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -204,6 +210,21 @@ export interface UnifiedTableProps<TData> {
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
+   * Whether there are more pages to load (infinite scroll)
+   */
+  readonly hasNextPage?: boolean;
+
+  /**
+   * Whether the next page is currently being fetched
+   */
+  readonly isFetchingNextPage?: boolean;
+
+  /**
+   * Callback to load more data when scrolling near the bottom
+   */
+  readonly onLoadMore?: () => void;
+
+  /**
    * Set of expanded row IDs for expandable rows.
    * When provided with renderExpandedContent, enables row expansion.
    */
@@ -297,12 +318,24 @@ export function UnifiedTable<TData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   expandedRowIds,
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const setTableContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (tableContainerRef.current === node) return;
+      tableContainerRef.current = node;
+      setScrollRoot(node);
+    },
+    [setScrollRoot]
+  );
 
   // Internal focused row state (uncontrolled mode)
   const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(-1);
@@ -392,6 +425,7 @@ export function UnifiedTable<TData>({
       getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
       getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
       enabled: groupingEnabled,
+      scrollRoot,
     });
 
   // Initialize virtualization
@@ -419,6 +453,25 @@ export function UnifiedTable<TData>({
     onRowClick,
   });
 
+  // Infinite scroll sentinel — fires onLoadMore when visible
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const scrollContainer = tableContainerRef.current;
+    if (!sentinel || !scrollContainer || !onLoadMore || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore();
+        }
+      },
+      { root: scrollContainer, rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [onLoadMore, hasNextPage, isFetchingNextPage]);
+
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
@@ -432,7 +485,7 @@ export function UnifiedTable<TData>({
   if (isLoading) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -452,7 +505,7 @@ export function UnifiedTable<TData>({
   if (rows.length === 0 && emptyState) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -481,7 +534,7 @@ export function UnifiedTable<TData>({
 
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
@@ -558,7 +611,7 @@ export function UnifiedTable<TData>({
   // Render table with data
   return (
     <div
-      ref={tableContainerRef}
+      ref={setTableContainerRef}
       className={cn('overflow-auto', containerClassName)}
     >
       <table className={tableClassName} style={{ minWidth }}>
@@ -588,6 +641,27 @@ export function UnifiedTable<TData>({
           getExpandableRowId={getExpandableRowId}
           columnCount={columnCount}
         />
+        {/* Infinite scroll sentinel + loading indicator */}
+        {onLoadMore && (
+          <tbody>
+            <tr ref={sentinelRef}>
+              <td style={{ height: 1, padding: 0, border: 'none' }} />
+            </tr>
+            {isFetchingNextPage && (
+              <tr>
+                <td
+                  colSpan={columnCount}
+                  className='py-3 text-center text-xs text-tertiary-token'
+                >
+                  <span className='inline-flex items-center gap-1.5'>
+                    <span className='h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent' />
+                    Loading more...
+                  </span>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        )}
       </table>
     </div>
   );

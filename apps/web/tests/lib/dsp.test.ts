@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { geoAwarePopularityIndex } from '@/constants/app';
 import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
 describe('DSP Utils', () => {
+  describe('geoAwarePopularityIndex', () => {
+    it('should prioritize region-specific DSP ordering when country is known', () => {
+      expect(geoAwarePopularityIndex('youtube', 'IN')).toBeLessThan(
+        geoAwarePopularityIndex('spotify', 'IN')
+      );
+    });
+
+    it('should fall back to global popularity for unsupported countries', () => {
+      expect(geoAwarePopularityIndex('spotify', 'ZA')).toBe(0);
+    });
+  });
   const mockArtist: Artist = {
     id: '1',
     owner_user_id: '1',
@@ -71,6 +83,16 @@ describe('DSP Utils', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe('https://open.spotify.com/artist/spotify123');
+    });
+
+    it('should sort DSPs by country-specific popularity when country code is provided', () => {
+      const result = getAvailableDSPs(mockArtist, undefined, 'IN');
+
+      expect(result.map(d => d.key)).toEqual([
+        'youtube',
+        'spotify',
+        'apple_music',
+      ]);
     });
 
     it('should include release URLs when releases are provided', () => {

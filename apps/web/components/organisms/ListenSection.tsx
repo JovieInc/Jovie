@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
-import { LISTEN_COOKIE } from '@/constants/app';
+import { COUNTRY_CODE_COOKIE, LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import type { AvailableDSP } from '@/lib/dsp';
+import { type AvailableDSP, sortDSPsByGeoPopularity } from '@/lib/dsp';
 import { captureError } from '@/lib/error-tracking';
 
 export interface ListenSectionProps {
@@ -53,6 +53,18 @@ export function ListenSection({
       }
     }
   }, [initialPreferredUrl]);
+
+  const sortedDSPs = useMemo(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    return sortDSPsByGeoPopularity([...dsps], countryCode ?? null);
+  }, [dsps]);
 
   const handleDSPClick = async (dspKey: string, url: string) => {
     try {
@@ -121,7 +133,7 @@ export function ListenSection({
   return (
     <div className={className} data-test='listen-btn'>
       <DSPButtonGroup
-        dsps={dsps}
+        dsps={sortedDSPs}
         onDSPClick={handleDSPClick}
         size={size}
         showPreferenceNotice={showPreferenceNotice}

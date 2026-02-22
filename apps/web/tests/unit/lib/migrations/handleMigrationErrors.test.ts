@@ -65,6 +65,26 @@ describe('handleMigrationErrors', () => {
     );
   });
 
+  it('returns fallback for user_settings failed query errors without postgres code', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message:
+          'Failed query: select "user_id", "theme_mode", "sidebar_collapsed", "updated_at" from "user_settings" where "user_settings"."user_id" = $1 limit $2',
+      },
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: undefined });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] user_settings migration in progress',
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+  });
+
   it('returns fallback for social_links migration errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
