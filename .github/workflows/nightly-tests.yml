@@ -1,13 +1,34 @@
-name: Nightly E2E Tests
+# Nightly Tests
+#
+# PURPOSE: Consolidated nightly test suite running both unit tests and E2E tests
+# in parallel. Alerts to Slack on failures.
+#
+# REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
+#
+# SCHEDULE: Daily at 2:00 AM UTC (both suites run in parallel)
+
+name: Nightly Tests
 
 on:
   schedule:
-    # Run daily at 3:00 AM UTC (after nightly-unit-tests at 2:00 AM)
-    - cron: '0 3 * * *'
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
+      suite:
+        description: 'Which suite to run'
+        type: choice
+        options:
+          - all
+          - unit
+          - e2e
+        default: all
+      coverage:
+        description: 'Enable unit test coverage report'
+        required: false
+        default: true
+        type: boolean
       test_filter:
-        description: 'Test file pattern (leave empty for nightly suite)'
+        description: 'E2E test file pattern (leave empty for full suite)'
         required: false
         default: ''
 
@@ -15,12 +36,56 @@ permissions:
   contents: read
 
 concurrency:
-  group: nightly-e2e-tests-${{ github.workflow }}-${{ github.ref }}
+  group: nightly-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  nightly-e2e:
+  # ==========================================================================
+  # Unit Tests
+  # ==========================================================================
+  unit-tests:
+    name: Full Unit Test Suite
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'unit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run full unit test suite
+        run: |
+          if [ "${{ inputs.coverage }}" != "false" ]; then
+            pnpm --filter=@jovie/web run test -- --coverage
+          else
+            pnpm --filter=@jovie/web run test
+          fi
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Upload coverage report
+        if: ${{ inputs.coverage != 'false' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: unit-test-coverage
+          path: apps/web/coverage/
+          retention-days: 7
+
+  # ==========================================================================
+  # E2E Tests
+  # ==========================================================================
+  e2e-tests:
     name: Nightly E2E Suite
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'e2e'
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -110,22 +175,46 @@ jobs:
             echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
           }
 
+  # ==========================================================================
+  # Notifications
+  # ==========================================================================
   notify:
     name: Notify Results
-    needs: [nightly-e2e]
+    needs: [unit-tests, e2e-tests]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Slack notification on failure
-        if: ${{ needs.nightly-e2e.result == 'failure' }}
+      - name: Slack notification on unit test failure
+        if: ${{ needs.unit-tests.result == 'failure' }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "Nightly unit tests failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Nightly Unit Tests Failed*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Slack notification on E2E failure
+        if: ${{ needs.e2e-tests.result == 'failure' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#alerts-critical'
-          author_name: 'Nightly E2E Tests'
+          author_name: 'Nightly Tests'
           custom_payload: |
             {
-              "text": ":warning: Nightly E2E tests failed",
+              "text": "Nightly E2E tests failed",
               "attachments": [
                 {
                   "color": "danger",
@@ -140,22 +229,24 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Slack notification on success
-        if: ${{ needs.nightly-e2e.result == 'success' }}
+      - name: Slack notification on all success
+        if: >-
+          needs.unit-tests.result != 'failure' &&
+          needs.e2e-tests.result != 'failure'
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#monitoring'
-          author_name: 'Nightly E2E Tests'
+          author_name: 'Nightly Tests'
           custom_payload: |
             {
-              "text": ":white_check_mark: Nightly E2E tests passed",
+              "text": "Nightly tests passed",
               "attachments": [
                 {
                   "color": "good",
                   "fields": [
-                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
-                    { "title": "Status", "value": "Success", "short": true },
+                    { "title": "Workflow", "value": "Nightly Tests", "short": true },
+                    { "title": "Status", "value": "All Passed", "short": true },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
                 }
