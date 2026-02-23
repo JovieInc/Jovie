@@ -6,7 +6,26 @@ import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
 const sendMessageMock = vi.fn();
 const maybeExecuteMock = vi.fn();
 const mutateAsyncMock = vi.fn();
+const setMessagesMock = vi.fn();
 let onRejectHandler: (() => void) | undefined;
+let mockStatus: 'ready' | 'streaming' = 'ready';
+let mockMessages: Array<{
+  id: string;
+  role: string;
+  parts: Array<{ type: 'text'; text: string }>;
+  createdAt: Date;
+}> = [];
+let mockConversationData:
+  | {
+      conversation?: { title: string | null };
+      messages?: Array<{
+        id: string;
+        role: string;
+        content: string;
+        createdAt: string;
+      }>;
+    }
+  | undefined;
 
 vi.mock('@ai-sdk/react', () => ({
   useChat: ({
@@ -16,14 +35,14 @@ vi.mock('@ai-sdk/react', () => ({
   }) => {
     const currentConversationId = transport.body?.conversationId;
     return {
-      messages: [],
+      messages: mockMessages,
       sendMessage: (payload: unknown) =>
         sendMessageMock({
           conversationIdAtSend: currentConversationId ?? null,
           payload,
         }),
-      status: 'ready',
-      setMessages: vi.fn(),
+      status: mockStatus,
+      setMessages: setMessagesMock,
     };
   },
 }));
@@ -47,7 +66,7 @@ vi.mock('@/lib/pacer', () => ({
 
 vi.mock('@/lib/queries/useChatConversationQuery', () => ({
   useChatConversationQuery: () => ({
-    data: undefined,
+    data: mockConversationData,
     isLoading: false,
   }),
 }));
@@ -67,10 +86,14 @@ describe('useJovieChat', () => {
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
     mutateAsyncMock.mockReset();
+    setMessagesMock.mockReset();
     mutateAsyncMock.mockResolvedValue({
       conversation: { id: 'conv_123' },
     });
     onRejectHandler = undefined;
+    mockStatus = 'ready';
+    mockMessages = [];
+    mockConversationData = undefined;
   });
 
   afterEach(() => {
@@ -112,6 +135,34 @@ describe('useJovieChat', () => {
     });
 
     expect(result.current.isRateLimited).toBe(false);
+  });
+
+  it('does not overwrite in-flight first message with loaded conversation sync while streaming', () => {
+    mockConversationData = {
+      messages: [
+        {
+          id: 'db_1',
+          role: 'user',
+          content: 'Persisted message',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    mockStatus = 'streaming';
+    mockMessages = [
+      {
+        id: 'local_1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Hello Jovie' }],
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ];
+
+    renderHook(() =>
+      useJovieChat({ profileId: 'profile_1', conversationId: 'conv_123' })
+    );
+
+    expect(setMessagesMock).not.toHaveBeenCalled();
   });
 
   it('queues first message until conversation id is active before sending', async () => {
