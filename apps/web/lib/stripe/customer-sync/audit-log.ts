@@ -42,6 +42,7 @@ export async function getBillingAuditLog(
     newState: Record<string, unknown>;
     stripeEventId: string | null;
     source: string;
+    metadata: Record<string, unknown>;
     createdAt: Date;
   }>;
   error?: string;
@@ -55,6 +56,7 @@ export async function getBillingAuditLog(
         newState: billingAuditLog.newState,
         stripeEventId: billingAuditLog.stripeEventId,
         source: billingAuditLog.source,
+        metadata: billingAuditLog.metadata,
         createdAt: billingAuditLog.createdAt,
       })
       .from(billingAuditLog)
@@ -68,6 +70,7 @@ export async function getBillingAuditLog(
         ...log,
         previousState: log.previousState as Record<string, unknown>,
         newState: log.newState as Record<string, unknown>,
+        metadata: log.metadata as Record<string, unknown>,
       })),
     };
   } catch (error) {

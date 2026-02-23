@@ -1,6 +1,7 @@
 'use client';
 
-import { AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { AlertTriangle } from 'lucide-react';
 import { ErrorDetails } from './ErrorDetails';
 
 interface PageErrorStateProps {
@@ -22,33 +23,30 @@ export function PageErrorState({
 }: PageErrorStateProps) {
   return (
     <div
-      className='flex items-center justify-center min-h-[300px]'
+      className='flex flex-1 flex-col items-center justify-center px-4 py-12 text-center'
       role='alert'
       aria-live='polite'
     >
-      <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
-        <div className='flex justify-center mb-4'>
-          <div className='rounded-full bg-destructive/10 p-3'>
-            <AlertTriangle
-              className='h-6 w-6 text-destructive'
-              aria-hidden='true'
-            />
+      <div className='w-full max-w-sm space-y-4'>
+        <div className='flex justify-center'>
+          <div className='flex h-10 w-10 items-center justify-center text-destructive'>
+            <AlertTriangle className='h-6 w-6' aria-hidden='true' />
           </div>
         </div>
-        <h1 className='mb-3 text-sm font-medium text-secondary-token'>
-          {title}
-        </h1>
-        <p className='mb-4 text-secondary-token'>{message}</p>
 
-        <div className='flex flex-col gap-2 items-center mb-4'>
-          <button
-            type='button'
+        <div className='space-y-1.5'>
+          <h1 className='text-sm font-medium text-secondary-token'>{title}</h1>
+          <p className='text-[13px] text-tertiary-token'>{message}</p>
+        </div>
+
+        <div className='flex justify-center'>
+          <Button
+            variant='primary'
+            size='sm'
             onClick={() => globalThis.location.reload()}
-            className='inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors'
           >
-            <RefreshCcw className='h-4 w-4' aria-hidden='true' />
             Refresh page
-          </button>
+          </Button>
         </div>
 
         <ErrorDetails
