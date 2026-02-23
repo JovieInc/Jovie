@@ -20,6 +20,8 @@ import {
   creatorTypeEnum,
   ingestionSourceTypeEnum,
   ingestionStatusEnum,
+  outreachChannelEnum,
+  outreachStatusEnum,
   photoStatusEnum,
 } from './enums';
 // eslint-disable-next-line import/no-cycle -- mutual FK references between profiles and waitlist tables
@@ -162,6 +164,11 @@ export const creatorProfiles = pgTable(
     spotifyPopularity: integer('spotify_popularity'),
     // Ingestion source tracking for fit scoring
     ingestionSourcePlatform: text('ingestion_source_platform'),
+    outreachStatus: outreachStatusEnum('outreach_status').default('pending'),
+    outreachChannel: outreachChannelEnum('outreach_channel'),
+    dmSentAt: timestamp('dm_sent_at'),
+    dmCopy: text('dm_copy'),
+    outreachPriority: integer('outreach_priority'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -199,6 +206,10 @@ export const creatorProfiles = pgTable(
     spotifyIdIndex: index('idx_creator_profiles_spotify_id')
       .on(table.spotifyId)
       .where(drizzleSql`spotify_id IS NOT NULL`),
+    outreachStatusIndex: index('idx_creator_profiles_outreach_status').on(
+      table.outreachStatus,
+      table.createdAt
+    ),
   })
 );
 
