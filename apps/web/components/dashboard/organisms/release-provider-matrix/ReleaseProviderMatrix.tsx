@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
+  rescanAppleMusicLinks,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
@@ -286,6 +287,30 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     []
   );
 
+  // Apple Music refresh handler
+  const [isAmSyncing, setIsAmSyncing] = useState(false);
+  const handleAppleMusicRescan = useCallback(async () => {
+    setIsAmSyncing(true);
+    try {
+      const result = await rescanAppleMusicLinks();
+      if (result.rateLimited) {
+        toast.error(
+          `Apple Music refresh is rate limited. Available again in ${result.retryAfter}.`
+        );
+      } else if (result.success) {
+        toast.success(result.message);
+        // Reload the page to pick up any new links
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('Failed to refresh Apple Music links');
+    } finally {
+      setIsAmSyncing(false);
+    }
+  }, [router]);
+
   const handleNewRelease = useCallback(() => {
     const prompt =
       "I'd like to add a new release to my discography. Help me set it up.";
@@ -446,9 +471,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         connected={isAmConnected}
         artistName={amArtistName}
         onClick={isAmConnected ? undefined : () => setAmPaletteOpen(true)}
+        onSyncNow={isAmConnected ? handleAppleMusicRescan : undefined}
+        disabled={isAmSyncing}
       />
     ),
-    [isAmConnected, amArtistName]
+    [isAmConnected, amArtistName, handleAppleMusicRescan, isAmSyncing]
   );
 
   const headerBadges = useMemo(

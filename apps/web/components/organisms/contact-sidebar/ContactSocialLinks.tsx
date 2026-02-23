@@ -57,7 +57,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
       className='p-3'
     >
       {contact.socialLinks.length > 0 && (
-        <div className='divide-y divide-subtle/50'>
+        <div className='space-y-0.5'>
           {contact.socialLinks.map((link: SocialLink, index: number) => {
             const username =
               extractUsernameFromUrl(link.url) ??

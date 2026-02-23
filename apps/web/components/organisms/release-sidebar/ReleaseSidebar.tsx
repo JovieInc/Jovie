@@ -261,7 +261,7 @@ export function ReleaseSidebar({
 
         {/* Always-visible artwork + release name */}
         {release && !selectedTrack && (
-          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+          <div className='shrink-0 px-4 py-3'>
             <ReleaseArtwork
               artworkUrl={release.artworkUrl}
               title={release.title}
@@ -280,7 +280,7 @@ export function ReleaseSidebar({
 
         {/* Tab navigation (edit mode only) */}
         {release && !selectedTrack && panelMode === 'edit' && (
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+          <div className='px-3 py-1.5 shrink-0'>
             <SegmentControl
               value={activeTab}
               onValueChange={setActiveTab}
@@ -291,7 +291,7 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
+        <div className='flex-1 space-y-5 overflow-auto px-4 py-4'>
           {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
@@ -313,26 +313,22 @@ export function ReleaseSidebar({
               {/* Catalog tab: Fields, Track list */}
               {panelMode === 'edit' && activeTab === 'catalog' && (
                 <>
-                  <div className='pb-5'>
-                    <ReleaseFields
-                      title={release.title}
-                      releaseDate={release.releaseDate}
-                      smartLinkPath={release.smartLinkPath}
-                    />
-                  </div>
+                  <ReleaseFields
+                    title={release.title}
+                    releaseDate={release.releaseDate}
+                    smartLinkPath={release.smartLinkPath}
+                  />
 
-                  <div className='pt-5'>
-                    <ReleaseTrackList
-                      release={release}
-                      onTrackClick={handleTrackClick}
-                    />
-                  </div>
+                  <ReleaseTrackList
+                    release={release}
+                    onTrackClick={handleTrackClick}
+                  />
                 </>
               )}
 
               {/* Links tab: DSP links management */}
               {panelMode === 'edit' && activeTab === 'links' && (
-                <div className='pt-0'>
+                <div>
                   <ReleaseDspLinks
                     release={release}
                     providerConfig={providerConfig}
@@ -357,27 +353,19 @@ export function ReleaseSidebar({
               {/* Details tab: Metadata + Settings */}
               {panelMode === 'edit' && activeTab === 'details' && (
                 <>
-                  <div className='pb-5'>
-                    <ReleaseSmartLinkAnalytics
-                      release={release}
-                      providerConfig={providerConfig}
-                    />
-                  </div>
-                  <div className='pb-5'>
-                    <ReleaseMetadata
-                      release={release}
-                      onCanvasStatusChange={
-                        canEditCanvasStatus
-                          ? handleCanvasStatusChange
-                          : undefined
-                      }
-                    />
-                  </div>
+                  <ReleaseSmartLinkAnalytics
+                    release={release}
+                    providerConfig={providerConfig}
+                  />
+                  <ReleaseMetadata
+                    release={release}
+                    onCanvasStatusChange={
+                      canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                    }
+                  />
 
                   {isEditable && (
-                    <div className='pt-5'>
-                      <ReleaseSettings allowDownloads={allowDownloads} />
-                    </div>
+                    <ReleaseSettings allowDownloads={allowDownloads} />
                   )}
                 </>
               )}
