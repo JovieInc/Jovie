@@ -123,6 +123,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       tagline: 'For growing artists',
       features: [
         'All Free features +',
+        'Unlimited smart links',
         'Pre-release & countdown pages',
         'Remove Jovie branding',
         'Extended analytics (90 days)',
@@ -162,6 +163,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       tagline: 'For serious artists',
       features: [
         'All Pro features +',
+        'Unlimited smart links',
         'Full analytics (1 year)',
         'Automated follow-ups',
         'A/B testing',

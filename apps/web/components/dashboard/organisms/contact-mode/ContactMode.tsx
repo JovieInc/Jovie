@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Badge,
   Button,
   ContextMenu,
   ContextMenuContent,
@@ -66,17 +67,17 @@ function ContactListItem({
       <ContextMenuTrigger asChild>
         <div className='group flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1 px-4 py-3 transition-colors hover:bg-surface-2'>
           <div className='min-w-0 flex-1'>
-            <p className='text-sm font-medium text-primary-token'>
-              {roleLabel}
-            </p>
-            {(secondaryLabel || territorySummary !== 'General') && (
+            <div className='flex items-center gap-2'>
+              <p className='text-sm font-medium text-primary-token'>
+                {roleLabel}
+              </p>
+              {territorySummary !== 'General' && (
+                <Badge size='sm'>{territorySummary}</Badge>
+              )}
+            </div>
+            {secondaryLabel && (
               <p className='truncate text-xs text-secondary-token'>
-                {[
-                  secondaryLabel,
-                  territorySummary !== 'General' && territorySummary,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+                {secondaryLabel}
               </p>
             )}
           </div>

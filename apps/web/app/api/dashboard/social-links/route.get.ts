@@ -11,6 +11,7 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 
 export async function GET(req: Request) {
   try {
@@ -59,7 +60,19 @@ export async function GET(req: Request) {
           eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
         .where(eq(creatorProfiles.id, profileId))
-        .orderBy(socialLinks.sortOrder);
+        .orderBy(socialLinks.sortOrder)
+        .catch(error => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: clerkUserId,
+            operation: 'social_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return [];
+          }
+
+          throw error;
+        });
 
       const links = rows
         .filter(r => r.linkId !== null)

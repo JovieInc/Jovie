@@ -2,6 +2,7 @@
 
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { useAvatarMutation } from '@/lib/queries/useProfileMutation';
@@ -15,8 +16,20 @@ export function ChatAvatarUploadCard() {
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  const previewPanel = usePreviewPanelContext();
+
   const { mutate: uploadAvatar } = useAvatarMutation({
-    onSuccess: () => setState('success'),
+    onSuccess: (avatarUrl: string) => {
+      setState('success');
+
+      // Instantly update sidebar preview with the new avatar
+      if (previewPanel?.previewData) {
+        previewPanel.setPreviewData({
+          ...previewPanel.previewData,
+          avatarUrl,
+        });
+      }
+    },
     onError: (err: Error) => {
       setState('error');
       setError(err.message || 'Upload failed. Please try again.');

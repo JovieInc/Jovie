@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
+const mockWithIdempotency = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
@@ -14,8 +15,19 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+vi.mock('@/lib/idempotency', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/lib/idempotency')>(
+      '@/lib/idempotency'
+    );
+  return {
+    ...actual,
+    withIdempotency: (...args: any[]) => mockWithIdempotency(...args),
+  };
+});
+
 // Import after mocks are set up
-import { GET } from '@/app/api/admin/creator-social-links/route';
+import { GET, PUT } from '@/app/api/admin/creator-social-links/route';
 
 describe('Admin Creator Social Links API', () => {
   beforeEach(() => {
@@ -103,6 +115,58 @@ describe('Admin Creator Social Links API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(Array.isArray(data.links)).toBe(true);
+    });
+  });
+
+  describe('PUT /api/admin/creator-social-links', () => {
+    it('returns 409 when another update is in progress', async () => {
+      mockGetCurrentUserEntitlements.mockResolvedValue({
+        userId: 'admin_123',
+        email: 'admin@example.com',
+        isAuthenticated: true,
+        isAdmin: true,
+        isPro: true,
+        hasAdvancedFeatures: true,
+        canRemoveBranding: true,
+      });
+
+      const profileId = '123e4567-e89b-12d3-a456-426614174000';
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                { id: profileId, usernameNormalized: 'artist' },
+              ]),
+          }),
+        }),
+      });
+
+      const { IdempotencyError } = await import('@/lib/idempotency');
+      mockWithIdempotency.mockRejectedValue(
+        new IdempotencyError(
+          'This action is already in progress. Please wait.',
+          'lock'
+        )
+      );
+
+      const request = new NextRequest(
+        'http://localhost/api/admin/creator-social-links',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId, links: [] }),
+        }
+      );
+
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(data.error).toBe(
+        'This action is already in progress. Please wait.'
+      );
     });
   });
 });

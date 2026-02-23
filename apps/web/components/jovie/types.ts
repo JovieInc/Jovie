@@ -116,6 +116,7 @@ export const TOOL_LABELS: Record<string, string> = {
   proposeProfileEdit: 'Editing profile...',
   proposeAvatarUpload: 'Preparing photo upload...',
   proposeSocialLink: 'Adding link...',
+  proposeSocialLinkRemoval: 'Removing link...',
   checkCanvasStatus: 'Checking canvas status...',
   suggestRelatedArtists: 'Finding related artists...',
   generateCanvasPlan: 'Planning canvas video...',
