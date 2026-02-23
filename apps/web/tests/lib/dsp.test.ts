@@ -121,6 +121,35 @@ describe('DSP Utils', () => {
       expect(result).toHaveLength(1);
       expect(result[0].url).toBe('https://open.spotify.com/track/track123');
     });
+
+    it('should include non-core DSP release URLs from imported releases', () => {
+      const artistWithNoUrls: Artist = {
+        ...mockArtist,
+        spotify_url: undefined,
+        apple_music_url: undefined,
+        youtube_url: undefined,
+        spotify_id: '',
+      };
+
+      const releases = [
+        {
+          id: '1',
+          creator_id: '1',
+          dsp: 'tidal',
+          title: 'Latest Song',
+          url: 'https://tidal.com/browse/track/123',
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      const result = getAvailableDSPs(artistWithNoUrls, releases);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].key).toBe('tidal');
+      expect(result[0].url).toBe('https://tidal.com/browse/track/123');
+      expect(result[0].name).toBe('Tidal');
+    });
   });
 
   describe('sortDSPsForDevice', () => {
