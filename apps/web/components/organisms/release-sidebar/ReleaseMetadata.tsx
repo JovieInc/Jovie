@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown } from 'lucide-react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   DrawerPropertyRow,
   DrawerSection,
@@ -124,7 +125,12 @@ export function ReleaseMetadata({
           label='Label'
           value={
             release.label ? (
-              <span className='text-xs'>{release.label}</span>
+              <CopyableMonospaceCell
+                value={release.label}
+                label='Label'
+                maxWidth={140}
+                className='font-sans'
+              />
             ) : (
               <span className='text-xs text-tertiary-token'>Unknown</span>
             )
@@ -232,7 +238,16 @@ export function ReleaseMetadata({
 
         {release.spotifyPopularity != null && (
           <DrawerPropertyRow
-            label='Popularity'
+            label={
+              <span title='Spotify Popularity'>
+                <SocialIcon
+                  platform='spotify'
+                  className='h-3.5 w-3.5 text-tertiary-token'
+                  aria-label='Spotify Popularity'
+                  aria-hidden={false}
+                />
+              </span>
+            }
             value={<PopularityBar value={release.spotifyPopularity} />}
           />
         )}
