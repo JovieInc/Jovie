@@ -391,7 +391,7 @@ function ContentPageBody({
   allProviders,
   utmParams,
   soundsUrl,
-}: {
+}: Readonly<{
   isUnreleased: boolean;
   showUnreleasedHero: boolean;
   content: Content;
@@ -404,7 +404,7 @@ function ContentPageBody({
   }>;
   utmParams: ReturnType<typeof extractUTMParams>;
   soundsUrl: string | null;
-}) {
+}>) {
   const artistName = creator.displayName ?? creator.username;
 
   if (isUnreleased && showUnreleasedHero) {
