@@ -6,6 +6,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { cancelSubscription } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -67,6 +68,11 @@ export async function POST() {
     );
   } catch (error) {
     logger.error('Error cancelling subscription:', error);
+    void captureCriticalError(
+      'Stripe subscription cancellation failed',
+      error,
+      { route: '/api/stripe/cancel' }
+    );
 
     return NextResponse.json(
       { error: 'Failed to cancel subscription' },

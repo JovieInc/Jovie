@@ -45,7 +45,20 @@ vi.mock('@/components/molecules/drawer', () => ({
 
 // Mock sub-components that are not under test
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
+  ReleaseSidebarHeader: ({
+    onPanelModeChange,
+  }: {
+    onPanelModeChange: (mode: 'edit' | 'live') => void;
+  }) => (
+    <div data-testid='sidebar-header'>
+      <button type='button' onClick={() => onPanelModeChange('edit')}>
+        Edit mode
+      </button>
+      <button type='button' onClick={() => onPanelModeChange('live')}>
+        Live mode
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseArtwork', () => ({
@@ -66,6 +79,10 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
   ReleaseSettings: () => <div data-testid='settings'>Settings</div>,
+}));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
+  ReleaseLyricsSection: () => <div data-testid='lyrics'>Lyrics</div>,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
@@ -134,7 +151,7 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Catalog, Links, Details works', async () => {
+  it('tab switching between Catalog, Links, Details, and Lyrics works', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
@@ -151,7 +168,13 @@ describe('ReleaseSidebar Links tab', () => {
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+
+    // Switch to Lyrics tab
+    await user.click(screen.getByRole('tab', { name: /lyrics/i }));
+    expect(screen.getByTestId('lyrics')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     // Switch back to Catalog
     await user.click(screen.getByRole('tab', { name: /catalog/i }));
@@ -175,6 +198,21 @@ describe('ReleaseSidebar Links tab', () => {
     // Should reset to Catalog
     expect(screen.getByTestId('fields')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+  });
+
+  it('switches to Live mode and hides edit tab content', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('fields')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /live mode/i }));
+
+    expect(
+      screen.queryByRole('tab', { name: /catalog/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fields')).not.toBeInTheDocument();
+    expect(screen.queryByText('Save changes')).not.toBeInTheDocument();
   });
 
   it('Links tab renders DSP links component', async () => {

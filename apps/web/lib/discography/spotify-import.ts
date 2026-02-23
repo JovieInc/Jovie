@@ -485,6 +485,8 @@ async function processTracksForRelease(
     const sanitizedPreviewUrl = track.preview_url
       ? sanitizeSpotifyPreviewUrl(track.preview_url)
       : null;
+    const audioFallbackUrl = sanitizedPreviewUrl;
+    const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
     const createdTrack = await upsertTrack({
       releaseId: release.id,
@@ -497,6 +499,8 @@ async function processTracksForRelease(
       isExplicit: track.explicit,
       isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
+      audioUrl: audioFallbackUrl,
+      audioFormat: audioFallbackFormat,
       sourceType: 'ingested',
       metadata: {
         spotifyId: track.id,

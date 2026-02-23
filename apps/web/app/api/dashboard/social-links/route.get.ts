@@ -3,10 +3,15 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
+import {
+  buildSocialLinksVerificationSelect,
+  getSocialLinksVerificationColumnSupport,
+} from '@/lib/db/queries/social-links-verification';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 
 export async function GET(req: Request) {
   try {
@@ -28,6 +33,9 @@ export async function GET(req: Request) {
         );
       }
 
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(db);
+
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -43,9 +51,7 @@ export async function GET(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
-          verificationStatus: socialLinks.verificationStatus,
-          verificationToken: socialLinks.verificationToken,
-          verifiedAt: socialLinks.verifiedAt,
+          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
           version: socialLinks.version,
         })
         .from(creatorProfiles)
@@ -54,7 +60,19 @@ export async function GET(req: Request) {
           eq(socialLinks.creatorProfileId, creatorProfiles.id)
         )
         .where(eq(creatorProfiles.id, profileId))
-        .orderBy(socialLinks.sortOrder);
+        .orderBy(socialLinks.sortOrder)
+        .catch(error => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: clerkUserId,
+            operation: 'social_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return [];
+          }
+
+          throw error;
+        });
 
       const links = rows
         .filter(r => r.linkId !== null)
