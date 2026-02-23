@@ -4,6 +4,7 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
@@ -52,7 +53,7 @@ export function SignUpForm() {
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
     (emailToPass: string) => {
-      const signInUrl = new URL('/signin', globalThis.location.origin);
+      const signInUrl = new URL(APP_ROUTES.SIGNIN, globalThis.location.origin);
       // Pass email to prefill sign-in form
       if (emailToPass) {
         signInUrl.searchParams.set('email', emailToPass);
@@ -179,14 +180,14 @@ export function SignUpForm() {
           <p className='mt-6 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
             By signing up, you agree to our{' '}
             <Link
-              href='/legal/terms'
+              href={APP_ROUTES.LEGAL_TERMS}
               className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
-              href='/legal/privacy'
+              href={APP_ROUTES.LEGAL_PRIVACY}
               className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Privacy Policy
