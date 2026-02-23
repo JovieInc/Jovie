@@ -6,6 +6,7 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
 
@@ -90,15 +91,15 @@ export function Footer({
   if (variant === 'regular') {
     const productLinks = [
       { href: '/link-in-bio', label: 'Profile' },
-      { href: '/pricing', label: 'Pricing' },
+      { href: APP_ROUTES.PRICING, label: 'Pricing' },
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
 
     const companyLinks = [{ href: '/support', label: 'Support' }];
 
     const legalLinks = [
-      { href: '/legal/privacy', label: 'Privacy Policy' },
-      { href: '/legal/terms', label: 'Terms of Service' },
+      { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy Policy' },
+      { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms of Service' },
     ];
 
     return (

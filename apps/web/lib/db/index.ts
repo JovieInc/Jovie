@@ -23,10 +23,14 @@ export {
   // Health checks
   checkDbHealth,
   checkDbPerformance,
+  // Circuit breaker
+  DbCircuitOpenError,
   // Connection
   db,
+  dbCircuitBreaker,
   doesTableExist,
   getDb,
+  getDbCircuitBreakerStats,
   getDbConfig,
   getPoolMetrics,
   initializeDb,

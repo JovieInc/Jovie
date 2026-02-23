@@ -890,8 +890,11 @@ async function seedProvidersDirectory() {
 async function seedScraperConfigs() {
   console.log('🕷️  Seeding scraper configs...');
 
-  for (const config of SCRAPER_CONFIGS_SEED) {
-    await db.insert(scraperConfigs).values(config).onConflictDoNothing();
+  if (SCRAPER_CONFIGS_SEED.length > 0) {
+    await db
+      .insert(scraperConfigs)
+      .values(SCRAPER_CONFIGS_SEED)
+      .onConflictDoNothing();
   }
 
   const configCount = await db.select().from(scraperConfigs);
@@ -1155,21 +1158,21 @@ async function seedProviderLinksForRelease(
     'deezer',
   ];
 
-  for (const providerId of activeProviders) {
-    const url = `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`;
+  const providerLinkRows = activeProviders.map(providerId => ({
+    providerId,
+    ownerType: 'release' as const,
+    releaseId,
+    externalId: `${providerId}-${slug}`,
+    url: `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`,
+    country: 'US',
+    isPrimary: providerId === 'spotify',
+    sourceType: 'admin' as const,
+  }));
 
+  if (providerLinkRows.length > 0) {
     await db
       .insert(providerLinks)
-      .values({
-        providerId,
-        ownerType: 'release',
-        releaseId,
-        externalId: `${providerId}-${slug}`,
-        url,
-        country: 'US',
-        isPrimary: providerId === 'spotify',
-        sourceType: 'admin',
-      })
+      .values(providerLinkRows)
       .onConflictDoNothing();
   }
 }
@@ -1181,21 +1184,21 @@ async function seedProviderLinksForTrack(
 ) {
   const activeProviders = ['spotify', 'apple_music', 'youtube_music'];
 
-  for (const providerId of activeProviders) {
-    const url = `https://${providerId.replace('_', '.')}.com/track/${username}-${slug}`;
+  const providerLinkRows = activeProviders.map(providerId => ({
+    providerId,
+    ownerType: 'track' as const,
+    trackId,
+    externalId: `${providerId}-track-${slug}`,
+    url: `https://${providerId.replace('_', '.')}.com/track/${username}-${slug}`,
+    country: 'US',
+    isPrimary: providerId === 'spotify',
+    sourceType: 'admin' as const,
+  }));
 
+  if (providerLinkRows.length > 0) {
     await db
       .insert(providerLinks)
-      .values({
-        providerId,
-        ownerType: 'track',
-        trackId,
-        externalId: `${providerId}-track-${slug}`,
-        url,
-        country: 'US',
-        isPrimary: providerId === 'spotify',
-        sourceType: 'admin',
-      })
+      .values(providerLinkRows)
       .onConflictDoNothing();
   }
 }
@@ -1214,22 +1217,18 @@ async function seedSmartLinkTargets(
     'deezer',
   ];
 
-  for (let i = 0; i < activeProviders.length; i++) {
-    const providerId = activeProviders[i];
-    const url = `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`;
+  const targetRows = activeProviders.map((providerId, index) => ({
+    creatorProfileId: profileId,
+    smartLinkSlug: slug,
+    providerId,
+    releaseId,
+    url: `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`,
+    isFallback: index === activeProviders.length - 1,
+    priority: index,
+  }));
 
-    await db
-      .insert(smartLinkTargets)
-      .values({
-        creatorProfileId: profileId,
-        smartLinkSlug: slug,
-        providerId,
-        releaseId,
-        url,
-        isFallback: i === activeProviders.length - 1,
-        priority: i,
-      })
-      .onConflictDoNothing();
+  if (targetRows.length > 0) {
+    await db.insert(smartLinkTargets).values(targetRows).onConflictDoNothing();
   }
 }
 
@@ -1239,20 +1238,21 @@ async function seedContacts(profileId: string, contacts: ContactSeed[]) {
     .delete(creatorContacts)
     .where(drizzleSql`creator_profile_id = ${profileId}`);
 
-  for (let i = 0; i < contacts.length; i++) {
-    const contact = contacts[i];
-    await db.insert(creatorContacts).values({
-      creatorProfileId: profileId,
-      role: contact.role,
-      personName: contact.personName,
-      companyName: contact.companyName,
-      territories: contact.territories ?? [],
-      email: contact.email,
-      phone: contact.phone,
-      preferredChannel: contact.preferredChannel,
-      isActive: true,
-      sortOrder: i,
-    });
+  const contactRows = contacts.map((contact, index) => ({
+    creatorProfileId: profileId,
+    role: contact.role,
+    personName: contact.personName,
+    companyName: contact.companyName,
+    territories: contact.territories ?? [],
+    email: contact.email,
+    phone: contact.phone,
+    preferredChannel: contact.preferredChannel,
+    isActive: true,
+    sortOrder: index,
+  }));
+
+  if (contactRows.length > 0) {
+    await db.insert(creatorContacts).values(contactRows);
   }
 }
 
@@ -1290,22 +1290,21 @@ async function seedSocialAccounts(profileId: string, username: string) {
     },
   ];
 
-  for (const platform of platforms) {
-    await db
-      .insert(socialAccounts)
-      .values({
-        creatorProfileId: profileId,
-        platform: platform.platform,
-        handle: `@${platform.handle}`,
-        url: `https://${platform.platform}.com/${platform.handle}`,
-        status: platform.status,
-        confidence: platform.status === 'confirmed' ? '0.95' : '0.60',
-        isVerifiedFlag: platform.isVerified,
-        paidFlag: false,
-        sourcePlatform: 'spotify',
-        sourceType: 'ingested',
-      })
-      .onConflictDoNothing();
+  const socialRows = platforms.map(platform => ({
+    creatorProfileId: profileId,
+    platform: platform.platform,
+    handle: `@${platform.handle}`,
+    url: `https://${platform.platform}.com/${platform.handle}`,
+    status: platform.status,
+    confidence: platform.status === 'confirmed' ? '0.95' : '0.60',
+    isVerifiedFlag: platform.isVerified,
+    paidFlag: false,
+    sourcePlatform: 'spotify',
+    sourceType: 'ingested' as const,
+  }));
+
+  if (socialRows.length > 0) {
+    await db.insert(socialAccounts).values(socialRows).onConflictDoNothing();
   }
 }
 
@@ -1361,6 +1360,8 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
   // Generate 20-50 audience members per profile
   const memberCount = 20 + Math.floor(Math.random() * 30);
 
+  const audienceRows = [];
+
   for (let i = 0; i < memberCount; i++) {
     const countryIdx = Math.floor(Math.random() * countries.length);
     const memberType =
@@ -1370,40 +1371,40 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
     const visits = 1 + Math.floor(Math.random() * 50);
     const engagementScore = Math.floor(Math.random() * 100);
 
-    await db
-      .insert(audienceMembers)
-      .values({
-        creatorProfileId: profileId,
-        type: memberType,
-        displayName: memberType !== 'anonymous' ? `Fan ${i + 1}` : null,
-        firstSeenAt: firstSeen,
-        lastSeenAt: lastSeen,
-        visits,
-        engagementScore,
-        intentLevel:
-          intentLevels[Math.floor(Math.random() * intentLevels.length)],
-        geoCity: cities[countryIdx],
-        geoCountry: countries[countryIdx],
-        deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
-        referrerHistory: [
-          { source: 'instagram', timestamp: firstSeen.toISOString() },
-        ],
-        latestActions: [
-          { action: 'profile_view', timestamp: lastSeen.toISOString() },
-        ],
-        email:
-          memberType === 'email' || memberType === 'customer'
-            ? `fan${i}@example.com`
-            : null,
-        phone:
-          memberType === 'sms' ? `+1555${String(i).padStart(7, '0')}` : null,
-        spotifyConnected: memberType === 'spotify',
-        purchaseCount:
-          memberType === 'customer' ? 1 + Math.floor(Math.random() * 5) : 0,
-        tags: engagementScore > 70 ? ['superfan'] : [],
-        fingerprint: `fp_${profileId.slice(0, 8)}_${i}`,
-      })
-      .onConflictDoNothing();
+    audienceRows.push({
+      creatorProfileId: profileId,
+      type: memberType,
+      displayName: memberType !== 'anonymous' ? `Fan ${i + 1}` : null,
+      firstSeenAt: firstSeen,
+      lastSeenAt: lastSeen,
+      visits,
+      engagementScore,
+      intentLevel:
+        intentLevels[Math.floor(Math.random() * intentLevels.length)],
+      geoCity: cities[countryIdx],
+      geoCountry: countries[countryIdx],
+      deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
+      referrerHistory: [
+        { source: 'instagram', timestamp: firstSeen.toISOString() },
+      ],
+      latestActions: [
+        { action: 'profile_view', timestamp: lastSeen.toISOString() },
+      ],
+      email:
+        memberType === 'email' || memberType === 'customer'
+          ? `fan${i}@example.com`
+          : null,
+      phone: memberType === 'sms' ? `+1555${String(i).padStart(7, '0')}` : null,
+      spotifyConnected: memberType === 'spotify',
+      purchaseCount:
+        memberType === 'customer' ? 1 + Math.floor(Math.random() * 5) : 0,
+      tags: engagementScore > 70 ? ['superfan'] : [],
+      fingerprint: `fp_${profileId.slice(0, 8)}_${i}`,
+    });
+  }
+
+  if (audienceRows.length > 0) {
+    await db.insert(audienceMembers).values(audienceRows).onConflictDoNothing();
   }
 }
 
@@ -1447,11 +1448,13 @@ async function seedClickEvents(profileId: string, linkIds: string[]) {
   // Generate 50-150 click events per profile
   const clickCount = 50 + Math.floor(Math.random() * 100);
 
+  const clickRows = [];
+
   for (let i = 0; i < clickCount; i++) {
     const countryIdx = Math.floor(Math.random() * countries.length);
     const clickDate = randomDate(new Date('2024-01-01'), new Date());
 
-    await db.insert(clickEvents).values({
+    clickRows.push({
       creatorProfileId: profileId,
       linkId:
         linkIds.length > 0
@@ -1470,6 +1473,10 @@ async function seedClickEvents(profileId: string, linkIds: string[]) {
       createdAt: clickDate,
     });
   }
+
+  if (clickRows.length > 0) {
+    await db.insert(clickEvents).values(clickRows);
+  }
 }
 
 async function seedTips(profileId: string) {
@@ -1487,6 +1494,8 @@ async function seedTips(profileId: string) {
   // Generate 5-20 tips per featured profile
   const tipCount = 5 + Math.floor(Math.random() * 15);
 
+  const tipRows = [];
+
   for (let i = 0; i < tipCount; i++) {
     const amount = [500, 1000, 2000, 2500, 5000, 10000][
       Math.floor(Math.random() * 6)
@@ -1494,7 +1503,7 @@ async function seedTips(profileId: string) {
     const tipDate = randomDate(new Date('2024-01-01'), new Date());
     const isAnonymous = Math.random() < 0.3;
 
-    await db.insert(tips).values({
+    tipRows.push({
       creatorProfileId: profileId,
       amountCents: amount,
       currency: currencies[Math.floor(Math.random() * currencies.length)],
@@ -1505,6 +1514,10 @@ async function seedTips(profileId: string) {
       createdAt: tipDate,
     });
   }
+
+  if (tipRows.length > 0) {
+    await db.insert(tips).values(tipRows);
+  }
 }
 
 async function seedNotificationSubscriptions(profileId: string) {
@@ -1514,37 +1527,47 @@ async function seedNotificationSubscriptions(profileId: string) {
 
   // Generate 10-30 email subscribers per profile
   const emailSubCount = 10 + Math.floor(Math.random() * 20);
+  const emailRows = [];
   for (let i = 0; i < emailSubCount; i++) {
     const countryIdx = Math.floor(Math.random() * countries.length);
+    emailRows.push({
+      creatorProfileId: profileId,
+      channel: 'email' as const,
+      email: `subscriber${i}_${profileId.slice(0, 8)}@example.com`,
+      countryCode: countries[countryIdx],
+      city: cities[countryIdx],
+      ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      source: sources[Math.floor(Math.random() * sources.length)],
+    });
+  }
+
+  if (emailRows.length > 0) {
     await db
       .insert(notificationSubscriptions)
-      .values({
-        creatorProfileId: profileId,
-        channel: 'email',
-        email: `subscriber${i}_${profileId.slice(0, 8)}@example.com`,
-        countryCode: countries[countryIdx],
-        city: cities[countryIdx],
-        ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-        source: sources[Math.floor(Math.random() * sources.length)],
-      })
+      .values(emailRows)
       .onConflictDoNothing();
   }
 
   // Generate 5-15 SMS subscribers per profile
   const smsSubCount = 5 + Math.floor(Math.random() * 10);
+  const smsRows = [];
   for (let i = 0; i < smsSubCount; i++) {
     const countryIdx = Math.floor(Math.random() * countries.length);
+    smsRows.push({
+      creatorProfileId: profileId,
+      channel: 'sms' as const,
+      phone: `+1555${String(i).padStart(7, '0')}${profileId.slice(0, 4)}`,
+      countryCode: countries[countryIdx],
+      city: cities[countryIdx],
+      ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      source: sources[Math.floor(Math.random() * sources.length)],
+    });
+  }
+
+  if (smsRows.length > 0) {
     await db
       .insert(notificationSubscriptions)
-      .values({
-        creatorProfileId: profileId,
-        channel: 'sms',
-        phone: `+1555${String(i).padStart(7, '0')}${profileId.slice(0, 4)}`,
-        countryCode: countries[countryIdx],
-        city: cities[countryIdx],
-        ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-        source: sources[Math.floor(Math.random() * sources.length)],
-      })
+      .values(smsRows)
       .onConflictDoNothing();
   }
 }
