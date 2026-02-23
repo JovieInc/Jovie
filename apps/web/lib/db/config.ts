@@ -17,6 +17,15 @@ export const PERFORMANCE_THRESHOLDS = {
   retryBackoffMultiplier: 2,
 } as const;
 
+// Circuit breaker configuration for database operations
+// Opens after repeated failures to prevent cascading load.
+export const DB_CIRCUIT_BREAKER_CONFIG = {
+  failureThreshold: 5, // Open after 5 failures
+  resetTimeout: 30_000, // Try again after 30 seconds
+  successThreshold: 2, // Need 2 successes to close
+  failureWindow: 60_000, // Count failures within 1 minute
+} as const;
+
 // Table names for schema operations
 export const TABLE_NAMES = {
   creatorProfiles: 'creator_profiles',

@@ -53,6 +53,28 @@ async function parseProfileUpdateRequest(req: Request) {
   } as const;
 }
 
+async function attemptClerkRollback(
+  rollback: (() => Promise<void>) | undefined,
+  clerkUserId: string,
+  context: string
+) {
+  if (!rollback) return;
+
+  try {
+    await rollback();
+  } catch (error) {
+    logger.error('Failed to rollback Clerk profile update:', {
+      error: error instanceof Error ? error.message : error,
+      clerkUserId,
+      context,
+    });
+    await captureError('Clerk profile rollback failed', error, {
+      route: '/api/dashboard/profile',
+      context,
+    });
+  }
+}
+
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
@@ -144,19 +166,27 @@ export async function PUT(req: Request) {
       if (usernameGuard instanceof NextResponse) return usernameGuard;
 
       const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
-      const [clerkSyncFailed, updatedProfile] = await Promise.all([
-        syncClerkProfile({
-          clerkUserId,
-          clerkUpdates,
-          avatarUrl,
-        }),
-        updateProfileRecords({
+      const { clerkSyncFailed, rollback } = await syncClerkProfile({
+        clerkUserId,
+        clerkUpdates,
+        avatarUrl,
+      });
+
+      let updatedProfile;
+      try {
+        updatedProfile = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
           displayNameForUserUpdate,
-        }),
-      ]);
-      if (updatedProfile instanceof NextResponse) return updatedProfile;
+        });
+      } catch (error) {
+        await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
+        throw error;
+      }
+      if (updatedProfile instanceof NextResponse) {
+        await attemptClerkRollback(rollback, clerkUserId, 'db_update_response');
+        return updatedProfile;
+      }
 
       await finalizeProfileResponse({
         updatedProfile,

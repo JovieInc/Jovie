@@ -194,6 +194,18 @@ export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
   'expired',
 ]);
 
+export const outreachStatusEnum = pgEnum('outreach_status', [
+  'pending',
+  'dm_generated',
+  'dm_sent',
+  'responded',
+]);
+
+export const outreachChannelEnum = pgEnum('outreach_channel', [
+  'instagram',
+  'twitter',
+]);
+
 // Audience & Analytics Enums
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',

@@ -183,7 +183,7 @@ export function ReleaseLandingPage({
 
           {/* Streaming Platform Buttons — scrolls independently when overflowing */}
           <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 pb-2'>
+            <div className='space-y-2 py-1'>
               {clickableProviders.map(provider => {
                 const logoConfig = DSP_LOGO_CONFIG[provider.key];
                 const brandHover = logoConfig
