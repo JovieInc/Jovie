@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -29,50 +30,35 @@ export default function ErrorBoundary({
   }, [error, context]);
 
   return (
-    <div className='flex flex-col items-center justify-center min-h-[400px] p-6 text-center'>
-      <div
-        className={
-          'w-full max-w-md rounded-2xl border border-subtle ' +
-          'bg-surface-1 p-6 shadow-sm'
-        }
-        role='alert'
-        aria-live='polite'
-      >
-        <div className='space-y-4'>
-          <div className='flex justify-center'>
-            <div className='text-destructive'>
-              <AlertTriangle className='h-12 w-12' aria-hidden='true' />
-            </div>
+    <div
+      className='flex flex-1 flex-col items-center justify-center px-4 py-12 text-center'
+      role='alert'
+      aria-live='polite'
+    >
+      <div className='w-full max-w-sm space-y-4'>
+        <div className='flex justify-center'>
+          <div className='flex h-10 w-10 items-center justify-center text-destructive'>
+            <AlertTriangle className='h-6 w-6' aria-hidden='true' />
           </div>
-
-          <div className='space-y-2'>
-            <h3 className='heading-linear text-lg text-primary-token'>
-              Something went wrong
-            </h3>
-            <p className='text-linear text-sm text-secondary-token'>
-              {message}
-            </p>
-          </div>
-
-          <div className='flex justify-center gap-3'>
-            <button
-              type='button'
-              onClick={reset}
-              className='btn btn-md btn-primary btn-press'
-            >
-              Try again
-            </button>
-            <button
-              type='button'
-              onClick={() => router.push('/')}
-              className='btn btn-md btn-secondary btn-press'
-            >
-              Go home
-            </button>
-          </div>
-
-          <ErrorDetails error={error} extraContext={{ Context: context }} />
         </div>
+
+        <div className='space-y-1.5'>
+          <h3 className='text-sm font-medium text-secondary-token'>
+            Something went wrong
+          </h3>
+          <p className='text-[13px] text-tertiary-token'>{message}</p>
+        </div>
+
+        <div className='flex justify-center gap-3'>
+          <Button variant='primary' size='sm' onClick={reset}>
+            Try again
+          </Button>
+          <Button variant='outline' size='sm' onClick={() => router.push('/')}>
+            Go home
+          </Button>
+        </div>
+
+        <ErrorDetails error={error} extraContext={{ Context: context }} />
       </div>
     </div>
   );

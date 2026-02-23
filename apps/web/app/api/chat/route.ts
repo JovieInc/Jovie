@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -366,73 +367,6 @@ function sanitizeRetryAfterSeconds(value: unknown): number | null {
   return Math.min(normalized, 3600);
 }
 
-function buildSystemPrompt(
-  context: ArtistContext,
-  options?: { aiCanUseTools: boolean; aiDailyMessageLimit: number }
-): string {
-  const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
-  return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-
-## About This Artist
-- **Name:** ${context.displayName} (@${context.username})
-- **Bio:** ${context.bio ?? 'Not set'}
-- **Genres:** ${context.genres.length > 0 ? context.genres.join(', ') : 'Not specified'}
-
-## Streaming Stats
-- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'Not connected'}
-- **Spotify Popularity:** ${context.spotifyPopularity ?? 'N/A'} / 100
-
-## Profile Analytics
-- **Profile Views:** ${context.profileViews.toLocaleString()}
-- **Has Social Links:** ${context.hasSocialLinks ? 'Yes' : 'No'}
-- **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes' : 'No'}
-
-## Tipping & Monetization
-- **Tip Link Clicks:** ${context.tippingStats.tipClicks}
-- **Tips Received:** ${context.tippingStats.tipsSubmitted}
-- **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
-- **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
-
-## Voice (CRITICAL)
-- Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
-- No emoji, no exclamation marks, no cheerleading, no filler, no repeating the user.
-- If a tool exists for the request, call it immediately with minimal preamble.
-- Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
-- You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
-
-## Profile Editing
-You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
-
-**Editable Fields:**
-- displayName: Their public display name
-- bio: Artist bio/description
-
-**Read-Only Fields:**
-- genres: Automatically synced from streaming platforms (Spotify, Apple Music, etc.) — cannot be edited manually
-
-**Blocked Fields (cannot edit via chat):**
-- username: Requires settings page
-- Connected accounts: Requires settings page
-
-**Profile Photo:**
-- Use the proposeAvatarUpload tool when the artist wants to change or update their profile photo. This renders an upload widget directly in the chat. Do not describe how to upload — just call the tool.
-- If they tell you they already updated their photo, acknowledge it briefly.
-
-**Social Links:**
-- Use the proposeSocialLink tool when the artist wants to add a social link or URL to their profile. Pass the full URL. If they only provide a handle (e.g. "@myhandle" for Instagram), construct the full URL (e.g. "https://instagram.com/myhandle") before calling the tool.
-- Do not add links without showing the confirmation preview first.
-
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${
-    options && !options.aiCanUseTools
-      ? `
-
-## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), and add social links (proposeSocialLink). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
-      : ''
-  }`;
-}
-
 /**
  * Creates the proposeAvatarUpload tool that signals the client to render
  * an inline photo upload widget in the chat conversation.
@@ -484,6 +418,76 @@ function createSocialLinkTool() {
         normalizedUrl: detected.normalizedUrl,
         originalUrl: detected.originalUrl,
         suggestedTitle: detected.suggestedTitle,
+      };
+    },
+  });
+}
+
+/**
+ * Creates the proposeSocialLinkRemoval tool that fetches the artist's
+ * active social links and returns a confirmation card to remove one.
+ */
+function createSocialLinkRemovalTool(profileId: string | null) {
+  return tool({
+    description:
+      'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
+    inputSchema: z.object({
+      platform: z
+        .string()
+        .describe(
+          'The platform name of the link to remove (e.g. "instagram", "spotify", "twitter", "tiktok"). Case-insensitive.'
+        ),
+    }),
+    execute: async ({ platform }) => {
+      if (!profileId) {
+        return {
+          success: false,
+          error: 'Profile ID required to remove links',
+        };
+      }
+
+      // Fetch active links for this profile
+      const activeLinks = await db
+        .select({
+          id: socialLinks.id,
+          platform: socialLinks.platform,
+          url: socialLinks.url,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.state, 'active')
+          )
+        );
+
+      if (activeLinks.length === 0) {
+        return {
+          success: false,
+          error: 'No social links found on your profile.',
+        };
+      }
+
+      // Find a matching link by platform (case-insensitive)
+      const normalizedPlatform = platform.toLowerCase();
+      const matchingLink = activeLinks.find(
+        l => l.platform.toLowerCase() === normalizedPlatform
+      );
+
+      if (!matchingLink) {
+        const available = activeLinks.map(l => l.platform).join(', ');
+        return {
+          success: false,
+          error: `No ${platform} link found. Available links: ${available}`,
+        };
+      }
+
+      return {
+        success: true,
+        action: 'remove_link' as const,
+        linkId: matchingLink.id,
+        platform: matchingLink.platform,
+        url: matchingLink.url,
       };
     },
   });
@@ -1035,10 +1039,11 @@ export async function OPTIONS(req: Request) {
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
  */
-function buildFreeChatTools() {
+function buildFreeChatTools(resolvedProfileId: string | null) {
   return {
     proposeAvatarUpload: createAvatarUploadTool(),
     proposeSocialLink: createSocialLinkTool(),
+    proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
   };
 }
 
@@ -1266,7 +1271,16 @@ export async function POST(req: Request) {
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
 
-  const systemPrompt = buildSystemPrompt(artistContext, {
+  let releases: ReleaseContext[] = [];
+  if (resolvedProfileId) {
+    try {
+      releases = await fetchReleasesForChat(resolvedProfileId);
+    } catch {
+      releases = [];
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
   });
@@ -1274,8 +1288,8 @@ export async function POST(req: Request) {
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Free tools (avatar upload, social links) available on ALL plans
-    const freeTools = buildFreeChatTools();
+    // Free tools (avatar upload, social links, link removal) available on ALL plans
+    const freeTools = buildFreeChatTools(resolvedProfileId);
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }

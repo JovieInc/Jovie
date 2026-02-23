@@ -13,14 +13,20 @@ import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import type { Artist } from '@/types/db';
+import { PreSaveActions } from './PreSaveActions';
 import { ReleaseCountdown } from './ReleaseCountdown';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
 
 interface UnreleasedReleaseHeroProps {
   readonly release: {
+    readonly id: string;
+    readonly slug: string;
     readonly title: string;
     readonly artworkUrl: string | null;
     readonly releaseDate: Date;
+    readonly trackId: string | null;
+    readonly hasSpotify: boolean;
+    readonly hasAppleMusic: boolean;
   };
   readonly artist: {
     readonly id: string;
@@ -107,6 +113,15 @@ export function UnreleasedReleaseHero({
             <div className='mt-5 rounded-xl bg-white/[0.05] p-4 ring-1 ring-inset ring-white/[0.06]'>
               <ReleaseCountdown releaseDate={release.releaseDate} />
             </div>
+
+            <PreSaveActions
+              releaseId={release.id}
+              trackId={release.trackId}
+              username={artist.handle}
+              slug={release.slug}
+              hasSpotify={release.hasSpotify}
+              hasAppleMusic={release.hasAppleMusic}
+            />
 
             {/* Notify Me CTA */}
             <div className='mt-4 space-y-2.5'>

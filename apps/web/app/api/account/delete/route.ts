@@ -8,6 +8,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import {
   checkAccountDeleteRateLimit,
   createRateLimitHeaders,
@@ -108,8 +109,21 @@ export async function POST(request: Request) {
       })
       .where(eq(users.id, user.id));
 
+    // Fetch usernames before deletion so we can invalidate handle availability cache
+    const profiles = await db
+      .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.userId, user.id));
+
     // Delete creator profiles (cascades to links, contacts, analytics)
     await db.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
+
+    // Invalidate handle availability cache so deleted usernames become available
+    for (const profile of profiles) {
+      if (profile.usernameNormalized) {
+        await invalidateHandleCache(profile.usernameNormalized);
+      }
+    }
 
     // Delete the Clerk user (signs out all sessions)
     try {

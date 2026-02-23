@@ -3,6 +3,7 @@
 import { Button, type ButtonProps } from '@jovie/ui';
 import { Rocket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
 import { useCheckoutMutation } from '@/lib/queries';
 
@@ -77,7 +78,7 @@ export function UpgradeButton({
       track('pricing_page_redirect', {
         flow_type: 'traditional',
       });
-      router.push('/billing/remove-branding');
+      router.push(APP_ROUTES.BILLING_REMOVE_BRANDING);
     }
   };
 

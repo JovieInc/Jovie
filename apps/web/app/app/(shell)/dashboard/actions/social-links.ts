@@ -20,6 +20,7 @@ import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 
 /**
  * Minimal link shape for initializing DashboardLinks client from the server.
@@ -124,7 +125,19 @@ export async function getProfileSocialLinks(
         .where(
           and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
         )
-        .orderBy(socialLinks.sortOrder);
+        .orderBy(socialLinks.sortOrder)
+        .catch(error => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: clerkUserId,
+            operation: 'social_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return [];
+          }
+
+          throw error;
+        });
 
       // If the profile does not belong to the user, rows will be empty
       // Map only existing link rows (filter out null linkId from left join)

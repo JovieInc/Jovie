@@ -35,6 +35,7 @@ import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { publicEnv } from '@/lib/env-public';
 import {
   homepageAutomaticReleaseSmartlinks,
   homepageComparison,
@@ -155,13 +156,13 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     verification: {
-      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+      google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     },
     other: {
-      'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || '',
+      'msvalidate.01': publicEnv.NEXT_PUBLIC_BING_SITE_VERIFICATION ?? '',
       'yandex-verification':
-        process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || '',
-      'p:domain_verify': process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || '',
+        publicEnv.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION ?? '',
+      'p:domain_verify': publicEnv.NEXT_PUBLIC_PINTEREST_VERIFICATION ?? '',
     },
   };
 }
