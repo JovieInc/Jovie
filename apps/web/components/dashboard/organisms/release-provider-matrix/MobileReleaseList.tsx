@@ -2,7 +2,6 @@
 
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
@@ -135,7 +134,7 @@ const SwipeActions = memo(function SwipeActions({
   );
 });
 
-/** Single release row in the mobile list */
+/** Single release row in the mobile list — Apple Music layout, Linear tokens */
 const MobileReleaseRow = memo(function MobileReleaseRow({
   release,
   artistName,
@@ -191,34 +190,31 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         onClick={() => onEdit(release)}
         className={mobileReleaseTokens.row.container}
       >
-        {/* Artwork thumbnail */}
-        <ReleaseArtworkThumb
-          src={release.artworkUrl}
-          alt={`${release.title} artwork`}
-        />
-
-        {/* Title + metadata */}
+        {/* Title + subtitle stacked — artwork hidden on mobile for density */}
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-1.5'>
             <TruncatedText lines={1} className={mobileReleaseTokens.row.title}>
               {release.title}
             </TruncatedText>
-            <span className={cn(mobileReleaseTokens.row.type, typeStyle.text)}>
+            {/* Release type badge */}
+            <span
+              className={cn(
+                mobileReleaseTokens.row.typeBadge,
+                typeStyle.text,
+                typeStyle.bg
+              )}
+            >
               {typeStyle.label}
             </span>
           </div>
-          {artistName && (
-            <TruncatedText
-              lines={1}
-              className={mobileReleaseTokens.row.subtitle}
-            >
-              {artistName}
-            </TruncatedText>
-          )}
+          <div className={mobileReleaseTokens.row.subtitle}>
+            {artistName && <span>{artistName}</span>}
+            {artistName && year && (
+              <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>
+            )}
+            {year && <span className='tabular-nums'>{year}</span>}
+          </div>
         </div>
-
-        {/* Year on the right */}
-        {year && <span className={mobileReleaseTokens.row.year}>{year}</span>}
 
         {/* Chevron indicator */}
         <Icon
@@ -238,19 +234,20 @@ function YearGroupHeader({
 }: Readonly<{ year: string; count: number }>) {
   return (
     <div className={mobileReleaseTokens.groupHeader}>
-      <span className={mobileReleaseTokens.row.title}>{year}</span>
-      <span className='text-xs tabular-nums text-tertiary-token'>{count}</span>
+      <span className={mobileReleaseTokens.groupHeaderTitle}>{year}</span>
+      <span className={mobileReleaseTokens.groupHeaderCount}>{count}</span>
     </div>
   );
 }
 
 /**
- * MobileReleaseList - Card/list-based mobile view for releases
+ * MobileReleaseList - Compact list view inspired by Apple Music layout
+ * with Linear design tokens.
  *
  * Features:
  * - Full-width tap targets
- * - Artwork visible (not hidden like in table view)
- * - Vertically stacked info instead of columns
+ * - Artwork hidden for density; title + artist + year inline
+ * - Release type shown as a colored pill badge
  * - Optional year grouping with sticky headers
  * - iOS-style swipe-to-reveal actions (Edit, Copy smart link)
  * - No horizontal scrolling

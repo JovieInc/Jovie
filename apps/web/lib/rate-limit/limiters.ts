@@ -276,6 +276,14 @@ export const spotifySearchLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for Spotify search API
+ * Limit: 30 requests per minute per IP
+ */
+export const spotifySearchApiLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifySearchApi
+);
+
+/**
  * Rate limiter for profile claim attempts
  * CRITICAL: 5 attempts per hour per user - prevents claim abuse
  */
@@ -490,6 +498,14 @@ export async function checkBandsintownSyncRateLimit(
 // ============================================================================
 
 /**
+ * Rate limiter for Apple Music search
+ * Limit: 30 requests per minute per IP
+ */
+export const appleMusicSearchLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicSearch
+);
+
+/**
  * Rate limiter for DSP artist discovery
  * Limit: 10 discoveries per minute per user
  * Protects 3rd-party platform APIs (Apple Music, Deezer, MusicBrainz)
@@ -635,11 +651,13 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     health: healthLimiter,
     general: generalLimiter,
     spotifySearch: spotifySearchLimiter,
+    spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
+    appleMusicSearch: appleMusicSearchLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
   };

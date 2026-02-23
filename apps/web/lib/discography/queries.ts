@@ -1,5 +1,4 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-
 import { db, doesTableExist } from '@/lib/db';
 import {
   type DiscogRelease,
@@ -12,6 +11,7 @@ import {
   providerLinks,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveTrackProviderLinks } from './track-provider-links';
 
 /**
  * Release data source types
@@ -699,17 +699,29 @@ export async function getTracksForReleaseWithProviders(
   // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
   let trackProviderLinks: ProviderLink[] = [];
+  let releaseProviderLinks: ProviderLink[] = [];
 
   if (await hasProviderLinksTable()) {
-    trackProviderLinks = await db
-      .select()
-      .from(providerLinks)
-      .where(
-        and(
-          eq(providerLinks.ownerType, 'track'),
-          inArray(providerLinks.trackId, trackIds)
-        )
-      );
+    [trackProviderLinks, releaseProviderLinks] = await Promise.all([
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'track'),
+            inArray(providerLinks.trackId, trackIds)
+          )
+        ),
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            eq(providerLinks.releaseId, releaseId)
+          )
+        ),
+    ]);
   }
 
   // Group links by track ID
@@ -734,7 +746,10 @@ export async function getTracksForReleaseWithProviders(
     isExplicit: track.isExplicit,
     isrc: track.isrc,
     previewUrl: track.previewUrl,
-    providerLinks: linksByTrack.get(track.id) ?? [],
+    providerLinks: resolveTrackProviderLinks(
+      linksByTrack.get(track.id) ?? [],
+      releaseProviderLinks
+    ),
   }));
 
   return {

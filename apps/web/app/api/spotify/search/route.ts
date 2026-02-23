@@ -2,6 +2,11 @@ import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { cacheQuery } from '@/lib/db/cache';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  spotifySearchApiLimiter,
+} from '@/lib/rate-limit';
 import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
@@ -30,91 +35,6 @@ export interface SpotifyArtistResult {
   followers?: number;
   popularity: number;
   verified?: boolean;
-}
-
-/**
- * In-memory rate limiting per IP with proactive cleanup
- *
- * LIMITATION: This rate limiting resets on each deployment and is per-instance
- * in a serverless environment. This means:
- * - Rate limits reset when the app redeploys
- * - Different serverless instances have independent rate limit state
- *
- * For production-grade rate limiting, consider:
- * - Vercel Edge Config or KV for persistent state
- * - Upstash Redis for distributed rate limiting
- * - Cloudflare Rate Limiting at the edge
- *
- * Current implementation provides basic protection against abuse while
- * keeping infrastructure simple. Monitor usage and upgrade if needed.
- */
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX = 30; // 30 requests per minute per IP
-const MAX_RATE_LIMIT_ENTRIES = 500; // Maximum IPs to track to prevent memory exhaustion
-
-/**
- * Proactively clean expired rate limit entries to prevent memory exhaustion.
- * Uses LRU-style eviction when limit is reached.
- */
-function cleanupRateLimitMap(): void {
-  const now = Date.now();
-
-  // First, remove all expired entries
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
-
-  // If still over limit, remove oldest entries (LRU eviction)
-  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-    const entries = Array.from(rateLimitMap.entries());
-    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
-    const toDelete = entries.slice(0, entries.length - MAX_RATE_LIMIT_ENTRIES);
-    toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
-  }
-}
-
-function getClientIp(request: NextRequest): string {
-  // Priority: CF > Real IP > Forwarded
-  return (
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
-}
-
-interface RateLimitResult {
-  limited: boolean;
-  remaining: number;
-  resetAt: number;
-}
-
-function checkRateLimit(ip: string): RateLimitResult {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return {
-      limited: false,
-      remaining: RATE_LIMIT_MAX - 1,
-      resetAt: now + RATE_LIMIT_WINDOW,
-    };
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { limited: true, remaining: 0, resetAt: entry.resetAt };
-  }
-
-  entry.count++;
-  return {
-    limited: false,
-    remaining: RATE_LIMIT_MAX - entry.count,
-    resetAt: entry.resetAt,
-  };
 }
 
 function validateSearchQuery(q: string | undefined): NextResponse | null {
@@ -185,27 +105,19 @@ export async function GET(request: NextRequest) {
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
   // Rate limiting with headers for client visibility
-  const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(clientIp);
-
+  const clientIp = getClientIP(request);
+  const rateLimitResult = await spotifySearchApiLimiter.limit(clientIp);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,
-    'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
-    'X-RateLimit-Remaining': String(rateLimit.remaining),
-    'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetAt / 1000)),
+    ...createRateLimitHeaders(rateLimitResult),
   } as const;
 
-  if (rateLimit.limited) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: 'Too many requests', code: 'RATE_LIMITED' },
       {
         status: 429,
-        headers: {
-          ...rateLimitHeaders,
-          'Retry-After': String(
-            Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
-          ),
-        },
+        headers: rateLimitHeaders,
       }
     );
   }
@@ -282,10 +194,5 @@ export async function GET(request: NextRequest) {
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
     );
-  } finally {
-    // Probabilistic cleanup (10% of requests) to amortize cost.
-    if (Math.random() < 0.1 || rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-      cleanupRateLimitMap();
-    }
   }
 }

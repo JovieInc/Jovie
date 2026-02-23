@@ -7,6 +7,7 @@
  * Uses the shared DrawerHeader shell for consistent styling.
  */
 
+import { SegmentControl } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DrawerHeader } from '@/components/molecules/drawer';
@@ -21,6 +22,8 @@ interface ReleaseSidebarHeaderProps {
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
+  readonly panelMode: 'edit' | 'live';
+  readonly onPanelModeChange: (mode: 'edit' | 'live') => void;
 }
 
 export function ReleaseSidebarHeader({
@@ -29,6 +32,8 @@ export function ReleaseSidebarHeader({
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
+  panelMode,
+  onPanelModeChange,
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
@@ -62,29 +67,31 @@ export function ReleaseSidebarHeader({
       onClick: handleCopySmartLink,
     });
 
-    // Refresh - overflow action
-    // Open smart link - overflow action
-    overflowActions.push(
-      {
-        id: 'refresh',
-        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
-        icon: RefreshCw,
-        onClick: () => {
-          if (isRefreshing) return;
-          if (onRefresh) {
-            onRefresh();
-            return;
-          }
-          globalThis.location.reload();
-        },
+    // Open smart link - always visible primary action
+    primaryActions.push({
+      id: 'open',
+      label: 'Open smart link',
+      icon: ExternalLink,
+      onClick: () => {
+        if (!release?.smartLinkPath) return;
+        globalThis.open(release.smartLinkPath, '_blank', 'noopener,noreferrer');
       },
-      {
-        id: 'open',
-        label: 'Open smart link',
-        icon: ExternalLink,
-        href: release?.smartLinkPath,
-      }
-    );
+    });
+
+    // Refresh - overflow action
+    overflowActions.push({
+      id: 'refresh',
+      label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
+      icon: RefreshCw,
+      onClick: () => {
+        if (isRefreshing) return;
+        if (onRefresh) {
+          onRefresh();
+          return;
+        }
+        globalThis.location.reload();
+      },
+    });
   }
 
   // Copy release ID - available for all releases with an ID
@@ -107,12 +114,26 @@ export function ReleaseSidebarHeader({
     <DrawerHeader
       title={hasRelease ? 'Release details' : 'No release selected'}
       actions={
-        hasActions ? (
-          <DrawerHeaderActions
-            primaryActions={primaryActions}
-            overflowActions={overflowActions}
-          />
-        ) : undefined
+        <div className='flex items-center gap-2'>
+          {hasRelease && (
+            <SegmentControl
+              value={panelMode}
+              onValueChange={onPanelModeChange}
+              options={[
+                { value: 'edit', label: 'Edit' },
+                { value: 'live', label: 'Live' },
+              ]}
+              size='sm'
+              aria-label='Sidebar mode'
+            />
+          )}
+          {hasActions ? (
+            <DrawerHeaderActions
+              primaryActions={primaryActions}
+              overflowActions={overflowActions}
+            />
+          ) : undefined}
+        </div>
       }
     />
   );

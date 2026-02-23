@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Badge,
   Input,
   Label,
   Select,
@@ -12,7 +13,6 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -70,7 +70,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   // Use a ref so the debounced timeout always calls the latest onSave,
   // avoiding stale closures when contact state updates between scheduling and firing.
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   // Debounced save: coalesces rapid edits into a single save call
   const debouncedSave = useCallback(() => {
@@ -366,7 +368,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         {/* Territories Section */}
         <DrawerSection title='Territories'>
           <div className='space-y-3'>
-            <DrawerPropertyRow label='Coverage' value={territorySummary} />
+            <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
+              <span className='text-xs text-secondary-token'>Coverage</span>
+              <Badge size='sm'>{territorySummary}</Badge>
+            </div>
             <div className='flex flex-wrap gap-1.5'>
               {CONTACT_TERRITORY_PRESETS.map(territory => {
                 const isSelected = contact.territories.includes(territory);
