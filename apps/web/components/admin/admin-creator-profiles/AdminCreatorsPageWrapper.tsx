@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
+import { BatchIngestForm } from '@/components/admin/BatchIngestForm';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -39,5 +40,10 @@ export function AdminCreatorsPageWrapper(
     };
   }, [setHeaderActions, handleIngestPending]);
 
-  return <AdminCreatorProfilesUnified {...props} />;
+  return (
+    <div className='space-y-4'>
+      <BatchIngestForm onComplete={() => router.refresh()} />
+      <AdminCreatorProfilesUnified {...props} />
+    </div>
+  );
 }

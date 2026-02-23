@@ -68,6 +68,8 @@ export function ReleaseSidebar({
   readOnly = false,
   onCanvasStatusUpdate,
 }: ReleaseSidebarProps) {
+  const [panelMode, setPanelMode] = useState<'edit' | 'live'>('edit');
+
   const {
     isAddingLink,
     setIsAddingLink,
@@ -116,6 +118,7 @@ export function ReleaseSidebar({
   useEffect(() => {
     setSelectedTrack(null);
     setActiveTab('catalog');
+    setPanelMode('edit');
   }, [release?.id]);
 
   const handleTrackClick = useCallback((track: TrackForDetail) => {
@@ -250,10 +253,11 @@ export function ReleaseSidebar({
         <ReleaseSidebarHeader
           release={release}
           hasRelease={hasRelease}
-          onClose={onClose}
           onRefresh={onRefresh}
           isRefreshing={isRefreshing}
           onCopySmartLink={handleCopySmartLink}
+          panelMode={panelMode}
+          onPanelModeChange={setPanelMode}
         />
 
         {/* Always-visible artwork + release name */}
@@ -275,8 +279,8 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        {/* Tab navigation */}
-        {release && !selectedTrack && (
+        {/* Tab navigation (edit mode only) */}
+        {release && !selectedTrack && panelMode === 'edit' && (
           <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
             <SegmentControl
               value={activeTab}
@@ -298,8 +302,17 @@ export function ReleaseSidebar({
           )}
           {!(selectedTrack && release) && release && (
             <>
+              {panelMode === 'live' ? (
+                <div className='pb-1'>
+                  <ReleaseSmartLinkAnalytics
+                    release={release}
+                    providerConfig={providerConfig}
+                  />
+                </div>
+              ) : null}
+
               {/* Catalog tab: Fields, Track list */}
-              {activeTab === 'catalog' && (
+              {panelMode === 'edit' && activeTab === 'catalog' && (
                 <>
                   <div className='pb-5'>
                     <ReleaseFields
@@ -318,7 +331,7 @@ export function ReleaseSidebar({
               )}
 
               {/* Links tab: DSP links management */}
-              {activeTab === 'links' && (
+              {panelMode === 'edit' && activeTab === 'links' && (
                 <div className='space-y-5'>
                   <DrawerSection title='Smart Link'>
                     <ReleaseSmartLinkSection
@@ -350,7 +363,7 @@ export function ReleaseSidebar({
               )}
 
               {/* Details tab: Metadata + Settings */}
-              {activeTab === 'details' && (
+              {panelMode === 'edit' && activeTab === 'details' && (
                 <div className='space-y-5'>
                   <DrawerSection title='Analytics'>
                     <ReleaseSmartLinkAnalytics
@@ -379,7 +392,7 @@ export function ReleaseSidebar({
               )}
 
               {/* Lyrics tab: Lyrics editor */}
-              {activeTab === 'lyrics' && (
+              {panelMode === 'edit' && activeTab === 'lyrics' && (
                 <ReleaseLyricsSection
                   releaseId={release.id}
                   lyrics={release.lyrics}
@@ -390,7 +403,7 @@ export function ReleaseSidebar({
                 />
               )}
 
-              {isEditable && onSave && (
+              {panelMode === 'edit' && isEditable && onSave && (
                 <div className='pt-2 flex justify-end'>
                   <Button
                     type='button'

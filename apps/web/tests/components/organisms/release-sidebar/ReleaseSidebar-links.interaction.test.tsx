@@ -54,7 +54,20 @@ vi.mock('@/components/molecules/drawer', () => ({
 
 // Mock sub-components that are not under test
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
+  ReleaseSidebarHeader: ({
+    onPanelModeChange,
+  }: {
+    onPanelModeChange: (mode: 'edit' | 'live') => void;
+  }) => (
+    <div data-testid='sidebar-header'>
+      <button type='button' onClick={() => onPanelModeChange('edit')}>
+        Edit mode
+      </button>
+      <button type='button' onClick={() => onPanelModeChange('live')}>
+        Live mode
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseArtwork', () => ({
@@ -206,6 +219,21 @@ describe('ReleaseSidebar Links tab', () => {
     // Should reset to Catalog
     expect(screen.getByTestId('fields')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+  });
+
+  it('switches to Live mode and hides edit tab content', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('fields')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /live mode/i }));
+
+    expect(
+      screen.queryByRole('tab', { name: /catalog/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fields')).not.toBeInTheDocument();
+    expect(screen.queryByText('Save changes')).not.toBeInTheDocument();
   });
 
   it('Links tab renders smart link and DSP links sections', async () => {
