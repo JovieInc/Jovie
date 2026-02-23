@@ -29,7 +29,7 @@ export function resolveTrackProviderLinks(
   });
 
   const remainingProviders = Array.from(merged.values())
-    .filter(link => !(link.providerId in PROVIDER_CONFIG))
+    .filter(link => !PROVIDER_ORDER.includes(link.providerId))
     .sort((a, b) => a.providerId.localeCompare(b.providerId));
 
   return [...orderedKnownProviders, ...remainingProviders];
