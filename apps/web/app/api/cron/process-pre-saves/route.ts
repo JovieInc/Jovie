@@ -69,10 +69,12 @@ async function processPreSaveRow(row: {
   encryptedAccessToken: string | null;
 }): Promise<boolean> {
   try {
-    const accessToken = await resolveAccessToken(row);
+    // Check for Spotify link first to avoid unnecessary token refresh
     const externalId = await findSpotifyExternalId(row.releaseId, row.trackId);
+    if (!externalId) return false;
 
-    if (!accessToken || !externalId) return false;
+    const accessToken = await resolveAccessToken(row);
+    if (!accessToken) return false;
 
     await saveReleaseToSpotifyLibrary({
       accessToken,
@@ -86,7 +88,8 @@ async function processPreSaveRow(row: {
       .where(eq(preSaveTokens.id, row.id));
 
     return true;
-  } catch {
+  } catch (error) {
+    console.error(`[pre-save] Failed to process row ${row.id}:`, error);
     return false;
   }
 }
