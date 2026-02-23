@@ -548,6 +548,84 @@ export async function checkIsrcRescanRateLimit(
   );
 }
 
+// ============================================================================
+// Apple Music Rescan (plan-aware)
+// ============================================================================
+
+/**
+ * Rate limiter for Apple Music rescan (free plan)
+ * Limit: 1 per day per profile
+ */
+export const appleMusicRescanFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanFree
+);
+
+/**
+ * Rate limiter for Apple Music rescan (paid plan)
+ * Limit: 1 per hour per profile
+ */
+export const appleMusicRescanPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanPaid
+);
+
+/**
+ * Check Apple Music rescan rate limit (plan-aware).
+ * Free: 1/day, Paid: 1/hour.
+ */
+export async function checkAppleMusicRescanRateLimit(
+  profileId: string,
+  isPaidPlan: boolean
+): Promise<RateLimitResult> {
+  const limiter = isPaidPlan
+    ? appleMusicRescanPaidLimiter
+    : appleMusicRescanFreeLimiter;
+  const window = isPaidPlan ? '1 hour' : '24 hours';
+  return checkRateLimit(
+    limiter,
+    profileId,
+    `Apple Music was recently refreshed. Please wait ${window} before refreshing again.`
+  );
+}
+
+// ============================================================================
+// Release Refresh (plan-aware)
+// ============================================================================
+
+/**
+ * Rate limiter for release refresh (free plan)
+ * Limit: 1 per day per release
+ */
+export const releaseRefreshFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshFree
+);
+
+/**
+ * Rate limiter for release refresh (paid plan)
+ * Limit: 1 per hour per release
+ */
+export const releaseRefreshPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshPaid
+);
+
+/**
+ * Check release refresh rate limit (plan-aware).
+ * Free: 1/day, Paid: 1/hour.
+ */
+export async function checkReleaseRefreshRateLimit(
+  releaseId: string,
+  isPaidPlan: boolean
+): Promise<RateLimitResult> {
+  const limiter = isPaidPlan
+    ? releaseRefreshPaidLimiter
+    : releaseRefreshFreeLimiter;
+  const window = isPaidPlan ? '1 hour' : '24 hours';
+  return checkRateLimit(
+    limiter,
+    releaseId,
+    `This release was recently refreshed. Available again in ${window}.`
+  );
+}
+
 /**
  * Check admin fit-scores rate limit
  * Returns the first failure or success if pass
@@ -658,6 +736,10 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
+    appleMusicRescanFree: appleMusicRescanFreeLimiter,
+    appleMusicRescanPaid: appleMusicRescanPaidLimiter,
+    releaseRefreshFree: releaseRefreshFreeLimiter,
+    releaseRefreshPaid: releaseRefreshPaidLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
   };

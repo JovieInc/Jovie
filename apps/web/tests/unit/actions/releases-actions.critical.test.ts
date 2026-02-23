@@ -546,8 +546,8 @@ describe('@critical releases/actions.ts', () => {
       );
       const result = await refreshRelease({ releaseId: 'rel_001' });
 
-      expect(result.id).toBe('rel_001');
-      expect(result.title).toBe('Test Album');
+      expect(result.release.id).toBe('rel_001');
+      expect(result.release.title).toBe('Test Album');
     });
 
     it('rejects unauthenticated calls', async () => {

@@ -260,12 +260,18 @@ export function useReleaseProviderMatrix({
       refreshReleaseMutation.mutate(
         { releaseId },
         {
-          onSuccess: updated => {
-            updateRow(updated);
-            setFlashedReleaseId(updated.id);
+          onSuccess: result => {
+            if (result.rateLimited) {
+              toast.error(
+                `Refresh is rate limited. Available again in ${result.retryAfter}.`
+              );
+              return;
+            }
+            updateRow(result.release);
+            setFlashedReleaseId(result.release.id);
             globalThis.setTimeout(() => {
               setFlashedReleaseId(current =>
-                current === updated.id ? null : current
+                current === result.release.id ? null : current
               );
             }, 1200);
             toast.success('Release refreshed');
