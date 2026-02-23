@@ -90,12 +90,19 @@ export function useReleaseProviderMatrix({
   );
 
   const openEditor = useCallback((release: ReleaseViewModel) => {
-    setEditingRelease(release);
-    const nextDrafts: DraftState = {};
-    release.providers.forEach(provider => {
-      nextDrafts[provider.key] = provider.url ?? '';
+    // Toggle: clicking the same release closes the editor
+    setEditingRelease(current => {
+      if (current?.id === release.id) {
+        setDrafts({});
+        return null;
+      }
+      const nextDrafts: DraftState = {};
+      release.providers.forEach(provider => {
+        nextDrafts[provider.key] = provider.url ?? '';
+      });
+      setDrafts(nextDrafts);
+      return release;
     });
-    setDrafts(nextDrafts);
   }, []);
 
   const closeEditor = useCallback(() => {

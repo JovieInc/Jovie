@@ -7,6 +7,7 @@ import {
   memo,
   Suspense,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -117,12 +118,24 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Release view filter state (Tracks / Releases)
   const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // Derive showTracks from releaseView toggle
   const showTracksFromView = releaseView === 'tracks';
 
-  // Apply filters to rows
+  // Apply filters and search to rows
   const filteredRows = useMemo(() => {
     return rows.filter(release => {
+      // Text search filter
+      if (deferredSearchQuery) {
+        const query = deferredSearchQuery.toLowerCase();
+        if (!release.title.toLowerCase().includes(query)) return false;
+      }
+
       // Filter by release type (from advanced filters)
       const matchesType =
         filters.releaseTypes.length === 0 ||
@@ -144,7 +157,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
       return true;
     });
-  }, [rows, filters]);
+  }, [rows, filters, deferredSearchQuery]);
 
   // Smart link gating
   const {
@@ -478,7 +491,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [isAmConnected, amArtistName, handleAppleMusicRescan, isAmSyncing]
   );
 
-  const headerBadges = useMemo(
+  // DSP badges for subheader (moved from header)
+  const dspBadges = useMemo(
     () => (
       <div className='flex items-center gap-2'>
         {spotifyBadge}
@@ -488,9 +502,60 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [spotifyBadge, appleMusicBadge]
   );
 
+  // Header search input — shown when search is open
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+  }, []);
+
+  const headerBadgeContent = useMemo(() => {
+    if (!isSearchOpen) return null; // Show default breadcrumb label
+
+    return (
+      <div className='flex flex-1 items-center gap-2'>
+        <Icon
+          name='Search'
+          className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        />
+        <input
+          ref={searchInputRef}
+          type='text'
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') handleSearchClose();
+          }}
+          placeholder='Search releases…'
+          className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+          aria-label='Search releases'
+        />
+        {searchQuery && (
+          <button
+            type='button'
+            onClick={() => setSearchQuery('')}
+            className='rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
+            aria-label='Clear search'
+          >
+            <Icon name='X' className='h-3.5 w-3.5' />
+          </button>
+        )}
+      </div>
+    );
+  }, [isSearchOpen, searchQuery, handleSearchClose]);
+
+  // Auto-focus search input when opened
   useEffect(() => {
-    // DSP pills on left side of header
-    setHeaderBadge(headerBadges);
+    if (isSearchOpen) {
+      // Use requestAnimationFrame to ensure the input is rendered before focusing
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  }, [isSearchOpen]);
+
+  useEffect(() => {
+    // Search input or null (for default breadcrumb) on left side of header
+    setHeaderBadge(headerBadgeContent);
 
     // New Release button + drawer toggle on right side (use memoized element to prevent infinite loops)
     setHeaderActions(headerActions);
@@ -500,7 +565,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [headerBadges, headerActions]);
+  }, [headerBadgeContent, headerActions]);
 
   // Register right panel with AuthShell instead of rendering inline
   const sidebarPanel = useMemo(
@@ -596,6 +661,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
+              dspBadges={dspBadges}
+              isSearchOpen={isSearchOpen}
+              onSearchToggle={() => setIsSearchOpen(open => !open)}
             />
           )}
 
@@ -674,6 +742,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   rowHeight={rowHeight}
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
+                  selectedReleaseId={editingRelease?.id}
                   refreshingReleaseId={refreshingReleaseId}
                   flashedReleaseId={flashedReleaseId}
                   isSmartLinkLocked={isSmartLinkLocked}

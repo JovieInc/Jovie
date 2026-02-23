@@ -9,7 +9,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, SegmentControl } from '@jovie/ui';
-import { Copy, ExternalLink, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DrawerEmptyState } from '@/components/molecules/drawer';
@@ -113,11 +113,9 @@ export function ReleaseSidebar({
     null
   );
 
-  // Reset selected track and tab when release changes to avoid stale views
+  // Reset selected track when release changes (preserve active tab for workflow continuity)
   useEffect(() => {
     setSelectedTrack(null);
-    setActiveTab('catalog');
-    setPanelMode('edit');
   }, [release?.id]);
 
   const handleTrackClick = useCallback((track: TrackForDetail) => {
@@ -216,29 +214,8 @@ export function ReleaseSidebar({
       }
     );
 
-    if (!readOnly) {
-      items.push(
-        { type: 'separator', id: 'sep-danger' },
-        {
-          type: 'action',
-          id: 'delete',
-          label: 'Delete release',
-          icon: <Trash2 className='h-4 w-4' />,
-          onClick: () => toast.info('Delete not implemented'),
-          variant: 'destructive',
-        }
-      );
-    }
-
     return items;
-  }, [
-    release,
-    handleCopySmartLink,
-    onRefresh,
-    isRefreshing,
-    artistName,
-    readOnly,
-  ]);
+  }, [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]);
 
   return (
     <RightDrawer
