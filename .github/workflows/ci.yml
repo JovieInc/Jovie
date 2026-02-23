@@ -1889,7 +1889,8 @@ jobs:
     needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    environment: Preview - jovie
+    timeout-minutes: 15
     steps:
       - name: Gate required smoke on PRs
         if: ${{ github.event_name == 'pull_request' }}
