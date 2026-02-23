@@ -1,4 +1,5 @@
 import { Footer as FooterOrganism } from '@/components/organisms/footer-module';
+import { APP_ROUTES } from '@/constants/routes';
 
 type FooterVersion = 1 | 2 | 'minimal' | 'regular';
 
@@ -32,8 +33,8 @@ export function Footer({
       showThemeToggle={showThemeToggle}
       themeShortcutKey={themeShortcutKey}
       links={[
-        { href: '/legal/privacy', label: 'Privacy' },
-        { href: '/legal/terms', label: 'Terms of Service' },
+        { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+        { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms of Service' },
       ]}
     />
   );
