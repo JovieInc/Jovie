@@ -62,6 +62,25 @@ import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
+const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
+  'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+
+function isSpotifyIdUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const dbError = error as Error & { code?: string; constraint?: string };
+  const message = dbError.message.toLowerCase();
+
+  return (
+    dbError.code === '23505' &&
+    (dbError.constraint === 'creator_profiles_spotify_id_unique' ||
+      message.includes('creator_profiles_spotify_id_unique') ||
+      (message.includes('spotify_id') && message.includes('duplicate')))
+  );
+}
+
 function buildProviderLabels() {
   return Object.entries(PROVIDER_CONFIG).reduce(
     (acc, [key, value]) => {
@@ -771,18 +790,32 @@ export async function connectSpotifyArtist(params: {
   >;
 
   // Update the profile with the Spotify artist ID, URL, and artist name in settings
-  await db
-    .update(creatorProfiles)
-    .set({
-      spotifyId: params.spotifyArtistId,
-      spotifyUrl: params.spotifyArtistUrl,
-      settings: {
-        ...currentSettings,
-        spotifyArtistName: params.artistName,
-      },
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        spotifyId: params.spotifyArtistId,
+        spotifyUrl: params.spotifyArtistUrl,
+        settings: {
+          ...currentSettings,
+          spotifyArtistName: params.artistName,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    if (isSpotifyIdUniqueViolation(error)) {
+      return {
+        success: false,
+        message: SPOTIFY_ALREADY_CLAIMED_MESSAGE,
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
+
+    throw error;
+  }
 
   // Sync releases from the connected artist
   const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
