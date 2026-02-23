@@ -44,6 +44,7 @@ export const APP_ROUTES = {
   // Admin
   ADMIN: '/app/admin',
   ADMIN_WAITLIST: '/app/admin/waitlist',
+  ADMIN_WAITLIST_SETTINGS: '/app/admin/waitlist/settings',
   ADMIN_CREATORS: '/app/admin/creators',
   ADMIN_CREATORS_BULK_REFRESH: '/app/admin/creators/bulk-refresh',
   ADMIN_CREATORS_DELETE: '/app/admin/creators/delete',
@@ -56,6 +57,13 @@ export const APP_ROUTES = {
 
   // Marketing
   PRICING: '/pricing',
+  LAUNCH: '/launch',
+  LAUNCH_PRICING: '/launch/pricing',
+
+  // Legal
+  LEGAL_PRIVACY: '/legal/privacy',
+  LEGAL_TERMS: '/legal/terms',
+  LEGAL_COOKIES: '/legal/cookies',
 
   // Auth & Onboarding
   SIGNIN: '/signin',
@@ -65,6 +73,7 @@ export const APP_ROUTES = {
 
   // Billing
   BILLING: '/billing',
+  BILLING_REMOVE_BRANDING: '/billing/remove-branding',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
 

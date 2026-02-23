@@ -257,6 +257,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** API search: 30 requests per minute per IP */
+  spotifySearchApi: {
+    name: 'Spotify Search API',
+    limit: 30,
+    window: '1 m',
+    prefix: 'spotify:search:api',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** Profile claim: 5 attempts per hour per user - CRITICAL for security */
   spotifyClaim: {
     name: 'Spotify Claim',
@@ -294,6 +303,15 @@ export const RATE_LIMITERS = {
     limit: 80,
     window: '1 m',
     prefix: 'dsp:apple-music:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music search: 30 requests per minute per IP */
+  appleMusicSearch: {
+    name: 'Apple Music Search',
+    limit: 30,
+    window: '1 m',
+    prefix: 'dsp:apple-music:search',
     analytics: true,
   } satisfies RateLimitConfig,
 

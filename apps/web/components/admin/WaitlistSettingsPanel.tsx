@@ -4,6 +4,7 @@ import { Switch } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface WaitlistSettingsResponse {
   gateEnabled: boolean;
@@ -21,7 +22,7 @@ export function WaitlistSettingsPanel() {
 
   useEffect(() => {
     let mounted = true;
-    fetch('/app/admin/waitlist/settings', { cache: 'no-store' })
+    fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, { cache: 'no-store' })
       .then(async response => {
         if (!response.ok) throw new Error('Failed to load waitlist settings');
         const payload = (await response.json()) as {
@@ -45,7 +46,7 @@ export function WaitlistSettingsPanel() {
     if (!settings) return;
     setSaving(true);
     try {
-      const response = await fetch('/app/admin/waitlist/settings', {
+      const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

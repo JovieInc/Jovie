@@ -1,7 +1,7 @@
 {
   "buildCommand": "cd ../.. && corepack pnpm turbo build --filter=@jovie/web",
   "installCommand": "cd ../.. && corepack enable && corepack pnpm install",
-  "ignoreCommand": "cd ../.. && npx turbo-ignore @jovie/web",
+  "ignoreCommand": "bash -c 'if [[ \"$VERCEL_GIT_COMMIT_REF\" =~ ^(codex|claude|codegen-bot|linear)/ ]]; then echo \"Skipping preview for agent branch: $VERCEL_GIT_COMMIT_REF\"; exit 0; fi; cd ../.. && npx turbo-ignore @jovie/web'",
   "crons": [
     {
       "path": "/api/cron/frequent",
