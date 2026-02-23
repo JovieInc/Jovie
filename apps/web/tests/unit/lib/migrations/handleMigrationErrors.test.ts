@@ -140,6 +140,46 @@ describe('handleMigrationErrors', () => {
     );
   });
 
+  it('returns fallback for uppercase failed query user_settings errors', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message:
+          'FAILED QUERY: SELECT "user_id", "theme_mode" FROM "user_settings" WHERE "user_settings"."user_id" = $1 LIMIT $2',
+      },
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: undefined });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] user_settings migration in progress',
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+  });
+
+  it('returns fallback for uppercase column missing creator_profiles errors', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message:
+          'COLUMN "profile_name" OF RELATION "creator_profiles" DOES NOT EXIST',
+      },
+      { userId: 'user_123', operation: 'creator_profiles' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: [] });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
+      { userId: 'user_123', operation: 'creator_profiles' }
+    );
+  });
+
   it('returns retry for non-migration errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
