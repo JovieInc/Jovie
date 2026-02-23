@@ -270,7 +270,7 @@ export default function PricingPage() {
                 color: 'var(--linear-text-primary)',
               }}
             >
-              Pricing
+              Simple pricing. No Surprises.
             </h1>
             <p
               className='mt-4 mx-auto max-w-lg'
@@ -280,8 +280,8 @@ export default function PricingPage() {
                 color: 'var(--linear-text-secondary)',
               }}
             >
-              Use Jovie for free with unlimited profiles. Upgrade to remove
-              branding, unlock advanced analytics, and export your contacts.
+              Start free with unlimited smartlinks. Upgrade when you&apos;re
+              ready to grow.
             </p>
           </div>
 
@@ -339,6 +339,16 @@ export default function PricingPage() {
                 </div>
               )}
             </div>
+
+            <p
+              className='mt-4 text-center'
+              style={{
+                fontSize: 'var(--linear-label-size)',
+                color: 'var(--linear-text-tertiary)',
+              }}
+            >
+              Unlimited subject to abuse guardrails.
+            </p>
           </div>
         </div>
       </Container>
