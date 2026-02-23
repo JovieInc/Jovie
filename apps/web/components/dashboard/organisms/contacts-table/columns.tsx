@@ -1,5 +1,6 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Copy, Mail, Phone, Trash2 } from 'lucide-react';
@@ -81,7 +82,7 @@ export function createContactColumns(
       header: 'Territories',
       cell: ({ row }) => {
         const { summary } = summarizeTerritories(row.original.territories);
-        return <span className='text-secondary-token'>{summary}</span>;
+        return <Badge size='sm'>{summary}</Badge>;
       },
       size: 140,
     }),

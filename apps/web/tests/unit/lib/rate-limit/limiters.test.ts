@@ -143,6 +143,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 m',
       prefix: 'spotify:search',
     },
+    spotifySearchApi: {
+      name: 'Spotify Search API',
+      limit: 30,
+      window: '1 m',
+      prefix: 'spotify:search:api',
+    },
     spotifyClaim: {
       name: 'Spotify Claim',
       limit: 5,
@@ -160,6 +166,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       limit: 10,
       window: '1 m',
       prefix: 'spotify:public-search',
+    },
+    appleMusicSearch: {
+      name: 'Apple Music Search',
+      limit: 30,
+      window: '1 m',
+      prefix: 'dsp:apple-music:search',
     },
     aiChat: { name: 'AI Chat', limit: 30, window: '1 h', prefix: 'ai:chat' },
     aiChatDailyFree: {
@@ -283,11 +295,13 @@ describe('limiters.ts', () => {
         'health',
         'general',
         'spotifySearch',
+        'spotifySearchApi',
         'spotifyClaim',
         'spotifyRefresh',
         'spotifyPublicSearch',
         'aiChat',
         'bandsintownSync',
+        'appleMusicSearch',
         'accountDelete',
         'accountExport',
       ];
