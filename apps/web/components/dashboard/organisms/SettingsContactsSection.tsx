@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -266,9 +266,9 @@ function ContactRow({
         </div>
       </div>
       {territorySummary && (
-        <span className='text-xs text-tertiary-token shrink-0'>
+        <Badge size='sm' className='shrink-0'>
           {territorySummary}
-        </span>
+        </Badge>
       )}
     </button>
   );
