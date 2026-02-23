@@ -83,6 +83,21 @@ async function ingestSpotifyArtist(
       return handleExistingUnclaimedProfile(tx, existing, socialContext);
     }
 
+    if (existing) {
+      // Profile exists and is already claimed — nothing to ingest
+      return NextResponse.json(
+        {
+          profile: {
+            id: existing.id,
+            username: existing.usernameNormalized,
+          },
+          skipped: true,
+          note: 'Artist profile already claimed.',
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const finalHandle = await findAvailableHandle(tx, fallbackHandle);
     if (!finalHandle) {
       return NextResponse.json(
@@ -120,9 +135,21 @@ async function ingestSpotifyArtist(
     profile?: { id?: string; username?: string; usernameNormalized?: string };
     error?: string;
     details?: string;
+    skipped?: boolean;
+    note?: string;
   };
 
   if (ingestResponse.status >= 200 && ingestResponse.status < 300) {
+    if (payload.skipped) {
+      return {
+        input: normalizedUrl,
+        status: 'skipped',
+        spotifyArtistId,
+        followers,
+        reason: payload.note ?? 'Artist profile already exists.',
+      };
+    }
+
     return {
       input: normalizedUrl,
       status: 'success',

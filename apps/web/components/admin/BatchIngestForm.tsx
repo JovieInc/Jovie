@@ -179,13 +179,30 @@ https://open.spotify.com/artist/...
           </div>
 
           {result && (
-            <div className='space-y-1.5 rounded-md border border-subtle p-2 text-2xs'>
-              <p className='font-medium text-secondary-token'>
-                Results: {result.summary.success} created &middot;{' '}
-                {result.summary.skipped} skipped &middot; {result.summary.error}{' '}
-                errors
-              </p>
-              <ul className='max-h-40 space-y-0.5 overflow-y-auto'>
+            <div className='space-y-2 rounded-md border border-subtle p-3 text-xs'>
+              {/* Summary badges */}
+              <div className='flex items-center gap-3'>
+                {result.summary.success > 0 && (
+                  <span className='inline-flex items-center gap-1 text-success'>
+                    <CheckCircle2 className='size-3' />
+                    {result.summary.success} created
+                  </span>
+                )}
+                {result.summary.skipped > 0 && (
+                  <span className='inline-flex items-center gap-1 text-warning'>
+                    <CircleMinus className='size-3' />
+                    {result.summary.skipped} skipped
+                  </span>
+                )}
+                {result.summary.error > 0 && (
+                  <span className='inline-flex items-center gap-1 text-error'>
+                    <CircleAlert className='size-3' />
+                    {result.summary.error} errors
+                  </span>
+                )}
+              </div>
+              {/* Individual results */}
+              <ul className='max-h-52 space-y-1 overflow-y-auto'>
                 {result.results.map(item => {
                   const config = STATUS_CONFIG[item.status];
                   const Icon = config.icon;
@@ -196,26 +213,18 @@ https://open.spotify.com/artist/...
                     >
                       <Icon
                         className={cn(
-                          'mt-0.5 h-3 w-3 shrink-0',
+                          'mt-0.5 size-3 shrink-0',
                           config.className
                         )}
                       />
-                      <span className={cn('font-medium', config.className)}>
-                        {config.label}
-                      </span>
-                      <span className='truncate font-mono text-tertiary-token'>
+                      <span>
+                        <span className={cn('font-medium', config.className)}>
+                          {config.label}
+                        </span>{' '}
                         {item.input}
+                        {item.username ? ` → @${item.username}` : ''}
+                        {item.reason ? ` (${item.reason})` : ''}
                       </span>
-                      {item.username && (
-                        <span className='shrink-0 text-secondary-token'>
-                          &rarr; @{item.username}
-                        </span>
-                      )}
-                      {item.reason && (
-                        <span className='shrink-0 text-tertiary-token'>
-                          ({item.reason})
-                        </span>
-                      )}
                     </li>
                   );
                 })}
