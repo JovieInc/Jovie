@@ -73,8 +73,8 @@ jobs:
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
           fi
 
-          # Check if only docs changed
-          if echo "$CHANGED_FILES" | grep -v -E '\.(md|txt|yml|yaml)$' | wc -l | grep -q '^0$'; then
+          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
+          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
             echo "Only documentation files changed"
             for t in run_build run_test run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> $GITHUB_OUTPUT
@@ -109,7 +109,7 @@ jobs:
           fi
 
           # Drizzle paths
-          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/db/schema|apps/web/drizzle\.config\.ts|apps/web/drizzle/config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
             echo "run_drizzle=true" >> $GITHUB_OUTPUT
           else
