@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { APP_ROUTES } from '@/constants/routes';
 
 export function NewUpgradeTeaser() {
   return (
@@ -45,7 +46,7 @@ export function NewUpgradeTeaser() {
                 variant='primary'
                 className='w-full justify-center gap-2 h-11 text-sm font-medium'
               >
-                <Link href='/billing/remove-branding'>
+                <Link href={APP_ROUTES.BILLING_REMOVE_BRANDING}>
                   Upgrade to Pro
                   <ArrowRight className='h-4 w-4' />
                 </Link>

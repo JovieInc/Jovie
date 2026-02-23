@@ -8,6 +8,7 @@ import { del } from '@vercel/blob';
 import { and, eq, lt, or, type SQL } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { profilePhotos } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -31,7 +32,7 @@ export function verifyCronAuth(
   request: Request,
   cronSecret: string | undefined
 ): NextResponse | null {
-  if (process.env.NODE_ENV !== 'production') {
+  if (env.NODE_ENV !== 'production') {
     return null;
   }
 
@@ -99,7 +100,7 @@ export function collectBlobUrls(records: OrphanedPhotoRecord[]): string[] {
  * Returns the number of URLs deleted on success, or -1 on failure.
  */
 export async function deleteBlobsIfConfigured(urls: string[]): Promise<number> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  const token = env.BLOB_READ_WRITE_TOKEN;
 
   if (!token || urls.length === 0) {
     return 0;
