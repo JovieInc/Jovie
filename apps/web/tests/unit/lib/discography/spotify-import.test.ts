@@ -406,6 +406,106 @@ describe('spotify-import', () => {
       );
     });
 
+    it('stores spotify preview as audio fallback when available', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-preview',
+          name: 'Preview Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [],
+          uri: 'spotify:album:album-preview',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-preview',
+          },
+        },
+      ]);
+
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-preview',
+          name: 'Preview Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [],
+          uri: 'spotify:album:album-preview',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-preview',
+          },
+          tracks: {
+            items: [
+              {
+                id: 'track-preview',
+                name: 'Track Preview',
+                track_number: 1,
+                disc_number: 1,
+                duration_ms: 180000,
+                explicit: false,
+                external_urls: {
+                  spotify: 'https://open.spotify.com/track/track-preview',
+                },
+                uri: 'spotify:track:track-preview',
+                preview_url: 'https://p.scdn.co/mp3-preview/abc123',
+                artists: [{ id: 'artist-1', name: 'Artist Name' }],
+              },
+            ],
+            total: 1,
+            next: null,
+          },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      mockGetSpotifyTracks.mockResolvedValueOnce([
+        {
+          id: 'track-preview',
+          name: 'Track Preview',
+          track_number: 1,
+          disc_number: 1,
+          duration_ms: 180000,
+          explicit: false,
+          external_urls: {
+            spotify: 'https://open.spotify.com/track/track-preview',
+          },
+          uri: 'spotify:track:track-preview',
+          preview_url: 'https://p.scdn.co/mp3-preview/abc123',
+          external_ids: { isrc: 'USABC2412345' },
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockUpsertTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previewUrl: 'https://p.scdn.co/mp3-preview/abc123',
+          audioUrl: 'https://p.scdn.co/mp3-preview/abc123',
+          audioFormat: 'mp3',
+        })
+      );
+    });
+
     it('drops malformed ISRC values from full track metadata', async () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
         {

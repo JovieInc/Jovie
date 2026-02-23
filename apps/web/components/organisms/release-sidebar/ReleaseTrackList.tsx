@@ -19,6 +19,8 @@ import {
   Link2,
   Loader2,
   MoreHorizontal,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +31,7 @@ import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
+import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Track shape returned by the API route for sidebar tracklist + actions. */
 type SidebarTrack = Pick<
@@ -43,6 +46,9 @@ type SidebarTrack = Pick<
   | 'durationMs'
   | 'isrc'
   | 'isExplicit'
+  | 'previewUrl'
+  | 'audioUrl'
+  | 'audioFormat'
   | 'providers'
 >;
 
@@ -72,6 +78,7 @@ export function ReleaseTrackList({
   release,
   onTrackClick,
 }: ReleaseTrackListProps) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
   const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -168,7 +175,13 @@ export function ReleaseTrackList({
             tracks &&
             tracks.length > 0 &&
             tracks.map(track => (
-              <TrackItem key={track.id} track={track} onClick={onTrackClick} />
+              <TrackItem
+                key={track.id}
+                track={track}
+                onClick={onTrackClick}
+                playbackState={playbackState}
+                onToggleTrack={toggleTrack}
+              />
             ))}
         </div>
       )}
@@ -179,9 +192,22 @@ export function ReleaseTrackList({
 function TrackItem({
   track,
   onClick,
+  playbackState,
+  onToggleTrack,
 }: {
   readonly track: SidebarTrack;
   readonly onClick?: (track: SidebarTrack) => void;
+  readonly playbackState: {
+    activeTrackId: string | null;
+    isPlaying: boolean;
+    currentTime: number;
+    duration: number;
+  };
+  readonly onToggleTrack: (track: {
+    id: string;
+    title: string;
+    audioUrl: string;
+  }) => Promise<void>;
 }) {
   const trackLabel =
     track.discNumber > 1
@@ -210,6 +236,30 @@ function TrackItem({
   }, [track.smartLinkPath]);
 
   const streamingProviders = track.providers.filter(p => p.url);
+  const playableUrl = track.audioUrl ?? track.previewUrl;
+  const isActiveTrack = playbackState.activeTrackId === track.id;
+  const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
+  const progressDuration = isActiveTrack ? playbackState.duration : 0;
+  const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
+  const progressPercent =
+    progressDuration > 0
+      ? Math.min(
+          100,
+          Math.max(0, (progressCurrentTime / progressDuration) * 100)
+        )
+      : 0;
+
+  const handleTogglePlayback = useCallback(() => {
+    if (!playableUrl) return;
+
+    onToggleTrack({
+      id: track.id,
+      title: track.title,
+      audioUrl: playableUrl,
+    }).catch(() => {
+      toast.error('Unable to play this track right now');
+    });
+  }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
     <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-surface-2/50 transition-colors'>
@@ -218,47 +268,82 @@ function TrackItem({
         {trackLabel}.
       </span>
 
-      {/* Track details - clickable */}
-      <button
-        type='button'
-        onClick={handleClick}
-        className='min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
-      >
-        <div className='flex items-center gap-1.5'>
-          <TruncatedText
-            lines={1}
-            className='text-xs text-primary-token hover:underline'
-            tooltipSide='top'
-          >
-            {track.title}
-          </TruncatedText>
-          {track.isExplicit && (
-            <Badge
-              variant='secondary'
-              className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+      {/* Track details */}
+      <div className='min-w-0 flex-1'>
+        <button
+          type='button'
+          onClick={handleClick}
+          className='w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+        >
+          <div className='flex items-center gap-1.5'>
+            <TruncatedText
+              lines={1}
+              className='text-xs text-primary-token hover:underline'
+              tooltipSide='top'
             >
-              E
-            </Badge>
-          )}
-        </div>
+              {track.title}
+            </TruncatedText>
+            {track.isExplicit && (
+              <Badge
+                variant='secondary'
+                className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+              >
+                E
+              </Badge>
+            )}
+          </div>
 
-        {/* Duration + ISRC row */}
-        <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
-          {track.durationMs != null && (
-            <span className='tabular-nums'>
-              {formatDuration(track.durationMs)}
-            </span>
-          )}
-          {track.isrc && (
-            <>
-              {track.durationMs != null && (
-                <span className='text-tertiary-token/50'>|</span>
-              )}
-              <span className='font-mono text-[10px]'>{track.isrc}</span>
-            </>
-          )}
-        </div>
-      </button>
+          {/* Duration + ISRC row */}
+          <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
+            {track.durationMs != null && (
+              <span className='tabular-nums'>
+                {formatDuration(track.durationMs)}
+              </span>
+            )}
+            {track.isrc && (
+              <>
+                {track.durationMs != null && (
+                  <span className='text-tertiary-token/50'>|</span>
+                )}
+                <span className='font-mono text-[10px]'>{track.isrc}</span>
+              </>
+            )}
+          </div>
+        </button>
+
+        {playableUrl && (
+          <div className='mt-2 space-y-1.5'>
+            <div className='flex items-center gap-2'>
+              <button
+                type='button'
+                onClick={event => {
+                  event.stopPropagation();
+                  handleTogglePlayback();
+                }}
+                className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle text-secondary-token hover:border-primary hover:text-primary-token transition-colors'
+                aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
+              >
+                {isTrackPlaying ? (
+                  <Pause className='h-3.5 w-3.5' />
+                ) : (
+                  <Play className='h-3.5 w-3.5' />
+                )}
+              </button>
+              <div className='h-1 flex-1 rounded-full bg-surface-2'>
+                <div
+                  className='h-full rounded-full bg-primary transition-[width]'
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+            <p className='text-[10px] text-tertiary-token'>
+              {track.audioFormat
+                ? `Audio preview · ${track.audioFormat.toUpperCase()}`
+                : 'Audio preview'}
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Actions menu */}
       <TrackActionsMenu
