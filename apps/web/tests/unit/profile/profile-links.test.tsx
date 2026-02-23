@@ -11,6 +11,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { detectPlatform } from '@/lib/utils/platform-detection';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import type { LegacySocialLink } from '@/types/db';
 
 // ─── Mocks for ProfileLinkList ───────────────────────────────────────────────
@@ -407,18 +409,47 @@ describe('Public profile link visibility', () => {
   function filterSocialNetworkLinks(
     socialLinks: LegacySocialLink[]
   ): LegacySocialLink[] {
-    return socialLinks.filter(
-      link =>
-        link.is_visible !== false &&
-        link.platform &&
-        link.url &&
-        SOCIAL_NETWORK_PLATFORMS.includes(
-          link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
+    return socialLinks.filter(link => {
+      if (link.is_visible === false || !link.platform || !link.url) {
+        return false;
+      }
+
+      const normalizedPlatform = link.platform.toLowerCase();
+      if (
+        !SOCIAL_NETWORK_PLATFORMS.includes(
+          normalizedPlatform as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
         )
-    );
+      ) {
+        return false;
+      }
+
+      if (!validateSocialLinkUrl(link.url).valid) {
+        return false;
+      }
+
+      const detected = detectPlatform(link.url).platform.id;
+      return (
+        detected === normalizedPlatform ||
+        (normalizedPlatform === 'youtube' && detected === 'youtube_music')
+      );
+    });
   }
 
   describe('social links appear on public profile', () => {
+    const SOCIAL_PLATFORM_URLS: Record<
+      (typeof SOCIAL_NETWORK_PLATFORMS)[number],
+      string
+    > = {
+      twitter: 'https://twitter.com/artist',
+      instagram: 'https://instagram.com/artist',
+      tiktok: 'https://tiktok.com/@artist',
+      youtube: 'https://youtube.com/@artist',
+      facebook: 'https://facebook.com/artist',
+      linkedin: 'https://linkedin.com/in/artist',
+      discord: 'https://discord.gg/artistcommunity',
+      twitch: 'https://twitch.tv/artist',
+    };
+
     it('shows visible social links with recognized platforms', () => {
       const links: LegacySocialLink[] = [
         createSocialLink({
@@ -454,7 +485,7 @@ describe('Public profile link visibility', () => {
           createSocialLink({
             id: `${i}`,
             platform,
-            url: `https://example.com/${platform}`,
+            url: SOCIAL_PLATFORM_URLS[platform],
           })
       );
 
@@ -502,6 +533,20 @@ describe('Public profile link visibility', () => {
     it('excludes links with empty URL', () => {
       const links: LegacySocialLink[] = [
         createSocialLink({ id: '1', platform: 'instagram', url: '' }),
+      ];
+
+      const visible = filterSocialNetworkLinks(links);
+
+      expect(visible).toHaveLength(0);
+    });
+
+    it('excludes links whose domains do not match their declared platform', () => {
+      const links: LegacySocialLink[] = [
+        createSocialLink({
+          id: '1',
+          platform: 'instagram',
+          url: 'https://malicious.example.com/fake-profile',
+        }),
       ];
 
       const visible = filterSocialNetworkLinks(links);
