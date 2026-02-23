@@ -99,6 +99,8 @@ export const discogTracks = pgTable(
     discNumber: integer('disc_number').default(1).notNull(),
     isExplicit: boolean('is_explicit').default(false).notNull(),
     isrc: text('isrc'),
+    audioUrl: text('audio_url'),
+    audioFormat: text('audio_format'),
     previewUrl: text('preview_url'),
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
