@@ -353,7 +353,9 @@ describeArtist('Artist Profile Pages', () => {
     test('footer branding link navigates correctly', async ({ page }) => {
       await page.goto('/dualipa', { timeout: 120_000 });
 
-      // Profile footer has Jovie home link (logo) not "Powered by Jovie"
+      await expect(page.getByText('Powered by')).toBeVisible();
+      await expect(page.getByText('Jovie')).toBeVisible();
+
       const footerLink = page.getByRole('link', { name: /Jovie home/i });
       await expect(footerLink.first()).toBeVisible();
 

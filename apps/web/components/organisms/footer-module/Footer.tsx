@@ -60,7 +60,7 @@ export function Footer({
             variant={config.colorVariant}
             size='sm'
             showCTA={false}
-            mark='icon'
+            mark='text'
           />
         </div>
 

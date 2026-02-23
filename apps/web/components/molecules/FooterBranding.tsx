@@ -10,7 +10,7 @@ interface FooterBrandingProps {
   readonly className?: string;
   readonly showCTA?: boolean;
   readonly size?: 'sm' | 'md';
-  readonly mark?: 'wordmark' | 'icon';
+  readonly mark?: 'wordmark' | 'icon' | 'text';
 }
 
 export function FooterBranding({
@@ -35,6 +35,9 @@ export function FooterBranding({
     ? 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-150 ease-out hover:opacity-80'
     : 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
 
+  const textLinkClass =
+    'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-[10px] uppercase tracking-widest text-white/20 transition-colors duration-150 ease-out hover:text-white/35';
+
   const logoClass = isLinear
     ? 'opacity-100'
     : 'opacity-50 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100';
@@ -57,6 +60,11 @@ export function FooterBranding({
             tone={isLinear ? 'white' : 'auto'}
             className={logoClass}
           />
+        </Link>
+      ) : mark === 'text' ? (
+        <Link href={logoHref} aria-label='Jovie home' className={textLinkClass}>
+          <span>Powered by</span>
+          <span className='font-semibold'>Jovie</span>
         </Link>
       ) : (
         <Link href={logoHref} aria-label='Jovie home' className={logoLinkClass}>
