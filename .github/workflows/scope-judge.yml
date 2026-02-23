@@ -29,6 +29,10 @@ permissions:
   pull-requests: read
   statuses: write
 
+concurrency:
+  group: scope-judge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   judge:
     name: Scope Alignment Check
