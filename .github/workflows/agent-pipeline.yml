@@ -1,34 +1,33 @@
-# Unified Agent Remediation Workflow
+# Agent Pipeline
 #
-# PURPOSE: Automatically fix agent-generated PRs that fail CI checks OR receive
-# blocking CodeRabbit reviews. This is the single remediation orchestrator that
-# replaces separate fix workflows.
+# PURPOSE: Unified automation pipeline for agent-generated PRs. Handles both
+# failure remediation (CI failures, CodeRabbit blocking reviews) and success
+# auto-approval in a single workflow.
+#
+# REPLACES: agent-remediation.yml, auto-approve-agent-prs.yml, coderabbit-autofix.yml
 #
 # TRIGGERS:
-# 1. CI failure on agent branches (workflow_run of CI completing with failure)
-# 2. CodeRabbit blocking review (pull_request_review with changes_requested)
+# 1. CI failure on agent branches → fix job (Claude Code fixes)
+# 2. CodeRabbit blocking review → fix job (Claude Code fixes)
+# 3. CI + Scope Judge both pass → approve job (auto-approve + auto-merge)
 #
 # SAFETY:
-# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*)
+# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*)
 # - Max 3 fix attempts per SHA to prevent infinite loops
 # - Escalates to 'needs-human' label after exhaustion
+# - Sensitive path detection prevents auto-merge on high-risk changes
 # - Uses least-privilege credentials
 # - Does NOT execute untrusted PR code
-#
-# FLOW:
-# CI fails / CodeRabbit blocks → Guard validates → Extract error context →
-# Claude agent fixes → Validate (biome + typecheck + tests) → Commit + Push →
-# If still fails: retry up to 3x → Escalate to human
 
-name: Agent Remediation
+name: Agent Pipeline
 
 on:
-  # Trigger 1: CI workflow completes (we check for failure in the guard)
+  # Trigger when CI or Scope Judge workflow completes
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "Scope Judge"]
     types: [completed]
 
-  # Trigger 2: CodeRabbit blocking review
+  # Trigger on CodeRabbit blocking review
   pull_request_review:
     types: [submitted]
 
@@ -39,19 +38,21 @@ permissions:
   actions: read
 
 concurrency:
-  group: agent-remediation-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  group: agent-pipeline-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   # ==========================================================================
   # GUARD: Determine trigger type and validate all conditions
+  # Routes to either the fix job or the approve job
   # ==========================================================================
   guard:
     name: Trigger Guard
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
-      should_run: ${{ steps.evaluate.outputs.should_run }}
+      should_fix: ${{ steps.evaluate.outputs.should_fix }}
+      should_approve: ${{ steps.evaluate.outputs.should_approve }}
       trigger_type: ${{ steps.evaluate.outputs.trigger_type }}
       pr_number: ${{ steps.evaluate.outputs.pr_number }}
       pr_head_ref: ${{ steps.evaluate.outputs.pr_head_ref }}
@@ -66,6 +67,7 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           PR_REVIEW_USER: ${{ github.event.review.user.login }}
           PR_REVIEW_STATE: ${{ github.event.review.state }}
           PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
@@ -77,20 +79,21 @@ jobs:
           EVENT="$EVENT_NAME"
 
           if [[ "$EVENT" == "workflow_run" ]]; then
-            echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
-
-            # Get PR info from the workflow run
-            if [[ "$CONCLUSION" != "failure" ]]; then
-              echo "CI did not fail (conclusion: $CONCLUSION). Skipping."
+            if [[ "$CONCLUSION" == "failure" ]]; then
+              echo "CI failed — routing to fix path"
+              echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
+            elif [[ "$CONCLUSION" == "success" ]]; then
+              echo "$WORKFLOW_NAME succeeded — routing to approve path"
+              echo "trigger_type=approval_candidate" >> $GITHUB_OUTPUT
+            else
+              echo "Workflow conclusion: $CONCLUSION. Skipping."
               echo "should_continue=false" >> $GITHUB_OUTPUT
               exit 0
             fi
 
-            # HEAD_BRANCH and HEAD_SHA are passed via env to prevent shell injection
-
             # Find the PR for this branch using jq --arg to avoid injection
             PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
-              | jq --arg branch "$HEAD_BRANCH" '.[] | select(.head.ref == $branch and .state == "open") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft}' \
+              | jq --arg branch "$HEAD_BRANCH" '.[] | select(.head.ref == $branch and .state == "open") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [.labels[].name]}' \
               | head -1)
 
             if [[ -z "$PR_DATA" ]]; then
@@ -103,15 +106,16 @@ jobs:
             PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head_ref')
             PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
+            HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '.labels | map(select(. == "needs-human")) | length > 0')
 
             echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
             echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
             echo "is_draft=$IS_DRAFT" >> $GITHUB_OUTPUT
+            echo "has_needs_human=$HAS_NEEDS_HUMAN" >> $GITHUB_OUTPUT
             echo "should_continue=true" >> $GITHUB_OUTPUT
 
           elif [[ "$EVENT" == "pull_request_review" ]]; then
-            # PR event properties passed via env to prevent shell injection
             REVIEWER="$PR_REVIEW_USER"
             STATE="$PR_REVIEW_STATE"
 
@@ -132,6 +136,7 @@ jobs:
             echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> $GITHUB_OUTPUT
             echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> $GITHUB_OUTPUT
             echo "is_draft=$PR_IS_DRAFT_EVENT" >> $GITHUB_OUTPUT
+            echo "has_needs_human=false" >> $GITHUB_OUTPUT
             echo "should_continue=true" >> $GITHUB_OUTPUT
           fi
 
@@ -147,7 +152,7 @@ jobs:
             echo "Agent branch detected"
             echo "is_agent_branch=true" >> $GITHUB_OUTPUT
           else
-            echo "Not an agent branch. Skipping remediation."
+            echo "Not an agent branch. Skipping."
             echo "is_agent_branch=false" >> $GITHUB_OUTPUT
           fi
 
@@ -163,9 +168,12 @@ jobs:
             echo "is_ready=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Retry guard (max 3 attempts per SHA)
+      - name: Retry guard (fix path only, max 3 attempts per SHA)
         id: retry-guard
-        if: steps.trigger.outputs.should_continue == 'true' && steps.branch-check.outputs.is_agent_branch == 'true'
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          (steps.trigger.outputs.trigger_type == 'ci_failure' || steps.trigger.outputs.trigger_type == 'coderabbit_review')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -199,9 +207,12 @@ jobs:
             echo "attempt_number=1" >> $GITHUB_OUTPUT
           fi
 
-      - name: Extract error context
+      - name: Extract error context (fix path only)
         id: error-context
-        if: steps.trigger.outputs.should_continue == 'true' && steps.branch-check.outputs.is_agent_branch == 'true' && steps.retry-guard.outputs.retries_available == 'true'
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          steps.retry-guard.outputs.retries_available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -271,34 +282,48 @@ jobs:
           PR_NUMBER: ${{ steps.trigger.outputs.pr_number }}
           PR_HEAD_REF: ${{ steps.trigger.outputs.pr_head_ref }}
           PR_HEAD_SHA: ${{ steps.trigger.outputs.pr_head_sha }}
+          HAS_NEEDS_HUMAN: ${{ steps.trigger.outputs.has_needs_human }}
         run: |
           echo "=== Guard Summary ==="
           echo "Should continue: $SHOULD_CONTINUE"
           echo "Is agent branch: $IS_AGENT"
           echo "Is ready (not draft): $IS_READY"
-          echo "Retries available: $RETRIES"
           echo "Trigger type: $TRIGGER_TYPE"
+          echo "Has needs-human: $HAS_NEEDS_HUMAN"
 
-          if [[ "$SHOULD_CONTINUE" == "true" && "$IS_AGENT" == "true" && "$IS_READY" == "true" && "$RETRIES" == "true" ]]; then
-            echo "All guards passed"
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          else
-            echo "One or more guards failed"
-            echo "should_run=false" >> $GITHUB_OUTPUT
+          SHOULD_FIX="false"
+          SHOULD_APPROVE="false"
+
+          if [[ "$SHOULD_CONTINUE" != "true" || "$IS_AGENT" != "true" || "$IS_READY" != "true" ]]; then
+            echo "Basic guards failed"
+          elif [[ "$HAS_NEEDS_HUMAN" == "true" ]]; then
+            echo "PR has needs-human label. Skipping all automation."
+          elif [[ "$TRIGGER_TYPE" == "ci_failure" || "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
+            if [[ "$RETRIES" == "true" ]]; then
+              SHOULD_FIX="true"
+              echo "Routing to fix path"
+            else
+              echo "Retries exhausted for fix path"
+            fi
+          elif [[ "$TRIGGER_TYPE" == "approval_candidate" ]]; then
+            SHOULD_APPROVE="true"
+            echo "Routing to approve path"
           fi
 
+          echo "should_fix=$SHOULD_FIX" >> $GITHUB_OUTPUT
+          echo "should_approve=$SHOULD_APPROVE" >> $GITHUB_OUTPUT
           echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
           echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
 
   # ==========================================================================
-  # FIX: Apply fixes using Claude agent
+  # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
   # ==========================================================================
   fix:
     name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
     needs: guard
-    if: needs.guard.outputs.should_run == 'true'
+    if: needs.guard.outputs.should_fix == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -537,7 +562,7 @@ jobs:
 
           git commit -m "$MSG
 
-          Automated fixes applied by agent-remediation workflow.
+          Automated fixes applied by agent-pipeline workflow.
 
           Co-authored-by: Claude <claude@anthropic.com>"
 
@@ -594,3 +619,177 @@ jobs:
               gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels/$label --method DELETE || true
             fi
           done
+
+  # ==========================================================================
+  # APPROVE: Auto-approve and enable auto-merge for passing agent PRs
+  # ==========================================================================
+  approve:
+    name: Auto-Approve Check
+    needs: guard
+    if: needs.guard.outputs.should_approve == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: read
+    steps:
+      - name: Check all required statuses
+        id: check-statuses
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_SHA="${{ needs.guard.outputs.pr_head_sha }}"
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Get all commit statuses and check runs
+          STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
+          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
+
+          # 1. Check scope-judge status
+          SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
+          echo "Scope judge: $SCOPE_STATUS"
+
+          if [[ "$SCOPE_STATUS" != "success" ]]; then
+            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 2. Check CI PR Ready (the aggregate required check)
+          CI_PR_READY=$(echo "$CHECK_RUNS" | jq -r '[.[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"')
+          echo "CI PR Ready: $CI_PR_READY"
+
+          if [[ "$CI_PR_READY" != "success" ]]; then
+            echo "CI PR Ready has not passed (conclusion: $CI_PR_READY). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=PR Ready: $CI_PR_READY" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 3. Check CodeRabbit is not blocking
+          REVIEWS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"')
+          echo "CodeRabbit review state: $REVIEWS"
+
+          if [[ "$REVIEWS" == "CHANGES_REQUESTED" ]]; then
+            echo "CodeRabbit has requested changes. Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=CodeRabbit: changes_requested" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "All status checks passed"
+          echo "all_passed=true" >> $GITHUB_OUTPUT
+
+      - name: Check for sensitive file changes
+        id: sensitive-check
+        if: steps.check-statuses.outputs.all_passed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Get changed files
+          CHANGED_FILES=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null || echo "")
+
+          # Define sensitive paths that require human review
+          SENSITIVE_PATTERNS=(
+            "^\.github/"                         # CI/CD and workflow changes
+            "^drizzle/migrations/"               # Database migrations
+            "^apps/web/lib/auth/"                 # Authentication
+            "^apps/web/lib/db/"                   # Database layer
+            "^apps/web/app/api/.*/billing"        # Billing API routes
+            "^apps/web/lib/stripe/"               # Stripe/payment code
+            "^apps/web/middleware"                 # Middleware (security surface)
+            "^\.env"                              # Environment files
+            "^CODEOWNERS"                         # Code ownership
+            "^agents\.md"                         # Agent guidelines
+            "^CLAUDE\.md"                         # Agent guidelines
+            "package\.json$"                      # Dependency changes
+            "pnpm-lock\.yaml$"                    # Lock file changes
+          )
+
+          SENSITIVE_FOUND=""
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
+            if [[ -n "$MATCHES" ]]; then
+              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
+            fi
+          done
+
+          if [[ -n "$SENSITIVE_FOUND" ]]; then
+            echo "Sensitive files changed — requires human review:"
+            echo -e "$SENSITIVE_FOUND"
+            echo "is_safe=false" >> $GITHUB_OUTPUT
+            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> $GITHUB_OUTPUT
+          else
+            echo "No sensitive files changed"
+            echo "is_safe=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-approve PR
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+
+          # Submit approval review
+          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+            --method POST \
+            -f event="APPROVE" \
+            -f body="## Auto-Approved by Agent Pipeline
+
+          All quality gates passed:
+          - [x] CI checks (typecheck, lint, unit tests, a11y, layout guard)
+          - [x] Scope judge (diff aligns with ticket intent)
+          - [x] CodeRabbit review (no blocking feedback)
+          - [x] Sensitive path check (no auth/billing/migration/CI changes)
+
+          This PR was auto-approved because it meets all criteria for low-risk agent changes.
+          It will now enter the merge queue for final validation.
+
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+
+          echo "PR #$PR_NUMBER approved"
+
+      - name: Enable auto-merge
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Enable auto-merge (squash) which will enter the merge queue
+          gh pr merge $PR_NUMBER --auto --squash || echo "Auto-merge already enabled or not available"
+
+          # Add label for tracking
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=auto-approved" || true
+
+          echo "Auto-merge enabled for PR #$PR_NUMBER"
+
+      - name: Skip reason (log only)
+        if: >-
+          steps.check-statuses.outputs.all_passed != 'true' || steps.sensitive-check.outputs.is_safe != 'true'
+        run: |
+          STATUSES_PASSED="${{ steps.check-statuses.outputs.all_passed }}"
+          SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
+          BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
+          SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+
+          echo "Auto-approve skipped:"
+          if [[ "$STATUSES_PASSED" != "true" ]]; then
+            echo "  - Status checks not all passing: $BLOCKING"
+          fi
+          if [[ "$SENSITIVE_SAFE" != "true" ]]; then
+            echo "  - Sensitive files changed: $SENSITIVE_FILES"
+          fi
