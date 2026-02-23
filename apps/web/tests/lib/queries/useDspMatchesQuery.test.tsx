@@ -59,6 +59,7 @@ describe('useDspMatchesQuery', () => {
         queries: {
           retry: false,
           gcTime: 0,
+          retryDelay: 0,
         },
       },
     });
@@ -193,6 +194,7 @@ describe('useDspMatchesQuery', () => {
     });
 
     it('throws error when API returns success: false', async () => {
+      vi.useFakeTimers();
       // Use mockResolvedValue (not Once) because hook has retry: 3
       mockFetch.mockResolvedValue({
         ok: true,
@@ -209,17 +211,16 @@ describe('useDspMatchesQuery', () => {
         { wrapper }
       );
 
-      await waitFor(
-        () => {
-          expect(result.current.isError).toBe(true);
-        },
-        { timeout: 10000 }
-      );
+      // Fast-forward through retry delays (1s + 2s + 4s)
+      await vi.advanceTimersByTimeAsync(10000);
 
+      expect(result.current.isError).toBe(true);
       expect(result.current.error?.message).toBe('Profile not found');
+      vi.useRealTimers();
     });
 
     it('handles HTTP error', async () => {
+      vi.useFakeTimers();
       // Use mockResolvedValue (not Once) because hook has retry: 3
       mockFetch.mockResolvedValue({
         ok: false,
@@ -232,12 +233,11 @@ describe('useDspMatchesQuery', () => {
         { wrapper }
       );
 
-      await waitFor(
-        () => {
-          expect(result.current.isError).toBe(true);
-        },
-        { timeout: 10000 }
-      );
+      // Fast-forward through retry delays
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(result.current.isError).toBe(true);
+      vi.useRealTimers();
     });
   });
 
