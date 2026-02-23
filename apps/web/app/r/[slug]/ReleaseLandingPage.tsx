@@ -117,15 +117,15 @@ export function ReleaseLandingPage({
   );
 
   return (
-    <div className='h-dvh bg-black text-white'>
+    <div className='h-dvh bg-base text-foreground'>
       {/* Ambient glow */}
       <div className='pointer-events-none fixed inset-0'>
-        <div className='absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-[120px]' />
+        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
       </div>
 
       <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
         {/* Content container — fills space between top padding and footer */}
-        <div className='flex w-full max-w-[272px] min-h-0 flex-1 flex-col'>
+        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
           {/* Artwork + Info — pinned at top, never scrolls */}
           <div className='shrink-0'>
             {/* Release Artwork */}
@@ -134,7 +134,7 @@ export function ReleaseLandingPage({
               sizes={sizes}
               allowDownloads={allowDownloads}
             >
-              <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-white/[0.04] shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
+              <div className='bg-surface-1/30 ring-border relative aspect-square w-full overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
                 {release.artworkUrl ? (
                   <Image
                     src={release.artworkUrl}
@@ -148,7 +148,7 @@ export function ReleaseLandingPage({
                   <div className='flex h-full w-full items-center justify-center'>
                     <Icon
                       name='Disc3'
-                      className='h-16 w-16 text-white/20'
+                      className='text-muted-foreground h-16 w-16'
                       aria-hidden='true'
                     />
                   </div>
@@ -158,21 +158,23 @@ export function ReleaseLandingPage({
 
             {/* Release Info */}
             <div className='mt-4 text-center'>
-              <h1 className='text-[17px] font-semibold leading-snug tracking-tight'>
+              <h1 className='text-lg font-semibold leading-snug tracking-tight'>
                 {release.title}
               </h1>
               {artist.handle ? (
                 <Link
                   href={`/${artist.handle}`}
-                  className='mt-1 block text-[13px] text-white/50 transition-colors hover:text-white/70'
+                  className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
                 >
                   {artist.name}
                 </Link>
               ) : (
-                <p className='mt-1 text-[13px] text-white/50'>{artist.name}</p>
+                <p className='text-muted-foreground mt-1 text-sm'>
+                  {artist.name}
+                </p>
               )}
               {formattedDate && (
-                <p className='mt-0.5 text-[11px] tracking-wide text-white/30'>
+                <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
                   {formattedDate}
                 </p>
               )}
@@ -195,7 +197,7 @@ export function ReleaseLandingPage({
                     target='_blank'
                     rel='noopener noreferrer'
                     onClick={() => handleProviderClick(provider.key)}
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white/[0.10] hover:ring-white/[0.12]'
+                    className='bg-surface-1/70 ring-border group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-surface-2/80'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -204,18 +206,18 @@ export function ReleaseLandingPage({
                       <svg
                         viewBox='0 0 24 24'
                         fill='currentColor'
-                        className='h-5 w-5 shrink-0 text-white/70 transition-colors duration-150 group-hover:text-[var(--brand-hover)]'
+                        className='text-muted-foreground h-5 w-5 shrink-0 transition-colors duration-150 group-hover:text-[var(--brand-hover)]'
                         aria-hidden='true'
                       >
                         <path d={logoConfig.iconPath} />
                       </svg>
                     )}
-                    <span className='flex-1 text-[15px] font-semibold text-white/90'>
+                    <span className='text-foreground flex-1 text-base font-semibold'>
                       {logoConfig?.name ?? provider.label}
                     </span>
                     <Icon
                       name='ChevronRight'
-                      className='h-4 w-4 text-white/25 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-white/40'
+                      className='text-muted-foreground/70 h-4 w-4 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground/80'
                       aria-hidden='true'
                     />
                   </a>
@@ -228,14 +230,14 @@ export function ReleaseLandingPage({
               <div className='pt-1'>
                 <Link
                   href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
+                  className='ring-border group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/20 hover:to-violet-500/20'
                 >
                   <Icon
                     name='Sparkles'
-                    className='h-4 w-4 text-white/60 transition-colors group-hover:text-white/80'
+                    className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
                     aria-hidden='true'
                   />
-                  <span className='text-[14px] font-semibold text-white/80 transition-colors group-hover:text-white/95'>
+                  <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
                     Use this sound
                   </span>
                 </Link>
@@ -244,13 +246,13 @@ export function ReleaseLandingPage({
 
             {/* Empty state if no providers */}
             {clickableProviders.length === 0 && (
-              <div className='rounded-xl bg-white/[0.04] p-5 text-center ring-1 ring-inset ring-white/[0.06]'>
+              <div className='bg-surface-1/40 ring-border rounded-xl p-5 text-center ring-1 ring-inset'>
                 <Icon
                   name='Music'
-                  className='mx-auto h-8 w-8 text-white/20'
+                  className='text-muted-foreground mx-auto h-8 w-8'
                   aria-hidden='true'
                 />
-                <p className='mt-2 text-[13px] text-white/40'>
+                <p className='text-muted-foreground mt-2 text-sm'>
                   No streaming links available yet.
                 </p>
               </div>
@@ -262,7 +264,7 @@ export function ReleaseLandingPage({
         <footer className='shrink-0 pb-5 pt-3 text-center'>
           <Link
             href='/'
-            className='inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-white/20 transition-colors hover:text-white/35'
+            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
           >
             <span>Powered by</span>
             <span className='font-semibold'>Jovie</span>
