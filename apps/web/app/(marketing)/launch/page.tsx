@@ -6,6 +6,7 @@ import { HeroSpotifySearch } from '@/components/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { publicEnv } from '@/lib/env-public';
 
 // Fully static - no database dependency, instant cold starts
 export const revalidate = false;
@@ -50,13 +51,13 @@ export async function generateMetadata(): Promise<Metadata> {
     formatDetection: { email: false, address: false, telephone: false },
     metadataBase: new URL(APP_URL),
     alternates: {
-      canonical: '/launch',
-      languages: { 'en-US': '/launch' },
+      canonical: APP_ROUTES.LAUNCH,
+      languages: { 'en-US': APP_ROUTES.LAUNCH },
     },
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: `${APP_URL}/launch`,
+      url: `${APP_URL}${APP_ROUTES.LAUNCH}`,
       title,
       description,
       siteName: APP_NAME,
@@ -100,13 +101,13 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     verification: {
-      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+      google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     },
     other: {
-      'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || '',
+      'msvalidate.01': publicEnv.NEXT_PUBLIC_BING_SITE_VERIFICATION ?? '',
       'yandex-verification':
-        process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || '',
-      'p:domain_verify': process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || '',
+        publicEnv.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION ?? '',
+      'p:domain_verify': publicEnv.NEXT_PUBLIC_PINTEREST_VERIFICATION ?? '',
     },
   };
 }
@@ -1903,7 +1904,7 @@ export default function LaunchPage() {
           <span className='text-secondary-token'>No surprises.</span>
         </h2>
         <Link
-          href='/launch/pricing'
+          href={APP_ROUTES.LAUNCH_PRICING}
           className='marketing-cta focus-ring mt-8 inline-block'
         >
           View pricing
