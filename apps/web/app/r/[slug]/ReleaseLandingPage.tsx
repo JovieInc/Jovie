@@ -181,7 +181,7 @@ export function ReleaseLandingPage({
 
           {/* Streaming Platform Buttons — scrolls independently when overflowing */}
           <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 pb-2'>
+            <div className='space-y-2 py-1'>
               {clickableProviders.map(provider => {
                 const logoConfig = DSP_LOGO_CONFIG[provider.key];
                 const brandHover = logoConfig
@@ -195,7 +195,7 @@ export function ReleaseLandingPage({
                     target='_blank'
                     rel='noopener noreferrer'
                     onClick={() => handleProviderClick(provider.key)}
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-white/[0.10] hover:ring-white/[0.12]'
+                    className='group flex w-full items-center gap-3.5 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-all duration-150 ease-out hover:bg-white/[0.10] hover:ring-white/[0.12]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -228,7 +228,7 @@ export function ReleaseLandingPage({
               <div className='pt-1'>
                 <Link
                   href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
+                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/[0.10] to-violet-500/[0.10] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:from-pink-500/[0.18] hover:to-violet-500/[0.18] hover:ring-white/[0.16]'
                 >
                   <Icon
                     name='Sparkles'

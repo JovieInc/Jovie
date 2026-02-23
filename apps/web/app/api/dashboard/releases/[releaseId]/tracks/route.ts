@@ -63,6 +63,8 @@ export async function GET(
       isrc: track.isrc,
       isExplicit: track.isExplicit,
       previewUrl: track.previewUrl,
+      audioUrl: track.audioUrl,
+      audioFormat: track.audioFormat,
       providers: track.providerLinks.map(link => ({
         key: link.providerId,
         label: link.providerId,
