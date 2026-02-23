@@ -39,25 +39,34 @@ function extractMigrationErrorDetails(error: unknown): {
 }
 
 function isCreatorProfilesColumnMissing(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
   return (
-    message.includes('creator_profiles.') ||
-    (message.includes('column') && message.includes('creator_profiles'))
+    normalizedMessage.includes('creator_profiles.') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('creator_profiles'))
   );
 }
 
 function isSocialLinksColumnMissing(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
   return (
-    message.includes('social_links.state') ||
-    (message.includes('column') && message.includes('social_links'))
+    normalizedMessage.includes('social_links.state') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('social_links'))
   );
 }
 
 function isUserSettingsSchemaIssue(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
   return (
-    message.includes('relation "user_settings" does not exist') ||
-    (message.includes('column') && message.includes('user_settings')) ||
-    (message.includes('Failed query:') &&
-      message.includes('from "user_settings"'))
+    normalizedMessage.includes('relation "user_settings" does not exist') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('user_settings')) ||
+    (normalizedMessage.includes('failed query:') &&
+      normalizedMessage.includes('from "user_settings"'))
   );
 }
 

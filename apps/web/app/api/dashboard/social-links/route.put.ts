@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateSocialLinksCache } from '@/lib/cache';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
+import { getSocialLinksVerificationColumnSupport } from '@/lib/db/queries/social-links-verification';
 import { socialLinks } from '@/lib/db/schema/links';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -154,13 +155,16 @@ export async function PUT(req: Request) {
           .delete(socialLinks)
           .where(inArray(socialLinks.id, removableIds));
       }
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(tx);
       const insertPayloadResult =
         links.length > 0
           ? buildSocialLinksInsertPayload(
               links,
               profileId,
               profile.usernameNormalized ?? null,
-              versioning.nextVersion
+              versioning.nextVersion,
+              { supportsVerification: hasVerificationColumns }
             )
           : { payload: [], linkUrls: [] };
       if (insertPayloadResult.payload.length > 0) {

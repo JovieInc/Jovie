@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { checkDbPerformance, getDbConfig } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG, PERFORMANCE_THRESHOLDS } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   createRateLimitHeadersFromStatus,
   getClientIP,
@@ -173,6 +174,11 @@ export async function GET(request: Request) {
       },
       'health/db/performance'
     );
+    void captureWarning('DB performance health check failed', undefined, {
+      route: '/api/health/db/performance',
+      error: performanceResult.error,
+      metrics: performanceResult.metrics,
+    });
   }
 
   return NextResponse.json(body, {

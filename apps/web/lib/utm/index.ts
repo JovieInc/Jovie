@@ -22,11 +22,14 @@
  * ```
  */
 
+export type { PartialUTMParams } from './build-url';
 // URL Builder
 export {
+  appendUTMParamsToUrl,
   buildUTMUrl,
   buildUTMUrlString,
   createSimpleUTMParams,
+  extractUTMParams,
   formatUTMParamsForDisplay,
   hasUTMParams,
   parseUTMParams,

@@ -6,6 +6,8 @@ import {
   AdminActivitySectionSkeleton,
   AdminKpiSection,
   AdminKpiSectionSkeleton,
+  AdminSentrySection,
+  AdminSentrySectionSkeleton,
   AdminUsageSection,
   AdminUsageSectionSkeleton,
 } from './_components';
@@ -31,6 +33,10 @@ export default function AdminPage() {
 
           <Suspense fallback={<AdminUsageSectionSkeleton />}>
             <AdminUsageSection />
+          </Suspense>
+
+          <Suspense fallback={<AdminSentrySectionSkeleton />}>
+            <AdminSentrySection />
           </Suspense>
 
           <Suspense fallback={<AdminActivitySectionSkeleton />}>

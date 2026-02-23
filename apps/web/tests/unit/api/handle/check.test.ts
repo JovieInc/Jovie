@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockEnforceHandleCheckRateLimit = vi.hoisted(() => vi.fn());
 const mockExtractClientIP = vi.hoisted(() => vi.fn());
+const mockGetCachedHandleAvailability = vi.hoisted(() => vi.fn());
+const mockCacheHandleAvailability = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -22,6 +24,11 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
   extractClientIP: mockExtractClientIP,
 }));
 
+vi.mock('@/lib/onboarding/handle-availability-cache', () => ({
+  getCachedHandleAvailability: mockGetCachedHandleAvailability,
+  cacheHandleAvailability: mockCacheHandleAvailability,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
   captureWarning: vi.fn(),
@@ -37,6 +44,8 @@ describe('GET /api/handle/check', () => {
     vi.resetModules();
     mockExtractClientIP.mockReturnValue('127.0.0.1');
     mockEnforceHandleCheckRateLimit.mockResolvedValue(undefined);
+    mockGetCachedHandleAvailability.mockResolvedValue(null);
+    mockCacheHandleAvailability.mockResolvedValue(undefined);
   });
 
   it('returns 400 when handle is missing', async () => {
@@ -92,6 +101,22 @@ describe('GET /api/handle/check', () => {
     expect(data.error).toContain('letters, numbers, and hyphens');
   });
 
+  it('uses cached availability when present', async () => {
+    mockGetCachedHandleAvailability.mockResolvedValue(true);
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=cachedhandle'
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.available).toBe(true);
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
   it('returns available true when handle is not taken', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -111,6 +136,10 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(200);
     expect(data.available).toBe(true);
+    expect(mockCacheHandleAvailability).toHaveBeenCalledWith(
+      'available-handle',
+      true
+    );
   });
 
   it('returns available false when handle is taken', async () => {
