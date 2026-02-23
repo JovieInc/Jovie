@@ -17,12 +17,34 @@ import {
   formatFollowers,
   initialState,
   releasesEmptyStateReducer,
+  type SpotifyArtist,
   useSpotifyConnect,
 } from './releases-empty-state';
 
 const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
 const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
 const PASTE_PLACEHOLDER = 'Paste your Spotify artist URL here';
+
+function handleEnterInResults(
+  activeIndex: number,
+  results: SpotifyArtist[],
+  pasteUrlIndex: number,
+  onArtistSelect: (artist: SpotifyArtist) => void,
+  onPasteUrl: () => void,
+  onClaimArtist: () => void
+) {
+  const isArtistSelected = activeIndex >= 0 && activeIndex < results.length;
+  if (isArtistSelected) {
+    const artist = results[activeIndex];
+    if (artist) onArtistSelect(artist);
+    return;
+  }
+  if (activeIndex === pasteUrlIndex) {
+    onPasteUrl();
+    return;
+  }
+  onClaimArtist();
+}
 
 function isSpotifyUrl(value: string): boolean {
   const trimmed = value.trim();
@@ -31,6 +53,49 @@ function isSpotifyUrl(value: string): boolean {
     trimmed.startsWith('open.spotify.com/') ||
     trimmed.startsWith('spotify.com/')
   );
+}
+
+function SearchInputTrailing({
+  showClaimButton,
+  claimButtonDisabled,
+  isLoading,
+  isPending,
+  onClaimArtist,
+}: {
+  readonly showClaimButton: boolean;
+  readonly claimButtonDisabled: boolean;
+  readonly isLoading: boolean;
+  readonly isPending: boolean;
+  readonly onClaimArtist: () => void;
+}) {
+  if (showClaimButton) {
+    return (
+      <button
+        type='button'
+        disabled={claimButtonDisabled}
+        onClick={onClaimArtist}
+        className={cn(
+          'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
+          claimButtonDisabled
+            ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
+            : 'bg-btn-primary text-btn-primary-foreground'
+        )}
+      >
+        {(isLoading || isPending) && (
+          <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+        )}
+        Connect Spotify
+      </button>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className='w-4 h-4 border-[1.5px] border-tertiary-token border-t-transparent rounded-full animate-spin shrink-0' />
+    );
+  }
+
+  return <Search className='w-4 h-4 shrink-0 text-tertiary-token' />;
 }
 
 interface SpotifyConnectDialogProps {
@@ -232,17 +297,14 @@ export function SpotifyConnectDialog({
           break;
         case 'Enter':
           e.preventDefault();
-          if (
-            formState.activeResultIndex >= 0 &&
-            formState.activeResultIndex < results.length
-          ) {
-            const artist = results[formState.activeResultIndex];
-            if (artist) handleArtistSelect(artist);
-          } else if (formState.activeResultIndex === pasteUrlIndex) {
-            handlePasteUrlClick();
-          } else {
-            handleClaimArtist();
-          }
+          handleEnterInResults(
+            formState.activeResultIndex,
+            results,
+            pasteUrlIndex,
+            handleArtistSelect,
+            handlePasteUrlClick,
+            handleClaimArtist
+          );
           break;
         case 'Escape':
           e.preventDefault();
@@ -357,28 +419,13 @@ export function SpotifyConnectDialog({
                   : undefined
               }
             />
-            {showClaimButton ? (
-              <button
-                type='button'
-                disabled={claimButtonDisabled}
-                onClick={handleClaimArtist}
-                className={cn(
-                  'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
-                  claimButtonDisabled
-                    ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
-                    : 'bg-btn-primary text-btn-primary-foreground'
-                )}
-              >
-                {(isLoading || isPending) && (
-                  <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
-                )}
-                Connect Spotify
-              </button>
-            ) : isPending ? (
-              <div className='w-4 h-4 border-[1.5px] border-tertiary-token border-t-transparent rounded-full animate-spin shrink-0' />
-            ) : (
-              <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
-            )}
+            <SearchInputTrailing
+              showClaimButton={showClaimButton}
+              claimButtonDisabled={claimButtonDisabled}
+              isLoading={isLoading}
+              isPending={isPending}
+              onClaimArtist={handleClaimArtist}
+            />
           </div>
 
           {formState.error && (

@@ -38,9 +38,10 @@ function buildDiscographySection(releases: ReleasePromptContext[]): string {
 
   const releaseLines = releases.slice(0, 25).map(formatReleaseLine).join('\n');
   const overflowCount = releases.length - 25;
+  const releasePlural = overflowCount === 1 ? '' : 's';
   const overflowLine =
     overflowCount > 0
-      ? `\n- ...and ${overflowCount} more release${overflowCount === 1 ? '' : 's'} in the catalog.`
+      ? `\n- ...and ${overflowCount} more release${releasePlural} in the catalog.`
       : '';
 
   return `${releaseLines}${overflowLine}`;
@@ -110,12 +111,17 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Do not add or remove links without showing the confirmation preview first.
 - All link changes instantly update the sidebar profile preview.
 
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${
-    options && !options.aiCanUseTools
-      ? `
+When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${buildPlanLimitationsSection(options)}`;
+}
+
+function buildPlanLimitationsSection(options?: {
+  aiCanUseTools: boolean;
+  aiDailyMessageLimit: number;
+}): string {
+  if (!options || options.aiCanUseTools) return '';
+
+  return `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
-      : ''
-  }`;
+This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
 }

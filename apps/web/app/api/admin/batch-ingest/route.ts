@@ -149,58 +149,95 @@ async function ingestSpotifyArtist(
   };
 }
 
-export async function POST(request: Request) {
+async function resolveAdminEntitlements(
+  route: string
+): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+  let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
   try {
-    let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
-    try {
-      entitlements = await getCurrentUserEntitlements();
-    } catch (error) {
-      if (error instanceof BillingUnavailableError && error.isAdmin) {
-        await captureError(
-          'Admin batch ingest proceeding despite billing unavailability',
-          error,
-          { route: '/api/admin/batch-ingest', userId: error.userId },
-          'warning'
-        );
-        const freeEnt = getEntitlements('free');
-        entitlements = {
-          userId: error.userId,
-          email: null,
-          isAuthenticated: true,
-          isAdmin: true,
-          plan: 'free',
-          isPro: false,
-          hasAdvancedFeatures: false,
-          ...freeEnt.booleans,
-          ...freeEnt.limits,
-        };
-      } else {
-        throw error;
-      }
+    entitlements = await getCurrentUserEntitlements();
+  } catch (error) {
+    if (error instanceof BillingUnavailableError && error.isAdmin) {
+      await captureError(
+        'Admin batch ingest proceeding despite billing unavailability',
+        error,
+        { route, userId: error.userId },
+        'warning'
+      );
+      const freeEnt = getEntitlements('free');
+      entitlements = {
+        userId: error.userId,
+        email: null,
+        isAuthenticated: true,
+        isAdmin: true,
+        plan: 'free',
+        isPro: false,
+        hasAdvancedFeatures: false,
+        ...freeEnt.booleans,
+        ...freeEnt.limits,
+      };
+    } else {
+      throw error;
     }
+  }
 
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
+  if (!entitlements.isAuthenticated) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
+  if (!entitlements.isAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+async function processSpotifyEntry(entry: string): Promise<BatchIngestResult> {
+  const spotifyArtistId = extractSpotifyArtistId(entry);
+  if (!spotifyArtistId) {
+    return {
+      input: entry,
+      status: 'error',
+      reason: 'Invalid Spotify artist URL or artist ID.',
+    };
+  }
+
+  try {
+    return await ingestSpotifyArtist(spotifyArtistId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      input: entry,
+      status: 'error',
+      spotifyArtistId,
+      reason: message,
+    };
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const authResult = await resolveAdminEntitlements(
+      '/api/admin/batch-ingest'
+    );
+    if (!authResult.ok) return authResult.response;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: 'POST /api/admin/batch-ingest',
       headers: NO_STORE_HEADERS,
     });
-
-    if (!parsedBody.ok) {
-      return parsedBody.response;
-    }
+    if (!parsedBody.ok) return parsedBody.response;
 
     const parsed = batchCreatorIngestSchema.safeParse(parsedBody.data);
     if (!parsed.success) {
@@ -211,31 +248,8 @@ export async function POST(request: Request) {
     }
 
     const results: BatchIngestResult[] = [];
-
     for (const entry of parsed.data.spotifyUrls) {
-      const spotifyArtistId = extractSpotifyArtistId(entry);
-      if (!spotifyArtistId) {
-        results.push({
-          input: entry,
-          status: 'error',
-          reason: 'Invalid Spotify artist URL or artist ID.',
-        });
-        continue;
-      }
-
-      try {
-        const result = await ingestSpotifyArtist(spotifyArtistId);
-        results.push(result);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        results.push({
-          input: entry,
-          status: 'error',
-          spotifyArtistId,
-          reason: message,
-        });
-      }
+      results.push(await processSpotifyEntry(entry));
     }
 
     return NextResponse.json(

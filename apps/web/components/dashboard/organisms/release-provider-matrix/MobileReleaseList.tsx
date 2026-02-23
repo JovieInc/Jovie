@@ -57,6 +57,14 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   }));
 }
 
+function getLockIconName(
+  isLocked: boolean,
+  lockReason?: 'scheduled' | 'cap' | null
+): string {
+  if (!isLocked) return 'Link2';
+  return lockReason === 'scheduled' ? 'Clock' : 'Lock';
+}
+
 /** Swipe action buttons revealed on left-swipe */
 const SwipeActions = memo(function SwipeActions({
   release,
@@ -120,9 +128,7 @@ const SwipeActions = memo(function SwipeActions({
         }
       >
         <Icon
-          name={
-            isLocked ? (lockReason === 'scheduled' ? 'Clock' : 'Lock') : 'Link2'
-          }
+          name={getLockIconName(isLocked, lockReason)}
           className='h-4 w-4'
           aria-hidden='true'
         />

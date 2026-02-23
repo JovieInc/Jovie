@@ -253,6 +253,13 @@ export function useReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
   }, [syncMutation.mutate]);
 
+  const flashRelease = useCallback((releaseId: string) => {
+    setFlashedReleaseId(releaseId);
+    globalThis.setTimeout(() => {
+      setFlashedReleaseId(current => (current === releaseId ? null : current));
+    }, 1200);
+  }, []);
+
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
@@ -262,12 +269,7 @@ export function useReleaseProviderMatrix({
         {
           onSuccess: updated => {
             updateRow(updated);
-            setFlashedReleaseId(updated.id);
-            globalThis.setTimeout(() => {
-              setFlashedReleaseId(current =>
-                current === updated.id ? null : current
-              );
-            }, 1200);
+            flashRelease(updated.id);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -287,7 +289,7 @@ export function useReleaseProviderMatrix({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
-    [refreshReleaseMutation.mutate]
+    [refreshReleaseMutation.mutate, flashRelease]
   );
 
   // Rescan ISRC links for a single release

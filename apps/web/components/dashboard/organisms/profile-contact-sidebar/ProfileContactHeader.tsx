@@ -116,100 +116,191 @@ export function ProfileContactHeader({
     setEditingField(null);
   }, [localUsername, username, onUsernameChange]);
 
+  const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
+
   return (
     <div className='flex items-center gap-3'>
-      {/* Avatar */}
-      {editable && onAvatarUpload ? (
-        <AvatarUploadable
-          src={avatarUrl}
-          alt={displayName ? `${displayName} avatar` : 'Profile avatar'}
-          name={displayName}
-          size='lg'
-          uploadable
-          onUpload={onAvatarUpload}
-          onError={message => {
-            toast.error(
-              message || 'Failed to upload avatar. Please try again.'
-            );
-          }}
-          maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-          acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-          showHoverOverlay
-        />
-      ) : (
-        <AvatarUploadable
-          src={avatarUrl}
-          alt={displayName ? `${displayName} avatar` : 'Profile avatar'}
-          name={displayName}
-          size='lg'
-        />
-      )}
+      <ProfileAvatar
+        editable={editable}
+        avatarUrl={avatarUrl}
+        avatarAlt={avatarAlt}
+        displayName={displayName}
+        onAvatarUpload={onAvatarUpload}
+      />
 
       {/* Name and username */}
       <div className='min-w-0 flex-1'>
-        {/* Display Name */}
-        {editable && editingField === 'displayName' ? (
-          <Input
-            ref={displayNameRef}
-            type='text'
-            aria-label='Display name'
-            value={localDisplayName}
-            onChange={e => setLocalDisplayName(e.target.value)}
-            onKeyDown={handleDisplayNameKeyDown}
-            onBlur={handleDisplayNameBlur}
-            className='h-7 text-sm font-medium px-1'
-          />
-        ) : (
-          <button
-            type='button'
-            className={cn(
-              'block w-full truncate text-left text-sm font-medium text-primary-token',
-              editable &&
-                'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
-            )}
-            onClick={
-              editable ? () => setEditingField('displayName') : undefined
-            }
-            disabled={!editable}
-            aria-label={editable ? 'Click to edit display name' : undefined}
-          >
-            {localDisplayName || 'Add display name'}
-          </button>
-        )}
+        <EditableDisplayName
+          editable={editable}
+          isEditing={editingField === 'displayName'}
+          inputRef={displayNameRef}
+          value={localDisplayName}
+          onChange={setLocalDisplayName}
+          onKeyDown={handleDisplayNameKeyDown}
+          onBlur={handleDisplayNameBlur}
+          onStartEdit={() => setEditingField('displayName')}
+        />
 
-        {/* Username */}
-        {editable && editingField === 'username' ? (
-          <Input
-            ref={usernameRef}
-            type='text'
-            aria-label='Username'
-            data-1p-ignore
-            autoComplete='off'
-            value={localUsername}
-            onChange={e => {
-              const raw = e.target.value;
-              setLocalUsername(raw.startsWith('@') ? raw.slice(1) : raw);
-            }}
-            onKeyDown={handleUsernameKeyDown}
-            onBlur={handleUsernameBlur}
-            className='h-6 text-xs px-1 mt-0.5'
-          />
-        ) : (
-          <button
-            type='button'
-            className={cn(
-              'block w-full truncate text-left text-xs text-sidebar-muted',
-              editable &&
-                'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
-            )}
-            onClick={editable ? () => setEditingField('username') : undefined}
-            disabled={!editable}
-            aria-label={editable ? 'Click to edit username' : undefined}
-          >
-            @{localUsername || 'username'}
-          </button>
-        )}
+        <EditableUsername
+          editable={editable}
+          isEditing={editingField === 'username'}
+          inputRef={usernameRef}
+          value={localUsername}
+          onChange={setLocalUsername}
+          onKeyDown={handleUsernameKeyDown}
+          onBlur={handleUsernameBlur}
+          onStartEdit={() => setEditingField('username')}
+        />
       </div>
     </div>
+  );
+}
+
+function ProfileAvatar({
+  editable,
+  avatarUrl,
+  avatarAlt,
+  displayName,
+  onAvatarUpload,
+}: {
+  readonly editable: boolean;
+  readonly avatarUrl: string | null;
+  readonly avatarAlt: string;
+  readonly displayName: string;
+  readonly onAvatarUpload?: (file: File) => Promise<string>;
+}) {
+  if (editable && onAvatarUpload) {
+    return (
+      <AvatarUploadable
+        src={avatarUrl}
+        alt={avatarAlt}
+        name={displayName}
+        size='lg'
+        uploadable
+        onUpload={onAvatarUpload}
+        onError={message => {
+          toast.error(message || 'Failed to upload avatar. Please try again.');
+        }}
+        maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+        acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+        showHoverOverlay
+      />
+    );
+  }
+
+  return (
+    <AvatarUploadable
+      src={avatarUrl}
+      alt={avatarAlt}
+      name={displayName}
+      size='lg'
+    />
+  );
+}
+
+function EditableDisplayName({
+  editable,
+  isEditing,
+  inputRef,
+  value,
+  onChange,
+  onKeyDown,
+  onBlur,
+  onStartEdit,
+}: {
+  readonly editable: boolean;
+  readonly isEditing: boolean;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onKeyDown: (e: React.KeyboardEvent) => void;
+  readonly onBlur: () => void;
+  readonly onStartEdit: () => void;
+}) {
+  if (editable && isEditing) {
+    return (
+      <Input
+        ref={inputRef}
+        type='text'
+        aria-label='Display name'
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        className='h-7 text-sm font-medium px-1'
+      />
+    );
+  }
+
+  return (
+    <button
+      type='button'
+      className={cn(
+        'block w-full truncate text-left text-sm font-medium text-primary-token',
+        editable &&
+          'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
+      )}
+      onClick={editable ? onStartEdit : undefined}
+      disabled={!editable}
+      aria-label={editable ? 'Click to edit display name' : undefined}
+    >
+      {value || 'Add display name'}
+    </button>
+  );
+}
+
+function EditableUsername({
+  editable,
+  isEditing,
+  inputRef,
+  value,
+  onChange,
+  onKeyDown,
+  onBlur,
+  onStartEdit,
+}: {
+  readonly editable: boolean;
+  readonly isEditing: boolean;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly onKeyDown: (e: React.KeyboardEvent) => void;
+  readonly onBlur: () => void;
+  readonly onStartEdit: () => void;
+}) {
+  if (editable && isEditing) {
+    return (
+      <Input
+        ref={inputRef}
+        type='text'
+        aria-label='Username'
+        data-1p-ignore
+        autoComplete='off'
+        value={value}
+        onChange={e => {
+          const raw = e.target.value;
+          onChange(raw.startsWith('@') ? raw.slice(1) : raw);
+        }}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
+        className='h-6 text-xs px-1 mt-0.5'
+      />
+    );
+  }
+
+  return (
+    <button
+      type='button'
+      className={cn(
+        'block w-full truncate text-left text-xs text-sidebar-muted',
+        editable &&
+          'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
+      )}
+      onClick={editable ? onStartEdit : undefined}
+      disabled={!editable}
+      aria-label={editable ? 'Click to edit username' : undefined}
+    >
+      @{value || 'username'}
+    </button>
   );
 }
