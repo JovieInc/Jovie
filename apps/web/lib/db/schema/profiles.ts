@@ -195,8 +195,8 @@ export const creatorProfiles = pgTable(
       table.userId,
       table.isClaimed
     ),
-    // Performance index: DSP enrichment lookups by Spotify ID
-    spotifyIdIndex: index('idx_creator_profiles_spotify_id')
+    // Enforce one-to-one Spotify artist ownership across creator profiles.
+    spotifyIdUnique: uniqueIndex('creator_profiles_spotify_id_unique')
       .on(table.spotifyId)
       .where(drizzleSql`spotify_id IS NOT NULL`),
   })
