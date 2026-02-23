@@ -413,7 +413,7 @@ describe('ErrorBoundary', () => {
       // Button uses CVA with Tailwind classes (variant='primary', size='sm')
       expect(tryAgainButton).toHaveClass('bg-btn-primary');
       // Button uses CVA with Tailwind classes (variant='outline', size='sm')
-      expect(goHomeButton).toHaveClass('border');
+      expect(goHomeButton).toHaveClass('bg-transparent');
     });
   });
 });
