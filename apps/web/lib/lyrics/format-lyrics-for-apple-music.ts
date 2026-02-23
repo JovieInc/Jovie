@@ -28,51 +28,51 @@ export function formatLyricsForAppleMusic(raw: string): {
 
   // 3. Straighten curly quotes
   const hadCurlyQuotes = /[\u2018\u2019\u201C\u201D]/.test(text);
-  text = text.replace(/[\u2018\u2019]/g, "'");
-  text = text.replace(/[\u201C\u201D]/g, '"');
+  text = text.replaceAll(/[\u2018\u2019]/g, "'");
+  text = text.replaceAll(/[\u201C\u201D]/g, '"');
   if (hadCurlyQuotes) {
     changes.push('Straightened curly quotes');
   }
 
   // 4. Normalize ellipsis (... → …)
   const hadEllipsis = /\.{3,}/.test(text);
-  text = text.replace(/\.{3,}/g, '\u2026');
+  text = text.replaceAll(/\.{3,}/g, '\u2026');
   if (hadEllipsis) {
     changes.push('Normalized ellipsis');
   }
 
   // 5. Normalize em-dashes (-- → —)
   const hadDashes = /--+/.test(text);
-  text = text.replace(/--+/g, '\u2014');
+  text = text.replaceAll(/--+/g, '\u2014');
   if (hadDashes) {
     changes.push('Normalized em-dashes');
   }
 
   // 6. Normalize repeated exclamation/question marks (max 1)
   const hadRepeatedPunctuation = /[!]{2,}|[?]{2,}/.test(text);
-  text = text.replace(/!{2,}/g, '!');
-  text = text.replace(/\?{2,}/g, '?');
+  text = text.replaceAll(/!{2,}/g, '!');
+  text = text.replaceAll(/\?{2,}/g, '?');
   if (hadRepeatedPunctuation) {
     changes.push('Normalized repeated punctuation');
   }
 
   // 7. Collapse multiple spaces to single space (per line)
   const hadMultipleSpaces = / {2,}/.test(text);
-  text = text.replace(/ {2,}/g, ' ');
+  text = text.replaceAll(/ {2,}/g, ' ');
   if (hadMultipleSpaces) {
     changes.push('Collapsed multiple spaces');
   }
 
   // 8. Trim trailing whitespace per line
   const hadTrailingWhitespace = / +$/m.test(text);
-  text = text.replace(/ +$/gm, '');
+  text = text.replaceAll(/ +$/gm, '');
   if (hadTrailingWhitespace) {
     changes.push('Trimmed trailing whitespace');
   }
 
   // 9. Collapse 3+ consecutive blank lines to 1 blank line
   const hadExcessiveBlanks = /\n{4,}/.test(text);
-  text = text.replace(/\n{4,}/g, '\n\n');
+  text = text.replaceAll(/\n{4,}/g, '\n\n');
   if (hadExcessiveBlanks) {
     changes.push('Collapsed excessive blank lines');
   }
