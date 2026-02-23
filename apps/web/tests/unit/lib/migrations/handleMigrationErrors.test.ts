@@ -180,6 +180,25 @@ describe('handleMigrationErrors', () => {
     );
   });
 
+  it('returns fallback for uppercase column missing social_links errors', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message: 'COLUMN "state" OF RELATION "social_links" DOES NOT EXIST',
+      },
+      { userId: 'user_123', operation: 'social_links_count' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: false });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] social_links.state column missing; treating as no links',
+      { userId: 'user_123', operation: 'social_links_count' }
+    );
+  });
+
   it('returns retry for non-migration errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'
