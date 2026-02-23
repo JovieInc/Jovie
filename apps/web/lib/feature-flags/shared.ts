@@ -5,6 +5,7 @@
 
 export const FEATURE_FLAG_KEYS = {
   CLAIM_HANDLE: 'feature_claim_handle',
+  HERO_SPOTIFY_CLAIM_FLOW: 'feature_hero_spotify_claim_flow',
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',
   SUBSCRIBE_TWO_STEP: 'feature_subscribe_two_step',
   LATEST_RELEASE_CARD: 'feature_latest_release_card',
