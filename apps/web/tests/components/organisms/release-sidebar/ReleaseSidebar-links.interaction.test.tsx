@@ -168,7 +168,7 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('fields')).toBeInTheDocument();
   });
 
-  it('tab resets to Catalog when release changes', async () => {
+  it('preserves active tab when release changes', async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <ReleaseSidebar release={mockRelease} {...defaultProps} />
@@ -182,9 +182,8 @@ describe('ReleaseSidebar Links tab', () => {
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    // Should reset to Catalog
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
-    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+    // Should preserve the Links tab for workflow continuity
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
   });
 
   it('Links tab renders DSP links component', async () => {

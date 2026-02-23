@@ -149,14 +149,9 @@ export function ReleaseMetadata({
                 <DropdownMenuTrigger asChild>
                   <button
                     type='button'
-                    className='inline-flex items-center gap-1 rounded-md px-0.5 -mx-0.5 py-0.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+                    className='inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 text-xs text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
                   >
-                    <Badge
-                      variant='secondary'
-                      className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
-                    >
-                      {canvasStatusDisplayLabel}
-                    </Badge>
+                    <span>{canvasStatusDisplayLabel}</span>
                     <ChevronDown
                       size={12}
                       className='text-tertiary-token'

@@ -218,6 +218,7 @@ function SidebarHeaderNav({
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { state, isMobile, setOpen } = useSidebar();
+  const { isAdmin: isUserAdmin } = useDashboardData();
   const isCollapsed = state === 'closed';
   const pathname = usePathname();
   const isInSettings = section === 'settings';
@@ -260,7 +261,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
         <span className='text-2xs text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {process.env.NEXT_PUBLIC_BUILD_SHA
+          {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
             : ''}
         </span>

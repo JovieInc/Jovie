@@ -18,7 +18,6 @@ import type { Release } from './types';
 interface ReleaseSidebarHeaderProps {
   readonly release: Release | null;
   readonly hasRelease: boolean;
-  readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
@@ -27,7 +26,6 @@ interface ReleaseSidebarHeaderProps {
 export function ReleaseSidebarHeader({
   release,
   hasRelease,
-  onClose,
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
@@ -108,7 +106,6 @@ export function ReleaseSidebarHeader({
   return (
     <DrawerHeader
       title={hasRelease ? 'Release details' : 'No release selected'}
-      onClose={onClose}
       actions={
         hasActions ? (
           <DrawerHeaderActions
