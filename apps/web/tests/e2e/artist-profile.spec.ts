@@ -352,12 +352,13 @@ describeArtist('Artist Profile Pages', () => {
 
     test('footer branding link navigates correctly', async ({ page }) => {
       await page.goto('/dualipa', { timeout: 120_000 });
-
-      await expect(page.getByText('Powered by')).toBeVisible();
-      await expect(page.getByText('Jovie')).toBeVisible();
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
 
       const footerLink = page.getByRole('link', { name: /Jovie home/i });
       await expect(footerLink.first()).toBeVisible();
+      await expect(footerLink.first().getByText('Powered by')).toBeVisible();
+      await expect(footerLink.first().getByText('Jovie')).toBeVisible();
 
       // Click the footer link
       await footerLink.first().click();

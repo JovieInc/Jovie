@@ -36,7 +36,7 @@ export function FooterBranding({
     : 'rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1';
 
   const textLinkClass =
-    'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-[10px] uppercase tracking-widest text-white/20 transition-colors duration-150 ease-out hover:text-white/35';
+    'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-[10px] uppercase tracking-widest text-muted-foreground/40 transition-colors duration-150 ease-out hover:text-muted-foreground';
 
   const logoClass = isLinear
     ? 'opacity-100'
