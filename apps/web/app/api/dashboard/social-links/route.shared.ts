@@ -271,8 +271,10 @@ export const buildSocialLinksInsertPayload = (
   links: LinkInput[],
   profileId: string,
   usernameNormalized: string | null,
-  nextVersion: number
+  nextVersion: number,
+  options?: { supportsVerification?: boolean }
 ): { payload: Array<typeof socialLinks.$inferInsert>; linkUrls: string[] } => {
+  const supportsVerification = options?.supportsVerification ?? true;
   const payload = links.map((link, index) => {
     const detected = detectPlatform(link.url);
     const normalizedUrl = detected.normalizedUrl;
@@ -285,6 +287,16 @@ export const buildSocialLinksInsertPayload = (
     );
 
     const isWebsite = link.platform === 'website';
+    const verificationFields = supportsVerification
+      ? {
+          verificationToken: isWebsite
+            ? (link.verificationToken ?? buildVerificationToken())
+            : null,
+          verificationStatus: isWebsite
+            ? (link.verificationStatus ?? 'pending')
+            : 'unverified',
+        }
+      : {};
 
     return {
       creatorProfileId: profileId,
@@ -303,12 +315,7 @@ export const buildSocialLinksInsertPayload = (
         signals: Array.from(new Set(evidence.signals)),
       },
       displayText: link.displayText || null,
-      verificationToken: isWebsite
-        ? (link.verificationToken ?? buildVerificationToken())
-        : null,
-      verificationStatus: isWebsite
-        ? (link.verificationStatus ?? 'pending')
-        : 'unverified',
+      ...verificationFields,
       version: nextVersion,
     };
   });

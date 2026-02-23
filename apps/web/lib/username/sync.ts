@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';
@@ -140,6 +141,10 @@ export async function syncCanonicalUsernameFromApp(
     // Note: We don't have the old username without a Clerk lookup,
     // but invalidateUsernameChange handles undefined oldUsername gracefully
     await invalidateUsernameChange(outcome.canonicalUsername, undefined);
+
+    // Invalidate handle availability cache so the old handle shows as available
+    // and the new handle shows as unavailable on next check
+    await invalidateHandleCache(outcome.canonicalUsername);
   }
 }
 

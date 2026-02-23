@@ -44,6 +44,7 @@ export const APP_ROUTES = {
   // Admin
   ADMIN: '/app/admin',
   ADMIN_WAITLIST: '/app/admin/waitlist',
+  ADMIN_WAITLIST_SETTINGS: '/app/admin/waitlist/settings',
   ADMIN_CREATORS: '/app/admin/creators',
   ADMIN_CREATORS_BULK_REFRESH: '/app/admin/creators/bulk-refresh',
   ADMIN_CREATORS_DELETE: '/app/admin/creators/delete',
