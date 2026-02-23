@@ -6,13 +6,12 @@ import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 
 export interface BillingHistoryEntry {
-  id: string;
   eventType: string;
-  previousState: Record<string, unknown>;
-  newState: Record<string, unknown>;
-  stripeEventId: string | null;
-  source: string;
-  createdAt: string;
+  timestamp: string;
+  amount: number | null;
+  currency: string | null;
+  status: string | null;
+  maskedIdentifier: string | null;
 }
 
 interface BillingHistoryResponse {
