@@ -5,6 +5,7 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { useCallback } from 'react';
 import { Badge } from '@/components/atoms/Badge';
+import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
 import { Icon } from '../../atoms/Icon';
@@ -132,21 +133,21 @@ function buildDropdownItems({
       id: 'privacy-policy',
       label: 'Privacy Policy',
       onClick: () =>
-        window.open('/legal/privacy', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_PRIVACY, '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms of Service',
       onClick: () =>
-        window.open('/legal/terms', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
       onClick: () =>
-        window.open('/legal/cookies', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
     }
   );
 

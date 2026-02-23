@@ -2,6 +2,7 @@ import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { profilePhotos } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
@@ -83,7 +84,7 @@ export async function cleanupOrphanedPhotos(): Promise<{
  * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  const authError = verifyCronAuth(request, process.env.CRON_SECRET);
+  const authError = verifyCronAuth(request, env.CRON_SECRET);
   if (authError) return authError;
 
   try {
