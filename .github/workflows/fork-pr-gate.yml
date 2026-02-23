@@ -39,6 +39,10 @@ permissions:
   pull-requests: read
   statuses: write
 
+concurrency:
+  group: fork-pr-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   fork-gate:
     name: Fork PR Gate
