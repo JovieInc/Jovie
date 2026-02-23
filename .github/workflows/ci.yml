@@ -590,9 +590,10 @@ jobs:
     needs: [ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
     # On PRs: only runs with 'testing' label (a11y + layout-guard are non-blocking).
+    # Fork PRs never get labels, so this is skipped for forks (fork PRs use fork-pr-gate).
     # On main push: always runs for full coverage.
     # Skipped in merge queue: a11y + layout-guard already ran on the PR.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -636,7 +637,7 @@ jobs:
     needs: [ci-build-public]
     # Non-blocking on PRs (PR Ready logs warning but doesn't fail).
     # Only runs when ci-build-public ran (requires 'testing' label on PRs).
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
